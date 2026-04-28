@@ -7,7 +7,7 @@ import {
   calculateBlockTop,
   formatTime,
 } from '@/lib/task-utils'
-import { Check, GripVertical } from 'lucide-react'
+import { Check, GripVertical, RefreshCw, Layers, Clock } from 'lucide-react'
 
 export type TaskDragType = 'move' | 'resize-top' | 'resize-bottom'
 
@@ -208,16 +208,21 @@ export function TaskBlock({
           </span>
         </div>
 
-        {/* Time + Workspace */}
+        {/* Time + Type */}
         {totalColumns <= 2 && (
           <div className="mt-auto">
             <span className="text-[10px] text-white/80 font-mono block">
               {formatTime(task.scheduledStartTime!)}-{formatTime(task.scheduledEndTime!)}
             </span>
             {totalColumns === 1 && (
-              <span className="text-[9px] text-white/60 truncate block">
-                {task.workspaceName}
-              </span>
+              <div className="flex items-center gap-1 mt-0.5">
+                {task.taskType === 'routine' && <RefreshCw className="w-2.5 h-2.5 text-white/50 flex-shrink-0" />}
+                {task.taskType === 'project' && <Layers className="w-2.5 h-2.5 text-white/50 flex-shrink-0" />}
+                {task.taskType === 'one_time' && <Clock className="w-2.5 h-2.5 text-white/50 flex-shrink-0" />}
+                <span className="text-[9px] text-white/55 truncate">
+                  {task.taskType === 'routine' ? '例行任務' : task.taskType === 'project' ? '專案' : '單次任務'}
+                </span>
+              </div>
             )}
           </div>
         )}

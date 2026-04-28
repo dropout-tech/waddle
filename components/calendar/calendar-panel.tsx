@@ -25,7 +25,7 @@ interface CalendarPanelProps {
   onCreateTask?: (date: string, startTime: string, endTime: string) => void
   onCreatePendingTask?: (title: string) => void
   onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: TimeBlock['type'], label: string, color: string) => void
-  onRescheduleTask?: (taskId: string, newStart: string, newEnd: string) => void
+  onRescheduleTask?: (taskId: string, newStartOrDate: string, newEndOrStart: string, newEnd?: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
   className?: string
@@ -102,6 +102,7 @@ export function CalendarPanel({
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}
           onCreateTimeBlock={onCreateTimeBlock}
+          onRescheduleTask={onRescheduleTask}
           onNavigate={navigate}
           onDateChange={onDateChange}
         />
@@ -117,6 +118,7 @@ export function CalendarPanel({
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}
           onCreateTimeBlock={onCreateTimeBlock}
+          onRescheduleTask={onRescheduleTask}
           onNavigate={navigate}
           onDateChange={onDateChange}
         />

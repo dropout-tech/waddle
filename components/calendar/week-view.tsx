@@ -4,6 +4,7 @@ import { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { CurrentTimeLine } from './current-time-line'
+import { TaskBlock, type TaskDragStart } from './task-block'
 import { CheckSquare, Coffee, Clock, Crosshair, User, X } from 'lucide-react'
 
 interface WeekViewProps {
@@ -15,10 +16,17 @@ interface WeekViewProps {
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (date: string, startTime: string, endTime: string) => void
   onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: TimeBlock['type'], label: string, color: string) => void
+  onRescheduleTask?: (taskId: string, date: string, newStart: string, newEnd: string) => void
   onNavigate?: (direction: 'prev' | 'next') => void
   onDateChange?: (date: Date) => void
   startHour?: number
   endHour?: number
+}
+
+interface ActiveTaskDrag extends TaskDragStart {
+  currentStart: number
+  currentEnd: number
+  dayIndex: number
 }
 
 const SLOT_TYPES = [
@@ -35,6 +43,20 @@ const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六']
 const DAY_WIDTH = 120 // pixels per day column
 const DAYS_TO_RENDER = 21 // render 3 weeks
 const CENTER_DAY_INDEX = 10
+
+function snap(minutes: number): number {
+  return Math.round(minutes / 15) * 15
+}
+
+function clamp(val: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, val))
+}
+
+function minutesToTime(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
 
 // Helper functions for time calculations
 function timeToMinutes(t: string): number {
@@ -118,16 +140,20 @@ export function WeekView({
   onToggleComplete,
   onCreateTask,
   onCreateTimeBlock,
+  onRescheduleTask,
   onNavigate,
   onDateChange,
   startHour = 6,
   endHour = 22,
 }: WeekViewProps) {
-  // Drag state for creating new slots
+  // New-slot drag state
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState<{ day: number; y: number } | null>(null)
   const [dragEnd, setDragEnd] = useState<{ day: number; y: number } | null>(null)
   const [pendingSlot, setPendingSlot] = useState<{ date: string; startTime: string; endTime: string; anchorX: number; anchorY: number } | null>(null)
+
+  // Task block drag state
+  const [activeTaskDrag, setActiveTaskDrag] = useState<ActiveTaskDrag | null>(null)
   
   const gridRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -245,11 +271,19 @@ export function WeekView({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
   }, [startHour])
 
-  // Handle mouse down on grid to start drag
+  const MIN = startHour * 60
+  const MAX = endHour * 60
+
+  const handleTaskDragStart = useCallback((info: TaskDragStart, dayIndex: number) => {
+    setActiveTaskDrag({ ...info, currentStart: info.originalStart, currentEnd: info.originalEnd, dayIndex })
+    setPendingSlot(null)
+  }, [])
+
+  // Handle mouse down on grid to start new-slot drag
   const handleMouseDown = useCallback((e: React.MouseEvent, dayIndex: number) => {
-    if ((e.target as HTMLElement).closest('[data-task]')) return
+    if ((e.target as HTMLElement).closest('[data-block]')) return
+    if (e.button !== 0) return
     const rect = e.currentTarget.getBoundingClientRect()
-    const scrollTop = scrollContainerRef.current?.scrollTop || 0
     const y = e.clientY - rect.top
     setIsDragging(true)
     setDragStart({ day: dayIndex, y })
@@ -258,15 +292,39 @@ export function WeekView({
 
   // Handle mouse move during drag
   const handleMouseMove = useCallback((e: React.MouseEvent, dayIndex: number) => {
+    if (activeTaskDrag) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const scrollTop = scrollContainerRef.current?.scrollTop ?? 0
+      const minutes = snap(MIN + (e.clientY - rect.top + scrollTop))
+      const duration = activeTaskDrag.originalEnd - activeTaskDrag.originalStart
+      if (activeTaskDrag.dragType === 'move') {
+        const newStart = clamp(snap(minutes - activeTaskDrag.offsetY), MIN, MAX - 15)
+        setActiveTaskDrag(prev => prev ? { ...prev, currentStart: newStart, currentEnd: clamp(newStart + duration, MIN + 15, MAX) } : null)
+      } else if (activeTaskDrag.dragType === 'resize-top') {
+        setActiveTaskDrag(prev => prev ? { ...prev, currentStart: clamp(minutes, MIN, prev.currentEnd - 15) } : null)
+      } else if (activeTaskDrag.dragType === 'resize-bottom') {
+        setActiveTaskDrag(prev => prev ? { ...prev, currentEnd: clamp(minutes, prev.currentStart + 15, MAX) } : null)
+      }
+      return
+    }
     if (!isDragging || !dragStart) return
     const rect = e.currentTarget.getBoundingClientRect()
     const maxY = hours.length * 60
     const y = Math.max(0, Math.min(e.clientY - rect.top, maxY))
     setDragEnd({ day: dayIndex, y })
-  }, [isDragging, dragStart, hours.length])
+  }, [isDragging, dragStart, activeTaskDrag, hours.length, MIN, MAX])
 
-  // Handle mouse up to finish drag and show type picker
-  const handleMouseUp = useCallback((e?: React.MouseEvent) => {
+  // Handle mouse up
+  const handleMouseUp = useCallback(() => {
+    if (activeTaskDrag) {
+      const date = allDates[activeTaskDrag.dayIndex]?.toISOString().split('T')[0]
+      if (date) {
+        onRescheduleTask?.(activeTaskDrag.taskId, date, minutesToTime(activeTaskDrag.currentStart), minutesToTime(activeTaskDrag.currentEnd))
+      }
+      setActiveTaskDrag(null)
+      return
+    }
+
     if (!isDragging || !dragStart || !dragEnd) {
       setIsDragging(false)
       setDragStart(null)
@@ -274,25 +332,20 @@ export function WeekView({
       return
     }
 
-    // Only show picker if dragged on same day and has some height
     if (dragStart.day === dragEnd.day && Math.abs(dragEnd.y - dragStart.y) > 15) {
       const minY = Math.min(dragStart.y, dragEnd.y)
       const maxY = Math.max(dragStart.y, dragEnd.y)
       const startTime = yToTime(minY)
       const endTime = yToTime(maxY)
       const date = allDates[dragStart.day].toISOString().split('T')[0]
-      
-      // Calculate popup position
       const anchorX = 56 + dragStart.day * DAY_WIDTH + DAY_WIDTH / 2
-      const anchorY = minY
-      
-      setPendingSlot({ date, startTime, endTime, anchorX, anchorY })
+      setPendingSlot({ date, startTime, endTime, anchorX, anchorY: minY })
     }
 
     setIsDragging(false)
     setDragStart(null)
     setDragEnd(null)
-  }, [isDragging, dragStart, dragEnd, allDates, yToTime])
+  }, [isDragging, dragStart, dragEnd, allDates, yToTime, activeTaskDrag, onRescheduleTask])
 
   // Handle slot type selection
   const handleSelectType = useCallback((key: SlotKey) => {
@@ -476,45 +529,26 @@ export function WeekView({
                   </div>
                 ))}
 
-                {/* Scheduled Tasks with overlap handling */}
+                {/* Scheduled Tasks with drag/resize via TaskBlock */}
                 {dayTasks.map((task) => {
                   const col = taskColumns.get(task.id)
-                  const column = col?.column ?? 0
-                  const totalColumns = col?.totalColumns ?? 1
-                  const widthPercent = 100 / totalColumns
-                  const leftPercent = column * widthPercent
-
+                  const isDraggingThis = activeTaskDrag?.taskId === task.id
+                  const dragOverride = isDraggingThis && activeTaskDrag
+                    ? { top: activeTaskDrag.currentStart - MIN, height: activeTaskDrag.currentEnd - activeTaskDrag.currentStart }
+                    : null
                   return (
-                    <button
+                    <TaskBlock
                       key={task.id}
-                      data-task="true"
-                      onClick={() => onTaskSelect(task)}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      className={cn(
-                        'absolute rounded px-1 py-0.5 text-left overflow-hidden transition-all hover:opacity-90 hover:z-10',
-                        task.isCompleted && 'opacity-60'
-                      )}
-                      style={{
-                        top: getTimePosition(task.scheduledStartTime!),
-                        height: getDurationHeight(task.scheduledStartTime!, task.scheduledEndTime!),
-                        left: `calc(${leftPercent}% + 1px)`,
-                        width: `calc(${widthPercent}% - 2px)`,
-                        backgroundColor: task.calendarColor || task.workspaceColor,
-                        color: '#fff',
-                      }}
-                    >
-                      <div className={cn(
-                        'text-[10px] font-semibold leading-tight truncate',
-                        task.isCompleted && 'line-through'
-                      )}>
-                        {task.title}
-                      </div>
-                      {totalColumns === 1 && (
-                        <div className="text-[9px] opacity-80">
-                          {task.scheduledStartTime}-{task.scheduledEndTime}
-                        </div>
-                      )}
-                    </button>
+                      task={task}
+                      calendarStartHour={startHour}
+                      onSelect={onTaskSelect}
+                      onToggleComplete={onToggleComplete}
+                      onDragStart={(info) => handleTaskDragStart(info, dayIndex)}
+                      column={col?.column ?? 0}
+                      totalColumns={col?.totalColumns ?? 1}
+                      dragOverride={dragOverride}
+                      isDragging={isDraggingThis}
+                    />
                   )
                 })}
 

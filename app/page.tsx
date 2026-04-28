@@ -333,7 +333,12 @@ export default function FlowDeskPage() {
   }, [])
 
   // Reschedule a task by dragging/resizing on the calendar
-  const handleRescheduleTask = useCallback((taskId: string, newStart: string, newEnd: string) => {
+  // date is optional — only provided by day/week views when dragging across days
+  const handleRescheduleTask = useCallback((taskId: string, newStartOrDate: string, newEndOrStart: string, newEndOpt?: string) => {
+    // Support both 3-arg (taskId, newStart, newEnd) and 4-arg (taskId, date, newStart, newEnd)
+    const date = newEndOpt ? newStartOrDate : undefined
+    const newStart = newEndOpt ? newEndOrStart : newStartOrDate
+    const newEnd = newEndOpt ?? newEndOrStart
     setWorkspaces((prev) =>
       prev.map((workspace) => ({
         ...workspace,
@@ -341,7 +346,13 @@ export default function FlowDeskPage() {
           ...category,
           tasks: category.tasks.map((task) =>
             task.id === taskId
-              ? { ...task, scheduledStartTime: newStart, scheduledEndTime: newEnd, updatedAt: new Date().toISOString() }
+              ? {
+                  ...task,
+                  scheduledStartTime: newStart,
+                  scheduledEndTime: newEnd,
+                  ...(date ? { scheduledDate: date } : {}),
+                  updatedAt: new Date().toISOString(),
+                }
               : task
           ),
         })),
