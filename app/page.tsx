@@ -122,6 +122,54 @@ export default function FlowDeskPage() {
     )
   }, [selectedTask])
 
+  // Create task from calendar click
+  const handleCreateCalendarTask = useCallback((date: string, startTime: string, endTime: string) => {
+    // Find the first available workspace and category
+    const firstWorkspace = workspaces[0]
+    const firstCategory = firstWorkspace?.categories[0]
+
+    if (!firstWorkspace || !firstCategory) return
+
+    const newTask: Task = {
+      id: `task-${Date.now()}`,
+      categoryId: firstCategory.id,
+      workspaceId: firstWorkspace.id,
+      workspaceName: firstWorkspace.name,
+      workspaceColor: firstWorkspace.color,
+      categoryName: firstCategory.name,
+      title: '新任務',
+      taskType: 'one_time',
+      urgency: 5,
+      calendarColor: firstWorkspace.color,
+      isCompleted: false,
+      sortOrder: 999,
+      scheduledDate: date,
+      scheduledStartTime: startTime,
+      scheduledEndTime: endTime,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    setWorkspaces((prev) =>
+      prev.map((workspace) => {
+        if (workspace.id !== firstWorkspace.id) return workspace
+        return {
+          ...workspace,
+          categories: workspace.categories.map((category) => {
+            if (category.id !== firstCategory.id) return category
+            return {
+              ...category,
+              tasks: [...category.tasks, newTask],
+            }
+          }),
+        }
+      })
+    )
+
+    // Open the task detail modal so user can edit
+    setSelectedTask(newTask)
+  }, [workspaces])
+
   // Open journal modal
   const handleOpenJournal = useCallback(() => {
     setJournalDate(new Date())
@@ -182,6 +230,7 @@ export default function FlowDeskPage() {
         onAddTask={handleAddTask}
         onOpenJournal={handleOpenJournal}
         onOpenReport={handleOpenReport}
+        onCreateCalendarTask={handleCreateCalendarTask}
       />
 
       {/* Task Detail Modal */}

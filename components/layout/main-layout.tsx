@@ -16,6 +16,7 @@ interface MainLayoutProps {
   onAddTask: (categoryId: string, title: string) => void
   onOpenJournal: () => void
   onOpenReport: () => void
+  onCreateCalendarTask?: (date: string, startTime: string, endTime: string) => void
 }
 
 const MIN_PANEL_WIDTH = 280
@@ -31,6 +32,7 @@ export function MainLayout({
   onAddTask,
   onOpenJournal,
   onOpenReport,
+  onCreateCalendarTask,
 }: MainLayoutProps) {
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -111,6 +113,10 @@ export function MainLayout({
           onViewModeChange={setViewMode}
           onTaskSelect={onSelectTask}
           onToggleComplete={onToggleComplete}
+          onCreateTask={(startTime, endTime) => {
+            const dateStr = selectedDate.toISOString().split('T')[0]
+            onCreateCalendarTask?.(dateStr, startTime, endTime)
+          }}
         />
       </div>
     </div>
