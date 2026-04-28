@@ -214,7 +214,7 @@ export function WeekView({
         onMouseLeave={() => { navDragStartX.current = null; navDragCommitted.current = null }}
       >
         {/* Time column header spacer */}
-        <div className="w-12 flex-shrink-0 border-r border-border" />
+        <div className="w-14 flex-shrink-0 border-r border-border" />
         
         {/* Day headers with all-day tasks */}
         {weekDates.map((date, i) => {

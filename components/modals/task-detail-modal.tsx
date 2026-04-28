@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown } from 'lucide-react'
+import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task, Workspace } from '@/lib/types'
 import { formatEstimatedTime } from '@/lib/task-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+
+const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
 const PRESET_COLORS = [
   '#FF6B6B', '#4A90D9', '#66BB6A', '#FFB74D', '#9575CD',
@@ -50,6 +52,19 @@ export function TaskDetailModal({
   const [calendarColor, setCalendarColor] = useState(task.calendarColor || task.workspaceColor)
   const [selectedCategoryId, setSelectedCategoryId] = useState(task.categoryId)
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
+  
+  // Recurrence settings
+  const [isRecurring, setIsRecurring] = useState(task.isRecurring || false)
+  const [recurrenceType, setRecurrenceType] = useState<'daily' | 'weekly' | 'monthly' | 'custom'>(
+    task.recurrence?.type || 'weekly'
+  )
+  const [recurrenceInterval, setRecurrenceInterval] = useState(
+    task.recurrence?.interval?.toString() || '1'
+  )
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>(
+    task.recurrence?.daysOfWeek || []
+  )
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState(task.recurrence?.endDate || '')
 
   // Find current selected category info
   const selectedCategory = workspaces
@@ -57,6 +72,12 @@ export function TaskDetailModal({
     .find((c) => c.id === selectedCategoryId)
 
   if (!isOpen) return null
+
+  const toggleRecurrenceDay = (day: number) => {
+    setRecurrenceDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
+    )
+  }
 
   const handleSave = () => {
     const updates: Partial<Task> = {
@@ -70,6 +91,15 @@ export function TaskDetailModal({
       scheduledEndTime: scheduledEndTime || undefined,
       notes: notes || undefined,
       calendarColor,
+      isRecurring,
+      recurrence: isRecurring
+        ? {
+            type: recurrenceType,
+            interval: parseInt(recurrenceInterval) || 1,
+            daysOfWeek: recurrenceType === 'weekly' ? recurrenceDays : undefined,
+            endDate: recurrenceEndDate || undefined,
+          }
+        : undefined,
     }
 
     // If category changed, include the new category info
@@ -331,6 +361,106 @@ export function TaskDetailModal({
                 title="自訂顏色"
               />
             </div>
+          </div>
+
+          {/* Recurrence Settings */}
+          <div className="space-y-3 p-4 rounded-xl bg-secondary/30 border border-border">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Repeat className="w-3.5 h-3.5" />
+                重複設定
+              </label>
+              <button
+                onClick={() => setIsRecurring(!isRecurring)}
+                className={cn(
+                  'relative w-10 h-5 rounded-full transition-colors',
+                  isRecurring ? 'bg-primary' : 'bg-muted'
+                )}
+              >
+                <span
+                  className={cn(
+                    'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform',
+                    isRecurring ? 'translate-x-5' : 'translate-x-0.5'
+                  )}
+                />
+              </button>
+            </div>
+
+            {isRecurring && (
+              <div className="space-y-4 pt-2">
+                {/* Recurrence Type */}
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: 'daily', label: '每天' },
+                    { value: 'weekly', label: '每週' },
+                    { value: 'monthly', label: '每月' },
+                    { value: 'custom', label: '自訂' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setRecurrenceType(option.value as typeof recurrenceType)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
+                        recurrenceType === option.value
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Interval (for custom) */}
+                {recurrenceType === 'custom' && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">每</span>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={recurrenceInterval}
+                      onChange={(e) => setRecurrenceInterval(e.target.value)}
+                      className="w-16 h-8 text-center"
+                    />
+                    <span className="text-xs text-muted-foreground">天重複一次</span>
+                  </div>
+                )}
+
+                {/* Days of Week (for weekly) */}
+                {recurrenceType === 'weekly' && (
+                  <div className="space-y-2">
+                    <span className="text-xs text-muted-foreground">選擇重複的星期</span>
+                    <div className="flex gap-1.5">
+                      {WEEKDAY_LABELS.map((label, index) => (
+                        <button
+                          key={index}
+                          onClick={() => toggleRecurrenceDay(index)}
+                          className={cn(
+                            'w-8 h-8 rounded-full text-xs font-medium transition-all',
+                            recurrenceDays.includes(index)
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* End Date */}
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">結束日期 (可選)</label>
+                  <Input
+                    type="date"
+                    value={recurrenceEndDate}
+                    onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Description */}
