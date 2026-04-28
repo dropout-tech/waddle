@@ -1,13 +1,10 @@
 'use client'
 
 import { useMemo, useState, useRef, useCallback } from 'react'
-import { Clock, Inbox, Check, ChevronDown } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
-import { TaskBlock } from './task-block'
-import { TimeBlockItem } from './time-block-item'
 import { CurrentTimeLine } from './current-time-line'
-import { formatEstimatedTime } from '@/lib/task-utils'
 
 interface WeekViewProps {
   selectedDate: Date
@@ -21,7 +18,7 @@ interface WeekViewProps {
   endHour?: number
 }
 
-const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+const WEEKDAYS = ['六', '日', '一', '二', '三', '四', '五']
 
 export function WeekView({
   selectedDate,
@@ -34,19 +31,21 @@ export function WeekView({
   startHour = 6,
   endHour = 22,
 }: WeekViewProps) {
-  const [pendingZoneOpen, setPendingZoneOpen] = useState(true)
   // Drag state for creating new tasks
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState<{ day: number; y: number } | null>(null)
   const [dragEnd, setDragEnd] = useState<{ day: number; y: number } | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Get the week dates (Sunday to Saturday)
+  // Get the week dates (Saturday to Friday, starting from Saturday of the week containing selectedDate)
   const weekDates = useMemo(() => {
     const dates: Date[] = []
     const start = new Date(selectedDate)
     const day = start.getDay()
-    start.setDate(start.getDate() - day) // Go to Sunday
+    // Go to Saturday (day 6) of the current week
+    const diff = day === 6 ? 0 : -(day + 1)
+    start.setDate(start.getDate() + diff)
     
     for (let i = 0; i < 7; i++) {
       const d = new Date(start)
@@ -67,11 +66,22 @@ export function WeekView({
   const today = new Date()
   const todayString = today.toISOString().split('T')[0]
 
-  // Get tasks for a specific date
-  const getTasksForDate = (date: Date) => {
+  // Get scheduled tasks for a specific date (tasks with specific time)
+  const getScheduledTasksForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0]
     return tasks.filter(
       (t) => t.scheduledDate === dateStr && t.scheduledStartTime && t.scheduledEndTime
+    )
+  }
+
+  // Get all-day/unscheduled tasks for a specific date
+  // These are tasks that have scheduledDate or dueDate matching this day but NO specific time
+  const getAllDayTasksForDate = (date: Date) => {
+    const dateStr = date.toISOString().split('T')[0]
+    return tasks.filter(
+      (t) => 
+        (t.scheduledDate === dateStr || t.dueDate === dateStr) && 
+        !t.scheduledStartTime
     )
   }
 
@@ -93,23 +103,25 @@ export function WeekView({
   const getDurationHeight = (start: string, end: string) => {
     const startPos = getTimePosition(start)
     const endPos = getTimePosition(end)
-    return endPos - startPos
+    return Math.max(endPos - startPos, 20)
   }
 
-  // Convert Y position to time string
+  // Convert Y position to time string with clamping
   const yToTime = useCallback((y: number) => {
     const totalMinutes = startHour * 60 + Math.round(y / 60 * 60)
-    // Round to nearest 15 minutes
+    // Round to nearest 15 minutes and clamp to valid range
     const roundedMinutes = Math.round(totalMinutes / 15) * 15
-    const hours = Math.floor(roundedMinutes / 60)
-    const minutes = roundedMinutes % 60
+    const clampedMinutes = Math.max(startHour * 60, Math.min(23 * 60 + 45, roundedMinutes))
+    const hours = Math.floor(clampedMinutes / 60)
+    const minutes = clampedMinutes % 60
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
   }, [startHour])
 
   // Handle mouse down on grid to start drag
   const handleMouseDown = useCallback((e: React.MouseEvent, dayIndex: number) => {
-    if (!gridRef.current) return
+    if ((e.target as HTMLElement).closest('[data-task]')) return
     const rect = e.currentTarget.getBoundingClientRect()
+    const scrollTop = scrollContainerRef.current?.scrollTop || 0
     const y = e.clientY - rect.top
     setIsDragging(true)
     setDragStart({ day: dayIndex, y })
@@ -120,7 +132,8 @@ export function WeekView({
   const handleMouseMove = useCallback((e: React.MouseEvent, dayIndex: number) => {
     if (!isDragging || !dragStart) return
     const rect = e.currentTarget.getBoundingClientRect()
-    const y = Math.max(0, Math.min(e.clientY - rect.top, hours.length * 60))
+    const maxY = hours.length * 60
+    const y = Math.max(0, Math.min(e.clientY - rect.top, maxY))
     setDragEnd({ day: dayIndex, y })
   }, [isDragging, dragStart, hours.length])
 
@@ -162,146 +175,95 @@ export function WeekView({
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Pending Tasks Zone - Collapsible */}
-      <div className="flex-shrink-0 border-b border-border bg-muted/20">
-        <button
-          onClick={() => setPendingZoneOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-2 hover:bg-muted/30 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-              待排程
-            </span>
-            {pendingTasks.length > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
-                {pendingTasks.length}
-              </span>
-            )}
-          </div>
-          <ChevronDown
-            className={cn(
-              'w-3.5 h-3.5 text-muted-foreground transition-transform duration-200',
-              pendingZoneOpen && 'rotate-180'
-            )}
-          />
-        </button>
-
-        {pendingZoneOpen && (
-          <div className="px-4 pb-3">
-            {pendingTasks.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground/50">
-                <Inbox className="w-4 h-4" />
-                <span className="text-xs">沒有待排程的任務</span>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {pendingTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    draggable
-                    className={cn(
-                      'group flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-all cursor-grab',
-                      'bg-card border border-border hover:border-primary/30 hover:shadow-sm',
-                      task.isCompleted && 'opacity-50'
-                    )}
-                  >
-                    {/* Checkbox */}
-                    <button
-                      onClick={() => onToggleComplete?.(task.id)}
-                      aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
-                      className={cn(
-                        'flex-shrink-0 w-3.5 h-3.5 rounded-full border-[1.5px] flex items-center justify-center transition-all',
-                        task.isCompleted
-                          ? 'border-primary bg-primary'
-                          : 'border-muted-foreground/30 hover:border-primary/50'
-                      )}
-                    >
-                      {task.isCompleted && (
-                        <Check className="w-2 h-2 text-primary-foreground" strokeWidth={3} />
-                      )}
-                    </button>
-
-                    {/* Color dot */}
-                    <div
-                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: task.workspaceColor }}
-                    />
-
-                    {/* Title */}
-                    <button
-                      onClick={() => onTaskSelect(task)}
-                      className={cn(
-                        'truncate max-w-[140px] font-medium text-foreground text-left',
-                        task.isCompleted && 'line-through text-muted-foreground'
-                      )}
-                    >
-                      {task.title}
-                    </button>
-
-                    {task.estimatedMinutes && (
-                      <span className="text-[10px] font-mono text-muted-foreground/70 flex-shrink-0">
-                        {formatEstimatedTime(task.estimatedMinutes)}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Week Grid */}
-      <div className="flex-1 overflow-auto">
-        <div className="min-w-[800px]">
-          {/* Header Row */}
-          <div className="sticky top-0 z-10 flex border-b border-border bg-panel">
-          {/* Time column header */}
-          <div className="w-16 flex-shrink-0 p-2 text-xs text-muted-foreground text-center border-r border-border">
-            時間
-          </div>
+    <div className="flex-1 flex flex-col overflow-hidden bg-panel-secondary">
+      {/* Sticky Header with Day columns + All-day tasks */}
+      <div className="flex-shrink-0 flex border-b border-border bg-panel">
+        {/* Time column header spacer */}
+        <div className="w-12 flex-shrink-0 border-r border-border" />
+        
+        {/* Day headers with all-day tasks */}
+        {weekDates.map((date, i) => {
+          const dateStr = date.toISOString().split('T')[0]
+          const isToday = dateStr === todayString
+          const allDayTasks = getAllDayTasksForDate(date)
           
-          {/* Day headers */}
-          {weekDates.map((date, i) => {
-            const dateStr = date.toISOString().split('T')[0]
-            const isToday = dateStr === todayString
-            const isSelected = date.toDateString() === selectedDate.toDateString()
-            
-            return (
-              <div
-                key={i}
-                className={cn(
-                  'flex-1 p-2 text-center border-r border-border last:border-r-0',
-                  isToday && 'bg-primary/10',
-                  isSelected && 'bg-secondary'
-                )}
-              >
-                <div className="text-xs text-muted-foreground">
+          return (
+            <div
+              key={i}
+              className={cn(
+                'flex-1 min-w-[100px] border-r border-border last:border-r-0 flex flex-col',
+                isToday && 'bg-primary/5'
+              )}
+            >
+              {/* Day header */}
+              <div className={cn(
+                'px-2 py-1.5 text-center border-b border-border/50',
+                isToday && 'bg-primary/10'
+              )}>
+                <div className="text-[10px] text-muted-foreground font-medium">
                   週{WEEKDAYS[i]}
                 </div>
                 <div className={cn(
-                  'text-sm font-bold mt-0.5',
-                  isToday && 'text-primary'
+                  'text-lg font-bold',
+                  isToday ? 'text-primary' : 'text-foreground'
                 )}>
                   {date.getDate()}
                 </div>
               </div>
-            )
-          })}
-        </div>
 
-        {/* Time Grid */}
-        <div className="relative flex" ref={gridRef}>
+              {/* All-day tasks area */}
+              <div className="min-h-[40px] max-h-[100px] overflow-y-auto px-1 py-1 space-y-0.5">
+                {allDayTasks.map((task) => (
+                  <button
+                    key={task.id}
+                    onClick={() => onTaskSelect(task)}
+                    className={cn(
+                      'w-full text-left px-1.5 py-1 rounded text-[10px] font-medium truncate transition-all',
+                      'hover:opacity-80',
+                      task.isCompleted && 'opacity-50 line-through'
+                    )}
+                    style={{
+                      backgroundColor: task.calendarColor || task.workspaceColor,
+                      color: '#fff',
+                    }}
+                  >
+                    {task.title}
+                  </button>
+                ))}
+                {/* Also show pending tasks that have dueDate for this day */}
+                {pendingTasks
+                  .filter((t) => t.dueDate === dateStr && !t.scheduledDate)
+                  .map((task) => (
+                    <button
+                      key={task.id}
+                      onClick={() => onTaskSelect(task)}
+                      className={cn(
+                        'w-full flex items-center gap-1 text-left px-1.5 py-1 rounded text-[10px] font-medium transition-all',
+                        'bg-muted/50 hover:bg-muted text-muted-foreground',
+                        task.isCompleted && 'opacity-50 line-through'
+                      )}
+                    >
+                      <Check className="w-2.5 h-2.5 flex-shrink-0 opacity-50" />
+                      <span className="truncate">{task.title}</span>
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Scrollable Time Grid */}
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
+        <div className="flex min-w-[800px]" ref={gridRef}>
           {/* Time labels column */}
-          <div className="w-16 flex-shrink-0 border-r border-border bg-panel">
+          <div className="w-12 flex-shrink-0 border-r border-border bg-panel">
             {hours.map((hour) => (
               <div
                 key={hour}
-                className="h-[60px] relative border-b border-border"
+                className="h-[60px] relative"
               >
-                <span className="absolute -top-2.5 left-2 text-[10px] text-muted-foreground font-mono">
+                <span className="absolute -top-2 right-2 text-[10px] text-muted-foreground font-mono">
                   {hour.toString().padStart(2, '0')}:00
                 </span>
               </div>
@@ -312,7 +274,7 @@ export function WeekView({
           {weekDates.map((date, dayIndex) => {
             const dateStr = date.toISOString().split('T')[0]
             const isToday = dateStr === todayString
-            const dayTasks = getTasksForDate(date)
+            const dayTasks = getScheduledTasksForDate(date)
             const dayBlocks = getTimeBlocksForDate(date)
             const dragSelection = getDragSelection(dayIndex)
 
@@ -320,7 +282,7 @@ export function WeekView({
               <div
                 key={dayIndex}
                 className={cn(
-                  'flex-1 relative border-r border-border last:border-r-0 cursor-crosshair',
+                  'flex-1 min-w-[100px] relative border-r border-border last:border-r-0 cursor-crosshair',
                   isToday && 'bg-primary/5'
                 )}
                 onMouseDown={(e) => handleMouseDown(e, dayIndex)}
@@ -334,48 +296,68 @@ export function WeekView({
                 {hours.map((hour) => (
                   <div
                     key={hour}
-                    className="h-[60px] border-b border-border"
-                  />
+                    className="h-[60px] border-b border-border/50"
+                  >
+                    {/* Half-hour line */}
+                    <div className="h-[30px] border-b border-dashed border-border/30" />
+                  </div>
                 ))}
 
                 {/* Time Blocks */}
                 {dayBlocks.map((block) => (
                   <div
                     key={block.id}
-                    className="absolute left-1 right-1 pointer-events-none"
+                    data-task="true"
+                    className="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-[9px] font-medium overflow-hidden"
                     style={{
                       top: getTimePosition(block.startTime),
                       height: getDurationHeight(block.startTime, block.endTime),
+                      backgroundColor: block.color + '30',
+                      borderLeft: `3px solid ${block.color}`,
+                      color: block.color,
                     }}
                   >
-                    <TimeBlockItem block={block} compact />
+                    <div className="truncate">{block.label}</div>
+                    <div className="text-[8px] opacity-70">
+                      {block.startTime}-{block.endTime}
+                    </div>
                   </div>
                 ))}
 
-                {/* Tasks */}
+                {/* Scheduled Tasks */}
                 {dayTasks.map((task) => (
-                  <div
+                  <button
                     key={task.id}
-                    className="absolute left-1 right-1"
+                    data-task="true"
+                    onClick={() => onTaskSelect(task)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className={cn(
+                      'absolute left-0.5 right-0.5 rounded px-1.5 py-1 text-left overflow-hidden transition-all hover:opacity-90',
+                      task.isCompleted && 'opacity-60'
+                    )}
                     style={{
                       top: getTimePosition(task.scheduledStartTime!),
                       height: getDurationHeight(task.scheduledStartTime!, task.scheduledEndTime!),
+                      backgroundColor: task.calendarColor || task.workspaceColor,
+                      color: '#fff',
                     }}
-                    onMouseDown={(e) => e.stopPropagation()}
                   >
-                    <TaskBlock
-                      task={task}
-                      onSelect={onTaskSelect}
-                      onToggleComplete={onToggleComplete}
-                      compact
-                    />
-                  </div>
+                    <div className={cn(
+                      'text-[10px] font-semibold leading-tight truncate',
+                      task.isCompleted && 'line-through'
+                    )}>
+                      {task.title}
+                    </div>
+                    <div className="text-[9px] opacity-80 mt-0.5">
+                      {task.scheduledStartTime}-{task.scheduledEndTime}
+                    </div>
+                  </button>
                 ))}
 
                 {/* Drag Selection Preview */}
-                {dragSelection && (
+                {dragSelection && dragSelection.height > 10 && (
                   <div
-                    className="absolute left-1 right-1 bg-primary/20 border-2 border-primary border-dashed rounded-lg pointer-events-none z-20 flex flex-col items-center justify-center"
+                    className="absolute left-0.5 right-0.5 bg-primary/20 border-2 border-primary border-dashed rounded pointer-events-none z-20 flex flex-col items-center justify-center"
                     style={{
                       top: dragSelection.top,
                       height: dragSelection.height,
@@ -383,9 +365,6 @@ export function WeekView({
                   >
                     <span className="text-[10px] font-mono font-bold text-primary">
                       {dragSelection.startTime} - {dragSelection.endTime}
-                    </span>
-                    <span className="text-[9px] text-primary/80 mt-0.5">
-                      拖曳建立任務
                     </span>
                   </div>
                 )}
@@ -397,7 +376,6 @@ export function WeekView({
               </div>
             )
           })}
-          </div>
         </div>
       </div>
     </div>

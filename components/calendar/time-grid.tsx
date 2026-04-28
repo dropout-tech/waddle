@@ -158,7 +158,15 @@ export function TimeGrid({
 
   const yToMinutes = (y: number): number => startHour * 60 + y
 
-  const snapToInterval = (minutes: number): number => Math.round(minutes / 15) * 15
+  const snapToInterval = (minutes: number): number => {
+    const snapped = Math.round(minutes / 15) * 15
+    // Clamp to valid range (startHour to 23:45)
+    return Math.max(startHour * 60, Math.min(23 * 60 + 45, snapped))
+  }
+
+  const clampMinutes = (minutes: number): number => {
+    return Math.max(startHour * 60, Math.min(23 * 60 + 45, minutes))
+  }
 
   const handleMouseDown = (e: React.MouseEvent) => {
     // Only initiate drag on the grid background, not on existing blocks
@@ -182,8 +190,10 @@ export function TimeGrid({
     const rect = gridRef.current.getBoundingClientRect()
     const y = e.clientY - rect.top + (containerRef.current?.scrollTop || 0)
     const minutes = snapToInterval(yToMinutes(y))
-
-    setDragEnd(minutes > dragStart ? Math.max(minutes, dragStart + 15) : dragStart + 30)
+    
+    // Clamp end time to max 24:00
+    const clampedMinutes = clampMinutes(minutes)
+    setDragEnd(clampedMinutes > dragStart ? Math.max(clampedMinutes, dragStart + 15) : dragStart + 30)
   }
 
   const handleMouseUp = (e: React.MouseEvent) => {
@@ -192,16 +202,15 @@ export function TimeGrid({
       return
     }
 
-    const start = Math.min(dragStart, dragEnd)
-    const end = Math.max(dragStart, dragEnd)
+    const start = clampMinutes(Math.min(dragStart, dragEnd))
+    const end = clampMinutes(Math.max(dragStart, dragEnd))
 
-    // Minimum 15 minutes
-    if (end - start >= 15) {
-      const rect = gridRef.current?.getBoundingClientRect()
+    // Minimum 15 minutes and ensure end doesn't exceed 24:00
+    if (end - start >= 15 && end <= 24 * 60) {
       const anchorY = (start - startHour * 60)
       setPendingSlot({
         startTime: minutesToTime(start),
-        endTime: minutesToTime(end),
+        endTime: minutesToTime(Math.min(end, 24 * 60)),
         anchorY,
       })
     }

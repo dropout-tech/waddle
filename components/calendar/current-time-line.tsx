@@ -4,9 +4,12 @@ import { useEffect, useState } from 'react'
 
 interface CurrentTimeLineProps {
   calendarStartHour?: number
+  startHour?: number // alias for calendarStartHour
+  compact?: boolean // for week view - simpler line without left offset
 }
 
-export function CurrentTimeLine({ calendarStartHour = 7 }: CurrentTimeLineProps) {
+export function CurrentTimeLine({ calendarStartHour, startHour, compact }: CurrentTimeLineProps) {
+  const effectiveStartHour = startHour ?? calendarStartHour ?? 7
   const [position, setPosition] = useState<number | null>(null)
 
   useEffect(() => {
@@ -16,9 +19,9 @@ export function CurrentTimeLine({ calendarStartHour = 7 }: CurrentTimeLineProps)
       const currentMinute = now.getMinutes()
 
       // Only show if current time is within calendar view
-      if (currentHour >= calendarStartHour && currentHour < 23) {
+      if (currentHour >= effectiveStartHour && currentHour < 23) {
         const totalMinutes = currentHour * 60 + currentMinute
-        const startMinutes = calendarStartHour * 60
+        const startMinutes = effectiveStartHour * 60
         setPosition(totalMinutes - startMinutes)
       } else {
         setPosition(null)
@@ -32,7 +35,7 @@ export function CurrentTimeLine({ calendarStartHour = 7 }: CurrentTimeLineProps)
     const interval = setInterval(updatePosition, 60000)
 
     return () => clearInterval(interval)
-  }, [calendarStartHour])
+  }, [effectiveStartHour])
 
   if (position === null) return null
 
@@ -42,13 +45,15 @@ export function CurrentTimeLine({ calendarStartHour = 7 }: CurrentTimeLineProps)
       style={{ top: `${position}px` }}
     >
       {/* Line */}
-      <div className="absolute left-[52px] right-0 h-[2px] bg-red-500" />
+      <div className={compact ? "absolute left-0 right-0 h-[2px] bg-red-500" : "absolute left-[52px] right-0 h-[2px] bg-red-500"} />
 
-      {/* Dot */}
-      <div
-        className="absolute left-[46px] w-3 h-3 rounded-full bg-red-500 current-time-dot"
-        style={{ top: '-5px' }}
-      />
+      {/* Dot - only show in non-compact mode */}
+      {!compact && (
+        <div
+          className="absolute left-[46px] w-3 h-3 rounded-full bg-red-500 current-time-dot"
+          style={{ top: '-5px' }}
+        />
+      )}
     </div>
   )
 }
