@@ -1,15 +1,18 @@
 'use client'
 
 import { useMemo, useState, useRef, useCallback } from 'react'
+import { Clock, Inbox, Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { TaskBlock } from './task-block'
 import { TimeBlockItem } from './time-block-item'
 import { CurrentTimeLine } from './current-time-line'
+import { formatEstimatedTime } from '@/lib/task-utils'
 
 interface WeekViewProps {
   selectedDate: Date
   tasks: Task[]
+  pendingTasks: Task[]
   timeBlocks: TimeBlock[]
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
@@ -23,6 +26,7 @@ const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 export function WeekView({
   selectedDate,
   tasks,
+  pendingTasks,
   timeBlocks,
   onTaskSelect,
   onToggleComplete,
@@ -30,6 +34,7 @@ export function WeekView({
   startHour = 6,
   endHour = 22,
 }: WeekViewProps) {
+  const [pendingZoneOpen, setPendingZoneOpen] = useState(true)
   // Drag state for creating new tasks
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState<{ day: number; y: number } | null>(null)
@@ -157,10 +162,102 @@ export function WeekView({
   }
 
   return (
-    <div className="flex-1 overflow-auto">
-      <div className="min-w-[800px]">
-        {/* Header Row */}
-        <div className="sticky top-0 z-10 flex border-b border-border bg-panel">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Pending Tasks Zone - Collapsible */}
+      <div className="flex-shrink-0 border-b border-border bg-muted/20">
+        <button
+          onClick={() => setPendingZoneOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-2 hover:bg-muted/30 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+              待排程
+            </span>
+            {pendingTasks.length > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-primary/15 text-primary text-[10px] font-bold">
+                {pendingTasks.length}
+              </span>
+            )}
+          </div>
+          <ChevronDown
+            className={cn(
+              'w-3.5 h-3.5 text-muted-foreground transition-transform duration-200',
+              pendingZoneOpen && 'rotate-180'
+            )}
+          />
+        </button>
+
+        {pendingZoneOpen && (
+          <div className="px-4 pb-3">
+            {pendingTasks.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground/50">
+                <Inbox className="w-4 h-4" />
+                <span className="text-xs">沒有待排程的任務</span>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {pendingTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    draggable
+                    className={cn(
+                      'group flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-all cursor-grab',
+                      'bg-card border border-border hover:border-primary/30 hover:shadow-sm',
+                      task.isCompleted && 'opacity-50'
+                    )}
+                  >
+                    {/* Checkbox */}
+                    <button
+                      onClick={() => onToggleComplete?.(task.id)}
+                      aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
+                      className={cn(
+                        'flex-shrink-0 w-3.5 h-3.5 rounded-full border-[1.5px] flex items-center justify-center transition-all',
+                        task.isCompleted
+                          ? 'border-primary bg-primary'
+                          : 'border-muted-foreground/30 hover:border-primary/50'
+                      )}
+                    >
+                      {task.isCompleted && (
+                        <Check className="w-2 h-2 text-primary-foreground" strokeWidth={3} />
+                      )}
+                    </button>
+
+                    {/* Color dot */}
+                    <div
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: task.workspaceColor }}
+                    />
+
+                    {/* Title */}
+                    <button
+                      onClick={() => onTaskSelect(task)}
+                      className={cn(
+                        'truncate max-w-[140px] font-medium text-foreground text-left',
+                        task.isCompleted && 'line-through text-muted-foreground'
+                      )}
+                    >
+                      {task.title}
+                    </button>
+
+                    {task.estimatedMinutes && (
+                      <span className="text-[10px] font-mono text-muted-foreground/70 flex-shrink-0">
+                        {formatEstimatedTime(task.estimatedMinutes)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Week Grid */}
+      <div className="flex-1 overflow-auto">
+        <div className="min-w-[800px]">
+          {/* Header Row */}
+          <div className="sticky top-0 z-10 flex border-b border-border bg-panel">
           {/* Time column header */}
           <div className="w-16 flex-shrink-0 p-2 text-xs text-muted-foreground text-center border-r border-border">
             時間
@@ -300,6 +397,7 @@ export function WeekView({
               </div>
             )
           })}
+          </div>
         </div>
       </div>
     </div>

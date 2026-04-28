@@ -91,6 +91,7 @@ export function CalendarPanel({
         <WeekView
           selectedDate={selectedDate}
           tasks={allTasks}
+          pendingTasks={pendingTasks}
           timeBlocks={timeBlocks}
           onTaskSelect={onTaskSelect}
           onToggleComplete={onToggleComplete}
