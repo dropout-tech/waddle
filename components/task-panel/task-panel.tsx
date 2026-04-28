@@ -1,13 +1,15 @@
 'use client'
 
 import { useRef, useState, useMemo } from 'react'
-import { BookOpen, BarChart3 } from 'lucide-react'
+import { BookOpen, BarChart3, AlignJustify, Minus, List } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Workspace, Task } from '@/lib/types'
 import { PanelHeader } from './panel-header'
 import { WorkspaceSection } from './workspace-section'
 import { FilterBar, type FilterState } from './filter-bar'
 import { Button } from '@/components/ui/button'
+
+export type Density = 'compact' | 'normal' | 'comfortable'
 
 interface TaskPanelProps {
   workspaces: Workspace[]
@@ -35,6 +37,7 @@ export function TaskPanel({
   className,
 }: TaskPanelProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [density, setDensity] = useState<Density>('normal')
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     urgency: [],
@@ -100,6 +103,8 @@ export function TaskPanel({
         filters={filters}
         onFiltersChange={setFilters}
         workspaces={workspaces.map((w) => ({ id: w.id, name: w.name, color: w.color }))}
+        density={density}
+        onDensityChange={setDensity}
       />
 
       {/* Task List - Scrollable */}
@@ -111,6 +116,7 @@ export function TaskPanel({
             <div key={workspace.id} id={`workspace-${workspace.id}`}>
               <WorkspaceSection
                 workspace={workspace}
+                density={density}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
                 onToggleComplete={onToggleComplete}
                 onSelectTask={onSelectTask}

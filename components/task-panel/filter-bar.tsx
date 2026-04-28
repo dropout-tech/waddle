@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Filter, X, ChevronDown } from 'lucide-react'
+import { Search, Filter, X, ChevronDown, AlignJustify, Minus, List } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { Density } from './task-panel'
 
 export interface FilterState {
   search: string
@@ -11,13 +12,21 @@ export interface FilterState {
   workspaceIds: string[] // empty = all
 }
 
+const DENSITY_OPTIONS: { value: Density; icon: React.ReactNode; label: string }[] = [
+  { value: 'compact', icon: <Minus className="w-3.5 h-3.5" />, label: '精簡' },
+  { value: 'normal', icon: <List className="w-3.5 h-3.5" />, label: '標準' },
+  { value: 'comfortable', icon: <AlignJustify className="w-3.5 h-3.5" />, label: '寬鬆' },
+]
+
 interface FilterBarProps {
   filters: FilterState
   onFiltersChange: (filters: FilterState) => void
   workspaces: { id: string; name: string; color: string }[]
+  density: Density
+  onDensityChange: (d: Density) => void
 }
 
-export function FilterBar({ filters, onFiltersChange, workspaces }: FilterBarProps) {
+export function FilterBar({ filters, onFiltersChange, workspaces, density, onDensityChange }: FilterBarProps) {
   const [showFilterPanel, setShowFilterPanel] = useState(false)
 
   const hasActiveFilters =
@@ -72,7 +81,7 @@ export function FilterBar({ filters, onFiltersChange, workspaces }: FilterBarPro
         )}
       </div>
 
-      {/* Filter Toggle */}
+      {/* Filter Toggle + Density Toggle */}
       <div className="flex items-center justify-between mt-2">
         <button
           onClick={() => setShowFilterPanel(!showFilterPanel)}
@@ -95,14 +104,34 @@ export function FilterBar({ filters, onFiltersChange, workspaces }: FilterBarPro
           />
         </button>
 
-        {hasActiveFilters && (
-          <button
-            onClick={clearFilters}
-            className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
-          >
-            清除全部
-          </button>
-        )}
+        <div className="flex items-center gap-0.5">
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="mr-2 text-[10px] text-muted-foreground hover:text-destructive transition-colors"
+            >
+              清除
+            </button>
+          )}
+          {/* Density Toggle */}
+          <div className="flex items-center rounded-lg border border-border bg-muted/50 p-0.5 gap-0.5">
+            {DENSITY_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => onDensityChange(opt.value)}
+                title={opt.label}
+                className={cn(
+                  'flex items-center justify-center w-6 h-6 rounded-md transition-all',
+                  density === opt.value
+                    ? 'bg-card shadow-sm text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {opt.icon}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Filter Panel */}

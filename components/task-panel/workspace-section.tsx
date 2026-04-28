@@ -4,9 +4,11 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { Workspace, Task } from '@/lib/types'
 import { CategorySection } from './category-section'
+import type { Density } from './task-panel'
 
 interface WorkspaceSectionProps {
   workspace: Workspace
+  density?: Density
   onToggleCategoryCollapse: (categoryId: string) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
@@ -16,6 +18,7 @@ interface WorkspaceSectionProps {
 
 export function WorkspaceSection({
   workspace,
+  density = 'normal',
   onToggleCategoryCollapse,
   onToggleComplete,
   onSelectTask,
@@ -81,6 +84,7 @@ export function WorkspaceSection({
             <CategorySection
               key={category.id}
               category={category}
+              density={density}
               onToggleCollapse={onToggleCategoryCollapse}
               onToggleComplete={onToggleComplete}
               onSelectTask={onSelectTask}

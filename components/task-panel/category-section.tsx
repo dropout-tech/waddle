@@ -5,9 +5,11 @@ import { ChevronDown, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Category, Task } from '@/lib/types'
 import { TaskRow } from './task-row'
+import type { Density } from './task-panel'
 
 interface CategorySectionProps {
   category: Category
+  density?: Density
   onToggleCollapse: (categoryId: string) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
@@ -16,6 +18,7 @@ interface CategorySectionProps {
 
 export function CategorySection({
   category,
+  density = 'normal',
   onToggleCollapse,
   onToggleComplete,
   onSelectTask,
@@ -87,11 +90,12 @@ export function CategorySection({
 
       {/* Tasks */}
       {!category.isCollapsed && (
-        <div className="mt-2 space-y-2">
+        <div className={cn('mt-1', density === 'compact' ? 'space-y-0.5' : density === 'comfortable' ? 'space-y-3 mt-2' : 'space-y-2 mt-2')}>
           {sortedTasks.map((task) => (
             <TaskRow
               key={task.id}
               task={task}
+              density={density}
               onToggleComplete={onToggleComplete}
               onSelect={onSelectTask}
             />
