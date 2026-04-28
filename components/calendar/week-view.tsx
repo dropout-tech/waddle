@@ -207,14 +207,14 @@ export function WeekView({
     <div className="flex-1 flex flex-col overflow-hidden bg-panel-secondary">
       {/* Sticky Header with Day columns + All-day tasks — drag left/right to navigate */}
       <div
-        className="flex-shrink-0 flex border-b border-border bg-panel select-none cursor-grab active:cursor-grabbing"
+        className="flex-shrink-0 flex bg-panel select-none cursor-grab active:cursor-grabbing"
         onMouseDown={handleHeaderMouseDown}
         onMouseMove={handleHeaderMouseMove}
         onMouseUp={handleHeaderMouseUp}
         onMouseLeave={() => { navDragStartX.current = null; navDragCommitted.current = null }}
       >
-        {/* Time column header spacer */}
-        <div className="w-12 flex-shrink-0 border-r border-border" />
+        {/* Time column header spacer - matches time labels column width */}
+        <div className="w-14 flex-shrink-0" />
         
         {/* Day headers with all-day tasks */}
         {weekDates.map((date, i) => {
@@ -232,7 +232,7 @@ export function WeekView({
             >
               {/* Day header */}
               <div className={cn(
-                'px-2 py-1.5 text-center border-b border-border/50',
+                'px-2 py-1.5 text-center',
                 isToday && 'bg-primary/10'
               )}>
                 <div className="text-[10px] text-muted-foreground font-medium">
@@ -246,8 +246,8 @@ export function WeekView({
                 </div>
               </div>
 
-              {/* All-day tasks area */}
-              <div className="min-h-[40px] max-h-[100px] overflow-y-auto px-1 py-1 space-y-0.5">
+              {/* All-day tasks area - seamlessly connected to time grid */}
+              <div className="min-h-[32px] max-h-[120px] overflow-y-auto px-1 pb-1 space-y-0.5">
                 {allDayTasks.map((task) => (
                   <button
                     key={task.id}
@@ -288,11 +288,11 @@ export function WeekView({
         })}
       </div>
 
-      {/* Scrollable Time Grid */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
+      {/* Scrollable Time Grid - seamlessly connected to header */}
+      <div ref={scrollContainerRef} className="flex-1 overflow-auto border-t border-border">
         <div className="flex min-w-[800px]" ref={gridRef}>
           {/* Time labels column */}
-          <div className="w-14 flex-shrink-0 border-r border-border bg-panel">
+          <div className="w-14 flex-shrink-0 border-r border-border bg-panel/50">
             {hours.map((hour) => (
               <div
                 key={hour}
