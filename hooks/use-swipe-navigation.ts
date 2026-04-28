@@ -1,16 +1,18 @@
 'use client'
 
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useEffect } from 'react'
 
 interface UseSwipeNavigationOptions {
   onSwipeLeft: () => void
   onSwipeRight: () => void
-  /** Minimum horizontal distance (px) to trigger a swipe. Default: 50 */
+  /** Minimum horizontal distance (px) to trigger a swipe. Default: 60 */
   threshold?: number
-  /** If horizontal movement exceeds this ratio vs vertical, it's a swipe. Default: 1.5 */
+  /** If horizontal movement exceeds this ratio vs vertical, it's a swipe. Default: 2.0 */
   directionRatio?: number
   /** Element ref to attach native (non-React) listeners to */
-  elementRef: React.RefObject<HTMLElement>
+  elementRef: React.RefObject<HTMLElement | null>
+  /** Also enable mouse drag navigation (default: true for week/month views) */
+  enableMouseDrag?: boolean
 }
 
 /**
@@ -21,13 +23,15 @@ interface UseSwipeNavigationOptions {
 export function useSwipeNavigation({
   onSwipeLeft,
   onSwipeRight,
-  threshold = 50,
-  directionRatio = 1.5,
+  threshold = 60,
+  directionRatio = 2.0,
   elementRef,
+  enableMouseDrag = true,
 }: UseSwipeNavigationOptions) {
   const startX = useRef<number | null>(null)
   const startY = useRef<number | null>(null)
   const pointerId = useRef<number | null>(null)
+  const pointerType = useRef<string | null>(null)
   const committed = useRef<'horizontal' | 'vertical' | null>(null)
 
   // Keep callbacks in refs so we don't re-attach listeners on every render
@@ -41,11 +45,13 @@ export function useSwipeNavigation({
     if (!el) return
 
     const onPointerDown = (e: PointerEvent) => {
-      // Only track touch pointers for navigation (mouse drag is used for creating slots)
-      if (e.pointerType !== 'touch') return
+      // For mouse, only track if enableMouseDrag is true
+      if (e.pointerType === 'mouse' && !enableMouseDrag) return
+      
       startX.current = e.clientX
       startY.current = e.clientY
       pointerId.current = e.pointerId
+      pointerType.current = e.pointerType
       committed.current = null
     }
 
@@ -58,7 +64,9 @@ export function useSwipeNavigation({
       const dy = Math.abs(e.clientY - startY.current)
 
       // Commit direction once we have enough movement to tell
-      if (dx > 8 || dy > 8) {
+      // For mouse, require more horizontal movement to not interfere with task creation
+      const minMove = pointerType.current === 'mouse' ? 15 : 8
+      if (dx > minMove || dy > minMove) {
         committed.current = dx > dy * directionRatio ? 'horizontal' : 'vertical'
       }
     }
@@ -69,6 +77,7 @@ export function useSwipeNavigation({
         startX.current = null
         startY.current = null
         pointerId.current = null
+        pointerType.current = null
         committed.current = null
         return
       }
@@ -82,6 +91,7 @@ export function useSwipeNavigation({
       startX.current = null
       startY.current = null
       pointerId.current = null
+      pointerType.current = null
       committed.current = null
     }
 
@@ -89,6 +99,7 @@ export function useSwipeNavigation({
       startX.current = null
       startY.current = null
       pointerId.current = null
+      pointerType.current = null
       committed.current = null
     }
 
@@ -103,5 +114,5 @@ export function useSwipeNavigation({
       el.removeEventListener('pointerup', onPointerUp)
       el.removeEventListener('pointercancel', onPointerCancel)
     }
-  }, [elementRef, threshold, directionRatio])
+  }, [elementRef, threshold, directionRatio, enableMouseDrag])
 }

@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useRef, useCallback } from 'react'
+import { useMemo, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { Check, Plus } from 'lucide-react'
+import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 
 interface MonthViewProps {
   selectedDate: Date
@@ -28,21 +29,15 @@ export function MonthView({
   onCreateTask,
   onNavigate,
 }: MonthViewProps) {
-  const dragStartX = useRef<number | null>(null)
+  const monthViewRef = useRef<HTMLDivElement>(null)
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return
-    dragStartX.current = e.clientX
-  }, [])
-
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    if (dragStartX.current === null) return
-    const dx = e.clientX - dragStartX.current
-    dragStartX.current = null
-    if (Math.abs(dx) > 60) {
-      onNavigate?.(dx < 0 ? 'next' : 'prev')
-    }
-  }, [onNavigate])
+  // Enable swipe/drag navigation
+  useSwipeNavigation({
+    onSwipeLeft: () => onNavigate?.('next'),
+    onSwipeRight: () => onNavigate?.('prev'),
+    elementRef: monthViewRef,
+    enableMouseDrag: true,
+  })
   // Calculate calendar grid
   const calendarDays = useMemo(() => {
     const year = selectedDate.getFullYear()
@@ -155,10 +150,8 @@ export function MonthView({
 
   return (
     <div
+      ref={monthViewRef}
       className="flex-1 flex flex-col p-4 overflow-hidden select-none"
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={() => { dragStartX.current = null }}
     >
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 mb-2">
