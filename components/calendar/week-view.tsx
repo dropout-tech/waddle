@@ -192,206 +192,209 @@ export function WeekView({
 
   return (
     <div ref={weekViewRef} className="flex-1 flex flex-col overflow-hidden bg-panel-secondary">
-      {/* Sticky Header with Day columns + All-day tasks */}
-      <div className="flex-shrink-0 flex border-b border-border bg-panel select-none">
-        {/* Time column header spacer */}
-        <div className="w-14 flex-shrink-0 border-r border-border" />
-        
-        {/* Day headers with all-day tasks */}
-        {weekDates.map((date, i) => {
-          const dateStr = date.toISOString().split('T')[0]
-          const isToday = dateStr === todayString
-          const allDayTasks = getAllDayTasksForDate(date)
-          
-          return (
-            <div
-              key={i}
-              className={cn(
-                'flex-1 min-w-[100px] border-r border-border last:border-r-0 flex flex-col',
-                isToday && 'bg-primary/5'
-              )}
-            >
-              {/* Day header */}
-              <div className={cn(
-                'px-2 py-1.5 text-center border-b border-border/50',
-                isToday && 'bg-primary/10'
-              )}>
-                <div className="text-[10px] text-muted-foreground font-medium">
-                  週{WEEKDAYS[i]}
-                </div>
-                <div className={cn(
-                  'text-lg font-bold',
-                  isToday ? 'text-primary' : 'text-foreground'
-                )}>
-                  {date.getDate()}
-                </div>
-              </div>
-
-              {/* All-day tasks area */}
-              <div className="min-h-[40px] max-h-[100px] overflow-y-auto px-1 py-1 space-y-0.5">
-                {allDayTasks.map((task) => (
-                  <button
-                    key={task.id}
-                    onClick={() => onTaskSelect(task)}
-                    className={cn(
-                      'w-full text-left px-1.5 py-1 rounded text-[10px] font-medium truncate transition-all',
-                      'hover:opacity-80',
-                      task.isCompleted && 'opacity-50 line-through'
-                    )}
-                    style={{
-                      backgroundColor: task.calendarColor || task.workspaceColor,
-                      color: '#fff',
-                    }}
-                  >
-                    {task.title}
-                  </button>
-                ))}
-                {/* Also show pending tasks that have dueDate for this day */}
-                {pendingTasks
-                  .filter((t) => t.dueDate === dateStr && !t.scheduledDate)
-                  .map((task) => (
-                    <button
-                      key={task.id}
-                      onClick={() => onTaskSelect(task)}
-                      className={cn(
-                        'w-full flex items-center gap-1 text-left px-1.5 py-1 rounded text-[10px] font-medium transition-all',
-                        'bg-muted/50 hover:bg-muted text-muted-foreground',
-                        task.isCompleted && 'opacity-50 line-through'
-                      )}
-                    >
-                      <Check className="w-2.5 h-2.5 flex-shrink-0 opacity-50" />
-                      <span className="truncate">{task.title}</span>
-                    </button>
-                  ))}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Scrollable Time Grid */}
+      {/* Single scrollable container for both header and time grid */}
       <div ref={scrollContainerRef} className="flex-1 overflow-auto">
-        <div className="flex min-w-[800px]" ref={gridRef}>
-          {/* Time labels column */}
-          <div className="w-14 flex-shrink-0 border-r border-border bg-panel">
-            {hours.map((hour) => (
-              <div
-                key={hour}
-                className="h-[60px] relative"
-              >
-                <span className="absolute -top-2 left-1 right-1 text-[10px] text-muted-foreground font-mono text-right">
-                  {hour.toString().padStart(2, '0')}:00
-                </span>
-              </div>
-            ))}
+        <div className="min-w-[800px]" ref={gridRef}>
+          {/* Sticky Header Row */}
+          <div className="sticky top-0 z-10 flex bg-panel border-b border-border select-none">
+            {/* Time column header spacer */}
+            <div className="w-14 flex-shrink-0 border-r border-border" />
+            
+            {/* Day headers with all-day tasks */}
+            {weekDates.map((date, i) => {
+              const dateStr = date.toISOString().split('T')[0]
+              const isToday = dateStr === todayString
+              const allDayTasks = getAllDayTasksForDate(date)
+              
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    'flex-1 min-w-[100px] border-r border-border last:border-r-0 flex flex-col',
+                    isToday && 'bg-primary/5'
+                  )}
+                >
+                  {/* Day header */}
+                  <div className={cn(
+                    'px-2 py-1.5 text-center',
+                    isToday && 'bg-primary/10'
+                  )}>
+                    <div className="text-[10px] text-muted-foreground font-medium">
+                      週{WEEKDAYS[i]}
+                    </div>
+                    <div className={cn(
+                      'text-lg font-bold',
+                      isToday ? 'text-primary' : 'text-foreground'
+                    )}>
+                      {date.getDate()}
+                    </div>
+                  </div>
+
+                  {/* All-day tasks area */}
+                  <div className="min-h-[32px] max-h-[80px] overflow-y-auto px-1 py-1 space-y-0.5 border-t border-border/30">
+                    {allDayTasks.map((task) => (
+                      <button
+                        key={task.id}
+                        onClick={() => onTaskSelect(task)}
+                        className={cn(
+                          'w-full text-left px-1.5 py-1 rounded text-[10px] font-medium truncate transition-all',
+                          'hover:opacity-80',
+                          task.isCompleted && 'opacity-50 line-through'
+                        )}
+                        style={{
+                          backgroundColor: task.calendarColor || task.workspaceColor,
+                          color: '#fff',
+                        }}
+                      >
+                        {task.title}
+                      </button>
+                    ))}
+                    {/* Also show pending tasks that have dueDate for this day */}
+                    {pendingTasks
+                      .filter((t) => t.dueDate === dateStr && !t.scheduledDate)
+                      .map((task) => (
+                        <button
+                          key={task.id}
+                          onClick={() => onTaskSelect(task)}
+                          className={cn(
+                            'w-full flex items-center gap-1 text-left px-1.5 py-1 rounded text-[10px] font-medium transition-all',
+                            'bg-muted/50 hover:bg-muted text-muted-foreground',
+                            task.isCompleted && 'opacity-50 line-through'
+                          )}
+                        >
+                          <Check className="w-2.5 h-2.5 flex-shrink-0 opacity-50" />
+                          <span className="truncate">{task.title}</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
-          {/* Day columns */}
-          {weekDates.map((date, dayIndex) => {
-            const dateStr = date.toISOString().split('T')[0]
-            const isToday = dateStr === todayString
-            const dayTasks = getScheduledTasksForDate(date)
-            const dayBlocks = getTimeBlocksForDate(date)
-            const dragSelection = getDragSelection(dayIndex)
+          {/* Time Grid Body */}
+          <div className="flex">
+            {/* Time labels column */}
+            <div className="w-14 flex-shrink-0 border-r border-border bg-panel/50">
+              {hours.map((hour) => (
+                <div
+                  key={hour}
+                  className="h-[60px] relative"
+                >
+                  <span className="absolute -top-2 left-1 right-1 text-[10px] text-muted-foreground font-mono text-right">
+                    {hour.toString().padStart(2, '0')}:00
+                  </span>
+                </div>
+              ))}
+            </div>
 
-            return (
-              <div
-                key={dayIndex}
-                className={cn(
-                  'flex-1 min-w-[100px] relative border-r border-border last:border-r-0 cursor-crosshair',
-                  isToday && 'bg-primary/5'
-                )}
-                onMouseDown={(e) => handleMouseDown(e, dayIndex)}
-                onMouseMove={(e) => handleMouseMove(e, dayIndex)}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={() => {
-                  if (isDragging) handleMouseUp()
-                }}
-              >
-                {/* Hour lines */}
-                {hours.map((hour) => (
-                  <div
-                    key={hour}
-                    className="h-[60px] border-b border-border/50"
-                  >
-                    {/* Half-hour line */}
-                    <div className="h-[30px] border-b border-dashed border-border/30" />
-                  </div>
-                ))}
+            {/* Day columns */}
+            {weekDates.map((date, dayIndex) => {
+              const dateStr = date.toISOString().split('T')[0]
+              const isToday = dateStr === todayString
+              const dayTasks = getScheduledTasksForDate(date)
+              const dayBlocks = getTimeBlocksForDate(date)
+              const dragSelection = getDragSelection(dayIndex)
 
-                {/* Time Blocks */}
-                {dayBlocks.map((block) => (
-                  <div
-                    key={block.id}
-                    data-task="true"
-                    className="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-[9px] font-medium overflow-hidden"
-                    style={{
-                      top: getTimePosition(block.startTime),
-                      height: getDurationHeight(block.startTime, block.endTime),
-                      backgroundColor: block.color + '30',
-                      borderLeft: `3px solid ${block.color}`,
-                      color: block.color,
-                    }}
-                  >
-                    <div className="truncate">{block.label}</div>
-                    <div className="text-[8px] opacity-70">
-                      {block.startTime}-{block.endTime}
+              return (
+                <div
+                  key={dayIndex}
+                  className={cn(
+                    'flex-1 min-w-[100px] relative border-r border-border last:border-r-0 cursor-crosshair',
+                    isToday && 'bg-primary/5'
+                  )}
+                  onMouseDown={(e) => handleMouseDown(e, dayIndex)}
+                  onMouseMove={(e) => handleMouseMove(e, dayIndex)}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={() => {
+                    if (isDragging) handleMouseUp()
+                  }}
+                >
+                  {/* Hour lines */}
+                  {hours.map((hour) => (
+                    <div
+                      key={hour}
+                      className="h-[60px] border-b border-border/50"
+                    >
+                      {/* Half-hour line */}
+                      <div className="h-[30px] border-b border-dashed border-border/30" />
                     </div>
-                  </div>
-                ))}
+                  ))}
 
-                {/* Scheduled Tasks */}
-                {dayTasks.map((task) => (
-                  <button
-                    key={task.id}
-                    data-task="true"
-                    onClick={() => onTaskSelect(task)}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    className={cn(
-                      'absolute left-0.5 right-0.5 rounded px-1.5 py-1 text-left overflow-hidden transition-all hover:opacity-90',
-                      task.isCompleted && 'opacity-60'
-                    )}
-                    style={{
-                      top: getTimePosition(task.scheduledStartTime!),
-                      height: getDurationHeight(task.scheduledStartTime!, task.scheduledEndTime!),
-                      backgroundColor: task.calendarColor || task.workspaceColor,
-                      color: '#fff',
-                    }}
-                  >
-                    <div className={cn(
-                      'text-[10px] font-semibold leading-tight truncate',
-                      task.isCompleted && 'line-through'
-                    )}>
-                      {task.title}
+                  {/* Time Blocks */}
+                  {dayBlocks.map((block) => (
+                    <div
+                      key={block.id}
+                      data-task="true"
+                      className="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-[9px] font-medium overflow-hidden"
+                      style={{
+                        top: getTimePosition(block.startTime),
+                        height: getDurationHeight(block.startTime, block.endTime),
+                        backgroundColor: block.color + '30',
+                        borderLeft: `3px solid ${block.color}`,
+                        color: block.color,
+                      }}
+                    >
+                      <div className="truncate">{block.label}</div>
+                      <div className="text-[8px] opacity-70">
+                        {block.startTime}-{block.endTime}
+                      </div>
                     </div>
-                    <div className="text-[9px] opacity-80 mt-0.5">
-                      {task.scheduledStartTime}-{task.scheduledEndTime}
+                  ))}
+
+                  {/* Scheduled Tasks */}
+                  {dayTasks.map((task) => (
+                    <button
+                      key={task.id}
+                      data-task="true"
+                      onClick={() => onTaskSelect(task)}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className={cn(
+                        'absolute left-0.5 right-0.5 rounded px-1.5 py-1 text-left overflow-hidden transition-all hover:opacity-90',
+                        task.isCompleted && 'opacity-60'
+                      )}
+                      style={{
+                        top: getTimePosition(task.scheduledStartTime!),
+                        height: getDurationHeight(task.scheduledStartTime!, task.scheduledEndTime!),
+                        backgroundColor: task.calendarColor || task.workspaceColor,
+                        color: '#fff',
+                      }}
+                    >
+                      <div className={cn(
+                        'text-[10px] font-semibold leading-tight truncate',
+                        task.isCompleted && 'line-through'
+                      )}>
+                        {task.title}
+                      </div>
+                      <div className="text-[9px] opacity-80 mt-0.5">
+                        {task.scheduledStartTime}-{task.scheduledEndTime}
+                      </div>
+                    </button>
+                  ))}
+
+                  {/* Drag Selection Preview */}
+                  {dragSelection && dragSelection.height > 10 && (
+                    <div
+                      className="absolute left-0.5 right-0.5 bg-primary/20 border-2 border-primary border-dashed rounded pointer-events-none z-20 flex flex-col items-center justify-center"
+                      style={{
+                        top: dragSelection.top,
+                        height: dragSelection.height,
+                      }}
+                    >
+                      <span className="text-[10px] font-mono font-bold text-primary">
+                        {dragSelection.startTime} - {dragSelection.endTime}
+                      </span>
                     </div>
-                  </button>
-                ))}
+                  )}
 
-                {/* Drag Selection Preview */}
-                {dragSelection && dragSelection.height > 10 && (
-                  <div
-                    className="absolute left-0.5 right-0.5 bg-primary/20 border-2 border-primary border-dashed rounded pointer-events-none z-20 flex flex-col items-center justify-center"
-                    style={{
-                      top: dragSelection.top,
-                      height: dragSelection.height,
-                    }}
-                  >
-                    <span className="text-[10px] font-mono font-bold text-primary">
-                      {dragSelection.startTime} - {dragSelection.endTime}
-                    </span>
-                  </div>
-                )}
-
-                {/* Current time line for today */}
-                {isToday && (
-                  <CurrentTimeLine startHour={startHour} />
-                )}
-              </div>
-            )
-          })}
+                  {/* Current time line for today */}
+                  {isToday && (
+                    <CurrentTimeLine startHour={startHour} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
     </div>
