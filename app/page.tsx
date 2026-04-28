@@ -4,8 +4,9 @@ import { useState, useCallback } from 'react'
 import { MainLayout } from '@/components/layout/main-layout'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
 import { JournalModal } from '@/components/modals/journal-modal'
-import { mockWorkspaces, mockTimeBlocks, getAllTasks } from '@/lib/mock-data'
-import type { Workspace, Task, JournalEntry } from '@/lib/types'
+import { ReportModal } from '@/components/modals/report-modal'
+import { mockWorkspaces, mockTimeBlocks } from '@/lib/mock-data'
+import type { Workspace, Task, JournalEntry, ExportDataPayload } from '@/lib/types'
 
 export default function FlowDeskPage() {
   // State for workspaces and tasks
@@ -15,6 +16,7 @@ export default function FlowDeskPage() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isJournalOpen, setIsJournalOpen] = useState(false)
   const [journalDate, setJournalDate] = useState(new Date())
+  const [isReportOpen, setIsReportOpen] = useState(false)
 
   // Toggle category collapse
   const handleToggleCategoryCollapse = useCallback((categoryId: string) => {
@@ -129,7 +131,25 @@ export default function FlowDeskPage() {
   // Save journal entry
   const handleSaveJournal = useCallback((entry: Partial<JournalEntry>) => {
     // In a real app, this would save to the database
-    console.log('[v0] Saving journal entry:', entry)
+    console.log('Saving journal entry:', entry)
+  }, [])
+
+  // Open report modal
+  const handleOpenReport = useCallback(() => {
+    setIsReportOpen(true)
+  }, [])
+
+  // Handle export
+  const handleExport = useCallback((data: ExportDataPayload) => {
+    console.log('Export data:', data)
+    // Download as JSON
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `flowdesk-report-${data.dateRange.start}-${data.dateRange.end}.json`
+    a.click()
+    URL.revokeObjectURL(url)
   }, [])
 
   // Get all tasks for journal task review
@@ -141,6 +161,16 @@ export default function FlowDeskPage() {
     (t) => t.scheduledDate === journalDateString
   )
 
+  // Report date range (current week)
+  const getWeekRange = () => {
+    const now = new Date()
+    const start = new Date(now)
+    start.setDate(now.getDate() - now.getDay())
+    const end = new Date(start)
+    end.setDate(start.getDate() + 6)
+    return { start, end }
+  }
+
   return (
     <>
       <MainLayout
@@ -151,6 +181,7 @@ export default function FlowDeskPage() {
         onSelectTask={handleSelectTask}
         onAddTask={handleAddTask}
         onOpenJournal={handleOpenJournal}
+        onOpenReport={handleOpenReport}
       />
 
       {/* Task Detail Modal */}
@@ -171,6 +202,15 @@ export default function FlowDeskPage() {
         onClose={() => setIsJournalOpen(false)}
         onSave={handleSaveJournal}
         onDateChange={setJournalDate}
+      />
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        workspaces={workspaces}
+        dateRange={getWeekRange()}
+        onExport={handleExport}
       />
     </>
   )

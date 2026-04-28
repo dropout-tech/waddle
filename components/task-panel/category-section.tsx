@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Plus } from 'lucide-react'
+import { ChevronDown, Plus, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Category, Task } from '@/lib/types'
 import { TaskRow } from './task-row'
@@ -25,6 +25,7 @@ export function CategorySection({
   const [newTaskTitle, setNewTaskTitle] = useState('')
 
   const pendingCount = category.tasks.filter((t) => !t.isCompleted).length
+  const completedCount = category.tasks.filter((t) => t.isCompleted).length
 
   const handleAddSubmit = () => {
     if (newTaskTitle.trim()) {
@@ -55,11 +56,11 @@ export function CategorySection({
   })
 
   return (
-    <div className="mb-1">
+    <div className="mb-2">
       {/* Category Header */}
       <button
         onClick={() => onToggleCollapse(category.id)}
-        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-secondary/50 transition-colors"
+        className="flex items-center gap-2 w-full px-2 py-2 rounded-xl hover:bg-secondary/50 transition-colors group"
       >
         <ChevronDown
           className={cn(
@@ -67,17 +68,26 @@ export function CategorySection({
             category.isCollapsed && '-rotate-90'
           )}
         />
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+        <span className="text-sm font-bold text-foreground/80">
           {category.name}
         </span>
-        <span className="text-xs text-muted-foreground/70 font-mono">
-          ({pendingCount})
-        </span>
+        <div className="flex items-center gap-1 ml-auto">
+          {pendingCount > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">
+              {pendingCount}
+            </span>
+          )}
+          {completedCount > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-success/10 text-success text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+              {completedCount} done
+            </span>
+          )}
+        </div>
       </button>
 
       {/* Tasks */}
       {!category.isCollapsed && (
-        <div className="ml-2 mt-1 space-y-1.5">
+        <div className="ml-2 mt-1 space-y-2">
           {sortedTasks.map((task) => (
             <TaskRow
               key={task.id}
@@ -89,8 +99,8 @@ export function CategorySection({
 
           {/* Add Task Input */}
           {isAdding ? (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-primary/30 bg-primary/5">
-              <Plus className="w-4 h-4 text-primary" />
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 border-primary/30 bg-primary/5 shadow-sm">
+              <Sparkles className="w-4 h-4 text-primary" />
               <input
                 type="text"
                 value={newTaskTitle}
@@ -109,10 +119,10 @@ export function CategorySection({
           ) : (
             <button
               onClick={() => setIsAdding(true)}
-              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors"
+              className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors border-2 border-dashed border-border hover:border-primary/30"
             >
               <Plus className="w-4 h-4" />
-              <span className="text-sm">新增任務</span>
+              <span className="text-sm font-medium">新增任務</span>
             </button>
           )}
         </div>

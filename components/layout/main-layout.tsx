@@ -15,11 +15,12 @@ interface MainLayoutProps {
   onSelectTask: (task: Task) => void
   onAddTask: (categoryId: string, title: string) => void
   onOpenJournal: () => void
+  onOpenReport: () => void
 }
 
 const MIN_PANEL_WIDTH = 280
 const MAX_PANEL_WIDTH = 600
-const DEFAULT_PANEL_WIDTH = 380
+const DEFAULT_PANEL_WIDTH = 400
 
 export function MainLayout({
   workspaces,
@@ -29,6 +30,7 @@ export function MainLayout({
   onSelectTask,
   onAddTask,
   onOpenJournal,
+  onOpenReport,
 }: MainLayoutProps) {
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -52,17 +54,19 @@ export function MainLayout({
     return tasks
   }, [workspaces])
 
+  const allTasks = getAllTasks()
+
   // Filter tasks for selected date
   const dateString = selectedDate.toISOString().split('T')[0]
 
-  const pendingTasks = getAllTasks().filter(
+  const pendingTasks = allTasks.filter(
     (task) =>
       task.scheduledDate === dateString &&
       !task.scheduledStartTime &&
       !task.isCompleted
   )
 
-  const scheduledTasks = getAllTasks().filter(
+  const scheduledTasks = allTasks.filter(
     (task) =>
       task.scheduledDate === dateString &&
       task.scheduledStartTime &&
@@ -87,6 +91,7 @@ export function MainLayout({
           onSelectTask={onSelectTask}
           onAddTask={onAddTask}
           onOpenJournal={onOpenJournal}
+          onOpenReport={onOpenReport}
         />
       </div>
 
@@ -100,6 +105,7 @@ export function MainLayout({
           viewMode={viewMode}
           pendingTasks={pendingTasks}
           scheduledTasks={scheduledTasks}
+          allTasks={allTasks}
           timeBlocks={filteredTimeBlocks}
           onDateChange={setSelectedDate}
           onViewModeChange={setViewMode}

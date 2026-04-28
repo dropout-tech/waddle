@@ -45,8 +45,8 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#0d0d12',
-  colorScheme: 'dark',
+  themeColor: '#fdf7f2',
+  colorScheme: 'light',
 }
 
 export default function RootLayout({
@@ -55,7 +55,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="zh-TW" className="dark bg-background">
+    <html lang="zh-TW" className="bg-background">
       <body
         className={`${geist.variable} ${geistMono.variable} ${notoSansTC.variable} font-sans antialiased`}
       >

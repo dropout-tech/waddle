@@ -15,6 +15,7 @@ interface TaskPanelProps {
   onSelectTask: (task: Task) => void
   onAddTask: (categoryId: string, title: string) => void
   onOpenJournal: () => void
+  onOpenReport: () => void
   className?: string
 }
 
@@ -25,6 +26,7 @@ export function TaskPanel({
   onSelectTask,
   onAddTask,
   onOpenJournal,
+  onOpenReport,
   className,
 }: TaskPanelProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -40,7 +42,7 @@ export function TaskPanel({
   return (
     <div
       className={cn(
-        'flex flex-col h-full bg-panel border-r border-border',
+        'flex flex-col h-full bg-card border-r border-border shadow-sm',
         className
       )}
     >
@@ -72,10 +74,10 @@ export function TaskPanel({
       </div>
 
       {/* Bottom Toolbar */}
-      <div className="flex items-center gap-2 p-3 border-t border-border bg-panel">
+      <div className="flex items-center gap-2 p-3 border-t border-border bg-card">
         <Button
           variant="secondary"
-          className="flex-1 gap-2"
+          className="flex-1 gap-2 rounded-xl"
           onClick={onOpenJournal}
         >
           <BookOpen className="w-4 h-4" />
@@ -83,9 +85,8 @@ export function TaskPanel({
         </Button>
         <Button
           variant="secondary"
-          className="flex-1 gap-2"
-          disabled
-          title="即將推出"
+          className="flex-1 gap-2 rounded-xl"
+          onClick={onOpenReport}
         >
           <BarChart3 className="w-4 h-4" />
           <span>報告</span>

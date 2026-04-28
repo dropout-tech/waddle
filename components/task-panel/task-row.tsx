@@ -1,10 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, GripVertical, Clock, Calendar } from 'lucide-react'
+import { Check, GripVertical, Clock, Calendar, MessageSquare, Timer } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import { getUrgencyColor, formatEstimatedTime } from '@/lib/task-utils'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface TaskRowProps {
   task: Task
@@ -25,14 +31,14 @@ export function TaskRow({
   return (
     <div
       className={cn(
-        'group relative flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-all duration-150 cursor-pointer',
+        'group relative flex items-start gap-2.5 px-3 py-3 rounded-xl border-2 transition-all duration-200 cursor-pointer soft-card cute-hover',
         colors.bg,
         colors.border,
         isDragging && 'opacity-50 scale-[0.98]',
-        isHovered && !task.isCompleted && 'ring-1 ring-primary/30'
+        isHovered && !task.isCompleted && 'ring-2 ring-primary/20'
       )}
       style={{
-        borderLeftWidth: '3px',
+        borderLeftWidth: '5px',
         borderLeftColor: task.workspaceColor,
       }}
       onMouseEnter={() => setIsHovered(true)}
@@ -41,7 +47,7 @@ export function TaskRow({
       draggable
     >
       {/* Drag Handle */}
-      <div className="opacity-0 group-hover:opacity-50 transition-opacity cursor-grab active:cursor-grabbing">
+      <div className="opacity-0 group-hover:opacity-50 transition-opacity cursor-grab active:cursor-grabbing pt-0.5">
         <GripVertical className="w-4 h-4 text-muted-foreground" />
       </div>
 
@@ -52,10 +58,10 @@ export function TaskRow({
           onToggleComplete(task.id)
         }}
         className={cn(
-          'flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all',
+          'flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all mt-0.5',
           task.isCompleted
             ? 'bg-primary border-primary'
-            : 'border-muted-foreground/40 hover:border-primary/60'
+            : 'border-muted-foreground/30 hover:border-primary/60 hover:bg-primary/10'
         )}
       >
         {task.isCompleted && <Check className="w-3 h-3 text-primary-foreground" />}
@@ -63,11 +69,13 @@ export function TaskRow({
 
       {/* Task Content */}
       <div className="flex-1 min-w-0">
+        {/* Title Row */}
         <div className="flex items-center gap-2">
           <span
             className={cn(
-              'text-sm font-medium truncate',
-              colors.text
+              'text-sm font-medium leading-tight',
+              colors.text,
+              task.isCompleted && 'line-through opacity-60'
             )}
           >
             {task.title}
@@ -75,33 +83,65 @@ export function TaskRow({
 
           {/* Urgency Dot */}
           <div
-            className={cn('flex-shrink-0 w-2 h-2 rounded-full', colors.dot)}
+            className={cn('flex-shrink-0 w-2.5 h-2.5 rounded-full', colors.dot)}
             title={`急迫度: ${task.urgency}`}
           />
+
+          {/* Notes Indicator */}
+          {task.notes && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors">
+                    <MessageSquare className="w-3.5 h-3.5" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[200px] text-xs">
+                  <p className="whitespace-pre-wrap">{task.notes}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
 
-        {/* Task Meta */}
-        {(task.scheduledStartTime || task.estimatedMinutes || task.dueDate) && (
-          <div className="flex items-center gap-3 mt-0.5">
-            {task.scheduledStartTime && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
-                <Clock className="w-3 h-3" />
+        {/* Meta Info - Separated Duration, Time, and Date */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+          {/* Estimated Duration */}
+          {task.estimatedMinutes && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Timer className="w-3 h-3" />
+              <span className="font-medium">{formatEstimatedTime(task.estimatedMinutes)}</span>
+            </span>
+          )}
+
+          {/* Scheduled Time (if set) */}
+          {task.scheduledStartTime && (
+            <span className="flex items-center gap-1 text-xs text-primary font-medium">
+              <Clock className="w-3 h-3" />
+              <span className="font-mono">
                 {task.scheduledStartTime}
                 {task.scheduledEndTime && ` - ${task.scheduledEndTime}`}
               </span>
-            )}
-            {task.estimatedMinutes && !task.scheduledStartTime && (
-              <span className="text-xs text-muted-foreground font-mono">
-                {formatEstimatedTime(task.estimatedMinutes)}
-              </span>
-            )}
-            {task.dueDate && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Calendar className="w-3 h-3" />
-                {task.dueDate}
-              </span>
-            )}
-          </div>
+            </span>
+          )}
+
+          {/* Due Date */}
+          {task.dueDate && (
+            <span className={cn(
+              'flex items-center gap-1 text-xs font-medium',
+              new Date(task.dueDate) < new Date() ? 'text-destructive' : 'text-muted-foreground'
+            )}>
+              <Calendar className="w-3 h-3" />
+              <span>{task.dueDate}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Notes Preview (if exists and long enough) */}
+        {task.notes && (
+          <p className="mt-1.5 text-xs text-muted-foreground/80 truncate max-w-[200px]">
+            {task.notes}
+          </p>
         )}
       </div>
     </div>
