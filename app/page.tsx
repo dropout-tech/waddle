@@ -1,0 +1,177 @@
+'use client'
+
+import { useState, useCallback } from 'react'
+import { MainLayout } from '@/components/layout/main-layout'
+import { TaskDetailModal } from '@/components/modals/task-detail-modal'
+import { JournalModal } from '@/components/modals/journal-modal'
+import { mockWorkspaces, mockTimeBlocks, getAllTasks } from '@/lib/mock-data'
+import type { Workspace, Task, JournalEntry } from '@/lib/types'
+
+export default function FlowDeskPage() {
+  // State for workspaces and tasks
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(mockWorkspaces)
+
+  // Modal states
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [isJournalOpen, setIsJournalOpen] = useState(false)
+  const [journalDate, setJournalDate] = useState(new Date())
+
+  // Toggle category collapse
+  const handleToggleCategoryCollapse = useCallback((categoryId: string) => {
+    setWorkspaces((prev) =>
+      prev.map((workspace) => ({
+        ...workspace,
+        categories: workspace.categories.map((category) =>
+          category.id === categoryId
+            ? { ...category, isCollapsed: !category.isCollapsed }
+            : category
+        ),
+      }))
+    )
+  }, [])
+
+  // Toggle task completion
+  const handleToggleComplete = useCallback((taskId: string) => {
+    setWorkspaces((prev) =>
+      prev.map((workspace) => ({
+        ...workspace,
+        categories: workspace.categories.map((category) => ({
+          ...category,
+          tasks: category.tasks.map((task) =>
+            task.id === taskId
+              ? {
+                  ...task,
+                  isCompleted: !task.isCompleted,
+                  completedAt: !task.isCompleted
+                    ? new Date().toISOString()
+                    : undefined,
+                }
+              : task
+          ),
+        })),
+      }))
+    )
+  }, [])
+
+  // Select task to open detail modal
+  const handleSelectTask = useCallback((task: Task) => {
+    setSelectedTask(task)
+  }, [])
+
+  // Add new task
+  const handleAddTask = useCallback((categoryId: string, title: string) => {
+    const newTask: Task = {
+      id: `task-${Date.now()}`,
+      categoryId,
+      workspaceId: '',
+      workspaceName: '',
+      workspaceColor: '',
+      categoryName: '',
+      title,
+      taskType: 'one_time',
+      urgency: 5,
+      calendarColor: '',
+      isCompleted: false,
+      sortOrder: 999,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    setWorkspaces((prev) =>
+      prev.map((workspace) => ({
+        ...workspace,
+        categories: workspace.categories.map((category) => {
+          if (category.id === categoryId) {
+            const enrichedTask = {
+              ...newTask,
+              workspaceId: workspace.id,
+              workspaceName: workspace.name,
+              workspaceColor: workspace.color,
+              categoryName: category.name,
+              calendarColor: workspace.color,
+            }
+            return {
+              ...category,
+              tasks: [...category.tasks, enrichedTask],
+            }
+          }
+          return category
+        }),
+      }))
+    )
+  }, [])
+
+  // Update task from modal
+  const handleSaveTask = useCallback((updates: Partial<Task>) => {
+    if (!selectedTask) return
+
+    setWorkspaces((prev) =>
+      prev.map((workspace) => ({
+        ...workspace,
+        categories: workspace.categories.map((category) => ({
+          ...category,
+          tasks: category.tasks.map((task) =>
+            task.id === selectedTask.id
+              ? { ...task, ...updates, updatedAt: new Date().toISOString() }
+              : task
+          ),
+        })),
+      }))
+    )
+  }, [selectedTask])
+
+  // Open journal modal
+  const handleOpenJournal = useCallback(() => {
+    setJournalDate(new Date())
+    setIsJournalOpen(true)
+  }, [])
+
+  // Save journal entry
+  const handleSaveJournal = useCallback((entry: Partial<JournalEntry>) => {
+    // In a real app, this would save to the database
+    console.log('[v0] Saving journal entry:', entry)
+  }, [])
+
+  // Get all tasks for journal task review
+  const allTasks = workspaces.flatMap((w) =>
+    w.categories.flatMap((c) => c.tasks)
+  )
+  const journalDateString = journalDate.toISOString().split('T')[0]
+  const tasksForJournalDate = allTasks.filter(
+    (t) => t.scheduledDate === journalDateString
+  )
+
+  return (
+    <>
+      <MainLayout
+        workspaces={workspaces}
+        timeBlocks={mockTimeBlocks}
+        onToggleCategoryCollapse={handleToggleCategoryCollapse}
+        onToggleComplete={handleToggleComplete}
+        onSelectTask={handleSelectTask}
+        onAddTask={handleAddTask}
+        onOpenJournal={handleOpenJournal}
+      />
+
+      {/* Task Detail Modal */}
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          isOpen={!!selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onSave={handleSaveTask}
+        />
+      )}
+
+      {/* Journal Modal */}
+      <JournalModal
+        isOpen={isJournalOpen}
+        date={journalDate}
+        tasksForDate={tasksForJournalDate}
+        onClose={() => setIsJournalOpen(false)}
+        onSave={handleSaveJournal}
+        onDateChange={setJournalDate}
+      />
+    </>
+  )
+}
