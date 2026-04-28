@@ -544,6 +544,7 @@ export function WeekView({
                       onSelect={onTaskSelect}
                       onToggleComplete={onToggleComplete}
                       onDragStart={(info) => handleTaskDragStart(info, dayIndex)}
+                      compact={true}
                       column={col?.column ?? 0}
                       totalColumns={col?.totalColumns ?? 1}
                       dragOverride={dragOverride}
