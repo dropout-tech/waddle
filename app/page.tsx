@@ -332,6 +332,23 @@ export default function FlowDeskPage() {
     setTimeBlocks((prev) => [...prev, newBlock])
   }, [])
 
+  // Reschedule a task by dragging/resizing on the calendar
+  const handleRescheduleTask = useCallback((taskId: string, newStart: string, newEnd: string) => {
+    setWorkspaces((prev) =>
+      prev.map((workspace) => ({
+        ...workspace,
+        categories: workspace.categories.map((category) => ({
+          ...category,
+          tasks: category.tasks.map((task) =>
+            task.id === taskId
+              ? { ...task, scheduledStartTime: newStart, scheduledEndTime: newEnd, updatedAt: new Date().toISOString() }
+              : task
+          ),
+        })),
+      }))
+    )
+  }, [])
+
   // Update time block (drag/resize)
   const handleUpdateTimeBlock = useCallback((id: string, updates: Partial<TimeBlock>) => {
     setTimeBlocks((prev) =>
@@ -462,6 +479,7 @@ export default function FlowDeskPage() {
         onOpenReport={handleOpenReport}
         onCreateCalendarTask={handleCreateCalendarTask}
         onCreateCalendarTimeBlock={handleCreateTimeBlock}
+        onRescheduleTask={handleRescheduleTask}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onUpdateTimeBlock={handleUpdateTimeBlock}
         onDeleteTimeBlock={handleDeleteTimeBlock}
