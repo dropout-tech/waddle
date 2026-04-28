@@ -292,13 +292,13 @@ export function WeekView({
       <div ref={scrollContainerRef} className="flex-1 overflow-auto">
         <div className="flex min-w-[800px]" ref={gridRef}>
           {/* Time labels column */}
-          <div className="w-12 flex-shrink-0 border-r border-border bg-panel">
+          <div className="w-14 flex-shrink-0 border-r border-border bg-panel">
             {hours.map((hour) => (
               <div
                 key={hour}
                 className="h-[60px] relative"
               >
-                <span className="absolute -top-2 right-2 text-[10px] text-muted-foreground font-mono">
+                <span className="absolute -top-2 left-1 right-1 text-[10px] text-muted-foreground font-mono text-right">
                   {hour.toString().padStart(2, '0')}:00
                 </span>
               </div>
