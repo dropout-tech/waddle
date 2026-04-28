@@ -6,6 +6,7 @@ import { CalendarHeader } from './calendar-header'
 import { PendingZone } from './pending-zone'
 import { TimeGrid } from './time-grid'
 import { WeekView } from './week-view'
+import { MonthView } from './month-view'
 
 interface CalendarPanelProps {
   selectedDate: Date
@@ -82,12 +83,20 @@ export function CalendarPanel({
       )}
 
       {viewMode === 'month' && (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground">
-          <div className="text-center">
-            <p className="text-lg font-medium">月視圖</p>
-            <p className="text-sm mt-1">即將推出</p>
-          </div>
-        </div>
+        <MonthView
+          selectedDate={selectedDate}
+          tasks={allTasks}
+          timeBlocks={timeBlocks}
+          onTaskSelect={onTaskSelect}
+          onToggleComplete={onToggleComplete}
+          onDateSelect={(date) => {
+            onDateChange(date)
+            onViewModeChange('day')
+          }}
+          onCreateTask={(dateString) => {
+            onCreateTask?.('09:00', '09:30')
+          }}
+        />
       )}
     </div>
   )

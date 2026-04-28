@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Calendar, Clock, AlertCircle, FileText, Save } from 'lucide-react'
+import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import { formatEstimatedTime } from '@/lib/task-utils'
@@ -13,6 +13,8 @@ interface TaskDetailModalProps {
   isOpen: boolean
   onClose: () => void
   onSave: (updates: Partial<Task>) => void
+  onToggleComplete?: (taskId: string) => void
+  onDelete?: (taskId: string) => void
 }
 
 export function TaskDetailModal({
@@ -20,6 +22,8 @@ export function TaskDetailModal({
   isOpen,
   onClose,
   onSave,
+  onToggleComplete,
+  onDelete,
 }: TaskDetailModalProps) {
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description || '')
@@ -67,20 +71,47 @@ export function TaskDetailModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
+            {/* Completion Checkbox */}
+            <button
+              onClick={() => onToggleComplete?.(task.id)}
+              className={cn(
+                'flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all hover:scale-110',
+                task.isCompleted
+                  ? 'border-primary bg-primary'
+                  : 'border-muted-foreground/40 hover:border-primary'
+              )}
+              title={task.isCompleted ? '標記為未完成' : '標記為完成'}
+            >
+              {task.isCompleted && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+            </button>
             <div
-              className="w-3 h-3 rounded-full"
+              className="w-2.5 h-2.5 rounded-full"
               style={{ backgroundColor: task.workspaceColor }}
             />
             <span className="text-xs font-medium text-muted-foreground">
               {task.workspaceName} / {task.categoryName}
             </span>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
+          <div className="flex items-center gap-1">
+            {onDelete && (
+              <button
+                onClick={() => {
+                  onDelete(task.id)
+                  onClose()
+                }}
+                className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                title="刪除任務"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
+            >
+              <X className="w-5 h-5 text-muted-foreground" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}

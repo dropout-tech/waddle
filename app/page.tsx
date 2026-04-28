@@ -103,6 +103,67 @@ export default function FlowDeskPage() {
     )
   }, [])
 
+  // Add new category
+  const handleAddCategory = useCallback((workspaceId: string, name: string) => {
+    const newCategory = {
+      id: `category-${Date.now()}`,
+      workspaceId,
+      name,
+      sortOrder: 999,
+      isCollapsed: false,
+      isArchived: false,
+      tasks: [],
+    }
+
+    setWorkspaces((prev) =>
+      prev.map((workspace) => {
+        if (workspace.id !== workspaceId) return workspace
+        return {
+          ...workspace,
+          categories: [...workspace.categories, newCategory],
+        }
+      })
+    )
+  }, [])
+
+  // Add new workspace
+  const handleAddWorkspace = useCallback((name: string, color: string, icon: string) => {
+    const newWorkspace: Workspace = {
+      id: `workspace-${Date.now()}`,
+      name,
+      color,
+      icon,
+      sortOrder: workspaces.length,
+      isArchived: false,
+      categories: [
+        {
+          id: `category-${Date.now()}-default`,
+          workspaceId: `workspace-${Date.now()}`,
+          name: '一般',
+          sortOrder: 0,
+          isCollapsed: false,
+          isArchived: false,
+          tasks: [],
+        },
+      ],
+    }
+
+    setWorkspaces((prev) => [...prev, newWorkspace])
+  }, [workspaces.length])
+
+  // Delete task
+  const handleDeleteTask = useCallback((taskId: string) => {
+    setWorkspaces((prev) =>
+      prev.map((workspace) => ({
+        ...workspace,
+        categories: workspace.categories.map((category) => ({
+          ...category,
+          tasks: category.tasks.filter((task) => task.id !== taskId),
+        })),
+      }))
+    )
+  }, [])
+
   // Update task from modal
   const handleSaveTask = useCallback((updates: Partial<Task>) => {
     if (!selectedTask) return
@@ -228,6 +289,8 @@ export default function FlowDeskPage() {
         onToggleComplete={handleToggleComplete}
         onSelectTask={handleSelectTask}
         onAddTask={handleAddTask}
+        onAddCategory={handleAddCategory}
+        onAddWorkspace={handleAddWorkspace}
         onOpenJournal={handleOpenJournal}
         onOpenReport={handleOpenReport}
         onCreateCalendarTask={handleCreateCalendarTask}
@@ -240,6 +303,8 @@ export default function FlowDeskPage() {
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           onSave={handleSaveTask}
+          onToggleComplete={handleToggleComplete}
+          onDelete={handleDeleteTask}
         />
       )}
 

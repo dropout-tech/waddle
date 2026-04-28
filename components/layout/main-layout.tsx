@@ -14,6 +14,8 @@ interface MainLayoutProps {
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
   onAddTask: (categoryId: string, title: string) => void
+  onAddCategory?: (workspaceId: string, name: string) => void
+  onAddWorkspace?: (name: string, color: string, icon: string) => void
   onOpenJournal: () => void
   onOpenReport: () => void
   onCreateCalendarTask?: (date: string, startTime: string, endTime: string) => void
@@ -30,6 +32,8 @@ export function MainLayout({
   onToggleComplete,
   onSelectTask,
   onAddTask,
+  onAddCategory,
+  onAddWorkspace,
   onOpenJournal,
   onOpenReport,
   onCreateCalendarTask,
@@ -92,6 +96,8 @@ export function MainLayout({
           onToggleComplete={onToggleComplete}
           onSelectTask={onSelectTask}
           onAddTask={onAddTask}
+          onAddCategory={onAddCategory}
+          onAddWorkspace={onAddWorkspace}
           onOpenJournal={onOpenJournal}
           onOpenReport={onOpenReport}
         />

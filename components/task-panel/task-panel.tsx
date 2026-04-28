@@ -1,11 +1,12 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { BookOpen, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Workspace, Task } from '@/lib/types'
 import { PanelHeader } from './panel-header'
 import { WorkspaceSection } from './workspace-section'
+import { FilterBar, type FilterState } from './filter-bar'
 import { Button } from '@/components/ui/button'
 
 interface TaskPanelProps {
@@ -14,6 +15,8 @@ interface TaskPanelProps {
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
   onAddTask: (categoryId: string, title: string) => void
+  onAddCategory?: (workspaceId: string, name: string) => void
+  onAddWorkspace?: (name: string, color: string, icon: string) => void
   onOpenJournal: () => void
   onOpenReport: () => void
   className?: string
@@ -25,11 +28,50 @@ export function TaskPanel({
   onToggleComplete,
   onSelectTask,
   onAddTask,
+  onAddCategory,
+  onAddWorkspace,
   onOpenJournal,
   onOpenReport,
   className,
 }: TaskPanelProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [filters, setFilters] = useState<FilterState>({
+    search: '',
+    urgency: [],
+    showCompleted: true,
+    workspaceIds: [],
+  })
+
+  // Filter workspaces and tasks
+  const filteredWorkspaces = useMemo(() => {
+    return workspaces
+      .filter((w) => !w.isArchived)
+      .filter((w) => filters.workspaceIds.length === 0 || filters.workspaceIds.includes(w.id))
+      .map((workspace) => ({
+        ...workspace,
+        categories: workspace.categories
+          .filter((c) => !c.isArchived)
+          .map((category) => ({
+            ...category,
+            tasks: category.tasks.filter((task) => {
+              // Search filter
+              if (filters.search && !task.title.toLowerCase().includes(filters.search.toLowerCase())) {
+                return false
+              }
+              // Urgency filter
+              if (filters.urgency.length > 0 && !filters.urgency.includes(task.urgency)) {
+                return false
+              }
+              // Completed filter
+              if (!filters.showCompleted && task.isCompleted) {
+                return false
+              }
+              return true
+            }),
+          })),
+      }))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+  }, [workspaces, filters])
 
   const handleWorkspaceClick = (workspaceId: string) => {
     // Scroll to workspace section
@@ -50,6 +92,14 @@ export function TaskPanel({
       <PanelHeader
         workspaces={workspaces}
         onWorkspaceClick={handleWorkspaceClick}
+        onAddWorkspace={onAddWorkspace}
+      />
+
+      {/* Filter Bar */}
+      <FilterBar
+        filters={filters}
+        onFiltersChange={setFilters}
+        workspaces={workspaces.map((w) => ({ id: w.id, name: w.name, color: w.color }))}
       />
 
       {/* Task List - Scrollable */}
@@ -57,10 +107,7 @@ export function TaskPanel({
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-3 py-4"
       >
-        {workspaces
-          .filter((w) => !w.isArchived)
-          .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map((workspace) => (
+        {filteredWorkspaces.map((workspace) => (
             <div key={workspace.id} id={`workspace-${workspace.id}`}>
               <WorkspaceSection
                 workspace={workspace}
@@ -68,6 +115,7 @@ export function TaskPanel({
                 onToggleComplete={onToggleComplete}
                 onSelectTask={onSelectTask}
                 onAddTask={onAddTask}
+                onAddCategory={onAddCategory}
               />
             </div>
           ))}

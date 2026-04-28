@@ -1,6 +1,7 @@
 'use client'
 
-import { Cloud, Sun, Leaf } from 'lucide-react'
+import { useState } from 'react'
+import { Cloud, Sun, Leaf, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/task-utils'
 import type { Workspace } from '@/lib/types'
@@ -8,9 +9,25 @@ import type { Workspace } from '@/lib/types'
 interface PanelHeaderProps {
   workspaces: Workspace[]
   onWorkspaceClick: (workspaceId: string) => void
+  onAddWorkspace?: (name: string, color: string, icon: string) => void
 }
 
-export function PanelHeader({ workspaces, onWorkspaceClick }: PanelHeaderProps) {
+const PRESET_COLORS = [
+  '#c9847a', // terracotta
+  '#8fae8b', // sage
+  '#a8927f', // taupe
+  '#7da2b8', // dusty blue
+  '#c4a4b5', // dusty rose
+  '#d4a76a', // amber
+]
+
+const PRESET_ICONS = ['', '', '', '', '', '', '', '']
+
+export function PanelHeader({ workspaces, onWorkspaceClick, onAddWorkspace }: PanelHeaderProps) {
+  const [isAdding, setIsAdding] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0])
+  const [selectedIcon, setSelectedIcon] = useState(PRESET_ICONS[0])
   const today = new Date()
 
   // Count pending tasks per workspace
@@ -25,8 +42,18 @@ export function PanelHeader({ workspaces, onWorkspaceClick }: PanelHeaderProps) 
   // Get total pending tasks
   const totalPending = workspaces.reduce((sum, ws) => sum + getWorkspaceCount(ws), 0)
 
+  const handleAddWorkspace = () => {
+    if (newName.trim() && onAddWorkspace) {
+      onAddWorkspace(newName.trim(), selectedColor, selectedIcon)
+      setNewName('')
+      setSelectedColor(PRESET_COLORS[0])
+      setSelectedIcon(PRESET_ICONS[0])
+      setIsAdding(false)
+    }
+  }
+
   return (
-    <div className="px-5 py-5 border-b border-border bg-card">
+    <div className="relative px-5 py-5 border-b border-border bg-card">
       {/* Row 1: Brand + Weather */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -105,7 +132,91 @@ export function PanelHeader({ workspaces, onWorkspaceClick }: PanelHeaderProps) 
               </button>
             )
           })}
+
+        {/* Add Workspace Button */}
+        <button
+          onClick={() => setIsAdding(true)}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-all"
+        >
+          <Plus className="w-3 h-3" />
+          <span>新增</span>
+        </button>
       </div>
+
+      {/* Add Workspace Modal */}
+      {isAdding && (
+        <div className="absolute inset-x-0 top-full mt-2 mx-4 p-4 bg-card border border-border rounded-xl shadow-lg z-50">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-foreground">新增工作區</span>
+            <button
+              onClick={() => setIsAdding(false)}
+              className="p-1 rounded hover:bg-secondary"
+            >
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleAddWorkspace()
+              else if (e.key === 'Escape') setIsAdding(false)
+            }}
+            placeholder="工作區名稱..."
+            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-primary"
+            autoFocus
+          />
+
+          {/* Color Picker */}
+          <div className="mb-3">
+            <span className="text-xs text-muted-foreground mb-1.5 block">顏色</span>
+            <div className="flex gap-2">
+              {PRESET_COLORS.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setSelectedColor(color)}
+                  className={cn(
+                    'w-6 h-6 rounded-full transition-all',
+                    selectedColor === color && 'ring-2 ring-offset-2 ring-primary'
+                  )}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Icon Picker */}
+          <div className="mb-4">
+            <span className="text-xs text-muted-foreground mb-1.5 block">圖示</span>
+            <div className="flex gap-2 flex-wrap">
+              {PRESET_ICONS.map((icon) => (
+                <button
+                  key={icon}
+                  onClick={() => setSelectedIcon(icon)}
+                  className={cn(
+                    'w-8 h-8 rounded-lg border flex items-center justify-center text-base transition-all',
+                    selectedIcon === icon
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border hover:border-primary/50'
+                  )}
+                >
+                  {icon}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={handleAddWorkspace}
+            disabled={!newName.trim()}
+            className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
+          >
+            建立工作區
+          </button>
+        </div>
+      )}
     </div>
   )
 }
