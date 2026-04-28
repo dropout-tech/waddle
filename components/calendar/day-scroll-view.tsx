@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useRef, useCallback, useEffect } from 'react'
+import { useMemo, useState, useRef, useCallback, useEffect, memo } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { CurrentTimeLine } from './current-time-line'
@@ -19,8 +19,8 @@ interface DayScrollViewProps {
 }
 
 const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六']
-const DAY_WIDTH = 280 // wider for day view
-const DAYS_TO_RENDER = 7 // render 7 days (3 before, current, 3 after)
+const DAY_WIDTH = 280
+const DAYS_TO_RENDER = 7
 const CENTER_DAY_INDEX = 3
 
 function timeToMinutes(t: string): number {
@@ -36,6 +36,73 @@ function minutesToTime(minutes: number): string {
 
 function snap(minutes: number): number {
   return Math.round(minutes / 15) * 15
+}
+
+function overlaps(a: Task, b: Task): boolean {
+  const aStart = timeToMinutes(a.scheduledStartTime!)
+  const aEnd = timeToMinutes(a.scheduledEndTime!)
+  const bStart = timeToMinutes(b.scheduledStartTime!)
+  const bEnd = timeToMinutes(b.scheduledEndTime!)
+  return aStart < bEnd && aEnd > bStart
+}
+
+function calculateTaskColumns(tasks: Task[]): Map<string, { column: number; totalColumns: number }> {
+  const result = new Map<string, { column: number; totalColumns: number }>()
+  const valid = tasks.filter(t => t.scheduledStartTime && t.scheduledEndTime)
+  if (!valid.length) return result
+
+  const sorted = [...valid].sort((a, b) => {
+    const d = timeToMinutes(a.scheduledStartTime!) - timeToMinutes(b.scheduledStartTime!)
+    return d !== 0 ? d :
+      (timeToMinutes(b.scheduledEndTime!) - timeToMinutes(b.scheduledStartTime!)) -
+      (timeToMinutes(a.scheduledEndTime!) - timeToMinutes(a.scheduledStartTime!))
+  })
+
+  const visited = new Set<string>()
+  const groups: Task[][] = []
+
+  for (const task of sorted) {
+    if (visited.has(task.id)) continue
+    const group: Task[] = []
+    const queue = [task]
+    while (queue.length) {
+      const cur = queue.shift()!
+      if (visited.has(cur.id)) continue
+      visited.add(cur.id)
+      group.push(cur)
+      for (const other of sorted) {
+        if (!visited.has(other.id) && overlaps(cur, other)) queue.push(other)
+      }
+    }
+    groups.push(group)
+  }
+
+  for (const group of groups) {
+    group.sort((a, b) => timeToMinutes(a.scheduledStartTime!) - timeToMinutes(b.scheduledStartTime!))
+    const columnEnds: number[] = []
+    for (const task of group) {
+      const taskStart = timeToMinutes(task.scheduledStartTime!)
+      let placed = false
+      for (let col = 0; col < columnEnds.length; col++) {
+        if (columnEnds[col] <= taskStart) {
+          result.set(task.id, { column: col, totalColumns: 0 })
+          columnEnds[col] = timeToMinutes(task.scheduledEndTime!)
+          placed = true
+          break
+        }
+      }
+      if (!placed) {
+        result.set(task.id, { column: columnEnds.length, totalColumns: 0 })
+        columnEnds.push(timeToMinutes(task.scheduledEndTime!))
+      }
+    }
+    const total = columnEnds.length
+    for (const task of group) {
+      const e = result.get(task.id)!
+      result.set(task.id, { column: e.column, totalColumns: total })
+    }
+  }
+  return result
 }
 
 export function DayScrollView({
@@ -109,14 +176,14 @@ export function DayScrollView({
     const scrollLeft = container.scrollLeft
     const maxScroll = container.scrollWidth - container.clientWidth
 
-    if (scrollLeft < DAY_WIDTH) {
+    if (scrollLeft < DAY_WIDTH * 0.5) {
       isScrolling.current = true
       onNavigate?.('prev')
-      setTimeout(() => { isScrolling.current = false }, 100)
-    } else if (scrollLeft > maxScroll - DAY_WIDTH) {
+      requestAnimationFrame(() => { isScrolling.current = false })
+    } else if (scrollLeft > maxScroll - DAY_WIDTH * 0.5) {
       isScrolling.current = true
       onNavigate?.('next')
-      setTimeout(() => { isScrolling.current = false }, 100)
+      requestAnimationFrame(() => { isScrolling.current = false })
     }
   }, [onNavigate])
 
@@ -345,35 +412,48 @@ export function DayScrollView({
                   </div>
                 ))}
 
-                {/* Scheduled Tasks */}
-                {dayTasks.map((task) => (
-                  <button
-                    key={task.id}
-                    data-task="true"
-                    onClick={() => onTaskSelect(task)}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    className={cn(
-                      'absolute left-1 right-1 rounded px-2 py-1.5 text-left overflow-hidden transition-all hover:opacity-90',
-                      task.isCompleted && 'opacity-60'
-                    )}
-                    style={{
-                      top: getTimePosition(task.scheduledStartTime!),
-                      height: getDurationHeight(task.scheduledStartTime!, task.scheduledEndTime!),
-                      backgroundColor: task.calendarColor || task.workspaceColor,
-                      color: '#fff',
-                    }}
-                  >
-                    <div className={cn(
-                      'text-sm font-semibold leading-tight truncate',
-                      task.isCompleted && 'line-through'
-                    )}>
-                      {task.title}
-                    </div>
-                    <div className="text-xs opacity-80 mt-0.5">
-                      {task.scheduledStartTime}-{task.scheduledEndTime}
-                    </div>
-                  </button>
-                ))}
+                {/* Scheduled Tasks with overlap handling */}
+                {(() => {
+                  const taskColumns = calculateTaskColumns(dayTasks)
+                  return dayTasks.map((task) => {
+                    const col = taskColumns.get(task.id)
+                    const column = col?.column ?? 0
+                    const totalColumns = col?.totalColumns ?? 1
+                    const widthPercent = 100 / totalColumns
+                    const leftPercent = column * widthPercent
+
+                    return (
+                      <button
+                        key={task.id}
+                        data-task="true"
+                        onClick={() => onTaskSelect(task)}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        className={cn(
+                          'absolute rounded px-2 py-1.5 text-left overflow-hidden transition-all hover:opacity-90 hover:z-10',
+                          task.isCompleted && 'opacity-60'
+                        )}
+                        style={{
+                          top: getTimePosition(task.scheduledStartTime!),
+                          height: getDurationHeight(task.scheduledStartTime!, task.scheduledEndTime!),
+                          left: `calc(${leftPercent}% + 4px)`,
+                          width: `calc(${widthPercent}% - 8px)`,
+                          backgroundColor: task.calendarColor || task.workspaceColor,
+                          color: '#fff',
+                        }}
+                      >
+                        <div className={cn(
+                          'text-sm font-semibold leading-tight truncate',
+                          task.isCompleted && 'line-through'
+                        )}>
+                          {task.title}
+                        </div>
+                        <div className="text-xs opacity-80 mt-0.5">
+                          {task.scheduledStartTime}-{task.scheduledEndTime}
+                        </div>
+                      </button>
+                    )
+                  })
+                })()}
 
                 {/* Drag Selection Preview */}
                 {dragSelection && dragSelection.height > 10 && (
