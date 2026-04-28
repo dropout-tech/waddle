@@ -273,6 +273,7 @@ export function WeekView({
 
   const MIN = startHour * 60
   const MAX = endHour * 60
+  const TIME_COL_WIDTH = 56
 
   const handleTaskDragStart = useCallback((info: TaskDragStart, dayIndex: number) => {
     setActiveTaskDrag({ ...info, currentStart: info.originalStart, currentEnd: info.originalEnd, dayIndex })
@@ -290,29 +291,45 @@ export function WeekView({
     setDragEnd({ day: dayIndex, y })
   }, [])
 
-  // Handle mouse move during drag
-  const handleMouseMove = useCallback((e: React.MouseEvent, dayIndex: number) => {
-    if (activeTaskDrag) {
-      const rect = e.currentTarget.getBoundingClientRect()
-      const scrollTop = scrollContainerRef.current?.scrollTop ?? 0
-      const minutes = snap(MIN + (e.clientY - rect.top + scrollTop))
-      const duration = activeTaskDrag.originalEnd - activeTaskDrag.originalStart
-      if (activeTaskDrag.dragType === 'move') {
-        const newStart = clamp(snap(minutes - activeTaskDrag.offsetY), MIN, MAX - 15)
-        setActiveTaskDrag(prev => prev ? { ...prev, currentStart: newStart, currentEnd: clamp(newStart + duration, MIN + 15, MAX) } : null)
-      } else if (activeTaskDrag.dragType === 'resize-top') {
-        setActiveTaskDrag(prev => prev ? { ...prev, currentStart: clamp(minutes, MIN, prev.currentEnd - 15) } : null)
-      } else if (activeTaskDrag.dragType === 'resize-bottom') {
-        setActiveTaskDrag(prev => prev ? { ...prev, currentEnd: clamp(minutes, prev.currentStart + 15, MAX) } : null)
-      }
-      return
+  // Global mouse move for cross-day task dragging
+  const handleGlobalMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!activeTaskDrag) return
+    
+    const gridEl = gridRef.current
+    if (!gridEl) return
+    
+    const gridRect = gridEl.getBoundingClientRect()
+    const scrollTop = scrollContainerRef.current?.scrollTop ?? 0
+    
+    // Calculate which day column the mouse is over
+    const relX = e.clientX - gridRect.left - TIME_COL_WIDTH
+    const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
+    
+    // Calculate time from Y position
+    const relY = e.clientY - gridRect.top + scrollTop
+    const minutes = snap(MIN + relY)
+    const duration = activeTaskDrag.originalEnd - activeTaskDrag.originalStart
+    
+    if (activeTaskDrag.dragType === 'move') {
+      const newStart = clamp(snap(minutes - activeTaskDrag.offsetY), MIN, MAX - 15)
+      const newEnd = clamp(newStart + duration, MIN + 15, MAX)
+      setActiveTaskDrag(prev => prev ? { ...prev, dayIndex: newDayIndex, currentStart: newStart, currentEnd: newEnd } : null)
+    } else if (activeTaskDrag.dragType === 'resize-top') {
+      setActiveTaskDrag(prev => prev ? { ...prev, currentStart: clamp(minutes, MIN, prev.currentEnd - 15) } : null)
+    } else if (activeTaskDrag.dragType === 'resize-bottom') {
+      setActiveTaskDrag(prev => prev ? { ...prev, currentEnd: clamp(minutes, prev.currentStart + 15, MAX) } : null)
     }
+  }, [activeTaskDrag, allDates.length, MIN, MAX])
+
+  // Handle mouse move for new-slot drag (per column)
+  const handleMouseMove = useCallback((e: React.MouseEvent, dayIndex: number) => {
+    if (activeTaskDrag) return // handled by global
     if (!isDragging || !dragStart) return
     const rect = e.currentTarget.getBoundingClientRect()
     const maxY = hours.length * 60
     const y = Math.max(0, Math.min(e.clientY - rect.top, maxY))
     setDragEnd({ day: dayIndex, y })
-  }, [isDragging, dragStart, activeTaskDrag, hours.length, MIN, MAX])
+  }, [isDragging, dragStart, activeTaskDrag, hours.length])
 
   // Handle mouse up
   const handleMouseUp = useCallback(() => {
@@ -338,7 +355,7 @@ export function WeekView({
       const startTime = yToTime(minY)
       const endTime = yToTime(maxY)
       const date = allDates[dragStart.day].toISOString().split('T')[0]
-      const anchorX = 56 + dragStart.day * DAY_WIDTH + DAY_WIDTH / 2
+      const anchorX = TIME_COL_WIDTH + dragStart.day * DAY_WIDTH + DAY_WIDTH / 2
       setPendingSlot({ date, startTime, endTime, anchorX, anchorY: minY })
     }
 
@@ -470,7 +487,14 @@ export function WeekView({
           syncScroll('grid')
         }}
       >
-        <div ref={gridRef} className="flex" style={{ width: `${56 + DAYS_TO_RENDER * DAY_WIDTH}px` }}>
+        <div 
+          ref={gridRef} 
+          className="flex" 
+          style={{ width: `${TIME_COL_WIDTH + DAYS_TO_RENDER * DAY_WIDTH}px` }}
+          onMouseMove={handleGlobalMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
           {/* Time labels column - sticky left */}
           <div className="w-14 flex-shrink-0 sticky left-0 z-20 bg-panel border-r border-border">
             {hours.map((hour) => (
@@ -533,6 +557,9 @@ export function WeekView({
                 {dayTasks.map((task) => {
                   const col = taskColumns.get(task.id)
                   const isDraggingThis = activeTaskDrag?.taskId === task.id
+                  const isBeingDraggedAway = isDraggingThis && activeTaskDrag?.dayIndex !== dayIndex
+                  // Hide task if it's being dragged to another day
+                  if (isBeingDraggedAway) return null
                   const dragOverride = isDraggingThis && activeTaskDrag
                     ? { top: activeTaskDrag.currentStart - MIN, height: activeTaskDrag.currentEnd - activeTaskDrag.currentStart }
                     : null
@@ -552,6 +579,25 @@ export function WeekView({
                     />
                   )
                 })}
+
+                {/* Show dragged task preview when dragging to this day */}
+                {activeTaskDrag && activeTaskDrag.dayIndex === dayIndex && !dayTasks.find(t => t.id === activeTaskDrag.taskId) && (
+                  <div
+                    className="absolute left-1 right-1 rounded-xl px-2 py-1.5 text-left overflow-hidden opacity-80 pointer-events-none z-30 shadow-lg"
+                    style={{
+                      top: `${activeTaskDrag.currentStart - MIN}px`,
+                      height: `${activeTaskDrag.currentEnd - activeTaskDrag.currentStart}px`,
+                      backgroundColor: tasks.find(t => t.id === activeTaskDrag.taskId)?.calendarColor || '#6B7FD4',
+                    }}
+                  >
+                    <div className="text-xs font-semibold text-white truncate">
+                      {tasks.find(t => t.id === activeTaskDrag.taskId)?.title}
+                    </div>
+                    <div className="text-[10px] text-white/80 font-mono mt-0.5">
+                      {minutesToTime(activeTaskDrag.currentStart)}-{minutesToTime(activeTaskDrag.currentEnd)}
+                    </div>
+                  </div>
+                )}
 
                 {/* Drag Selection Preview */}
                 {dragSelection && dragSelection.height > 10 && (
