@@ -18,14 +18,16 @@ interface TaskRowProps {
   onToggleComplete: (taskId: string) => void
   onSelect: (task: Task) => void
   isDragging?: boolean
+  showWorkspaceTag?: boolean
 }
 
 export function TaskRow({
   task,
-  density = 'normal',
+  density = 'comfortable',
   onToggleComplete,
   onSelect,
   isDragging,
+  showWorkspaceTag = false,
 }: TaskRowProps) {
   const colors = getUrgencyColor(task)
 
@@ -69,6 +71,16 @@ export function TaskRow({
           style={{ backgroundColor: colors.accentColor }}
         />
 
+        {/* Workspace Tag */}
+        {showWorkspaceTag && (
+          <span
+            className="flex-shrink-0 text-[9px] font-semibold px-1 py-0.5 rounded"
+            style={{ backgroundColor: `${task.workspaceColor}20`, color: task.workspaceColor }}
+          >
+            {task.workspaceName}
+          </span>
+        )}
+
         {/* Title */}
         <span
           className={cn(
@@ -97,102 +109,7 @@ export function TaskRow({
     )
   }
 
-  // ─── COMFORTABLE: full detail, extra padding, notes always visible ────────
-  if (density === 'comfortable') {
-    return (
-      <div
-        className={cn(
-          'group relative flex items-start gap-3 px-4 py-4 rounded-xl transition-all duration-200 cursor-pointer',
-          'border hover:brightness-[0.97]',
-          isDragging && 'opacity-50 scale-[0.98]',
-          task.isCompleted && 'opacity-55'
-        )}
-        style={{
-          backgroundColor: colors.rowBg,
-          borderColor: `color-mix(in oklch, ${colors.accentColor} 25%, transparent)`,
-          borderLeftWidth: '4px',
-          borderLeftColor: colors.accentColor,
-        }}
-        onClick={() => onSelect(task)}
-        draggable
-      >
-        {/* Drag handle */}
-        <div className="opacity-0 group-hover:opacity-40 transition-opacity cursor-grab active:cursor-grabbing pt-0.5">
-          <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
-        </div>
-
-        {/* Checkbox */}
-        <button
-          onClick={handleCheck}
-          className="flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all mt-0.5 hover:scale-110"
-          style={{
-            backgroundColor: task.isCompleted ? colors.accentColor : 'transparent',
-            borderColor: task.isCompleted ? colors.accentColor : `color-mix(in oklch, ${colors.accentColor} 50%, transparent)`,
-          }}
-        >
-          {task.isCompleted && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-        </button>
-
-        <div className="flex-1 min-w-0">
-          {/* Title + badges */}
-          <div className="flex items-start gap-2 flex-wrap">
-            <span className={cn(
-              'text-sm font-semibold leading-snug text-foreground flex-1 min-w-0',
-              task.isCompleted && 'line-through text-muted-foreground'
-            )}>
-              {task.title}
-            </span>
-            <span
-              className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold"
-              style={{ backgroundColor: colors.badgeBg, color: colors.badgeText }}
-            >
-              {colors.isOverdue && <AlertCircle className="w-2.5 h-2.5" />}
-              {colors.label ?? `U${task.urgency}`}
-            </span>
-          </div>
-
-          {/* Meta row */}
-          <div className="flex flex-wrap items-center gap-3 mt-2">
-            {task.estimatedMinutes && (
-              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Timer className="w-3 h-3" />
-                <span className="font-medium">{formatEstimatedTime(task.estimatedMinutes)}</span>
-              </span>
-            )}
-            {task.scheduledStartTime && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: colors.accentColor }}>
-                <Clock className="w-3 h-3" />
-                <span className="font-mono">
-                  {task.scheduledStartTime}{task.scheduledEndTime && ` - ${task.scheduledEndTime}`}
-                </span>
-              </span>
-            )}
-            {task.dueDate && (
-              <span
-                className="inline-flex items-center gap-1 text-[11px] font-medium"
-                style={{ color: colors.isOverdue ? colors.accentColor : 'oklch(0.52 0.02 55)' }}
-              >
-                <Calendar className="w-3 h-3" />
-                <span>{task.dueDate}</span>
-              </span>
-            )}
-          </div>
-
-          {/* Notes always shown in comfortable mode */}
-          {task.notes && (
-            <p
-              className="mt-2.5 text-[11px] leading-relaxed pl-2.5 text-foreground/60"
-              style={{ borderLeft: `2px solid ${colors.accentColor}50` }}
-            >
-              {task.notes}
-            </p>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // ─── NORMAL: current look (default) ──────────────────────────────────────
+  // ─── COMFORTABLE (default): full detail, extra padding, notes always visible ────────
   return (
     <div
       className={cn(
@@ -231,6 +148,15 @@ export function TaskRow({
       <div className="flex-1 min-w-0">
         {/* Title Row */}
         <div className="flex items-start gap-2 flex-wrap">
+          {/* Workspace Tag */}
+          {showWorkspaceTag && (
+            <span
+              className="flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded"
+              style={{ backgroundColor: `${task.workspaceColor}20`, color: task.workspaceColor }}
+            >
+              {task.workspaceName}
+            </span>
+          )}
           <span className={cn(
             'text-sm font-medium leading-snug text-foreground flex-1 min-w-0',
             task.isCompleted && 'line-through text-muted-foreground'

@@ -89,7 +89,7 @@ export function WeekView({
         {/* Header Row */}
         <div className="sticky top-0 z-10 flex border-b border-border bg-panel">
           {/* Time column header */}
-          <div className="w-14 flex-shrink-0 p-2 text-xs text-muted-foreground text-center border-r border-border">
+          <div className="w-16 flex-shrink-0 p-2 text-xs text-muted-foreground text-center border-r border-border">
             時間
           </div>
           
@@ -125,13 +125,13 @@ export function WeekView({
         {/* Time Grid */}
         <div className="relative flex">
           {/* Time labels column */}
-          <div className="w-14 flex-shrink-0 border-r border-border">
+          <div className="w-16 flex-shrink-0 border-r border-border bg-panel">
             {hours.map((hour) => (
               <div
                 key={hour}
                 className="h-[60px] relative border-b border-border"
               >
-                <span className="absolute -top-2.5 right-2 text-[10px] text-muted-foreground font-mono">
+                <span className="absolute -top-2.5 left-2 text-[10px] text-muted-foreground font-mono">
                   {hour.toString().padStart(2, '0')}:00
                 </span>
               </div>

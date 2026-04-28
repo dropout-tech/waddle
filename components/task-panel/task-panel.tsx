@@ -1,15 +1,17 @@
 'use client'
 
 import { useRef, useState, useMemo } from 'react'
-import { BookOpen, BarChart3, AlignJustify, Minus, List } from 'lucide-react'
+import { BookOpen, BarChart3, FolderTree, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Workspace, Task } from '@/lib/types'
 import { PanelHeader } from './panel-header'
 import { WorkspaceSection } from './workspace-section'
 import { FilterBar, type FilterState } from './filter-bar'
+import { UnifiedTaskList } from './unified-task-list'
 import { Button } from '@/components/ui/button'
 
-export type Density = 'compact' | 'normal' | 'comfortable'
+export type Density = 'compact' | 'comfortable'
+export type ViewMode = 'category' | 'unified'
 
 interface TaskPanelProps {
   workspaces: Workspace[]
@@ -37,7 +39,8 @@ export function TaskPanel({
   className,
 }: TaskPanelProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [density, setDensity] = useState<Density>('normal')
+  const [density, setDensity] = useState<Density>('comfortable')
+  const [viewMode, setViewMode] = useState<ViewMode>('category')
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     urgency: [],
@@ -76,6 +79,17 @@ export function TaskPanel({
       .sort((a, b) => a.sortOrder - b.sortOrder)
   }, [workspaces, filters])
 
+  // Flatten all tasks for unified view
+  const allFilteredTasks = useMemo(() => {
+    const tasks: Task[] = []
+    filteredWorkspaces.forEach((ws) => {
+      ws.categories.forEach((cat) => {
+        tasks.push(...cat.tasks)
+      })
+    })
+    return tasks
+  }, [filteredWorkspaces])
+
   const handleWorkspaceClick = (workspaceId: string) => {
     // Scroll to workspace section
     const element = document.getElementById(`workspace-${workspaceId}`)
@@ -98,6 +112,36 @@ export function TaskPanel({
         onAddWorkspace={onAddWorkspace}
       />
 
+      {/* View Mode Toggle + Filter Bar */}
+      <div className="px-3 pt-2 pb-1 border-b border-border bg-card/50">
+        <div className="flex items-center gap-1 mb-2">
+          <button
+            onClick={() => setViewMode('category')}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
+              viewMode === 'category'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            )}
+          >
+            <FolderTree className="w-3 h-3" />
+            <span>依分類</span>
+          </button>
+          <button
+            onClick={() => setViewMode('unified')}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
+              viewMode === 'unified'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            )}
+          >
+            <Clock className="w-3 h-3" />
+            <span>依時間</span>
+          </button>
+        </div>
+      </div>
+
       {/* Filter Bar */}
       <FilterBar
         filters={filters}
@@ -112,7 +156,8 @@ export function TaskPanel({
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-3 py-4"
       >
-        {filteredWorkspaces.map((workspace) => (
+        {viewMode === 'category' ? (
+          filteredWorkspaces.map((workspace) => (
             <div key={workspace.id} id={`workspace-${workspace.id}`}>
               <WorkspaceSection
                 workspace={workspace}
@@ -124,7 +169,15 @@ export function TaskPanel({
                 onAddCategory={onAddCategory}
               />
             </div>
-          ))}
+          ))
+        ) : (
+          <UnifiedTaskList
+            tasks={allFilteredTasks}
+            density={density}
+            onToggleComplete={onToggleComplete}
+            onSelectTask={onSelectTask}
+          />
+        )}
       </div>
 
       {/* Bottom Toolbar */}

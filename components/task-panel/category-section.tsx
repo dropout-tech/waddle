@@ -18,7 +18,7 @@ interface CategorySectionProps {
 
 export function CategorySection({
   category,
-  density = 'normal',
+  density = 'comfortable',
   onToggleCollapse,
   onToggleComplete,
   onSelectTask,
@@ -90,7 +90,7 @@ export function CategorySection({
 
       {/* Tasks */}
       {!category.isCollapsed && (
-        <div className={cn('mt-1', density === 'compact' ? 'space-y-0.5' : density === 'comfortable' ? 'space-y-3 mt-2' : 'space-y-2 mt-2')}>
+        <div className={cn('mt-1', density === 'compact' ? 'space-y-0.5' : 'space-y-3 mt-2')}>
           {sortedTasks.map((task) => (
             <TaskRow
               key={task.id}

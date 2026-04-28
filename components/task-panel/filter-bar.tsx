@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Filter, X, ChevronDown, AlignJustify, Minus, List } from 'lucide-react'
+import { Search, Filter, X, ChevronDown, AlignJustify, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Density } from './task-panel'
 
@@ -14,8 +14,7 @@ export interface FilterState {
 
 const DENSITY_OPTIONS: { value: Density; icon: React.ReactNode; label: string }[] = [
   { value: 'compact', icon: <Minus className="w-3.5 h-3.5" />, label: '精簡' },
-  { value: 'normal', icon: <List className="w-3.5 h-3.5" />, label: '標準' },
-  { value: 'comfortable', icon: <AlignJustify className="w-3.5 h-3.5" />, label: '寬鬆' },
+  { value: 'comfortable', icon: <AlignJustify className="w-3.5 h-3.5" />, label: '詳細' },
 ]
 
 interface FilterBarProps {
@@ -140,19 +139,21 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
           {/* Urgency Filter */}
           <div>
             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-              急迫度
+              急迫度 (1-10)
             </span>
-            <div className="flex gap-1 mt-1.5">
-              {[1, 2, 3, 4, 5].map((level) => (
+            <div className="flex gap-1 mt-1.5 flex-wrap">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => (
                 <button
                   key={level}
                   onClick={() => toggleUrgency(level)}
                   className={cn(
-                    'w-7 h-7 rounded text-xs font-medium transition-all',
+                    'w-6 h-6 rounded text-[10px] font-bold transition-all',
                     filters.urgency.includes(level)
-                      ? level <= 2
+                      ? level <= 3
+                        ? 'bg-blue-500 text-white'
+                        : level <= 5
                         ? 'bg-emerald-500 text-white'
-                        : level <= 3
+                        : level <= 7
                         ? 'bg-amber-500 text-white'
                         : 'bg-red-500 text-white'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'

@@ -2,9 +2,9 @@ import type { Task, ColorStatus } from './types'
 
 /**
  * Returns inline CSS color values for the entire task row based on urgency
- * (1–5) and date state (overdue / today / upcoming / normal / completed).
+ * (1–10) and date state (overdue / today / upcoming / normal / completed).
  *
- * State priority: completed > overdue > urgency-5 > urgency-4 > urgency-3 > urgency-2 > urgency-1
+ * State priority: completed > overdue > urgency (10 highest to 1 lowest)
  */
 export function getUrgencyColor(task: Task): {
   /** Full row background colour (rgba string) */
@@ -50,59 +50,70 @@ export function getUrgencyColor(task: Task): {
     }
   }
 
-  // --- Urgency-based colouring (1 = low → 5 = critical) ---
-  switch (task.urgency) {
-    case 5:
-      return {
-        rowBg: 'oklch(0.62 0.18 25 / 0.06)',
-        accentColor: 'oklch(0.62 0.18 25)',
-        badgeBg: 'oklch(0.62 0.18 25 / 0.14)',
-        badgeText: 'oklch(0.42 0.18 25)',
-        dot: 'oklch(0.62 0.18 25)',
-        label: '緊急',
-        isOverdue: false,
-      }
-    case 4:
-      return {
-        rowBg: 'oklch(0.72 0.15 55 / 0.07)',
-        accentColor: 'oklch(0.68 0.16 55)',
-        badgeBg: 'oklch(0.68 0.16 55 / 0.14)',
-        badgeText: 'oklch(0.45 0.14 55)',
-        dot: 'oklch(0.68 0.16 55)',
-        label: '重要',
-        isOverdue: false,
-      }
-    case 3:
-      return {
-        rowBg: 'oklch(0.80 0.12 85 / 0.07)',
-        accentColor: 'oklch(0.74 0.13 85)',
-        badgeBg: 'oklch(0.74 0.13 85 / 0.16)',
-        badgeText: 'oklch(0.48 0.10 70)',
-        dot: 'oklch(0.74 0.13 85)',
-        label: '普通',
-        isOverdue: false,
-      }
-    case 2:
-      return {
-        rowBg: 'oklch(0.78 0.10 155 / 0.06)',
-        accentColor: 'oklch(0.70 0.12 155)',
-        badgeBg: 'oklch(0.70 0.12 155 / 0.14)',
-        badgeText: 'oklch(0.40 0.10 155)',
-        dot: 'oklch(0.70 0.12 155)',
-        label: '低',
-        isOverdue: false,
-      }
-    case 1:
-    default:
-      return {
-        rowBg: 'oklch(0.78 0.08 230 / 0.05)',
-        accentColor: 'oklch(0.68 0.10 230)',
-        badgeBg: 'oklch(0.68 0.10 230 / 0.12)',
-        badgeText: 'oklch(0.40 0.10 230)',
-        dot: 'oklch(0.68 0.10 230)',
-        label: '輕鬆',
-        isOverdue: false,
-      }
+  // --- Urgency-based colouring (1 = low → 10 = critical) ---
+  const urgency = task.urgency
+
+  // 9-10: Critical (deep red)
+  if (urgency >= 9) {
+    return {
+      rowBg: 'oklch(0.55 0.22 25 / 0.08)',
+      accentColor: 'oklch(0.55 0.22 25)',
+      badgeBg: 'oklch(0.55 0.22 25 / 0.16)',
+      badgeText: 'oklch(0.40 0.20 25)',
+      dot: 'oklch(0.55 0.22 25)',
+      label: '極度緊急',
+      isOverdue: false,
+    }
+  }
+
+  // 7-8: High (warm orange-red)
+  if (urgency >= 7) {
+    return {
+      rowBg: 'oklch(0.62 0.18 35 / 0.07)',
+      accentColor: 'oklch(0.60 0.18 35)',
+      badgeBg: 'oklch(0.60 0.18 35 / 0.14)',
+      badgeText: 'oklch(0.42 0.16 35)',
+      dot: 'oklch(0.60 0.18 35)',
+      label: '高度緊急',
+      isOverdue: false,
+    }
+  }
+
+  // 5-6: Medium (amber/yellow)
+  if (urgency >= 5) {
+    return {
+      rowBg: 'oklch(0.75 0.14 70 / 0.07)',
+      accentColor: 'oklch(0.70 0.14 70)',
+      badgeBg: 'oklch(0.70 0.14 70 / 0.14)',
+      badgeText: 'oklch(0.45 0.12 70)',
+      dot: 'oklch(0.70 0.14 70)',
+      label: '中等',
+      isOverdue: false,
+    }
+  }
+
+  // 3-4: Normal (sage green)
+  if (urgency >= 3) {
+    return {
+      rowBg: 'oklch(0.75 0.10 145 / 0.06)',
+      accentColor: 'oklch(0.68 0.12 145)',
+      badgeBg: 'oklch(0.68 0.12 145 / 0.14)',
+      badgeText: 'oklch(0.40 0.10 145)',
+      dot: 'oklch(0.68 0.12 145)',
+      label: '一般',
+      isOverdue: false,
+    }
+  }
+
+  // 1-2: Low (calm blue)
+  return {
+    rowBg: 'oklch(0.78 0.08 230 / 0.05)',
+    accentColor: 'oklch(0.65 0.10 230)',
+    badgeBg: 'oklch(0.65 0.10 230 / 0.12)',
+    badgeText: 'oklch(0.40 0.10 230)',
+    dot: 'oklch(0.65 0.10 230)',
+    label: '輕鬆',
+    isOverdue: false,
   }
 }
 

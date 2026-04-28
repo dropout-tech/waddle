@@ -18,7 +18,7 @@ interface WorkspaceSectionProps {
 
 export function WorkspaceSection({
   workspace,
-  density = 'normal',
+  density = 'comfortable',
   onToggleCategoryCollapse,
   onToggleComplete,
   onSelectTask,
