@@ -7,6 +7,7 @@ import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { CalendarHeader } from './calendar-header'
 import { PendingZone } from './pending-zone'
 import { TimeGrid } from './time-grid'
+import { DayScrollView } from './day-scroll-view'
 import { WeekView } from './week-view'
 import { MonthView } from './month-view'
 
@@ -93,34 +94,16 @@ export function CalendarPanel({
       />
 
       {viewMode === 'day' && (
-        <>
-          {/* Pending Zone */}
-          <PendingZone
-            tasks={pendingTasks}
-            onTaskSelect={onTaskSelect}
-            onToggleComplete={onToggleComplete}
-            onCreateTask={onCreatePendingTask}
-          />
-
-          {/* Time Grid */}
-          <TimeGrid
-            scheduledTasks={scheduledTasks}
-            timeBlocks={timeBlocks}
-            onTaskSelect={onTaskSelect}
-            onToggleComplete={onToggleComplete}
-            onCreateTask={(startTime, endTime) => {
-              const dateStr = selectedDate.toISOString().split('T')[0]
-              onCreateTask?.(dateStr, startTime, endTime)
-            }}
-            onCreateTimeBlock={(startTime, endTime, type, label, color) => {
-              const dateStr = selectedDate.toISOString().split('T')[0]
-              onCreateTimeBlock?.(dateStr, startTime, endTime, type, label, color)
-            }}
-            onRescheduleTask={onRescheduleTask}
-            onUpdateTimeBlock={onUpdateTimeBlock}
-            onDeleteTimeBlock={onDeleteTimeBlock}
-          />
-        </>
+        <DayScrollView
+          selectedDate={selectedDate}
+          tasks={allTasks}
+          timeBlocks={timeBlocks}
+          onTaskSelect={onTaskSelect}
+          onToggleComplete={onToggleComplete}
+          onCreateTask={onCreateTask}
+          onNavigate={navigate}
+          onDateChange={onDateChange}
+        />
       )}
 
       {viewMode === 'week' && (
