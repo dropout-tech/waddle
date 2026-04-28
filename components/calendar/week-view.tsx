@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useRef, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { TaskBlock } from './task-block'
@@ -13,6 +13,7 @@ interface WeekViewProps {
   timeBlocks: TimeBlock[]
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
+  onCreateTask?: (date: string, startTime: string, endTime: string) => void
   startHour?: number
   endHour?: number
 }
@@ -25,9 +26,16 @@ export function WeekView({
   timeBlocks,
   onTaskSelect,
   onToggleComplete,
+  onCreateTask,
   startHour = 6,
   endHour = 22,
 }: WeekViewProps) {
+  // Drag state for creating new tasks
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState<{ day: number; y: number } | null>(null)
+  const [dragEnd, setDragEnd] = useState<{ day: number; y: number } | null>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+
   // Get the week dates (Sunday to Saturday)
   const weekDates = useMemo(() => {
     const dates: Date[] = []
@@ -83,6 +91,71 @@ export function WeekView({
     return endPos - startPos
   }
 
+  // Convert Y position to time string
+  const yToTime = useCallback((y: number) => {
+    const totalMinutes = startHour * 60 + Math.round(y / 60 * 60)
+    // Round to nearest 15 minutes
+    const roundedMinutes = Math.round(totalMinutes / 15) * 15
+    const hours = Math.floor(roundedMinutes / 60)
+    const minutes = roundedMinutes % 60
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+  }, [startHour])
+
+  // Handle mouse down on grid to start drag
+  const handleMouseDown = useCallback((e: React.MouseEvent, dayIndex: number) => {
+    if (!gridRef.current) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const y = e.clientY - rect.top
+    setIsDragging(true)
+    setDragStart({ day: dayIndex, y })
+    setDragEnd({ day: dayIndex, y })
+  }, [])
+
+  // Handle mouse move during drag
+  const handleMouseMove = useCallback((e: React.MouseEvent, dayIndex: number) => {
+    if (!isDragging || !dragStart) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const y = Math.max(0, Math.min(e.clientY - rect.top, hours.length * 60))
+    setDragEnd({ day: dayIndex, y })
+  }, [isDragging, dragStart, hours.length])
+
+  // Handle mouse up to finish drag and create task
+  const handleMouseUp = useCallback(() => {
+    if (!isDragging || !dragStart || !dragEnd) {
+      setIsDragging(false)
+      setDragStart(null)
+      setDragEnd(null)
+      return
+    }
+
+    // Only create if dragged on same day and has some height
+    if (dragStart.day === dragEnd.day && Math.abs(dragEnd.y - dragStart.y) > 15) {
+      const minY = Math.min(dragStart.y, dragEnd.y)
+      const maxY = Math.max(dragStart.y, dragEnd.y)
+      const startTime = yToTime(minY)
+      const endTime = yToTime(maxY)
+      const date = weekDates[dragStart.day].toISOString().split('T')[0]
+      
+      onCreateTask?.(date, startTime, endTime)
+    }
+
+    setIsDragging(false)
+    setDragStart(null)
+    setDragEnd(null)
+  }, [isDragging, dragStart, dragEnd, weekDates, yToTime, onCreateTask])
+
+  // Calculate drag selection box
+  const getDragSelection = (dayIndex: number) => {
+    if (!isDragging || !dragStart || !dragEnd || dragStart.day !== dayIndex) {
+      return null
+    }
+    const minY = Math.min(dragStart.y, dragEnd.y)
+    const maxY = Math.max(dragStart.y, dragEnd.y)
+    const startTime = yToTime(minY)
+    const endTime = yToTime(maxY)
+    return { top: minY, height: maxY - minY, startTime, endTime }
+  }
+
   return (
     <div className="flex-1 overflow-auto">
       <div className="min-w-[800px]">
@@ -123,7 +196,7 @@ export function WeekView({
         </div>
 
         {/* Time Grid */}
-        <div className="relative flex">
+        <div className="relative flex" ref={gridRef}>
           {/* Time labels column */}
           <div className="w-16 flex-shrink-0 border-r border-border bg-panel">
             {hours.map((hour) => (
@@ -144,14 +217,21 @@ export function WeekView({
             const isToday = dateStr === todayString
             const dayTasks = getTasksForDate(date)
             const dayBlocks = getTimeBlocksForDate(date)
+            const dragSelection = getDragSelection(dayIndex)
 
             return (
               <div
                 key={dayIndex}
                 className={cn(
-                  'flex-1 relative border-r border-border last:border-r-0',
+                  'flex-1 relative border-r border-border last:border-r-0 cursor-crosshair',
                   isToday && 'bg-primary/5'
                 )}
+                onMouseDown={(e) => handleMouseDown(e, dayIndex)}
+                onMouseMove={(e) => handleMouseMove(e, dayIndex)}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={() => {
+                  if (isDragging) handleMouseUp()
+                }}
               >
                 {/* Hour lines */}
                 {hours.map((hour) => (
@@ -165,7 +245,7 @@ export function WeekView({
                 {dayBlocks.map((block) => (
                   <div
                     key={block.id}
-                    className="absolute left-1 right-1"
+                    className="absolute left-1 right-1 pointer-events-none"
                     style={{
                       top: getTimePosition(block.startTime),
                       height: getDurationHeight(block.startTime, block.endTime),
@@ -184,6 +264,7 @@ export function WeekView({
                       top: getTimePosition(task.scheduledStartTime!),
                       height: getDurationHeight(task.scheduledStartTime!, task.scheduledEndTime!),
                     }}
+                    onMouseDown={(e) => e.stopPropagation()}
                   >
                     <TaskBlock
                       task={task}
@@ -193,6 +274,24 @@ export function WeekView({
                     />
                   </div>
                 ))}
+
+                {/* Drag Selection Preview */}
+                {dragSelection && (
+                  <div
+                    className="absolute left-1 right-1 bg-primary/20 border-2 border-primary border-dashed rounded-lg pointer-events-none z-20 flex flex-col items-center justify-center"
+                    style={{
+                      top: dragSelection.top,
+                      height: dragSelection.height,
+                    }}
+                  >
+                    <span className="text-[10px] font-mono font-bold text-primary">
+                      {dragSelection.startTime} - {dragSelection.endTime}
+                    </span>
+                    <span className="text-[9px] text-primary/80 mt-0.5">
+                      拖曳建立任務
+                    </span>
+                  </div>
+                )}
 
                 {/* Current time line for today */}
                 {isToday && (

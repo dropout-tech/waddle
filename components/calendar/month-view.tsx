@@ -20,6 +20,7 @@ const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 export function MonthView({
   selectedDate,
   tasks,
+  timeBlocks,
   onTaskSelect,
   onToggleComplete,
   onDateSelect,
@@ -97,12 +98,42 @@ export function MonthView({
         map[date].push(task)
       }
     }
+    // Sort tasks within each date by urgency (high to low) then by time
+    for (const date in map) {
+      map[date].sort((a, b) => {
+        // Urgency first (higher urgency = more important = comes first)
+        if (b.urgency !== a.urgency) return b.urgency - a.urgency
+        // Then by start time if available
+        if (a.scheduledStartTime && b.scheduledStartTime) {
+          return a.scheduledStartTime.localeCompare(b.scheduledStartTime)
+        }
+        return 0
+      })
+    }
     return map
   }, [tasks])
+
+  // Get time blocks by date
+  const blocksByDate = useMemo(() => {
+    const map: Record<string, TimeBlock[]> = {}
+    for (const block of timeBlocks) {
+      if (!map[block.date]) map[block.date] = []
+      map[block.date].push(block)
+    }
+    return map
+  }, [timeBlocks])
 
   const handleToggleComplete = (e: React.MouseEvent, taskId: string) => {
     e.stopPropagation()
     onToggleComplete?.(taskId)
+  }
+
+  // Get urgency color
+  const getUrgencyColor = (urgency: number) => {
+    if (urgency >= 8) return 'oklch(0.55 0.22 25)' // red
+    if (urgency >= 6) return 'oklch(0.65 0.18 45)' // orange  
+    if (urgency >= 4) return 'oklch(0.70 0.14 70)' // amber
+    return 'oklch(0.65 0.12 145)' // green
   }
 
   return (
@@ -117,7 +148,7 @@ export function MonthView({
               index === 0 ? 'text-red-400' : index === 6 ? 'text-blue-400' : 'text-muted-foreground'
             )}
           >
-            {day}
+            週{day}
           </div>
         ))}
       </div>
@@ -126,31 +157,41 @@ export function MonthView({
       <div className="grid grid-cols-7 flex-1 gap-1">
         {calendarDays.map((day, index) => {
           const dayTasks = tasksByDate[day.dateString] || []
+          const dayBlocks = blocksByDate[day.dateString] || []
           const pendingTasks = dayTasks.filter((t) => !t.isCompleted)
           const completedTasks = dayTasks.filter((t) => t.isCompleted)
+          const totalEstimated = dayTasks.reduce((sum, t) => sum + (t.estimatedMinutes || 0), 0)
 
           return (
             <div
               key={index}
               className={cn(
-                'relative flex flex-col rounded-lg border transition-all cursor-pointer overflow-hidden group',
-                day.isCurrentMonth ? 'bg-card' : 'bg-muted/30',
+                'relative flex flex-col rounded-lg border transition-all cursor-pointer overflow-hidden group min-h-[100px]',
+                day.isCurrentMonth ? 'bg-card hover:bg-card/80' : 'bg-muted/30',
                 day.isToday && 'ring-2 ring-primary ring-offset-1',
                 !day.isCurrentMonth && 'opacity-50'
               )}
               onClick={() => onDateSelect?.(day.date)}
             >
-              {/* Date Number */}
-              <div className="flex items-center justify-between px-2 py-1">
-                <span
-                  className={cn(
-                    'text-xs font-medium',
-                    day.isToday && 'text-primary font-bold',
-                    !day.isCurrentMonth && 'text-muted-foreground'
+              {/* Date Header */}
+              <div className="flex items-center justify-between px-2 py-1 border-b border-border/50">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      'text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center',
+                      day.isToday && 'bg-primary text-primary-foreground',
+                      !day.isCurrentMonth && 'text-muted-foreground'
+                    )}
+                  >
+                    {day.date.getDate()}
+                  </span>
+                  {/* Time estimate badge */}
+                  {totalEstimated > 0 && day.isCurrentMonth && (
+                    <span className="text-[9px] text-muted-foreground font-mono">
+                      {Math.floor(totalEstimated / 60)}h{totalEstimated % 60 > 0 ? `${totalEstimated % 60}m` : ''}
+                    </span>
                   )}
-                >
-                  {day.date.getDate()}
-                </span>
+                </div>
 
                 {/* Quick Add Button */}
                 <button
@@ -158,15 +199,29 @@ export function MonthView({
                     e.stopPropagation()
                     onCreateTask?.(day.dateString)
                   }}
-                  className="opacity-0 group-hover:opacity-100 w-4 h-4 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-all"
+                  className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-all"
                 >
-                  <Plus className="w-2.5 h-2.5 text-primary" />
+                  <Plus className="w-3 h-3 text-primary" />
                 </button>
               </div>
 
+              {/* Time Blocks Indicator */}
+              {dayBlocks.length > 0 && (
+                <div className="flex gap-0.5 px-1 py-0.5">
+                  {dayBlocks.map((block) => (
+                    <div
+                      key={block.id}
+                      className="h-1 flex-1 rounded-full"
+                      style={{ backgroundColor: block.color }}
+                      title={`${block.label}: ${block.startTime}-${block.endTime}`}
+                    />
+                  ))}
+                </div>
+              )}
+
               {/* Task List */}
               <div className="flex-1 px-1 pb-1 space-y-0.5 overflow-y-auto">
-                {pendingTasks.slice(0, 3).map((task) => (
+                {pendingTasks.slice(0, 4).map((task) => (
                   <div
                     key={task.id}
                     onClick={(e) => {
@@ -175,55 +230,72 @@ export function MonthView({
                     }}
                     className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] cursor-pointer hover:brightness-95 transition-all group/task"
                     style={{
-                      backgroundColor: `${task.workspaceColor}20`,
-                      borderLeft: `2px solid ${task.workspaceColor}`,
+                      backgroundColor: `${task.calendarColor || task.workspaceColor}15`,
+                      borderLeft: `2px solid ${task.calendarColor || task.workspaceColor}`,
                     }}
                   >
                     {/* Checkbox */}
                     <button
                       onClick={(e) => handleToggleComplete(e, task.id)}
                       className="flex-shrink-0 w-3 h-3 rounded-full border flex items-center justify-center transition-all hover:scale-110"
-                      style={{ borderColor: task.workspaceColor }}
+                      style={{ borderColor: task.calendarColor || task.workspaceColor }}
                     >
                       {task.isCompleted && (
                         <Check
                           className="w-2 h-2"
-                          style={{ color: task.workspaceColor }}
+                          style={{ color: task.calendarColor || task.workspaceColor }}
                           strokeWidth={3}
                         />
                       )}
                     </button>
-                    <span className="truncate font-medium text-foreground/80">
+                    
+                    {/* Urgency dot */}
+                    <div
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: getUrgencyColor(task.urgency) }}
+                    />
+                    
+                    {/* Title */}
+                    <span className="truncate font-medium text-foreground/80 flex-1">
                       {task.title}
                     </span>
+                    
+                    {/* Time if scheduled */}
+                    {task.scheduledStartTime && (
+                      <span className="text-[8px] font-mono text-muted-foreground flex-shrink-0">
+                        {task.scheduledStartTime}
+                      </span>
+                    )}
                   </div>
                 ))}
 
                 {/* Completed tasks indicator */}
-                {completedTasks.length > 0 && pendingTasks.length < 3 && (
-                  <div className="text-[9px] text-muted-foreground/60 px-1">
-                    + {completedTasks.length} 已完成
+                {completedTasks.length > 0 && pendingTasks.length < 4 && (
+                  <div className="text-[9px] text-muted-foreground/60 px-1 flex items-center gap-1">
+                    <Check className="w-2.5 h-2.5" />
+                    {completedTasks.length} 已完成
                   </div>
                 )}
 
                 {/* More tasks indicator */}
-                {pendingTasks.length > 3 && (
+                {pendingTasks.length > 4 && (
                   <div className="text-[9px] text-primary font-medium px-1">
-                    + {pendingTasks.length - 3} 更多
+                    + {pendingTasks.length - 4} 更多
                   </div>
                 )}
               </div>
 
-              {/* Task count badge */}
-              {dayTasks.length > 0 && (
+              {/* Task count badge - only show if there are pending tasks */}
+              {pendingTasks.length > 0 && (
                 <div
-                  className="absolute top-1 right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white"
+                  className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center text-white"
                   style={{
-                    backgroundColor:
-                      pendingTasks.length > 0 ? 'oklch(0.65 0.15 25)' : 'oklch(0.70 0.12 145)',
+                    backgroundColor: pendingTasks.some(t => t.urgency >= 7) 
+                      ? 'oklch(0.55 0.22 25)' 
+                      : 'oklch(0.65 0.15 230)',
                   }}
                 >
-                  {dayTasks.length}
+                  {pendingTasks.length}
                 </div>
               )}
             </div>

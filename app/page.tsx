@@ -5,18 +5,43 @@ import { MainLayout } from '@/components/layout/main-layout'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
 import { JournalModal } from '@/components/modals/journal-modal'
 import { ReportModal } from '@/components/modals/report-modal'
+import { SettingsModal } from '@/components/modals/settings-modal'
 import { mockWorkspaces, mockTimeBlocks } from '@/lib/mock-data'
-import type { Workspace, Task, JournalEntry, ExportDataPayload } from '@/lib/types'
+import type { Workspace, Task, JournalEntry, ExportDataPayload, UserSettings, TimeBlock } from '@/lib/types'
+
+const defaultSettings: UserSettings = {
+  calendarStartHour: 6,
+  calendarEndHour: 22,
+  defaultView: 'day',
+  weekStartDay: 0,
+  weatherCity: 'Taipei',
+  weatherUnit: 'celsius',
+  lunchBreak: {
+    enabled: true,
+    startTime: '12:00',
+    endTime: '13:00',
+    color: '#F5F5F5',
+  },
+  bufferTime: {
+    enabled: true,
+    defaultDuration: 30,
+    color: '#FFF8E1',
+  },
+  defaultTaskColors: {},
+}
 
 export default function FlowDeskPage() {
   // State for workspaces and tasks
   const [workspaces, setWorkspaces] = useState<Workspace[]>(mockWorkspaces)
+  const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>(mockTimeBlocks)
+  const [settings, setSettings] = useState<UserSettings>(defaultSettings)
 
   // Modal states
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isJournalOpen, setIsJournalOpen] = useState(false)
   const [journalDate, setJournalDate] = useState(new Date())
   const [isReportOpen, setIsReportOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   // Toggle category collapse
   const handleToggleCategoryCollapse = useCallback((categoryId: string) => {
@@ -183,7 +208,13 @@ export default function FlowDeskPage() {
     )
   }, [selectedTask])
 
-  // Create task from calendar click
+  // Save settings
+  const handleSaveSettings = useCallback((newSettings: UserSettings, newTimeBlocks: TimeBlock[]) => {
+    setSettings(newSettings)
+    setTimeBlocks(newTimeBlocks)
+  }, [])
+
+  // Create task from calendar click or drag
   const handleCreateCalendarTask = useCallback((date: string, startTime: string, endTime: string) => {
     // Find the first available workspace and category
     const firstWorkspace = workspaces[0]
@@ -284,7 +315,7 @@ export default function FlowDeskPage() {
     <>
       <MainLayout
         workspaces={workspaces}
-        timeBlocks={mockTimeBlocks}
+        timeBlocks={timeBlocks}
         onToggleCategoryCollapse={handleToggleCategoryCollapse}
         onToggleComplete={handleToggleComplete}
         onSelectTask={handleSelectTask}
@@ -294,6 +325,7 @@ export default function FlowDeskPage() {
         onOpenJournal={handleOpenJournal}
         onOpenReport={handleOpenReport}
         onCreateCalendarTask={handleCreateCalendarTask}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       {/* Task Detail Modal */}
@@ -325,6 +357,15 @@ export default function FlowDeskPage() {
         workspaces={workspaces}
         dateRange={getWeekRange()}
         onExport={handleExport}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        settings={settings}
+        timeBlocks={timeBlocks}
+        onClose={() => setIsSettingsOpen(false)}
+        onSave={handleSaveSettings}
       />
     </>
   )

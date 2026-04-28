@@ -19,7 +19,7 @@ interface CalendarPanelProps {
   onViewModeChange: (mode: 'day' | 'week' | 'month') => void
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
-  onCreateTask?: (startTime: string, endTime: string) => void
+  onCreateTask?: (date: string, startTime: string, endTime: string) => void
   className?: string
 }
 
@@ -67,7 +67,10 @@ export function CalendarPanel({
             timeBlocks={timeBlocks}
             onTaskSelect={onTaskSelect}
             onToggleComplete={onToggleComplete}
-            onCreateTask={onCreateTask}
+            onCreateTask={(startTime, endTime) => {
+              const dateStr = selectedDate.toISOString().split('T')[0]
+              onCreateTask?.(dateStr, startTime, endTime)
+            }}
           />
         </>
       )}
@@ -79,6 +82,7 @@ export function CalendarPanel({
           timeBlocks={timeBlocks}
           onTaskSelect={onTaskSelect}
           onToggleComplete={onToggleComplete}
+          onCreateTask={onCreateTask}
         />
       )}
 

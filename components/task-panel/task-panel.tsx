@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useMemo } from 'react'
-import { BookOpen, BarChart3, FolderTree, Clock } from 'lucide-react'
+import { BookOpen, BarChart3, FolderTree, Clock, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Workspace, Task } from '@/lib/types'
 import { PanelHeader } from './panel-header'
@@ -23,6 +23,7 @@ interface TaskPanelProps {
   onAddWorkspace?: (name: string, color: string, icon: string) => void
   onOpenJournal: () => void
   onOpenReport: () => void
+  onOpenSettings?: () => void
   className?: string
 }
 
@@ -36,6 +37,7 @@ export function TaskPanel({
   onAddWorkspace,
   onOpenJournal,
   onOpenReport,
+  onOpenSettings,
   className,
 }: TaskPanelProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -197,6 +199,14 @@ export function TaskPanel({
         >
           <BarChart3 className="w-4 h-4" />
           <span>報告</span>
+        </Button>
+        <Button
+          variant="secondary"
+          className="w-10 h-10 p-0 rounded-xl"
+          onClick={onOpenSettings}
+          title="設定"
+        >
+          <Settings className="w-4 h-4" />
         </Button>
       </div>
     </div>

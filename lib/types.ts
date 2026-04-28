@@ -83,6 +83,20 @@ export interface UserSettings {
   weekStartDay: number
   weatherCity: string
   weatherUnit: 'celsius' | 'fahrenheit'
+  // Time block defaults
+  lunchBreak: {
+    enabled: boolean
+    startTime: string
+    endTime: string
+    color: string
+  }
+  bufferTime: {
+    enabled: boolean
+    defaultDuration: number // minutes
+    color: string
+  }
+  // Default calendar colors for new tasks (by workspace)
+  defaultTaskColors: Record<string, string>
 }
 
 // UI State Types

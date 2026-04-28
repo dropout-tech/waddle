@@ -1,12 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2 } from 'lucide-react'
+import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import { formatEstimatedTime } from '@/lib/task-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+
+const PRESET_COLORS = [
+  '#FF6B6B', '#4A90D9', '#66BB6A', '#FFB74D', '#9575CD',
+  '#4DD0E1', '#F06292', '#AED581', '#FFD54F', '#90A4AE',
+]
 
 interface TaskDetailModalProps {
   task: Task
@@ -40,6 +45,7 @@ export function TaskDetailModal({
     task.scheduledEndTime || ''
   )
   const [notes, setNotes] = useState(task.notes || '')
+  const [calendarColor, setCalendarColor] = useState(task.calendarColor || task.workspaceColor)
 
   if (!isOpen) return null
 
@@ -54,6 +60,7 @@ export function TaskDetailModal({
       scheduledStartTime: scheduledStartTime || undefined,
       scheduledEndTime: scheduledEndTime || undefined,
       notes: notes || undefined,
+      calendarColor,
     })
     onClose()
   }
@@ -224,6 +231,36 @@ export function TaskDetailModal({
                 value={scheduledEndTime}
                 onChange={(e) => setScheduledEndTime(e.target.value)}
                 className="h-9 font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Calendar Color */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Palette className="w-3.5 h-3.5" />
+              日曆顏色
+            </label>
+            <div className="flex items-center gap-2 flex-wrap">
+              {PRESET_COLORS.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setCalendarColor(color)}
+                  className={cn(
+                    'w-7 h-7 rounded-full border-2 transition-all',
+                    calendarColor === color
+                      ? 'border-foreground scale-110'
+                      : 'border-transparent hover:scale-105'
+                  )}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+              <input
+                type="color"
+                value={calendarColor}
+                onChange={(e) => setCalendarColor(e.target.value)}
+                className="w-7 h-7 rounded-full cursor-pointer"
+                title="自訂顏色"
               />
             </div>
           </div>

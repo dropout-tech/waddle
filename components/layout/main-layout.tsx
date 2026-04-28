@@ -18,6 +18,7 @@ interface MainLayoutProps {
   onAddWorkspace?: (name: string, color: string, icon: string) => void
   onOpenJournal: () => void
   onOpenReport: () => void
+  onOpenSettings?: () => void
   onCreateCalendarTask?: (date: string, startTime: string, endTime: string) => void
 }
 
@@ -36,6 +37,7 @@ export function MainLayout({
   onAddWorkspace,
   onOpenJournal,
   onOpenReport,
+  onOpenSettings,
   onCreateCalendarTask,
 }: MainLayoutProps) {
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
@@ -100,6 +102,7 @@ export function MainLayout({
           onAddWorkspace={onAddWorkspace}
           onOpenJournal={onOpenJournal}
           onOpenReport={onOpenReport}
+          onOpenSettings={onOpenSettings}
         />
       </div>
 
@@ -119,10 +122,7 @@ export function MainLayout({
           onViewModeChange={setViewMode}
           onTaskSelect={onSelectTask}
           onToggleComplete={onToggleComplete}
-          onCreateTask={(startTime, endTime) => {
-            const dateStr = selectedDate.toISOString().split('T')[0]
-            onCreateCalendarTask?.(dateStr, startTime, endTime)
-          }}
+          onCreateTask={onCreateCalendarTask}
         />
       </div>
     </div>
