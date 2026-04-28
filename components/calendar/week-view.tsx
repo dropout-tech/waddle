@@ -43,6 +43,7 @@ const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六']
 const DAY_WIDTH = 120 // pixels per day column
 const DAYS_TO_RENDER = 21 // render 3 weeks
 const CENTER_DAY_INDEX = 10
+const TIME_COL_WIDTH = 56 // time label column width
 
 function snap(minutes: number): number {
   return Math.round(minutes / 15) * 15
@@ -273,7 +274,6 @@ export function WeekView({
 
   const MIN = startHour * 60
   const MAX = endHour * 60
-  const TIME_COL_WIDTH = 56
 
   const handleTaskDragStart = useCallback((info: TaskDragStart, dayIndex: number) => {
     setActiveTaskDrag({ ...info, currentStart: info.originalStart, currentEnd: info.originalEnd, dayIndex })

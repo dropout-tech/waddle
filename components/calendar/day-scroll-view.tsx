@@ -42,6 +42,7 @@ const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六']
 const DAY_WIDTH = 280
 const DAYS_TO_RENDER = 7
 const CENTER_DAY_INDEX = 3
+const TIME_COL_WIDTH = 56 // time label column width
 
 function timeToMinutes(t: string): number {
   const [h, m] = t.split(':').map(Number)
@@ -260,19 +261,8 @@ export function DayScrollView({
   const MIN = startHour * 60
   const MAX = endHour * 60
 
-  const yToMinutes = useCallback((clientY: number, colEl: HTMLElement): number => {
-    const rect = colEl.getBoundingClientRect()
-    const scrollTop = scrollContainerRef.current?.scrollTop ?? 0
-    return MIN + (clientY - rect.top + scrollTop)
-  }, [MIN])
-
   const handleTaskDragStart = useCallback((info: TaskDragStart, dayIndex: number) => {
-    setActiveTaskDrag({
-      ...info,
-      currentStart: info.originalStart,
-      currentEnd: info.originalEnd,
-      dayIndex,
-    })
+    setActiveTaskDrag({ ...info, currentStart: info.originalStart, currentEnd: info.originalEnd, dayIndex })
     setPendingSlot(null)
   }, [])
 
