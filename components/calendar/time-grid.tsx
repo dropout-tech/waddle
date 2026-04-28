@@ -12,6 +12,7 @@ interface TimeGridProps {
   startHour?: number
   endHour?: number
   onTaskSelect: (task: Task) => void
+  onToggleComplete?: (taskId: string) => void
 }
 
 export function TimeGrid({
@@ -20,6 +21,7 @@ export function TimeGrid({
   startHour = 7,
   endHour = 23,
   onTaskSelect,
+  onToggleComplete,
 }: TimeGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -92,6 +94,7 @@ export function TimeGrid({
             task={task}
             calendarStartHour={startHour}
             onSelect={onTaskSelect}
+            onToggleComplete={onToggleComplete}
           />
         ))}
 

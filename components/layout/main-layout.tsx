@@ -110,6 +110,7 @@ export function MainLayout({
           onDateChange={setSelectedDate}
           onViewModeChange={setViewMode}
           onTaskSelect={onSelectTask}
+          onToggleComplete={onToggleComplete}
         />
       </div>
     </div>

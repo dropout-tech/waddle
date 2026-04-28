@@ -12,6 +12,7 @@ interface WeekViewProps {
   tasks: Task[]
   timeBlocks: TimeBlock[]
   onTaskSelect: (task: Task) => void
+  onToggleComplete?: (taskId: string) => void
   startHour?: number
   endHour?: number
 }
@@ -23,6 +24,7 @@ export function WeekView({
   tasks,
   timeBlocks,
   onTaskSelect,
+  onToggleComplete,
   startHour = 6,
   endHour = 22,
 }: WeekViewProps) {
@@ -183,7 +185,12 @@ export function WeekView({
                       height: getDurationHeight(task.scheduledStartTime!, task.scheduledEndTime!),
                     }}
                   >
-                    <TaskBlock task={task} onSelect={onTaskSelect} compact />
+                    <TaskBlock
+                      task={task}
+                      onSelect={onTaskSelect}
+                      onToggleComplete={onToggleComplete}
+                      compact
+                    />
                   </div>
                 ))}
 
