@@ -1,10 +1,9 @@
 'use client'
 
-import { useMemo, useState, useRef, useCallback } from 'react'
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
-import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { CurrentTimeLine } from './current-time-line'
 
 interface WeekViewProps {
@@ -16,11 +15,15 @@ interface WeekViewProps {
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (date: string, startTime: string, endTime: string) => void
   onNavigate?: (direction: 'prev' | 'next') => void
+  onDateChange?: (date: Date) => void
   startHour?: number
   endHour?: number
 }
 
-const WEEKDAYS = ['六', '日', '一', '二', '三', '四', '五']
+const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六']
+const DAY_WIDTH = 120 // pixels per day column
+const DAYS_TO_RENDER = 21 // render 3 weeks (7 days before, current week, 7 days after)
+const CENTER_DAY_INDEX = 10 // index of the center day (0-indexed)
 
 export function WeekView({
   selectedDate,
@@ -31,6 +34,7 @@ export function WeekView({
   onToggleComplete,
   onCreateTask,
   onNavigate,
+  onDateChange,
   startHour = 6,
   endHour = 22,
 }: WeekViewProps) {
@@ -41,35 +45,63 @@ export function WeekView({
   const gridRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const weekViewRef = useRef<HTMLDivElement>(null)
+  const isScrolling = useRef(false)
+  const lastScrollLeft = useRef(0)
 
-  // Enable swipe/drag navigation on the entire week view
-  useSwipeNavigation({
-    onSwipeLeft: () => onNavigate?.('next'),
-    onSwipeRight: () => onNavigate?.('prev'),
-    elementRef: weekViewRef,
-    enableMouseDrag: true,
-    threshold: 80,
-    directionRatio: 2.5, // Require more horizontal movement to not interfere with task creation
-  })
-
-
-
-  // Get the week dates (Saturday to Friday, starting from Saturday of the week containing selectedDate)
-  const weekDates = useMemo(() => {
+  // Generate dates centered around selectedDate
+  const allDates = useMemo(() => {
     const dates: Date[] = []
-    const start = new Date(selectedDate)
-    const day = start.getDay()
-    // Go to Saturday (day 6) of the current week
-    const diff = day === 6 ? 0 : -(day + 1)
-    start.setDate(start.getDate() + diff)
+    const centerDate = new Date(selectedDate)
     
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(start)
-      d.setDate(start.getDate() + i)
+    for (let i = -CENTER_DAY_INDEX; i < DAYS_TO_RENDER - CENTER_DAY_INDEX; i++) {
+      const d = new Date(centerDate)
+      d.setDate(centerDate.getDate() + i)
       dates.push(d)
     }
     return dates
   }, [selectedDate])
+
+  // Scroll to center on mount and when selectedDate changes
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    
+    // Calculate scroll position to center the selected date
+    const timeColumnWidth = 56 // w-14 = 56px
+    const targetScrollLeft = CENTER_DAY_INDEX * DAY_WIDTH
+    
+    container.scrollLeft = targetScrollLeft
+    lastScrollLeft.current = targetScrollLeft
+  }, [selectedDate])
+
+  // Handle scroll to detect when user scrolls to edges and load more dates
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (!container || isScrolling.current) return
+
+    const scrollLeft = container.scrollLeft
+    const maxScroll = container.scrollWidth - container.clientWidth
+    const timeColumnWidth = 56
+
+    // Calculate which date is now in the center of the viewport
+    const viewportCenter = scrollLeft + (container.clientWidth - timeColumnWidth) / 2
+    const centerDayIndex = Math.floor((viewportCenter - timeColumnWidth) / DAY_WIDTH)
+    
+    // If scrolled near the edges, update the selected date
+    if (scrollLeft < DAY_WIDTH * 3) {
+      // Near left edge - go to previous week
+      isScrolling.current = true
+      onNavigate?.('prev')
+      setTimeout(() => { isScrolling.current = false }, 100)
+    } else if (scrollLeft > maxScroll - DAY_WIDTH * 3) {
+      // Near right edge - go to next week
+      isScrolling.current = true
+      onNavigate?.('next')
+      setTimeout(() => { isScrolling.current = false }, 100)
+    }
+
+    lastScrollLeft.current = scrollLeft
+  }, [onNavigate])
 
   const hours = useMemo(() => {
     const h = []
@@ -168,7 +200,7 @@ export function WeekView({
       const maxY = Math.max(dragStart.y, dragEnd.y)
       const startTime = yToTime(minY)
       const endTime = yToTime(maxY)
-      const date = weekDates[dragStart.day].toISOString().split('T')[0]
+      const date = allDates[dragStart.day].toISOString().split('T')[0]
       
       onCreateTask?.(date, startTime, endTime)
     }
@@ -176,7 +208,7 @@ export function WeekView({
     setIsDragging(false)
     setDragStart(null)
     setDragEnd(null)
-  }, [isDragging, dragStart, dragEnd, weekDates, yToTime, onCreateTask])
+  }, [isDragging, dragStart, dragEnd, allDates, yToTime, onCreateTask])
 
   // Calculate drag selection box
   const getDragSelection = (dayIndex: number) => {
@@ -193,34 +225,57 @@ export function WeekView({
   return (
     <div ref={weekViewRef} className="flex-1 flex flex-col overflow-hidden bg-panel-secondary">
       {/* Single scrollable container for both header and time grid */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-auto">
-        <div className="min-w-[800px]" ref={gridRef}>
-          {/* Sticky Header Row */}
-          <div className="sticky top-0 z-10 flex bg-panel border-b border-border select-none">
-            {/* Time column header spacer */}
-            <div className="w-14 flex-shrink-0 border-r border-border" />
-            
-            {/* Day headers with all-day tasks */}
-            {weekDates.map((date, i) => {
-              const dateStr = date.toISOString().split('T')[0]
-              const isToday = dateStr === todayString
-              const allDayTasks = getAllDayTasksForDate(date)
-              
-              return (
-                <div
-                  key={i}
-                  className={cn(
-                    'flex-1 min-w-[100px] border-r border-border last:border-r-0 flex flex-col',
-                    isToday && 'bg-primary/5'
-                  )}
-                >
-                  {/* Day header */}
-                  <div className={cn(
-                    'px-2 py-1.5 text-center',
-                    isToday && 'bg-primary/10'
-                  )}>
+      <div 
+        ref={scrollContainerRef} 
+        className="flex-1 overflow-auto"
+        onScroll={handleScroll}
+      >
+        <div 
+          ref={gridRef}
+          className="flex"
+          style={{ width: `${56 + DAYS_TO_RENDER * DAY_WIDTH}px` }}
+        >
+          {/* Sticky Time Labels Column */}
+          <div className="w-14 flex-shrink-0 sticky left-0 z-20 bg-panel border-r border-border">
+            {/* Header spacer */}
+            <div className="h-[72px] border-b border-border" />
+            {/* Time labels */}
+            {hours.map((hour) => (
+              <div key={hour} className="h-[60px] relative">
+                <span className="absolute -top-2 left-1 right-1 text-[10px] text-muted-foreground font-mono text-right">
+                  {hour.toString().padStart(2, '0')}:00
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Day columns - continuous scrolling */}
+          {allDates.map((date, dayIndex) => {
+            const dateStr = date.toISOString().split('T')[0]
+            const isToday = dateStr === todayString
+            const dayTasks = getScheduledTasksForDate(date)
+            const dayBlocks = getTimeBlocksForDate(date)
+            const allDayTasks = getAllDayTasksForDate(date)
+            const dragSelection = getDragSelection(dayIndex)
+            const weekdayIndex = date.getDay()
+
+            return (
+              <div
+                key={dateStr}
+                className={cn(
+                  'border-r border-border last:border-r-0 flex flex-col',
+                  isToday && 'bg-primary/5'
+                )}
+                style={{ width: `${DAY_WIDTH}px`, minWidth: `${DAY_WIDTH}px` }}
+              >
+                {/* Sticky Day Header */}
+                <div className={cn(
+                  'sticky top-0 z-10 bg-panel border-b border-border',
+                  isToday && 'bg-primary/10'
+                )}>
+                  <div className="px-2 py-1.5 text-center">
                     <div className="text-[10px] text-muted-foreground font-medium">
-                      週{WEEKDAYS[i]}
+                      週{WEEKDAY_NAMES[weekdayIndex]}
                     </div>
                     <div className={cn(
                       'text-lg font-bold',
@@ -229,94 +284,41 @@ export function WeekView({
                       {date.getDate()}
                     </div>
                   </div>
-
                   {/* All-day tasks area */}
-                  <div className="min-h-[32px] max-h-[80px] overflow-y-auto px-1 py-1 space-y-0.5 border-t border-border/30">
-                    {allDayTasks.map((task) => (
-                      <button
-                        key={task.id}
-                        onClick={() => onTaskSelect(task)}
-                        className={cn(
-                          'w-full text-left px-1.5 py-1 rounded text-[10px] font-medium truncate transition-all',
-                          'hover:opacity-80',
-                          task.isCompleted && 'opacity-50 line-through'
-                        )}
-                        style={{
-                          backgroundColor: task.calendarColor || task.workspaceColor,
-                          color: '#fff',
-                        }}
-                      >
-                        {task.title}
-                      </button>
-                    ))}
-                    {/* Also show pending tasks that have dueDate for this day */}
-                    {pendingTasks
-                      .filter((t) => t.dueDate === dateStr && !t.scheduledDate)
-                      .map((task) => (
+                  {(allDayTasks.length > 0 || pendingTasks.some(t => t.dueDate === dateStr && !t.scheduledDate)) && (
+                    <div className="max-h-[48px] overflow-y-auto px-1 pb-1 space-y-0.5 border-t border-border/30">
+                      {allDayTasks.map((task) => (
                         <button
                           key={task.id}
                           onClick={() => onTaskSelect(task)}
                           className={cn(
-                            'w-full flex items-center gap-1 text-left px-1.5 py-1 rounded text-[10px] font-medium transition-all',
-                            'bg-muted/50 hover:bg-muted text-muted-foreground',
+                            'w-full text-left px-1.5 py-0.5 rounded text-[9px] font-medium truncate transition-all',
+                            'hover:opacity-80',
                             task.isCompleted && 'opacity-50 line-through'
                           )}
+                          style={{
+                            backgroundColor: task.calendarColor || task.workspaceColor,
+                            color: '#fff',
+                          }}
                         >
-                          <Check className="w-2.5 h-2.5 flex-shrink-0 opacity-50" />
-                          <span className="truncate">{task.title}</span>
+                          {task.title}
                         </button>
                       ))}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Time Grid Body */}
-          <div className="flex">
-            {/* Time labels column */}
-            <div className="w-14 flex-shrink-0 border-r border-border bg-panel/50">
-              {hours.map((hour) => (
-                <div
-                  key={hour}
-                  className="h-[60px] relative"
-                >
-                  <span className="absolute -top-2 left-1 right-1 text-[10px] text-muted-foreground font-mono text-right">
-                    {hour.toString().padStart(2, '0')}:00
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Day columns */}
-            {weekDates.map((date, dayIndex) => {
-              const dateStr = date.toISOString().split('T')[0]
-              const isToday = dateStr === todayString
-              const dayTasks = getScheduledTasksForDate(date)
-              const dayBlocks = getTimeBlocksForDate(date)
-              const dragSelection = getDragSelection(dayIndex)
-
-              return (
-                <div
-                  key={dayIndex}
-                  className={cn(
-                    'flex-1 min-w-[100px] relative border-r border-border last:border-r-0 cursor-crosshair',
-                    isToday && 'bg-primary/5'
+                    </div>
                   )}
+                </div>
+
+                {/* Time Grid for this day */}
+                <div
+                  className="relative flex-1 cursor-crosshair"
                   onMouseDown={(e) => handleMouseDown(e, dayIndex)}
                   onMouseMove={(e) => handleMouseMove(e, dayIndex)}
                   onMouseUp={handleMouseUp}
-                  onMouseLeave={() => {
-                    if (isDragging) handleMouseUp()
-                  }}
+                  onMouseLeave={() => { if (isDragging) handleMouseUp() }}
                 >
                   {/* Hour lines */}
                   {hours.map((hour) => (
-                    <div
-                      key={hour}
-                      className="h-[60px] border-b border-border/50"
-                    >
-                      {/* Half-hour line */}
+                    <div key={hour} className="h-[60px] border-b border-border/50">
                       <div className="h-[30px] border-b border-dashed border-border/30" />
                     </div>
                   ))}
@@ -336,9 +338,6 @@ export function WeekView({
                       }}
                     >
                       <div className="truncate">{block.label}</div>
-                      <div className="text-[8px] opacity-70">
-                        {block.startTime}-{block.endTime}
-                      </div>
                     </div>
                   ))}
 
@@ -388,13 +387,11 @@ export function WeekView({
                   )}
 
                   {/* Current time line for today */}
-                  {isToday && (
-                    <CurrentTimeLine startHour={startHour} />
-                  )}
+                  {isToday && <CurrentTimeLine startHour={startHour} />}
                 </div>
-              )
-            })}
-          </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

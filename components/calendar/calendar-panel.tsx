@@ -133,6 +133,7 @@ export function CalendarPanel({
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}
           onNavigate={navigate}
+          onDateChange={onDateChange}
         />
       )}
 
