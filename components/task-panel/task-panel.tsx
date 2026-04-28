@@ -21,6 +21,7 @@ interface TaskPanelProps {
   onAddTask: (categoryId: string, title: string) => void
   onAddCategory?: (workspaceId: string, name: string) => void
   onAddWorkspace?: (name: string, color: string, icon: string) => void
+  onUpdateWorkspaceColor?: (workspaceId: string, color: string) => void
   onOpenJournal: () => void
   onOpenReport: () => void
   onOpenSettings?: () => void
@@ -35,6 +36,7 @@ export function TaskPanel({
   onAddTask,
   onAddCategory,
   onAddWorkspace,
+  onUpdateWorkspaceColor,
   onOpenJournal,
   onOpenReport,
   onOpenSettings,
@@ -112,6 +114,7 @@ export function TaskPanel({
         workspaces={workspaces}
         onWorkspaceClick={handleWorkspaceClick}
         onAddWorkspace={onAddWorkspace}
+        onUpdateWorkspaceColor={onUpdateWorkspaceColor}
       />
 
       {/* View Mode Toggle + Filter Bar */}

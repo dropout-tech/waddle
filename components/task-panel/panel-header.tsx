@@ -10,6 +10,7 @@ interface PanelHeaderProps {
   workspaces: Workspace[]
   onWorkspaceClick: (workspaceId: string) => void
   onAddWorkspace?: (name: string, color: string, icon: string) => void
+  onUpdateWorkspaceColor?: (workspaceId: string, color: string) => void
 }
 
 const PRESET_COLORS = [
@@ -23,7 +24,8 @@ const PRESET_COLORS = [
 
 const PRESET_ICONS = ['', '', '', '', '', '', '', '']
 
-export function PanelHeader({ workspaces, onWorkspaceClick, onAddWorkspace }: PanelHeaderProps) {
+export function PanelHeader({ workspaces, onWorkspaceClick, onAddWorkspace, onUpdateWorkspaceColor }: PanelHeaderProps) {
+  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
   const [isAdding, setIsAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0])
@@ -109,27 +111,74 @@ export function PanelHeader({ workspaces, onWorkspaceClick, onAddWorkspace }: Pa
           .map((workspace) => {
             const count = getWorkspaceCount(workspace)
             return (
-              <button
-                key={workspace.id}
-                onClick={() => onWorkspaceClick(workspace.id)}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all soft-hover',
-                  'border bg-card hover:bg-muted/50'
-                )}
-                style={{
-                  borderColor: `${workspace.color}40`,
-                  color: workspace.color,
-                }}
-              >
-                {workspace.icon && <span className="text-sm">{workspace.icon}</span>}
-                <span className="font-semibold">{workspace.name}</span>
-                <span 
-                  className="ml-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold"
-                  style={{ backgroundColor: `${workspace.color}15` }}
+              <div key={workspace.id} className="relative flex items-center">
+                <button
+                  onClick={() => onWorkspaceClick(workspace.id)}
+                  className={cn(
+                    'flex items-center gap-1.5 pl-2 pr-3 py-1.5 rounded-lg text-xs font-medium transition-all soft-hover',
+                    'border bg-card hover:bg-muted/50'
+                  )}
+                  style={{
+                    borderColor: `${workspace.color}40`,
+                    color: workspace.color,
+                  }}
                 >
-                  {count}
-                </span>
-              </button>
+                  {/* Color swatch — clicking opens picker */}
+                  <span
+                    role="button"
+                    aria-label={`更改 ${workspace.name} 顏色`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setEditingWorkspaceId(
+                        editingWorkspaceId === workspace.id ? null : workspace.id
+                      )
+                    }}
+                    className="w-3 h-3 rounded-full border border-white/40 flex-shrink-0 cursor-pointer hover:scale-125 transition-transform"
+                    style={{ backgroundColor: workspace.color }}
+                  />
+                  {workspace.icon && <span className="text-sm">{workspace.icon}</span>}
+                  <span className="font-semibold">{workspace.name}</span>
+                  <span
+                    className="ml-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                    style={{ backgroundColor: `${workspace.color}15` }}
+                  >
+                    {count}
+                  </span>
+                </button>
+
+                {/* Inline color picker popover */}
+                {editingWorkspaceId === workspace.id && (
+                  <div className="absolute top-full left-0 mt-1.5 z-50 bg-card border border-border rounded-xl shadow-xl p-3 w-44">
+                    <p className="text-[10px] text-muted-foreground mb-2 font-medium">選擇顏色</p>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {PRESET_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => {
+                            onUpdateWorkspaceColor?.(workspace.id, color)
+                            setEditingWorkspaceId(null)
+                          }}
+                          className={cn(
+                            'w-6 h-6 rounded-full border-2 transition-all hover:scale-110',
+                            workspace.color === color ? 'border-foreground' : 'border-transparent'
+                          )}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground">自訂</span>
+                      <input
+                        type="color"
+                        value={workspace.color}
+                        onChange={(e) => onUpdateWorkspaceColor?.(workspace.id, e.target.value)}
+                        onBlur={() => setEditingWorkspaceId(null)}
+                        className="w-7 h-7 rounded cursor-pointer border border-border"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             )
           })}
 

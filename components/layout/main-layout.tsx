@@ -16,6 +16,7 @@ interface MainLayoutProps {
   onAddTask: (categoryId: string, title: string) => void
   onAddCategory?: (workspaceId: string, name: string) => void
   onAddWorkspace?: (name: string, color: string, icon: string) => void
+  onUpdateWorkspaceColor?: (workspaceId: string, color: string) => void
   onOpenJournal: () => void
   onOpenReport: () => void
   onOpenSettings?: () => void
@@ -37,6 +38,7 @@ export function MainLayout({
   onAddTask,
   onAddCategory,
   onAddWorkspace,
+  onUpdateWorkspaceColor,
   onOpenJournal,
   onOpenReport,
   onOpenSettings,
@@ -104,6 +106,7 @@ export function MainLayout({
           onAddTask={onAddTask}
           onAddCategory={onAddCategory}
           onAddWorkspace={onAddWorkspace}
+          onUpdateWorkspaceColor={onUpdateWorkspaceColor}
           onOpenJournal={onOpenJournal}
           onOpenReport={onOpenReport}
           onOpenSettings={onOpenSettings}

@@ -151,6 +151,31 @@ export default function FlowDeskPage() {
     )
   }, [])
 
+  // Update workspace color — also updates workspaceColor on all tasks that haven't
+  // had their calendarColor manually overridden (i.e. calendarColor === old workspace color)
+  const handleUpdateWorkspaceColor = useCallback((workspaceId: string, newColor: string) => {
+    setWorkspaces((prev) =>
+      prev.map((workspace) => {
+        if (workspace.id !== workspaceId) return workspace
+        const oldColor = workspace.color
+        return {
+          ...workspace,
+          color: newColor,
+          categories: workspace.categories.map((category) => ({
+            ...category,
+            tasks: category.tasks.map((task) => ({
+              ...task,
+              workspaceColor: newColor,
+              // Only update calendarColor if it was still the default workspace color
+              calendarColor:
+                task.calendarColor === oldColor ? newColor : task.calendarColor,
+            })),
+          })),
+        }
+      })
+    )
+  }, [])
+
   // Add new workspace
   const handleAddWorkspace = useCallback((name: string, color: string, icon: string) => {
     const newWorkspace: Workspace = {
@@ -368,6 +393,7 @@ export default function FlowDeskPage() {
         onAddTask={handleAddTask}
         onAddCategory={handleAddCategory}
         onAddWorkspace={handleAddWorkspace}
+        onUpdateWorkspaceColor={handleUpdateWorkspaceColor}
         onOpenJournal={handleOpenJournal}
         onOpenReport={handleOpenReport}
         onCreateCalendarTask={handleCreateCalendarTask}

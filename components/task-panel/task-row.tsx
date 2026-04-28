@@ -170,7 +170,8 @@ export function TaskRow({
             style={{ backgroundColor: colors.badgeBg, color: colors.badgeText }}
           >
             {colors.isOverdue && <AlertCircle className="w-2.5 h-2.5" />}
-            {colors.label ?? `U${task.urgency}`}
+            <span className="opacity-60 font-mono">{task.urgency}</span>
+            {colors.label && <span>{colors.label}</span>}
           </span>
 
           {/* Notes tooltip icon */}

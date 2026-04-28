@@ -1,15 +1,17 @@
 import type { Task, ColorStatus } from './types'
 
 /**
- * Returns inline CSS color values for the entire task row based on urgency
- * (1–10) and date state (overdue / today / upcoming / normal / completed).
+ * Returns inline CSS color values for the entire task row.
  *
- * State priority: completed > overdue > urgency (10 highest to 1 lowest)
+ * Primary color is always the workspace color (task.workspaceColor).
+ * Urgency (1–10) only affects background opacity and the label text shown in the badge.
+ * Overdue state overrides to a red warning color.
+ * Completed state desaturates everything.
  */
 export function getUrgencyColor(task: Task): {
-  /** Full row background colour (rgba string) */
+  /** Full row background colour */
   rowBg: string
-  /** Left accent border colour */
+  /** Left accent border colour — matches workspace color */
   accentColor: string
   /** Small badge background */
   badgeBg: string
@@ -23,96 +25,58 @@ export function getUrgencyColor(task: Task): {
   isOverdue: boolean
 } {
   const today = new Date().toISOString().split('T')[0]
+  const base = task.workspaceColor // always the workspace hex color
+
+  // Background opacity increases with urgency (0.04 at low, 0.12 at critical)
+  const urgency = task.urgency
+  const bgOpacity =
+    urgency >= 9 ? 0.13
+    : urgency >= 7 ? 0.10
+    : urgency >= 5 ? 0.08
+    : urgency >= 3 ? 0.06
+    : 0.04
+
+  const urgencyLabel =
+    urgency >= 9 ? '極度緊急'
+    : urgency >= 7 ? '高度緊急'
+    : urgency >= 5 ? '中等'
+    : urgency >= 3 ? '一般'
+    : '輕鬆'
 
   // --- Completed ---
   if (task.isCompleted) {
     return {
       rowBg: 'transparent',
-      accentColor: 'oklch(0.80 0.01 85)',
-      badgeBg: 'oklch(0.92 0.008 85)',
-      badgeText: 'oklch(0.55 0.02 55)',
-      dot: 'oklch(0.80 0.01 85)',
+      accentColor: `color-mix(in srgb, ${base} 35%, #aaa)`,
+      badgeBg: `color-mix(in srgb, ${base} 12%, transparent)`,
+      badgeText: `color-mix(in srgb, ${base} 40%, #888)`,
+      dot: `color-mix(in srgb, ${base} 35%, #aaa)`,
       label: null,
       isOverdue: false,
     }
   }
 
-  // --- Overdue (dueDate is strictly before today) ---
+  // --- Overdue (dueDate strictly before today) — red override ---
   if (task.dueDate && task.dueDate < today) {
     return {
-      rowBg: 'oklch(0.62 0.18 25 / 0.08)',
+      rowBg: `color-mix(in srgb, ${base} ${bgOpacity * 100}%, oklch(0.62 0.18 25 / 0.10))`,
       accentColor: 'oklch(0.58 0.20 25)',
       badgeBg: 'oklch(0.58 0.20 25 / 0.15)',
-      badgeText: 'oklch(0.45 0.18 25)',
+      badgeText: 'oklch(0.42 0.18 25)',
       dot: 'oklch(0.58 0.20 25)',
       label: '已過期',
       isOverdue: true,
     }
   }
 
-  // --- Urgency-based colouring (1 = low → 10 = critical) ---
-  const urgency = task.urgency
-
-  // 9-10: Critical (deep red)
-  if (urgency >= 9) {
-    return {
-      rowBg: 'oklch(0.55 0.22 25 / 0.08)',
-      accentColor: 'oklch(0.55 0.22 25)',
-      badgeBg: 'oklch(0.55 0.22 25 / 0.16)',
-      badgeText: 'oklch(0.40 0.20 25)',
-      dot: 'oklch(0.55 0.22 25)',
-      label: '極度緊急',
-      isOverdue: false,
-    }
-  }
-
-  // 7-8: High (warm orange-red)
-  if (urgency >= 7) {
-    return {
-      rowBg: 'oklch(0.62 0.18 35 / 0.07)',
-      accentColor: 'oklch(0.60 0.18 35)',
-      badgeBg: 'oklch(0.60 0.18 35 / 0.14)',
-      badgeText: 'oklch(0.42 0.16 35)',
-      dot: 'oklch(0.60 0.18 35)',
-      label: '高度緊急',
-      isOverdue: false,
-    }
-  }
-
-  // 5-6: Medium (amber/yellow)
-  if (urgency >= 5) {
-    return {
-      rowBg: 'oklch(0.75 0.14 70 / 0.07)',
-      accentColor: 'oklch(0.70 0.14 70)',
-      badgeBg: 'oklch(0.70 0.14 70 / 0.14)',
-      badgeText: 'oklch(0.45 0.12 70)',
-      dot: 'oklch(0.70 0.14 70)',
-      label: '中等',
-      isOverdue: false,
-    }
-  }
-
-  // 3-4: Normal (sage green)
-  if (urgency >= 3) {
-    return {
-      rowBg: 'oklch(0.75 0.10 145 / 0.06)',
-      accentColor: 'oklch(0.68 0.12 145)',
-      badgeBg: 'oklch(0.68 0.12 145 / 0.14)',
-      badgeText: 'oklch(0.40 0.10 145)',
-      dot: 'oklch(0.68 0.12 145)',
-      label: '一般',
-      isOverdue: false,
-    }
-  }
-
-  // 1-2: Low (calm blue)
+  // --- Normal: workspace color drives everything ---
   return {
-    rowBg: 'oklch(0.78 0.08 230 / 0.05)',
-    accentColor: 'oklch(0.65 0.10 230)',
-    badgeBg: 'oklch(0.65 0.10 230 / 0.12)',
-    badgeText: 'oklch(0.40 0.10 230)',
-    dot: 'oklch(0.65 0.10 230)',
-    label: '輕鬆',
+    rowBg: `color-mix(in srgb, ${base} ${Math.round(bgOpacity * 100)}%, transparent)`,
+    accentColor: base,
+    badgeBg: `color-mix(in srgb, ${base} 18%, transparent)`,
+    badgeText: `color-mix(in srgb, ${base} 80%, #222)`,
+    dot: base,
+    label: urgencyLabel,
     isOverdue: false,
   }
 }
