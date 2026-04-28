@@ -121,13 +121,11 @@ export function CalendarHeader({
             <button
               key={mode}
               onClick={() => onViewModeChange(mode)}
-              disabled={mode === 'month'}
               className={cn(
                 'px-3 py-1.5 text-xs font-medium transition-all',
                 viewMode === mode
                   ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-                mode === 'month' && 'opacity-40 cursor-not-allowed'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               )}
             >
               {mode === 'day' ? '日' : mode === 'week' ? '週' : '月'}
