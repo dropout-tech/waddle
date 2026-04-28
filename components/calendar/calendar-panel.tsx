@@ -20,6 +20,8 @@ interface CalendarPanelProps {
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (date: string, startTime: string, endTime: string) => void
+  onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
+  onDeleteTimeBlock?: (id: string) => void
   className?: string
 }
 
@@ -35,6 +37,8 @@ export function CalendarPanel({
   onTaskSelect,
   onToggleComplete,
   onCreateTask,
+  onUpdateTimeBlock,
+  onDeleteTimeBlock,
   className,
 }: CalendarPanelProps) {
   const handleTodayClick = () => {
@@ -71,6 +75,8 @@ export function CalendarPanel({
               const dateStr = selectedDate.toISOString().split('T')[0]
               onCreateTask?.(dateStr, startTime, endTime)
             }}
+            onUpdateTimeBlock={onUpdateTimeBlock}
+            onDeleteTimeBlock={onDeleteTimeBlock}
           />
         </>
       )}

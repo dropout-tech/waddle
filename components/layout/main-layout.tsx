@@ -20,6 +20,8 @@ interface MainLayoutProps {
   onOpenReport: () => void
   onOpenSettings?: () => void
   onCreateCalendarTask?: (date: string, startTime: string, endTime: string) => void
+  onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
+  onDeleteTimeBlock?: (id: string) => void
 }
 
 const MIN_PANEL_WIDTH = 280
@@ -39,6 +41,8 @@ export function MainLayout({
   onOpenReport,
   onOpenSettings,
   onCreateCalendarTask,
+  onUpdateTimeBlock,
+  onDeleteTimeBlock,
 }: MainLayoutProps) {
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -123,6 +127,8 @@ export function MainLayout({
           onTaskSelect={onSelectTask}
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateCalendarTask}
+          onUpdateTimeBlock={onUpdateTimeBlock}
+          onDeleteTimeBlock={onDeleteTimeBlock}
         />
       </div>
     </div>

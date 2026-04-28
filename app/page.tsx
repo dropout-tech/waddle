@@ -246,6 +246,20 @@ export default function FlowDeskPage() {
     setTimeBlocks(newTimeBlocks)
   }, [])
 
+  // Update time block (drag/resize)
+  const handleUpdateTimeBlock = useCallback((id: string, updates: Partial<TimeBlock>) => {
+    setTimeBlocks((prev) =>
+      prev.map((block) =>
+        block.id === id ? { ...block, ...updates } : block
+      )
+    )
+  }, [])
+
+  // Delete time block
+  const handleDeleteTimeBlock = useCallback((id: string) => {
+    setTimeBlocks((prev) => prev.filter((block) => block.id !== id))
+  }, [])
+
   // Create task from calendar click or drag
   const handleCreateCalendarTask = useCallback((date: string, startTime: string, endTime: string) => {
     // Find the first available workspace and category
@@ -358,6 +372,8 @@ export default function FlowDeskPage() {
         onOpenReport={handleOpenReport}
         onCreateCalendarTask={handleCreateCalendarTask}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onUpdateTimeBlock={handleUpdateTimeBlock}
+        onDeleteTimeBlock={handleDeleteTimeBlock}
       />
 
       {/* Task Detail Modal */}

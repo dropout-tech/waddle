@@ -15,6 +15,9 @@ interface TimeGridProps {
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (startTime: string, endTime: string) => void
+  onCreateTimeBlock?: (startTime: string, endTime: string, type: TimeBlock['type']) => void
+  onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
+  onDeleteTimeBlock?: (id: string) => void
 }
 
 // Helper to convert time string to minutes since midnight
@@ -159,6 +162,9 @@ export function TimeGrid({
   onTaskSelect,
   onToggleComplete,
   onCreateTask,
+  onCreateTimeBlock,
+  onUpdateTimeBlock,
+  onDeleteTimeBlock,
 }: TimeGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -368,12 +374,14 @@ export function TimeGrid({
           </div>
         )}
 
-        {/* Time Blocks (breaks, buffers) */}
+        {/* Time Blocks (breaks, buffers) - draggable/resizable */}
         {timeBlocks.map((block) => (
           <TimeBlockItem
             key={block.id}
             block={block}
             calendarStartHour={startHour}
+            onUpdate={onUpdateTimeBlock}
+            onDelete={onDeleteTimeBlock}
           />
         ))}
 
