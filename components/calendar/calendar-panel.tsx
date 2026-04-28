@@ -98,7 +98,7 @@ export function CalendarPanel({
             onViewModeChange('day')
           }}
           onCreateTask={(dateString) => {
-            onCreateTask?.('09:00', '09:30')
+            onCreateTask?.(dateString, '09:00', '09:30')
           }}
         />
       )}
