@@ -42,77 +42,83 @@ function minutesToTime(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
+function overlaps(a: Task, b: Task): boolean {
+  const aStart = timeToMinutes(a.scheduledStartTime!)
+  const aEnd = timeToMinutes(a.scheduledEndTime!)
+  const bStart = timeToMinutes(b.scheduledStartTime!)
+  const bEnd = timeToMinutes(b.scheduledEndTime!)
+  return aStart < bEnd && aEnd > bStart
+}
+
 function calculateTaskColumns(tasks: Task[]): Map<string, { column: number; totalColumns: number }> {
   const result = new Map<string, { column: number; totalColumns: number }>()
   const validTasks = tasks.filter(t => t.scheduledStartTime && t.scheduledEndTime)
   if (validTasks.length === 0) return result
 
+  // Sort by start time, then by longer duration first
   const sorted = [...validTasks].sort((a, b) => {
-    const startA = timeToMinutes(a.scheduledStartTime!)
-    const startB = timeToMinutes(b.scheduledStartTime!)
-    if (startA !== startB) return startA - startB
-    return timeToMinutes(b.scheduledEndTime!) - timeToMinutes(a.scheduledEndTime!)
+    const startDiff = timeToMinutes(a.scheduledStartTime!) - timeToMinutes(b.scheduledStartTime!)
+    if (startDiff !== 0) return startDiff
+    return (timeToMinutes(b.scheduledEndTime!) - timeToMinutes(b.scheduledStartTime!)) -
+           (timeToMinutes(a.scheduledEndTime!) - timeToMinutes(a.scheduledStartTime!))
   })
 
+  // Build overlap groups (connected components)
+  const visited = new Set<string>()
   const groups: Task[][] = []
-  for (const task of sorted) {
-    const taskStart = timeToMinutes(task.scheduledStartTime!)
-    const taskEnd = timeToMinutes(task.scheduledEndTime!)
-    let foundGroup = false
-    for (const group of groups) {
-      if (group.some(t => taskStart < timeToMinutes(t.scheduledEndTime!) && taskEnd > timeToMinutes(t.scheduledStartTime!))) {
-        group.push(task)
-        foundGroup = true
-        break
-      }
-    }
-    if (!foundGroup) groups.push([task])
-  }
 
-  // Merge overlapping groups
-  let merged = true
-  while (merged) {
-    merged = false
-    for (let i = 0; i < groups.length; i++) {
-      for (let j = i + 1; j < groups.length; j++) {
-        const overlaps = groups[i].some(ti =>
-          groups[j].some(tj =>
-            timeToMinutes(ti.scheduledStartTime!) < timeToMinutes(tj.scheduledEndTime!) &&
-            timeToMinutes(ti.scheduledEndTime!) > timeToMinutes(tj.scheduledStartTime!)
-          )
-        )
-        if (overlaps) {
-          groups[i].push(...groups[j])
-          groups.splice(j, 1)
-          merged = true
-          break
+  for (const task of sorted) {
+    if (visited.has(task.id)) continue
+    // BFS to find all tasks that overlap (directly or transitively) with this one
+    const group: Task[] = []
+    const queue = [task]
+    while (queue.length > 0) {
+      const cur = queue.shift()!
+      if (visited.has(cur.id)) continue
+      visited.add(cur.id)
+      group.push(cur)
+      for (const other of sorted) {
+        if (!visited.has(other.id) && overlaps(cur, other)) {
+          queue.push(other)
         }
       }
-      if (merged) break
     }
+    groups.push(group)
   }
 
+  // For each group, assign columns using a greedy interval scheduling approach
   for (const group of groups) {
     group.sort((a, b) => timeToMinutes(a.scheduledStartTime!) - timeToMinutes(b.scheduledStartTime!))
-    const columns: Task[][] = []
+
+    // columns[i] = end time (minutes) of last task placed in column i
+    const columnEnds: number[] = []
+
     for (const task of group) {
       const taskStart = timeToMinutes(task.scheduledStartTime!)
+      // Find first column where the last task ends at or before this task starts
       let placed = false
-      for (let col = 0; col < columns.length; col++) {
-        if (timeToMinutes(columns[col][columns[col].length - 1].scheduledEndTime!) <= taskStart) {
-          columns[col].push(task)
+      for (let col = 0; col < columnEnds.length; col++) {
+        if (columnEnds[col] <= taskStart) {
+          result.set(task.id, { column: col, totalColumns: 0 }) // totalColumns filled in below
+          columnEnds[col] = timeToMinutes(task.scheduledEndTime!)
           placed = true
           break
         }
       }
-      if (!placed) columns.push([task])
-    }
-    for (let col = 0; col < columns.length; col++) {
-      for (const task of columns[col]) {
-        result.set(task.id, { column: col, totalColumns: columns.length })
+      if (!placed) {
+        result.set(task.id, { column: columnEnds.length, totalColumns: 0 })
+        columnEnds.push(timeToMinutes(task.scheduledEndTime!))
       }
     }
+
+    // Now set totalColumns for all tasks in this group
+    const total = columnEnds.length
+    for (const task of group) {
+      const entry = result.get(task.id)!
+      result.set(task.id, { column: entry.column, totalColumns: total })
+    }
   }
+
   return result
 }
 

@@ -20,7 +20,16 @@ const PRESET_COLORS = [
   '#c9847a', '#8fae8b', '#a8927f', '#7da2b8', '#c4a4b5', '#d4a76a',
 ]
 
-const PRESET_ICONS = ['', '', '', '', '', '', '', '']
+const PRESET_ICONS = [
+  { value: '', label: '無' },
+  { value: '', label: '星星' },
+  { value: '', label: '愛心' },
+  { value: '', label: '火焰' },
+  { value: '', label: '閃電' },
+  { value: '', label: '書本' },
+  { value: '', label: '音符' },
+  { value: '', label: '地球' },
+]
 
 export function PanelHeader({
   workspaces,
@@ -37,7 +46,7 @@ export function PanelHeader({
   const [isAdding, setIsAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0])
-  const [selectedIcon, setSelectedIcon] = useState(PRESET_ICONS[0])
+  const [selectedIcon, setSelectedIcon] = useState(PRESET_ICONS[0].value)
   const today = new Date()
 
   // Count pending tasks per workspace
@@ -57,7 +66,7 @@ export function PanelHeader({
       onAddWorkspace(newName.trim(), selectedColor, selectedIcon)
       setNewName('')
       setSelectedColor(PRESET_COLORS[0])
-      setSelectedIcon(PRESET_ICONS[0])
+      setSelectedIcon(PRESET_ICONS[0].value)
       setIsAdding(false)
     }
   }
@@ -232,18 +241,19 @@ export function PanelHeader({
           <div className="mb-4">
             <span className="text-xs text-muted-foreground mb-1.5 block">圖示</span>
             <div className="flex gap-2 flex-wrap">
-              {PRESET_ICONS.map((icon) => (
+              {PRESET_ICONS.map(({ value, label }) => (
                 <button
-                  key={icon}
-                  onClick={() => setSelectedIcon(icon)}
+                  key={label}
+                  onClick={() => setSelectedIcon(value)}
+                  title={label}
                   className={cn(
                     'w-8 h-8 rounded-lg border flex items-center justify-center text-base transition-all',
-                    selectedIcon === icon
+                    selectedIcon === value
                       ? 'border-primary bg-primary/10'
                       : 'border-border hover:border-primary/50'
                   )}
                 >
-                  {icon}
+                  {value || <span className="text-muted-foreground text-xs">無</span>}
                 </button>
               ))}
             </div>

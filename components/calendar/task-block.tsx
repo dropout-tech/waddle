@@ -37,15 +37,25 @@ export function TaskBlock({
     task.scheduledEndTime
   )
 
-  // Calculate width and left position for overlapping support
-  const baseLeft = 56 // Time label width
-  const baseRight = 12 // Right margin
-  const availableWidth = `calc(100% - ${baseLeft + baseRight}px)`
-  
-  // Each column gets equal width with small gap
-  const gap = 2 // px gap between columns
-  const columnWidth = `calc((${availableWidth} - ${(totalColumns - 1) * gap}px) / ${totalColumns})`
-  const leftOffset = `calc(${baseLeft}px + (${columnWidth} + ${gap}px) * ${column})`
+  // Column layout: divide the available track area (after the 56px time label)
+  // into equal columns with a 2px gap between each.
+  // We express left/width as percentages of the full container, offsetting by the
+  // 56px time-label area that is always present.
+  const LABEL_PX = 56   // width of the time-label column
+  const RIGHT_PX = 4    // right padding
+  const GAP_PX = 2      // gap between columns
+
+  // Percentage of the full container width that the track area occupies
+  // We keep this as inline style strings that are simple (no nested calc).
+  // Instead we use left + width both in calc() but without nesting.
+  const totalGap = (totalColumns - 1) * GAP_PX
+  // width = (100% - LABEL_PX - RIGHT_PX - totalGap) / totalColumns
+  const columnWidth = `calc((100% - ${LABEL_PX + RIGHT_PX + totalGap}px) / ${totalColumns})`
+  // left  = LABEL_PX + column * (columnWidth + GAP_PX)
+  //       = LABEL_PX + column * ((100% - LABEL_PX - RIGHT_PX - totalGap) / totalColumns + GAP_PX)
+  const leftOffset = column === 0
+    ? `${LABEL_PX}px`
+    : `calc(${LABEL_PX}px + ${column} * ((100% - ${LABEL_PX + RIGHT_PX + totalGap}px) / ${totalColumns} + ${GAP_PX}px))`
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
