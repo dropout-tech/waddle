@@ -11,7 +11,7 @@ const PRESET_COLORS = [
   '#b07bb5', '#c4a95a', '#7a9ec9', '#d47a8b',
 ]
 
-const PRESET_ICONS = ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
+const PRESET_ICONS = ['⭐', '❤️', '🔥', '⚡', '📚', '🎵', '🌍', '🎯', '💡', '🚀', '🌱', '💎', '🏆', '🎨', '📝', '⚙️']
 
 interface WorkspaceSettingsModalProps {
   workspace: Workspace

@@ -1,7 +1,9 @@
 'use client'
 
+import { useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
+import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { CalendarHeader } from './calendar-header'
 import { PendingZone } from './pending-zone'
 import { TimeGrid } from './time-grid'
@@ -47,8 +49,34 @@ export function CalendarPanel({
     onDateChange(new Date())
   }
 
+  const navigate = useCallback((direction: 'prev' | 'next') => {
+    const d = new Date(selectedDate)
+    if (viewMode === 'day') {
+      d.setDate(d.getDate() + (direction === 'next' ? 1 : -1))
+    } else if (viewMode === 'week') {
+      d.setDate(d.getDate() + (direction === 'next' ? 7 : -7))
+    } else {
+      d.setMonth(d.getMonth() + (direction === 'next' ? 1 : -1))
+    }
+    onDateChange(d)
+  }, [selectedDate, viewMode, onDateChange])
+
+  const swipe = useSwipeNavigation({
+    onSwipeLeft: () => navigate('next'),
+    onSwipeRight: () => navigate('prev'),
+  })
+
   return (
-    <div className={cn('flex flex-col h-full bg-panel', className)}>
+    <div
+      className={cn('flex flex-col h-full bg-panel focus:outline-none', className)}
+      onTouchStart={swipe.onTouchStart}
+      onTouchEnd={swipe.onTouchEnd}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); navigate('prev') }
+        if (e.key === 'ArrowRight') { e.preventDefault(); navigate('next') }
+      }}
+      tabIndex={0}
+    >
       {/* Calendar Header */}
       <CalendarHeader
         selectedDate={selectedDate}

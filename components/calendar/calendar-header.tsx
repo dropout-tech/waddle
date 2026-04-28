@@ -52,25 +52,31 @@ export function CalendarHeader({
     )
   }
 
-  // Format week range
+  // Format week range — week starts on Saturday (matching WeekView)
   const getWeekRange = () => {
     const start = new Date(selectedDate)
-    const day = start.getDay()
-    start.setDate(start.getDate() - day)
+    const day = start.getDay() // 0=Sun … 6=Sat
+    const diff = day === 6 ? 0 : -(day + 1)
+    start.setDate(start.getDate() + diff)
+
     const end = new Date(start)
     end.setDate(start.getDate() + 6)
-    
-    const startStr = `${start.getMonth() + 1}/${start.getDate()}`
-    const endStr = `${end.getMonth() + 1}/${end.getDate()}`
-    return `${start.getFullYear()} ${startStr} - ${endStr}`
+
+    const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`
+
+    // If week spans two months show both month numbers
+    if (start.getMonth() !== end.getMonth()) {
+      return `${start.getFullYear()}年 ${fmt(start)} - ${fmt(end)}`
+    }
+    return `${start.getFullYear()}年 ${start.getMonth() + 1}月 ${start.getDate()}-${end.getDate()}日`
   }
 
   const getDisplayText = () => {
-    if (viewMode === 'week') {
-      return getWeekRange()
+    if (viewMode === 'day') {
+      return `${selectedDate.getFullYear()}年 ${selectedDate.getMonth() + 1}月 ${selectedDate.getDate()}日`
     }
-    // Japanese style date
-    return `${selectedDate.getFullYear()}年 ${selectedDate.getMonth() + 1}月 ${selectedDate.getDate()}日`
+    if (viewMode === 'week') return getWeekRange()
+    return `${selectedDate.getFullYear()}年 ${selectedDate.getMonth() + 1}月`
   }
 
   return (

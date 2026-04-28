@@ -22,13 +22,13 @@ const PRESET_COLORS = [
 
 const PRESET_ICONS = [
   { value: '', label: '無' },
-  { value: '', label: '星星' },
-  { value: '', label: '愛心' },
-  { value: '', label: '火焰' },
-  { value: '', label: '閃電' },
-  { value: '', label: '書本' },
-  { value: '', label: '音符' },
-  { value: '', label: '地球' },
+  { value: '⭐', label: '星星' },
+  { value: '❤️', label: '愛心' },
+  { value: '🔥', label: '火焰' },
+  { value: '⚡', label: '閃電' },
+  { value: '📚', label: '書本' },
+  { value: '🎵', label: '音符' },
+  { value: '🌍', label: '地球' },
 ]
 
 export function PanelHeader({
