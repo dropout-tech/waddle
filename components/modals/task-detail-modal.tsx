@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette } from 'lucide-react'
+import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { Task } from '@/lib/types'
+import type { Task, Workspace } from '@/lib/types'
 import { formatEstimatedTime } from '@/lib/task-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,15 +15,17 @@ const PRESET_COLORS = [
 
 interface TaskDetailModalProps {
   task: Task
+  workspaces?: Workspace[]
   isOpen: boolean
   onClose: () => void
-  onSave: (updates: Partial<Task>) => void
+  onSave: (updates: Partial<Task>, newCategoryId?: string) => void
   onToggleComplete?: (taskId: string) => void
   onDelete?: (taskId: string) => void
 }
 
 export function TaskDetailModal({
   task,
+  workspaces = [],
   isOpen,
   onClose,
   onSave,
@@ -46,11 +48,18 @@ export function TaskDetailModal({
   )
   const [notes, setNotes] = useState(task.notes || '')
   const [calendarColor, setCalendarColor] = useState(task.calendarColor || task.workspaceColor)
+  const [selectedCategoryId, setSelectedCategoryId] = useState(task.categoryId)
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false)
+
+  // Find current selected category info
+  const selectedCategory = workspaces
+    .flatMap((w) => w.categories.map((c) => ({ ...c, workspace: w })))
+    .find((c) => c.id === selectedCategoryId)
 
   if (!isOpen) return null
 
   const handleSave = () => {
-    onSave({
+    const updates: Partial<Task> = {
       title,
       description: description || undefined,
       urgency,
@@ -61,7 +70,21 @@ export function TaskDetailModal({
       scheduledEndTime: scheduledEndTime || undefined,
       notes: notes || undefined,
       calendarColor,
-    })
+    }
+
+    // If category changed, include the new category info
+    if (selectedCategoryId !== task.categoryId && selectedCategory) {
+      updates.categoryId = selectedCategoryId
+      updates.workspaceId = selectedCategory.workspace.id
+      updates.workspaceName = selectedCategory.workspace.name
+      updates.workspaceColor = selectedCategory.workspace.color
+      updates.categoryName = selectedCategory.name
+      if (!calendarColor || calendarColor === task.workspaceColor) {
+        updates.calendarColor = selectedCategory.workspace.color
+      }
+    }
+
+    onSave(updates, selectedCategoryId !== task.categoryId ? selectedCategoryId : undefined)
     onClose()
   }
 
@@ -91,13 +114,58 @@ export function TaskDetailModal({
             >
               {task.isCompleted && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
             </button>
-            <div
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: task.workspaceColor }}
-            />
-            <span className="text-xs font-medium text-muted-foreground">
-              {task.workspaceName} / {task.categoryName}
-            </span>
+            {/* Category Selector */}
+            <div className="relative">
+              <button
+                onClick={() => setShowCategoryPicker(!showCategoryPicker)}
+                className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-secondary transition-colors"
+              >
+                <div
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: selectedCategory?.workspace.color || task.workspaceColor }}
+                />
+                <span className="text-xs font-medium text-muted-foreground">
+                  {selectedCategory?.workspace.name || task.workspaceName} / {selectedCategory?.name || task.categoryName}
+                </span>
+                <ChevronDown className="w-3 h-3 text-muted-foreground" />
+              </button>
+
+              {/* Category Dropdown */}
+              {showCategoryPicker && workspaces.length > 0 && (
+                <div className="absolute top-full left-0 mt-1 w-64 bg-card rounded-xl border border-border shadow-xl z-50 py-2 max-h-64 overflow-y-auto">
+                  {workspaces.map((workspace) => (
+                    <div key={workspace.id}>
+                      <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                        <div
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: workspace.color }}
+                        />
+                        {workspace.name}
+                      </div>
+                      {workspace.categories.map((category) => (
+                        <button
+                          key={category.id}
+                          onClick={() => {
+                            setSelectedCategoryId(category.id)
+                            setShowCategoryPicker(false)
+                          }}
+                          className={cn(
+                            'w-full text-left px-4 py-2 text-sm hover:bg-secondary transition-colors flex items-center gap-2',
+                            selectedCategoryId === category.id && 'bg-primary/10 text-primary'
+                          )}
+                        >
+                          <FolderTree className="w-3.5 h-3.5 text-muted-foreground" />
+                          {category.name}
+                          {selectedCategoryId === category.id && (
+                            <Check className="w-3.5 h-3.5 ml-auto" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-1">
             {onDelete && (

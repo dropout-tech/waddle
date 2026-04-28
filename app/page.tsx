@@ -190,22 +190,54 @@ export default function FlowDeskPage() {
   }, [])
 
   // Update task from modal
-  const handleSaveTask = useCallback((updates: Partial<Task>) => {
+  const handleSaveTask = useCallback((updates: Partial<Task>, newCategoryId?: string) => {
     if (!selectedTask) return
 
-    setWorkspaces((prev) =>
-      prev.map((workspace) => ({
-        ...workspace,
-        categories: workspace.categories.map((category) => ({
-          ...category,
-          tasks: category.tasks.map((task) =>
-            task.id === selectedTask.id
-              ? { ...task, ...updates, updatedAt: new Date().toISOString() }
-              : task
-          ),
-        })),
-      }))
-    )
+    if (newCategoryId && newCategoryId !== selectedTask.categoryId) {
+      // Move task to new category
+      setWorkspaces((prev) => {
+        // First, remove task from old category
+        const updatedWorkspaces = prev.map((workspace) => ({
+          ...workspace,
+          categories: workspace.categories.map((category) => ({
+            ...category,
+            tasks: category.tasks.filter((task) => task.id !== selectedTask.id),
+          })),
+        }))
+
+        // Then, add task to new category
+        return updatedWorkspaces.map((workspace) => ({
+          ...workspace,
+          categories: workspace.categories.map((category) => {
+            if (category.id === newCategoryId) {
+              return {
+                ...category,
+                tasks: [
+                  ...category.tasks,
+                  { ...selectedTask, ...updates, updatedAt: new Date().toISOString() },
+                ],
+              }
+            }
+            return category
+          }),
+        }))
+      })
+    } else {
+      // Update task in place
+      setWorkspaces((prev) =>
+        prev.map((workspace) => ({
+          ...workspace,
+          categories: workspace.categories.map((category) => ({
+            ...category,
+            tasks: category.tasks.map((task) =>
+              task.id === selectedTask.id
+                ? { ...task, ...updates, updatedAt: new Date().toISOString() }
+                : task
+            ),
+          })),
+        }))
+      )
+    }
   }, [selectedTask])
 
   // Save settings
@@ -332,6 +364,7 @@ export default function FlowDeskPage() {
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
+          workspaces={workspaces}
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           onSave={handleSaveTask}
