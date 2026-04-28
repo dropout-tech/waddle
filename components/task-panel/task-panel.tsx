@@ -22,6 +22,9 @@ interface TaskPanelProps {
   onAddCategory?: (workspaceId: string, name: string) => void
   onAddWorkspace?: (name: string, color: string, icon: string) => void
   onUpdateWorkspaceColor?: (workspaceId: string, color: string) => void
+  onUpdateWorkspace?: (workspaceId: string, updates: Partial<Pick<import('@/lib/types').Workspace, 'name' | 'color' | 'icon'>>) => void
+  onDeleteWorkspace?: (workspaceId: string) => void
+  onArchiveWorkspace?: (workspaceId: string) => void
   onOpenJournal: () => void
   onOpenReport: () => void
   onOpenSettings?: () => void
@@ -37,6 +40,9 @@ export function TaskPanel({
   onAddCategory,
   onAddWorkspace,
   onUpdateWorkspaceColor,
+  onUpdateWorkspace,
+  onDeleteWorkspace,
+  onArchiveWorkspace,
   onOpenJournal,
   onOpenReport,
   onOpenSettings,
@@ -121,6 +127,9 @@ export function TaskPanel({
         onWorkspaceClick={handleWorkspaceClick}
         onAddWorkspace={onAddWorkspace}
         onUpdateWorkspaceColor={onUpdateWorkspaceColor}
+        onUpdateWorkspace={onUpdateWorkspace}
+        onDeleteWorkspace={onDeleteWorkspace}
+        onArchiveWorkspace={onArchiveWorkspace}
       />
 
       {/* Toolbar Toggle Row */}

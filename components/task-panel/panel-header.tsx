@@ -1,31 +1,39 @@
 'use client'
 
 import { useState } from 'react'
-import { Cloud, Sun, Leaf, Plus, X } from 'lucide-react'
+import { Sun, Leaf, Plus, X, Settings2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatDate } from '@/lib/task-utils'
 import type { Workspace } from '@/lib/types'
+import { WorkspaceSettingsModal } from '@/components/modals/workspace-settings-modal'
 
 interface PanelHeaderProps {
   workspaces: Workspace[]
   onWorkspaceClick: (workspaceId: string) => void
   onAddWorkspace?: (name: string, color: string, icon: string) => void
   onUpdateWorkspaceColor?: (workspaceId: string, color: string) => void
+  onUpdateWorkspace?: (workspaceId: string, updates: Partial<Pick<Workspace, 'name' | 'color' | 'icon'>>) => void
+  onDeleteWorkspace?: (workspaceId: string) => void
+  onArchiveWorkspace?: (workspaceId: string) => void
 }
 
 const PRESET_COLORS = [
-  '#c9847a', // terracotta
-  '#8fae8b', // sage
-  '#a8927f', // taupe
-  '#7da2b8', // dusty blue
-  '#c4a4b5', // dusty rose
-  '#d4a76a', // amber
+  '#c9847a', '#8fae8b', '#a8927f', '#7da2b8', '#c4a4b5', '#d4a76a',
 ]
 
 const PRESET_ICONS = ['', '', '', '', '', '', '', '']
 
-export function PanelHeader({ workspaces, onWorkspaceClick, onAddWorkspace, onUpdateWorkspaceColor }: PanelHeaderProps) {
+export function PanelHeader({
+  workspaces,
+  onWorkspaceClick,
+  onAddWorkspace,
+  onUpdateWorkspaceColor,
+  onUpdateWorkspace,
+  onDeleteWorkspace,
+  onArchiveWorkspace,
+}: PanelHeaderProps) {
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
+  const [settingsWorkspaceId, setSettingsWorkspaceId] = useState<string | null>(null)
+  const settingsWorkspace = workspaces.find((w) => w.id === settingsWorkspaceId) ?? null
   const [isAdding, setIsAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0])
@@ -111,73 +119,42 @@ export function PanelHeader({ workspaces, onWorkspaceClick, onAddWorkspace, onUp
           .map((workspace) => {
             const count = getWorkspaceCount(workspace)
             return (
-              <div key={workspace.id} className="relative flex items-center">
+              <div key={workspace.id} className="group relative flex items-center">
+                {/* Main pill — click to scroll to workspace */}
                 <button
                   onClick={() => onWorkspaceClick(workspace.id)}
                   className={cn(
-                    'flex items-center gap-1.5 pl-2 pr-3 py-1.5 rounded-lg text-xs font-medium transition-all soft-hover',
-                    'border bg-card hover:bg-muted/50'
+                    'flex items-center gap-1.5 pl-2 pr-2 py-1.5 rounded-l-lg text-xs font-medium transition-all soft-hover',
+                    'border-y border-l bg-card hover:bg-muted/50'
                   )}
-                  style={{
-                    borderColor: `${workspace.color}40`,
-                    color: workspace.color,
-                  }}
+                  style={{ borderColor: `${workspace.color}40`, color: workspace.color }}
                 >
-                  {/* Color swatch — clicking opens picker */}
                   <span
-                    role="button"
-                    aria-label={`更改 ${workspace.name} 顏色`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setEditingWorkspaceId(
-                        editingWorkspaceId === workspace.id ? null : workspace.id
-                      )
-                    }}
-                    className="w-3 h-3 rounded-full border border-white/40 flex-shrink-0 cursor-pointer hover:scale-125 transition-transform"
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                     style={{ backgroundColor: workspace.color }}
                   />
                   {workspace.icon && <span className="text-sm">{workspace.icon}</span>}
                   <span className="font-semibold">{workspace.name}</span>
                   <span
-                    className="ml-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold"
-                    style={{ backgroundColor: `${workspace.color}15` }}
+                    className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                    style={{ backgroundColor: `${workspace.color}18` }}
                   >
                     {count}
                   </span>
                 </button>
 
-                {/* Inline color picker popover */}
-                {editingWorkspaceId === workspace.id && (
-                  <div className="absolute top-full left-0 mt-1.5 z-50 bg-card border border-border rounded-xl shadow-xl p-3 w-44">
-                    <p className="text-[10px] text-muted-foreground mb-2 font-medium">選擇顏色</p>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {PRESET_COLORS.map((color) => (
-                        <button
-                          key={color}
-                          onClick={() => {
-                            onUpdateWorkspaceColor?.(workspace.id, color)
-                            setEditingWorkspaceId(null)
-                          }}
-                          className={cn(
-                            'w-6 h-6 rounded-full border-2 transition-all hover:scale-110',
-                            workspace.color === color ? 'border-foreground' : 'border-transparent'
-                          )}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground">自訂</span>
-                      <input
-                        type="color"
-                        value={workspace.color}
-                        onChange={(e) => onUpdateWorkspaceColor?.(workspace.id, e.target.value)}
-                        onBlur={() => setEditingWorkspaceId(null)}
-                        className="w-7 h-7 rounded cursor-pointer border border-border"
-                      />
-                    </div>
-                  </div>
-                )}
+                {/* Settings gear — opens full workspace settings modal */}
+                <button
+                  onClick={() => setSettingsWorkspaceId(workspace.id)}
+                  aria-label={`${workspace.name} 設定`}
+                  className={cn(
+                    'flex items-center justify-center w-6 h-full rounded-r-lg border-y border-r bg-card transition-all',
+                    'text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50'
+                  )}
+                  style={{ borderColor: `${workspace.color}40` }}
+                >
+                  <Settings2 className="w-3 h-3" />
+                </button>
               </div>
             )
           })}
@@ -191,6 +168,21 @@ export function PanelHeader({ workspaces, onWorkspaceClick, onAddWorkspace, onUp
           <span>新增</span>
         </button>
       </div>
+
+      {/* Workspace Settings Modal */}
+      {settingsWorkspace && (
+        <WorkspaceSettingsModal
+          workspace={settingsWorkspace}
+          isOpen={!!settingsWorkspaceId}
+          onClose={() => setSettingsWorkspaceId(null)}
+          onUpdate={(id, updates) => {
+            onUpdateWorkspace?.(id, updates)
+            if (updates.color) onUpdateWorkspaceColor?.(id, updates.color)
+          }}
+          onDelete={onDeleteWorkspace}
+          onArchive={onArchiveWorkspace}
+        />
+      )}
 
       {/* Add Workspace Modal */}
       {isAdding && (

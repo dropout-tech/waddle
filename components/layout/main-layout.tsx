@@ -17,6 +17,9 @@ interface MainLayoutProps {
   onAddCategory?: (workspaceId: string, name: string) => void
   onAddWorkspace?: (name: string, color: string, icon: string) => void
   onUpdateWorkspaceColor?: (workspaceId: string, color: string) => void
+  onUpdateWorkspace?: (workspaceId: string, updates: Partial<Pick<Workspace, 'name' | 'color' | 'icon'>>) => void
+  onDeleteWorkspace?: (workspaceId: string) => void
+  onArchiveWorkspace?: (workspaceId: string) => void
   onOpenJournal: () => void
   onOpenReport: () => void
   onOpenSettings?: () => void
@@ -40,6 +43,9 @@ export function MainLayout({
   onAddCategory,
   onAddWorkspace,
   onUpdateWorkspaceColor,
+  onUpdateWorkspace,
+  onDeleteWorkspace,
+  onArchiveWorkspace,
   onOpenJournal,
   onOpenReport,
   onOpenSettings,
@@ -109,6 +115,9 @@ export function MainLayout({
           onAddCategory={onAddCategory}
           onAddWorkspace={onAddWorkspace}
           onUpdateWorkspaceColor={onUpdateWorkspaceColor}
+          onUpdateWorkspace={onUpdateWorkspace}
+          onDeleteWorkspace={onDeleteWorkspace}
+          onArchiveWorkspace={onArchiveWorkspace}
           onOpenJournal={onOpenJournal}
           onOpenReport={onOpenReport}
           onOpenSettings={onOpenSettings}

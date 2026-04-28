@@ -201,6 +201,45 @@ export default function FlowDeskPage() {
     setWorkspaces((prev) => [...prev, newWorkspace])
   }, [workspaces.length])
 
+  // Update workspace (name, color, icon) — color update also propagates to tasks
+  const handleUpdateWorkspace = useCallback((
+    workspaceId: string,
+    updates: Partial<Pick<Workspace, 'name' | 'color' | 'icon'>>
+  ) => {
+    setWorkspaces((prev) =>
+      prev.map((workspace) => {
+        if (workspace.id !== workspaceId) return workspace
+        const oldColor = workspace.color
+        const newColor = updates.color ?? workspace.color
+        return {
+          ...workspace,
+          ...updates,
+          categories: workspace.categories.map((category) => ({
+            ...category,
+            tasks: category.tasks.map((task) => ({
+              ...task,
+              workspaceName: updates.name ?? task.workspaceName,
+              workspaceColor: newColor,
+              calendarColor: task.calendarColor === oldColor ? newColor : task.calendarColor,
+            })),
+          })),
+        }
+      })
+    )
+  }, [])
+
+  // Archive workspace (hide from view, keep data)
+  const handleArchiveWorkspace = useCallback((workspaceId: string) => {
+    setWorkspaces((prev) =>
+      prev.map((w) => w.id === workspaceId ? { ...w, isArchived: true } : w)
+    )
+  }, [])
+
+  // Delete workspace (remove entirely)
+  const handleDeleteWorkspace = useCallback((workspaceId: string) => {
+    setWorkspaces((prev) => prev.filter((w) => w.id !== workspaceId))
+  }, [])
+
   // Delete task
   const handleDeleteTask = useCallback((taskId: string) => {
     setWorkspaces((prev) =>
@@ -416,6 +455,9 @@ export default function FlowDeskPage() {
         onAddCategory={handleAddCategory}
         onAddWorkspace={handleAddWorkspace}
         onUpdateWorkspaceColor={handleUpdateWorkspaceColor}
+        onUpdateWorkspace={handleUpdateWorkspace}
+        onDeleteWorkspace={handleDeleteWorkspace}
+        onArchiveWorkspace={handleArchiveWorkspace}
         onOpenJournal={handleOpenJournal}
         onOpenReport={handleOpenReport}
         onCreateCalendarTask={handleCreateCalendarTask}
