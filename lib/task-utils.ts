@@ -1,77 +1,108 @@
 import type { Task, ColorStatus } from './types'
 
-// Get urgency color based on task state and urgency level
+/**
+ * Returns inline CSS color values for the entire task row based on urgency
+ * (1–5) and date state (overdue / today / upcoming / normal / completed).
+ *
+ * State priority: completed > overdue > urgency-5 > urgency-4 > urgency-3 > urgency-2 > urgency-1
+ */
 export function getUrgencyColor(task: Task): {
-  bg: string
-  border: string
+  /** Full row background colour (rgba string) */
+  rowBg: string
+  /** Left accent border colour */
+  accentColor: string
+  /** Small badge background */
+  badgeBg: string
+  /** Small badge text colour */
+  badgeText: string
+  /** Dot indicator colour */
   dot: string
-  text: string
+  /** Human-readable status label */
+  label: string | null
+  /** Whether the task is overdue */
+  isOverdue: boolean
 } {
   const today = new Date().toISOString().split('T')[0]
 
-  // Priority 1 - Completed
+  // --- Completed ---
   if (task.isCompleted) {
     return {
-      bg: 'bg-muted/50',
-      border: 'border-muted',
-      dot: 'bg-muted-foreground/50',
-      text: 'text-muted-foreground line-through',
+      rowBg: 'transparent',
+      accentColor: 'oklch(0.80 0.01 85)',
+      badgeBg: 'oklch(0.92 0.008 85)',
+      badgeText: 'oklch(0.55 0.02 55)',
+      dot: 'oklch(0.80 0.01 85)',
+      label: null,
+      isOverdue: false,
     }
   }
 
-  // Priority 2 - Overdue
+  // --- Overdue (dueDate is strictly before today) ---
   if (task.dueDate && task.dueDate < today) {
     return {
-      bg: 'bg-red-500/10',
-      border: 'border-red-500/30',
-      dot: 'bg-red-500',
-      text: 'text-foreground',
+      rowBg: 'oklch(0.62 0.18 25 / 0.08)',
+      accentColor: 'oklch(0.58 0.20 25)',
+      badgeBg: 'oklch(0.58 0.20 25 / 0.15)',
+      badgeText: 'oklch(0.45 0.18 25)',
+      dot: 'oklch(0.58 0.20 25)',
+      label: '已過期',
+      isOverdue: true,
     }
   }
 
-  // Priority 3 - Today (scheduled for today)
-  if (task.scheduledDate === today) {
-    return {
-      bg: 'bg-amber-500/10',
-      border: 'border-amber-500/30',
-      dot: 'bg-amber-500',
-      text: 'text-foreground',
-    }
-  }
-
-  // Priority 4 - Upcoming (due within 3 days)
-  if (task.dueDate) {
-    const dueDate = new Date(task.dueDate)
-    const todayDate = new Date(today)
-    const diffDays = Math.ceil(
-      (dueDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24)
-    )
-    if (diffDays <= 3 && diffDays > 0) {
+  // --- Urgency-based colouring (1 = low → 5 = critical) ---
+  switch (task.urgency) {
+    case 5:
       return {
-        bg: 'bg-orange-500/10',
-        border: 'border-orange-500/30',
-        dot: 'bg-orange-500',
-        text: 'text-foreground',
+        rowBg: 'oklch(0.62 0.18 25 / 0.06)',
+        accentColor: 'oklch(0.62 0.18 25)',
+        badgeBg: 'oklch(0.62 0.18 25 / 0.14)',
+        badgeText: 'oklch(0.42 0.18 25)',
+        dot: 'oklch(0.62 0.18 25)',
+        label: '緊急',
+        isOverdue: false,
       }
-    }
-  }
-
-  // Priority 5 - No deadline (green, flexible)
-  if (!task.dueDate && !task.scheduledDate) {
-    return {
-      bg: 'bg-emerald-500/10',
-      border: 'border-emerald-500/20',
-      dot: 'bg-emerald-500',
-      text: 'text-foreground',
-    }
-  }
-
-  // Priority 6 - Normal (default)
-  return {
-    bg: 'bg-card',
-    border: 'border-border',
-    dot: 'bg-muted-foreground/50',
-    text: 'text-foreground',
+    case 4:
+      return {
+        rowBg: 'oklch(0.72 0.15 55 / 0.07)',
+        accentColor: 'oklch(0.68 0.16 55)',
+        badgeBg: 'oklch(0.68 0.16 55 / 0.14)',
+        badgeText: 'oklch(0.45 0.14 55)',
+        dot: 'oklch(0.68 0.16 55)',
+        label: '重要',
+        isOverdue: false,
+      }
+    case 3:
+      return {
+        rowBg: 'oklch(0.80 0.12 85 / 0.07)',
+        accentColor: 'oklch(0.74 0.13 85)',
+        badgeBg: 'oklch(0.74 0.13 85 / 0.16)',
+        badgeText: 'oklch(0.48 0.10 70)',
+        dot: 'oklch(0.74 0.13 85)',
+        label: '普通',
+        isOverdue: false,
+      }
+    case 2:
+      return {
+        rowBg: 'oklch(0.78 0.10 155 / 0.06)',
+        accentColor: 'oklch(0.70 0.12 155)',
+        badgeBg: 'oklch(0.70 0.12 155 / 0.14)',
+        badgeText: 'oklch(0.40 0.10 155)',
+        dot: 'oklch(0.70 0.12 155)',
+        label: '低',
+        isOverdue: false,
+      }
+    case 1:
+    default:
+      return {
+        rowBg: 'oklch(0.78 0.08 230 / 0.05)',
+        accentColor: 'oklch(0.68 0.10 230)',
+        badgeBg: 'oklch(0.68 0.10 230 / 0.12)',
+        badgeText: 'oklch(0.40 0.10 230)',
+        dot: 'oklch(0.68 0.10 230)',
+        label: '輕鬆',
+        isOverdue: false,
+      }
   }
 }
 
