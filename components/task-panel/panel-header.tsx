@@ -128,43 +128,39 @@ export function PanelHeader({
           .map((workspace) => {
             const count = getWorkspaceCount(workspace)
             return (
-              <div key={workspace.id} className="group relative flex items-center">
-                {/* Main pill — click to scroll to workspace */}
-                <button
-                  onClick={() => onWorkspaceClick(workspace.id)}
-                  className={cn(
-                    'flex items-center gap-1.5 pl-2 pr-2 py-1.5 rounded-l-lg text-xs font-medium transition-all soft-hover',
-                    'border-y border-l bg-card hover:bg-muted/50'
-                  )}
-                  style={{ borderColor: `${workspace.color}40`, color: workspace.color }}
+              <button
+                key={workspace.id}
+                onClick={() => onWorkspaceClick(workspace.id)}
+                className={cn(
+                  'group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
+                  'border bg-card hover:bg-muted/50'
+                )}
+                style={{ borderColor: `${workspace.color}40`, color: workspace.color }}
+              >
+                <span
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: workspace.color }}
+                />
+                {workspace.icon && <span className="text-xs">{workspace.icon}</span>}
+                <span className="font-semibold">{workspace.name}</span>
+                <span
+                  className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                  style={{ backgroundColor: `${workspace.color}18` }}
                 >
-                  <span
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: workspace.color }}
-                  />
-                  {workspace.icon && <span className="text-sm">{workspace.icon}</span>}
-                  <span className="font-semibold">{workspace.name}</span>
-                  <span
-                    className="px-1.5 py-0.5 rounded text-[10px] font-bold"
-                    style={{ backgroundColor: `${workspace.color}18` }}
-                  >
-                    {count}
-                  </span>
-                </button>
-
-                {/* Settings gear — opens full workspace settings modal */}
-                <button
-                  onClick={() => setSettingsWorkspaceId(workspace.id)}
-                  aria-label={`${workspace.name} 設定`}
-                  className={cn(
-                    'flex items-center justify-center w-6 h-full rounded-r-lg border-y border-r bg-card transition-all',
-                    'text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50'
-                  )}
-                  style={{ borderColor: `${workspace.color}40` }}
+                  {count}
+                </span>
+                
+                {/* Settings icon - appears on hover */}
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSettingsWorkspaceId(workspace.id)
+                  }}
+                  className="ml-0.5 p-0.5 rounded opacity-40 hover:opacity-100 hover:bg-muted/60 transition-all cursor-pointer"
                 >
                   <Settings2 className="w-3 h-3" />
-                </button>
-              </div>
+                </span>
+              </button>
             )
           })}
 

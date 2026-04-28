@@ -363,6 +363,45 @@ export default function FlowDeskPage() {
     setTimeBlocks((prev) => prev.filter((block) => block.id !== id))
   }, [])
 
+  // Create pending task (no scheduled time)
+  const handleCreatePendingTask = useCallback((title: string) => {
+    const firstWorkspace = workspaces[0]
+    const firstCategory = firstWorkspace?.categories[0]
+    if (!firstWorkspace || !firstCategory) return
+
+    const today = new Date().toISOString().split('T')[0]
+    const newTask: Task = {
+      id: `task-${Date.now()}`,
+      categoryId: firstCategory.id,
+      workspaceId: firstWorkspace.id,
+      workspaceName: firstWorkspace.name,
+      workspaceColor: firstWorkspace.color,
+      categoryName: firstCategory.name,
+      title,
+      taskType: 'one_time',
+      urgency: 5,
+      calendarColor: firstWorkspace.color,
+      isCompleted: false,
+      sortOrder: 999,
+      scheduledDate: today,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    setWorkspaces((prev) =>
+      prev.map((ws) => {
+        if (ws.id !== firstWorkspace.id) return ws
+        return {
+          ...ws,
+          categories: ws.categories.map((cat) => {
+            if (cat.id !== firstCategory.id) return cat
+            return { ...cat, tasks: [...cat.tasks, newTask] }
+          }),
+        }
+      })
+    )
+  }, [workspaces])
+
   // Create task from calendar click or drag
   const handleCreateCalendarTask = useCallback((date: string, startTime: string, endTime: string) => {
     // Find the first available workspace and category
@@ -478,6 +517,7 @@ export default function FlowDeskPage() {
         onOpenJournal={handleOpenJournal}
         onOpenReport={handleOpenReport}
         onCreateCalendarTask={handleCreateCalendarTask}
+        onCreatePendingTask={handleCreatePendingTask}
         onCreateCalendarTimeBlock={handleCreateTimeBlock}
         onRescheduleTask={handleRescheduleTask}
         onOpenSettings={() => setIsSettingsOpen(true)}

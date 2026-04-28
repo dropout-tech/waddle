@@ -44,6 +44,14 @@ export interface Task {
   sortOrder: number
   createdAt: string
   updatedAt: string
+  // Recurrence settings
+  isRecurring?: boolean
+  recurrence?: {
+    type: 'daily' | 'weekly' | 'monthly' | 'custom'
+    interval: number // every N days/weeks/months
+    daysOfWeek?: number[] // 0-6 for weekly (0=Sunday)
+    endDate?: string // ISO date string
+  }
 }
 
 export interface TimeBlock {

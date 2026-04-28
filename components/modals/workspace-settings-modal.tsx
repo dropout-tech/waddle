@@ -127,9 +127,9 @@ export function WorkspaceSettingsModal({
               圖示
             </label>
             <div className="flex flex-wrap gap-1.5">
-              {PRESET_ICONS.map((ic) => (
+              {PRESET_ICONS.map((ic, idx) => (
                 <button
-                  key={ic}
+                  key={`icon-${idx}`}
                   onClick={() => setIcon(ic)}
                   className={cn(
                     'w-8 h-8 rounded-lg border text-base flex items-center justify-center transition-all hover:scale-110',
