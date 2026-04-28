@@ -1,80 +1,107 @@
 'use client'
 
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useEffect } from 'react'
 
 interface UseSwipeNavigationOptions {
   onSwipeLeft: () => void
   onSwipeRight: () => void
-  /** Minimum horizontal distance (px) to trigger a swipe. Default: 60 */
+  /** Minimum horizontal distance (px) to trigger a swipe. Default: 50 */
   threshold?: number
-  /** Maximum vertical drift allowed before cancelling. Default: 80 */
-  verticalThreshold?: number
+  /** If horizontal movement exceeds this ratio vs vertical, it's a swipe. Default: 1.5 */
+  directionRatio?: number
+  /** Element ref to attach native (non-React) listeners to */
+  elementRef: React.RefObject<HTMLElement>
 }
 
 /**
- * Returns ref + event handlers to attach to a scrollable container.
- * Supports both touch (mobile) and mouse drag (desktop) swipe gestures.
- * Ignores vertical scrolling — only fires when the gesture is primarily horizontal.
+ * Attaches native pointer event listeners directly to the element so they fire
+ * even when child elements call stopPropagation on React synthetic events.
+ * Distinguishes horizontal swipe (navigate) from vertical drag (scroll/create).
  */
 export function useSwipeNavigation({
   onSwipeLeft,
   onSwipeRight,
-  threshold = 60,
-  verticalThreshold = 80,
+  threshold = 50,
+  directionRatio = 1.5,
+  elementRef,
 }: UseSwipeNavigationOptions) {
   const startX = useRef<number | null>(null)
   const startY = useRef<number | null>(null)
-  const isSwiping = useRef(false)
+  const pointerId = useRef<number | null>(null)
+  const committed = useRef<'horizontal' | 'vertical' | null>(null)
 
-  // ── Touch ──────────────────────────────────────────────────────────────────
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    startX.current = e.touches[0].clientX
-    startY.current = e.touches[0].clientY
-    isSwiping.current = false
-  }, [])
+  // Keep callbacks in refs so we don't re-attach listeners on every render
+  const onSwipeLeftRef = useRef(onSwipeLeft)
+  const onSwipeRightRef = useRef(onSwipeRight)
+  useEffect(() => { onSwipeLeftRef.current = onSwipeLeft }, [onSwipeLeft])
+  useEffect(() => { onSwipeRightRef.current = onSwipeRight }, [onSwipeRight])
 
-  const onTouchEnd = useCallback(
-    (e: React.TouchEvent) => {
+  useEffect(() => {
+    const el = elementRef.current
+    if (!el) return
+
+    const onPointerDown = (e: PointerEvent) => {
+      // Only track touch pointers for navigation (mouse drag is used for creating slots)
+      if (e.pointerType !== 'touch') return
+      startX.current = e.clientX
+      startY.current = e.clientY
+      pointerId.current = e.pointerId
+      committed.current = null
+    }
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId.current) return
       if (startX.current === null || startY.current === null) return
-      const dx = e.changedTouches[0].clientX - startX.current
-      const dy = e.changedTouches[0].clientY - startY.current
+      if (committed.current) return
 
-      // Only fire if horizontal movement dominates and exceeds threshold
-      if (Math.abs(dx) > threshold && Math.abs(dy) < verticalThreshold) {
-        if (dx < 0) onSwipeLeft()
-        else onSwipeRight()
+      const dx = Math.abs(e.clientX - startX.current)
+      const dy = Math.abs(e.clientY - startY.current)
+
+      // Commit direction once we have enough movement to tell
+      if (dx > 8 || dy > 8) {
+        committed.current = dx > dy * directionRatio ? 'horizontal' : 'vertical'
       }
-      startX.current = null
-      startY.current = null
-    },
-    [onSwipeLeft, onSwipeRight, threshold, verticalThreshold]
-  )
+    }
 
-  // ── Mouse (desktop drag) ────────────────────────────────────────────────
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    // Only initiate on left-button drag on the background (not on task blocks)
-    if (e.button !== 0) return
-    if ((e.target as HTMLElement).closest('[data-task],[data-no-swipe]')) return
-    startX.current = e.clientX
-    startY.current = e.clientY
-    isSwiping.current = false
-  }, [])
+    const onPointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId.current) return
+      if (startX.current === null || committed.current !== 'horizontal') {
+        startX.current = null
+        startY.current = null
+        pointerId.current = null
+        committed.current = null
+        return
+      }
 
-  const onMouseUp = useCallback(
-    (e: React.MouseEvent) => {
-      if (startX.current === null || startY.current === null) return
       const dx = e.clientX - startX.current
-      const dy = e.clientY - startY.current
-
-      if (Math.abs(dx) > threshold && Math.abs(dy) < verticalThreshold) {
-        if (dx < 0) onSwipeLeft()
-        else onSwipeRight()
+      if (Math.abs(dx) >= threshold) {
+        if (dx < 0) onSwipeLeftRef.current()
+        else onSwipeRightRef.current()
       }
+
       startX.current = null
       startY.current = null
-    },
-    [onSwipeLeft, onSwipeRight, threshold, verticalThreshold]
-  )
+      pointerId.current = null
+      committed.current = null
+    }
 
-  return { onTouchStart, onTouchEnd, onMouseDown, onMouseUp }
+    const onPointerCancel = () => {
+      startX.current = null
+      startY.current = null
+      pointerId.current = null
+      committed.current = null
+    }
+
+    el.addEventListener('pointerdown', onPointerDown, { passive: true })
+    el.addEventListener('pointermove', onPointerMove, { passive: true })
+    el.addEventListener('pointerup', onPointerUp, { passive: true })
+    el.addEventListener('pointercancel', onPointerCancel, { passive: true })
+
+    return () => {
+      el.removeEventListener('pointerdown', onPointerDown)
+      el.removeEventListener('pointermove', onPointerMove)
+      el.removeEventListener('pointerup', onPointerUp)
+      el.removeEventListener('pointercancel', onPointerCancel)
+    }
+  }, [elementRef, threshold, directionRatio])
 }

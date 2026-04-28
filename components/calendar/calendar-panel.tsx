@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
@@ -49,6 +49,8 @@ export function CalendarPanel({
   onDeleteTimeBlock,
   className,
 }: CalendarPanelProps) {
+  const panelRef = useRef<HTMLDivElement>(null)
+
   const handleTodayClick = () => {
     onDateChange(new Date())
   }
@@ -65,16 +67,16 @@ export function CalendarPanel({
     onDateChange(d)
   }, [selectedDate, viewMode, onDateChange])
 
-  const swipe = useSwipeNavigation({
+  useSwipeNavigation({
     onSwipeLeft: () => navigate('next'),
     onSwipeRight: () => navigate('prev'),
+    elementRef: panelRef,
   })
 
   return (
     <div
+      ref={panelRef}
       className={cn('flex flex-col h-full bg-panel focus:outline-none', className)}
-      onTouchStart={swipe.onTouchStart}
-      onTouchEnd={swipe.onTouchEnd}
       onKeyDown={(e) => {
         if (e.key === 'ArrowLeft') { e.preventDefault(); navigate('prev') }
         if (e.key === 'ArrowRight') { e.preventDefault(); navigate('next') }
@@ -130,6 +132,7 @@ export function CalendarPanel({
           onTaskSelect={onTaskSelect}
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}
+          onNavigate={navigate}
         />
       )}
 
@@ -147,6 +150,7 @@ export function CalendarPanel({
           onCreateTask={(dateString) => {
             onCreateTask?.(dateString, '09:00', '09:30')
           }}
+          onNavigate={navigate}
         />
       )}
     </div>

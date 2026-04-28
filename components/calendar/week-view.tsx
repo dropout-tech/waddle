@@ -14,6 +14,7 @@ interface WeekViewProps {
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (date: string, startTime: string, endTime: string) => void
+  onNavigate?: (direction: 'prev' | 'next') => void
   startHour?: number
   endHour?: number
 }
@@ -28,6 +29,7 @@ export function WeekView({
   onTaskSelect,
   onToggleComplete,
   onCreateTask,
+  onNavigate,
   startHour = 6,
   endHour = 22,
 }: WeekViewProps) {
@@ -37,6 +39,33 @@ export function WeekView({
   const [dragEnd, setDragEnd] = useState<{ day: number; y: number } | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Mouse-drag navigation state (for the sticky header row)
+  const navDragStartX = useRef<number | null>(null)
+  const navDragCommitted = useRef<'horizontal' | 'vertical' | null>(null)
+
+  const handleHeaderMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return
+    navDragStartX.current = e.clientX
+    navDragCommitted.current = null
+  }, [])
+
+  const handleHeaderMouseMove = useCallback((e: React.MouseEvent) => {
+    if (navDragStartX.current === null || navDragCommitted.current) return
+    const dx = Math.abs(e.clientX - navDragStartX.current)
+    const dy = Math.abs(e.clientY - (e.clientY)) // can't know dy here, so just use dx threshold
+    if (dx > 12) navDragCommitted.current = 'horizontal'
+  }, [])
+
+  const handleHeaderMouseUp = useCallback((e: React.MouseEvent) => {
+    if (navDragStartX.current === null) return
+    const dx = e.clientX - navDragStartX.current
+    if (navDragCommitted.current === 'horizontal' && Math.abs(dx) > 50) {
+      onNavigate?.(dx < 0 ? 'next' : 'prev')
+    }
+    navDragStartX.current = null
+    navDragCommitted.current = null
+  }, [onNavigate])
 
   // Get the week dates (Saturday to Friday, starting from Saturday of the week containing selectedDate)
   const weekDates = useMemo(() => {
@@ -176,8 +205,14 @@ export function WeekView({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-panel-secondary">
-      {/* Sticky Header with Day columns + All-day tasks */}
-      <div className="flex-shrink-0 flex border-b border-border bg-panel">
+      {/* Sticky Header with Day columns + All-day tasks — drag left/right to navigate */}
+      <div
+        className="flex-shrink-0 flex border-b border-border bg-panel select-none cursor-grab active:cursor-grabbing"
+        onMouseDown={handleHeaderMouseDown}
+        onMouseMove={handleHeaderMouseMove}
+        onMouseUp={handleHeaderMouseUp}
+        onMouseLeave={() => { navDragStartX.current = null; navDragCommitted.current = null }}
+      >
         {/* Time column header spacer */}
         <div className="w-12 flex-shrink-0 border-r border-border" />
         

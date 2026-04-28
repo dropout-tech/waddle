@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useRef, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { Check, Plus } from 'lucide-react'
@@ -13,6 +13,7 @@ interface MonthViewProps {
   onToggleComplete?: (taskId: string) => void
   onDateSelect?: (date: Date) => void
   onCreateTask?: (date: string) => void
+  onNavigate?: (direction: 'prev' | 'next') => void
 }
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
@@ -25,7 +26,23 @@ export function MonthView({
   onToggleComplete,
   onDateSelect,
   onCreateTask,
+  onNavigate,
 }: MonthViewProps) {
+  const dragStartX = useRef<number | null>(null)
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return
+    dragStartX.current = e.clientX
+  }, [])
+
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    if (dragStartX.current === null) return
+    const dx = e.clientX - dragStartX.current
+    dragStartX.current = null
+    if (Math.abs(dx) > 60) {
+      onNavigate?.(dx < 0 ? 'next' : 'prev')
+    }
+  }, [onNavigate])
   // Calculate calendar grid
   const calendarDays = useMemo(() => {
     const year = selectedDate.getFullYear()
@@ -137,7 +154,12 @@ export function MonthView({
   }
 
   return (
-    <div className="flex-1 flex flex-col p-4 overflow-hidden">
+    <div
+      className="flex-1 flex flex-col p-4 overflow-hidden select-none"
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={() => { dragStartX.current = null }}
+    >
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 mb-2">
         {WEEKDAYS.map((day, index) => (
