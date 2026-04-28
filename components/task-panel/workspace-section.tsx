@@ -27,27 +27,30 @@ export function WorkspaceSection({
   return (
     <div className="mb-6">
       {/* Workspace Header */}
-      <div className="flex items-center gap-3 px-2 mb-3">
+      <div className="flex items-center gap-3 px-1 mb-3">
         <div
-          className="w-2 h-8 rounded-full"
+          className="w-1 h-6 rounded-sm"
           style={{ backgroundColor: workspace.color }}
         />
-        <div className="flex-1">
-          <h3
-            className="text-sm font-bold"
-            style={{ color: workspace.color }}
-          >
-            {workspace.icon && <span className="mr-1.5">{workspace.icon}</span>}
+        <div className="flex-1 flex items-center gap-2">
+          <h3 className="text-sm font-bold text-foreground">
+            {workspace.icon && <span className="mr-1">{workspace.icon}</span>}
             {workspace.name}
           </h3>
-          <p className="text-[10px] text-muted-foreground">
-            {pendingCount} 個待辦任務
-          </p>
+          <span 
+            className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+            style={{ 
+              backgroundColor: `${workspace.color}15`,
+              color: workspace.color 
+            }}
+          >
+            {pendingCount}
+          </span>
         </div>
       </div>
 
       {/* Categories */}
-      <div className="space-y-1 pl-2 border-l-2" style={{ borderColor: `${workspace.color}30` }}>
+      <div className="space-y-1 pl-3 border-l border-border ml-1">
         {workspace.categories
           .filter((c) => !c.isArchived)
           .sort((a, b) => a.sortOrder - b.sortOrder)

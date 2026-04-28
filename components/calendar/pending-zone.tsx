@@ -14,8 +14,8 @@ interface PendingZoneProps {
 export function PendingZone({ tasks, onTaskSelect, onToggleComplete }: PendingZoneProps) {
   if (tasks.length === 0) {
     return (
-      <div className="px-4 py-4 border-b border-border bg-secondary/20">
-        <div className="flex items-center justify-center gap-2 text-muted-foreground/60">
+      <div className="px-5 py-4 border-b border-border bg-muted/30">
+        <div className="flex items-center justify-center gap-2 text-muted-foreground/50">
           <Inbox className="w-4 h-4" />
           <span className="text-xs">今天沒有待排程的任務</span>
         </div>
@@ -24,17 +24,15 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete }: PendingZo
   }
 
   return (
-    <div className="px-4 py-3 border-b border-border bg-gradient-to-r from-secondary/30 to-accent/10">
+    <div className="px-5 py-4 border-b border-border bg-muted/20">
       {/* Label */}
-      <div className="flex items-center gap-2 mb-2.5">
-        <div className="w-5 h-5 rounded-lg bg-primary/20 flex items-center justify-center">
-          <Clock className="w-3 h-3 text-primary" />
-        </div>
-        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+      <div className="flex items-center gap-2 mb-3">
+        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
           待排程
         </span>
-        <span className="text-[10px] text-muted-foreground/70">
-          拖曳到時間軸排程
+        <span className="text-[10px] text-muted-foreground/60">
+          - 拖曳到下方時間軸
         </span>
       </div>
 
@@ -45,45 +43,46 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete }: PendingZo
             key={task.id}
             draggable
             className={cn(
-              'flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all',
-              'hover:scale-[1.02] shadow-sm',
-              task.isCompleted && 'opacity-55'
+              'group flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-all cursor-grab',
+              'bg-card border border-border hover:border-primary/30 hover:shadow-sm',
+              task.isCompleted && 'opacity-50'
             )}
-            style={{
-              backgroundColor: `${task.workspaceColor}20`,
-              borderWidth: '2px',
-              borderColor: `${task.workspaceColor}40`,
-              color: task.workspaceColor,
-            }}
           >
             {/* Checkbox */}
             <button
               onClick={() => onToggleComplete?.(task.id)}
               aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
               className={cn(
-                'flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all hover:scale-110',
-                task.isCompleted ? 'bg-current border-current' : 'border-current/60 hover:border-current'
+                'flex-shrink-0 w-3.5 h-3.5 rounded-full border-[1.5px] flex items-center justify-center transition-all',
+                task.isCompleted 
+                  ? 'border-primary bg-primary' 
+                  : 'border-muted-foreground/30 hover:border-primary/50'
               )}
-              style={{ color: task.workspaceColor }}
             >
               {task.isCompleted && (
-                <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                <Check className="w-2 h-2 text-primary-foreground" strokeWidth={3} />
               )}
             </button>
+
+            {/* Color dot */}
+            <div 
+              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: task.workspaceColor }}
+            />
 
             {/* Title */}
             <button
               onClick={() => onTaskSelect(task)}
               className={cn(
-                'truncate max-w-[150px] font-bold text-left cursor-pointer',
-                task.isCompleted && 'line-through opacity-70'
+                'truncate max-w-[140px] font-medium text-foreground text-left',
+                task.isCompleted && 'line-through text-muted-foreground'
               )}
             >
               {task.title}
             </button>
 
             {task.estimatedMinutes && (
-              <span className="text-[10px] font-mono opacity-70 px-1.5 py-0.5 rounded-full bg-white/50 flex-shrink-0">
+              <span className="text-[10px] font-mono text-muted-foreground/70 flex-shrink-0">
                 {formatEstimatedTime(task.estimatedMinutes)}
               </span>
             )}
