@@ -101,6 +101,7 @@ export function CalendarPanel({
           onTaskSelect={onTaskSelect}
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}
+          onCreateTimeBlock={onCreateTimeBlock}
           onNavigate={navigate}
           onDateChange={onDateChange}
         />
@@ -115,6 +116,7 @@ export function CalendarPanel({
           onTaskSelect={onTaskSelect}
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}
+          onCreateTimeBlock={onCreateTimeBlock}
           onNavigate={navigate}
           onDateChange={onDateChange}
         />

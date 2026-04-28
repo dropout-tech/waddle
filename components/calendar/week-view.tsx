@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState, useRef, useCallback, useEffect, memo } from 'react'
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { CurrentTimeLine } from './current-time-line'
+import { CheckSquare, Coffee, Clock, Crosshair, User, X } from 'lucide-react'
 
 interface WeekViewProps {
   selectedDate: Date
@@ -13,11 +14,22 @@ interface WeekViewProps {
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (date: string, startTime: string, endTime: string) => void
+  onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: TimeBlock['type'], label: string, color: string) => void
   onNavigate?: (direction: 'prev' | 'next') => void
   onDateChange?: (date: Date) => void
   startHour?: number
   endHour?: number
 }
+
+const SLOT_TYPES = [
+  { key: 'task',     label: '任務', icon: CheckSquare, color: '#6B7FD4', description: '建立一般任務' },
+  { key: 'break',    label: '午休', icon: Coffee,      color: '#F6A854', description: '休息時間' },
+  { key: 'buffer',   label: '緩衝', icon: Clock,       color: '#9BBFAC', description: '彈性緩衝時間' },
+  { key: 'focus',    label: '專注', icon: Crosshair,   color: '#D46B8A', description: '專注工作時段' },
+  { key: 'personal', label: '個人', icon: User,        color: '#8B8BCC', description: '個人事務' },
+] as const
+
+type SlotKey = typeof SLOT_TYPES[number]['key']
 
 const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六']
 const DAY_WIDTH = 120 // pixels per day column
@@ -105,15 +117,18 @@ export function WeekView({
   onTaskSelect,
   onToggleComplete,
   onCreateTask,
+  onCreateTimeBlock,
   onNavigate,
   onDateChange,
   startHour = 6,
   endHour = 22,
 }: WeekViewProps) {
-  // Drag state for creating new tasks
+  // Drag state for creating new slots
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState<{ day: number; y: number } | null>(null)
   const [dragEnd, setDragEnd] = useState<{ day: number; y: number } | null>(null)
+  const [pendingSlot, setPendingSlot] = useState<{ date: string; startTime: string; endTime: string; anchorX: number; anchorY: number } | null>(null)
+  
   const gridRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const weekViewRef = useRef<HTMLDivElement>(null)
@@ -250,8 +265,8 @@ export function WeekView({
     setDragEnd({ day: dayIndex, y })
   }, [isDragging, dragStart, hours.length])
 
-  // Handle mouse up to finish drag and create task
-  const handleMouseUp = useCallback(() => {
+  // Handle mouse up to finish drag and show type picker
+  const handleMouseUp = useCallback((e?: React.MouseEvent) => {
     if (!isDragging || !dragStart || !dragEnd) {
       setIsDragging(false)
       setDragStart(null)
@@ -259,7 +274,7 @@ export function WeekView({
       return
     }
 
-    // Only create if dragged on same day and has some height
+    // Only show picker if dragged on same day and has some height
     if (dragStart.day === dragEnd.day && Math.abs(dragEnd.y - dragStart.y) > 15) {
       const minY = Math.min(dragStart.y, dragEnd.y)
       const maxY = Math.max(dragStart.y, dragEnd.y)
@@ -267,13 +282,31 @@ export function WeekView({
       const endTime = yToTime(maxY)
       const date = allDates[dragStart.day].toISOString().split('T')[0]
       
-      onCreateTask?.(date, startTime, endTime)
+      // Calculate popup position
+      const anchorX = 56 + dragStart.day * DAY_WIDTH + DAY_WIDTH / 2
+      const anchorY = minY
+      
+      setPendingSlot({ date, startTime, endTime, anchorX, anchorY })
     }
 
     setIsDragging(false)
     setDragStart(null)
     setDragEnd(null)
-  }, [isDragging, dragStart, dragEnd, allDates, yToTime, onCreateTask])
+  }, [isDragging, dragStart, dragEnd, allDates, yToTime])
+
+  // Handle slot type selection
+  const handleSelectType = useCallback((key: SlotKey) => {
+    if (!pendingSlot) return
+    const { date, startTime, endTime } = pendingSlot
+    
+    if (key === 'task') {
+      onCreateTask?.(date, startTime, endTime)
+    } else {
+      const meta = SLOT_TYPES.find(s => s.key === key)!
+      onCreateTimeBlock?.(date, startTime, endTime, key as TimeBlock['type'], meta.label, meta.color)
+    }
+    setPendingSlot(null)
+  }, [pendingSlot, onCreateTask, onCreateTimeBlock])
 
   // Calculate drag selection box
   const getDragSelection = (dayIndex: number) => {
@@ -506,6 +539,51 @@ export function WeekView({
             )
           })}
         </div>
+
+        {/* Type picker popup */}
+        {pendingSlot && (
+          <>
+            <div
+              className="fixed inset-0 z-30"
+              onMouseDown={(e) => { e.stopPropagation(); setPendingSlot(null) }}
+            />
+            <div
+              className="absolute z-40 bg-card border border-border rounded-2xl shadow-2xl p-3 w-56"
+              style={{ 
+                left: `${Math.min(pendingSlot.anchorX, (scrollContainerRef.current?.clientWidth || 400) - 240)}px`,
+                top: `${Math.min(pendingSlot.anchorY, hours.length * 60 - 220)}px`
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-foreground">
+                  {pendingSlot.startTime} - {pendingSlot.endTime}
+                </span>
+                <button onClick={() => setPendingSlot(null)} className="p-1 rounded-lg hover:bg-muted transition-colors">
+                  <X className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground mb-2">選擇時間區塊的類型</p>
+              <div className="flex flex-col gap-1">
+                {SLOT_TYPES.map(({ key, label, icon: Icon, color, description }) => (
+                  <button
+                    key={key}
+                    onClick={() => handleSelectType(key)}
+                    className="flex items-center gap-2 px-2 py-2 rounded-xl hover:bg-muted transition-colors text-left"
+                  >
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}25` }}>
+                      <Icon className="w-3.5 h-3.5" style={{ color }} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-foreground">{label}</div>
+                      <div className="text-[9px] text-muted-foreground">{description}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
