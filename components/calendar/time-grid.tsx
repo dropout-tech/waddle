@@ -5,7 +5,7 @@ import type { Task, TimeBlock } from '@/lib/types'
 import { TaskBlock } from './task-block'
 import { TimeBlockItem } from './time-block-item'
 import { CurrentTimeLine } from './current-time-line'
-import { Plus } from 'lucide-react'
+import { CheckSquare, Coffee, Clock, Crosshair, User, X } from 'lucide-react'
 
 interface TimeGridProps {
   scheduledTasks: Task[]
@@ -15,68 +15,58 @@ interface TimeGridProps {
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (startTime: string, endTime: string) => void
-  onCreateTimeBlock?: (startTime: string, endTime: string, type: TimeBlock['type']) => void
+  onCreateTimeBlock?: (startTime: string, endTime: string, type: TimeBlock['type'], label: string, color: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
 }
 
-// Helper to convert time string to minutes since midnight
+// Slot type options shown in the popup
+const SLOT_TYPES = [
+  { key: 'task', label: '任務', icon: CheckSquare, color: '#6B7FD4', description: '建立一般任務' },
+  { key: 'break', label: '午休', icon: Coffee, color: '#F6A854', description: '休息時間' },
+  { key: 'buffer', label: '緩衝', icon: Clock, color: '#9BBFAC', description: '彈性緩衝時間' },
+  { key: 'focus', label: '專注', icon: Crosshair, color: '#D46B8A', description: '專注工作時段' },
+  { key: 'personal', label: '個人', icon: User, color: '#8B8BCC', description: '個人事務' },
+] as const
+
+type SlotKey = typeof SLOT_TYPES[number]['key']
+
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
   return h * 60 + m
 }
 
-// Helper to convert minutes to time string
 function minutesToTime(minutes: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-// Calculate overlapping columns for tasks
 function calculateTaskColumns(tasks: Task[]): Map<string, { column: number; totalColumns: number }> {
   const result = new Map<string, { column: number; totalColumns: number }>()
-  
-  // Filter tasks with valid time range
   const validTasks = tasks.filter(t => t.scheduledStartTime && t.scheduledEndTime)
   if (validTasks.length === 0) return result
 
-  // Sort by start time, then by end time (longer tasks first)
   const sorted = [...validTasks].sort((a, b) => {
     const startA = timeToMinutes(a.scheduledStartTime!)
     const startB = timeToMinutes(b.scheduledStartTime!)
     if (startA !== startB) return startA - startB
-    const endA = timeToMinutes(a.scheduledEndTime!)
-    const endB = timeToMinutes(b.scheduledEndTime!)
-    return endB - endA // Longer tasks first
+    return timeToMinutes(b.scheduledEndTime!) - timeToMinutes(a.scheduledEndTime!)
   })
 
-  // Group overlapping tasks
   const groups: Task[][] = []
-  
   for (const task of sorted) {
     const taskStart = timeToMinutes(task.scheduledStartTime!)
     const taskEnd = timeToMinutes(task.scheduledEndTime!)
-    
-    // Find a group this task overlaps with
     let foundGroup = false
     for (const group of groups) {
-      const overlaps = group.some(t => {
-        const tStart = timeToMinutes(t.scheduledStartTime!)
-        const tEnd = timeToMinutes(t.scheduledEndTime!)
-        return taskStart < tEnd && taskEnd > tStart
-      })
-      
-      if (overlaps) {
+      if (group.some(t => taskStart < timeToMinutes(t.scheduledEndTime!) && taskEnd > timeToMinutes(t.scheduledStartTime!))) {
         group.push(task)
         foundGroup = true
         break
       }
     }
-    
-    if (!foundGroup) {
-      groups.push([task])
-    }
+    if (!foundGroup) groups.push([task])
   }
 
   // Merge overlapping groups
@@ -85,17 +75,12 @@ function calculateTaskColumns(tasks: Task[]): Map<string, { column: number; tota
     merged = false
     for (let i = 0; i < groups.length; i++) {
       for (let j = i + 1; j < groups.length; j++) {
-        // Check if any task in group i overlaps with any task in group j
-        const overlaps = groups[i].some(ti => {
-          const tiStart = timeToMinutes(ti.scheduledStartTime!)
-          const tiEnd = timeToMinutes(ti.scheduledEndTime!)
-          return groups[j].some(tj => {
-            const tjStart = timeToMinutes(tj.scheduledStartTime!)
-            const tjEnd = timeToMinutes(tj.scheduledEndTime!)
-            return tiStart < tjEnd && tiEnd > tjStart
-          })
-        })
-        
+        const overlaps = groups[i].some(ti =>
+          groups[j].some(tj =>
+            timeToMinutes(ti.scheduledStartTime!) < timeToMinutes(tj.scheduledEndTime!) &&
+            timeToMinutes(ti.scheduledEndTime!) > timeToMinutes(tj.scheduledStartTime!)
+          )
+        )
         if (overlaps) {
           groups[i].push(...groups[j])
           groups.splice(j, 1)
@@ -107,50 +92,27 @@ function calculateTaskColumns(tasks: Task[]): Map<string, { column: number; tota
     }
   }
 
-  // Assign columns within each group
   for (const group of groups) {
-    // Sort group by start time
-    group.sort((a, b) => {
-      const startA = timeToMinutes(a.scheduledStartTime!)
-      const startB = timeToMinutes(b.scheduledStartTime!)
-      if (startA !== startB) return startA - startB
-      const endA = timeToMinutes(a.scheduledEndTime!)
-      const endB = timeToMinutes(b.scheduledEndTime!)
-      return endB - endA
-    })
-
+    group.sort((a, b) => timeToMinutes(a.scheduledStartTime!) - timeToMinutes(b.scheduledStartTime!))
     const columns: Task[][] = []
-    
     for (const task of group) {
       const taskStart = timeToMinutes(task.scheduledStartTime!)
-      
-      // Find the first column where this task fits (no overlap with last task in column)
       let placed = false
       for (let col = 0; col < columns.length; col++) {
-        const lastInColumn = columns[col][columns[col].length - 1]
-        const lastEnd = timeToMinutes(lastInColumn.scheduledEndTime!)
-        
-        if (taskStart >= lastEnd) {
+        if (timeToMinutes(columns[col][columns[col].length - 1].scheduledEndTime!) <= taskStart) {
           columns[col].push(task)
           placed = true
           break
         }
       }
-      
-      if (!placed) {
-        columns.push([task])
-      }
+      if (!placed) columns.push([task])
     }
-    
-    // Assign column info to each task
-    const totalColumns = columns.length
     for (let col = 0; col < columns.length; col++) {
       for (const task of columns[col]) {
-        result.set(task.id, { column: col, totalColumns })
+        result.set(task.id, { column: col, totalColumns: columns.length })
       }
     }
   }
-
   return result
 }
 
@@ -168,137 +130,128 @@ export function TimeGrid({
 }: TimeGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
-  const [hoverTime, setHoverTime] = useState<{ hour: number; half: boolean } | null>(null)
-  
-  // Drag to create state
+
+  // Drag state
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState<number | null>(null)
   const [dragEnd, setDragEnd] = useState<number | null>(null)
 
-  // Calculate task columns for overlapping display
+  // Type picker popup state — shown after drag ends
+  const [pendingSlot, setPendingSlot] = useState<{
+    startTime: string
+    endTime: string
+    anchorY: number // pixel offset inside the grid for popup positioning
+  } | null>(null)
+
   const taskColumns = useMemo(() => calculateTaskColumns(scheduledTasks), [scheduledTasks])
+  const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i)
 
-  // Generate hour slots
-  const hours = Array.from(
-    { length: endHour - startHour },
-    (_, i) => startHour + i
-  )
-
-  // Auto-scroll to current hour on mount
   useEffect(() => {
     if (containerRef.current) {
       const now = new Date()
       const currentHour = now.getHours()
       if (currentHour >= startHour && currentHour < endHour) {
-        const scrollPosition = (currentHour - startHour) * 60 - 60
-        containerRef.current.scrollTop = Math.max(0, scrollPosition)
+        containerRef.current.scrollTop = Math.max(0, (currentHour - startHour) * 60 - 60)
       }
     }
   }, [startHour, endHour])
 
-  // Convert Y position to minutes
-  const yToMinutes = (y: number): number => {
-    const minutesFromStart = Math.round(y / 60 * 60) // 60px per hour
-    return startHour * 60 + minutesFromStart
-  }
+  const yToMinutes = (y: number): number => startHour * 60 + y
 
-  // Snap to 15-minute intervals
-  const snapToInterval = (minutes: number): number => {
-    return Math.round(minutes / 15) * 15
-  }
+  const snapToInterval = (minutes: number): number => Math.round(minutes / 15) * 15
 
-  // Handle mouse down for drag start
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!onCreateTask || !gridRef.current) return
-    
+    // Only initiate drag on the grid background, not on existing blocks
+    if ((e.target as HTMLElement).closest('[data-block]')) return
+    if (!gridRef.current) return
+    e.preventDefault()
+
     const rect = gridRef.current.getBoundingClientRect()
     const y = e.clientY - rect.top + (containerRef.current?.scrollTop || 0)
     const minutes = snapToInterval(yToMinutes(y))
-    
+
     setIsDragging(true)
     setDragStart(minutes)
-    setDragEnd(minutes + 30) // Default 30 min duration
+    setDragEnd(minutes + 30)
+    setPendingSlot(null)
   }
 
-  // Handle mouse move during drag
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !gridRef.current || dragStart === null) return
-    
+
     const rect = gridRef.current.getBoundingClientRect()
     const y = e.clientY - rect.top + (containerRef.current?.scrollTop || 0)
     const minutes = snapToInterval(yToMinutes(y))
-    
-    // Ensure minimum 15 minute duration
-    if (minutes > dragStart) {
-      setDragEnd(Math.max(minutes, dragStart + 15))
-    } else {
-      setDragEnd(dragStart + 30)
-    }
+
+    setDragEnd(minutes > dragStart ? Math.max(minutes, dragStart + 15) : dragStart + 30)
   }
 
-  // Handle mouse up to complete drag
-  const handleMouseUp = () => {
-    if (isDragging && dragStart !== null && dragEnd !== null && onCreateTask) {
-      const startTime = minutesToTime(Math.min(dragStart, dragEnd))
-      const endTime = minutesToTime(Math.max(dragStart, dragEnd))
-      onCreateTask(startTime, endTime)
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isDragging || dragStart === null || dragEnd === null) {
+      setIsDragging(false)
+      return
     }
-    
+
+    const start = Math.min(dragStart, dragEnd)
+    const end = Math.max(dragStart, dragEnd)
+
+    // Minimum 15 minutes
+    if (end - start >= 15) {
+      const rect = gridRef.current?.getBoundingClientRect()
+      const anchorY = (start - startHour * 60)
+      setPendingSlot({
+        startTime: minutesToTime(start),
+        endTime: minutesToTime(end),
+        anchorY,
+      })
+    }
+
     setIsDragging(false)
     setDragStart(null)
     setDragEnd(null)
   }
 
-  // Handle click on time slot
-  const handleTimeSlotClick = (hour: number, isHalfHour: boolean) => {
-    if (!onCreateTask || isDragging) return
-    const startMinute = isHalfHour ? 30 : 0
-    const endHourCalc = isHalfHour ? hour + 1 : hour
-    const endMinute = isHalfHour ? 0 : 30
-    const startTime = `${String(hour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')}`
-    const endTime = `${String(endHourCalc).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`
-    onCreateTask(startTime, endTime)
+  // User picks a type from the popup
+  const handleSelectType = (key: SlotKey) => {
+    if (!pendingSlot) return
+    const { startTime, endTime } = pendingSlot
+
+    if (key === 'task') {
+      onCreateTask?.(startTime, endTime)
+    } else {
+      const slotMeta = SLOT_TYPES.find(s => s.key === key)!
+      onCreateTimeBlock?.(startTime, endTime, key as TimeBlock['type'], slotMeta.label, slotMeta.color)
+    }
+    setPendingSlot(null)
   }
 
-  // Handle mouse move for hover effect
-  const handleHoverMove = (e: React.MouseEvent, hour: number) => {
-    if (isDragging) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const relativeY = e.clientY - rect.top
-    const isHalfHour = relativeY >= 30
-    setHoverTime({ hour, half: isHalfHour })
-  }
-
-  // Calculate drag preview position and height
-  const getDragPreview = () => {
+  const dragPreview = (() => {
     if (!isDragging || dragStart === null || dragEnd === null) return null
-    
     const start = Math.min(dragStart, dragEnd)
     const end = Math.max(dragStart, dragEnd)
-    const top = (start - startHour * 60) // Convert to pixels
-    const height = end - start
-    
-    return { top, height, startTime: minutesToTime(start), endTime: minutesToTime(end) }
-  }
-
-  const dragPreview = getDragPreview()
+    return {
+      top: start - startHour * 60,
+      height: end - start,
+      startTime: minutesToTime(start),
+      endTime: minutesToTime(end),
+    }
+  })()
 
   return (
     <div
       ref={containerRef}
       className="flex-1 overflow-y-auto relative bg-panel-secondary"
-      onMouseUp={handleMouseUp}
       onMouseLeave={() => {
-        setHoverTime(null)
-        if (isDragging) handleMouseUp()
+        if (isDragging) handleMouseUp({ clientY: 0 } as React.MouseEvent)
       }}
     >
-      {/* Time Grid Container */}
       <div
         ref={gridRef}
         className="relative"
         style={{ height: `${(endHour - startHour) * 60}px` }}
+        onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
       >
         {/* Hour Lines */}
         {hours.map((hour, index) => (
@@ -307,54 +260,16 @@ export function TimeGrid({
             className="absolute left-0 right-0 flex"
             style={{ top: `${index * 60}px`, height: '60px' }}
           >
-            {/* Hour Label */}
-            <div className="w-14 flex-shrink-0 pr-2 text-right">
+            <div className="w-14 flex-shrink-0 pr-2 text-right select-none">
               <span className="text-[11px] font-mono text-muted-foreground">
                 {String(hour).padStart(2, '0')}:00
               </span>
             </div>
-
-            {/* Grid Lines - Clickable/Draggable area */}
-            <div
-              className="flex-1 relative border-t border-calendar-grid cursor-crosshair"
-              onMouseMove={(e) => handleHoverMove(e, hour)}
-              onMouseDown={handleMouseDown}
-            >
-              {/* First half hour */}
-              <div
-                className="absolute left-0 right-0 top-0 h-[30px] hover:bg-primary/5 transition-colors"
-                onClick={() => !isDragging && handleTimeSlotClick(hour, false)}
-              >
-                {hoverTime?.hour === hour && !hoverTime.half && !isDragging && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="flex items-center gap-1 text-[10px] text-primary/60 bg-primary/10 px-2 py-0.5 rounded-full">
-                      <Plus className="w-3 h-3" />
-                      <span>點擊或拖曳</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Half-hour dashed line */}
+            <div className="flex-1 relative border-t border-calendar-grid">
               <div
                 className="absolute left-0 right-0 border-t border-dashed border-calendar-grid-subtle pointer-events-none"
                 style={{ top: '30px' }}
               />
-
-              {/* Second half hour */}
-              <div
-                className="absolute left-0 right-0 top-[30px] h-[30px] hover:bg-primary/5 transition-colors"
-                onClick={() => !isDragging && handleTimeSlotClick(hour, true)}
-              >
-                {hoverTime?.hour === hour && hoverTime.half && !isDragging && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="flex items-center gap-1 text-[10px] text-primary/60 bg-primary/10 px-2 py-0.5 rounded-full">
-                      <Plus className="w-3 h-3" />
-                      <span>點擊或拖曳</span>
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         ))}
@@ -362,42 +277,95 @@ export function TimeGrid({
         {/* Drag Preview */}
         {dragPreview && (
           <div
-            className="absolute left-[56px] right-3 bg-primary/20 border-2 border-primary border-dashed rounded-lg flex items-center justify-center pointer-events-none z-20"
-            style={{
-              top: `${dragPreview.top}px`,
-              height: `${dragPreview.height}px`,
-            }}
+            className="absolute left-14 right-3 bg-primary/15 border-2 border-primary/50 border-dashed rounded-lg flex items-center justify-center pointer-events-none z-20"
+            style={{ top: `${dragPreview.top}px`, height: `${dragPreview.height}px` }}
           >
-            <span className="text-xs font-medium text-primary">
-              {dragPreview.startTime} - {dragPreview.endTime}
+            <span className="text-xs font-medium text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full">
+              {dragPreview.startTime} – {dragPreview.endTime}
             </span>
           </div>
         )}
 
-        {/* Time Blocks (breaks, buffers) - draggable/resizable */}
+        {/* Type Picker Popup */}
+        {pendingSlot && (
+          <>
+            {/* Click-away backdrop */}
+            <div
+              className="fixed inset-0 z-30"
+              onMouseDown={(e) => { e.stopPropagation(); setPendingSlot(null) }}
+            />
+            <div
+              className="absolute left-16 z-40 bg-card border border-border rounded-2xl shadow-2xl p-3 w-64"
+              style={{
+                top: `${Math.min(pendingSlot.anchorY, (endHour - startHour) * 60 - 220)}px`,
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-xs font-semibold text-foreground">
+                  {pendingSlot.startTime} – {pendingSlot.endTime}
+                </span>
+                <button
+                  onClick={() => setPendingSlot(null)}
+                  className="p-1 rounded-lg hover:bg-muted transition-colors"
+                >
+                  <X className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              </div>
+
+              <p className="text-[10px] text-muted-foreground mb-2">選擇時間區塊的類型</p>
+
+              <div className="flex flex-col gap-1">
+                {SLOT_TYPES.map(({ key, label, icon: Icon, color, description }) => (
+                  <button
+                    key={key}
+                    onClick={() => handleSelectType(key)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left group"
+                  >
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: `${color}25` }}
+                    >
+                      <Icon className="w-4 h-4" style={{ color }} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-foreground">{label}</div>
+                      <div className="text-[10px] text-muted-foreground">{description}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Time Blocks */}
         {timeBlocks.map((block) => (
-          <TimeBlockItem
-            key={block.id}
-            block={block}
-            calendarStartHour={startHour}
-            onUpdate={onUpdateTimeBlock}
-            onDelete={onDeleteTimeBlock}
-          />
+          <div key={block.id} data-block="true">
+            <TimeBlockItem
+              block={block}
+              calendarStartHour={startHour}
+              onUpdate={onUpdateTimeBlock}
+              onDelete={onDeleteTimeBlock}
+            />
+          </div>
         ))}
 
-        {/* Scheduled Tasks with column support */}
+        {/* Scheduled Tasks */}
         {scheduledTasks.map((task) => {
           const columnInfo = taskColumns.get(task.id)
           return (
-            <TaskBlock
-              key={task.id}
-              task={task}
-              calendarStartHour={startHour}
-              onSelect={onTaskSelect}
-              onToggleComplete={onToggleComplete}
-              column={columnInfo?.column ?? 0}
-              totalColumns={columnInfo?.totalColumns ?? 1}
-            />
+            <div key={task.id} data-block="true">
+              <TaskBlock
+                task={task}
+                calendarStartHour={startHour}
+                onSelect={onTaskSelect}
+                onToggleComplete={onToggleComplete}
+                column={columnInfo?.column ?? 0}
+                totalColumns={columnInfo?.totalColumns ?? 1}
+              />
+            </div>
           )
         })}
 

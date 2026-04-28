@@ -21,6 +21,7 @@ interface MainLayoutProps {
   onOpenReport: () => void
   onOpenSettings?: () => void
   onCreateCalendarTask?: (date: string, startTime: string, endTime: string) => void
+  onCreateCalendarTimeBlock?: (date: string, startTime: string, endTime: string, type: TimeBlock['type'], label: string, color: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
 }
@@ -43,6 +44,7 @@ export function MainLayout({
   onOpenReport,
   onOpenSettings,
   onCreateCalendarTask,
+  onCreateCalendarTimeBlock,
   onUpdateTimeBlock,
   onDeleteTimeBlock,
 }: MainLayoutProps) {
@@ -130,6 +132,7 @@ export function MainLayout({
           onTaskSelect={onSelectTask}
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateCalendarTask}
+          onCreateTimeBlock={onCreateCalendarTimeBlock}
           onUpdateTimeBlock={onUpdateTimeBlock}
           onDeleteTimeBlock={onDeleteTimeBlock}
         />

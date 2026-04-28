@@ -271,6 +271,28 @@ export default function FlowDeskPage() {
     setTimeBlocks(newTimeBlocks)
   }, [])
 
+  // Create a new time block from calendar drag
+  const handleCreateTimeBlock = useCallback((
+    date: string,
+    startTime: string,
+    endTime: string,
+    type: TimeBlock['type'],
+    label: string,
+    color: string,
+  ) => {
+    const newBlock: TimeBlock = {
+      id: `block-${Date.now()}`,
+      date,
+      startTime,
+      endTime,
+      type,
+      label,
+      color,
+      isRecurring: false,
+    }
+    setTimeBlocks((prev) => [...prev, newBlock])
+  }, [])
+
   // Update time block (drag/resize)
   const handleUpdateTimeBlock = useCallback((id: string, updates: Partial<TimeBlock>) => {
     setTimeBlocks((prev) =>
@@ -397,6 +419,7 @@ export default function FlowDeskPage() {
         onOpenJournal={handleOpenJournal}
         onOpenReport={handleOpenReport}
         onCreateCalendarTask={handleCreateCalendarTask}
+        onCreateCalendarTimeBlock={handleCreateTimeBlock}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onUpdateTimeBlock={handleUpdateTimeBlock}
         onDeleteTimeBlock={handleDeleteTimeBlock}
