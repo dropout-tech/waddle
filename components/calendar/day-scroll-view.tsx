@@ -62,12 +62,6 @@ function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val))
 }
 
-function minutesToTime(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
-
 function overlaps(a: Task, b: Task): boolean {
   const aStart = timeToMinutes(a.scheduledStartTime!)
   const aEnd = timeToMinutes(a.scheduledEndTime!)
