@@ -2,21 +2,27 @@
 
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { NotificationCenter } from '@/components/notifications/notification-center'
+import type { Workspace, Task } from '@/lib/types'
 
 interface CalendarHeaderProps {
   selectedDate: Date
   viewMode: 'day' | 'week' | 'month'
+  workspaces: Workspace[]
   onDateChange: (date: Date) => void
   onViewModeChange: (mode: 'day' | 'week' | 'month') => void
   onTodayClick: () => void
+  onTaskClick?: (task: Task) => void
 }
 
 export function CalendarHeader({
   selectedDate,
   viewMode,
+  workspaces,
   onDateChange,
   onViewModeChange,
   onTodayClick,
+  onTaskClick,
 }: CalendarHeaderProps) {
   const isToday = () => {
     const today = new Date()
@@ -73,6 +79,12 @@ export function CalendarHeader({
         >
           今天
         </Button>
+
+        {/* Notification Center */}
+        <NotificationCenter
+          workspaces={workspaces}
+          onTaskClick={onTaskClick}
+        />
       </div>
     </div>
   )

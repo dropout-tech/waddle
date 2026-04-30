@@ -135,15 +135,16 @@ export function MainLayout({
 
       {/* Right Panel - Calendar */}
       <div className="flex-1 h-full min-w-0">
-        <CalendarPanel
-          selectedDate={selectedDate}
-          viewMode={viewMode}
-          pendingTasks={pendingTasks}
-          scheduledTasks={scheduledTasks}
-          allTasks={allTasks}
-          timeBlocks={filteredTimeBlocks}
-          slotTypes={slotTypes}
-          onDateChange={setSelectedDate}
+ <CalendarPanel
+  selectedDate={selectedDate}
+  viewMode={viewMode}
+  pendingTasks={pendingTasks}
+  scheduledTasks={scheduledTasks}
+  allTasks={allTasks}
+  timeBlocks={filteredTimeBlocks}
+  slotTypes={slotTypes}
+  workspaces={workspaces}
+  onDateChange={setSelectedDate}
           onViewModeChange={setViewMode}
           onTaskSelect={onSelectTask}
           onToggleComplete={onToggleComplete}

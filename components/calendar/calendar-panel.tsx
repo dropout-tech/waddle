@@ -2,7 +2,7 @@
 
 import { useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import type { Task, TimeBlock, SlotType } from '@/lib/types'
+import type { Task, TimeBlock, SlotType, Workspace } from '@/lib/types'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { CalendarHeader } from './calendar-header'
 import { PendingZone } from './pending-zone'
@@ -19,6 +19,7 @@ interface CalendarPanelProps {
   allTasks: Task[]
   timeBlocks: TimeBlock[]
   slotTypes?: SlotType[]
+  workspaces: Workspace[]
   onDateChange: (date: Date) => void
   onViewModeChange: (mode: 'day' | 'week' | 'month') => void
   onTaskSelect: (task: Task) => void
@@ -40,6 +41,7 @@ export function CalendarPanel({
   allTasks,
   timeBlocks,
   slotTypes,
+  workspaces,
   onDateChange,
   onViewModeChange,
   onTaskSelect,
@@ -90,9 +92,11 @@ export function CalendarPanel({
       <CalendarHeader
         selectedDate={selectedDate}
         viewMode={viewMode}
+        workspaces={workspaces}
         onDateChange={onDateChange}
         onViewModeChange={onViewModeChange}
         onTodayClick={handleTodayClick}
+        onTaskClick={onTaskSelect}
       />
 
       {viewMode === 'day' && (
