@@ -7,7 +7,20 @@ import { JournalModal } from '@/components/modals/journal-modal'
 import { ReportModal } from '@/components/modals/report-modal'
 import { SettingsModal } from '@/components/modals/settings-modal'
 import { mockWorkspaces, mockTimeBlocks } from '@/lib/mock-data'
-import type { Workspace, Task, JournalEntry, ExportDataPayload, UserSettings, TimeBlock } from '@/lib/types'
+import type { Workspace, Task, JournalEntry, ExportDataPayload, UserSettings, TimeBlock, SlotType } from '@/lib/types'
+
+// Default slot types with nested structure
+const defaultSlotTypes: SlotType[] = [
+  // Top-level: Task
+  { id: 'task', key: 'task', label: '任務', description: '建立一般任務', icon: 'CheckSquare', color: '#6B7FD4', sortOrder: 0, isBuiltIn: true },
+  // Top-level: Time Block category (parent)
+  { id: 'timeblock', key: 'timeblock', label: '時間區塊', description: '各類時間安排', icon: 'Layers', color: '#9CA3AF', sortOrder: 1, isBuiltIn: true },
+  // Children of timeblock
+  { id: 'break', key: 'break', label: '午休', description: '休息時間', icon: 'Coffee', color: '#F6A854', parentId: 'timeblock', sortOrder: 0, isBuiltIn: true },
+  { id: 'buffer', key: 'buffer', label: '緩衝', description: '彈性緩衝時間', icon: 'Clock', color: '#9BBFAC', parentId: 'timeblock', sortOrder: 1, isBuiltIn: true },
+  { id: 'focus', key: 'focus', label: '專注', description: '專注工作時段', icon: 'Crosshair', color: '#D46B8A', parentId: 'timeblock', sortOrder: 2, isBuiltIn: true },
+  { id: 'personal', key: 'personal', label: '個人', description: '個人事務', icon: 'User', color: '#8B8BCC', parentId: 'timeblock', sortOrder: 3, isBuiltIn: true },
+]
 
 const defaultSettings: UserSettings = {
   calendarStartHour: 6,
@@ -28,6 +41,7 @@ const defaultSettings: UserSettings = {
     color: '#FFF8E1',
   },
   defaultTaskColors: {},
+  slotTypes: defaultSlotTypes,
 }
 
 export default function FlowDeskPage() {
@@ -315,7 +329,7 @@ export default function FlowDeskPage() {
     date: string,
     startTime: string,
     endTime: string,
-    type: TimeBlock['type'],
+    type: string,
     label: string,
     color: string,
   ) => {
@@ -515,6 +529,7 @@ export default function FlowDeskPage() {
       <MainLayout
         workspaces={workspaces}
         timeBlocks={timeBlocks}
+        slotTypes={settings.slotTypes}
         onToggleCategoryCollapse={handleToggleCategoryCollapse}
         onToggleComplete={handleToggleComplete}
         onSelectTask={handleSelectTask}

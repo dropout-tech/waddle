@@ -5,11 +5,12 @@ import { cn } from '@/lib/utils'
 import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
-import type { Workspace, Task, TimeBlock } from '@/lib/types'
+import type { Workspace, Task, TimeBlock, SlotType } from '@/lib/types'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
   timeBlocks: TimeBlock[]
+  slotTypes?: SlotType[]
   onToggleCategoryCollapse: (categoryId: string) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
@@ -25,7 +26,7 @@ interface MainLayoutProps {
   onOpenSettings?: () => void
   onCreateCalendarTask?: (date: string, startTime: string, endTime: string) => void
   onCreatePendingTask?: (title: string) => void
-  onCreateCalendarTimeBlock?: (date: string, startTime: string, endTime: string, type: TimeBlock['type'], label: string, color: string) => void
+  onCreateCalendarTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string) => void
   onRescheduleTask?: (taskId: string, newStart: string, newEnd: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
@@ -38,6 +39,7 @@ const DEFAULT_PANEL_WIDTH = 400
 export function MainLayout({
   workspaces,
   timeBlocks,
+  slotTypes,
   onToggleCategoryCollapse,
   onToggleComplete,
   onSelectTask,
@@ -140,6 +142,7 @@ export function MainLayout({
           scheduledTasks={scheduledTasks}
           allTasks={allTasks}
           timeBlocks={filteredTimeBlocks}
+          slotTypes={slotTypes}
           onDateChange={setSelectedDate}
           onViewModeChange={setViewMode}
           onTaskSelect={onSelectTask}

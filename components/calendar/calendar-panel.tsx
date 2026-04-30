@@ -2,7 +2,7 @@
 
 import { useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import type { Task, TimeBlock } from '@/lib/types'
+import type { Task, TimeBlock, SlotType } from '@/lib/types'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { CalendarHeader } from './calendar-header'
 import { PendingZone } from './pending-zone'
@@ -18,13 +18,14 @@ interface CalendarPanelProps {
   scheduledTasks: Task[]
   allTasks: Task[]
   timeBlocks: TimeBlock[]
+  slotTypes?: SlotType[]
   onDateChange: (date: Date) => void
   onViewModeChange: (mode: 'day' | 'week' | 'month') => void
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (date: string, startTime: string, endTime: string) => void
   onCreatePendingTask?: (title: string) => void
-  onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: TimeBlock['type'], label: string, color: string) => void
+  onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string) => void
   onRescheduleTask?: (taskId: string, newStartOrDate: string, newEndOrStart: string, newEnd?: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
@@ -38,6 +39,7 @@ export function CalendarPanel({
   scheduledTasks,
   allTasks,
   timeBlocks,
+  slotTypes,
   onDateChange,
   onViewModeChange,
   onTaskSelect,
@@ -98,6 +100,7 @@ export function CalendarPanel({
           selectedDate={selectedDate}
           tasks={allTasks}
           timeBlocks={timeBlocks}
+          slotTypes={slotTypes}
           onTaskSelect={onTaskSelect}
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}
@@ -114,6 +117,7 @@ export function CalendarPanel({
           tasks={allTasks}
           pendingTasks={pendingTasks}
           timeBlocks={timeBlocks}
+          slotTypes={slotTypes}
           onTaskSelect={onTaskSelect}
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}

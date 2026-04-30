@@ -2,20 +2,26 @@
 
 import { useMemo, useState, useRef, useCallback, useEffect } from 'react'
 import { cn } from '@/lib/utils'
-import type { Task, TimeBlock } from '@/lib/types'
+import type { Task, TimeBlock, SlotType } from '@/lib/types'
 import { CurrentTimeLine } from './current-time-line'
 import { TaskBlock, type TaskDragStart } from './task-block'
-import { CheckSquare, Coffee, Clock, Crosshair, User, X } from 'lucide-react'
+import { CheckSquare, Coffee, Clock, Crosshair, User, Layers, X, ChevronLeft } from 'lucide-react'
+
+// Map icon names to components
+const ICON_MAP: Record<string, React.ElementType> = {
+  CheckSquare, Coffee, Clock, Crosshair, User, Layers,
+}
 
 interface WeekViewProps {
   selectedDate: Date
   tasks: Task[]
   pendingTasks: Task[]
   timeBlocks: TimeBlock[]
+  slotTypes?: SlotType[]
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (date: string, startTime: string, endTime: string) => void
-  onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: TimeBlock['type'], label: string, color: string) => void
+  onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string) => void
   onRescheduleTask?: (taskId: string, date: string, newStart: string, newEnd: string) => void
   onNavigate?: (direction: 'prev' | 'next') => void
   onDateChange?: (date: Date) => void
@@ -28,16 +34,6 @@ interface ActiveTaskDrag extends TaskDragStart {
   currentEnd: number
   dayIndex: number
 }
-
-const SLOT_TYPES = [
-  { key: 'task',     label: '任務', icon: CheckSquare, color: '#6B7FD4', description: '建立一般任務' },
-  { key: 'break',    label: '午休', icon: Coffee,      color: '#F6A854', description: '休息時間' },
-  { key: 'buffer',   label: '緩衝', icon: Clock,       color: '#9BBFAC', description: '彈性緩衝時間' },
-  { key: 'focus',    label: '專注', icon: Crosshair,   color: '#D46B8A', description: '專注工作時段' },
-  { key: 'personal', label: '個人', icon: User,        color: '#8B8BCC', description: '個人事務' },
-] as const
-
-type SlotKey = typeof SLOT_TYPES[number]['key']
 
 const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六']
 const DAY_WIDTH = 120 // pixels per day column
@@ -137,6 +133,7 @@ export function WeekView({
   tasks,
   pendingTasks,
   timeBlocks,
+  slotTypes = [],
   onTaskSelect,
   onToggleComplete,
   onCreateTask,
@@ -155,6 +152,13 @@ export function WeekView({
 
   // Task block drag state
   const [activeTaskDrag, setActiveTaskDrag] = useState<ActiveTaskDrag | null>(null)
+
+  // Slot picker nested navigation
+  const [selectedParent, setSelectedParent] = useState<string | null>(null)
+
+  // Organized slot types
+  const topLevelSlotTypes = useMemo(() => slotTypes.filter(s => !s.parentId).sort((a, b) => a.sortOrder - b.sortOrder), [slotTypes])
+  const getChildSlotTypes = useCallback((parentId: string) => slotTypes.filter(s => s.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder), [slotTypes])
   
   const gridRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -365,18 +369,25 @@ export function WeekView({
   }, [isDragging, dragStart, dragEnd, allDates, yToTime, activeTaskDrag, onRescheduleTask])
 
   // Handle slot type selection
-  const handleSelectType = useCallback((key: SlotKey) => {
+const handleSelectType = useCallback((slotType: SlotType) => {
     if (!pendingSlot) return
     const { date, startTime, endTime } = pendingSlot
     
-    if (key === 'task') {
+    // Check if this type has children - if so, navigate into it
+    const children = getChildSlotTypes(slotType.id)
+    if (children.length > 0) {
+      setSelectedParent(slotType.id)
+      return
+    }
+    
+    if (slotType.key === 'task') {
       onCreateTask?.(date, startTime, endTime)
     } else {
-      const meta = SLOT_TYPES.find(s => s.key === key)!
-      onCreateTimeBlock?.(date, startTime, endTime, key as TimeBlock['type'], meta.label, meta.color)
+      onCreateTimeBlock?.(date, startTime, endTime, slotType.key, slotType.label, slotType.color)
     }
     setPendingSlot(null)
-  }, [pendingSlot, onCreateTask, onCreateTimeBlock])
+    setSelectedParent(null)
+  }, [pendingSlot, onCreateTask, onCreateTimeBlock, getChildSlotTypes])
 
   // Calculate drag selection box
   const getDragSelection = (dayIndex: number) => {
@@ -668,49 +679,68 @@ export function WeekView({
         </div>
 
         {/* Type picker popup */}
-        {pendingSlot && (
+{pendingSlot && (
           <>
-            <div
-              className="fixed inset-0 z-30"
-              onMouseDown={(e) => { e.stopPropagation(); setPendingSlot(null) }}
-            />
-            <div
-              className="absolute z-40 bg-card border border-border rounded-2xl shadow-2xl p-3 w-56"
-              style={{ 
-                left: `${Math.min(pendingSlot.anchorX, (scrollContainerRef.current?.clientWidth || 400) - 240)}px`,
-                top: `${Math.min(pendingSlot.anchorY, hours.length * 60 - 220)}px`
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-2">
+          <div
+            className="fixed inset-0 z-30"
+            onMouseDown={(e) => { e.stopPropagation(); setPendingSlot(null); setSelectedParent(null) }}
+          />
+          <div
+            className="absolute z-40 bg-card border border-border rounded-2xl shadow-2xl p-3 w-56"
+            style={{
+              left: `${Math.min(pendingSlot.anchorX, (scrollContainerRef.current?.clientWidth || 400) - 240)}px`,
+              top: `${Math.min(pendingSlot.anchorY, hours.length * 60 - 220)}px`
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-2">
+              {selectedParent ? (
+                <button
+                  onClick={() => setSelectedParent(null)}
+                  className="flex items-center gap-1 text-xs font-semibold text-foreground hover:text-primary transition-colors"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  返回
+                </button>
+              ) : (
                 <span className="text-xs font-semibold text-foreground">
                   {pendingSlot.startTime} - {pendingSlot.endTime}
                 </span>
-                <button onClick={() => setPendingSlot(null)} className="p-1 rounded-lg hover:bg-muted transition-colors">
-                  <X className="w-3.5 h-3.5 text-muted-foreground" />
-                </button>
-              </div>
-              <p className="text-[10px] text-muted-foreground mb-2">選擇時間區塊的類型</p>
-              <div className="flex flex-col gap-1">
-                {SLOT_TYPES.map(({ key, label, icon: Icon, color, description }) => (
+              )}
+              <button onClick={() => { setPendingSlot(null); setSelectedParent(null) }} className="p-1 rounded-lg hover:bg-muted transition-colors">
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              {selectedParent ? slotTypes.find(s => s.id === selectedParent)?.label : '選擇時間區塊的類型'}
+            </p>
+            <div className="flex flex-col gap-1">
+              {(selectedParent ? getChildSlotTypes(selectedParent) : topLevelSlotTypes).map((slotType) => {
+                const Icon = ICON_MAP[slotType.icon] || Clock
+                const hasChildren = getChildSlotTypes(slotType.id).length > 0
+                return (
                   <button
-                    key={key}
-                    onClick={() => handleSelectType(key)}
+                    key={slotType.id}
+                    onClick={() => handleSelectType(slotType)}
                     className="flex items-center gap-2 px-2 py-2 rounded-xl hover:bg-muted transition-colors text-left"
                   >
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}25` }}>
-                      <Icon className="w-3.5 h-3.5" style={{ color }} />
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${slotType.color}25` }}>
+                      <Icon className="w-3.5 h-3.5" style={{ color: slotType.color }} />
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-medium text-foreground">{label}</div>
-                      <div className="text-[9px] text-muted-foreground">{description}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-foreground">{slotType.label}</div>
+                      <div className="text-[9px] text-muted-foreground">{slotType.description}</div>
                     </div>
+                    {hasChildren && (
+                      <ChevronLeft className="w-3.5 h-3.5 text-muted-foreground rotate-180" />
+                    )}
                   </button>
-                ))}
-              </div>
+                )
+              })}
             </div>
+          </div>
           </>
-        )}
+          )}
       </div>
     </div>
   )

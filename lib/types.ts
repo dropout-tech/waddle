@@ -59,11 +59,33 @@ export interface TimeBlock {
   date: string
   startTime: string // HH:mm
   endTime: string // HH:mm
-  type: 'buffer' | 'break' | 'personal' | 'focus'
+  type: string // now references SlotType.key
   label: string
   color: string
   isRecurring: boolean
   recurrenceRule?: string
+}
+
+// Customizable slot type for time blocks
+export interface SlotType {
+  id: string
+  key: string // unique identifier
+  label: string
+  description: string
+  icon: string // icon name from lucide-react
+  color: string
+  parentId?: string // for nested categories
+  sortOrder: number
+  isBuiltIn: boolean // true for default types that can't be deleted
+}
+
+// Default slot type categories
+export interface SlotTypeCategory {
+  id: string
+  key: string
+  label: string
+  icon: string
+  children: SlotType[]
 }
 
 export interface JournalEntry {
@@ -105,6 +127,8 @@ export interface UserSettings {
   }
   // Default calendar colors for new tasks (by workspace)
   defaultTaskColors: Record<string, string>
+  // Custom slot types for time blocks
+  slotTypes: SlotType[]
 }
 
 // UI State Types

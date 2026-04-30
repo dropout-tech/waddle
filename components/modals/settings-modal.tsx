@@ -1,11 +1,30 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Clock, Coffee, Palette, Save } from 'lucide-react'
+import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { UserSettings, TimeBlock } from '@/lib/types'
+import type { UserSettings, TimeBlock, SlotType } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+
+// Map icon names to components
+const ICON_MAP: Record<string, React.ElementType> = {
+  CheckSquare,
+  Coffee,
+  Clock,
+  Crosshair,
+  User,
+  Layers,
+}
+
+const AVAILABLE_ICONS = [
+  { name: 'CheckSquare', icon: CheckSquare },
+  { name: 'Coffee', icon: Coffee },
+  { name: 'Clock', icon: Clock },
+  { name: 'Crosshair', icon: Crosshair },
+  { name: 'User', icon: User },
+  { name: 'Layers', icon: Layers },
+]
 
 interface SettingsModalProps {
   isOpen: boolean
@@ -29,6 +48,16 @@ export function SettingsModal({
 }: SettingsModalProps) {
   const [localSettings, setLocalSettings] = useState<UserSettings>(settings)
   const [localTimeBlocks, setLocalTimeBlocks] = useState<TimeBlock[]>(timeBlocks)
+  const [activeTab, setActiveTab] = useState<'general' | 'slotTypes'>('general')
+  const [editingSlotType, setEditingSlotType] = useState<SlotType | null>(null)
+  const [isAddingNew, setIsAddingNew] = useState(false)
+  const [newSlotType, setNewSlotType] = useState<Partial<SlotType>>({
+    label: '',
+    description: '',
+    icon: 'Clock',
+    color: '#6B7FD4',
+    parentId: 'timeblock',
+  })
 
   // Find or create lunch break block
   const lunchBlock = localTimeBlocks.find(tb => tb.type === 'break') || {
@@ -78,6 +107,49 @@ export function SettingsModal({
     onClose()
   }
 
+  // Slot type management
+  const handleAddSlotType = () => {
+    if (!newSlotType.label) return
+    const id = `slot-${Date.now()}`
+    const maxSort = Math.max(0, ...localSettings.slotTypes.filter(s => s.parentId === newSlotType.parentId).map(s => s.sortOrder))
+    const newType: SlotType = {
+      id,
+      key: id,
+      label: newSlotType.label,
+      description: newSlotType.description || '',
+      icon: newSlotType.icon || 'Clock',
+      color: newSlotType.color || '#6B7FD4',
+      parentId: newSlotType.parentId,
+      sortOrder: maxSort + 1,
+      isBuiltIn: false,
+    }
+    setLocalSettings(prev => ({
+      ...prev,
+      slotTypes: [...prev.slotTypes, newType],
+    }))
+    setNewSlotType({ label: '', description: '', icon: 'Clock', color: '#6B7FD4', parentId: 'timeblock' })
+    setIsAddingNew(false)
+  }
+
+  const handleUpdateSlotType = (updated: SlotType) => {
+    setLocalSettings(prev => ({
+      ...prev,
+      slotTypes: prev.slotTypes.map(s => s.id === updated.id ? updated : s),
+    }))
+    setEditingSlotType(null)
+  }
+
+  const handleDeleteSlotType = (id: string) => {
+    setLocalSettings(prev => ({
+      ...prev,
+      slotTypes: prev.slotTypes.filter(s => s.id !== id),
+    }))
+  }
+
+  // Get slot types organized by parent
+  const topLevelTypes = localSettings.slotTypes?.filter(s => !s.parentId) || []
+  const getChildTypes = (parentId: string) => localSettings.slotTypes?.filter(s => s.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder) || []
+
   if (!isOpen) return null
 
   return (
@@ -89,7 +161,7 @@ export function SettingsModal({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md mx-4 bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-lg mx-4 bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">設定</h2>
@@ -101,8 +173,35 @@ export function SettingsModal({
           </button>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex border-b border-border">
+          <button
+            onClick={() => setActiveTab('general')}
+            className={cn(
+              'flex-1 px-4 py-2.5 text-sm font-medium transition-colors',
+              activeTab === 'general'
+                ? 'text-primary border-b-2 border-primary bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            一般設定
+          </button>
+          <button
+            onClick={() => setActiveTab('slotTypes')}
+            className={cn(
+              'flex-1 px-4 py-2.5 text-sm font-medium transition-colors',
+              activeTab === 'slotTypes'
+                ? 'text-primary border-b-2 border-primary bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            時間區塊類型
+          </button>
+        </div>
+
         {/* Content */}
         <div className="p-5 space-y-6 max-h-[60vh] overflow-y-auto">
+          {activeTab === 'general' && (<>
           {/* Calendar Time Range */}
           <div className="space-y-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -295,6 +394,226 @@ export function SettingsModal({
               </div>
             )}
           </div>
+          </>)}
+
+          {/* Slot Types Tab */}
+          {activeTab === 'slotTypes' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Layers className="w-4 h-4" />
+                  時間區塊類型管理
+                </h3>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setIsAddingNew(true)}
+                  className="h-8 gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  新增類型
+                </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                自訂日曆上可建立的時間區塊類型，支援分類結構
+              </p>
+
+              {/* Add new slot type form */}
+              {isAddingNew && (
+                <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-3">
+                  <div className="text-sm font-medium text-foreground">新增類型</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="名稱"
+                      value={newSlotType.label || ''}
+                      onChange={(e) => setNewSlotType(prev => ({ ...prev, label: e.target.value }))}
+                      className="h-8 text-sm"
+                    />
+                    <Input
+                      placeholder="描述"
+                      value={newSlotType.description || ''}
+                      onChange={(e) => setNewSlotType(prev => ({ ...prev, description: e.target.value }))}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">圖示:</span>
+                    <div className="flex gap-1">
+                      {AVAILABLE_ICONS.map(({ name, icon: Icon }) => (
+                        <button
+                          key={name}
+                          onClick={() => setNewSlotType(prev => ({ ...prev, icon: name }))}
+                          className={cn(
+                            'w-7 h-7 rounded flex items-center justify-center transition-colors',
+                            newSlotType.icon === name ? 'bg-primary text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'
+                          )}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">顏色:</span>
+                    <div className="flex gap-1">
+                      {PRESET_COLORS.slice(0, 6).map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => setNewSlotType(prev => ({ ...prev, color }))}
+                          className={cn(
+                            'w-6 h-6 rounded-full border-2 transition-all',
+                            newSlotType.color === color ? 'border-foreground scale-110' : 'border-transparent'
+                          )}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                      <input
+                        type="color"
+                        value={newSlotType.color || '#6B7FD4'}
+                        onChange={(e) => setNewSlotType(prev => ({ ...prev, color: e.target.value }))}
+                        className="w-6 h-6 rounded-full cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setIsAddingNew(false)} className="h-7">
+                      取消
+                    </Button>
+                    <Button size="sm" onClick={handleAddSlotType} className="h-7">
+                      新增
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Slot types list */}
+              <div className="space-y-2">
+                {topLevelTypes.sort((a, b) => a.sortOrder - b.sortOrder).map((type) => {
+                  const children = getChildTypes(type.id)
+                  const IconComp = ICON_MAP[type.icon] || Clock
+                  const isEditing = editingSlotType?.id === type.id
+
+                  return (
+                    <div key={type.id} className="rounded-lg border border-border overflow-hidden">
+                      {/* Parent type row */}
+                      <div className="flex items-center gap-2 px-3 py-2 bg-secondary/30">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: type.color + '20' }}
+                        >
+                          <IconComp className="w-4 h-4" style={{ color: type.color }} />
+                        </div>
+                        {isEditing ? (
+                          <div className="flex-1 flex items-center gap-2">
+                            <Input
+                              value={editingSlotType.label}
+                              onChange={(e) => setEditingSlotType(prev => prev ? { ...prev, label: e.target.value } : null)}
+                              className="h-7 text-sm flex-1"
+                            />
+                            <Button size="sm" variant="ghost" onClick={() => setEditingSlotType(null)} className="h-7 px-2">
+                              取消
+                            </Button>
+                            <Button size="sm" onClick={() => handleUpdateSlotType(editingSlotType)} className="h-7 px-2">
+                              儲存
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-foreground">{type.label}</div>
+                              <div className="text-[10px] text-muted-foreground truncate">{type.description}</div>
+                            </div>
+                            {!type.isBuiltIn && (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => setEditingSlotType(type)}
+                                  className="p-1.5 rounded hover:bg-secondary transition-colors"
+                                >
+                                  <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteSlotType(type.id)}
+                                  className="p-1.5 rounded hover:bg-destructive/10 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                                </button>
+                              </div>
+                            )}
+                            {children.length > 0 && (
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      {/* Child types */}
+                      {children.length > 0 && (
+                        <div className="divide-y divide-border">
+                          {children.map((child) => {
+                            const ChildIcon = ICON_MAP[child.icon] || Clock
+                            const isChildEditing = editingSlotType?.id === child.id
+
+                            return (
+                              <div
+                                key={child.id}
+                                className="flex items-center gap-2 px-3 py-2 pl-6 bg-card hover:bg-secondary/20 transition-colors"
+                              >
+                                <div
+                                  className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                                  style={{ backgroundColor: child.color + '20' }}
+                                >
+                                  <ChildIcon className="w-3.5 h-3.5" style={{ color: child.color }} />
+                                </div>
+                                {isChildEditing ? (
+                                  <div className="flex-1 flex items-center gap-2">
+                                    <Input
+                                      value={editingSlotType.label}
+                                      onChange={(e) => setEditingSlotType(prev => prev ? { ...prev, label: e.target.value } : null)}
+                                      className="h-7 text-sm flex-1"
+                                    />
+                                    <Button size="sm" variant="ghost" onClick={() => setEditingSlotType(null)} className="h-7 px-2">
+                                      取消
+                                    </Button>
+                                    <Button size="sm" onClick={() => handleUpdateSlotType(editingSlotType)} className="h-7 px-2">
+                                      儲存
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-sm font-medium text-foreground">{child.label}</div>
+                                      <div className="text-[10px] text-muted-foreground truncate">{child.description}</div>
+                                    </div>
+                                    {!child.isBuiltIn && (
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          onClick={() => setEditingSlotType(child)}
+                                          className="p-1.5 rounded hover:bg-secondary transition-colors"
+                                        >
+                                          <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteSlotType(child.id)}
+                                          className="p-1.5 rounded hover:bg-destructive/10 transition-colors"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
