@@ -42,8 +42,8 @@ const generateSlotTypesFromWorkspaces = (workspaces: Workspace[]): SlotType[] =>
 const defaultSlotTypes: SlotType[] = generateSlotTypesFromWorkspaces(mockWorkspaces)
 
 const defaultSettings: UserSettings = {
-  calendarStartHour: 6,
-  calendarEndHour: 22,
+  calendarStartHour: 0,
+  calendarEndHour: 24,
   defaultView: 'day',
   weekStartDay: 0,
   weatherCity: 'Taipei',
@@ -61,6 +61,53 @@ const defaultSettings: UserSettings = {
   },
   defaultTaskColors: {},
   slotTypes: defaultSlotTypes,
+  notifications: {
+    enabled: true,
+    overdue: {
+      enabled: true,
+      criticalDays: 7,
+      showInBell: true,
+      dailyDigest: true,
+    },
+    dueSoon: {
+      enabled: true,
+      daysBeforeDue: 3,
+      notifyOnDueDay: true,
+      notifyDayBefore: true,
+    },
+    staleTasks: {
+      enabled: true,
+      daysUntilStale: 14,
+      includeUnscheduled: true,
+      includeNoDueDate: true,
+    },
+    highPriority: {
+      enabled: true,
+      minUrgency: 8,
+      alertWhenTooMany: true,
+      maxBeforeAlert: 5,
+    },
+    scheduling: {
+      enabled: true,
+      remindUnscheduled: true,
+      percentThreshold: 50,
+      dailyPlanningReminder: false,
+      planningReminderTime: '08:00',
+    },
+    workspaceOverrides: {},
+    quietHours: {
+      enabled: false,
+      startTime: '22:00',
+      endTime: '08:00',
+      allowUrgent: true,
+    },
+    appearance: {
+      showBadgeCount: true,
+      groupByType: true,
+      autoCollapse: false,
+      maxVisible: 10,
+    },
+  },
 }
 
 export default function FlowDeskPage() {

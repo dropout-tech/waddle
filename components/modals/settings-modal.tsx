@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil } from 'lucide-react'
+import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { UserSettings, TimeBlock, SlotType, Workspace } from '@/lib/types'
+import type { UserSettings, TimeBlock, SlotType, Workspace, NotificationSettings } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -40,6 +40,55 @@ const PRESET_COLORS = [
   '#4DD0E1', '#F06292', '#AED581', '#FFD54F', '#90A4AE',
 ]
 
+// Default notification settings
+const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  enabled: true,
+  overdue: {
+    enabled: true,
+    criticalDays: 7,
+    showInBell: true,
+    dailyDigest: true,
+  },
+  dueSoon: {
+    enabled: true,
+    daysBeforeDue: 3,
+    notifyOnDueDay: true,
+    notifyDayBefore: true,
+  },
+  staleTasks: {
+    enabled: true,
+    daysUntilStale: 14,
+    includeUnscheduled: true,
+    includeNoDueDate: true,
+  },
+  highPriority: {
+    enabled: true,
+    minUrgency: 8,
+    alertWhenTooMany: true,
+    maxBeforeAlert: 5,
+  },
+  scheduling: {
+    enabled: true,
+    remindUnscheduled: true,
+    percentThreshold: 50,
+    dailyPlanningReminder: false,
+    planningReminderTime: '08:00',
+  },
+  workspaceOverrides: {},
+  quietHours: {
+    enabled: false,
+    startTime: '22:00',
+    endTime: '08:00',
+    allowUrgent: true,
+  },
+  appearance: {
+    showBadgeCount: true,
+    groupByType: true,
+    autoCollapse: false,
+    maxVisible: 10,
+  },
+}
+
 export function SettingsModal({
   isOpen,
   settings,
@@ -50,7 +99,7 @@ export function SettingsModal({
 }: SettingsModalProps) {
   const [localSettings, setLocalSettings] = useState<UserSettings>(settings)
   const [localTimeBlocks, setLocalTimeBlocks] = useState<TimeBlock[]>(timeBlocks)
-  const [activeTab, setActiveTab] = useState<'general' | 'slotTypes'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'slotTypes' | 'notifications'>('general')
   const [editingSlotType, setEditingSlotType] = useState<SlotType | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [newSlotType, setNewSlotType] = useState<Partial<SlotType>>({
@@ -247,6 +296,17 @@ export function SettingsModal({
             一般設定
           </button>
           <button
+            onClick={() => setActiveTab('notifications')}
+            className={cn(
+              'flex-1 px-4 py-2.5 text-sm font-medium transition-colors',
+              activeTab === 'notifications'
+                ? 'text-primary border-b-2 border-primary bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            提醒設定
+          </button>
+          <button
             onClick={() => setActiveTab('slotTypes')}
             className={cn(
               'flex-1 px-4 py-2.5 text-sm font-medium transition-colors',
@@ -255,7 +315,7 @@ export function SettingsModal({
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            時間區塊類型
+            時間區塊
           </button>
         </div>
 
@@ -429,6 +489,15 @@ export function SettingsModal({
             </div>
           </div>
           </>)}
+
+          {/* Notifications Tab */}
+          {activeTab === 'notifications' && (
+            <NotificationsSettingsTab
+              settings={localSettings}
+              workspaces={workspaces}
+              onUpdate={(notifications) => setLocalSettings(prev => ({ ...prev, notifications }))}
+            />
+          )}
 
           {/* Slot Types Tab */}
           {activeTab === 'slotTypes' && (
@@ -711,6 +780,556 @@ export function SettingsModal({
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Notifications Settings Tab Component
+function NotificationsSettingsTab({
+  settings,
+  workspaces,
+  onUpdate,
+}: {
+  settings: UserSettings
+  workspaces: Workspace[]
+  onUpdate: (notifications: NotificationSettings) => void
+}) {
+  const notifications = settings.notifications || DEFAULT_NOTIFICATION_SETTINGS
+  
+  const updateField = <K extends keyof NotificationSettings>(
+    key: K,
+    value: NotificationSettings[K]
+  ) => {
+    onUpdate({ ...notifications, [key]: value })
+  }
+
+  const updateNestedField = <K extends keyof NotificationSettings>(
+    key: K,
+    field: string,
+    value: unknown
+  ) => {
+    const current = notifications[key] as Record<string, unknown>
+    onUpdate({
+      ...notifications,
+      [key]: { ...current, [field]: value },
+    })
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Master Toggle */}
+      <div className="flex items-center justify-between p-4 rounded-xl bg-primary/5 border border-primary/20">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Bell className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <div className="font-medium text-foreground">啟用任務提醒</div>
+            <div className="text-xs text-muted-foreground">接收任務相關的智慧提醒通知</div>
+          </div>
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input
+            type="checkbox"
+            checked={notifications.enabled}
+            onChange={(e) => updateField('enabled', e.target.checked)}
+            className="sr-only peer"
+          />
+          <div className="w-11 h-6 bg-secondary rounded-full peer peer-checked:bg-primary transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
+        </label>
+      </div>
+
+      {notifications.enabled && (
+        <>
+          {/* Overdue Tasks */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-500" />
+              <h3 className="text-sm font-semibold text-foreground">過期任務提醒</h3>
+            </div>
+            
+            <div className="space-y-3 pl-6">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm text-foreground">啟用過期任務提醒</span>
+                <input
+                  type="checkbox"
+                  checked={notifications.overdue.enabled}
+                  onChange={(e) => updateNestedField('overdue', 'enabled', e.target.checked)}
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+              </label>
+              
+              {notifications.overdue.enabled && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">嚴重過期天數</span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={notifications.overdue.criticalDays}
+                        onChange={(e) => updateNestedField('overdue', 'criticalDays', parseInt(e.target.value) || 7)}
+                        className="h-8 w-16 text-center"
+                      />
+                      <span className="text-xs text-muted-foreground">天</span>
+                    </div>
+                  </div>
+                  
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm text-muted-foreground">顯示在通知鈴鐺</span>
+                    <input
+                      type="checkbox"
+                      checked={notifications.overdue.showInBell}
+                      onChange={(e) => updateNestedField('overdue', 'showInBell', e.target.checked)}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                  </label>
+                  
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm text-muted-foreground">每日摘要提醒</span>
+                    <input
+                      type="checkbox"
+                      checked={notifications.overdue.dailyDigest}
+                      onChange={(e) => updateNestedField('overdue', 'dailyDigest', e.target.checked)}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* Due Soon */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-500" />
+              <h3 className="text-sm font-semibold text-foreground">即將到期提醒</h3>
+            </div>
+            
+            <div className="space-y-3 pl-6">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm text-foreground">啟用即將到期提醒</span>
+                <input
+                  type="checkbox"
+                  checked={notifications.dueSoon.enabled}
+                  onChange={(e) => updateNestedField('dueSoon', 'enabled', e.target.checked)}
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+              </label>
+              
+              {notifications.dueSoon.enabled && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">提前提醒天數</span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={14}
+                        value={notifications.dueSoon.daysBeforeDue}
+                        onChange={(e) => updateNestedField('dueSoon', 'daysBeforeDue', parseInt(e.target.value) || 3)}
+                        className="h-8 w-16 text-center"
+                      />
+                      <span className="text-xs text-muted-foreground">天</span>
+                    </div>
+                  </div>
+                  
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm text-muted-foreground">到期當天特別提醒</span>
+                    <input
+                      type="checkbox"
+                      checked={notifications.dueSoon.notifyOnDueDay}
+                      onChange={(e) => updateNestedField('dueSoon', 'notifyOnDueDay', e.target.checked)}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                  </label>
+                  
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm text-muted-foreground">到期前一天提醒</span>
+                    <input
+                      type="checkbox"
+                      checked={notifications.dueSoon.notifyDayBefore}
+                      onChange={(e) => updateNestedField('dueSoon', 'notifyDayBefore', e.target.checked)}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* Stale Tasks */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-blue-500" />
+              <h3 className="text-sm font-semibold text-foreground">閒置任務提醒</h3>
+            </div>
+            
+            <div className="space-y-3 pl-6">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm text-foreground">提醒閒置過久的任務</span>
+                <input
+                  type="checkbox"
+                  checked={notifications.staleTasks.enabled}
+                  onChange={(e) => updateNestedField('staleTasks', 'enabled', e.target.checked)}
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+              </label>
+              
+              {notifications.staleTasks.enabled && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">閒置天數門檻</span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={7}
+                        max={60}
+                        value={notifications.staleTasks.daysUntilStale}
+                        onChange={(e) => updateNestedField('staleTasks', 'daysUntilStale', parseInt(e.target.value) || 14)}
+                        className="h-8 w-16 text-center"
+                      />
+                      <span className="text-xs text-muted-foreground">天</span>
+                    </div>
+                  </div>
+                  
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm text-muted-foreground">包含未排程任務</span>
+                    <input
+                      type="checkbox"
+                      checked={notifications.staleTasks.includeUnscheduled}
+                      onChange={(e) => updateNestedField('staleTasks', 'includeUnscheduled', e.target.checked)}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                  </label>
+                  
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm text-muted-foreground">包含無截止日任務</span>
+                    <input
+                      type="checkbox"
+                      checked={notifications.staleTasks.includeNoDueDate}
+                      onChange={(e) => updateNestedField('staleTasks', 'includeNoDueDate', e.target.checked)}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* High Priority */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-orange-500" />
+              <h3 className="text-sm font-semibold text-foreground">高優先任務提醒</h3>
+            </div>
+            
+            <div className="space-y-3 pl-6">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm text-foreground">啟用高優先任務提醒</span>
+                <input
+                  type="checkbox"
+                  checked={notifications.highPriority.enabled}
+                  onChange={(e) => updateNestedField('highPriority', 'enabled', e.target.checked)}
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+              </label>
+              
+              {notifications.highPriority.enabled && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">最低優先等級</span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={notifications.highPriority.minUrgency}
+                        onChange={(e) => updateNestedField('highPriority', 'minUrgency', parseInt(e.target.value) || 8)}
+                        className="h-8 w-16 text-center"
+                      />
+                      <span className="text-xs text-muted-foreground">/ 10</span>
+                    </div>
+                  </div>
+                  
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm text-muted-foreground">高優先任務過多時提醒</span>
+                    <input
+                      type="checkbox"
+                      checked={notifications.highPriority.alertWhenTooMany}
+                      onChange={(e) => updateNestedField('highPriority', 'alertWhenTooMany', e.target.checked)}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                  </label>
+                  
+                  {notifications.highPriority.alertWhenTooMany && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">超過幾個時提醒</span>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min={3}
+                          max={20}
+                          value={notifications.highPriority.maxBeforeAlert}
+                          onChange={(e) => updateNestedField('highPriority', 'maxBeforeAlert', parseInt(e.target.value) || 5)}
+                          className="h-8 w-16 text-center"
+                        />
+                        <span className="text-xs text-muted-foreground">個</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* Scheduling Reminders */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-green-500" />
+              <h3 className="text-sm font-semibold text-foreground">排程提醒</h3>
+            </div>
+            
+            <div className="space-y-3 pl-6">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm text-foreground">提醒未排程任務</span>
+                <input
+                  type="checkbox"
+                  checked={notifications.scheduling.remindUnscheduled}
+                  onChange={(e) => updateNestedField('scheduling', 'remindUnscheduled', e.target.checked)}
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+              </label>
+              
+              {notifications.scheduling.remindUnscheduled && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">未排程比例門檻</span>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={10}
+                      max={90}
+                      step={10}
+                      value={notifications.scheduling.percentThreshold}
+                      onChange={(e) => updateNestedField('scheduling', 'percentThreshold', parseInt(e.target.value) || 50)}
+                      className="h-8 w-16 text-center"
+                    />
+                    <span className="text-xs text-muted-foreground">%</span>
+                  </div>
+                </div>
+              )}
+              
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm text-foreground">每日規劃提醒</span>
+                <input
+                  type="checkbox"
+                  checked={notifications.scheduling.dailyPlanningReminder}
+                  onChange={(e) => updateNestedField('scheduling', 'dailyPlanningReminder', e.target.checked)}
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+              </label>
+              
+              {notifications.scheduling.dailyPlanningReminder && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">提醒時間</span>
+                  <Input
+                    type="time"
+                    value={notifications.scheduling.planningReminderTime}
+                    onChange={(e) => updateNestedField('scheduling', 'planningReminderTime', e.target.value)}
+                    className="h-8 w-28"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* Quiet Hours */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Moon className="w-4 h-4 text-indigo-500" />
+              <h3 className="text-sm font-semibold text-foreground">勿擾時段</h3>
+            </div>
+            
+            <div className="space-y-3 pl-6">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm text-foreground">啟用勿擾時段</span>
+                <input
+                  type="checkbox"
+                  checked={notifications.quietHours.enabled}
+                  onChange={(e) => updateNestedField('quietHours', 'enabled', e.target.checked)}
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+              </label>
+              
+              {notifications.quietHours.enabled && (
+                <>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm text-muted-foreground">時段</span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="time"
+                        value={notifications.quietHours.startTime}
+                        onChange={(e) => updateNestedField('quietHours', 'startTime', e.target.value)}
+                        className="h-8 w-28"
+                      />
+                      <span className="text-xs text-muted-foreground">至</span>
+                      <Input
+                        type="time"
+                        value={notifications.quietHours.endTime}
+                        onChange={(e) => updateNestedField('quietHours', 'endTime', e.target.value)}
+                        className="h-8 w-28"
+                      />
+                    </div>
+                  </div>
+                  
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm text-muted-foreground">允許緊急通知</span>
+                    <input
+                      type="checkbox"
+                      checked={notifications.quietHours.allowUrgent}
+                      onChange={(e) => updateNestedField('quietHours', 'allowUrgent', e.target.checked)}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* Workspace Overrides */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-purple-500" />
+              <h3 className="text-sm font-semibold text-foreground">工作區設定</h3>
+            </div>
+            <p className="text-xs text-muted-foreground pl-6">為不同工作區設定不同的提醒規則</p>
+            
+            <div className="space-y-2 pl-6">
+              {workspaces.filter(ws => !ws.isArchived).map((workspace) => {
+                const override = notifications.workspaceOverrides[workspace.id] || {
+                  enabled: true,
+                  overduePriority: 'default' as const,
+                }
+                
+                return (
+                  <div
+                    key={workspace.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 border border-border"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: workspace.color }}
+                      />
+                      <span className="text-sm font-medium">{workspace.name}</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <select
+                        value={override.overduePriority}
+                        onChange={(e) => {
+                          const newOverrides = {
+                            ...notifications.workspaceOverrides,
+                            [workspace.id]: {
+                              ...override,
+                              overduePriority: e.target.value as 'high' | 'medium' | 'low' | 'default',
+                            },
+                          }
+                          updateField('workspaceOverrides', newOverrides)
+                        }}
+                        className="h-7 px-2 text-xs rounded-md bg-background border border-border"
+                      >
+                        <option value="default">預設</option>
+                        <option value="high">高優先</option>
+                        <option value="medium">中優先</option>
+                        <option value="low">低優先</option>
+                      </select>
+                      
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={override.enabled}
+                          onChange={(e) => {
+                            const newOverrides = {
+                              ...notifications.workspaceOverrides,
+                              [workspace.id]: {
+                                ...override,
+                                enabled: e.target.checked,
+                              },
+                            }
+                            updateField('workspaceOverrides', newOverrides)
+                          }}
+                          className="w-4 h-4 rounded border-border accent-primary"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* Appearance */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Eye className="w-4 h-4 text-cyan-500" />
+              <h3 className="text-sm font-semibold text-foreground">顯示設定</h3>
+            </div>
+            
+            <div className="space-y-3 pl-6">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm text-foreground">顯示通知數量徽章</span>
+                <input
+                  type="checkbox"
+                  checked={notifications.appearance.showBadgeCount}
+                  onChange={(e) => updateNestedField('appearance', 'showBadgeCount', e.target.checked)}
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+              </label>
+              
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm text-foreground">按類型分組顯示</span>
+                <input
+                  type="checkbox"
+                  checked={notifications.appearance.groupByType}
+                  onChange={(e) => updateNestedField('appearance', 'groupByType', e.target.checked)}
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+              </label>
+              
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">最多顯示通知數</span>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={5}
+                    max={50}
+                    value={notifications.appearance.maxVisible}
+                    onChange={(e) => updateNestedField('appearance', 'maxVisible', parseInt(e.target.value) || 10)}
+                    className="h-8 w-16 text-center"
+                  />
+                  <span className="text-xs text-muted-foreground">個</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

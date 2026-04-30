@@ -131,6 +131,77 @@ export interface UserSettings {
   defaultTaskColors: Record<string, string>
   // Custom slot types for time blocks
   slotTypes: SlotType[]
+  // Notification and reminder settings
+  notifications: NotificationSettings
+}
+
+export interface NotificationSettings {
+  // Master toggle
+  enabled: boolean
+  
+  // Overdue task notifications
+  overdue: {
+    enabled: boolean
+    criticalDays: number // Days overdue to consider "critical" (default: 7)
+    showInBell: boolean // Show in notification center
+    dailyDigest: boolean // Show daily summary
+  }
+  
+  // Due soon notifications
+  dueSoon: {
+    enabled: boolean
+    daysBeforeDue: number // How many days before to notify (default: 3)
+    notifyOnDueDay: boolean // Special notification on due day
+    notifyDayBefore: boolean // Notify the day before
+  }
+  
+  // Stale/forgotten tasks
+  staleTasks: {
+    enabled: boolean
+    daysUntilStale: number // Days without activity to consider stale (default: 14)
+    includeUnscheduled: boolean // Include tasks without schedule
+    includeNoDueDate: boolean // Include tasks without due date
+  }
+  
+  // High priority alerts
+  highPriority: {
+    enabled: boolean
+    minUrgency: number // Minimum urgency level to notify (default: 8)
+    alertWhenTooMany: boolean // Alert when too many high priority tasks
+    maxBeforeAlert: number // Max high priority before alerting (default: 5)
+  }
+  
+  // Scheduling reminders
+  scheduling: {
+    enabled: boolean
+    remindUnscheduled: boolean // Remind about unscheduled tasks
+    percentThreshold: number // Alert when this % of tasks are unscheduled (default: 50)
+    dailyPlanningReminder: boolean // Remind to plan the day
+    planningReminderTime: string // Time for planning reminder (default: "08:00")
+  }
+  
+  // Workspace-specific settings
+  workspaceOverrides: Record<string, {
+    enabled: boolean // Enable/disable notifications for this workspace
+    overduePriority: 'high' | 'medium' | 'low' | 'default'
+    muteUntil?: string // ISO date string to temporarily mute
+  }>
+  
+  // Quiet hours
+  quietHours: {
+    enabled: boolean
+    startTime: string // e.g., "22:00"
+    endTime: string // e.g., "08:00"
+    allowUrgent: boolean // Allow critical notifications during quiet hours
+  }
+  
+  // Sound and visual
+  appearance: {
+    showBadgeCount: boolean
+    groupByType: boolean // Group notifications by type
+    autoCollapse: boolean // Auto-collapse read notifications
+    maxVisible: number // Max notifications to show at once (default: 10)
+  }
 }
 
 // UI State Types
