@@ -127,26 +127,33 @@ export function PanelHeader({
         </div>
       </div>
 
-      {/* Date Display - Japanese style */}
-      <div className="mb-4">
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-foreground tabular-nums">
-            {today.getDate()}
-          </span>
-          <div className="flex flex-col">
-            <span className="text-xs font-medium text-muted-foreground">
-              {today.toLocaleDateString('zh-TW', { month: 'long' })}
+      {/* Date Display */}
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {/* Day number */}
+          <div className="flex flex-col items-center justify-center w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex-shrink-0">
+            <span className="text-xl font-bold leading-none text-primary tabular-nums">
+              {today.getDate()}
             </span>
-            <span className="text-[10px] text-muted-foreground/70">
+          </div>
+          {/* Month / Year / Weekday */}
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-sm font-semibold text-foreground">
+                {today.toLocaleDateString('zh-TW', { month: 'long' })}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {today.getFullYear()}
+              </span>
+            </div>
+            <span className="text-xs text-muted-foreground">
               {today.toLocaleDateString('zh-TW', { weekday: 'long' })}
             </span>
           </div>
-          <div className="ml-auto">
-            <span className="stamp text-primary border-primary">
-              {totalPending} 待辦
-            </span>
-          </div>
         </div>
+        <span className="stamp text-primary border-primary">
+          {totalPending} 待辦
+        </span>
       </div>
 
       {/* Workspace Badges - Clean pills */}
