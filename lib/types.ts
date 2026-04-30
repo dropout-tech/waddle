@@ -72,7 +72,8 @@ export interface SlotType {
   key: string // unique identifier
   label: string
   description: string
-  icon: string // icon name from lucide-react
+  icon: string // icon name from lucide-react OR custom image URL
+  iconType: 'lucide' | 'custom' | 'emoji' // type of icon
   color: string
   parentId?: string // for nested categories
   sortOrder: number

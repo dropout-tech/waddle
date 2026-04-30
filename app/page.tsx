@@ -9,18 +9,37 @@ import { SettingsModal } from '@/components/modals/settings-modal'
 import { mockWorkspaces, mockTimeBlocks } from '@/lib/mock-data'
 import type { Workspace, Task, JournalEntry, ExportDataPayload, UserSettings, TimeBlock, SlotType } from '@/lib/types'
 
-// Default slot types with nested structure
-const defaultSlotTypes: SlotType[] = [
-  // Top-level: Task
-  { id: 'task', key: 'task', label: '任務', description: '建立一般任務', icon: 'CheckSquare', color: '#6B7FD4', sortOrder: 0, isBuiltIn: true },
-  // Top-level: Time Block category (parent)
-  { id: 'timeblock', key: 'timeblock', label: '時間區塊', description: '各類時間安排', icon: 'Layers', color: '#9CA3AF', sortOrder: 1, isBuiltIn: true },
-  // Children of timeblock
-  { id: 'break', key: 'break', label: '午休', description: '休息時間', icon: 'Coffee', color: '#F6A854', parentId: 'timeblock', sortOrder: 0, isBuiltIn: true },
-  { id: 'buffer', key: 'buffer', label: '緩衝', description: '彈性緩衝時間', icon: 'Clock', color: '#9BBFAC', parentId: 'timeblock', sortOrder: 1, isBuiltIn: true },
-  { id: 'focus', key: 'focus', label: '專注', description: '專注工作時段', icon: 'Crosshair', color: '#D46B8A', parentId: 'timeblock', sortOrder: 2, isBuiltIn: true },
-  { id: 'personal', key: 'personal', label: '個人', description: '個人事務', icon: 'User', color: '#8B8BCC', parentId: 'timeblock', sortOrder: 3, isBuiltIn: true },
-]
+// Generate slot types based on workspaces
+const generateSlotTypesFromWorkspaces = (workspaces: Workspace[]): SlotType[] => {
+  const baseTypes: SlotType[] = [
+    // Top-level: Time Block category (parent) for non-task blocks
+    { id: 'timeblock', key: 'timeblock', label: '時間區塊', description: '各類時間安排', icon: 'Layers', iconType: 'lucide', color: '#9CA3AF', sortOrder: 0, isBuiltIn: true },
+    // Children of timeblock (no workspace association)
+    { id: 'break', key: 'break', label: '午休', description: '休息時間', icon: 'Coffee', iconType: 'lucide', color: '#F6A854', parentId: 'timeblock', sortOrder: 0, isBuiltIn: true },
+    { id: 'buffer', key: 'buffer', label: '緩衝', description: '彈性緩衝時間', icon: 'Clock', iconType: 'lucide', color: '#9BBFAC', parentId: 'timeblock', sortOrder: 1, isBuiltIn: true },
+    { id: 'focus', key: 'focus', label: '專注', description: '專注工作時段', icon: 'Crosshair', iconType: 'lucide', color: '#D46B8A', parentId: 'timeblock', sortOrder: 2, isBuiltIn: true },
+  ]
+  
+  // Add workspace-based slot types (these sync tasks to left sidebar)
+  const workspaceTypes: SlotType[] = workspaces
+    .filter(ws => !ws.isArchived)
+    .map((ws, index) => ({
+      id: `ws-${ws.id}`,
+      key: `ws-${ws.id}`,
+      label: ws.name,
+      description: `新增任務到「${ws.name}」`,
+      icon: ws.icon,
+      iconType: 'emoji' as const,
+      color: ws.color,
+      sortOrder: index + 1, // after timeblock
+      isBuiltIn: true,
+      workspaceId: ws.id,
+    }))
+  
+  return [...workspaceTypes, ...baseTypes]
+}
+
+const defaultSlotTypes: SlotType[] = generateSlotTypesFromWorkspaces(mockWorkspaces)
 
 const defaultSettings: UserSettings = {
   calendarStartHour: 6,
@@ -325,6 +344,7 @@ export default function FlowDeskPage() {
   }, [])
 
   // Create a new time block from calendar drag
+  // If the slot type has a workspaceId, create a task instead
   const handleCreateTimeBlock = useCallback((
     date: string,
     startTime: string,
@@ -333,6 +353,53 @@ export default function FlowDeskPage() {
     label: string,
     color: string,
   ) => {
+    // Find the slot type to check if it has a workspace association
+    const slotType = settings.slotTypes.find(s => s.key === type)
+    
+    if (slotType?.workspaceId) {
+      // Create a task in the associated workspace instead of a time block
+      const workspace = workspaces.find(w => w.id === slotType.workspaceId)
+      if (workspace && workspace.categories.length > 0) {
+        const defaultCategory = workspace.categories[0]
+        const now = new Date().toISOString()
+        const newTask: Task = {
+          id: `task-${Date.now()}`,
+          categoryId: defaultCategory.id,
+          workspaceId: workspace.id,
+          workspaceName: workspace.name,
+          workspaceColor: workspace.color,
+          categoryName: defaultCategory.name,
+          title: label || slotType.label,
+          taskType: 'one_time',
+          urgency: 5,
+          scheduledDate: date,
+          scheduledStartTime: startTime,
+          scheduledEndTime: endTime,
+          calendarColor: color || workspace.color,
+          isCompleted: false,
+          sortOrder: defaultCategory.tasks.length,
+          createdAt: now,
+          updatedAt: now,
+        }
+        setWorkspaces((prev) =>
+          prev.map((ws) =>
+            ws.id === workspace.id
+              ? {
+                  ...ws,
+                  categories: ws.categories.map((cat) =>
+                    cat.id === defaultCategory.id
+                      ? { ...cat, tasks: [...cat.tasks, newTask] }
+                      : cat
+                  ),
+                }
+              : ws
+          )
+        )
+        return
+      }
+    }
+    
+    // Otherwise create a time block (no workspace association)
     const newBlock: TimeBlock = {
       id: `block-${Date.now()}`,
       date,
@@ -344,7 +411,7 @@ export default function FlowDeskPage() {
       isRecurring: false,
     }
     setTimeBlocks((prev) => [...prev, newBlock])
-  }, [])
+  }, [settings.slotTypes, workspaces])
 
   // Reschedule a task by dragging/resizing on the calendar
   // date is optional — only provided by day/week views when dragging across days

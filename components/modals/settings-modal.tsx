@@ -57,10 +57,15 @@ export function SettingsModal({
     label: '',
     description: '',
     icon: 'Clock',
+    iconType: 'lucide',
     color: '#6B7FD4',
     parentId: 'timeblock',
     workspaceId: undefined,
   })
+  const [customIconInput, setCustomIconInput] = useState('')
+
+  // Common emojis for quick selection
+  const COMMON_EMOJIS = ['🎯', '💼', '📝', '🏠', '💡', '🎨', '📚', '🏃', '🍽️', '☕', '💤', '🎮']
 
   // Find or create lunch break block
   const lunchBlock = localTimeBlocks.find(tb => tb.type === 'break') || {
@@ -121,6 +126,7 @@ export function SettingsModal({
       label: newSlotType.label,
       description: newSlotType.description || '',
       icon: newSlotType.icon || 'Clock',
+      iconType: newSlotType.iconType || 'lucide',
       color: newSlotType.color || '#6B7FD4',
       parentId: newSlotType.parentId,
       sortOrder: maxSort + 1,
@@ -131,7 +137,8 @@ export function SettingsModal({
       ...prev,
       slotTypes: [...prev.slotTypes, newType],
     }))
-    setNewSlotType({ label: '', description: '', icon: 'Clock', color: '#6B7FD4', parentId: 'timeblock', workspaceId: undefined })
+    setNewSlotType({ label: '', description: '', icon: 'Clock', iconType: 'lucide', color: '#6B7FD4', parentId: 'timeblock', workspaceId: undefined })
+    setCustomIconInput('')
     setIsAddingNew(false)
   }
 
@@ -153,6 +160,19 @@ export function SettingsModal({
   // Get slot types organized by parent
   const topLevelTypes = localSettings.slotTypes?.filter(s => !s.parentId) || []
   const getChildTypes = (parentId: string) => localSettings.slotTypes?.filter(s => s.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder) || []
+
+  // Render icon based on type (lucide or emoji/custom)
+  const renderSlotIcon = (slotType: SlotType, size: 'sm' | 'md' = 'md') => {
+    const sizeClass = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'
+    const textSize = size === 'sm' ? 'text-sm' : 'text-base'
+    
+    if (slotType.iconType === 'lucide') {
+      const IconComp = ICON_MAP[slotType.icon] || Clock
+      return <IconComp className={sizeClass} style={{ color: slotType.color }} />
+    }
+    // emoji or custom text
+    return <span className={textSize}>{slotType.icon}</span>
+  }
 
   if (!isOpen) return null
 
@@ -350,21 +370,37 @@ export function SettingsModal({
                       className="h-8 text-sm"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="space-y-2">
                     <span className="text-xs text-muted-foreground">圖示:</span>
-                    <div className="flex gap-1">
-                      {AVAILABLE_ICONS.map(({ name, icon: Icon }) => (
+                    <div className="flex flex-wrap gap-1.5">
+                      {COMMON_EMOJIS.map((emoji) => (
                         <button
-                          key={name}
-                          onClick={() => setNewSlotType(prev => ({ ...prev, icon: name }))}
+                          key={emoji}
+                          onClick={() => setNewSlotType(prev => ({ ...prev, icon: emoji, iconType: 'emoji' }))}
                           className={cn(
-                            'w-7 h-7 rounded flex items-center justify-center transition-colors',
-                            newSlotType.icon === name ? 'bg-primary text-primary-foreground' : 'bg-secondary hover:bg-secondary/80'
+                            'w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-all',
+                            newSlotType.icon === emoji && newSlotType.iconType === 'emoji'
+                              ? 'bg-primary/20 ring-2 ring-primary scale-110'
+                              : 'bg-secondary hover:bg-secondary/80 hover:scale-105'
                           )}
                         >
-                          <Icon className="w-4 h-4" />
+                          {emoji}
                         </button>
                       ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="自訂 emoji 或文字"
+                        value={customIconInput}
+                        onChange={(e) => {
+                          setCustomIconInput(e.target.value)
+                          if (e.target.value) {
+                            setNewSlotType(prev => ({ ...prev, icon: e.target.value, iconType: 'emoji' }))
+                          }
+                        }}
+                        className="h-8 text-sm flex-1"
+                      />
+                      <span className="text-[10px] text-muted-foreground">輸入 emoji 或文字作為圖示</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -440,7 +476,6 @@ export function SettingsModal({
               <div className="space-y-2">
                 {topLevelTypes.sort((a, b) => a.sortOrder - b.sortOrder).map((type) => {
                   const children = getChildTypes(type.id)
-                  const IconComp = ICON_MAP[type.icon] || Clock
                   const isEditing = editingSlotType?.id === type.id
 
                   return (
@@ -451,7 +486,7 @@ export function SettingsModal({
                           className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
                           style={{ backgroundColor: type.color + '20' }}
                         >
-                          <IconComp className="w-4 h-4" style={{ color: type.color }} />
+                          {renderSlotIcon(type)}
                         </div>
                         {isEditing ? (
                           <div className="flex-1 flex items-center gap-2">
@@ -500,7 +535,6 @@ export function SettingsModal({
                       {children.length > 0 && (
                         <div className="divide-y divide-border">
                           {children.map((child) => {
-                            const ChildIcon = ICON_MAP[child.icon] || Clock
                             const isChildEditing = editingSlotType?.id === child.id
 
                             return (
@@ -512,7 +546,7 @@ export function SettingsModal({
                                   className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                                   style={{ backgroundColor: child.color + '20' }}
                                 >
-                                  <ChildIcon className="w-3.5 h-3.5" style={{ color: child.color }} />
+                                  {renderSlotIcon(child, 'sm')}
                                 </div>
                                 {isChildEditing ? (
                                   <div className="flex-1 flex items-center gap-2">

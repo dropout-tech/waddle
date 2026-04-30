@@ -12,6 +12,16 @@ const ICON_MAP: Record<string, React.ElementType> = {
   CheckSquare, Coffee, Clock, Crosshair, User, Layers,
 }
 
+// Render icon based on type (lucide or emoji/custom)
+const renderSlotIcon = (slotType: SlotType) => {
+  if (slotType.iconType === 'lucide') {
+    const IconComp = ICON_MAP[slotType.icon] || Clock
+    return <IconComp className="w-4 h-4" style={{ color: slotType.color }} />
+  }
+  // emoji or custom text
+  return <span className="text-base">{slotType.icon}</span>
+}
+
 interface DayScrollViewProps {
   selectedDate: Date
   tasks: Task[]
@@ -687,7 +697,6 @@ const handleSelectType = useCallback((slotType: SlotType) => {
             </p>
             <div className="flex flex-col gap-1">
               {(selectedParent ? getChildSlotTypes(selectedParent) : topLevelSlotTypes).map((slotType) => {
-                const Icon = ICON_MAP[slotType.icon] || Clock
                 const hasChildren = getChildSlotTypes(slotType.id).length > 0
                 return (
                   <button
@@ -696,7 +705,7 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                     className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
                   >
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${slotType.color}25` }}>
-                      <Icon className="w-4 h-4" style={{ color: slotType.color }} />
+                      {renderSlotIcon(slotType)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-foreground">{slotType.label}</div>
