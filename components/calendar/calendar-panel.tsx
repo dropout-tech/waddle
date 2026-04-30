@@ -20,6 +20,13 @@ interface CalendarPanelProps {
   timeBlocks: TimeBlock[]
   slotTypes?: SlotType[]
   workspaces: Workspace[]
+  // Time range and zoom
+  startHour?: number
+  endHour?: number
+  hourHeight?: number
+  zoomLevel?: number
+  onZoomChange?: (level: number) => void
+  // Callbacks
   onDateChange: (date: Date) => void
   onViewModeChange: (mode: 'day' | 'week' | 'month') => void
   onTaskSelect: (task: Task) => void
@@ -42,6 +49,11 @@ export function CalendarPanel({
   timeBlocks,
   slotTypes,
   workspaces,
+  startHour = 0,
+  endHour = 24,
+  hourHeight = 60,
+  zoomLevel = 2,
+  onZoomChange,
   onDateChange,
   onViewModeChange,
   onTaskSelect,
@@ -93,6 +105,10 @@ export function CalendarPanel({
         selectedDate={selectedDate}
         viewMode={viewMode}
         workspaces={workspaces}
+        zoomLevel={zoomLevel}
+        startHour={startHour}
+        endHour={endHour}
+        onZoomChange={onZoomChange}
         onDateChange={onDateChange}
         onViewModeChange={onViewModeChange}
         onTodayClick={handleTodayClick}
@@ -105,6 +121,9 @@ export function CalendarPanel({
           tasks={allTasks}
           timeBlocks={timeBlocks}
           slotTypes={slotTypes}
+          startHour={startHour}
+          endHour={endHour}
+          hourHeight={hourHeight}
           onTaskSelect={onTaskSelect}
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}
@@ -122,6 +141,9 @@ export function CalendarPanel({
           pendingTasks={pendingTasks}
           timeBlocks={timeBlocks}
           slotTypes={slotTypes}
+          startHour={startHour}
+          endHour={endHour}
+          hourHeight={hourHeight}
           onTaskSelect={onTaskSelect}
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}

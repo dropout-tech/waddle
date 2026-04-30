@@ -5,13 +5,14 @@ import { cn } from '@/lib/utils'
 import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, BookOpen, BarChart3, Maximize2, Minimize2 } from 'lucide-react'
-import type { Workspace, Task, TimeBlock, SlotType } from '@/lib/types'
+import { PanelLeftClose, PanelLeftOpen, BookOpen, BarChart3, Minimize2, ZoomIn, ZoomOut, Clock } from 'lucide-react'
+import type { Workspace, Task, TimeBlock, SlotType, UserSettings } from '@/lib/types'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
   timeBlocks: TimeBlock[]
   slotTypes?: SlotType[]
+  settings: UserSettings
   onToggleCategoryCollapse: (categoryId: string) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
@@ -41,6 +42,7 @@ export function MainLayout({
   workspaces,
   timeBlocks,
   slotTypes,
+  settings,
   onToggleCategoryCollapse,
   onToggleComplete,
   onSelectTask,
@@ -71,6 +73,18 @@ export function MainLayout({
   
   // Focus mode for journal/report (full screen view)
   const [focusMode, setFocusMode] = useState<'none' | 'journal' | 'report'>('none')
+  
+  // Calendar zoom level - controls hour height and visible time range
+  // Zoom levels: 1 = compact (40px/hour), 2 = normal (60px/hour), 3 = expanded (80px/hour), 4 = detailed (100px/hour)
+  const [zoomLevel, setZoomLevel] = useState(2)
+  
+  // Calculate hour height based on zoom level
+  const hourHeights = [40, 60, 80, 100]
+  const hourHeight = hourHeights[zoomLevel - 1] || 60
+  
+  // Time range from settings (with defensive fallbacks)
+  const startHour = settings?.calendarStartHour ?? 0
+  const endHour = settings?.calendarEndHour ?? 24
 
   const handleResize = useCallback((delta: number) => {
     setPanelWidth((prev) => {
@@ -226,6 +240,11 @@ export function MainLayout({
           timeBlocks={filteredTimeBlocks}
           slotTypes={slotTypes}
           workspaces={workspaces}
+          startHour={startHour}
+          endHour={endHour}
+          hourHeight={hourHeight}
+          zoomLevel={zoomLevel}
+          onZoomChange={setZoomLevel}
           onDateChange={setSelectedDate}
           onViewModeChange={setViewMode}
           onTaskSelect={onSelectTask}

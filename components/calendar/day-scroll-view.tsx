@@ -39,6 +39,7 @@ interface DayScrollViewProps {
   onDateChange?: (date: Date) => void
   startHour?: number
   endHour?: number
+  hourHeight?: number
 }
 
 interface ActiveTaskDrag extends TaskDragStart {
@@ -151,8 +152,9 @@ export function DayScrollView({
   onRescheduleTask,
   onNavigate,
   onDateChange,
-  startHour = 6,
-  endHour = 22,
+  startHour = 0,
+  endHour = 24,
+  hourHeight = 60,
 }: DayScrollViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const headerScrollRef = useRef<HTMLDivElement>(null)
@@ -260,20 +262,22 @@ export function DayScrollView({
   // Time position calculations
   const getTimePosition = useCallback((time: string) => {
     const minutes = timeToMinutes(time)
-    return `${minutes - startHour * 60}px`
-  }, [startHour])
+    const offsetMinutes = minutes - startHour * 60
+    return `${(offsetMinutes / 60) * hourHeight}px`
+  }, [startHour, hourHeight])
 
   const getDurationHeight = useCallback((start: string, end: string) => {
     const startMin = timeToMinutes(start)
     const endMin = timeToMinutes(end)
-    return `${Math.max(endMin - startMin, 15)}px`
-  }, [])
+    const durationMinutes = endMin - startMin
+    return `${Math.max((durationMinutes / 60) * hourHeight, hourHeight / 4)}px`
+  }, [hourHeight])
 
   // Drag handlers
   const yToTime = useCallback((y: number) => {
-    const minutes = snap(startHour * 60 + y)
+    const minutes = snap(startHour * 60 + Math.round(y / hourHeight * 60))
     return minutesToTime(Math.max(startHour * 60, Math.min(endHour * 60, minutes)))
-  }, [startHour, endHour])
+  }, [startHour, endHour, hourHeight])
 
   const MIN = startHour * 60
   const MAX = endHour * 60
@@ -566,7 +570,7 @@ const handleSelectType = useCallback((slotType: SlotType) => {
           {/* Time labels column */}
           <div className="w-14 flex-shrink-0 sticky left-0 z-20 bg-panel border-r border-border">
             {hours.map((hour) => (
-              <div key={hour} className="h-[60px] relative">
+                <div key={hour} className="relative" style={{ height: `${hourHeight}px` }}>
                 <span className="absolute -top-2 left-1 right-1 text-[10px] text-muted-foreground font-mono text-right">
                   {hour.toString().padStart(2, '0')}:00
                 </span>
@@ -597,7 +601,7 @@ const handleSelectType = useCallback((slotType: SlotType) => {
               >
                 {/* Hour lines */}
                 {hours.map((hour) => (
-                  <div key={hour} className="h-[60px] border-b border-border/50">
+                  <div key={hour} className="border-b border-border/50" style={{ height: `${hourHeight}px` }}>
                     <div className="h-[30px] border-b border-dashed border-border/30" />
                   </div>
                 ))}
@@ -634,19 +638,20 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                       ? { top: activeTaskDrag.currentStart - MIN, height: activeTaskDrag.currentEnd - activeTaskDrag.currentStart }
                       : null
                     return (
-                      <TaskBlock
-                        key={task.id}
-                        task={task}
-                        calendarStartHour={startHour}
-                        onSelect={onTaskSelect}
-                        onToggleComplete={onToggleComplete}
-                        onDragStart={(info) => handleTaskDragStart(info, dayIndex)}
-                        compact={true}
-                        column={col?.column ?? 0}
-                        totalColumns={col?.totalColumns ?? 1}
-                        dragOverride={dragOverride}
-                        isDragging={isDraggingThis}
-                      />
+                        <TaskBlock
+                          key={task.id}
+                          task={task}
+                          calendarStartHour={startHour}
+                          hourHeight={hourHeight}
+                          onSelect={onTaskSelect}
+                          onToggleComplete={onToggleComplete}
+                          onDragStart={(info) => handleTaskDragStart(info, dayIndex)}
+                          compact={true}
+                          column={col?.column ?? 0}
+                          totalColumns={col?.totalColumns ?? 1}
+                          dragOverride={dragOverride}
+                          isDragging={isDraggingThis}
+                        />
                     )
                   })
                 })()}

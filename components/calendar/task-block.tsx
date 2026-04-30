@@ -25,6 +25,7 @@ export interface TaskDragStart {
 interface TaskBlockProps {
   task: Task
   calendarStartHour?: number
+  hourHeight?: number
   onSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
   onDragStart?: (info: TaskDragStart) => void
@@ -43,7 +44,8 @@ function timeToMinutes(time: string): number {
 
 export function TaskBlock({
   task,
-  calendarStartHour = 7,
+  calendarStartHour = 0,
+  hourHeight = 60,
   onSelect,
   onToggleComplete,
   onDragStart,
@@ -56,8 +58,8 @@ export function TaskBlock({
   if (!task.scheduledStartTime || !task.scheduledEndTime) return null
 
   // For compact mode (day/week scroll views), position is relative to column, not time label
-  const baseTop = calculateBlockTop(task.scheduledStartTime, calendarStartHour)
-  const baseHeight = calculateBlockHeight(task.scheduledStartTime, task.scheduledEndTime)
+  const baseTop = calculateBlockTop(task.scheduledStartTime, calendarStartHour, hourHeight)
+  const baseHeight = calculateBlockHeight(task.scheduledStartTime, task.scheduledEndTime, hourHeight)
 
   const top = dragOverride ? dragOverride.top : baseTop
   const height = dragOverride ? dragOverride.height : baseHeight

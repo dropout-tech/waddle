@@ -138,24 +138,28 @@ export function minutesToTime(minutes: number): string {
   return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
 }
 
-// Calculate task block height in pixels (1 minute = 1 pixel)
+// Calculate task block height in pixels
 export function calculateBlockHeight(
   startTime: string,
-  endTime: string
+  endTime: string,
+  hourHeight: number = 60 // pixels per hour
 ): number {
   const startMinutes = timeToMinutes(startTime)
   const endMinutes = timeToMinutes(endTime)
-  return Math.max(endMinutes - startMinutes, 30) // Minimum 30px height
+  const durationMinutes = endMinutes - startMinutes
+  const height = (durationMinutes / 60) * hourHeight
+  return Math.max(height, hourHeight / 2) // Minimum half hour height
 }
 
 // Calculate task block position from top (relative to start hour)
 export function calculateBlockTop(
   startTime: string,
-  calendarStartHour: number = 7
+  calendarStartHour: number = 0,
+  hourHeight: number = 60 // pixels per hour
 ): number {
   const startMinutes = timeToMinutes(startTime)
   const calendarStartMinutes = calendarStartHour * 60
-  return startMinutes - calendarStartMinutes
+  return ((startMinutes - calendarStartMinutes) / 60) * hourHeight
 }
 
 // Snap time to 15-minute intervals

@@ -630,6 +630,7 @@ export default function FlowDeskPage() {
         workspaces={workspaces}
         timeBlocks={timeBlocks}
         slotTypes={activeSlotTypes}
+        settings={settings}
         onToggleCategoryCollapse={handleToggleCategoryCollapse}
         onToggleComplete={handleToggleComplete}
         onSelectTask={handleSelectTask}

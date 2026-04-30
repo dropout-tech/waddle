@@ -3,22 +3,35 @@
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
+import { ZoomIn, ZoomOut, Clock } from 'lucide-react'
 import type { Workspace, Task } from '@/lib/types'
 
 interface CalendarHeaderProps {
   selectedDate: Date
   viewMode: 'day' | 'week' | 'month'
   workspaces: Workspace[]
+  // Zoom controls
+  zoomLevel?: number
+  startHour?: number
+  endHour?: number
+  onZoomChange?: (level: number) => void
+  // Callbacks
   onDateChange: (date: Date) => void
   onViewModeChange: (mode: 'day' | 'week' | 'month') => void
   onTodayClick: () => void
   onTaskClick?: (task: Task) => void
 }
 
+const ZOOM_LABELS = ['緊湊', '標準', '寬鬆', '詳細']
+
 export function CalendarHeader({
   selectedDate,
   viewMode,
   workspaces,
+  zoomLevel = 2,
+  startHour = 0,
+  endHour = 24,
+  onZoomChange,
   onDateChange,
   onViewModeChange,
   onTodayClick,
@@ -65,6 +78,45 @@ export function CalendarHeader({
             </button>
           ))}
         </div>
+
+        {/* Zoom Controls - Only show in day/week view */}
+        {viewMode !== 'month' && onZoomChange && (
+          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-secondary/50 border border-border/50">
+            <button
+              onClick={() => onZoomChange(Math.max(1, zoomLevel - 1))}
+              disabled={zoomLevel <= 1}
+              className={cn(
+                'p-1 rounded transition-colors',
+                zoomLevel <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
+              )}
+              title="縮小"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <div className="flex items-center gap-1 px-1.5 min-w-[52px] justify-center">
+              <span className="text-[10px] text-muted-foreground">{ZOOM_LABELS[zoomLevel - 1]}</span>
+            </div>
+            <button
+              onClick={() => onZoomChange(Math.min(4, zoomLevel + 1))}
+              disabled={zoomLevel >= 4}
+              className={cn(
+                'p-1 rounded transition-colors',
+                zoomLevel >= 4 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
+              )}
+              title="放大"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Time Range Display */}
+        {viewMode !== 'month' && (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-secondary/30 text-[10px] text-muted-foreground">
+            <Clock className="w-3 h-3" />
+            <span>{String(startHour).padStart(2, '0')}:00 - {String(endHour).padStart(2, '0')}:00</span>
+          </div>
+        )}
 
         {/* Today Button */}
         <Button
