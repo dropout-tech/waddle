@@ -1,7 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Trash2, Archive, Check } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { 
+  X, Trash2, Archive, Check, Upload, ImageIcon,
+  Star, Heart, Flame, Zap, BookOpen, Music, Globe, Target,
+  Lightbulb, Rocket, Leaf, Gem, Trophy, Palette, FileText, Settings,
+  Home, Briefcase, Code, Coffee, Camera, Gift, Calendar, Users,
+  Folder, Mail, Phone, ShoppingBag, Plane, Car, Gamepad2, Headphones
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Workspace } from '@/lib/types'
 
@@ -11,7 +17,19 @@ const PRESET_COLORS = [
   '#b07bb5', '#c4a95a', '#7a9ec9', '#d47a8b',
 ]
 
-const PRESET_ICONS = ['⭐', '❤️', '🔥', '⚡', '📚', '🎵', '🌍', '🎯', '💡', '🚀', '🌱', '💎', '🏆', '🎨', '📝', '⚙️']
+// Map icon names to Lucide components
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  star: Star, heart: Heart, flame: Flame, zap: Zap,
+  book: BookOpen, music: Music, globe: Globe, target: Target,
+  lightbulb: Lightbulb, rocket: Rocket, leaf: Leaf, gem: Gem,
+  trophy: Trophy, palette: Palette, file: FileText, settings: Settings,
+  home: Home, briefcase: Briefcase, code: Code, coffee: Coffee,
+  camera: Camera, gift: Gift, calendar: Calendar, users: Users,
+  folder: Folder, mail: Mail, phone: Phone, shopping: ShoppingBag,
+  plane: Plane, car: Car, gamepad: Gamepad2, headphones: Headphones,
+}
+
+const PRESET_ICONS = Object.keys(ICON_MAP)
 
 interface WorkspaceSettingsModalProps {
   workspace: Workspace
@@ -33,12 +51,67 @@ export function WorkspaceSettingsModal({
   const [name, setName] = useState(workspace.name)
   const [color, setColor] = useState(workspace.color)
   const [icon, setIcon] = useState(workspace.icon)
+  const [customImage, setCustomImage] = useState<string | null>(
+    workspace.icon?.startsWith('data:') || workspace.icon?.startsWith('http') ? workspace.icon : null
+  )
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        alert('圖片大小不能超過 2MB')
+        return
+      }
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const result = reader.result as string
+        setCustomImage(result)
+        setIcon(result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const clearCustomImage = () => {
+    setCustomImage(null)
+    setIcon('star')
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   if (!isOpen) return null
 
   const hasChanges =
     name !== workspace.name || color !== workspace.color || icon !== workspace.icon
+
+  // Helper to render icon (either Lucide or custom image)
+  const renderIcon = (iconValue: string | undefined, size: 'sm' | 'md' | 'lg' = 'md') => {
+    const sizeClasses = { sm: 'w-4 h-4', md: 'w-5 h-5', lg: 'w-6 h-6' }
+    
+    if (!iconValue) return null
+    
+    // Check if it's a custom image (data URL or http URL)
+    if (iconValue.startsWith('data:') || iconValue.startsWith('http')) {
+      return (
+        <img 
+          src={iconValue} 
+          alt="custom icon" 
+          className={cn(sizeClasses[size], 'rounded object-cover')}
+        />
+      )
+    }
+    
+    // Otherwise render Lucide icon
+    const IconComponent = ICON_MAP[iconValue]
+    if (IconComponent) {
+      return <IconComponent className={sizeClasses[size]} />
+    }
+    
+    return null
+  }
 
   const handleSave = () => {
     if (!name.trim()) return
@@ -68,10 +141,10 @@ export function WorkspaceSettingsModal({
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
           <div className="flex items-center gap-2.5">
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-base"
-              style={{ backgroundColor: `${color}20`, border: `1.5px solid ${color}40` }}
+              className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden"
+              style={{ backgroundColor: `${color}15`, border: `1.5px solid ${color}30`, color }}
             >
-              {icon || <span style={{ color }} className="text-xs font-bold">{name.charAt(0)}</span>}
+              {icon ? renderIcon(icon, 'lg') : <span className="text-sm font-bold">{name.charAt(0)}</span>}
             </div>
             <div>
               <p className="text-xs text-muted-foreground">工作區設定</p>
@@ -123,24 +196,84 @@ export function WorkspaceSettingsModal({
 
           {/* Icon */}
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
               圖示
             </label>
-            <div className="flex flex-wrap gap-1.5">
-              {PRESET_ICONS.map((ic, idx) => (
+            
+            {/* Custom Image Upload */}
+            <div className="mb-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              
+              {customImage ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden border border-border flex-shrink-0">
+                    <img src={customImage} alt="custom" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">自訂圖片</p>
+                    <p className="text-xs text-muted-foreground">已上傳</p>
+                  </div>
+                  <button
+                    onClick={clearCustomImage}
+                    className="p-2 rounded-lg hover:bg-secondary transition-colors"
+                  >
+                    <X className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
+              ) : (
                 <button
-                  key={`icon-${idx}`}
-                  onClick={() => setIcon(ic)}
-                  className={cn(
-                    'w-8 h-8 rounded-lg border text-base flex items-center justify-center transition-all hover:scale-110',
-                    icon === ic
-                      ? 'border-primary/60 bg-primary/10 scale-110'
-                      : 'border-border hover:border-border/80 bg-muted/30'
-                  )}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all group"
                 >
-                  {ic}
+                  <div className="w-10 h-10 rounded-xl bg-muted/50 border border-border flex items-center justify-center group-hover:border-primary/30 group-hover:bg-primary/10 transition-colors">
+                    <Upload className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-foreground">上傳自訂圖片</p>
+                    <p className="text-xs text-muted-foreground">支援 JPG、PNG，最大 2MB</p>
+                  </div>
                 </button>
-              ))}
+              )}
+            </div>
+            
+            {/* Divider */}
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">或選擇圖示</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            
+            {/* Preset Icons Grid */}
+            <div className="flex flex-wrap gap-1.5">
+              {PRESET_ICONS.map((iconName) => {
+                const IconComponent = ICON_MAP[iconName]
+                const isSelected = icon === iconName && !customImage
+                return (
+                  <button
+                    key={iconName}
+                    onClick={() => {
+                      setIcon(iconName)
+                      setCustomImage(null)
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                    }}
+                    className={cn(
+                      'w-9 h-9 rounded-xl border flex items-center justify-center transition-all hover:scale-105',
+                      isSelected
+                        ? 'border-primary bg-primary/10 text-primary scale-105'
+                        : 'border-border hover:border-primary/40 bg-muted/30 text-muted-foreground hover:text-foreground'
+                    )}
+                    title={iconName}
+                  >
+                    <IconComponent className="w-4 h-4" />
+                  </button>
+                )
+              })}
             </div>
           </div>
 

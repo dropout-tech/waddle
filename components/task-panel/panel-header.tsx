@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Sun, Leaf, Plus, X, Settings2, PanelLeftClose, PanelRightClose, Maximize2, Minimize2 } from 'lucide-react'
+import { Sun, Leaf, Plus, X, Settings2, PanelLeftClose, Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Workspace } from '@/lib/types'
 import { WorkspaceSettingsModal } from '@/components/modals/workspace-settings-modal'
+import { WorkspaceIcon, PRESET_ICONS, PRESET_ICON_NAMES } from '@/lib/workspace-icons'
 
 interface PanelHeaderProps {
   workspaces: Workspace[]
@@ -21,17 +22,6 @@ interface PanelHeaderProps {
 
 const PRESET_COLORS = [
   '#c9847a', '#8fae8b', '#a8927f', '#7da2b8', '#c4a4b5', '#d4a76a',
-]
-
-const PRESET_ICONS = [
-  { value: '', label: '無' },
-  { value: '⭐', label: '星星' },
-  { value: '❤️', label: '愛心' },
-  { value: '🔥', label: '火焰' },
-  { value: '⚡', label: '閃電' },
-  { value: '📚', label: '書本' },
-  { value: '🎵', label: '音符' },
-  { value: '🌍', label: '地球' },
 ]
 
 export function PanelHeader({
@@ -52,7 +42,7 @@ export function PanelHeader({
   const [isAdding, setIsAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0])
-  const [selectedIcon, setSelectedIcon] = useState(PRESET_ICONS[0].value)
+  const [selectedIcon, setSelectedIcon] = useState(PRESET_ICON_NAMES[0])
   const today = new Date()
 
   // Count pending tasks per workspace
@@ -72,7 +62,7 @@ export function PanelHeader({
       onAddWorkspace(newName.trim(), selectedColor, selectedIcon)
       setNewName('')
       setSelectedColor(PRESET_COLORS[0])
-      setSelectedIcon(PRESET_ICONS[0].value)
+      setSelectedIcon(PRESET_ICON_NAMES[0])
       setIsAdding(false)
     }
   }
@@ -176,11 +166,12 @@ export function PanelHeader({
                 )}
                 style={{ borderColor: `${workspace.color}40`, color: workspace.color }}
               >
-                <span
-                  className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: workspace.color }}
+                <WorkspaceIcon 
+                  icon={workspace.icon} 
+                  fallback={workspace.name}
+                  color={workspace.color} 
+                  size="xs" 
                 />
-                {workspace.icon && <span className="text-xs">{workspace.icon}</span>}
                 <span className="font-semibold">{workspace.name}</span>
                 <span
                   className="px-1.5 py-0.5 rounded text-[10px] font-bold"
