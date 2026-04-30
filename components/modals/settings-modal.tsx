@@ -208,6 +208,7 @@ export function SettingsModal({
               <Clock className="w-4 h-4" />
               日曆顯示時間範圍
             </h3>
+            <p className="text-xs text-muted-foreground">設定日曆顯示的時間區間</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs text-muted-foreground">開始時間</label>
@@ -240,159 +241,67 @@ export function SettingsModal({
             </div>
           </div>
 
-          {/* Lunch Break Settings */}
+          {/* Default View Mode */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Coffee className="w-4 h-4" />
-                午休時間
-              </h3>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={localSettings.lunchBreak.enabled}
-                  onChange={(e) => setLocalSettings(prev => ({
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Layers className="w-4 h-4" />
+              預設視圖模式
+            </h3>
+            <p className="text-xs text-muted-foreground">開啟日曆時的預設顯示模式</p>
+            <div className="flex gap-2">
+              {[
+                { key: 'day', label: '日' },
+                { key: 'week', label: '週' },
+                { key: 'month', label: '月' },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setLocalSettings(prev => ({
                     ...prev,
-                    lunchBreak: { ...prev.lunchBreak, enabled: e.target.checked }
+                    defaultView: key as 'day' | 'week' | 'month'
                   }))}
-                  className="w-4 h-4 rounded border-border accent-primary"
-                />
-                <span className="text-xs text-muted-foreground">啟用</span>
-              </label>
+                  className={cn(
+                    'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                    localSettings.defaultView === key
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-            
-            {localSettings.lunchBreak.enabled && (
-              <div className="space-y-3 pl-6 border-l-2 border-border">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground">開始時間</label>
-                    <Input
-                      type="time"
-                      value={localSettings.lunchBreak.startTime}
-                      onChange={(e) => setLocalSettings(prev => ({
-                        ...prev,
-                        lunchBreak: { ...prev.lunchBreak, startTime: e.target.value }
-                      }))}
-                      className="h-9 font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-muted-foreground">結束時間</label>
-                    <Input
-                      type="time"
-                      value={localSettings.lunchBreak.endTime}
-                      onChange={(e) => setLocalSettings(prev => ({
-                        ...prev,
-                        lunchBreak: { ...prev.lunchBreak, endTime: e.target.value }
-                      }))}
-                      className="h-9 font-mono"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">顯示顏色</label>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {PRESET_COLORS.map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => setLocalSettings(prev => ({
-                          ...prev,
-                          lunchBreak: { ...prev.lunchBreak, color }
-                        }))}
-                        className={cn(
-                          'w-7 h-7 rounded-full border-2 transition-all',
-                          localSettings.lunchBreak.color === color
-                            ? 'border-foreground scale-110'
-                            : 'border-transparent hover:scale-105'
-                        )}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                    <input
-                      type="color"
-                      value={localSettings.lunchBreak.color}
-                      onChange={(e) => setLocalSettings(prev => ({
-                        ...prev,
-                        lunchBreak: { ...prev.lunchBreak, color: e.target.value }
-                      }))}
-                      className="w-7 h-7 rounded-full cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Buffer Time Settings */}
+          {/* Week Start Day */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Clock className="w-4 h-4" />
-                緩衝時間
-              </h3>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={localSettings.bufferTime.enabled}
-                  onChange={(e) => setLocalSettings(prev => ({
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Clock className="w-4 h-4" />
+              每週開始日
+            </h3>
+            <p className="text-xs text-muted-foreground">設定週視圖的第一天</p>
+            <div className="flex gap-2">
+              {[
+                { day: 0, label: '週日' },
+                { day: 1, label: '週一' },
+              ].map(({ day, label }) => (
+                <button
+                  key={day}
+                  onClick={() => setLocalSettings(prev => ({
                     ...prev,
-                    bufferTime: { ...prev.bufferTime, enabled: e.target.checked }
+                    weekStartDay: day
                   }))}
-                  className="w-4 h-4 rounded border-border accent-primary"
-                />
-                <span className="text-xs text-muted-foreground">啟用</span>
-              </label>
+                  className={cn(
+                    'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                    localSettings.weekStartDay === day
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-
-            {localSettings.bufferTime.enabled && (
-              <div className="space-y-3 pl-6 border-l-2 border-border">
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">預設時長 (分鐘)</label>
-                  <Input
-                    type="number"
-                    min={5}
-                    max={120}
-                    step={5}
-                    value={localSettings.bufferTime.defaultDuration}
-                    onChange={(e) => setLocalSettings(prev => ({
-                      ...prev,
-                      bufferTime: { ...prev.bufferTime, defaultDuration: parseInt(e.target.value) || 30 }
-                    }))}
-                    className="h-9 w-24"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs text-muted-foreground">顯示顏色</label>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {PRESET_COLORS.map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => setLocalSettings(prev => ({
-                          ...prev,
-                          bufferTime: { ...prev.bufferTime, color }
-                        }))}
-                        className={cn(
-                          'w-7 h-7 rounded-full border-2 transition-all',
-                          localSettings.bufferTime.color === color
-                            ? 'border-foreground scale-110'
-                            : 'border-transparent hover:scale-105'
-                        )}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                    <input
-                      type="color"
-                      value={localSettings.bufferTime.color}
-                      onChange={(e) => setLocalSettings(prev => ({
-                        ...prev,
-                        bufferTime: { ...prev.bufferTime, color: e.target.value }
-                      }))}
-                      className="w-7 h-7 rounded-full cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
           </>)}
 
