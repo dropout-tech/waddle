@@ -297,12 +297,24 @@ export function WeekView({
     setPendingSlot(null)
   }, [])
 
-  // Handle mouse down on grid to start new-slot drag
+  // Track if this is a click vs drag
+  const mouseDownTime = useRef<number>(0)
+  const mouseDownPos = useRef<{ x: number; y: number } | null>(null)
+  
+  // Default duration for click-to-create (in minutes)
+  const DEFAULT_DURATION = 30
+
+  // Handle mouse down on grid to start new-slot drag or click
   const handleMouseDown = useCallback((e: React.MouseEvent, dayIndex: number) => {
     if ((e.target as HTMLElement).closest('[data-block]')) return
     if (e.button !== 0) return
     const rect = e.currentTarget.getBoundingClientRect()
     const y = e.clientY - rect.top
+    
+    // Track mouse down time and position to detect click vs drag
+    mouseDownTime.current = Date.now()
+    mouseDownPos.current = { x: e.clientX, y: e.clientY }
+    
     setIsDragging(true)
     setDragStart({ day: dayIndex, y })
     setDragEnd({ day: dayIndex, y })
@@ -348,8 +360,8 @@ export function WeekView({
     setDragEnd({ day: dayIndex, y })
   }, [isDragging, dragStart, activeTaskDrag, hours.length])
 
-  // Handle mouse up
-  const handleMouseUp = useCallback(() => {
+  // Handle mouse up - detect click vs drag
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
     if (activeTaskDrag) {
       const date = allDates[activeTaskDrag.dayIndex]?.toISOString().split('T')[0]
       if (date) {
@@ -366,7 +378,24 @@ export function WeekView({
       return
     }
 
-    if (dragStart.day === dragEnd.day && Math.abs(dragEnd.y - dragStart.y) > 15) {
+    // Calculate if this was a click (short time, small movement) vs drag
+    const elapsed = Date.now() - mouseDownTime.current
+    const movedDistance = mouseDownPos.current 
+      ? Math.sqrt(Math.pow(e.clientX - mouseDownPos.current.x, 2) + Math.pow(e.clientY - mouseDownPos.current.y, 2))
+      : 0
+    const isClick = elapsed < 200 && movedDistance < 10
+
+    if (isClick) {
+      // Click: create a default duration slot at clicked position
+      const startTime = yToTime(dragStart.y)
+      const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1])
+      const endMinutes = Math.min(startMinutes + DEFAULT_DURATION, endHour * 60)
+      const endTime = `${Math.floor(endMinutes / 60).toString().padStart(2, '0')}:${(endMinutes % 60).toString().padStart(2, '0')}`
+      const date = allDates[dragStart.day].toISOString().split('T')[0]
+      const anchorX = TIME_COL_WIDTH + dragStart.day * DAY_WIDTH + DAY_WIDTH / 2
+      setPendingSlot({ date, startTime, endTime, anchorX, anchorY: dragStart.y })
+    } else if (dragStart.day === dragEnd.day && Math.abs(dragEnd.y - dragStart.y) > 15) {
+      // Drag: use dragged range
       const minY = Math.min(dragStart.y, dragEnd.y)
       const maxY = Math.max(dragStart.y, dragEnd.y)
       const startTime = yToTime(minY)
@@ -379,7 +408,8 @@ export function WeekView({
     setIsDragging(false)
     setDragStart(null)
     setDragEnd(null)
-  }, [isDragging, dragStart, dragEnd, allDates, yToTime, activeTaskDrag, onRescheduleTask])
+    mouseDownPos.current = null
+  }, [isDragging, dragStart, dragEnd, allDates, yToTime, activeTaskDrag, onRescheduleTask, endHour])
 
   // Handle slot type selection
 const handleSelectType = useCallback((slotType: SlotType) => {
@@ -562,8 +592,8 @@ const handleSelectType = useCallback((slotType: SlotType) => {
           className="flex" 
           style={{ width: `${TIME_COL_WIDTH + DAYS_TO_RENDER * DAY_WIDTH}px` }}
           onMouseMove={handleGlobalMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onMouseUp={(e) => handleMouseUp(e)}
+          onMouseLeave={(e) => handleMouseUp(e)}
         >
           {/* Time labels column - sticky left */}
           <div className="w-14 flex-shrink-0 sticky left-0 z-20 bg-panel border-r border-border">
@@ -595,8 +625,8 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                 style={{ width: `${DAY_WIDTH}px`, minWidth: `${DAY_WIDTH}px` }}
                 onMouseDown={(e) => handleMouseDown(e, dayIndex)}
                 onMouseMove={(e) => handleMouseMove(e, dayIndex)}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={() => { if (isDragging) handleMouseUp() }}
+                onMouseUp={(e) => handleMouseUp(e)}
+                onMouseLeave={(e) => { if (isDragging) handleMouseUp(e) }}
               >
                 {/* Hour lines */}
                 {hours.map((hour) => (
