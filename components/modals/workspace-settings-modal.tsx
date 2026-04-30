@@ -132,7 +132,7 @@ export function WorkspaceSettingsModal({
     >
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
 
-      <div className="relative bg-card rounded-2xl shadow-2xl border border-border w-full max-w-sm mx-4 overflow-hidden">
+      <div className="relative bg-card rounded-2xl shadow-2xl border border-border w-full max-w-sm mx-4 overflow-hidden flex flex-col max-h-[90dvh]">
 
         {/* Color accent top bar */}
         <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
@@ -161,7 +161,7 @@ export function WorkspaceSettingsModal({
         </div>
 
         {/* Body */}
-        <div className="px-5 py-4 space-y-5">
+        <div className="px-5 py-4 space-y-5 overflow-y-auto flex-1 min-h-0">
 
           {/* Stats */}
           <div className="flex gap-3">
@@ -322,7 +322,7 @@ export function WorkspaceSettingsModal({
         </div>
 
         {/* Footer */}
-        <div className="px-5 pb-5 space-y-3">
+        <div className="px-5 pb-5 pt-3 space-y-3 border-t border-border bg-card flex-shrink-0">
           {/* Save */}
           <button
             onClick={handleSave}
