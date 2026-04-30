@@ -376,76 +376,119 @@ export function DayScrollView({
     }
   }, [isDragging, dragStart, dragEnd, yToTime])
 
+  // Resizable header height state
+  const [headerHeight, setHeaderHeight] = useState(72)
+  const HEADER_DATE_HEIGHT = 60
+  const HEADER_MIN = HEADER_DATE_HEIGHT
+  const HEADER_MAX = 360
+  const isResizingHeader = useRef(false)
+  const resizeStartY = useRef(0)
+  const resizeStartH = useRef(0)
+
+  const handleHeaderResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    isResizingHeader.current = true
+    resizeStartY.current = e.clientY
+    resizeStartH.current = headerHeight
+
+    const onMove = (ev: MouseEvent) => {
+      if (!isResizingHeader.current) return
+      const delta = ev.clientY - resizeStartY.current
+      setHeaderHeight(Math.max(HEADER_MIN, Math.min(HEADER_MAX, resizeStartH.current + delta)))
+    }
+    const onUp = () => {
+      isResizingHeader.current = false
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [headerHeight, HEADER_MIN])
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-panel-secondary">
-      {/* Fixed Header Row */}
-      <div className="flex-shrink-0 flex border-b border-border bg-panel">
-        <div className="w-14 flex-shrink-0 border-r border-border" />
-        <div 
-          ref={headerScrollRef}
-          className="flex-1 overflow-x-auto overflow-y-hidden"
-          onScroll={() => syncScroll('header')}
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          <div className="flex" style={{ width: `${DAYS_TO_RENDER * DAY_WIDTH}px` }}>
-            {allDates.map((date) => {
-              const dateStr = date.toISOString().split('T')[0]
-              const isToday = dateStr === todayString
-              const allDayTasks = getAllDayTasksForDate(date)
-              const weekdayIndex = date.getDay()
+      {/* Resizable Header Row */}
+      <div
+        className="flex-shrink-0 flex flex-col border-b border-border bg-panel"
+        style={{ height: `${headerHeight}px` }}
+      >
+        <div className="flex flex-1 min-h-0">
+          <div className="w-14 flex-shrink-0 border-r border-border" />
+          <div
+            ref={headerScrollRef}
+            className="flex-1 overflow-x-auto overflow-y-auto"
+            onScroll={() => syncScroll('header')}
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            <div className="flex" style={{ width: `${DAYS_TO_RENDER * DAY_WIDTH}px` }}>
+              {allDates.map((date) => {
+                const dateStr = date.toISOString().split('T')[0]
+                const isToday = dateStr === todayString
+                const allDayTasks = getAllDayTasksForDate(date)
+                const weekdayIndex = date.getDay()
 
-              return (
-                <div
-                  key={dateStr}
-                  className={cn(
-                    'border-r border-border last:border-r-0',
-                    isToday && 'bg-primary/5'
-                  )}
-                  style={{ width: `${DAY_WIDTH}px`, minWidth: `${DAY_WIDTH}px` }}
-                >
-                  <div className={cn(
-                    'px-3 py-2 text-center',
-                    isToday && 'bg-primary/10'
-                  )}>
-                    <div className="text-xs text-muted-foreground font-medium">
-                      {date.getMonth() + 1}/{date.getDate()} 週{WEEKDAY_NAMES[weekdayIndex]}
-                    </div>
+                return (
+                  <div
+                    key={dateStr}
+                    className={cn(
+                      'border-r border-border last:border-r-0 flex flex-col',
+                      isToday && 'bg-primary/5'
+                    )}
+                    style={{ width: `${DAY_WIDTH}px`, minWidth: `${DAY_WIDTH}px` }}
+                  >
+                    {/* Date label - fixed height */}
                     <div className={cn(
-                      'text-2xl font-bold',
-                      isToday ? 'text-primary' : 'text-foreground'
+                      'px-3 py-2 text-center flex-shrink-0',
+                      isToday && 'bg-primary/10'
                     )}>
-                      {date.getDate()}
+                      <div className="text-xs text-muted-foreground font-medium">
+                        {date.getMonth() + 1}/{date.getDate()} 週{WEEKDAY_NAMES[weekdayIndex]}
+                      </div>
+                      <div className={cn(
+                        'text-2xl font-bold',
+                        isToday ? 'text-primary' : 'text-foreground'
+                      )}>
+                        {date.getDate()}
+                      </div>
                     </div>
+                    {/* Pending/All-day tasks - visible only when header expanded */}
+                    {allDayTasks.length > 0 && headerHeight > HEADER_DATE_HEIGHT && (
+                      <div className="px-1 pb-1.5 flex flex-col gap-0.5 overflow-hidden">
+                        {allDayTasks.map((task) => (
+                          <button
+                            key={task.id}
+                            onClick={() => onTaskSelect(task)}
+                            className={cn(
+                              'w-full flex-shrink-0 text-left px-2 py-1 rounded text-[11px] font-medium truncate transition-opacity',
+                              'hover:opacity-80 active:opacity-70',
+                              task.isCompleted && 'opacity-40 line-through'
+                            )}
+                            style={{
+                              backgroundColor: task.calendarColor || task.workspaceColor,
+                              color: '#fff',
+                            }}
+                          >
+                            <span className="flex items-center gap-1.5 min-w-0">
+                              {task.isCompleted && <span className="flex-shrink-0">✓</span>}
+                              <span className="truncate">{task.title}</span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {/* Pending/All-day tasks area - compact pill style */}
-                  {allDayTasks.length > 0 && (
-                    <div className="px-1 pb-1.5 flex flex-col gap-0.5">
-                      {allDayTasks.map((task) => (
-                        <button
-                          key={task.id}
-                          onClick={() => onTaskSelect(task)}
-                          className={cn(
-                            'w-full text-left px-2 py-1 rounded text-[11px] font-medium truncate transition-opacity',
-                            'hover:opacity-80 active:opacity-70',
-                            task.isCompleted && 'opacity-40 line-through'
-                          )}
-                          style={{
-                            backgroundColor: task.calendarColor || task.workspaceColor,
-                            color: '#fff',
-                          }}
-                        >
-                          <span className="flex items-center gap-1.5 min-w-0">
-                            {task.isCompleted && <span className="flex-shrink-0">✓</span>}
-                            <span className="truncate">{task.title}</span>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
+        </div>
+
+        {/* Drag handle */}
+        <div
+          className="flex-shrink-0 h-2 flex items-center justify-center cursor-row-resize group select-none border-t border-border/40 hover:border-primary/40 transition-colors"
+          onMouseDown={handleHeaderResizeStart}
+        >
+          <div className="w-8 h-0.5 rounded-full bg-border group-hover:bg-primary/50 transition-colors" />
         </div>
       </div>
 
