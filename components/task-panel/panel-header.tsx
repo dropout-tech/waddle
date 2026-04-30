@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Sun, Leaf, Plus, X, Settings2 } from 'lucide-react'
+import { Sun, Leaf, Plus, X, Settings2, PanelLeftClose } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Workspace } from '@/lib/types'
 import { WorkspaceSettingsModal } from '@/components/modals/workspace-settings-modal'
@@ -14,6 +14,7 @@ interface PanelHeaderProps {
   onUpdateWorkspace?: (workspaceId: string, updates: Partial<Pick<Workspace, 'name' | 'color' | 'icon'>>) => void
   onDeleteWorkspace?: (workspaceId: string) => void
   onArchiveWorkspace?: (workspaceId: string) => void
+  onClosePanel?: () => void
 }
 
 const PRESET_COLORS = [
@@ -39,6 +40,7 @@ export function PanelHeader({
   onUpdateWorkspace,
   onDeleteWorkspace,
   onArchiveWorkspace,
+  onClosePanel,
 }: PanelHeaderProps) {
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
   const [settingsWorkspaceId, setSettingsWorkspaceId] = useState<string | null>(null)
@@ -91,10 +93,23 @@ export function PanelHeader({
           </div>
         </div>
 
-        {/* Weather Widget - Minimal */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary/50 border border-border">
-          <Sun className="w-3.5 h-3.5 text-amber-500" />
-          <span className="text-xs font-medium text-foreground">26°</span>
+        <div className="flex items-center gap-2">
+          {/* Weather Widget - Minimal */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary/50 border border-border">
+            <Sun className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-xs font-medium text-foreground">26°</span>
+          </div>
+
+          {/* Close Panel Button */}
+          {onClosePanel && (
+            <button
+              onClick={onClosePanel}
+              className="p-1.5 rounded-md hover:bg-secondary transition-colors"
+              title="收起面板"
+            >
+              <PanelLeftClose className="w-4 h-4 text-muted-foreground" />
+            </button>
+          )}
         </div>
       </div>
 

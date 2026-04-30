@@ -28,6 +28,7 @@ interface TaskPanelProps {
   onOpenJournal: () => void
   onOpenReport: () => void
   onOpenSettings?: () => void
+  onClosePanel?: () => void
   className?: string
 }
 
@@ -46,6 +47,7 @@ export function TaskPanel({
   onOpenJournal,
   onOpenReport,
   onOpenSettings,
+  onClosePanel,
   className,
 }: TaskPanelProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -130,6 +132,7 @@ export function TaskPanel({
         onUpdateWorkspace={onUpdateWorkspace}
         onDeleteWorkspace={onDeleteWorkspace}
         onArchiveWorkspace={onArchiveWorkspace}
+        onClosePanel={onClosePanel}
       />
 
       {/* Toolbar Toggle Row */}

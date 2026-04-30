@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
-import { PanelLeftClose, PanelLeftOpen, BookOpen, BarChart3, Minimize2 } from 'lucide-react'
+import { PanelLeftOpen, BookOpen, BarChart3, Minimize2 } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings } from '@/lib/types'
 
@@ -178,16 +178,8 @@ export function MainLayout({
           onOpenJournal={onOpenJournal}
           onOpenReport={onOpenReport}
           onOpenSettings={onOpenSettings}
+          onClosePanel={() => setIsLeftPanelOpen(false)}
         />
-        
-        {/* Close left panel button */}
-        <button
-          onClick={() => setIsLeftPanelOpen(false)}
-          className="absolute right-2 top-2 z-10 flex items-center justify-center w-8 h-8 rounded-md hover:bg-secondary transition-colors"
-          title="收起任務面板"
-        >
-          <PanelLeftClose className="w-4 h-4 text-muted-foreground" />
-        </button>
       </div>
 
       {/* Resize Handle */}
