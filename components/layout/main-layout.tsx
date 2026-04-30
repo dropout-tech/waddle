@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
+import { FullScreenTaskView } from '@/components/task-panel/full-screen-task-view'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
 import { PanelLeftOpen, BookOpen, BarChart3, Minimize2 } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
@@ -155,48 +156,53 @@ export function MainLayout({
         </div>
       )}
 
-      {/* Left Panel - Task Panel */}
-      <div
-        className={cn(
-          "h-full transition-all duration-300 ease-in-out relative",
-          isLeftPanelOpen ? "opacity-100" : "opacity-0 w-0 overflow-hidden",
-          !isRightPanelOpen && "flex-1" // Full width when calendar is hidden
-        )}
-        style={{ 
-          width: isLeftPanelOpen 
-            ? (isRightPanelOpen ? `${panelWidth}px` : '100%') 
-            : '0px' 
-        }}
-      >
-        <TaskPanel
-          workspaces={workspaces}
-          isExpanded={!isRightPanelOpen}
-          onToggleCategoryCollapse={onToggleCategoryCollapse}
-          onToggleComplete={onToggleComplete}
-          onSelectTask={onSelectTask}
-          onAddTask={onAddTask}
-          onAddCategory={onAddCategory}
-          onAddWorkspace={onAddWorkspace}
-          onUpdateWorkspaceColor={onUpdateWorkspaceColor}
-          onUpdateWorkspace={onUpdateWorkspace}
-          onDeleteWorkspace={onDeleteWorkspace}
-          onArchiveWorkspace={onArchiveWorkspace}
-          onOpenJournal={onOpenJournal}
-          onOpenReport={onOpenReport}
-          onOpenSettings={onOpenSettings}
-          onClosePanel={() => setIsLeftPanelOpen(false)}
-          onToggleExpand={() => setIsRightPanelOpen(!isRightPanelOpen)}
-        />
-      </div>
+      {/* Full Screen Task View (when calendar is hidden) */}
+      {!isRightPanelOpen ? (
+        <div className="flex-1 h-full">
+          <FullScreenTaskView
+            workspaces={workspaces}
+            onTaskClick={onSelectTask}
+            onToggleComplete={onToggleComplete}
+            onClose={() => setIsRightPanelOpen(true)}
+            onAddTask={onAddTask}
+          />
+        </div>
+      ) : (
+        <>
+          {/* Left Panel - Task Panel */}
+          <div
+            className={cn(
+              "h-full transition-all duration-300 ease-in-out relative flex-shrink-0",
+              isLeftPanelOpen ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
+            )}
+            style={{ width: isLeftPanelOpen ? `${panelWidth}px` : '0px' }}
+          >
+            <TaskPanel
+              workspaces={workspaces}
+              isExpanded={false}
+              onToggleCategoryCollapse={onToggleCategoryCollapse}
+              onToggleComplete={onToggleComplete}
+              onSelectTask={onSelectTask}
+              onAddTask={onAddTask}
+              onAddCategory={onAddCategory}
+              onAddWorkspace={onAddWorkspace}
+              onUpdateWorkspaceColor={onUpdateWorkspaceColor}
+              onUpdateWorkspace={onUpdateWorkspace}
+              onDeleteWorkspace={onDeleteWorkspace}
+              onArchiveWorkspace={onArchiveWorkspace}
+              onOpenJournal={onOpenJournal}
+              onOpenReport={onOpenReport}
+              onOpenSettings={onOpenSettings}
+              onClosePanel={() => setIsLeftPanelOpen(false)}
+              onToggleExpand={() => setIsRightPanelOpen(false)}
+            />
+          </div>
 
-      {/* Resize Handle */}
-      {isLeftPanelOpen && isRightPanelOpen && <ResizeHandle onResize={handleResize} />}
+          {/* Resize Handle */}
+          {isLeftPanelOpen && <ResizeHandle onResize={handleResize} />}
 
-      {/* Right Panel - Calendar */}
-      <div className={cn(
-        "flex-1 h-full min-w-0 transition-all duration-300 ease-in-out relative",
-        !isRightPanelOpen && "hidden w-0 overflow-hidden"
-      )}>
+          {/* Right Panel - Calendar */}
+          <div className="flex-1 h-full min-w-0">
         <CalendarPanel
           selectedDate={selectedDate}
           viewMode={viewMode}
@@ -225,6 +231,8 @@ export function MainLayout({
           onOpenReport={handleOpenReportFocus}
         />
       </div>
+        </>
+      )}
 
       {/* Focus Mode Overlay for Journal/Report */}
       {focusMode !== 'none' && (

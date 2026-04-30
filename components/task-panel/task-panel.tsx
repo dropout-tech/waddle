@@ -8,7 +8,7 @@ import { PanelHeader } from './panel-header'
 import { WorkspaceSection } from './workspace-section'
 import { FilterBar, type FilterState } from './filter-bar'
 import { UnifiedTaskList } from './unified-task-list'
-import { ExpandedPanelView } from './expanded-panel-view'
+
 import { Button } from '@/components/ui/button'
 
 export type Density = 'compact' | 'comfortable'
@@ -272,17 +272,6 @@ export function TaskPanel({
         </Button>
       </div>
       </div>
-
-      {/* Right Column: Expanded View (only when expanded) */}
-      {isExpanded && (
-        <div className="flex-1 h-full overflow-hidden">
-          <ExpandedPanelView
-            workspaces={workspaces}
-            onTaskClick={onSelectTask}
-            onToggleComplete={onToggleComplete}
-          />
-        </div>
-      )}
     </div>
   )
 }
