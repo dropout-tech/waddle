@@ -5,14 +5,14 @@ import { cn } from '@/lib/utils'
 import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
-import { PanelLeftClose, PanelLeftOpen, BookOpen, BarChart3, Minimize2, ZoomIn, ZoomOut, Clock } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings } from '@/lib/types'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
   timeBlocks: TimeBlock[]
   slotTypes?: SlotType[]
-  settings: UserSettings
+  settings?: UserSettings
   onToggleCategoryCollapse: (categoryId: string) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
@@ -42,7 +42,7 @@ export function MainLayout({
   workspaces,
   timeBlocks,
   slotTypes,
-  settings,
+  settings = {},
   onToggleCategoryCollapse,
   onToggleComplete,
   onSelectTask,
@@ -197,40 +197,6 @@ export function MainLayout({
         "flex-1 h-full min-w-0 transition-all duration-300 ease-in-out relative",
         !isRightPanelOpen && "hidden"
       )}>
-        {/* Panel Control Bar */}
-        <div className="absolute right-3 top-3 z-20 flex items-center gap-1.5">
-          {/* Focus Mode Buttons */}
-          <div className="flex items-center gap-1 mr-2 px-2 py-1 rounded-lg bg-card/80 backdrop-blur-sm border border-border/50">
-            <button
-              onClick={handleOpenJournalFocus}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              title="開啟日記 (專注模式)"
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">日記</span>
-            </button>
-            <button
-              onClick={handleOpenReportFocus}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              title="開啟報告 (專注模式)"
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">報告</span>
-            </button>
-          </div>
-          
-          {/* Toggle Buttons */}
-          {!isLeftPanelOpen && (
-            <button
-              onClick={() => setIsLeftPanelOpen(true)}
-              className="flex items-center justify-center w-8 h-8 rounded-md bg-card/80 backdrop-blur-sm border border-border/50 hover:bg-secondary transition-colors"
-              title="開啟任務面板"
-            >
-              <PanelLeftOpen className="w-4 h-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-
         <CalendarPanel
           selectedDate={selectedDate}
           viewMode={viewMode}
@@ -255,6 +221,8 @@ export function MainLayout({
           onRescheduleTask={onRescheduleTask}
           onUpdateTimeBlock={onUpdateTimeBlock}
           onDeleteTimeBlock={onDeleteTimeBlock}
+          onOpenJournal={handleOpenJournalFocus}
+          onOpenReport={handleOpenReportFocus}
         />
       </div>
 

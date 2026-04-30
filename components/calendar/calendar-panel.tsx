@@ -37,6 +37,9 @@ interface CalendarPanelProps {
   onRescheduleTask?: (taskId: string, newStartOrDate: string, newEndOrStart: string, newEnd?: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
+  // Focus mode callbacks
+  onOpenJournal?: () => void
+  onOpenReport?: () => void
   className?: string
 }
 
@@ -64,6 +67,8 @@ export function CalendarPanel({
   onRescheduleTask,
   onUpdateTimeBlock,
   onDeleteTimeBlock,
+  onOpenJournal,
+  onOpenReport,
   className,
 }: CalendarPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
@@ -113,6 +118,8 @@ export function CalendarPanel({
         onViewModeChange={onViewModeChange}
         onTodayClick={handleTodayClick}
         onTaskClick={onTaskSelect}
+        onOpenJournal={onOpenJournal}
+        onOpenReport={onOpenReport}
       />
 
       {viewMode === 'day' && (
