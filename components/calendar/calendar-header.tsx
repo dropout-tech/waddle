@@ -82,7 +82,7 @@ export function CalendarHeader({
 
         {/* Notification Center */}
         <NotificationCenter
-          workspaces={workspaces}
+          workspaces={workspaces || []}
           onTaskClick={onTaskClick}
         />
       </div>
