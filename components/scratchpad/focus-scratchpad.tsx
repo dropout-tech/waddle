@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { 
-  ChevronDown, ChevronUp, Plus, X, Image, Link2, Type, 
-  Trash2, GripVertical, ExternalLink, Calendar, Sparkles
+  ChevronDown, ChevronUp, X, Image, Link2, Type, 
+  Trash2, ExternalLink, Calendar, Sparkles, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ScratchpadItem } from '@/lib/types'
@@ -12,9 +12,27 @@ interface FocusScratchpadProps {
   className?: string
 }
 
+// Get all saved scratchpad dates from localStorage
+function getSavedDates(): string[] {
+  const dates: string[] = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key?.startsWith('scratchpad-')) {
+      const date = key.replace('scratchpad-', '')
+      if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        dates.push(date)
+      }
+    }
+  }
+  return dates.sort().reverse() // Most recent first
+}
+
 export function FocusScratchpad({ className }: FocusScratchpadProps) {
+  const todayKey = new Date().toISOString().split('T')[0]
   const [isExpanded, setIsExpanded] = useState(false)
+  const [selectedDate, setSelectedDate] = useState(todayKey)
   const [items, setItems] = useState<ScratchpadItem[]>([])
+  const [savedDates, setSavedDates] = useState<string[]>([])
   const [inputMode, setInputMode] = useState<'text' | 'image' | 'link' | null>(null)
   const [textInput, setTextInput] = useState('')
   const [linkInput, setLinkInput] = useState('')
@@ -24,30 +42,66 @@ export function FocusScratchpad({ className }: FocusScratchpadProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
-  const today = new Date().toLocaleDateString('zh-TW', { 
-    month: 'long', 
-    day: 'numeric',
-    weekday: 'long'
-  })
+  const isToday = selectedDate === todayKey
 
-  // Load items from localStorage
+  const formatDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number)
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+    const date = new Date(year, month - 1, day)
+    const weekday = weekdays[date.getDay()]
+    return `${year}年${month}月${day}日 星期${weekday}`
+  }
+
+  // Load saved dates list
   useEffect(() => {
-    const todayKey = new Date().toISOString().split('T')[0]
-    const saved = localStorage.getItem(`scratchpad-${todayKey}`)
+    setSavedDates(getSavedDates())
+  }, [isExpanded])
+
+  // Load items for selected date
+  useEffect(() => {
+    const saved = localStorage.getItem(`scratchpad-${selectedDate}`)
     if (saved) {
       try {
         setItems(JSON.parse(saved))
       } catch (e) {
         console.error('Failed to parse scratchpad data')
+        setItems([])
+      }
+    } else {
+      setItems([])
+    }
+  }, [selectedDate])
+
+  // Save items to localStorage (only for today)
+  useEffect(() => {
+    if (isToday && items.length > 0) {
+      localStorage.setItem(`scratchpad-${todayKey}`, JSON.stringify(items))
+      // Update saved dates if needed
+      if (!savedDates.includes(todayKey)) {
+        setSavedDates(prev => [todayKey, ...prev])
       }
     }
-  }, [])
+  }, [items, isToday, todayKey, savedDates])
 
-  // Save items to localStorage
-  useEffect(() => {
-    const todayKey = new Date().toISOString().split('T')[0]
-    localStorage.setItem(`scratchpad-${todayKey}`, JSON.stringify(items))
-  }, [items])
+  // Navigate between dates
+  const goToPreviousDate = () => {
+    const currentIndex = savedDates.indexOf(selectedDate)
+    if (currentIndex < savedDates.length - 1) {
+      setSelectedDate(savedDates[currentIndex + 1])
+    }
+  }
+
+  const goToNextDate = () => {
+    const currentIndex = savedDates.indexOf(selectedDate)
+    if (currentIndex > 0) {
+      setSelectedDate(savedDates[currentIndex - 1])
+    } else if (selectedDate !== todayKey) {
+      setSelectedDate(todayKey)
+    }
+  }
+
+  const canGoPrevious = savedDates.indexOf(selectedDate) < savedDates.length - 1
+  const canGoNext = selectedDate !== todayKey
 
   // Focus textarea when text mode is activated
   useEffect(() => {
@@ -173,49 +227,58 @@ export function FocusScratchpad({ className }: FocusScratchpadProps) {
   }
 
   return (
-    <div className={cn('relative z-50', className)}>
-      {/* Pull Tab - Always Visible */}
-      <div 
-        className={cn(
-          'absolute left-1/2 -translate-x-1/2 top-0 z-50',
-          'transition-all duration-300',
-          isExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100'
-        )}
-      >
-        <button
-          onClick={() => setIsExpanded(true)}
+    <>
+      {/* Backdrop - render first so it's behind */}
+      {isExpanded && (
+        <div 
+          className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[60]"
+          onClick={() => setIsExpanded(false)}
+        />
+      )}
+
+      <div className={cn('relative z-[70]', className)}>
+        {/* Pull Tab - Always Visible */}
+        <div 
           className={cn(
-            'flex items-center gap-2 px-4 py-1.5 rounded-b-xl',
-            'bg-card/95 backdrop-blur-sm border border-t-0 border-border shadow-lg',
-            'hover:bg-secondary/80 transition-all group',
-            'text-xs font-medium text-muted-foreground hover:text-foreground'
+            'absolute left-1/2 -translate-x-1/2 top-0',
+            'transition-all duration-300',
+            isExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100'
           )}
         >
-          <Sparkles className="w-3 h-3" />
-          <span>專注白板</span>
-          {items.length > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
-              {items.length}
-            </span>
-          )}
-          <ChevronDown className="w-3 h-3 group-hover:translate-y-0.5 transition-transform" />
-        </button>
-      </div>
+          <button
+            onClick={() => { setIsExpanded(true); setSelectedDate(todayKey) }}
+            className={cn(
+              'flex items-center gap-2 px-4 py-1.5 rounded-b-xl',
+              'bg-card/95 backdrop-blur-sm border border-t-0 border-border shadow-lg',
+              'hover:bg-secondary/80 transition-all group',
+              'text-xs font-medium text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Sparkles className="w-3 h-3" />
+            <span>專注白板</span>
+            {items.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
+                {items.length}
+              </span>
+            )}
+            <ChevronDown className="w-3 h-3 group-hover:translate-y-0.5 transition-transform" />
+          </button>
+        </div>
 
-      {/* Expanded Panel */}
-      <div
-        ref={panelRef}
-        className={cn(
-          'absolute left-0 right-0 top-0',
-          'bg-card/98 backdrop-blur-md border-b border-border shadow-xl',
-          'transition-all duration-300 ease-out overflow-hidden',
-          isExpanded ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0'
-        )}
-        onPaste={handlePaste}
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-        onDragLeave={() => setIsDragging(false)}
-        onDrop={handleDrop}
-      >
+        {/* Expanded Panel */}
+        <div
+          ref={panelRef}
+          className={cn(
+            'absolute left-0 right-0 top-0',
+            'bg-card border-b border-border shadow-xl',
+            'transition-all duration-300 ease-out overflow-hidden',
+            isExpanded ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+          )}
+          onPaste={handlePaste}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+        >
         {/* Drag Overlay */}
         {isDragging && (
           <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary/50 z-50 flex items-center justify-center">
@@ -232,21 +295,43 @@ export function FocusScratchpad({ className }: FocusScratchpadProps) {
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-foreground">專注白板</h2>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Calendar className="w-3 h-3" />
-                  <span>{today}</span>
+                {/* Date Navigation */}
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <button
+                    onClick={goToPreviousDate}
+                    disabled={!canGoPrevious}
+                    className="p-0.5 rounded hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="w-3 h-3" />
+                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-3 h-3" />
+                    <span>{formatDate(selectedDate)}</span>
+                    {isToday && (
+                      <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium">
+                        今天
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={goToNextDate}
+                    disabled={!canGoNext}
+                    className="p-0.5 rounded hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
                 </div>
               </div>
             </div>
             
             <div className="flex items-center gap-2">
-              {items.length > 0 && (
+              {items.length > 0 && isToday && (
                 <button
                   onClick={clearAll}
                   className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
                 >
                   <Trash2 className="w-3 h-3" />
-                  清除全部
+                  清除
                 </button>
               )}
               <button
@@ -259,52 +344,64 @@ export function FocusScratchpad({ className }: FocusScratchpadProps) {
             </div>
           </div>
 
-          {/* Quick Add Buttons */}
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              onClick={() => setInputMode(inputMode === 'text' ? null : 'text')}
-              className={cn(
-                'flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-sm',
-                inputMode === 'text'
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Type className="w-4 h-4" />
-              <span>文字</span>
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-sm text-muted-foreground hover:text-foreground"
-            >
-              <Image className="w-4 h-4" />
-              <span>圖片</span>
-            </button>
-            <button
-              onClick={() => setInputMode(inputMode === 'link' ? null : 'link')}
-              className={cn(
-                'flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-sm',
-                inputMode === 'link'
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Link2 className="w-4 h-4" />
-              <span>連結</span>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-            />
-            
-            <div className="flex-1" />
-            <span className="text-[10px] text-muted-foreground">
-              提示：可直接貼上圖片或拖放檔案
-            </span>
-          </div>
+          {/* Quick Add Buttons - Only show for today */}
+          {isToday ? (
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                onClick={() => setInputMode(inputMode === 'text' ? null : 'text')}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-sm',
+                  inputMode === 'text'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Type className="w-4 h-4" />
+                <span>文字</span>
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-sm text-muted-foreground hover:text-foreground"
+              >
+                <Image className="w-4 h-4" />
+                <span>圖片</span>
+              </button>
+              <button
+                onClick={() => setInputMode(inputMode === 'link' ? null : 'link')}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-sm',
+                  inputMode === 'link'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-border hover:border-primary/50 hover:bg-primary/5 text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Link2 className="w-4 h-4" />
+                <span>連結</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              
+              <div className="flex-1" />
+              <span className="text-[10px] text-muted-foreground">
+                提示：可直接貼上圖片或拖放檔案
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between mb-4 p-3 rounded-xl bg-secondary/30 border border-border">
+              <span className="text-xs text-muted-foreground">這是過去日期的記錄，僅供查看</span>
+              <button
+                onClick={() => setSelectedDate(todayKey)}
+                className="text-xs text-primary hover:underline"
+              >
+                返回今天
+              </button>
+            </div>
+          )}
 
           {/* Text Input */}
           {inputMode === 'text' && (
@@ -461,14 +558,7 @@ export function FocusScratchpad({ className }: FocusScratchpadProps) {
           </button>
         </div>
       </div>
-
-      {/* Backdrop */}
-      {isExpanded && (
-        <div 
-          className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-40"
-          onClick={() => setIsExpanded(false)}
-        />
-      )}
     </div>
+    </>
   )
 }
