@@ -55,21 +55,18 @@ export function TaskBlock({
 }: TaskBlockProps) {
   if (!task.scheduledStartTime || !task.scheduledEndTime) return null
 
-  const baseTop = compact ? 0 : calculateBlockTop(task.scheduledStartTime, calendarStartHour)
-  const baseHeight = compact ? undefined : calculateBlockHeight(task.scheduledStartTime, task.scheduledEndTime)
+  // For compact mode (day/week scroll views), position is relative to column, not time label
+  const baseTop = calculateBlockTop(task.scheduledStartTime, calendarStartHour)
+  const baseHeight = calculateBlockHeight(task.scheduledStartTime, task.scheduledEndTime)
 
   const top = dragOverride ? dragOverride.top : baseTop
-  const height = dragOverride ? dragOverride.height : (compact ? undefined : baseHeight)
+  const height = dragOverride ? dragOverride.height : baseHeight
 
-  // Column positioning
-  const LABEL_PX = 56
-  const RIGHT_PX = 4
+  // Column positioning for compact mode (no time label offset needed)
   const GAP_PX = 2
   const totalGap = (totalColumns - 1) * GAP_PX
-  const columnWidth = `calc((100% - ${LABEL_PX + RIGHT_PX + totalGap}px) / ${totalColumns})`
-  const leftOffset = column === 0
-    ? `${LABEL_PX}px`
-    : `calc(${LABEL_PX}px + ${column} * ((100% - ${LABEL_PX + RIGHT_PX + totalGap}px) / ${totalColumns} + ${GAP_PX}px))`
+  const widthPercent = 100 / totalColumns
+  const leftPercent = column * widthPercent
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -77,8 +74,7 @@ export function TaskBlock({
   }
 
   const handleBodyMouseDown = (e: React.MouseEvent) => {
-    if (!onDragStart || compact) return
-    // Only left button, not on handle areas
+    if (!onDragStart) return
     if (e.button !== 0) return
     e.stopPropagation()
     e.preventDefault()
@@ -95,7 +91,7 @@ export function TaskBlock({
   }
 
   const handleResizeTopMouseDown = (e: React.MouseEvent) => {
-    if (!onDragStart || compact) return
+    if (!onDragStart) return
     e.stopPropagation()
     e.preventDefault()
     onDragStart({
@@ -108,7 +104,7 @@ export function TaskBlock({
   }
 
   const handleResizeBottomMouseDown = (e: React.MouseEvent) => {
-    if (!onDragStart || compact) return
+    if (!onDragStart) return
     e.stopPropagation()
     e.preventDefault()
     onDragStart({
@@ -122,47 +118,40 @@ export function TaskBlock({
 
   const color = task.calendarColor || task.workspaceColor
 
-  if (compact) {
-    return (
-      <button
-        onClick={() => onSelect(task)}
-        data-task-block
-        className={cn(
-          'w-full h-full rounded-lg overflow-hidden transition-all cursor-pointer group',
-          'hover:shadow-md active:scale-[0.99]',
-          task.isCompleted && 'opacity-50'
-        )}
-        style={{ backgroundColor: color }}
-      >
-        <div className="h-full flex items-start gap-2 p-1">
-          <span className={cn('font-semibold text-white truncate leading-tight text-[9px]', task.isCompleted && 'line-through opacity-80')}>
-            {task.title}
-          </span>
-        </div>
-      </button>
-    )
-  }
+  // Compact mode: positioned within column, uses percentage-based width
+  // Non-compact: uses time label offset calculation
+  const styleProps = compact
+    ? {
+        top: `${top}px`,
+        height: `${height}px`,
+        left: `calc(${leftPercent}% + 2px)`,
+        width: `calc(${widthPercent}% - 4px)`,
+        backgroundColor: color,
+        zIndex: isDragging ? 50 : column + 1,
+        cursor: isDragging ? 'grabbing' : 'grab',
+      }
+    : {
+        top: `${top}px`,
+        height: `${height}px`,
+        left: `calc(56px + ${leftPercent}% * (100% - 60px) / 100)`,
+        width: `calc((100% - 60px) / ${totalColumns} - 2px)`,
+        backgroundColor: color,
+        zIndex: isDragging ? 50 : column + 1,
+        cursor: isDragging ? 'grabbing' : 'grab',
+      }
 
   return (
     <div
       data-task-block
       data-block="true"
       className={cn(
-        'absolute rounded-lg overflow-hidden group select-none',
+        'absolute rounded-xl overflow-hidden group select-none',
         isDragging
           ? 'shadow-2xl opacity-90 z-50 ring-2 ring-white/40'
           : 'hover:shadow-lg hover:z-10 transition-shadow',
         task.isCompleted && 'opacity-50'
       )}
-      style={{
-        top: `${top}px`,
-        height: `${height}px`,
-        left: leftOffset,
-        width: columnWidth,
-        backgroundColor: color,
-        zIndex: isDragging ? 50 : column + 1,
-        cursor: isDragging ? 'grabbing' : 'grab',
-      }}
+      style={styleProps}
     >
       {/* Resize handle — TOP */}
       <div
