@@ -8,6 +8,7 @@ import { PanelHeader } from './panel-header'
 import { WorkspaceSection } from './workspace-section'
 import { FilterBar, type FilterState } from './filter-bar'
 import { UnifiedTaskList } from './unified-task-list'
+import { ExpandedPanelView } from './expanded-panel-view'
 import { Button } from '@/components/ui/button'
 
 export type Density = 'compact' | 'comfortable'
@@ -15,6 +16,7 @@ export type ViewMode = 'category' | 'unified'
 
 interface TaskPanelProps {
   workspaces: Workspace[]
+  isExpanded?: boolean
   onToggleCategoryCollapse: (categoryId: string) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
@@ -29,11 +31,13 @@ interface TaskPanelProps {
   onOpenReport: () => void
   onOpenSettings?: () => void
   onClosePanel?: () => void
+  onToggleExpand?: () => void
   className?: string
 }
 
 export function TaskPanel({
   workspaces,
+  isExpanded = false,
   onToggleCategoryCollapse,
   onToggleComplete,
   onSelectTask,
@@ -48,6 +52,7 @@ export function TaskPanel({
   onOpenReport,
   onOpenSettings,
   onClosePanel,
+  onToggleExpand,
   className,
 }: TaskPanelProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -119,23 +124,30 @@ export function TaskPanel({
   return (
     <div
       className={cn(
-        'flex flex-col h-full bg-card border-r border-border shadow-sm',
+        'flex h-full bg-card border-r border-border shadow-sm',
         className
       )}
     >
-      {/* Header */}
-      <PanelHeader
-        workspaces={workspaces}
-        onWorkspaceClick={handleWorkspaceClick}
-        onAddWorkspace={onAddWorkspace}
-        onUpdateWorkspaceColor={onUpdateWorkspaceColor}
-        onUpdateWorkspace={onUpdateWorkspace}
-        onDeleteWorkspace={onDeleteWorkspace}
-        onArchiveWorkspace={onArchiveWorkspace}
-        onClosePanel={onClosePanel}
-      />
+      {/* Left Column: Task List */}
+      <div className={cn(
+        'flex flex-col h-full',
+        isExpanded ? 'w-[360px] border-r border-border' : 'flex-1'
+      )}>
+        {/* Header */}
+        <PanelHeader
+          workspaces={workspaces}
+          isExpanded={isExpanded}
+          onWorkspaceClick={handleWorkspaceClick}
+          onAddWorkspace={onAddWorkspace}
+          onUpdateWorkspaceColor={onUpdateWorkspaceColor}
+          onUpdateWorkspace={onUpdateWorkspace}
+          onDeleteWorkspace={onDeleteWorkspace}
+          onArchiveWorkspace={onArchiveWorkspace}
+          onClosePanel={onClosePanel}
+          onToggleExpand={onToggleExpand}
+        />
 
-      {/* Toolbar Toggle Row */}
+        {/* Toolbar Toggle Row */}
       <div className="border-b border-border bg-card/50">
         <button
           onClick={() => setToolbarOpen((v) => !v)}
@@ -259,6 +271,18 @@ export function TaskPanel({
           <Settings className="w-4 h-4" />
         </Button>
       </div>
+      </div>
+
+      {/* Right Column: Expanded View (only when expanded) */}
+      {isExpanded && (
+        <div className="flex-1 h-full overflow-hidden">
+          <ExpandedPanelView
+            workspaces={workspaces}
+            onTaskClick={onSelectTask}
+            onToggleComplete={onToggleComplete}
+          />
+        </div>
+      )}
     </div>
   )
 }

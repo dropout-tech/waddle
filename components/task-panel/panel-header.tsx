@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Sun, Leaf, Plus, X, Settings2, PanelLeftClose } from 'lucide-react'
+import { Sun, Leaf, Plus, X, Settings2, PanelLeftClose, PanelRightClose, Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Workspace } from '@/lib/types'
 import { WorkspaceSettingsModal } from '@/components/modals/workspace-settings-modal'
 
 interface PanelHeaderProps {
   workspaces: Workspace[]
+  isExpanded?: boolean
   onWorkspaceClick: (workspaceId: string) => void
   onAddWorkspace?: (name: string, color: string, icon: string) => void
   onUpdateWorkspaceColor?: (workspaceId: string, color: string) => void
@@ -15,6 +16,7 @@ interface PanelHeaderProps {
   onDeleteWorkspace?: (workspaceId: string) => void
   onArchiveWorkspace?: (workspaceId: string) => void
   onClosePanel?: () => void
+  onToggleExpand?: () => void
 }
 
 const PRESET_COLORS = [
@@ -34,6 +36,7 @@ const PRESET_ICONS = [
 
 export function PanelHeader({
   workspaces,
+  isExpanded = false,
   onWorkspaceClick,
   onAddWorkspace,
   onUpdateWorkspaceColor,
@@ -41,6 +44,7 @@ export function PanelHeader({
   onDeleteWorkspace,
   onArchiveWorkspace,
   onClosePanel,
+  onToggleExpand,
 }: PanelHeaderProps) {
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
   const [settingsWorkspaceId, setSettingsWorkspaceId] = useState<string | null>(null)
@@ -93,15 +97,35 @@ export function PanelHeader({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {/* Weather Widget - Minimal */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary/50 border border-border">
             <Sun className="w-3.5 h-3.5 text-amber-500" />
             <span className="text-xs font-medium text-foreground">26°</span>
           </div>
 
+          {/* Expand/Collapse Right Panel Button */}
+          {onToggleExpand && (
+            <button
+              onClick={onToggleExpand}
+              className={cn(
+                "p-1.5 rounded-md transition-colors",
+                isExpanded 
+                  ? "bg-primary/10 text-primary hover:bg-primary/20" 
+                  : "hover:bg-secondary text-muted-foreground"
+              )}
+              title={isExpanded ? "顯示日曆" : "展開任務面板"}
+            >
+              {isExpanded ? (
+                <Minimize2 className="w-4 h-4" />
+              ) : (
+                <Maximize2 className="w-4 h-4" />
+              )}
+            </button>
+          )}
+
           {/* Close Panel Button */}
-          {onClosePanel && (
+          {onClosePanel && !isExpanded && (
             <button
               onClick={onClosePanel}
               className="p-1.5 rounded-md hover:bg-secondary transition-colors"

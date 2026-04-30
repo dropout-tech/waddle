@@ -158,13 +158,19 @@ export function MainLayout({
       {/* Left Panel - Task Panel */}
       <div
         className={cn(
-          "flex-shrink-0 h-full transition-all duration-300 ease-in-out relative",
-          isLeftPanelOpen ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
+          "h-full transition-all duration-300 ease-in-out relative",
+          isLeftPanelOpen ? "opacity-100" : "opacity-0 w-0 overflow-hidden",
+          !isRightPanelOpen && "flex-1" // Full width when calendar is hidden
         )}
-        style={{ width: isLeftPanelOpen ? `${panelWidth}px` : '0px' }}
+        style={{ 
+          width: isLeftPanelOpen 
+            ? (isRightPanelOpen ? `${panelWidth}px` : '100%') 
+            : '0px' 
+        }}
       >
         <TaskPanel
           workspaces={workspaces}
+          isExpanded={!isRightPanelOpen}
           onToggleCategoryCollapse={onToggleCategoryCollapse}
           onToggleComplete={onToggleComplete}
           onSelectTask={onSelectTask}
@@ -179,16 +185,17 @@ export function MainLayout({
           onOpenReport={onOpenReport}
           onOpenSettings={onOpenSettings}
           onClosePanel={() => setIsLeftPanelOpen(false)}
+          onToggleExpand={() => setIsRightPanelOpen(!isRightPanelOpen)}
         />
       </div>
 
       {/* Resize Handle */}
-      {isLeftPanelOpen && <ResizeHandle onResize={handleResize} />}
+      {isLeftPanelOpen && isRightPanelOpen && <ResizeHandle onResize={handleResize} />}
 
       {/* Right Panel - Calendar */}
       <div className={cn(
         "flex-1 h-full min-w-0 transition-all duration-300 ease-in-out relative",
-        !isRightPanelOpen && "hidden"
+        !isRightPanelOpen && "hidden w-0 overflow-hidden"
       )}>
         <CalendarPanel
           selectedDate={selectedDate}
