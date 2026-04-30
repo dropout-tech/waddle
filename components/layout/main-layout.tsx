@@ -8,6 +8,7 @@ import { FullScreenTaskView } from '@/components/task-panel/full-screen-task-vie
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
 import { PanelLeftOpen, BookOpen, BarChart3, Minimize2 } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
+import { FocusScratchpad } from '@/components/scratchpad/focus-scratchpad'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings } from '@/lib/types'
 
 interface MainLayoutProps {
@@ -142,7 +143,11 @@ export function MainLayout({
   }, [onOpenReport])
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden relative">
+    <div className="flex flex-col h-screen bg-background overflow-hidden relative">
+      {/* Focus Scratchpad - Pull down from top */}
+      <FocusScratchpad />
+      
+      <div className="flex flex-1 min-h-0 relative">
       {/* Left Panel Toggle Button (when panel is closed) */}
       {!isLeftPanelOpen && (
         <div className="absolute left-0 top-0 z-20 p-2">
@@ -281,6 +286,7 @@ export function MainLayout({
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

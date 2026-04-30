@@ -1,5 +1,19 @@
 // FlowDesk Type Definitions
 
+// Scratchpad (Focus Capture) Types
+export interface ScratchpadItem {
+  id: string
+  type: 'text' | 'image' | 'link'
+  content: string // text content, image data URL, or link URL
+  title?: string // for links
+  createdAt: string
+}
+
+export interface ScratchpadDay {
+  date: string // ISO date string YYYY-MM-DD
+  items: ScratchpadItem[]
+}
+
 export interface Workspace {
   id: string
   name: string
