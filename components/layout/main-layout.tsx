@@ -9,6 +9,7 @@ import { CalendarPanel } from '@/components/calendar/calendar-panel'
 import { PanelLeftOpen, BookOpen, BarChart3, Minimize2 } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
 import { FocusScratchpad } from '@/components/scratchpad/focus-scratchpad'
+import { FocusTimer } from '@/components/timer/focus-timer'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings } from '@/lib/types'
 
 interface MainLayoutProps {
@@ -287,6 +288,12 @@ export function MainLayout({
         </div>
       )}
       </div>
+
+      {/* Focus Timer - Floating Widget */}
+      <FocusTimer
+        workspaces={workspaces}
+        onCreateTimeBlock={onCreateCalendarTimeBlock}
+      />
     </div>
   )
 }
