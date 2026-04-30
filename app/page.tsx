@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { MainLayout } from '@/components/layout/main-layout'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
 import { JournalModal } from '@/components/modals/journal-modal'
@@ -68,6 +68,39 @@ export default function FlowDeskPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>(mockWorkspaces)
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>(mockTimeBlocks)
   const [settings, setSettings] = useState<UserSettings>(defaultSettings)
+
+  // Generate slot types dynamically based on current workspaces
+  // This ensures workspace-based types are always in sync with the sidebar
+  const activeSlotTypes = useMemo(() => {
+    // Get workspace-based slot types
+    const workspaceTypes: SlotType[] = workspaces
+      .filter(ws => !ws.isArchived)
+      .map((ws, index) => ({
+        id: `ws-${ws.id}`,
+        key: `ws-${ws.id}`,
+        label: ws.name,
+        description: `新增任務到「${ws.name}」`,
+        icon: ws.icon,
+        iconType: 'emoji' as const,
+        color: ws.color,
+        sortOrder: index,
+        isBuiltIn: true,
+        workspaceId: ws.id,
+      }))
+    
+    // Get base time block types (non-workspace)
+    const baseTypes: SlotType[] = [
+      { id: 'timeblock', key: 'timeblock', label: '時間區塊', description: '各類時間安排', icon: 'Layers', iconType: 'lucide', color: '#9CA3AF', sortOrder: workspaceTypes.length, isBuiltIn: true },
+      { id: 'break', key: 'break', label: '午休', description: '休息時間', icon: 'Coffee', iconType: 'lucide', color: '#F6A854', parentId: 'timeblock', sortOrder: 0, isBuiltIn: true },
+      { id: 'buffer', key: 'buffer', label: '緩衝', description: '彈性緩衝時間', icon: 'Clock', iconType: 'lucide', color: '#9BBFAC', parentId: 'timeblock', sortOrder: 1, isBuiltIn: true },
+      { id: 'focus', key: 'focus', label: '專注', description: '專注工作時段', icon: 'Crosshair', iconType: 'lucide', color: '#D46B8A', parentId: 'timeblock', sortOrder: 2, isBuiltIn: true },
+    ]
+    
+    // Get custom slot types from settings (user-created)
+    const customTypes = settings.slotTypes?.filter(s => !s.isBuiltIn) || []
+    
+    return [...workspaceTypes, ...baseTypes, ...customTypes]
+  }, [workspaces, settings.slotTypes])
 
   // Modal states
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -354,7 +387,7 @@ export default function FlowDeskPage() {
     color: string,
   ) => {
     // Find the slot type to check if it has a workspace association
-    const slotType = settings.slotTypes.find(s => s.key === type)
+    const slotType = activeSlotTypes.find(s => s.key === type)
     
     if (slotType?.workspaceId) {
       // Create a task in the associated workspace instead of a time block
@@ -411,7 +444,7 @@ export default function FlowDeskPage() {
       isRecurring: false,
     }
     setTimeBlocks((prev) => [...prev, newBlock])
-  }, [settings.slotTypes, workspaces])
+  }, [activeSlotTypes, workspaces])
 
   // Reschedule a task by dragging/resizing on the calendar
   // date is optional — only provided by day/week views when dragging across days
@@ -596,7 +629,7 @@ export default function FlowDeskPage() {
       <MainLayout
         workspaces={workspaces}
         timeBlocks={timeBlocks}
-        slotTypes={settings.slotTypes}
+        slotTypes={activeSlotTypes}
         onToggleCategoryCollapse={handleToggleCategoryCollapse}
         onToggleComplete={handleToggleComplete}
         onSelectTask={handleSelectTask}

@@ -6,7 +6,7 @@ export const mockWorkspaces: Workspace[] = [
     id: 'ws-1',
     name: '夢想一號',
     color: '#FF6B6B',
-    icon: '',
+    icon: '🚀',
     sortOrder: 1,
     isArchived: false,
     categories: [
@@ -319,10 +319,10 @@ export const mockWorkspaces: Workspace[] = [
     ],
   },
   {
-    id: 'ws-2',
-    name: '琢奧',
-    color: '#4A90D9',
-    icon: '',
+  id: 'ws-2',
+  name: '琢奧',
+  color: '#4A90D9',
+  icon: '💼',
     sortOrder: 2,
     isArchived: false,
     categories: [
@@ -408,10 +408,10 @@ export const mockWorkspaces: Workspace[] = [
     ],
   },
   {
-    id: 'ws-3',
-    name: '個人',
-    color: '#66BB6A',
-    icon: '',
+  id: 'ws-3',
+  name: '個人',
+  color: '#66BB6A',
+  icon: '🏠',
     sortOrder: 3,
     isArchived: false,
     categories: [

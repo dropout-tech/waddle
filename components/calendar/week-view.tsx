@@ -18,7 +18,10 @@ const renderSlotIcon = (slotType: SlotType) => {
     const IconComp = ICON_MAP[slotType.icon] || Clock
     return <IconComp className="w-4 h-4" style={{ color: slotType.color }} />
   }
-  // emoji or custom text
+  // emoji or custom text - fallback to colored circle if empty
+  if (!slotType.icon) {
+    return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: slotType.color }} />
+  }
   return <span className="text-base">{slotType.icon}</span>
 }
 

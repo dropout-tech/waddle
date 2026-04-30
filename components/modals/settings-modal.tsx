@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserSettings, TimeBlock, SlotType, Workspace } from '@/lib/types'
@@ -157,20 +157,56 @@ export function SettingsModal({
     }))
   }
 
+  // Generate workspace-based slot types for display
+  const workspaceSlotTypes: SlotType[] = useMemo(() => {
+    return workspaces
+      .filter(ws => !ws.isArchived)
+      .map((ws, index) => ({
+        id: `ws-${ws.id}`,
+        key: `ws-${ws.id}`,
+        label: ws.name,
+        description: `新增任務到「${ws.name}」`,
+        icon: ws.icon,
+        iconType: 'emoji' as const,
+        color: ws.color,
+        sortOrder: index,
+        isBuiltIn: true,
+        workspaceId: ws.id,
+      }))
+  }, [workspaces])
+
+  // Base time block types
+  const baseSlotTypes: SlotType[] = useMemo(() => [
+    { id: 'timeblock', key: 'timeblock', label: '時間區塊', description: '各類時間安排', icon: 'Layers', iconType: 'lucide' as const, color: '#9CA3AF', sortOrder: workspaceSlotTypes.length, isBuiltIn: true },
+    { id: 'break', key: 'break', label: '午休', description: '休息時間', icon: 'Coffee', iconType: 'lucide' as const, color: '#F6A854', parentId: 'timeblock', sortOrder: 0, isBuiltIn: true },
+    { id: 'buffer', key: 'buffer', label: '緩衝', description: '彈性緩衝時間', icon: 'Clock', iconType: 'lucide' as const, color: '#9BBFAC', parentId: 'timeblock', sortOrder: 1, isBuiltIn: true },
+    { id: 'focus', key: 'focus', label: '專注', description: '專注工作時段', icon: 'Crosshair', iconType: 'lucide' as const, color: '#D46B8A', parentId: 'timeblock', sortOrder: 2, isBuiltIn: true },
+  ], [workspaceSlotTypes.length])
+
+  // Combine all slot types for display
+  const allSlotTypes = useMemo(() => {
+    const customTypes = localSettings.slotTypes?.filter(s => !s.isBuiltIn) || []
+    return [...workspaceSlotTypes, ...baseSlotTypes, ...customTypes]
+  }, [workspaceSlotTypes, baseSlotTypes, localSettings.slotTypes])
+
   // Get slot types organized by parent
-  const topLevelTypes = localSettings.slotTypes?.filter(s => !s.parentId) || []
-  const getChildTypes = (parentId: string) => localSettings.slotTypes?.filter(s => s.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder) || []
+  const topLevelTypes = allSlotTypes.filter(s => !s.parentId)
+  const getChildTypes = (parentId: string) => allSlotTypes.filter(s => s.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder)
 
   // Render icon based on type (lucide or emoji/custom)
   const renderSlotIcon = (slotType: SlotType, size: 'sm' | 'md' = 'md') => {
     const sizeClass = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'
+    const circleSize = size === 'sm' ? 'w-2.5 h-2.5' : 'w-3 h-3'
     const textSize = size === 'sm' ? 'text-sm' : 'text-base'
     
     if (slotType.iconType === 'lucide') {
       const IconComp = ICON_MAP[slotType.icon] || Clock
       return <IconComp className={sizeClass} style={{ color: slotType.color }} />
     }
-    // emoji or custom text
+    // emoji or custom text - fallback to colored circle if empty
+    if (!slotType.icon) {
+      return <div className={`${circleSize} rounded-full`} style={{ backgroundColor: slotType.color }} />
+    }
     return <span className={textSize}>{slotType.icon}</span>
   }
 
@@ -325,6 +361,71 @@ export function SettingsModal({
                   {label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-border" />
+
+          {/* Extended Features */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">延伸功能</h3>
+            
+            {/* Auto sync workspace tasks */}
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <div className="text-sm text-foreground">自動同步工作區任務</div>
+                <div className="text-xs text-muted-foreground">從日曆建立任務時自動同步到左側工作區</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={localSettings.lunchBreak?.enabled ?? true}
+                onChange={(e) => setLocalSettings(prev => ({
+                  ...prev,
+                  lunchBreak: { ...prev.lunchBreak, enabled: e.target.checked }
+                }))}
+                className="w-4 h-4 rounded border-border accent-primary"
+              />
+            </label>
+
+            {/* Show completed tasks */}
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <div className="text-sm text-foreground">顯示已完成任務</div>
+                <div className="text-xs text-muted-foreground">在日曆上顯示已完成的任務</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={localSettings.bufferTime?.enabled ?? true}
+                onChange={(e) => setLocalSettings(prev => ({
+                  ...prev,
+                  bufferTime: { ...prev.bufferTime, enabled: e.target.checked }
+                }))}
+                className="w-4 h-4 rounded border-border accent-primary"
+              />
+            </label>
+
+            {/* Default task duration */}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm text-foreground">預設任務時長</div>
+                <div className="text-xs text-muted-foreground">拖曳建立任務時的預設持續時間</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={15}
+                  max={240}
+                  step={15}
+                  value={localSettings.bufferTime?.defaultDuration ?? 30}
+                  onChange={(e) => setLocalSettings(prev => ({
+                    ...prev,
+                    bufferTime: { ...prev.bufferTime, defaultDuration: parseInt(e.target.value) || 30 }
+                  }))}
+                  className="h-8 w-20 text-center"
+                />
+                <span className="text-xs text-muted-foreground">分鐘</span>
+              </div>
             </div>
           </div>
           </>)}
