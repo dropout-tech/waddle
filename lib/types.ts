@@ -77,6 +77,7 @@ export interface SlotType {
   parentId?: string // for nested categories
   sortOrder: number
   isBuiltIn: boolean // true for default types that can't be deleted
+  workspaceId?: string // if set, tasks created with this type sync to this workspace
 }
 
 // Default slot type categories

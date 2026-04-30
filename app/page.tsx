@@ -588,6 +588,7 @@ export default function FlowDeskPage() {
         isOpen={isSettingsOpen}
         settings={settings}
         timeBlocks={timeBlocks}
+        workspaces={workspaces}
         onClose={() => setIsSettingsOpen(false)}
         onSave={handleSaveSettings}
       />

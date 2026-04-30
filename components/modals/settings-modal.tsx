@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { UserSettings, TimeBlock, SlotType } from '@/lib/types'
+import type { UserSettings, TimeBlock, SlotType, Workspace } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -30,6 +30,7 @@ interface SettingsModalProps {
   isOpen: boolean
   settings: UserSettings
   timeBlocks: TimeBlock[]
+  workspaces: Workspace[]
   onClose: () => void
   onSave: (settings: UserSettings, timeBlocks: TimeBlock[]) => void
 }
@@ -43,6 +44,7 @@ export function SettingsModal({
   isOpen,
   settings,
   timeBlocks,
+  workspaces,
   onClose,
   onSave,
 }: SettingsModalProps) {
@@ -57,6 +59,7 @@ export function SettingsModal({
     icon: 'Clock',
     color: '#6B7FD4',
     parentId: 'timeblock',
+    workspaceId: undefined,
   })
 
   // Find or create lunch break block
@@ -122,12 +125,13 @@ export function SettingsModal({
       parentId: newSlotType.parentId,
       sortOrder: maxSort + 1,
       isBuiltIn: false,
+      workspaceId: newSlotType.workspaceId,
     }
     setLocalSettings(prev => ({
       ...prev,
       slotTypes: [...prev.slotTypes, newType],
     }))
-    setNewSlotType({ label: '', description: '', icon: 'Clock', color: '#6B7FD4', parentId: 'timeblock' })
+    setNewSlotType({ label: '', description: '', icon: 'Clock', color: '#6B7FD4', parentId: 'timeblock', workspaceId: undefined })
     setIsAddingNew(false)
   }
 
@@ -383,6 +387,42 @@ export function SettingsModal({
                         onChange={(e) => setNewSlotType(prev => ({ ...prev, color: e.target.value }))}
                         className="w-6 h-6 rounded-full cursor-pointer"
                       />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <span className="text-xs text-muted-foreground">關聯工作區 (選填):</span>
+                    <p className="text-[10px] text-muted-foreground">若選擇工作區，建立的項目會同步到左側任務欄</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        onClick={() => setNewSlotType(prev => ({ ...prev, workspaceId: undefined }))}
+                        className={cn(
+                          'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
+                          !newSlotType.workspaceId
+                            ? 'bg-secondary ring-1 ring-foreground/20'
+                            : 'bg-secondary/50 hover:bg-secondary'
+                        )}
+                      >
+                        無 (純時間區塊)
+                      </button>
+                      {workspaces.filter(w => !w.isArchived).map((ws) => (
+                        <button
+                          key={ws.id}
+                          onClick={() => setNewSlotType(prev => ({ ...prev, workspaceId: ws.id }))}
+                          className={cn(
+                            'px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5',
+                            newSlotType.workspaceId === ws.id
+                              ? 'ring-1 ring-foreground/20'
+                              : 'hover:opacity-80'
+                          )}
+                          style={{
+                            backgroundColor: newSlotType.workspaceId === ws.id ? ws.color + '30' : ws.color + '15',
+                            color: ws.color,
+                          }}
+                        >
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: ws.color }} />
+                          {ws.name}
+                        </button>
+                      ))}
                     </div>
                   </div>
                   <div className="flex justify-end gap-2">
