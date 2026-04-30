@@ -417,22 +417,27 @@ export function DayScrollView({
                       {date.getDate()}
                     </div>
                   </div>
+                  {/* Pending/All-day tasks area - compact pill style */}
                   {allDayTasks.length > 0 && (
-                    <div className="max-h-[60px] overflow-y-auto px-2 pb-2 space-y-1 border-t border-border/30">
+                    <div className="px-1 pb-1.5 flex flex-col gap-0.5">
                       {allDayTasks.map((task) => (
                         <button
                           key={task.id}
                           onClick={() => onTaskSelect(task)}
                           className={cn(
-                            'w-full text-left px-2 py-1 rounded text-xs font-medium truncate transition-all hover:opacity-80',
-                            task.isCompleted && 'opacity-50 line-through'
+                            'w-full text-left px-2 py-1 rounded text-[11px] font-medium truncate transition-opacity',
+                            'hover:opacity-80 active:opacity-70',
+                            task.isCompleted && 'opacity-40 line-through'
                           )}
                           style={{
                             backgroundColor: task.calendarColor || task.workspaceColor,
                             color: '#fff',
                           }}
                         >
-                          {task.title}
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            {task.isCompleted && <span className="flex-shrink-0">✓</span>}
+                            <span className="truncate">{task.title}</span>
+                          </span>
                         </button>
                       ))}
                     </div>

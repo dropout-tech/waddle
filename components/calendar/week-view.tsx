@@ -449,24 +449,27 @@ export function WeekView({
                       {date.getDate()}
                     </div>
                   </div>
-                  {/* All-day tasks area */}
-                  {(allDayTasks.length > 0 || pendingTasks.some(t => t.dueDate === dateStr && !t.scheduledDate)) && (
-                    <div className="max-h-[48px] overflow-y-auto px-1 pb-1 space-y-0.5 border-t border-border/30">
+                  {/* Pending/All-day tasks area - compact pill style */}
+                  {allDayTasks.length > 0 && (
+                    <div className="px-0.5 pb-1 flex flex-col gap-px">
                       {allDayTasks.map((task) => (
                         <button
                           key={task.id}
                           onClick={() => onTaskSelect(task)}
                           className={cn(
-                            'w-full text-left px-1.5 py-0.5 rounded text-[9px] font-medium truncate transition-all',
-                            'hover:opacity-80',
-                            task.isCompleted && 'opacity-50 line-through'
+                            'w-full text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate transition-opacity',
+                            'hover:opacity-80 active:opacity-70',
+                            task.isCompleted && 'opacity-40 line-through'
                           )}
                           style={{
                             backgroundColor: task.calendarColor || task.workspaceColor,
                             color: '#fff',
                           }}
                         >
-                          {task.title}
+                          <span className="flex items-center gap-1 min-w-0">
+                            {task.isCompleted && <span className="flex-shrink-0">✓</span>}
+                            <span className="truncate">{task.title}</span>
+                          </span>
                         </button>
                       ))}
                     </div>
