@@ -5,7 +5,8 @@ import { cn } from '@/lib/utils'
 import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen, BookOpen, BarChart3, Minimize2 } from 'lucide-react'
+import { ReportDashboard } from '@/components/reports/report-dashboard'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings } from '@/lib/types'
 
 interface MainLayoutProps {
@@ -264,7 +265,7 @@ export function MainLayout({
               </div>
             ) : (
               <div className="max-w-6xl mx-auto">
-                <ReportFocusView 
+                <ReportDashboard 
                   workspaces={workspaces}
                   onClose={() => setFocusMode('none')}
                 />
@@ -411,167 +412,4 @@ function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], on
   )
 }
 
-// Report Focus View Component
-function ReportFocusView({ workspaces, onClose }: { workspaces: Workspace[], onClose: () => void }) {
-  const [dateRange, setDateRange] = useState<'week' | 'month' | 'quarter'>('week')
-  
-  // Calculate stats
-  const allTasks = workspaces.flatMap(ws => 
-    ws.categories.flatMap(cat => cat.tasks)
-  )
 
-  const now = new Date()
-  const rangeStart = new Date()
-  if (dateRange === 'week') rangeStart.setDate(now.getDate() - 7)
-  else if (dateRange === 'month') rangeStart.setMonth(now.getMonth() - 1)
-  else rangeStart.setMonth(now.getMonth() - 3)
-
-  const tasksInRange = allTasks.filter(t => {
-    const created = new Date(t.createdAt)
-    return created >= rangeStart && created <= now
-  })
-
-  const completedInRange = tasksInRange.filter(t => t.isCompleted)
-  const completionRate = tasksInRange.length > 0 
-    ? Math.round((completedInRange.length / tasksInRange.length) * 100) 
-    : 0
-
-  // Overdue tasks
-  const overdueTasks = allTasks.filter(t => {
-    if (t.isCompleted || !t.dueDate) return false
-    return new Date(t.dueDate) < now
-  })
-
-  // Tasks by workspace
-  const tasksByWorkspace = workspaces.map(ws => ({
-    name: ws.name,
-    color: ws.color,
-    total: ws.categories.flatMap(c => c.tasks).length,
-    completed: ws.categories.flatMap(c => c.tasks.filter(t => t.isCompleted)).length,
-  }))
-
-  return (
-    <div className="space-y-6">
-      {/* Date Range Selector */}
-      <div className="flex items-center gap-2">
-        {(['week', 'month', 'quarter'] as const).map(range => (
-          <button
-            key={range}
-            onClick={() => setDateRange(range)}
-            className={cn(
-              "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-              dateRange === range
-                ? "bg-primary text-primary-foreground"
-                : "bg-secondary text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {range === 'week' ? '本週' : range === 'month' ? '本月' : '本季'}
-          </button>
-        ))}
-      </div>
-
-      {/* Overview Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-5 rounded-xl bg-card border border-border">
-          <div className="text-3xl font-bold">{tasksInRange.length}</div>
-          <div className="text-sm text-muted-foreground mt-1">總任務數</div>
-        </div>
-        <div className="p-5 rounded-xl bg-green-500/10 border border-green-500/20">
-          <div className="text-3xl font-bold text-green-600">{completedInRange.length}</div>
-          <div className="text-sm text-muted-foreground mt-1">已完成</div>
-        </div>
-        <div className="p-5 rounded-xl bg-blue-500/10 border border-blue-500/20">
-          <div className="text-3xl font-bold text-blue-600">{completionRate}%</div>
-          <div className="text-sm text-muted-foreground mt-1">完成率</div>
-        </div>
-        <div className="p-5 rounded-xl bg-red-500/10 border border-red-500/20">
-          <div className="text-3xl font-bold text-red-600">{overdueTasks.length}</div>
-          <div className="text-sm text-muted-foreground mt-1">過期任務</div>
-        </div>
-      </div>
-
-      {/* Workspace Breakdown */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">工作區概覽</h3>
-        <div className="space-y-3">
-          {tasksByWorkspace.map(ws => (
-            <div key={ws.name} className="p-4 rounded-xl bg-card border border-border">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: ws.color }}
-                  />
-                  <span className="font-medium">{ws.name}</span>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  {ws.completed} / {ws.total} 完成
-                </span>
-              </div>
-              <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                <div 
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{ 
-                    width: `${ws.total > 0 ? (ws.completed / ws.total) * 100 : 0}%`,
-                    backgroundColor: ws.color 
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Overdue Tasks Alert */}
-      {overdueTasks.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-red-600">需要關注的過期任務</h3>
-          <div className="space-y-2">
-            {overdueTasks.slice(0, 10).map(task => {
-              const daysOverdue = Math.floor((now.getTime() - new Date(task.dueDate!).getTime()) / 86400000)
-              return (
-                <div 
-                  key={task.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-red-500/5 border border-red-500/20"
-                >
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: task.workspaceColor || '#999' }}
-                    />
-                    <span>{task.title}</span>
-                  </div>
-                  <span className="text-sm text-red-600 font-medium">
-                    過期 {daysOverdue} 天
-                  </span>
-                </div>
-              )
-            })}
-            {overdueTasks.length > 10 && (
-              <div className="text-sm text-muted-foreground text-center py-2">
-                還有 {overdueTasks.length - 10} 個過期任務...
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Productivity Tips */}
-      <div className="p-5 rounded-xl bg-primary/5 border border-primary/20">
-        <h3 className="font-medium mb-3">生產力建議</h3>
-        <ul className="space-y-2 text-sm text-muted-foreground">
-          {completionRate < 50 && (
-            <li>完成率偏低，建議將大任務拆分成更小的可執行項目</li>
-          )}
-          {overdueTasks.length > 5 && (
-            <li>過期任務較多，建議重新評估任務優先級並清理不必要的任務</li>
-          )}
-          {completionRate >= 80 && (
-            <li>表現出色！繼續保持良好的工作節奏</li>
-          )}
-          <li>定期回顧任務清單，移除已不再需要的任務</li>
-        </ul>
-      </div>
-    </div>
-  )
-}
