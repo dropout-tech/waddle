@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Sun, Leaf, Plus, X, Settings2, PanelLeftClose, Maximize2, Minimize2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Sun, Leaf, Plus, X, Settings2, PanelLeftClose, Maximize2, Minimize2, ChevronUp, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Workspace } from '@/lib/types'
 import { WorkspaceSettingsModal } from '@/components/modals/workspace-settings-modal'
@@ -45,6 +45,22 @@ export function PanelHeader({
   const [selectedIcon, setSelectedIcon] = useState(PRESET_ICON_NAMES[0])
   const today = new Date()
 
+  // Header collapsed state - persisted to localStorage
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false)
+  
+  useEffect(() => {
+    const saved = localStorage.getItem('flowdesk-header-collapsed')
+    if (saved !== null) {
+      setIsHeaderCollapsed(saved === 'true')
+    }
+  }, [])
+
+  const toggleHeaderCollapsed = () => {
+    const newValue = !isHeaderCollapsed
+    setIsHeaderCollapsed(newValue)
+    localStorage.setItem('flowdesk-header-collapsed', String(newValue))
+  }
+
   // Count pending tasks per workspace
   const getWorkspaceCount = (workspace: Workspace) => {
     let count = 0
@@ -68,148 +84,228 @@ export function PanelHeader({
   }
 
   return (
-    <div className="relative px-5 py-5 border-b border-border bg-card">
-      {/* Row 1: Brand + Weather */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
-              <Leaf className="w-4.5 h-4.5 text-primary" />
+    <div className="relative px-5 py-4 border-b border-border bg-card">
+      {/* Collapsed Mode - Single compact row */}
+      {isHeaderCollapsed ? (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {/* Compact date */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 border border-primary/20">
+                <span className="text-base font-bold text-primary tabular-nums">
+                  {today.getDate()}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-foreground">
+                  {today.toLocaleDateString('zh-TW', { month: 'short' })}
+                </span>
+                <span className="text-[10px] text-muted-foreground -mt-0.5">
+                  {today.toLocaleDateString('zh-TW', { weekday: 'short' })}
+                </span>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-foreground tracking-tight">
-                FlowDesk
-              </h1>
-              <p className="text-[10px] text-muted-foreground -mt-0.5">
-                your daily planner
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          {/* Weather Widget - Minimal */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary/50 border border-border">
-            <Sun className="w-3.5 h-3.5 text-amber-500" />
-            <span className="text-xs font-medium text-foreground">26°</span>
+            {/* Pending count */}
+            <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-primary/10 text-primary">
+              {totalPending} 待辦
+            </span>
           </div>
 
-          {/* Expand/Collapse Right Panel Button */}
-          {onToggleExpand && (
+          <div className="flex items-center gap-1">
+            {/* Expand header button */}
             <button
-              onClick={onToggleExpand}
-              className={cn(
-                "p-1.5 rounded-md transition-colors",
-                isExpanded 
-                  ? "bg-primary/10 text-primary hover:bg-primary/20" 
-                  : "hover:bg-secondary text-muted-foreground"
-              )}
-              title={isExpanded ? "顯示日曆" : "展開任務面板"}
-            >
-              {isExpanded ? (
-                <Minimize2 className="w-4 h-4" />
-              ) : (
-                <Maximize2 className="w-4 h-4" />
-              )}
-            </button>
-          )}
-
-          {/* Close Panel Button */}
-          {onClosePanel && !isExpanded && (
-            <button
-              onClick={onClosePanel}
+              onClick={toggleHeaderCollapsed}
               className="p-1.5 rounded-md hover:bg-secondary transition-colors"
-              title="收起面板"
+              title="展開標題列"
             >
-              <PanelLeftClose className="w-4 h-4 text-muted-foreground" />
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </button>
-          )}
-        </div>
-      </div>
-
-      {/* Date Display */}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {/* Day number */}
-          <div className="flex flex-col items-center justify-center w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex-shrink-0">
-            <span className="text-xl font-bold leading-none text-primary tabular-nums">
-              {today.getDate()}
-            </span>
-          </div>
-          {/* Month / Year / Weekday */}
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-sm font-semibold text-foreground">
-                {today.toLocaleDateString('zh-TW', { month: 'long' })}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {today.getFullYear()}
-              </span>
-            </div>
-            <span className="text-xs text-muted-foreground">
-              {today.toLocaleDateString('zh-TW', { weekday: 'long' })}
-            </span>
-          </div>
-        </div>
-        <span className="stamp text-primary border-primary">
-          {totalPending} 待辦
-        </span>
-      </div>
-
-      {/* Workspace Badges - Clean pills */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {workspaces
-          .filter((w) => !w.isArchived)
-          .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map((workspace) => {
-            const count = getWorkspaceCount(workspace)
-            return (
+            {/* Expand/Collapse Right Panel Button */}
+            {onToggleExpand && (
               <button
-                key={workspace.id}
-                onClick={() => onWorkspaceClick(workspace.id)}
+                onClick={onToggleExpand}
                 className={cn(
-                  'group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
-                  'border bg-card hover:bg-muted/50'
+                  "p-1.5 rounded-md transition-colors",
+                  isExpanded 
+                    ? "bg-primary/10 text-primary hover:bg-primary/20" 
+                    : "hover:bg-secondary text-muted-foreground"
                 )}
-                style={{ borderColor: `${workspace.color}40`, color: workspace.color }}
+                title={isExpanded ? "顯示日曆" : "展開任務面板"}
               >
-                <WorkspaceIcon 
-                  icon={workspace.icon} 
-                  fallback={workspace.name}
-                  color={workspace.color} 
-                  size="xs" 
-                />
-                <span className="font-semibold">{workspace.name}</span>
-                <span
-                  className="px-1.5 py-0.5 rounded text-[10px] font-bold"
-                  style={{ backgroundColor: `${workspace.color}18` }}
-                >
-                  {count}
-                </span>
-                
-                {/* Settings icon - appears on hover */}
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSettingsWorkspaceId(workspace.id)
-                  }}
-                  className="ml-0.5 p-0.5 rounded opacity-40 hover:opacity-100 hover:bg-muted/60 transition-all cursor-pointer"
-                >
-                  <Settings2 className="w-3 h-3" />
-                </span>
+                {isExpanded ? (
+                  <Minimize2 className="w-4 h-4" />
+                ) : (
+                  <Maximize2 className="w-4 h-4" />
+                )}
               </button>
-            )
-          })}
+            )}
+            {/* Close Panel Button */}
+            {onClosePanel && !isExpanded && (
+              <button
+                onClick={onClosePanel}
+                className="p-1.5 rounded-md hover:bg-secondary transition-colors"
+                title="收起面板"
+              >
+                <PanelLeftClose className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Expanded Mode - Full header */
+        <>
+          {/* Row 1: Brand + Weather */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <Leaf className="w-4.5 h-4.5 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold text-foreground tracking-tight">
+                    FlowDesk
+                  </h1>
+                  <p className="text-[10px] text-muted-foreground -mt-0.5">
+                    your daily planner
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {/* Weather Widget - Minimal */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary/50 border border-border">
+                <Sun className="w-3.5 h-3.5 text-amber-500" />
+                <span className="text-xs font-medium text-foreground">26°</span>
+              </div>
+
+              {/* Collapse header button */}
+              <button
+                onClick={toggleHeaderCollapsed}
+                className="p-1.5 rounded-md hover:bg-secondary transition-colors"
+                title="收合標題列"
+              >
+                <ChevronUp className="w-4 h-4 text-muted-foreground" />
+              </button>
+
+              {/* Expand/Collapse Right Panel Button */}
+              {onToggleExpand && (
+                <button
+                  onClick={onToggleExpand}
+                  className={cn(
+                    "p-1.5 rounded-md transition-colors",
+                    isExpanded 
+                      ? "bg-primary/10 text-primary hover:bg-primary/20" 
+                      : "hover:bg-secondary text-muted-foreground"
+                  )}
+                  title={isExpanded ? "顯示日曆" : "展開任務面板"}
+                >
+                  {isExpanded ? (
+                    <Minimize2 className="w-4 h-4" />
+                  ) : (
+                    <Maximize2 className="w-4 h-4" />
+                  )}
+                </button>
+              )}
+
+              {/* Close Panel Button */}
+              {onClosePanel && !isExpanded && (
+                <button
+                  onClick={onClosePanel}
+                  className="p-1.5 rounded-md hover:bg-secondary transition-colors"
+                  title="收起面板"
+                >
+                  <PanelLeftClose className="w-4 h-4 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Date Display */}
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {/* Day number */}
+              <div className="flex flex-col items-center justify-center w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex-shrink-0">
+                <span className="text-xl font-bold leading-none text-primary tabular-nums">
+                  {today.getDate()}
+                </span>
+              </div>
+              {/* Month / Year / Weekday */}
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-sm font-semibold text-foreground">
+                    {today.toLocaleDateString('zh-TW', { month: 'long' })}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {today.getFullYear()}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {today.toLocaleDateString('zh-TW', { weekday: 'long' })}
+                </span>
+              </div>
+            </div>
+            <span className="stamp text-primary border-primary">
+              {totalPending} 待辦
+            </span>
+          </div>
+
+          {/* Workspace Badges - Clean pills */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {workspaces
+              .filter((w) => !w.isArchived)
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((workspace) => {
+                const count = getWorkspaceCount(workspace)
+                return (
+                  <button
+                    key={workspace.id}
+                    onClick={() => onWorkspaceClick(workspace.id)}
+                    className={cn(
+                      'group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
+                      'border bg-card hover:bg-muted/50'
+                    )}
+                    style={{ borderColor: `${workspace.color}40`, color: workspace.color }}
+                  >
+                    <WorkspaceIcon 
+                      icon={workspace.icon} 
+                      fallback={workspace.name}
+                      color={workspace.color} 
+                      size="xs" 
+                    />
+                    <span className="font-semibold">{workspace.name}</span>
+                    <span
+                      className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                      style={{ backgroundColor: `${workspace.color}18` }}
+                    >
+                      {count}
+                    </span>
+                    
+                    {/* Settings icon - appears on hover */}
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSettingsWorkspaceId(workspace.id)
+                      }}
+                      className="ml-0.5 p-0.5 rounded opacity-40 hover:opacity-100 hover:bg-muted/60 transition-all cursor-pointer"
+                    >
+                      <Settings2 className="w-3 h-3" />
+                    </span>
+                  </button>
+                )
+              })}
 
         {/* Add Workspace Button */}
-        <button
-          onClick={() => setIsAdding(true)}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-all"
-        >
-          <Plus className="w-3 h-3" />
-          <span>新增</span>
-        </button>
-      </div>
+            <button
+              onClick={() => setIsAdding(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-all"
+            >
+              <Plus className="w-3 h-3" />
+              <span>新增</span>
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Workspace Settings Modal */}
       {settingsWorkspace && (
