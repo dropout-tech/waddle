@@ -207,85 +207,85 @@ export function MainLayout({
           {/* Resize Handle */}
           {isLeftPanelOpen && <ResizeHandle onResize={handleResize} />}
 
-          {/* Right Panel - Calendar */}
-          <div className="flex-1 h-full min-w-0">
-        <CalendarPanel
-          selectedDate={selectedDate}
-          viewMode={viewMode}
-          pendingTasks={pendingTasks}
-          scheduledTasks={scheduledTasks}
-          allTasks={allTasks}
-          timeBlocks={filteredTimeBlocks}
-          slotTypes={slotTypes}
-          workspaces={workspaces}
-          startHour={startHour}
-          endHour={endHour}
-          hourHeight={hourHeight}
-          zoomLevel={zoomLevel}
-          onZoomChange={setZoomLevel}
-          onDateChange={setSelectedDate}
-          onViewModeChange={setViewMode}
-          onTaskSelect={onSelectTask}
-          onToggleComplete={onToggleComplete}
-          onCreateTask={onCreateCalendarTask}
-          onCreatePendingTask={onCreatePendingTask}
-          onCreateTimeBlock={onCreateCalendarTimeBlock}
-          onRescheduleTask={onRescheduleTask}
-          onUpdateTimeBlock={onUpdateTimeBlock}
-          onDeleteTimeBlock={onDeleteTimeBlock}
-          onOpenJournal={handleOpenJournalFocus}
-          onOpenReport={handleOpenReportFocus}
-        />
-      </div>
-        </>
-      )}
-
-      {/* Focus Mode Overlay for Journal/Report */}
-      {focusMode !== 'none' && (
-        <div className="absolute inset-0 z-50 bg-background flex flex-col">
-          {/* Focus Mode Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/50">
-            <div className="flex items-center gap-3">
-              {focusMode === 'journal' ? (
-                <>
-                  <BookOpen className="w-5 h-5 text-primary" />
-                  <h1 className="text-lg font-semibold">日記</h1>
-                </>
-              ) : (
-                <>
-                  <BarChart3 className="w-5 h-5 text-primary" />
-                  <h1 className="text-lg font-semibold">報告</h1>
-                </>
-              )}
-            </div>
-            <button
-              onClick={() => setFocusMode('none')}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-            >
-              <Minimize2 className="w-4 h-4" />
-              返回主畫面
-            </button>
-          </div>
-          
-          {/* Focus Mode Content */}
-          <div className="flex-1 overflow-auto p-6">
-            {focusMode === 'journal' ? (
-              <div className="max-w-4xl mx-auto">
-                <JournalFocusView 
-                  workspaces={workspaces}
-                  onClose={() => setFocusMode('none')}
-                />
+          {/* Right Panel - Calendar or Focus View */}
+          <div className="flex-1 h-full min-w-0 flex flex-col">
+            {focusMode !== 'none' ? (
+              /* Full-page Journal / Report - replaces calendar inline */
+              <div className="flex flex-col h-full bg-background">
+                {/* Slim header bar */}
+                <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card/50 flex-shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    {focusMode === 'journal' ? (
+                      <>
+                        <BookOpen className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-semibold">日記</span>
+                      </>
+                    ) : (
+                      <>
+                        <BarChart3 className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-semibold">報告</span>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setFocusMode('none')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                  >
+                    <Minimize2 className="w-3.5 h-3.5" />
+                    返回日曆
+                  </button>
+                </div>
+                {/* Content */}
+                <div className="flex-1 overflow-auto p-6">
+                  {focusMode === 'journal' ? (
+                    <div className="max-w-3xl mx-auto">
+                      <JournalFocusView
+                        workspaces={workspaces}
+                        onClose={() => setFocusMode('none')}
+                      />
+                    </div>
+                  ) : (
+                    <div className="max-w-5xl mx-auto">
+                      <ReportDashboard
+                        workspaces={workspaces}
+                        onClose={() => setFocusMode('none')}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
-              <div className="max-w-6xl mx-auto">
-                <ReportDashboard 
-                  workspaces={workspaces}
-                  onClose={() => setFocusMode('none')}
-                />
-              </div>
+              <CalendarPanel
+                selectedDate={selectedDate}
+                viewMode={viewMode}
+                pendingTasks={pendingTasks}
+                scheduledTasks={scheduledTasks}
+                allTasks={allTasks}
+                timeBlocks={filteredTimeBlocks}
+                slotTypes={slotTypes}
+                workspaces={workspaces}
+                startHour={startHour}
+                endHour={endHour}
+                hourHeight={hourHeight}
+                zoomLevel={zoomLevel}
+                onZoomChange={setZoomLevel}
+                onDateChange={setSelectedDate}
+                onViewModeChange={setViewMode}
+                onTaskSelect={onSelectTask}
+                onToggleComplete={onToggleComplete}
+                onCreateTask={onCreateCalendarTask}
+                onCreatePendingTask={onCreatePendingTask}
+                onCreateTimeBlock={onCreateCalendarTimeBlock}
+                onRescheduleTask={onRescheduleTask}
+                onUpdateTimeBlock={onUpdateTimeBlock}
+                onDeleteTimeBlock={onDeleteTimeBlock}
+                onOpenJournal={handleOpenJournalFocus}
+                onOpenReport={handleOpenReportFocus}
+                onOpenSettings={onOpenSettings}
+              />
             )}
           </div>
-        </div>
+        </>
       )}
       </div>
 

@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ZoomIn, ZoomOut, Clock, ChevronLeft, ChevronRight, BookOpen, BarChart3, Settings } from 'lucide-react'
 import type { Workspace, Task } from '@/lib/types'
 
 interface CalendarHeaderProps {
@@ -23,6 +23,7 @@ interface CalendarHeaderProps {
   // Focus mode
   onOpenJournal?: () => void
   onOpenReport?: () => void
+  onOpenSettings?: () => void
 }
 
 const ZOOM_LABELS = ['緊湊', '標準', '寬鬆', '詳細']
@@ -41,6 +42,7 @@ export function CalendarHeader({
   onTaskClick,
   onOpenJournal,
   onOpenReport,
+  onOpenSettings,
 }: CalendarHeaderProps) {
   const isToday = () => {
     const today = new Date()
@@ -189,29 +191,38 @@ export function CalendarHeader({
           <div />
         )}
 
-        {/* Right: Focus Mode Buttons */}
-        {(onOpenJournal || onOpenReport) && (
-          <div className="flex items-center gap-1.5">
-            {onOpenJournal && (
-              <button
-                onClick={onOpenJournal}
-                className="px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors border border-transparent hover:border-border/50"
-                title="開啟日記 (專注模式)"
-              >
-                📝 日記
-              </button>
-            )}
-            {onOpenReport && (
-              <button
-                onClick={onOpenReport}
-                className="px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors border border-transparent hover:border-border/50"
-                title="開啟報告 (專注模式)"
-              >
-                📊 報告
-              </button>
-            )}
-          </div>
-        )}
+        {/* Right: Journal / Report / Settings */}
+        <div className="flex items-center gap-1">
+          {onOpenJournal && (
+            <button
+              onClick={onOpenJournal}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              title="日記"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              日記
+            </button>
+          )}
+          {onOpenReport && (
+            <button
+              onClick={onOpenReport}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              title="報告"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              報告
+            </button>
+          )}
+          {onOpenSettings && (
+            <button
+              onClick={onOpenSettings}
+              className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors ml-1"
+              title="設定"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

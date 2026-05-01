@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useMemo } from 'react'
-import { BookOpen, BarChart3, FolderTree, Clock, Settings, SlidersHorizontal, ChevronDown } from 'lucide-react'
+import { FolderTree, Clock, SlidersHorizontal, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Workspace, Task } from '@/lib/types'
 import { PanelHeader } from './panel-header'
@@ -244,33 +244,6 @@ export function TaskPanel({
         )}
       </div>
 
-      {/* Bottom Toolbar */}
-      <div className="flex items-center gap-2 p-3 border-t border-border bg-card">
-        <Button
-          variant="secondary"
-          className="flex-1 gap-2 rounded-xl"
-          onClick={onOpenJournal}
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>日記</span>
-        </Button>
-        <Button
-          variant="secondary"
-          className="flex-1 gap-2 rounded-xl"
-          onClick={onOpenReport}
-        >
-          <BarChart3 className="w-4 h-4" />
-          <span>報告</span>
-        </Button>
-        <Button
-          variant="secondary"
-          className="w-10 h-10 p-0 rounded-xl"
-          onClick={onOpenSettings}
-          title="設定"
-        >
-          <Settings className="w-4 h-4" />
-        </Button>
-      </div>
       </div>
     </div>
   )

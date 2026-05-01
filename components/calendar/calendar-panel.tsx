@@ -40,6 +40,7 @@ interface CalendarPanelProps {
   // Focus mode callbacks
   onOpenJournal?: () => void
   onOpenReport?: () => void
+  onOpenSettings?: () => void
   className?: string
 }
 
@@ -69,6 +70,7 @@ export function CalendarPanel({
   onDeleteTimeBlock,
   onOpenJournal,
   onOpenReport,
+  onOpenSettings,
   className,
 }: CalendarPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
@@ -120,6 +122,7 @@ export function CalendarPanel({
         onTaskClick={onTaskSelect}
         onOpenJournal={onOpenJournal}
         onOpenReport={onOpenReport}
+        onOpenSettings={onOpenSettings}
       />
 
       {viewMode === 'day' && (
