@@ -160,6 +160,8 @@ export function DayScrollView({
   const headerScrollRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const isScrolling = useRef(false)
+  // Track dragging state synchronously for scroll handler
+  const isDraggingTaskRef = useRef(false)
 
   // New-slot drag state
   const [isDragging, setIsDragging] = useState(false)
@@ -237,8 +239,8 @@ export function DayScrollView({
     const container = scrollContainerRef.current
     if (!container || isScrolling.current) return
     
-    // Don't trigger navigation while dragging tasks or during cooldown
-    if (activeTaskDrag || pendingTaskDrag || dragEndCooldown.current) {
+    // Don't trigger navigation while dragging tasks or during cooldown (use ref for sync access)
+    if (isDraggingTaskRef.current || dragEndCooldown.current) {
       lastScrollLeft.current = container.scrollLeft
       return
     }
@@ -268,7 +270,7 @@ export function DayScrollView({
     }
 
     lastScrollLeft.current = scrollLeft
-  }, [onNavigate, activeTaskDrag, pendingTaskDrag])
+  }, [onNavigate])
 
   // Get tasks for a specific date
   const getTasksForDate = useCallback((date: Date) => {
@@ -315,6 +317,7 @@ export function DayScrollView({
   const MAX = endHour * 60
 
   const handleTaskDragStart = useCallback((info: TaskDragStart, dayIndex: number) => {
+    isDraggingTaskRef.current = true
     setActiveTaskDrag({ ...info, currentStart: info.originalStart, currentEnd: info.originalEnd, dayIndex })
     setPendingSlot(null)
   }, [])
@@ -331,6 +334,7 @@ export function DayScrollView({
   // Handle pending task drag start from header
   const handlePendingTaskDragStart = useCallback((task: Task, e: React.MouseEvent) => {
     e.preventDefault()
+    isDraggingTaskRef.current = true
     const duration = task.estimatedMinutes || 30
     // Start at 9:00 AM or current grid position if over grid
     const gridEl = gridRef.current
@@ -439,7 +443,8 @@ export function DayScrollView({
         onRescheduleTask?.(pendingTaskDrag.task.id, date, startTime, endTime)
       }
       setPendingTaskDrag(null)
-      // Prevent navigation for a short period after drag ends
+      // Reset drag ref and prevent navigation briefly
+      isDraggingTaskRef.current = false
       dragEndCooldown.current = true
       setTimeout(() => { dragEndCooldown.current = false }, 300)
       return
@@ -452,7 +457,8 @@ export function DayScrollView({
         onRescheduleTask?.(activeTaskDrag.taskId, date, minutesToTime(activeTaskDrag.currentStart), minutesToTime(activeTaskDrag.currentEnd))
       }
       setActiveTaskDrag(null)
-      // Prevent navigation for a short period after drag ends
+      // Reset drag ref and prevent navigation briefly
+      isDraggingTaskRef.current = false
       dragEndCooldown.current = true
       setTimeout(() => { dragEndCooldown.current = false }, 300)
       return
