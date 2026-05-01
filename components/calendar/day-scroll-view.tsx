@@ -241,6 +241,7 @@ export function DayScrollView({
     
     // Don't trigger navigation while dragging tasks or during cooldown (use ref for sync access)
     if (isDraggingTaskRef.current || dragEndCooldown.current) {
+      console.log("[v0] Scroll blocked - isDragging:", isDraggingTaskRef.current, "cooldown:", dragEndCooldown.current)
       lastScrollLeft.current = container.scrollLeft
       return
     }
@@ -258,12 +259,16 @@ export function DayScrollView({
     // Determine scroll direction
     const scrollDirection = scrollLeft - lastScrollLeft.current
 
+    console.log("[v0] Scroll check - scrollLeft:", scrollLeft, "maxScroll:", maxScroll, "direction:", scrollDirection)
+
     // Only navigate when both at edge AND scrolling toward that edge
     if (scrollLeft < DAY_WIDTH * 0.5 && scrollDirection < 0) {
+      console.log("[v0] NAVIGATING PREV")
       isScrolling.current = true
       onNavigate?.('prev')
       requestAnimationFrame(() => { isScrolling.current = false })
     } else if (scrollLeft > maxScroll - DAY_WIDTH * 0.5 && scrollDirection > 0) {
+      console.log("[v0] NAVIGATING NEXT")
       isScrolling.current = true
       onNavigate?.('next')
       requestAnimationFrame(() => { isScrolling.current = false })
@@ -317,6 +322,7 @@ export function DayScrollView({
   const MAX = endHour * 60
 
   const handleTaskDragStart = useCallback((info: TaskDragStart, dayIndex: number) => {
+    console.log("[v0] DRAG START - setting isDraggingTaskRef to true, dayIndex:", dayIndex)
     isDraggingTaskRef.current = true
     setActiveTaskDrag({ ...info, currentStart: info.originalStart, currentEnd: info.originalEnd, dayIndex })
     setPendingSlot(null)
@@ -395,6 +401,8 @@ export function DayScrollView({
     const relX = mouseXInContent - TIME_COL_WIDTH
     const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
     
+    console.log("[v0] MouseMove - relX:", relX, "DAY_WIDTH:", DAY_WIDTH, "calc dayIdx:", Math.floor(relX / DAY_WIDTH), "clamped:", newDayIndex, "allDates.length:", allDates.length)
+    
     // Calculate time from Y position
     const minutes = snap(MIN + mouseYInContent)
     
@@ -453,6 +461,7 @@ export function DayScrollView({
     // Commit scheduled task block drag
     if (activeTaskDrag) {
       const date = allDates[activeTaskDrag.dayIndex]?.toISOString().split('T')[0]
+      console.log("[v0] DRAG END - dayIndex:", activeTaskDrag.dayIndex, "date:", date, "allDates:", allDates.map(d => d.toISOString().split('T')[0]))
       if (date) {
         onRescheduleTask?.(activeTaskDrag.taskId, date, minutesToTime(activeTaskDrag.currentStart), minutesToTime(activeTaskDrag.currentEnd))
       }

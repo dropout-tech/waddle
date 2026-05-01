@@ -228,6 +228,7 @@ export function WeekView({
     
     // Don't trigger navigation while dragging tasks or during cooldown (use ref for sync access)
     if (isDraggingTaskRef.current || dragEndCooldown.current) {
+      console.log("[v0] WEEK Scroll blocked - isDragging:", isDraggingTaskRef.current, "cooldown:", dragEndCooldown.current)
       lastScrollLeft.current = container.scrollLeft
       return
     }
@@ -245,14 +246,18 @@ export function WeekView({
     // Determine scroll direction: negative = scrolling left (want to see earlier), positive = scrolling right (want to see later)
     const scrollDirection = scrollLeft - lastScrollLeft.current
     
+    console.log("[v0] WEEK Scroll check - scrollLeft:", scrollLeft, "maxScroll:", maxScroll, "direction:", scrollDirection)
+    
     // If scrolled near the edges, update the selected date
     // When scrolling LEFT (scrollDirection < 0, approaching left edge): show earlier dates (prev)
     // When scrolling RIGHT (scrollDirection > 0, approaching right edge): show later dates (next)
     if (scrollLeft < DAY_WIDTH * 2 && scrollDirection < 0) {
+      console.log("[v0] WEEK NAVIGATING PREV")
       isScrolling.current = true
       onNavigate?.('prev')
       requestAnimationFrame(() => { isScrolling.current = false })
     } else if (scrollLeft > maxScroll - DAY_WIDTH * 2 && scrollDirection > 0) {
+      console.log("[v0] WEEK NAVIGATING NEXT")
       isScrolling.current = true
       onNavigate?.('next')
       requestAnimationFrame(() => { isScrolling.current = false })
@@ -327,6 +332,7 @@ export function WeekView({
   const MAX = endHour * 60
 
   const handleTaskDragStart = useCallback((info: TaskDragStart, dayIndex: number) => {
+    console.log("[v0] WEEK DRAG START - setting isDraggingTaskRef to true, dayIndex:", dayIndex)
     isDraggingTaskRef.current = true
     setActiveTaskDrag({ ...info, currentStart: info.originalStart, currentEnd: info.originalEnd, dayIndex })
     setPendingSlot(null)
