@@ -215,14 +215,17 @@ export function WeekView({
     lastScrollLeft.current = targetScrollLeft
   }, [selectedDate])
 
+  // Cooldown after drag ends to prevent accidental navigation
+  const dragEndCooldown = useRef(false)
+
   // Handle scroll to detect when user scrolls to edges and load more dates
   // Only trigger on horizontal scroll, not vertical
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current
     if (!container || isScrolling.current) return
     
-    // Don't trigger navigation while dragging tasks
-    if (activeTaskDrag || pendingTaskDrag) {
+    // Don't trigger navigation while dragging tasks or during cooldown
+    if (activeTaskDrag || pendingTaskDrag || dragEndCooldown.current) {
       lastScrollLeft.current = container.scrollLeft
       return
     }
@@ -447,6 +450,9 @@ export function WeekView({
         onRescheduleTask?.(pendingTaskDrag.task.id, date, startTime, endTime)
       }
       setPendingTaskDrag(null)
+      // Prevent navigation for a short period after drag ends
+      dragEndCooldown.current = true
+      setTimeout(() => { dragEndCooldown.current = false }, 300)
       return
     }
 
@@ -457,6 +463,9 @@ export function WeekView({
         onRescheduleTask?.(activeTaskDrag.taskId, date, minutesToTime(activeTaskDrag.currentStart), minutesToTime(activeTaskDrag.currentEnd))
       }
       setActiveTaskDrag(null)
+      // Prevent navigation for a short period after drag ends
+      dragEndCooldown.current = true
+      setTimeout(() => { dragEndCooldown.current = false }, 300)
       return
     }
 

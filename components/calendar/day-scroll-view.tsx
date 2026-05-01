@@ -229,14 +229,16 @@ export function DayScrollView({
 
   // Track last horizontal scroll position
   const lastScrollLeft = useRef(0)
+  // Cooldown after drag ends to prevent accidental navigation
+  const dragEndCooldown = useRef(false)
 
   // Handle scroll to detect edges - only trigger on horizontal scroll
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current
     if (!container || isScrolling.current) return
     
-    // Don't trigger navigation while dragging tasks
-    if (activeTaskDrag || pendingTaskDrag) {
+    // Don't trigger navigation while dragging tasks or during cooldown
+    if (activeTaskDrag || pendingTaskDrag || dragEndCooldown.current) {
       lastScrollLeft.current = container.scrollLeft
       return
     }
@@ -437,6 +439,9 @@ export function DayScrollView({
         onRescheduleTask?.(pendingTaskDrag.task.id, date, startTime, endTime)
       }
       setPendingTaskDrag(null)
+      // Prevent navigation for a short period after drag ends
+      dragEndCooldown.current = true
+      setTimeout(() => { dragEndCooldown.current = false }, 300)
       return
     }
 
@@ -447,6 +452,9 @@ export function DayScrollView({
         onRescheduleTask?.(activeTaskDrag.taskId, date, minutesToTime(activeTaskDrag.currentStart), minutesToTime(activeTaskDrag.currentEnd))
       }
       setActiveTaskDrag(null)
+      // Prevent navigation for a short period after drag ends
+      dragEndCooldown.current = true
+      setTimeout(() => { dragEndCooldown.current = false }, 300)
       return
     }
 
