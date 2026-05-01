@@ -223,12 +223,17 @@ export function WeekView({
       return
     }
     
+    // Determine scroll direction: negative = scrolling left (want to see earlier), positive = scrolling right (want to see later)
+    const scrollDirection = scrollLeft - lastScrollLeft.current
+    
     // If scrolled near the edges, update the selected date
-    if (scrollLeft < DAY_WIDTH * 2) {
+    // When scrolling LEFT (scrollDirection < 0, approaching left edge): show earlier dates (prev)
+    // When scrolling RIGHT (scrollDirection > 0, approaching right edge): show later dates (next)
+    if (scrollLeft < DAY_WIDTH * 2 && scrollDirection < 0) {
       isScrolling.current = true
       onNavigate?.('prev')
       requestAnimationFrame(() => { isScrolling.current = false })
-    } else if (scrollLeft > maxScroll - DAY_WIDTH * 2) {
+    } else if (scrollLeft > maxScroll - DAY_WIDTH * 2 && scrollDirection > 0) {
       isScrolling.current = true
       onNavigate?.('next')
       requestAnimationFrame(() => { isScrolling.current = false })

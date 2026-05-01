@@ -237,11 +237,15 @@ export function DayScrollView({
       return
     }
 
-    if (scrollLeft < DAY_WIDTH * 0.5) {
+    // Determine scroll direction
+    const scrollDirection = scrollLeft - lastScrollLeft.current
+
+    // Only navigate when both at edge AND scrolling toward that edge
+    if (scrollLeft < DAY_WIDTH * 0.5 && scrollDirection < 0) {
       isScrolling.current = true
       onNavigate?.('prev')
       requestAnimationFrame(() => { isScrolling.current = false })
-    } else if (scrollLeft > maxScroll - DAY_WIDTH * 0.5) {
+    } else if (scrollLeft > maxScroll - DAY_WIDTH * 0.5 && scrollDirection > 0) {
       isScrolling.current = true
       onNavigate?.('next')
       requestAnimationFrame(() => { isScrolling.current = false })
