@@ -11,6 +11,7 @@ import {
   Flame,
   ChevronRight,
   ChevronDown,
+  ChevronsDownUp,
   LayoutGrid,
   List,
   Filter,
@@ -615,6 +616,36 @@ export function FullScreenTaskView({
                   <option value="urgency">依優先度</option>
                   <option value="created">依建立時間</option>
                 </select>
+
+                {/* Expand/Collapse All - only show in grouped view */}
+                {viewMode === 'grouped' && (
+                  <div className="flex items-center gap-1 ml-2">
+                    <button
+                      onClick={() => {
+                        // Expand all workspaces and categories
+                        const allWsIds = workspaces.filter(w => !w.isArchived).map(w => w.id)
+                        const allCatIds = workspaces.flatMap(w => w.categories?.map(c => c.id) || [])
+                        setExpandedWorkspaces(new Set(allWsIds))
+                        setExpandedCategories(new Set(allCatIds))
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                      title="展開全部"
+                    >
+                      <ChevronsDownUp className="w-3.5 h-3.5 rotate-180" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Collapse all
+                        setExpandedWorkspaces(new Set())
+                        setExpandedCategories(new Set())
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                      title="收合全部"
+                    >
+                      <ChevronsDownUp className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Density */}
