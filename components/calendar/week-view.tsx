@@ -559,38 +559,37 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                       </div>
                     </div>
                     {/* Pending/All-day tasks - always show with click to add */}
-                    {headerHeight > HEADER_DATE_HEIGHT && (
-                      <div 
-                        className="flex-1 px-0.5 pb-1 flex flex-col gap-px overflow-hidden cursor-pointer hover:bg-secondary/30 transition-colors"
-                        onClick={(e) => {
-                          // Only trigger if clicking on empty space, not a task
-                          if ((e.target as HTMLElement).closest('button')) return
-                          onCreateTask?.(dateStr, '09:00', '09:30')
-                        }}
-                        title="點擊新增任務"
-                      >
-                        {allDayTasks.map((task) => (
-                          <button
-                            key={task.id}
-                            onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
-                            className={cn(
-                              'w-full flex-shrink-0 text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate transition-opacity',
-                              'hover:opacity-80 active:opacity-70',
-                              task.isCompleted && 'opacity-40 line-through'
-                            )}
-                            style={{
-                              backgroundColor: task.calendarColor || task.workspaceColor,
-                              color: '#fff',
-                            }}
-                          >
-                            <span className="flex items-center gap-1 min-w-0">
-                              {task.isCompleted && <span className="flex-shrink-0">✓</span>}
-                              <span className="truncate">{task.title}</span>
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    <div 
+                      className="flex-1 px-0.5 pb-1 flex flex-col gap-px overflow-hidden cursor-pointer hover:bg-secondary/30 transition-colors border-t border-border/50"
+                      style={{ minHeight: `${headerHeight - HEADER_DATE_HEIGHT}px` }}
+                      onClick={(e) => {
+                        // Only trigger if clicking on empty space, not a task
+                        if ((e.target as HTMLElement).closest('button')) return
+                        onCreateTask?.(dateStr, '09:00', '09:30')
+                      }}
+                      title="點擊新增任務"
+                    >
+                      {allDayTasks.map((task) => (
+                        <button
+                          key={task.id}
+                          onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
+                          className={cn(
+                            'w-full flex-shrink-0 text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate transition-opacity',
+                            'hover:opacity-80 active:opacity-70',
+                            task.isCompleted && 'opacity-40 line-through'
+                          )}
+                          style={{
+                            backgroundColor: task.calendarColor || task.workspaceColor,
+                            color: '#fff',
+                          }}
+                        >
+                          <span className="flex items-center gap-1 min-w-0">
+                            {task.isCompleted && <span className="flex-shrink-0">✓</span>}
+                            <span className="truncate">{task.title}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )
               })}

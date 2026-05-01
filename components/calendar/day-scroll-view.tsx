@@ -450,10 +450,10 @@ const handleSelectType = useCallback((slotType: SlotType) => {
     }
   }, [isDragging, dragStart, dragEnd, yToTime])
 
-  // Resizable header height state
-  const [headerHeight, setHeaderHeight] = useState(72)
+  // Resizable header height state - default to show pending tasks area
+  const [headerHeight, setHeaderHeight] = useState(160)
   const HEADER_DATE_HEIGHT = 60
-  const HEADER_MIN = HEADER_DATE_HEIGHT
+  const HEADER_MIN = 100 // min: at least some space for pending tasks
   const HEADER_MAX = 360
   const isResizingHeader = useRef(false)
   const resizeStartY = useRef(0)
@@ -525,31 +525,37 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                         {date.getDate()}
                       </div>
                     </div>
-                    {/* Pending/All-day tasks - visible only when header expanded */}
-                    {allDayTasks.length > 0 && headerHeight > HEADER_DATE_HEIGHT && (
-                      <div className="px-1 pb-1.5 flex flex-col gap-0.5 overflow-hidden">
-                        {allDayTasks.map((task) => (
-                          <button
-                            key={task.id}
-                            onClick={() => onTaskSelect(task)}
-                            className={cn(
-                              'w-full flex-shrink-0 text-left px-2 py-1 rounded text-[11px] font-medium truncate transition-opacity',
-                              'hover:opacity-80 active:opacity-70',
-                              task.isCompleted && 'opacity-40 line-through'
-                            )}
-                            style={{
-                              backgroundColor: task.calendarColor || task.workspaceColor,
-                              color: '#fff',
-                            }}
-                          >
-                            <span className="flex items-center gap-1.5 min-w-0">
-                              {task.isCompleted && <span className="flex-shrink-0">✓</span>}
-                              <span className="truncate">{task.title}</span>
-                            </span>
-                          </button>
+                    {/* Pending/All-day tasks - always visible with click to add */}
+                    <div 
+                      className="flex-1 px-1 pb-1.5 flex flex-col gap-0.5 overflow-hidden cursor-pointer hover:bg-secondary/30 transition-colors border-t border-border/50"
+                      style={{ minHeight: `${headerHeight - HEADER_DATE_HEIGHT}px` }}
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('button')) return
+                        onCreateTask?.(dateStr, '09:00', '09:30')
+                      }}
+                      title="點擊新增任務"
+                    >
+                      {allDayTasks.map((task) => (
+                        <button
+                          key={task.id}
+                          onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
+                          className={cn(
+                            'w-full flex-shrink-0 text-left px-2 py-1 rounded text-[11px] font-medium truncate transition-opacity',
+                            'hover:opacity-80 active:opacity-70',
+                            task.isCompleted && 'opacity-40 line-through'
+                          )}
+                          style={{
+                            backgroundColor: task.calendarColor || task.workspaceColor,
+                            color: '#fff',
+                          }}
+                        >
+                          <span className="flex items-center gap-1.5 min-w-0">
+                            {task.isCompleted && <span className="flex-shrink-0">✓</span>}
+                            <span className="truncate">{task.title}</span>
+                          </span>
+                        </button>
                         ))}
-                      </div>
-                    )}
+                    </div>
                   </div>
                 )
               })}
