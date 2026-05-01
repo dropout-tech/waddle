@@ -234,6 +234,12 @@ export function DayScrollView({
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current
     if (!container || isScrolling.current) return
+    
+    // Don't trigger navigation while dragging tasks
+    if (activeTaskDrag || pendingTaskDrag) {
+      lastScrollLeft.current = container.scrollLeft
+      return
+    }
 
     const scrollLeft = container.scrollLeft
     const maxScroll = container.scrollWidth - container.clientWidth
@@ -260,7 +266,7 @@ export function DayScrollView({
     }
 
     lastScrollLeft.current = scrollLeft
-  }, [onNavigate])
+  }, [onNavigate, activeTaskDrag, pendingTaskDrag])
 
   // Get tasks for a specific date
   const getTasksForDate = useCallback((date: Date) => {
@@ -363,21 +369,27 @@ export function DayScrollView({
   }, [])
 
   // Global mouse move for cross-day task dragging (both scheduled and pending tasks)
+  // Use ref to track header height to avoid dependency issues
+  const headerHeightRef = useRef(160)
+  
   const handleGlobalMouseMove = useCallback((e: React.MouseEvent) => {
-    const gridEl = gridRef.current
-    if (!gridEl) return
+    const scrollContainer = scrollContainerRef.current
+    if (!scrollContainer) return
     
-    const gridRect = gridEl.getBoundingClientRect()
-    const scrollTop = scrollContainerRef.current?.scrollTop ?? 0
-    const scrollLeft = scrollContainerRef.current?.scrollLeft ?? 0
+    const containerRect = scrollContainer.getBoundingClientRect()
+    const scrollTop = scrollContainer.scrollTop
+    const scrollLeft = scrollContainer.scrollLeft
     
-    // Calculate which day column the mouse is over
-    const relX = e.clientX - gridRect.left - TIME_COL_WIDTH + scrollLeft
+    // Calculate mouse position relative to the scrollable content
+    const mouseXInContent = e.clientX - containerRect.left + scrollLeft
+    const mouseYInContent = e.clientY - containerRect.top + scrollTop - headerHeightRef.current
+    
+    // Calculate which day column the mouse is over (accounting for time column)
+    const relX = mouseXInContent - TIME_COL_WIDTH
     const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
     
     // Calculate time from Y position
-    const relY = e.clientY - gridRect.top + scrollTop
-    const minutes = snap(MIN + relY)
+    const minutes = snap(MIN + mouseYInContent)
     
     // Handle pending task drag (from header to grid)
     if (pendingTaskDrag) {
@@ -509,6 +521,8 @@ const handleSelectType = useCallback((slotType: SlotType) => {
 
   // Resizable header height state - default to show pending tasks area
   const [headerHeight, setHeaderHeight] = useState(160)
+  // Keep ref in sync for use in callbacks
+  useEffect(() => { headerHeightRef.current = headerHeight }, [headerHeight])
   const HEADER_DATE_HEIGHT = 60
   const HEADER_MIN = 100 // min: at least some space for pending tasks
   const HEADER_MAX = 360
