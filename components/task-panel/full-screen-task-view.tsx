@@ -43,7 +43,13 @@ export function FullScreenTaskView({
   const [taskFilter, setTaskFilter] = useState<'all' | 'today' | 'upcoming' | 'overdue' | 'unscheduled'>('all')
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<string>>(new Set(workspaces.map(w => w.id)))
   const [searchQuery, setSearchQuery] = useState('')
+  const [viewMode, setViewMode] = useState<'flat' | 'grouped'>('grouped')
+  const [sortBy, setSortBy] = useState<'category' | 'dueDate' | 'urgency' | 'created'>('category')
+  const [density, setDensity] = useState<'compact' | 'comfortable' | 'relaxed'>('comfortable')
+  const [addingTaskInCategory, setAddingTaskInCategory] = useState<string | null>(null)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
   
   const now = new Date()
   const todayStr = now.toISOString().split('T')[0]
@@ -525,8 +531,8 @@ export function FullScreenTaskView({
 
         {activeTab === 'tasks' && (
           <div className="p-6">
-            {/* Filter Bar */}
-            <div className="flex items-center gap-4 mb-6">
+            {/* Filter Bar Row 1 */}
+            <div className="flex items-center gap-4 mb-4">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
@@ -573,40 +579,295 @@ export function FullScreenTaskView({
               </select>
             </div>
 
+            {/* Filter Bar Row 2: View Controls */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                {/* View Mode */}
+                <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary">
+                  <button
+                    onClick={() => setViewMode('grouped')}
+                    className={cn(
+                      "px-2.5 py-1 rounded text-xs font-medium transition-colors",
+                      viewMode === 'grouped' ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    依分類
+                  </button>
+                  <button
+                    onClick={() => setViewMode('flat')}
+                    className={cn(
+                      "px-2.5 py-1 rounded text-xs font-medium transition-colors",
+                      viewMode === 'flat' ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    列表
+                  </button>
+                </div>
+
+                {/* Sort By */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="px-2.5 py-1.5 rounded-lg border border-border bg-card text-xs"
+                >
+                  <option value="category">依分類</option>
+                  <option value="dueDate">依到期日</option>
+                  <option value="urgency">依優先度</option>
+                  <option value="created">依建立時間</option>
+                </select>
+              </div>
+
+              {/* Density */}
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+                <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary">
+                  {[
+                    { id: 'compact', label: '緊湊' },
+                    { id: 'comfortable', label: '舒適' },
+                    { id: 'relaxed', label: '寬鬆' },
+                  ].map(d => (
+                    <button
+                      key={d.id}
+                      onClick={() => setDensity(d.id as typeof density)}
+                      className={cn(
+                        "px-2 py-1 rounded text-xs font-medium transition-colors",
+                        density === d.id ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             {/* Task List */}
-            <div className="space-y-2">
+            <div className="space-y-4">
               {filteredTasks.length === 0 ? (
                 <div className="py-16 text-center">
-                  <div className="text-4xl mb-4">
-                    {taskFilter === 'overdue' ? '🎉' : '📋'}
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-secondary/50 flex items-center justify-center">
+                    <CheckCircle2 className="w-8 h-8 text-muted-foreground" />
                   </div>
                   <div className="text-lg font-medium text-muted-foreground">
                     {taskFilter === 'overdue' ? '太棒了！沒有過期任務' : '沒有符合條件的任務'}
                   </div>
                 </div>
+              ) : viewMode === 'grouped' ? (
+                /* Grouped View */
+                workspaces.filter(ws => !ws.isArchived && (!selectedWorkspace || ws.id === selectedWorkspace)).map(workspace => {
+                  const wsTasksRaw = workspace.categories?.flatMap(cat => 
+                    cat.tasks?.filter(t => !t.isCompleted).map(t => ({
+                      ...t,
+                      workspaceName: workspace.name,
+                      workspaceColor: workspace.color,
+                      categoryName: cat.name,
+                      categoryId: cat.id
+                    })) || []
+                  ) || []
+                  
+                  // Apply filters
+                  const wsTasks = wsTasksRaw.filter(task => {
+                    if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) return false
+                    if (taskFilter === 'today') return task.scheduledDate === todayStr || task.dueDate === todayStr
+                    if (taskFilter === 'upcoming') {
+                      if (!task.dueDate) return false
+                      const due = new Date(task.dueDate)
+                      const threeDaysFromNow = new Date(now)
+                      threeDaysFromNow.setDate(now.getDate() + 3)
+                      return due > now && due <= threeDaysFromNow
+                    }
+                    if (taskFilter === 'overdue') return task.dueDate && new Date(task.dueDate) < now
+                    if (taskFilter === 'unscheduled') return !task.scheduledDate && !task.dueDate
+                    return true
+                  })
+
+                  if (wsTasks.length === 0) return null
+                  
+                  const isExpanded = expandedWorkspaces.has(workspace.id)
+                  
+                  return (
+                    <div key={workspace.id} className="rounded-xl border border-border overflow-hidden">
+                      {/* Workspace Header */}
+                      <button
+                        onClick={() => {
+                          const newSet = new Set(expandedWorkspaces)
+                          if (isExpanded) newSet.delete(workspace.id)
+                          else newSet.add(workspace.id)
+                          setExpandedWorkspaces(newSet)
+                        }}
+                        className="w-full flex items-center gap-3 p-4 bg-card hover:bg-secondary/50 transition-colors"
+                      >
+                        <ChevronDown className={cn("w-4 h-4 transition-transform", !isExpanded && "-rotate-90")} />
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: workspace.color }} />
+                        <span className="font-semibold">{workspace.name}</span>
+                        <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-secondary">
+                          {wsTasks.length}
+                        </span>
+                      </button>
+
+                      {/* Categories */}
+                      {isExpanded && (
+                        <div className="border-t border-border">
+                          {workspace.categories?.filter(cat => !cat.isArchived).map(category => {
+                            const catTasks = wsTasks.filter(t => t.categoryId === category.id)
+                            if (catTasks.length === 0 && addingTaskInCategory !== category.id) return null
+                            const isCatExpanded = expandedCategories.has(category.id)
+                            
+                            return (
+                              <div key={category.id} className="border-b border-border last:border-b-0">
+                                {/* Category Header */}
+                                <button
+                                  onClick={() => {
+                                    const newSet = new Set(expandedCategories)
+                                    if (isCatExpanded) newSet.delete(category.id)
+                                    else newSet.add(category.id)
+                                    setExpandedCategories(newSet)
+                                  }}
+                                  className="w-full flex items-center gap-3 px-6 py-2.5 hover:bg-secondary/30 transition-colors"
+                                >
+                                  <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", !isCatExpanded && "-rotate-90")} />
+                                  <span className="text-sm font-medium">{category.name}</span>
+                                  <span className="text-xs text-muted-foreground">{catTasks.length}</span>
+                                </button>
+
+                                {/* Tasks */}
+                                {isCatExpanded && (
+                                  <div className={cn(
+                                    "px-4 pb-2",
+                                    density === 'compact' && "space-y-1",
+                                    density === 'comfortable' && "space-y-2",
+                                    density === 'relaxed' && "space-y-3"
+                                  )}>
+                                    {catTasks.map(task => (
+                                      <div
+                                        key={task.id}
+                                        className={cn(
+                                          "flex items-center gap-3 rounded-lg border transition-all cursor-pointer group",
+                                          "bg-card border-border hover:border-primary/30 hover:shadow-sm",
+                                          density === 'compact' && "px-3 py-2",
+                                          density === 'comfortable' && "px-4 py-3",
+                                          density === 'relaxed' && "px-4 py-4"
+                                        )}
+                                        style={{ borderLeftColor: workspace.color, borderLeftWidth: '3px' }}
+                                        onClick={() => onTaskClick?.(task)}
+                                      >
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id) }}
+                                          className="w-5 h-5 rounded-full border-2 border-muted-foreground hover:border-primary hover:bg-primary/10 flex-shrink-0 transition-colors"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                          <div className={cn(
+                                            "font-medium truncate",
+                                            density === 'compact' && "text-sm"
+                                          )}>{task.title}</div>
+                                          {density !== 'compact' && task.estimatedMinutes && (
+                                            <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground">
+                                              <Clock className="w-3 h-3" />
+                                              {task.estimatedMinutes}m
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                          {task.urgency && (
+                                            <span className={cn(
+                                              "px-1.5 py-0.5 rounded text-[10px] font-medium",
+                                              task.urgency === 'high' && "bg-red-500/10 text-red-600",
+                                              task.urgency === 'medium' && "bg-orange-500/10 text-orange-600",
+                                              task.urgency === 'low' && "bg-green-500/10 text-green-600"
+                                            )}>
+                                              {task.urgency === 'high' ? '高' : task.urgency === 'medium' ? '中' : '低'}
+                                            </span>
+                                          )}
+                                          {task.dueDate && (
+                                            <span className={cn(
+                                              "text-xs",
+                                              new Date(task.dueDate) < now ? "text-red-500 font-medium" : "text-muted-foreground"
+                                            )}>
+                                              {formatDate(task.dueDate)}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+
+                                    {/* Add Task Button */}
+                                    {addingTaskInCategory === category.id ? (
+                                      <div className="flex items-center gap-2 px-3 py-2">
+                                        <input
+                                          type="text"
+                                          value={newTaskTitle}
+                                          onChange={(e) => setNewTaskTitle(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && newTaskTitle.trim()) {
+                                              onAddTask?.(category.id, newTaskTitle.trim())
+                                              setNewTaskTitle('')
+                                              setAddingTaskInCategory(null)
+                                            } else if (e.key === 'Escape') {
+                                              setNewTaskTitle('')
+                                              setAddingTaskInCategory(null)
+                                            }
+                                          }}
+                                          placeholder="輸入任務名稱..."
+                                          className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={() => {
+                                            if (newTaskTitle.trim()) {
+                                              onAddTask?.(category.id, newTaskTitle.trim())
+                                              setNewTaskTitle('')
+                                            }
+                                            setAddingTaskInCategory(null)
+                                          }}
+                                          className="px-3 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
+                                        >
+                                          新增
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => setAddingTaskInCategory(category.id)}
+                                        className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                      >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        新增任務
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
               ) : (
+                /* Flat List View */
                 filteredTasks.map(task => (
                   <div
                     key={task.id}
                     className={cn(
-                      "flex items-center gap-4 p-4 rounded-xl border transition-all cursor-pointer group",
+                      "flex items-center gap-4 rounded-xl border transition-all cursor-pointer group",
                       taskFilter === 'overdue'
                         ? "bg-red-500/5 border-red-500/20 hover:bg-red-500/10"
-                        : "bg-card border-border hover:border-primary/30 hover:shadow-sm"
+                        : "bg-card border-border hover:border-primary/30 hover:shadow-sm",
+                      density === 'compact' && "p-3",
+                      density === 'comfortable' && "p-4",
+                      density === 'relaxed' && "p-5"
                     )}
                     onClick={() => onTaskClick?.(task)}
                   >
                     <button
                       onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id) }}
                       className={cn(
-                        "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0",
+                        "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0",
                         taskFilter === 'overdue'
                           ? "border-red-400 hover:bg-red-500/20"
                           : "border-muted-foreground hover:border-primary hover:bg-primary/10"
                       )}
-                    >
-                      <Circle className="w-3 h-3 opacity-0 group-hover:opacity-50" />
-                    </button>
+                    />
 
                     <div 
                       className="w-3 h-3 rounded-full flex-shrink-0"
@@ -614,7 +875,7 @@ export function FullScreenTaskView({
                     />
 
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{task.title}</div>
+                      <div className={cn("font-medium truncate", density === 'compact' && "text-sm")}>{task.title}</div>
                       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                         <span>{task.workspaceName}</span>
                         <span>·</span>
