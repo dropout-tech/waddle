@@ -27,8 +27,6 @@ interface TaskPanelProps {
   onUpdateWorkspace?: (workspaceId: string, updates: Partial<Pick<import('@/lib/types').Workspace, 'name' | 'color' | 'icon'>>) => void
   onDeleteWorkspace?: (workspaceId: string) => void
   onArchiveWorkspace?: (workspaceId: string) => void
-  onOpenJournal: () => void
-  onOpenReport: () => void
   onOpenSettings?: () => void
   onClosePanel?: () => void
   onToggleExpand?: () => void
@@ -48,8 +46,6 @@ export function TaskPanel({
   onUpdateWorkspace,
   onDeleteWorkspace,
   onArchiveWorkspace,
-  onOpenJournal,
-  onOpenReport,
   onOpenSettings,
   onClosePanel,
   onToggleExpand,

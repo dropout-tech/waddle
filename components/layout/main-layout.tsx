@@ -27,8 +27,6 @@ interface MainLayoutProps {
   onUpdateWorkspace?: (workspaceId: string, updates: Partial<Pick<Workspace, 'name' | 'color' | 'icon'>>) => void
   onDeleteWorkspace?: (workspaceId: string) => void
   onArchiveWorkspace?: (workspaceId: string) => void
-  onOpenJournal: () => void
-  onOpenReport: () => void
   onOpenSettings?: () => void
   onCreateCalendarTask?: (date: string, startTime: string, endTime: string) => void
   onCreatePendingTask?: (title: string) => void
@@ -57,8 +55,6 @@ export function MainLayout({
   onUpdateWorkspace,
   onDeleteWorkspace,
   onArchiveWorkspace,
-  onOpenJournal,
-  onOpenReport,
   onOpenSettings,
   onCreateCalendarTask,
   onCreatePendingTask,
@@ -134,14 +130,12 @@ export function MainLayout({
   // Handle opening journal in focus mode
   const handleOpenJournalFocus = useCallback(() => {
     setFocusMode('journal')
-    onOpenJournal()
-  }, [onOpenJournal])
+  }, [])
 
   // Handle opening report in focus mode
   const handleOpenReportFocus = useCallback(() => {
     setFocusMode('report')
-    onOpenReport()
-  }, [onOpenReport])
+  }, [])
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden relative">
@@ -196,8 +190,6 @@ export function MainLayout({
               onUpdateWorkspace={onUpdateWorkspace}
               onDeleteWorkspace={onDeleteWorkspace}
               onArchiveWorkspace={onArchiveWorkspace}
-              onOpenJournal={onOpenJournal}
-              onOpenReport={onOpenReport}
               onOpenSettings={onOpenSettings}
               onClosePanel={() => setIsLeftPanelOpen(false)}
               onToggleExpand={() => setIsRightPanelOpen(false)}
@@ -413,7 +405,7 @@ function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], on
         <h3 className="text-sm font-medium text-muted-foreground">反思提示</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {[
-            '今天最有成就感的事是什麼？',
+            '今天最有成就感的事是什麼���',
             '有什麼事情可以做得更好？',
             '今天學到了什麼新東西？',
             '明天最重要的任務是什麼？'
