@@ -219,13 +219,23 @@ export function DayScrollView({
     }
   }, [])
 
-  // Handle scroll to detect edges
+  // Track last horizontal scroll position
+  const lastScrollLeft = useRef(0)
+
+  // Handle scroll to detect edges - only trigger on horizontal scroll
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current
     if (!container || isScrolling.current) return
 
     const scrollLeft = container.scrollLeft
     const maxScroll = container.scrollWidth - container.clientWidth
+
+    // Only trigger navigation if horizontal scroll changed significantly
+    const horizontalDelta = Math.abs(scrollLeft - lastScrollLeft.current)
+    if (horizontalDelta < 10) {
+      // Likely a vertical scroll, ignore
+      return
+    }
 
     if (scrollLeft < DAY_WIDTH * 0.5) {
       isScrolling.current = true
@@ -236,6 +246,8 @@ export function DayScrollView({
       onNavigate?.('next')
       requestAnimationFrame(() => { isScrolling.current = false })
     }
+
+    lastScrollLeft.current = scrollLeft
   }, [onNavigate])
 
   // Get tasks for a specific date

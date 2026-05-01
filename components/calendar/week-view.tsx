@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import type { Task, TimeBlock, SlotType } from '@/lib/types'
 import { CurrentTimeLine } from './current-time-line'
 import { TaskBlock, type TaskDragStart } from './task-block'
-import { CheckSquare, Coffee, Clock, Crosshair, User, Layers, X, ChevronLeft } from 'lucide-react'
+import { CheckSquare, Coffee, Clock, Crosshair, User, Layers, X, ChevronLeft, Plus } from 'lucide-react'
 
 // Map icon names to components
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -208,12 +208,20 @@ export function WeekView({
   }, [selectedDate])
 
   // Handle scroll to detect when user scrolls to edges and load more dates
+  // Only trigger on horizontal scroll, not vertical
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current
     if (!container || isScrolling.current) return
 
     const scrollLeft = container.scrollLeft
     const maxScroll = container.scrollWidth - container.clientWidth
+    
+    // Only trigger navigation if horizontal scroll position changed significantly
+    const horizontalDelta = Math.abs(scrollLeft - lastScrollLeft.current)
+    if (horizontalDelta < 10) {
+      // Likely a vertical scroll, ignore
+      return
+    }
     
     // If scrolled near the edges, update the selected date
     if (scrollLeft < DAY_WIDTH * 2) {
@@ -461,10 +469,10 @@ const handleSelectType = useCallback((slotType: SlotType) => {
     }
   }, [])
 
-  // Resizable header height state
-  const [headerHeight, setHeaderHeight] = useState(64) // min: date row only
+  // Resizable header height state - default to show ~4 task rows
+  const [headerHeight, setHeaderHeight] = useState(160) // default: show pending tasks
   const HEADER_DATE_HEIGHT = 52 // fixed date row height
-  const HEADER_MIN = HEADER_DATE_HEIGHT
+  const HEADER_MIN = 100 // min: at least some space for pending tasks
   const HEADER_MAX = 320
   const isResizingHeader = useRef(false)
   const resizeStartY = useRef(0)
@@ -539,29 +547,44 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                         {date.getDate()}
                       </div>
                     </div>
-                    {/* Pending/All-day tasks - scrollable within expanded area */}
-                    {allDayTasks.length > 0 && headerHeight > HEADER_DATE_HEIGHT && (
-                      <div className="px-0.5 pb-1 flex flex-col gap-px overflow-hidden">
-                        {allDayTasks.map((task) => (
-                          <button
-                            key={task.id}
-                            onClick={() => onTaskSelect(task)}
-                            className={cn(
-                              'w-full flex-shrink-0 text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate transition-opacity',
-                              'hover:opacity-80 active:opacity-70',
-                              task.isCompleted && 'opacity-40 line-through'
-                            )}
-                            style={{
-                              backgroundColor: task.calendarColor || task.workspaceColor,
-                              color: '#fff',
-                            }}
-                          >
-                            <span className="flex items-center gap-1 min-w-0">
-                              {task.isCompleted && <span className="flex-shrink-0">✓</span>}
-                              <span className="truncate">{task.title}</span>
-                            </span>
-                          </button>
-                        ))}
+                    {/* Pending/All-day tasks - always show with click to add */}
+                    {headerHeight > HEADER_DATE_HEIGHT && (
+                      <div 
+                        className="flex-1 px-0.5 pb-1 flex flex-col gap-px overflow-hidden cursor-pointer hover:bg-secondary/30 transition-colors"
+                        onClick={(e) => {
+                          // Only trigger if clicking on empty space, not a task
+                          if ((e.target as HTMLElement).closest('button')) return
+                          onCreateTask?.(dateStr, '09:00', '09:30')
+                        }}
+                        title="點擊新增任務"
+                      >
+                        {allDayTasks.length > 0 ? (
+                          allDayTasks.map((task) => (
+                            <button
+                              key={task.id}
+                              onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
+                              className={cn(
+                                'w-full flex-shrink-0 text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate transition-opacity',
+                                'hover:opacity-80 active:opacity-70',
+                                task.isCompleted && 'opacity-40 line-through'
+                              )}
+                              style={{
+                                backgroundColor: task.calendarColor || task.workspaceColor,
+                                color: '#fff',
+                              }}
+                            >
+                              <span className="flex items-center gap-1 min-w-0">
+                                {task.isCompleted && <span className="flex-shrink-0">✓</span>}
+                                <span className="truncate">{task.title}</span>
+                              </span>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="flex-1 flex items-center justify-center text-[10px] text-muted-foreground/40">
+                            <Plus className="w-3 h-3 mr-0.5" />
+                            <span>新增</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
