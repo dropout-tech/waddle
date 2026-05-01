@@ -390,7 +390,7 @@ export function DayScrollView({
     const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
     
     // Calculate time from Y position
-    const minutes = snap(MIN + mouseYInGrid)
+    const minutes = snap(MIN + mouseYInContent)
     
     // Handle pending task drag (from header to grid)
     if (pendingTaskDrag) {
