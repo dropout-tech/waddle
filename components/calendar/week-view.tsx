@@ -168,6 +168,14 @@ export function WeekView({
   // Task block drag state
   const [activeTaskDrag, setActiveTaskDrag] = useState<ActiveTaskDrag | null>(null)
 
+  // Pending task drag state (from header to grid)
+  const [pendingTaskDrag, setPendingTaskDrag] = useState<{
+    task: Task
+    currentDayIndex: number
+    currentMinutes: number
+    duration: number
+  } | null>(null)
+
   // Slot picker nested navigation
   const [selectedParent, setSelectedParent] = useState<string | null>(null)
 
@@ -319,6 +327,33 @@ export function WeekView({
   // Default duration for click-to-create (in minutes)
   const DEFAULT_DURATION = 30
 
+  // Handle pending task drag start from header
+  const handlePendingTaskDragStart = useCallback((task: Task, e: React.MouseEvent) => {
+    e.preventDefault()
+    const duration = task.estimatedMinutes || 30
+    // Start at 9:00 AM or current grid position if over grid
+    const gridEl = gridRef.current
+    let startMinutes = 9 * 60
+    let dayIndex = CENTER_DAY_INDEX
+    
+    if (gridEl) {
+      const gridRect = gridEl.getBoundingClientRect()
+      const scrollTop = scrollContainerRef.current?.scrollTop ?? 0
+      const scrollLeft = scrollContainerRef.current?.scrollLeft ?? 0
+      const relX = e.clientX - gridRect.left - TIME_COL_WIDTH + scrollLeft
+      const relY = e.clientY - gridRect.top + scrollTop
+      dayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
+      startMinutes = snap(MIN + Math.max(0, relY))
+    }
+    
+    setPendingTaskDrag({
+      task,
+      currentDayIndex: dayIndex,
+      currentMinutes: startMinutes,
+      duration,
+    })
+  }, [allDates.length, MIN])
+
   // Handle mouse down on grid to start new-slot drag or click
   const handleMouseDown = useCallback((e: React.MouseEvent, dayIndex: number) => {
     if ((e.target as HTMLElement).closest('[data-block]')) return
@@ -335,35 +370,45 @@ export function WeekView({
     setDragEnd({ day: dayIndex, y })
   }, [])
 
-  // Global mouse move for cross-day task dragging
+  // Global mouse move for cross-day task dragging (both scheduled and pending tasks)
   const handleGlobalMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!activeTaskDrag) return
-    
     const gridEl = gridRef.current
     if (!gridEl) return
     
     const gridRect = gridEl.getBoundingClientRect()
     const scrollTop = scrollContainerRef.current?.scrollTop ?? 0
+    const scrollLeft = scrollContainerRef.current?.scrollLeft ?? 0
     
     // Calculate which day column the mouse is over
-    const relX = e.clientX - gridRect.left - TIME_COL_WIDTH
+    const relX = e.clientX - gridRect.left - TIME_COL_WIDTH + scrollLeft
     const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
     
     // Calculate time from Y position
     const relY = e.clientY - gridRect.top + scrollTop
     const minutes = snap(MIN + relY)
-    const duration = activeTaskDrag.originalEnd - activeTaskDrag.originalStart
     
-    if (activeTaskDrag.dragType === 'move') {
-      const newStart = clamp(snap(minutes - activeTaskDrag.offsetY), MIN, MAX - 15)
-      const newEnd = clamp(newStart + duration, MIN + 15, MAX)
-      setActiveTaskDrag(prev => prev ? { ...prev, dayIndex: newDayIndex, currentStart: newStart, currentEnd: newEnd } : null)
-    } else if (activeTaskDrag.dragType === 'resize-top') {
-      setActiveTaskDrag(prev => prev ? { ...prev, currentStart: clamp(minutes, MIN, prev.currentEnd - 15) } : null)
-    } else if (activeTaskDrag.dragType === 'resize-bottom') {
-      setActiveTaskDrag(prev => prev ? { ...prev, currentEnd: clamp(minutes, prev.currentStart + 15, MAX) } : null)
+    // Handle pending task drag (from header to grid)
+    if (pendingTaskDrag) {
+      const newStart = clamp(snap(minutes), MIN, MAX - 15)
+      setPendingTaskDrag(prev => prev ? { ...prev, currentDayIndex: newDayIndex, currentMinutes: newStart } : null)
+      return
     }
-  }, [activeTaskDrag, allDates.length, MIN, MAX])
+    
+    // Handle scheduled task drag
+    if (activeTaskDrag) {
+      const duration = activeTaskDrag.originalEnd - activeTaskDrag.originalStart
+      
+      if (activeTaskDrag.dragType === 'move') {
+        const newStart = clamp(snap(minutes - activeTaskDrag.offsetY), MIN, MAX - 15)
+        const newEnd = clamp(newStart + duration, MIN + 15, MAX)
+        setActiveTaskDrag(prev => prev ? { ...prev, dayIndex: newDayIndex, currentStart: newStart, currentEnd: newEnd } : null)
+      } else if (activeTaskDrag.dragType === 'resize-top') {
+        setActiveTaskDrag(prev => prev ? { ...prev, currentStart: clamp(minutes, MIN, prev.currentEnd - 15) } : null)
+      } else if (activeTaskDrag.dragType === 'resize-bottom') {
+        setActiveTaskDrag(prev => prev ? { ...prev, currentEnd: clamp(minutes, prev.currentStart + 15, MAX) } : null)
+      }
+    }
+  }, [activeTaskDrag, pendingTaskDrag, allDates.length, MIN, MAX])
 
   // Handle mouse move for new-slot drag (per column)
   const handleMouseMove = useCallback((e: React.MouseEvent, dayIndex: number) => {
@@ -377,6 +422,19 @@ export function WeekView({
 
   // Handle mouse up - detect click vs drag
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    // Handle pending task drop
+    if (pendingTaskDrag) {
+      const date = allDates[pendingTaskDrag.currentDayIndex]?.toISOString().split('T')[0]
+      if (date) {
+        const startTime = minutesToTime(pendingTaskDrag.currentMinutes)
+        const endTime = minutesToTime(pendingTaskDrag.currentMinutes + pendingTaskDrag.duration)
+        onRescheduleTask?.(pendingTaskDrag.task.id, date, startTime, endTime)
+      }
+      setPendingTaskDrag(null)
+      return
+    }
+
+    // Handle scheduled task drop
     if (activeTaskDrag) {
       const date = allDates[activeTaskDrag.dayIndex]?.toISOString().split('T')[0]
       if (date) {
@@ -430,7 +488,7 @@ export function WeekView({
     setDragStart(null)
     setDragEnd(null)
     mouseDownPos.current = null
-  }, [isDragging, dragStart, dragEnd, allDates, yToTime, activeTaskDrag, onRescheduleTask, endHour])
+  }, [isDragging, dragStart, dragEnd, allDates, yToTime, activeTaskDrag, pendingTaskDrag, onRescheduleTask, endHour])
 
   // Handle slot type selection
 const handleSelectType = useCallback((slotType: SlotType) => {
@@ -570,13 +628,18 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                       title="點擊新增任務"
                     >
                       {allDayTasks.map((task) => (
-                        <button
+                        <div
                           key={task.id}
+                          onMouseDown={(e) => {
+                            e.stopPropagation()
+                            handlePendingTaskDragStart(task, e)
+                          }}
                           onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
                           className={cn(
-                            'w-full flex-shrink-0 text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate transition-opacity',
-                            'hover:opacity-80 active:opacity-70',
-                            task.isCompleted && 'opacity-40 line-through'
+                            'w-full flex-shrink-0 text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate cursor-grab active:cursor-grabbing select-none',
+                            'hover:opacity-90 hover:shadow-sm transition-all',
+                            task.isCompleted && 'opacity-40 line-through',
+                            pendingTaskDrag?.task.id === task.id && 'opacity-30'
                           )}
                           style={{
                             backgroundColor: task.calendarColor || task.workspaceColor,
@@ -587,7 +650,7 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                             {task.isCompleted && <span className="flex-shrink-0">✓</span>}
                             <span className="truncate">{task.title}</span>
                           </span>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -621,7 +684,11 @@ const handleSelectType = useCallback((slotType: SlotType) => {
           style={{ width: `${TIME_COL_WIDTH + DAYS_TO_RENDER * DAY_WIDTH}px` }}
           onMouseMove={handleGlobalMouseMove}
           onMouseUp={(e) => handleMouseUp(e)}
-          onMouseLeave={(e) => handleMouseUp(e)}
+          onMouseLeave={(e) => {
+            handleMouseUp(e)
+            // Also cancel pending task drag on leave
+            if (pendingTaskDrag) setPendingTaskDrag(null)
+          }}
         >
           {/* Time labels column - sticky left */}
           <div className="w-14 flex-shrink-0 sticky left-0 z-20 bg-panel border-r border-border">
@@ -724,6 +791,25 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                     </div>
                     <div className="text-[10px] text-white/80 font-mono mt-0.5">
                       {minutesToTime(activeTaskDrag.currentStart)}-{minutesToTime(activeTaskDrag.currentEnd)}
+                    </div>
+                  </div>
+                )}
+
+                {/* Show pending task drag preview when dragging from header to this day */}
+                {pendingTaskDrag && pendingTaskDrag.currentDayIndex === dayIndex && (
+                  <div
+                    className="absolute left-1 right-1 rounded-xl px-2 py-1.5 text-left overflow-hidden pointer-events-none z-30 shadow-xl border-2 border-white/50"
+                    style={{
+                      top: `${pendingTaskDrag.currentMinutes - MIN}px`,
+                      height: `${Math.max(pendingTaskDrag.duration, 30)}px`,
+                      backgroundColor: pendingTaskDrag.task.calendarColor || pendingTaskDrag.task.workspaceColor || '#6B7FD4',
+                    }}
+                  >
+                    <div className="text-xs font-semibold text-white truncate">
+                      {pendingTaskDrag.task.title}
+                    </div>
+                    <div className="text-[10px] text-white/80 font-mono mt-0.5">
+                      {minutesToTime(pendingTaskDrag.currentMinutes)}-{minutesToTime(pendingTaskDrag.currentMinutes + pendingTaskDrag.duration)}
                     </div>
                   </div>
                 )}
