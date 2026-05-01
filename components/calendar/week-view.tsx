@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import type { Task, TimeBlock, SlotType } from '@/lib/types'
 import { CurrentTimeLine } from './current-time-line'
 import { TaskBlock, type TaskDragStart } from './task-block'
-import { CheckSquare, Coffee, Clock, Crosshair, User, Layers, X, ChevronLeft, Plus } from 'lucide-react'
+import { CheckSquare, Coffee, Clock, Crosshair, User, Layers, X, ChevronLeft } from 'lucide-react'
 
 // Map icon names to components
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -402,8 +402,11 @@ export function WeekView({
       const endMinutes = Math.min(startMinutes + DEFAULT_DURATION, endHour * 60)
       const endTime = `${Math.floor(endMinutes / 60).toString().padStart(2, '0')}:${(endMinutes % 60).toString().padStart(2, '0')}`
       const date = allDates[dragStart.day].toISOString().split('T')[0]
-      const anchorX = TIME_COL_WIDTH + dragStart.day * DAY_WIDTH + DAY_WIDTH / 2
-      setPendingSlot({ date, startTime, endTime, anchorX, anchorY: dragStart.y })
+      // Use viewport coordinates from the original mouse event
+      const rect = scrollContainerRef.current?.getBoundingClientRect()
+      const anchorX = (rect?.left || 0) + TIME_COL_WIDTH + dragStart.day * DAY_WIDTH + DAY_WIDTH / 2 - (scrollContainerRef.current?.scrollLeft || 0)
+      const anchorY = (rect?.top || 0) + dragStart.y + headerHeight - (scrollContainerRef.current?.scrollTop || 0)
+      setPendingSlot({ date, startTime, endTime, anchorX, anchorY })
     } else if (dragStart.day === dragEnd.day && Math.abs(dragEnd.y - dragStart.y) > 15) {
       // Drag: use dragged range
       const minY = Math.min(dragStart.y, dragEnd.y)
@@ -411,8 +414,11 @@ export function WeekView({
       const startTime = yToTime(minY)
       const endTime = yToTime(maxY)
       const date = allDates[dragStart.day].toISOString().split('T')[0]
-      const anchorX = TIME_COL_WIDTH + dragStart.day * DAY_WIDTH + DAY_WIDTH / 2
-      setPendingSlot({ date, startTime, endTime, anchorX, anchorY: minY })
+      // Use viewport coordinates
+      const rect = scrollContainerRef.current?.getBoundingClientRect()
+      const anchorX = (rect?.left || 0) + TIME_COL_WIDTH + dragStart.day * DAY_WIDTH + DAY_WIDTH / 2 - (scrollContainerRef.current?.scrollLeft || 0)
+      const anchorY = (rect?.top || 0) + minY + headerHeight - (scrollContainerRef.current?.scrollTop || 0)
+      setPendingSlot({ date, startTime, endTime, anchorX, anchorY })
     }
 
     setIsDragging(false)
@@ -558,33 +564,26 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                         }}
                         title="點擊新增任務"
                       >
-                        {allDayTasks.length > 0 ? (
-                          allDayTasks.map((task) => (
-                            <button
-                              key={task.id}
-                              onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
-                              className={cn(
-                                'w-full flex-shrink-0 text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate transition-opacity',
-                                'hover:opacity-80 active:opacity-70',
-                                task.isCompleted && 'opacity-40 line-through'
-                              )}
-                              style={{
-                                backgroundColor: task.calendarColor || task.workspaceColor,
-                                color: '#fff',
-                              }}
-                            >
-                              <span className="flex items-center gap-1 min-w-0">
-                                {task.isCompleted && <span className="flex-shrink-0">✓</span>}
-                                <span className="truncate">{task.title}</span>
-                              </span>
-                            </button>
-                          ))
-                        ) : (
-                          <div className="flex-1 flex items-center justify-center text-[10px] text-muted-foreground/40">
-                            <Plus className="w-3 h-3 mr-0.5" />
-                            <span>新增</span>
-                          </div>
-                        )}
+                        {allDayTasks.map((task) => (
+                          <button
+                            key={task.id}
+                            onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
+                            className={cn(
+                              'w-full flex-shrink-0 text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate transition-opacity',
+                              'hover:opacity-80 active:opacity-70',
+                              task.isCompleted && 'opacity-40 line-through'
+                            )}
+                            style={{
+                              backgroundColor: task.calendarColor || task.workspaceColor,
+                              color: '#fff',
+                            }}
+                          >
+                            <span className="flex items-center gap-1 min-w-0">
+                              {task.isCompleted && <span className="flex-shrink-0">✓</span>}
+                              <span className="truncate">{task.title}</span>
+                            </span>
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -747,18 +746,18 @@ const handleSelectType = useCallback((slotType: SlotType) => {
           })}
         </div>
 
-        {/* Type picker popup */}
+        {/* Type picker popup - fixed position near click location */}
 {pendingSlot && (
           <>
           <div
-            className="fixed inset-0 z-30"
+            className="fixed inset-0 z-[100]"
             onMouseDown={(e) => { e.stopPropagation(); setPendingSlot(null); setSelectedParent(null) }}
           />
           <div
-            className="absolute z-40 bg-card border border-border rounded-2xl shadow-2xl p-3 w-56"
+            className="fixed z-[101] bg-card border border-border rounded-2xl shadow-2xl p-3 w-56"
             style={{
-              left: `${Math.min(pendingSlot.anchorX, (scrollContainerRef.current?.clientWidth || 400) - 240)}px`,
-              top: `${Math.min(pendingSlot.anchorY, hours.length * 60 - 220)}px`
+              left: `${Math.min(Math.max(pendingSlot.anchorX - 112, 8), window.innerWidth - 240)}px`,
+              top: `${Math.min(Math.max(pendingSlot.anchorY, 8), window.innerHeight - 320)}px`
             }}
             onMouseDown={(e) => e.stopPropagation()}
           >
