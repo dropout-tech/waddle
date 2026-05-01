@@ -191,14 +191,19 @@ export function TaskRow({
           )}
         </div>
 
-        {/* Meta Info Row */}
+        {/* Meta Info Row - Order: Date → Time Slot → Duration (temporal hierarchy) */}
         <div className="flex flex-wrap items-center gap-3 mt-1.5">
-          {task.estimatedMinutes && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-              <Timer className="w-3 h-3" />
-              <span className="font-medium">{formatEstimatedTime(task.estimatedMinutes)}</span>
+          {/* 1. Date - which day */}
+          {task.dueDate && (
+            <span
+              className="inline-flex items-center gap-1 text-[11px] font-medium"
+              style={{ color: colors.isOverdue ? colors.accentColor : 'oklch(0.52 0.02 55)' }}
+            >
+              <Calendar className="w-3 h-3" />
+              <span>{task.dueDate}</span>
             </span>
           )}
+          {/* 2. Time slot - when on that day */}
           {task.scheduledStartTime && (
             <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: colors.accentColor }}>
               <Clock className="w-3 h-3" />
@@ -207,13 +212,11 @@ export function TaskRow({
               </span>
             </span>
           )}
-          {task.dueDate && (
-            <span
-              className="inline-flex items-center gap-1 text-[11px] font-medium"
-              style={{ color: colors.isOverdue ? colors.accentColor : 'oklch(0.52 0.02 55)' }}
-            >
-              <Calendar className="w-3 h-3" />
-              <span>{task.dueDate}</span>
+          {/* 3. Estimated duration - how long */}
+          {task.estimatedMinutes && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Timer className="w-3 h-3" />
+              <span className="font-medium">{formatEstimatedTime(task.estimatedMinutes)}</span>
             </span>
           )}
         </div>
