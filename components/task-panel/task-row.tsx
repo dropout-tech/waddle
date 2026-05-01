@@ -4,7 +4,7 @@ import { Check, Clock, Calendar, MessageSquare, Timer, AlertCircle, GripVertical
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import { getUrgencyColor, formatEstimatedTime } from '@/lib/task-utils'
-import type { Density } from './task-panel'
+import type { Density, MetaField } from './task-panel'
 import {
   Tooltip,
   TooltipContent,
@@ -15,15 +15,19 @@ import {
 interface TaskRowProps {
   task: Task
   density?: Density
+  metaOrder?: MetaField[]
   onToggleComplete: (taskId: string) => void
   onSelect: (task: Task) => void
   isDragging?: boolean
   showWorkspaceTag?: boolean
 }
 
+const DEFAULT_META_ORDER: MetaField[] = ['duration', 'date', 'time']
+
 export function TaskRow({
   task,
   density = 'comfortable',
+  metaOrder = DEFAULT_META_ORDER,
   onToggleComplete,
   onSelect,
   isDragging,
@@ -191,34 +195,41 @@ export function TaskRow({
           )}
         </div>
 
-        {/* Meta Info Row - Order: Date → Time Slot → Duration (temporal hierarchy) */}
+        {/* Meta Info Row - dynamic order from user preference */}
         <div className="flex flex-wrap items-center gap-3 mt-1.5">
-          {/* 1. Date - which day */}
-          {task.dueDate && (
-            <span
-              className="inline-flex items-center gap-1 text-[11px] font-medium"
-              style={{ color: colors.isOverdue ? colors.accentColor : 'oklch(0.52 0.02 55)' }}
-            >
-              <Calendar className="w-3 h-3" />
-              <span>{task.dueDate}</span>
-            </span>
-          )}
-          {/* 2. Time slot - when on that day */}
-          {task.scheduledStartTime && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: colors.accentColor }}>
-              <Clock className="w-3 h-3" />
-              <span className="font-mono">
-                {task.scheduledStartTime}{task.scheduledEndTime && ` - ${task.scheduledEndTime}`}
-              </span>
-            </span>
-          )}
-          {/* 3. Estimated duration - how long */}
-          {task.estimatedMinutes && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-              <Timer className="w-3 h-3" />
-              <span className="font-medium">{formatEstimatedTime(task.estimatedMinutes)}</span>
-            </span>
-          )}
+          {metaOrder.map((field) => {
+            if (field === 'duration' && task.estimatedMinutes) {
+              return (
+                <span key="duration" className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <Timer className="w-3 h-3" />
+                  <span className="font-medium">{formatEstimatedTime(task.estimatedMinutes)}</span>
+                </span>
+              )
+            }
+            if (field === 'date' && task.dueDate) {
+              return (
+                <span
+                  key="date"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium"
+                  style={{ color: colors.isOverdue ? colors.accentColor : 'oklch(0.52 0.02 55)' }}
+                >
+                  <Calendar className="w-3 h-3" />
+                  <span>{task.dueDate}</span>
+                </span>
+              )
+            }
+            if (field === 'time' && task.scheduledStartTime) {
+              return (
+                <span key="time" className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: colors.accentColor }}>
+                  <Clock className="w-3 h-3" />
+                  <span className="font-mono">
+                    {task.scheduledStartTime}{task.scheduledEndTime && ` - ${task.scheduledEndTime}`}
+                  </span>
+                </span>
+              )
+            }
+            return null
+          })}
         </div>
 
         {/* Notes preview */}

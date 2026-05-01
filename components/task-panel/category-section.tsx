@@ -5,11 +5,12 @@ import { ChevronDown, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Category, Task } from '@/lib/types'
 import { TaskRow } from './task-row'
-import type { Density } from './task-panel'
+import type { Density, MetaField } from './task-panel'
 
 interface CategorySectionProps {
   category: Category
   density?: Density
+  metaOrder?: MetaField[]
   onToggleCollapse: (categoryId: string) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
@@ -19,6 +20,7 @@ interface CategorySectionProps {
 export function CategorySection({
   category,
   density = 'comfortable',
+  metaOrder,
   onToggleCollapse,
   onToggleComplete,
   onSelectTask,
@@ -96,6 +98,7 @@ export function CategorySection({
               key={task.id}
               task={task}
               density={density}
+              metaOrder={metaOrder}
               onToggleComplete={onToggleComplete}
               onSelect={onSelectTask}
             />

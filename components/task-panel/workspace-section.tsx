@@ -4,11 +4,12 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { Workspace, Task } from '@/lib/types'
 import { CategorySection } from './category-section'
-import type { Density } from './task-panel'
+import type { Density, MetaField } from './task-panel'
 
 interface WorkspaceSectionProps {
   workspace: Workspace
   density?: Density
+  metaOrder?: MetaField[]
   onToggleCategoryCollapse: (categoryId: string) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
@@ -19,6 +20,7 @@ interface WorkspaceSectionProps {
 export function WorkspaceSection({
   workspace,
   density = 'comfortable',
+  metaOrder,
   onToggleCategoryCollapse,
   onToggleComplete,
   onSelectTask,
@@ -85,6 +87,7 @@ export function WorkspaceSection({
               key={category.id}
               category={category}
               density={density}
+              metaOrder={metaOrder}
               onToggleCollapse={onToggleCategoryCollapse}
               onToggleComplete={onToggleComplete}
               onSelectTask={onSelectTask}

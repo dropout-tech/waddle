@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Filter, X, ChevronDown, AlignJustify, Minus } from 'lucide-react'
+import { Search, Filter, X, ChevronDown, AlignJustify, Minus, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { Density } from './task-panel'
+import type { Density, MetaField } from './task-panel'
 
 export interface FilterState {
   search: string
@@ -17,16 +17,26 @@ const DENSITY_OPTIONS: { value: Density; icon: React.ReactNode; label: string }[
   { value: 'comfortable', icon: <AlignJustify className="w-3.5 h-3.5" />, label: '詳細' },
 ]
 
+const META_FIELD_LABELS: Record<MetaField, string> = {
+  duration: '花費時間',
+  date: '日期',
+  time: '時間段',
+}
+
 interface FilterBarProps {
   filters: FilterState
   onFiltersChange: (filters: FilterState) => void
   workspaces: { id: string; name: string; color: string }[]
   density: Density
   onDensityChange: (d: Density) => void
+  metaOrder: MetaField[]
+  onMetaOrderChange: (order: MetaField[]) => void
 }
 
-export function FilterBar({ filters, onFiltersChange, workspaces, density, onDensityChange }: FilterBarProps) {
+export function FilterBar({ filters, onFiltersChange, workspaces, density, onDensityChange, metaOrder, onMetaOrderChange }: FilterBarProps) {
   const [showFilterPanel, setShowFilterPanel] = useState(false)
+  const [draggingField, setDraggingField] = useState<MetaField | null>(null)
+  const [dragOverField, setDragOverField] = useState<MetaField | null>(null)
 
   const hasActiveFilters =
     filters.urgency.length > 0 ||
@@ -212,6 +222,49 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
                 )}
               />
             </button>
+          </div>
+
+          {/* Meta Info Order */}
+          <div>
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+              資訊顯示順序
+            </span>
+            <div className="flex items-center gap-1.5 mt-1.5">
+              {metaOrder.map((field, index) => (
+                <div
+                  key={field}
+                  draggable
+                  onDragStart={() => setDraggingField(field)}
+                  onDragEnd={() => {
+                    if (draggingField && dragOverField && draggingField !== dragOverField) {
+                      const from = metaOrder.indexOf(draggingField)
+                      const to = metaOrder.indexOf(dragOverField)
+                      const next = [...metaOrder]
+                      next.splice(from, 1)
+                      next.splice(to, 0, draggingField)
+                      onMetaOrderChange(next)
+                    }
+                    setDraggingField(null)
+                    setDragOverField(null)
+                  }}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverField(field) }}
+                  onDragLeave={() => setDragOverField(null)}
+                  className={cn(
+                    'flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-medium cursor-grab active:cursor-grabbing select-none transition-all',
+                    draggingField === field
+                      ? 'opacity-40 border-primary/40 bg-primary/5'
+                      : dragOverField === field
+                      ? 'border-primary bg-primary/10 text-primary scale-105'
+                      : 'border-border bg-muted/50 text-muted-foreground hover:border-primary/30 hover:text-foreground'
+                  )}
+                >
+                  <GripVertical className="w-2.5 h-2.5 opacity-50" />
+                  <span className="text-[9px] text-muted-foreground/60 font-mono mr-0.5">{index + 1}</span>
+                  {META_FIELD_LABELS[field]}
+                </div>
+              ))}
+            </div>
+            <p className="text-[9px] text-muted-foreground/50 mt-1">拖曳調整顯示順序</p>
           </div>
         </div>
       )}

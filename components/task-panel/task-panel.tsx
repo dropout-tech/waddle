@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 
 export type Density = 'compact' | 'comfortable'
 export type ViewMode = 'category' | 'unified'
+export type MetaField = 'duration' | 'time' | 'date'
 
 interface TaskPanelProps {
   workspaces: Workspace[]
@@ -54,6 +55,13 @@ export function TaskPanel({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [density, setDensity] = useState<Density>('comfortable')
   const [viewMode, setViewMode] = useState<ViewMode>('category')
+  const [metaOrder, setMetaOrder] = useState<MetaField[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('flowdesk-meta-order')
+      if (saved) return JSON.parse(saved) as MetaField[]
+    }
+    return ['duration', 'date', 'time']
+  })
   const [toolbarOpen, setToolbarOpen] = useState(false)
   const [filters, setFilters] = useState<FilterState>({
     search: '',
@@ -206,6 +214,11 @@ export function TaskPanel({
               workspaces={workspaces.map((w) => ({ id: w.id, name: w.name, color: w.color }))}
               density={density}
               onDensityChange={setDensity}
+              metaOrder={metaOrder}
+              onMetaOrderChange={(order) => {
+                setMetaOrder(order)
+                localStorage.setItem('flowdesk-meta-order', JSON.stringify(order))
+              }}
             />
           </div>
         )}
@@ -222,6 +235,7 @@ export function TaskPanel({
               <WorkspaceSection
                 workspace={workspace}
                 density={density}
+                metaOrder={metaOrder}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
                 onToggleComplete={onToggleComplete}
                 onSelectTask={onSelectTask}
@@ -234,6 +248,7 @@ export function TaskPanel({
           <UnifiedTaskList
             tasks={allFilteredTasks}
             density={density}
+            metaOrder={metaOrder}
             onToggleComplete={onToggleComplete}
             onSelectTask={onSelectTask}
           />

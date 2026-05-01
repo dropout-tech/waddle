@@ -3,12 +3,12 @@
 import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/types'
-import type { Density } from './task-panel'
-import { TaskRow } from './task-row'
+import type { Density, MetaField } from './task-panel'
 
 interface UnifiedTaskListProps {
   tasks: Task[]
   density: Density
+  metaOrder?: MetaField[]
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
 }
@@ -16,6 +16,7 @@ interface UnifiedTaskListProps {
 export function UnifiedTaskList({
   tasks,
   density,
+  metaOrder,
   onToggleComplete,
   onSelectTask,
 }: UnifiedTaskListProps) {
@@ -127,6 +128,7 @@ export function UnifiedTaskList({
                   <TaskRow
                     task={task}
                     density={density}
+                    metaOrder={metaOrder}
                     onToggleComplete={onToggleComplete}
                     onSelect={onSelectTask}
                     showWorkspaceTag
