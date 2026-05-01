@@ -369,27 +369,25 @@ export function DayScrollView({
   }, [])
 
   // Global mouse move for cross-day task dragging (both scheduled and pending tasks)
-  // Use ref to track header height to avoid dependency issues
-  const headerHeightRef = useRef(160)
-  
   const handleGlobalMouseMove = useCallback((e: React.MouseEvent) => {
+    const gridEl = gridRef.current
+    if (!gridEl) return
+    
+    const gridRect = gridEl.getBoundingClientRect()
     const scrollContainer = scrollContainerRef.current
-    if (!scrollContainer) return
+    const scrollTop = scrollContainer?.scrollTop ?? 0
+    const scrollLeft = scrollContainer?.scrollLeft ?? 0
     
-    const containerRect = scrollContainer.getBoundingClientRect()
-    const scrollTop = scrollContainer.scrollTop
-    const scrollLeft = scrollContainer.scrollLeft
-    
-    // Calculate mouse position relative to the scrollable content
-    const mouseXInContent = e.clientX - containerRect.left + scrollLeft
-    const mouseYInContent = e.clientY - containerRect.top + scrollTop - headerHeightRef.current
+    // gridRect gives the viewport position of the grid element
+    const mouseXInGrid = e.clientX - gridRect.left + scrollLeft
+    const mouseYInGrid = e.clientY - gridRect.top + scrollTop
     
     // Calculate which day column the mouse is over (accounting for time column)
-    const relX = mouseXInContent - TIME_COL_WIDTH
+    const relX = mouseXInGrid - TIME_COL_WIDTH
     const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
     
     // Calculate time from Y position
-    const minutes = snap(MIN + mouseYInContent)
+    const minutes = snap(MIN + mouseYInGrid)
     
     // Handle pending task drag (from header to grid)
     if (pendingTaskDrag) {
@@ -403,13 +401,16 @@ export function DayScrollView({
       const duration = activeTaskDrag.originalEnd - activeTaskDrag.originalStart
       
       if (activeTaskDrag.dragType === 'move') {
+        // Move: can change both day and time
         const newStart = clamp(snap(minutes - activeTaskDrag.offsetY), MIN, MAX - 15)
         const newEnd = clamp(newStart + duration, MIN + 15, MAX)
         setActiveTaskDrag(prev => prev ? { ...prev, dayIndex: newDayIndex, currentStart: newStart, currentEnd: newEnd } : null)
       } else if (activeTaskDrag.dragType === 'resize-top') {
-        setActiveTaskDrag(prev => prev ? { ...prev, currentStart: clamp(minutes, MIN, prev.currentEnd - 15) } : null)
+        // Resize top: only change start time, keep same day
+        setActiveTaskDrag(prev => prev ? { ...prev, currentStart: clamp(snap(minutes), MIN, prev.currentEnd - 15) } : null)
       } else if (activeTaskDrag.dragType === 'resize-bottom') {
-        setActiveTaskDrag(prev => prev ? { ...prev, currentEnd: clamp(minutes, prev.currentStart + 15, MAX) } : null)
+        // Resize bottom: only change end time, keep same day
+        setActiveTaskDrag(prev => prev ? { ...prev, currentEnd: clamp(snap(minutes), prev.currentStart + 15, MAX) } : null)
       }
     }
   }, [activeTaskDrag, pendingTaskDrag, allDates.length, MIN, MAX])
@@ -521,8 +522,6 @@ const handleSelectType = useCallback((slotType: SlotType) => {
 
   // Resizable header height state - default to show pending tasks area
   const [headerHeight, setHeaderHeight] = useState(160)
-  // Keep ref in sync for use in callbacks
-  useEffect(() => { headerHeightRef.current = headerHeight }, [headerHeight])
   const HEADER_DATE_HEIGHT = 60
   const HEADER_MIN = 100 // min: at least some space for pending tasks
   const HEADER_MAX = 360
