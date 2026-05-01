@@ -371,19 +371,22 @@ export function DayScrollView({
   // Global mouse move for cross-day task dragging (both scheduled and pending tasks)
   const handleGlobalMouseMove = useCallback((e: React.MouseEvent) => {
     const gridEl = gridRef.current
-    if (!gridEl) return
-    
-    const gridRect = gridEl.getBoundingClientRect()
     const scrollContainer = scrollContainerRef.current
-    const scrollTop = scrollContainer?.scrollTop ?? 0
-    const scrollLeft = scrollContainer?.scrollLeft ?? 0
+    if (!gridEl || !scrollContainer) return
     
-    // gridRect gives the viewport position of the grid element
-    const mouseXInGrid = e.clientX - gridRect.left + scrollLeft
-    const mouseYInGrid = e.clientY - gridRect.top + scrollTop
+    // Use scroll container rect for accurate positioning
+    const containerRect = scrollContainer.getBoundingClientRect()
+    const scrollTop = scrollContainer.scrollTop
+    const scrollLeft = scrollContainer.scrollLeft
+    
+    // Calculate mouse position in the scrollable content coordinate system
+    // e.clientX/Y is viewport position, containerRect.left/top is container's viewport position
+    // Adding scroll offset gives us position in the full scrollable content
+    const mouseXInContent = e.clientX - containerRect.left + scrollLeft
+    const mouseYInContent = e.clientY - containerRect.top + scrollTop
     
     // Calculate which day column the mouse is over (accounting for time column)
-    const relX = mouseXInGrid - TIME_COL_WIDTH
+    const relX = mouseXInContent - TIME_COL_WIDTH
     const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
     
     // Calculate time from Y position
