@@ -592,14 +592,36 @@ function TimeBlockSection({
     onEndTimeChange(formatTimeFromMinutes(next))
   }
 
+  // Has any schedule info → user can wipe everything in one click and send
+  // the task back to the unscheduled bucket in the left panel.
+  const hasSchedule = !!scheduledDate || !!startTime || !!endTime
+  const handleClearAll = () => {
+    onScheduledDateChange('')
+    onStartTimeChange('')
+    onEndTimeChange('')
+  }
+
   return (
     <div className="space-y-3 p-4 rounded-xl bg-secondary/30 border border-border">
       {/* Date */}
       <div className="space-y-1.5">
-        <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          <Calendar className="w-3.5 h-3.5" />
-          排程日期
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Calendar className="w-3.5 h-3.5" />
+            排程日期
+          </label>
+          {hasSchedule && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              title="清空日期與時段，任務移回左側待排程"
+            >
+              <X className="w-3 h-3" />
+              取消排程
+            </button>
+          )}
+        </div>
         <Input
           type="date"
           value={scheduledDate}

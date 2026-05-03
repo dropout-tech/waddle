@@ -89,11 +89,14 @@ export function CalendarHeader({
     <div className="border-b border-border bg-card" role="toolbar" aria-label="日曆導航">
       {/* Primary Row: Navigation + View Mode + Today.
           Reserve ~56px on the left when the task panel is closed so the
-          floating reopen button doesn't overlap the prev-month chevron. */}
+          floating reopen button doesn't overlap the prev-month chevron.
+          Reserve ~56px on the right unconditionally so the floating
+          UserMenu (top-3 right-3, ~40px wide) doesn't sit on top of the
+          notification bell. */}
       <div
         className={cn(
           'flex items-center justify-between py-3 gap-4 transition-[padding] duration-200',
-          leftPanelOpen ? 'px-4' : 'pl-16 pr-4'
+          leftPanelOpen ? 'pl-4 pr-14' : 'pl-16 pr-14'
         )}
       >
         {/* Left: Date Navigation */}
