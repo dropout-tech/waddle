@@ -6,6 +6,7 @@ import {
   Trash2, ExternalLink, Calendar, Sparkles, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toDateString } from '@/lib/calendar-utils'
 import type { ScratchpadItem } from '@/lib/types'
 
 interface FocusScratchpadProps {
@@ -28,7 +29,7 @@ function getSavedDates(): string[] {
 }
 
 export function FocusScratchpad({ className }: FocusScratchpadProps) {
-  const todayKey = new Date().toISOString().split('T')[0]
+  const todayKey = toDateString(new Date())
   const [isExpanded, setIsExpanded] = useState(false)
   const [selectedDate, setSelectedDate] = useState(todayKey)
   const [items, setItems] = useState<ScratchpadItem[]>([])
@@ -246,6 +247,7 @@ export function FocusScratchpad({ className }: FocusScratchpadProps) {
           )}
         >
           <button
+            data-tour="scratchpad"
             onClick={() => { setIsExpanded(true); setSelectedDate(todayKey) }}
             className={cn(
               'flex items-center gap-2 px-4 py-1.5 rounded-b-xl',

@@ -3,6 +3,7 @@
 import { useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock, SlotType, Workspace } from '@/lib/types'
+// Re-import SlotType type as it's used in the callback signature
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { CalendarHeader } from './calendar-header'
 import { PendingZone } from './pending-zone'
@@ -33,14 +34,19 @@ interface CalendarPanelProps {
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (date: string, startTime: string, endTime: string) => void
   onCreatePendingTask?: (title: string) => void
-  onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string) => void
+  onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string, notes?: string, description?: string) => void
+  onOpenCreateTask?: (slotType: SlotType, date: string, startTime: string, endTime: string) => void
   onRescheduleTask?: (taskId: string, newStartOrDate: string, newEndOrStart: string, newEnd?: string) => void
+  onUnscheduleTask?: (taskId: string, date?: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
   // Focus mode callbacks
   onOpenJournal?: () => void
   onOpenReport?: () => void
   onOpenSettings?: () => void
+  /** When the left task panel is closed, the calendar header reserves space
+   * on the left so the floating reopen button doesn't cover the prev chevron. */
+  leftPanelOpen?: boolean
   className?: string
 }
 
@@ -65,12 +71,15 @@ export function CalendarPanel({
   onCreateTask,
   onCreatePendingTask,
   onCreateTimeBlock,
+  onOpenCreateTask,
   onRescheduleTask,
+  onUnscheduleTask,
   onUpdateTimeBlock,
   onDeleteTimeBlock,
   onOpenJournal,
   onOpenReport,
   onOpenSettings,
+  leftPanelOpen = true,
   className,
 }: CalendarPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
@@ -91,20 +100,41 @@ export function CalendarPanel({
     onDateChange(d)
   }, [selectedDate, viewMode, onDateChange])
 
+  // Touch swipe only — mouse drags are reserved for in-calendar interactions
+  // (task block drag, time block resize, new-slot creation). Letting mouse
+  // drags double as swipe-to-navigate caused tasks dragged ≥60px horizontally
+  // to incorrectly trigger week navigation, making them appear to jump weeks.
   useSwipeNavigation({
     onSwipeLeft: () => navigate('next'),
     onSwipeRight: () => navigate('prev'),
     elementRef: panelRef,
+    enableMouseDrag: false,
   })
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Skip when user is typing in an input
+    const target = e.target as HTMLElement
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+
+    if (e.key === 'ArrowLeft') { e.preventDefault(); navigate('prev'); return }
+    if (e.key === 'ArrowRight') { e.preventDefault(); navigate('next'); return }
+    if (e.key === 't' || e.key === 'T') { e.preventDefault(); handleTodayClick(); return }
+    if (e.key === 'd' || e.key === 'D') { e.preventDefault(); onViewModeChange('day'); return }
+    if (e.key === 'w' || e.key === 'W') { e.preventDefault(); onViewModeChange('week'); return }
+    if (e.key === 'm' || e.key === 'M') { e.preventDefault(); onViewModeChange('month'); return }
+  }
 
   return (
     <div
       ref={panelRef}
+      role="region"
+      aria-label="日曆"
+      data-tour="calendar-panel"
       className={cn('flex flex-col h-full bg-panel focus:outline-none', className)}
-      onKeyDown={(e) => {
-        if (e.key === 'ArrowLeft') { e.preventDefault(); navigate('prev') }
-        if (e.key === 'ArrowRight') { e.preventDefault(); navigate('next') }
-      }}
+      onKeyDown={handleKeyDown}
       tabIndex={0}
     >
       {/* Calendar Header */}
@@ -123,6 +153,7 @@ export function CalendarPanel({
         onOpenJournal={onOpenJournal}
         onOpenReport={onOpenReport}
         onOpenSettings={onOpenSettings}
+        leftPanelOpen={leftPanelOpen}
       />
 
       {viewMode === 'day' && (
@@ -138,7 +169,9 @@ export function CalendarPanel({
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}
           onCreateTimeBlock={onCreateTimeBlock}
+          onOpenCreateTask={onOpenCreateTask}
           onRescheduleTask={onRescheduleTask}
+          onUnscheduleTask={onUnscheduleTask}
           onNavigate={navigate}
           onDateChange={onDateChange}
         />
@@ -158,7 +191,9 @@ export function CalendarPanel({
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}
           onCreateTimeBlock={onCreateTimeBlock}
+          onOpenCreateTask={onOpenCreateTask}
           onRescheduleTask={onRescheduleTask}
+          onUnscheduleTask={onUnscheduleTask}
           onNavigate={navigate}
           onDateChange={onDateChange}
         />

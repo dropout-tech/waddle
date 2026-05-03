@@ -19,6 +19,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toDateString } from '@/lib/calendar-utils'
 import type { Task, Workspace, ExportDataPayload } from '@/lib/types'
 
 interface ReportModalProps {
@@ -50,8 +51,8 @@ export function ReportModal({
 
   // Filter tasks within date range
   const tasksInRange = useMemo(() => {
-    const start = dateRange.start.toISOString().split('T')[0]
-    const end = dateRange.end.toISOString().split('T')[0]
+    const start = toDateString(dateRange.start)
+    const end = toDateString(dateRange.end)
     return allTasks.filter((t) => {
       const date = t.scheduledDate || t.dueDate
       return date && date >= start && date <= end
@@ -114,8 +115,8 @@ export function ReportModal({
     const exportData: ExportDataPayload = {
       exportDate: new Date().toISOString(),
       dateRange: {
-        start: dateRange.start.toISOString().split('T')[0],
-        end: dateRange.end.toISOString().split('T')[0],
+        start: toDateString(dateRange.start),
+        end: toDateString(dateRange.end),
       },
       tasks: tasksInRange.map((t) => ({
         id: t.id,
@@ -153,7 +154,7 @@ export function ReportModal({
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `flowdesk-report-${exportData.dateRange.start}-${exportData.dateRange.end}.json`
+      a.download = `waddle-report-${exportData.dateRange.start}-${exportData.dateRange.end}.json`
       a.click()
       URL.revokeObjectURL(url)
     }

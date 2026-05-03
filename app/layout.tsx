@@ -21,9 +21,9 @@ const notoSansTC = Noto_Sans_TC({
 })
 
 export const metadata: Metadata = {
-  title: 'FlowDesk | Unified Workspace',
+  title: 'Waddle | Unified Workspace',
   description:
-    'A unified workspace that merges task management, time-block scheduling, and daily journaling into a single split-screen interface.',
+    'Waddle — a unified workspace that merges task management, time-block scheduling, and daily journaling into a single split-screen interface. Take it slow, get it done.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#faf6f1',
+  themeColor: '#f4d977',
   colorScheme: 'light',
 }
 

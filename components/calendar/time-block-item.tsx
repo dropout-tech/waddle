@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { memo, useState, useRef } from 'react'
 import { Coffee, Clock, User, Target, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { TimeBlock } from '@/lib/types'
@@ -14,14 +14,14 @@ interface TimeBlockItemProps {
   onDelete?: (id: string) => void
 }
 
-const typeIcons = {
+const typeIcons: Record<string, React.ElementType> = {
   break: Coffee,
   buffer: Clock,
   personal: User,
   focus: Target,
 }
 
-const typeLabels = {
+const typeLabels: Record<string, string> = {
   break: '休息',
   buffer: '緩衝',
   personal: '私人',
@@ -40,7 +40,7 @@ function minutesToTime(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-export function TimeBlockItem({
+function TimeBlockItemImpl({
   block,
   calendarStartHour = 7,
   compact = false,
@@ -56,7 +56,7 @@ export function TimeBlockItem({
 
   const top = compact ? 0 : calculateBlockTop(block.startTime, calendarStartHour)
   const height = compact ? '100%' : calculateBlockHeight(block.startTime, block.endTime)
-  const Icon = typeIcons[block.type]
+  const Icon = typeIcons[block.type] ?? Clock
 
   // Handle drag start (move whole block)
   const handleDragStart = (e: React.MouseEvent) => {
@@ -194,3 +194,5 @@ export function TimeBlockItem({
     </div>
   )
 }
+
+export const TimeBlockItem = memo(TimeBlockItemImpl)

@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Sun, Leaf, Plus, X, Settings2, PanelLeftClose, Maximize2, Minimize2, ChevronUp, ChevronDown } from 'lucide-react'
+import { Sun, Plus, X, Settings2, PanelLeftClose, Maximize2, Minimize2, ChevronUp, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Workspace } from '@/lib/types'
 import { WorkspaceSettingsModal } from '@/components/modals/workspace-settings-modal'
 import { WorkspaceIcon, PRESET_ICONS, PRESET_ICON_NAMES } from '@/lib/workspace-icons'
+import { WaddleMascot } from '@/components/branding/waddle-mascot'
 
 interface PanelHeaderProps {
   workspaces: Workspace[]
@@ -49,7 +50,7 @@ export function PanelHeader({
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false)
   
   useEffect(() => {
-    const saved = localStorage.getItem('flowdesk-header-collapsed')
+    const saved = localStorage.getItem('waddle-header-collapsed')
     if (saved !== null) {
       setIsHeaderCollapsed(saved === 'true')
     }
@@ -58,7 +59,7 @@ export function PanelHeader({
   const toggleHeaderCollapsed = () => {
     const newValue = !isHeaderCollapsed
     setIsHeaderCollapsed(newValue)
-    localStorage.setItem('flowdesk-header-collapsed', String(newValue))
+    localStorage.setItem('waddle-header-collapsed', String(newValue))
   }
 
   // Count pending tasks per workspace
@@ -158,15 +159,13 @@ export function PanelHeader({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
-                  <Leaf className="w-4.5 h-4.5 text-primary" />
-                </div>
+                <WaddleMascot withBackground className="w-9 h-9 rounded-lg" />
                 <div>
                   <h1 className="text-lg font-bold text-foreground tracking-tight">
-                    FlowDesk
+                    Waddle
                   </h1>
                   <p className="text-[10px] text-muted-foreground -mt-0.5">
-                    your daily planner
+                    慢慢搖擺，把事情做完
                   </p>
                 </div>
               </div>

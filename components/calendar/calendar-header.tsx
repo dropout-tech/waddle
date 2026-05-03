@@ -1,9 +1,11 @@
 'use client'
 
+import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronLeft, ChevronRight, BookOpen, BarChart3, Settings } from 'lucide-react'
+import { ZoomIn, ZoomOut, Clock, ChevronLeft, ChevronRight, BookOpen, BarChart3, Settings, Sparkles } from 'lucide-react'
+import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
 
 interface CalendarHeaderProps {
@@ -24,6 +26,9 @@ interface CalendarHeaderProps {
   onOpenJournal?: () => void
   onOpenReport?: () => void
   onOpenSettings?: () => void
+  /** When false, the top nav row is shifted right to leave room for the
+   * floating "open task panel" button at the top-left of the calendar area. */
+  leftPanelOpen?: boolean
 }
 
 const ZOOM_LABELS = ['緊湊', '標準', '寬鬆', '詳細']
@@ -43,6 +48,7 @@ export function CalendarHeader({
   onOpenJournal,
   onOpenReport,
   onOpenSettings,
+  leftPanelOpen = true,
 }: CalendarHeaderProps) {
   const isToday = () => {
     const today = new Date()
@@ -77,40 +83,59 @@ export function CalendarHeader({
     onDateChange(newDate)
   }
 
+  const navUnitLabel = viewMode === 'week' ? '週' : '月'
+
   return (
-    <div className="border-b border-border bg-card">
-      {/* Primary Row: Navigation + View Mode + Today */}
-      <div className="flex items-center justify-between px-4 py-3 gap-4">
+    <div className="border-b border-border bg-card" role="toolbar" aria-label="日曆導航">
+      {/* Primary Row: Navigation + View Mode + Today.
+          Reserve ~56px on the left when the task panel is closed so the
+          floating reopen button doesn't overlap the prev-month chevron. */}
+      <div
+        className={cn(
+          'flex items-center justify-between py-3 gap-4 transition-[padding] duration-200',
+          leftPanelOpen ? 'px-4' : 'pl-16 pr-4'
+        )}
+      >
         {/* Left: Date Navigation */}
         <div className="flex items-center gap-3 flex-1">
           <div className="flex items-center gap-1">
             <button
+              type="button"
               onClick={handlePrevMonth}
-              className="p-1.5 rounded-md hover:bg-secondary transition-colors"
-              title="上一個"
+              aria-label={`上一${navUnitLabel}`}
+              className="p-1.5 rounded-md hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4" aria-hidden="true" />
             </button>
-            <span className="min-w-[140px] text-sm font-medium text-center">
+            <span className="min-w-[140px] text-sm font-medium text-center" aria-live="polite">
               {getDisplayText()}
             </span>
             <button
+              type="button"
               onClick={handleNextMonth}
-              className="p-1.5 rounded-md hover:bg-secondary transition-colors"
-              title="下一個"
+              aria-label={`下一${navUnitLabel}`}
+              className="p-1.5 rounded-md hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
 
           {/* View Mode Buttons */}
-          <div className="flex items-center border border-border rounded-lg overflow-hidden ml-auto">
+          <div
+            data-tour="view-modes"
+            className="flex items-center border border-border rounded-lg overflow-hidden ml-auto"
+            role="group"
+            aria-label="檢視模式"
+          >
             {(['day', 'week', 'month'] as const).map((mode) => (
               <button
                 key={mode}
+                type="button"
                 onClick={() => onViewModeChange(mode)}
+                aria-pressed={viewMode === mode}
+                aria-label={mode === 'day' ? '日檢視' : mode === 'week' ? '週檢視' : '月檢視'}
                 className={cn(
-                  'px-3 py-1.5 text-xs font-medium transition-all',
+                  'px-3 py-1.5 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
                   viewMode === mode
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -124,17 +149,19 @@ export function CalendarHeader({
           {/* Today + Actions */}
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
+              variant={isToday() ? 'secondary' : 'outline'}
               size="sm"
               onClick={onTodayClick}
+              aria-label={isToday() ? '已是今天' : '回到今天'}
               className={cn(
-                'text-xs font-medium rounded-lg h-8 border-border',
-                isToday() && 'opacity-40'
+                'text-xs font-medium rounded-lg h-8 border-border transition-colors',
+                isToday() && 'text-muted-foreground'
               )}
-              disabled={isToday()}
             >
               今天
             </Button>
+
+            <TodayProgressRing workspaces={workspaces || []} />
 
             {/* Notification Center */}
             <NotificationCenter
@@ -153,39 +180,39 @@ export function CalendarHeader({
             <span className="text-[10px] text-muted-foreground font-medium">縮放</span>
             <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-background border border-border/50">
               <button
+                type="button"
                 onClick={() => onZoomChange(Math.max(1, zoomLevel - 1))}
                 disabled={zoomLevel <= 1}
+                aria-label="縮小"
                 className={cn(
-                  'p-0.5 rounded transition-colors',
+                  'p-0.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   zoomLevel <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
                 )}
-                title="縮小"
               >
-                <ZoomOut className="w-3.5 h-3.5" />
+                <ZoomOut className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
-              <span className="text-[10px] text-muted-foreground min-w-[30px] text-center">
+              <span className="text-[10px] text-muted-foreground min-w-[30px] text-center" aria-live="polite">
                 {ZOOM_LABELS[zoomLevel - 1]}
               </span>
               <button
+                type="button"
                 onClick={() => onZoomChange(Math.min(4, zoomLevel + 1))}
                 disabled={zoomLevel >= 4}
+                aria-label="放大"
                 className={cn(
-                  'p-0.5 rounded transition-colors',
+                  'p-0.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   zoomLevel >= 4 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
                 )}
-                title="放大"
               >
-                <ZoomIn className="w-3.5 h-3.5" />
+                <ZoomIn className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
             </div>
 
             {/* Time Range Display */}
-            {viewMode !== 'month' && (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background border border-border/50 text-[10px] text-muted-foreground">
-                <Clock className="w-3 h-3" />
-                <span>{String(startHour).padStart(2, '0')}:00 - {String(endHour).padStart(2, '0')}:00</span>
-              </div>
-            )}
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background border border-border/50 text-[10px] text-muted-foreground">
+              <Clock className="w-3 h-3" />
+              <span>{String(startHour).padStart(2, '0')}:00 - {String(endHour).padStart(2, '0')}:00</span>
+            </div>
           </div>
         ) : (
           <div />
@@ -195,34 +222,128 @@ export function CalendarHeader({
         <div className="flex items-center gap-1">
           {onOpenJournal && (
             <button
+              type="button"
               onClick={onOpenJournal}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              title="日記"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <BookOpen className="w-3.5 h-3.5" />
+              <BookOpen className="w-3.5 h-3.5" aria-hidden="true" />
               日記
             </button>
           )}
           {onOpenReport && (
             <button
+              type="button"
               onClick={onOpenReport}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-              title="報告"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <BarChart3 className="w-3.5 h-3.5" />
+              <BarChart3 className="w-3.5 h-3.5" aria-hidden="true" />
               報告
             </button>
           )}
           {onOpenSettings && (
             <button
+              type="button"
               onClick={onOpenSettings}
-              className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors ml-1"
-              title="設定"
+              aria-label="設定"
+              className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <Settings className="w-3.5 h-3.5" />
+              <Settings className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// TodayProgressRing — at-a-glance ring showing today's task completion.
+// Hover for breakdown. Empty state shows a sparkle icon as a friendly prompt.
+// ────────────────────────────────────────────────────────────────────────────
+
+interface TodayProgressRingProps {
+  workspaces: Workspace[]
+}
+
+function TodayProgressRing({ workspaces }: TodayProgressRingProps) {
+  const stats = useMemo(() => {
+    const today = toDateString(new Date())
+    let total = 0
+    let completed = 0
+    for (const ws of workspaces) {
+      if (ws.isArchived) continue
+      for (const cat of ws.categories) {
+        if (cat.isArchived) continue
+        for (const t of cat.tasks) {
+          // "Today" = scheduled today OR (no schedule but due today)
+          const matches =
+            t.scheduledDate === today ||
+            (!t.scheduledDate && t.dueDate === today)
+          if (!matches) continue
+          total++
+          if (t.isCompleted) completed++
+        }
+      }
+    }
+    const pct = total === 0 ? 0 : Math.round((completed / total) * 100)
+    return { total, completed, pct, allDone: total > 0 && completed === total }
+  }, [workspaces])
+
+  const r = 12
+  const c = 2 * Math.PI * r
+  const dash = (stats.pct / 100) * c
+
+  // Color shifts as the user makes progress: muted → primary → emerald.
+  const stroke =
+    stats.allDone
+      ? 'stroke-emerald-500'
+      : stats.pct > 0
+      ? 'stroke-primary'
+      : 'stroke-muted-foreground/30'
+
+  const tooltip =
+    stats.total === 0
+      ? '今日尚無排程任務'
+      : stats.allDone
+      ? `今天 ${stats.total} 個任務全部完成 ✨`
+      : `今天 ${stats.completed} / ${stats.total} 完成 · ${stats.pct}%`
+
+  return (
+    <div
+      className="relative w-9 h-8 flex items-center justify-center group"
+      title={tooltip}
+      aria-label={tooltip}
+    >
+      <svg width="32" height="32" viewBox="0 0 32 32" className="transform -rotate-90">
+        <circle
+          cx="16"
+          cy="16"
+          r={r}
+          fill="none"
+          strokeWidth="2.5"
+          className="stroke-muted/40"
+        />
+        <circle
+          cx="16"
+          cy="16"
+          r={r}
+          fill="none"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${c}`}
+          className={cn(stroke, 'transition-[stroke-dasharray,stroke] duration-500 ease-out')}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        {stats.total === 0 ? (
+          <Sparkles className="w-3.5 h-3.5 text-muted-foreground/50" aria-hidden="true" />
+        ) : stats.allDone ? (
+          <Sparkles className="w-3.5 h-3.5 text-emerald-500 animate-pulse" aria-hidden="true" />
+        ) : (
+          <span className="text-[9px] font-semibold text-foreground tabular-nums">
+            {stats.completed}/{stats.total}
+          </span>
+        )}
       </div>
     </div>
   )

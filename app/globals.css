@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* FlowDesk 2.0 - Japanese Kawaii Stationery Theme */
+/* Waddle 2.0 - Japanese Kawaii Stationery Theme */
 :root {
   /* Warm Cream Paper Background */
   --background: oklch(0.975 0.008 85);
@@ -381,4 +381,42 @@
 .today-highlight {
   background: oklch(0.68 0.14 35 / 0.08);
   border: 1px solid oklch(0.68 0.14 35 / 0.2);
+}
+
+/* Task completion celebration — checkbox bounce, check icon scale, sparkle burst */
+@keyframes task-pop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.4); }
+  70%  { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+
+@keyframes task-check {
+  0%   { transform: scale(0) rotate(-30deg); opacity: 0; }
+  60%  { transform: scale(1.3) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes task-sparkle {
+  0% {
+    transform: translate(-50%, -50%) rotate(var(--task-sparkle-angle, 0deg)) translateX(0) scale(0.5);
+    opacity: 0;
+  }
+  20% { opacity: 1; }
+  100% {
+    transform: translate(-50%, -50%) rotate(var(--task-sparkle-angle, 0deg)) translateX(14px) scale(0.4);
+    opacity: 0;
+  }
+}
+
+
+/* Waddle mascot bob — gentle up-down rocking like a penguin waddling */
+@keyframes waddle-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-4px) rotate(2deg); }
+}
+
+.animate-waddle-bob {
+  animation: waddle-bob 1.6s ease-in-out infinite;
+  transform-origin: 50% 90%;
 }

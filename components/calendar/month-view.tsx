@@ -4,6 +4,7 @@ import { useMemo, useRef, useCallback, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { Check, Plus } from 'lucide-react'
+import { toDateString } from '@/lib/calendar-utils'
 
 interface MonthViewProps {
   selectedDate: Date
@@ -95,13 +96,13 @@ export function MonthView({
       isToday: boolean
     }> = []
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = toDateString(new Date())
 
     for (let i = firstDayOfWeek - 1; i >= 0; i--) {
       const date = new Date(year, month - 1, prevMonthLastDay - i)
       days.push({
         date,
-        dateString: date.toISOString().split('T')[0],
+        dateString: toDateString(date),
         isCurrentMonth: false,
         isToday: false,
       })
@@ -109,7 +110,7 @@ export function MonthView({
 
     for (let day = 1; day <= totalDays; day++) {
       const date = new Date(year, month, day)
-      const dateString = date.toISOString().split('T')[0]
+      const dateString = toDateString(date)
       days.push({
         date,
         dateString,
@@ -123,7 +124,7 @@ export function MonthView({
       const date = new Date(year, month + 1, day)
       days.push({
         date,
-        dateString: date.toISOString().split('T')[0],
+        dateString: toDateString(date),
         isCurrentMonth: false,
         isToday: false,
       })

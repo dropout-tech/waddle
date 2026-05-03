@@ -10,13 +10,15 @@ import { PanelLeftOpen, BookOpen, BarChart3, Minimize2 } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
 import { FocusScratchpad } from '@/components/scratchpad/focus-scratchpad'
 import { FocusTimer } from '@/components/timer/focus-timer'
+import { ErrorBoundary } from '@/components/error-boundary'
+import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings } from '@/lib/types'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
   timeBlocks: TimeBlock[]
   slotTypes?: SlotType[]
-  settings?: UserSettings
+  settings: UserSettings
   onToggleCategoryCollapse: (categoryId: string) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
@@ -30,8 +32,10 @@ interface MainLayoutProps {
   onOpenSettings?: () => void
   onCreateCalendarTask?: (date: string, startTime: string, endTime: string) => void
   onCreatePendingTask?: (title: string) => void
-  onCreateCalendarTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string) => void
+  onCreateCalendarTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string, notes?: string, description?: string) => void
+  onOpenCreateTask?: (slotType: SlotType, date: string, startTime: string, endTime: string) => void
   onRescheduleTask?: (taskId: string, newStart: string, newEnd: string) => void
+  onUnscheduleTask?: (taskId: string, date?: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
 }
@@ -44,7 +48,7 @@ export function MainLayout({
   workspaces,
   timeBlocks,
   slotTypes,
-  settings = {},
+  settings,
   onToggleCategoryCollapse,
   onToggleComplete,
   onSelectTask,
@@ -59,7 +63,9 @@ export function MainLayout({
   onCreateCalendarTask,
   onCreatePendingTask,
   onCreateCalendarTimeBlock,
+  onOpenCreateTask,
   onRescheduleTask,
+  onUnscheduleTask,
   onUpdateTimeBlock,
   onDeleteTimeBlock,
 }: MainLayoutProps) {
@@ -106,8 +112,8 @@ export function MainLayout({
 
   const allTasks = getAllTasks()
 
-  // Filter tasks for selected date
-  const dateString = selectedDate.toISOString().split('T')[0]
+  // Filter tasks for selected date (local date — must match toDateString used elsewhere)
+  const dateString = toDateString(selectedDate)
 
   const pendingTasks = allTasks.filter(
     (task) =>
@@ -148,10 +154,11 @@ export function MainLayout({
         <div className="absolute left-0 top-0 z-20 p-2">
           <button
             onClick={() => setIsLeftPanelOpen(true)}
-            className="flex items-center justify-center w-10 h-10 rounded-lg bg-card border border-border shadow-sm hover:bg-secondary transition-colors"
+            className="flex items-center justify-center w-10 h-10 rounded-lg bg-card border border-border shadow-sm hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             title="開啟任務面板"
+            aria-label="開啟任務面板"
           >
-            <PanelLeftOpen className="w-5 h-5 text-muted-foreground" />
+            <PanelLeftOpen className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
           </button>
         </div>
       )}
@@ -177,23 +184,25 @@ export function MainLayout({
             )}
             style={{ width: isLeftPanelOpen ? `${panelWidth}px` : '0px' }}
           >
-            <TaskPanel
-              workspaces={workspaces}
-              isExpanded={false}
-              onToggleCategoryCollapse={onToggleCategoryCollapse}
-              onToggleComplete={onToggleComplete}
-              onSelectTask={onSelectTask}
-              onAddTask={onAddTask}
-              onAddCategory={onAddCategory}
-              onAddWorkspace={onAddWorkspace}
-              onUpdateWorkspaceColor={onUpdateWorkspaceColor}
-              onUpdateWorkspace={onUpdateWorkspace}
-              onDeleteWorkspace={onDeleteWorkspace}
-              onArchiveWorkspace={onArchiveWorkspace}
-              onOpenSettings={onOpenSettings}
-              onClosePanel={() => setIsLeftPanelOpen(false)}
-              onToggleExpand={() => setIsRightPanelOpen(false)}
-            />
+            <ErrorBoundary>
+              <TaskPanel
+                workspaces={workspaces}
+                isExpanded={false}
+                onToggleCategoryCollapse={onToggleCategoryCollapse}
+                onToggleComplete={onToggleComplete}
+                onSelectTask={onSelectTask}
+                onAddTask={onAddTask}
+                onAddCategory={onAddCategory}
+                onAddWorkspace={onAddWorkspace}
+                onUpdateWorkspaceColor={onUpdateWorkspaceColor}
+                onUpdateWorkspace={onUpdateWorkspace}
+                onDeleteWorkspace={onDeleteWorkspace}
+                onArchiveWorkspace={onArchiveWorkspace}
+                onOpenSettings={onOpenSettings}
+                onClosePanel={() => setIsLeftPanelOpen(false)}
+                onToggleExpand={() => setIsRightPanelOpen(false)}
+              />
+            </ErrorBoundary>
           </div>
 
           {/* Resize Handle */}
@@ -247,34 +256,39 @@ export function MainLayout({
                 </div>
               </div>
             ) : (
-              <CalendarPanel
-                selectedDate={selectedDate}
-                viewMode={viewMode}
-                pendingTasks={pendingTasks}
-                scheduledTasks={scheduledTasks}
-                allTasks={allTasks}
-                timeBlocks={filteredTimeBlocks}
-                slotTypes={slotTypes}
-                workspaces={workspaces}
-                startHour={startHour}
-                endHour={endHour}
-                hourHeight={hourHeight}
-                zoomLevel={zoomLevel}
-                onZoomChange={setZoomLevel}
-                onDateChange={setSelectedDate}
-                onViewModeChange={setViewMode}
-                onTaskSelect={onSelectTask}
-                onToggleComplete={onToggleComplete}
-                onCreateTask={onCreateCalendarTask}
-                onCreatePendingTask={onCreatePendingTask}
-                onCreateTimeBlock={onCreateCalendarTimeBlock}
-                onRescheduleTask={onRescheduleTask}
-                onUpdateTimeBlock={onUpdateTimeBlock}
-                onDeleteTimeBlock={onDeleteTimeBlock}
-                onOpenJournal={handleOpenJournalFocus}
-                onOpenReport={handleOpenReportFocus}
-                onOpenSettings={onOpenSettings}
-              />
+              <ErrorBoundary>
+                <CalendarPanel
+                  selectedDate={selectedDate}
+                  viewMode={viewMode}
+                  pendingTasks={pendingTasks}
+                  scheduledTasks={scheduledTasks}
+                  allTasks={allTasks}
+                  timeBlocks={filteredTimeBlocks}
+                  slotTypes={slotTypes}
+                  workspaces={workspaces}
+                  startHour={startHour}
+                  endHour={endHour}
+                  hourHeight={hourHeight}
+                  zoomLevel={zoomLevel}
+                  onZoomChange={setZoomLevel}
+                  onDateChange={setSelectedDate}
+                  onViewModeChange={setViewMode}
+                  onTaskSelect={onSelectTask}
+                  onToggleComplete={onToggleComplete}
+                  onCreateTask={onCreateCalendarTask}
+                  onCreatePendingTask={onCreatePendingTask}
+                  onCreateTimeBlock={onCreateCalendarTimeBlock}
+                  onOpenCreateTask={onOpenCreateTask}
+                  onRescheduleTask={onRescheduleTask}
+                  onUnscheduleTask={onUnscheduleTask}
+                  onUpdateTimeBlock={onUpdateTimeBlock}
+                  onDeleteTimeBlock={onDeleteTimeBlock}
+                  onOpenJournal={handleOpenJournalFocus}
+                  onOpenReport={handleOpenReportFocus}
+                  onOpenSettings={onOpenSettings}
+                  leftPanelOpen={isLeftPanelOpen}
+                />
+              </ErrorBoundary>
             )}
           </div>
         </>
@@ -304,10 +318,11 @@ function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], on
     })
   }
 
-  // Get tasks for selected date
-  const tasksForDate = workspaces.flatMap(ws => 
-    ws.categories.flatMap(cat => 
-      cat.tasks.filter(t => t.scheduledDate === selectedDate.toISOString().split('T')[0])
+  // Get tasks for selected date (local date)
+  const dateStr = toDateString(selectedDate)
+  const tasksForDate = workspaces.flatMap(ws =>
+    ws.categories.flatMap(cat =>
+      cat.tasks.filter(t => t.scheduledDate === dateStr)
     )
   )
 

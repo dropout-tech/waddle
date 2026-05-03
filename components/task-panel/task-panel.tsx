@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useMemo } from 'react'
-import { FolderTree, Clock, SlidersHorizontal, ChevronDown } from 'lucide-react'
+import { FolderTree, Clock, SlidersHorizontal, ChevronDown, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Workspace, Task } from '@/lib/types'
 import { PanelHeader } from './panel-header'
@@ -12,8 +12,14 @@ import { UnifiedTaskList } from './unified-task-list'
 import { Button } from '@/components/ui/button'
 
 export type Density = 'compact' | 'comfortable'
-export type ViewMode = 'category' | 'unified'
+export type ViewMode = 'category' | 'unified' | 'urgency'
 export type MetaField = 'duration' | 'time' | 'date'
+
+const VIEW_MODE_LABEL: Record<ViewMode, string> = {
+  category: '依分類',
+  unified: '依時間',
+  urgency: '依急迫程度',
+}
 
 interface TaskPanelProps {
   workspaces: Workspace[]
@@ -57,7 +63,7 @@ export function TaskPanel({
   const [viewMode, setViewMode] = useState<ViewMode>('category')
   const [metaOrder, setMetaOrder] = useState<MetaField[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('flowdesk-meta-order')
+      const saved = localStorage.getItem('waddle-meta-order')
       if (saved) return JSON.parse(saved) as MetaField[]
     }
     return ['duration', 'date', 'time']
@@ -127,6 +133,7 @@ export function TaskPanel({
 
   return (
     <div
+      data-tour="left-panel"
       className={cn(
         'flex h-full bg-card border-r border-border shadow-sm',
         className
@@ -160,7 +167,7 @@ export function TaskPanel({
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-xs font-medium text-muted-foreground">
-              {viewMode === 'category' ? '依分類' : '依時間'}
+              {VIEW_MODE_LABEL[viewMode]}
               {hasActiveFilters && (
                 <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold">
                   {filters.urgency.length + filters.workspaceIds.length + (filters.showCompleted ? 0 : 1)}
@@ -180,9 +187,10 @@ export function TaskPanel({
         {toolbarOpen && (
           <div className="border-t border-border/60">
             {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 px-3 pt-2 pb-1">
+            <div className="flex items-center gap-1 px-3 pt-2 pb-1 flex-wrap">
               <button
                 onClick={() => setViewMode('category')}
+                aria-pressed={viewMode === 'category'}
                 className={cn(
                   'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
                   viewMode === 'category'
@@ -190,11 +198,12 @@ export function TaskPanel({
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
                 )}
               >
-                <FolderTree className="w-3 h-3" />
+                <FolderTree className="w-3 h-3" aria-hidden="true" />
                 <span>依分類</span>
               </button>
               <button
                 onClick={() => setViewMode('unified')}
+                aria-pressed={viewMode === 'unified'}
                 className={cn(
                   'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
                   viewMode === 'unified'
@@ -202,8 +211,21 @@ export function TaskPanel({
                     : 'bg-muted text-muted-foreground hover:bg-muted/80'
                 )}
               >
-                <Clock className="w-3 h-3" />
+                <Clock className="w-3 h-3" aria-hidden="true" />
                 <span>依時間</span>
+              </button>
+              <button
+                onClick={() => setViewMode('urgency')}
+                aria-pressed={viewMode === 'urgency'}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
+                  viewMode === 'urgency'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                )}
+              >
+                <AlertCircle className="w-3 h-3" aria-hidden="true" />
+                <span>依急迫程度</span>
               </button>
             </div>
 
@@ -217,7 +239,7 @@ export function TaskPanel({
               metaOrder={metaOrder}
               onMetaOrderChange={(order) => {
                 setMetaOrder(order)
-                localStorage.setItem('flowdesk-meta-order', JSON.stringify(order))
+                localStorage.setItem('waddle-meta-order', JSON.stringify(order))
               }}
             />
           </div>
@@ -249,6 +271,7 @@ export function TaskPanel({
             tasks={allFilteredTasks}
             density={density}
             metaOrder={metaOrder}
+            groupBy={viewMode === 'urgency' ? 'urgency' : 'time'}
             onToggleComplete={onToggleComplete}
             onSelectTask={onSelectTask}
           />

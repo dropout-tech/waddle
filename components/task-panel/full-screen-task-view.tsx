@@ -1,11 +1,11 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { 
-  Calendar, 
-  CheckCircle2, 
-  Clock, 
-  AlertTriangle, 
+import {
+  Calendar,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
   TrendingUp,
   Target,
   Flame,
@@ -20,9 +20,15 @@ import {
   MoreHorizontal,
   Plus,
   Search,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Hourglass,
+  ArrowRight,
+  ShieldCheck,
+  ShieldAlert,
+  Shield,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
 
 interface FullScreenTaskViewProps {
@@ -53,7 +59,7 @@ export function FullScreenTaskView({
   const [newTaskTitle, setNewTaskTitle] = useState('')
   
   const now = new Date()
-  const todayStr = now.toISOString().split('T')[0]
+  const todayStr = toDateString(now)
   
   // Gather all tasks
   const allTasks = useMemo(() => {
@@ -95,13 +101,13 @@ export function FullScreenTaskView({
       return due >= now && due <= threeDaysLater
     })
     const unscheduled = allTasks.filter(t => !t.isCompleted && !t.scheduledDate)
-    const highPriority = allTasks.filter(t => !t.isCompleted && t.urgency === 'high')
+    const highPriority = allTasks.filter(t => !t.isCompleted && t.urgency >= 8)
 
     // Calculate streak
     let streak = 0
     const checkDate = new Date(now)
     for (let i = 0; i < 30; i++) {
-      const dateStr = checkDate.toISOString().split('T')[0]
+      const dateStr = toDateString(checkDate)
       const hasCompleted = allTasks.some(t => 
         t.isCompleted && t.completedAt && t.completedAt.split('T')[0] === dateStr
       )
@@ -134,7 +140,7 @@ export function FullScreenTaskView({
   // Filter tasks
   const filteredTasks = useMemo(() => {
     let tasks = allTasks.filter(t => !t.isCompleted)
-    
+
     // Apply workspace filter
     if (selectedWorkspace) {
       tasks = tasks.filter(t => {
@@ -146,61 +152,148 @@ export function FullScreenTaskView({
     // Apply search
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      tasks = tasks.filter(t => 
+      tasks = tasks.filter(t =>
         t.title.toLowerCase().includes(query) ||
         t.workspaceName.toLowerCase().includes(query) ||
         t.categoryName.toLowerCase().includes(query)
       )
     }
-    
+
     // Apply filter
     switch (taskFilter) {
       case 'today':
-        return tasks.filter(t => t.scheduledDate === todayStr)
+        tasks = tasks.filter(t => t.scheduledDate === todayStr)
+        break
       case 'upcoming':
-        return tasks.filter(t => {
+        tasks = tasks.filter(t => {
           if (!t.dueDate) return false
           const due = new Date(t.dueDate)
           const threeDaysLater = new Date(now)
           threeDaysLater.setDate(threeDaysLater.getDate() + 3)
           return due >= now && due <= threeDaysLater
         })
+        break
       case 'overdue':
-        return tasks.filter(t => {
+        tasks = tasks.filter(t => {
           if (!t.dueDate) return false
           return new Date(t.dueDate) < now
         })
+        break
       case 'unscheduled':
-        return tasks.filter(t => !t.scheduledDate)
-      default:
-        return tasks
+        tasks = tasks.filter(t => !t.scheduledDate)
+        break
     }
-  }, [allTasks, taskFilter, selectedWorkspace, searchQuery, todayStr, now, workspaces])
+
+    // Apply sort. Returns a new array — don't mutate the source filter result.
+    const sorted = [...tasks]
+    switch (sortBy) {
+      case 'urgency':
+        // High urgency first; missing urgency treated as 0
+        sorted.sort((a, b) => (b.urgency || 0) - (a.urgency || 0))
+        break
+      case 'dueDate':
+        // Earliest due first; tasks without due date sink to the bottom
+        sorted.sort((a, b) => {
+          if (!a.dueDate && !b.dueDate) return 0
+          if (!a.dueDate) return 1
+          if (!b.dueDate) return -1
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+        })
+        break
+      case 'created':
+        // Newest first
+        sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        break
+      case 'category':
+      default:
+        // Workspace → category → original order
+        sorted.sort((a, b) => {
+          const ws = a.workspaceName.localeCompare(b.workspaceName)
+          if (ws !== 0) return ws
+          return a.categoryName.localeCompare(b.categoryName)
+        })
+        break
+    }
+    return sorted
+  }, [allTasks, taskFilter, selectedWorkspace, searchQuery, sortBy, todayStr, now, workspaces])
 
   // Workspace stats
   const workspaceStats = useMemo(() => {
+    const sevenDaysAgo = new Date(now)
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    const upcoming = new Date(now)
+    upcoming.setDate(upcoming.getDate() + 3)
+
     return workspaces
       .filter(ws => !ws.isArchived)
       .map(ws => {
-        const tasks = ws.categories?.flatMap(cat => cat.tasks || []) || []
+        const cats = ws.categories?.filter(c => !c.isArchived) ?? []
+        const tasks = cats.flatMap(cat => cat.tasks || [])
         const total = tasks.length
-        const completed = tasks.filter(t => t.isCompleted).length
-        const overdue = tasks.filter(t => {
-          if (t.isCompleted || !t.dueDate) return false
-          return new Date(t.dueDate) < now
-        }).length
-        const today = tasks.filter(t => t.scheduledDate === todayStr && !t.isCompleted).length
+        const pending = tasks.filter(t => !t.isCompleted)
+        const completed = tasks.filter(t => t.isCompleted)
+
+        const overdueTasks = pending.filter(t => t.dueDate && new Date(t.dueDate) < now)
+        const todayTasks = pending.filter(t => t.scheduledDate === todayStr)
+        const upcomingTasks = pending.filter(t => {
+          if (!t.dueDate) return false
+          const d = new Date(t.dueDate)
+          return d >= now && d <= upcoming
+        })
+        const stuckTasks = pending.filter(t => !t.scheduledDate && !t.dueDate && new Date(t.createdAt) < sevenDaysAgo)
+
+        // Workload — sum of estimated minutes for incomplete tasks
+        const estimatedMin = pending.reduce((sum, t) => sum + (t.estimatedMinutes || 0), 0)
+
+        // "Most urgent next-up" — surfaces a single task to the PM:
+        //   priority: overdue (most days first) → today → high urgency → others
+        const sortedByUrgency = [...pending].sort((a, b) => {
+          const aOver = a.dueDate ? Math.max(0, now.getTime() - new Date(a.dueDate).getTime()) : 0
+          const bOver = b.dueDate ? Math.max(0, now.getTime() - new Date(b.dueDate).getTime()) : 0
+          if (aOver !== bOver) return bOver - aOver
+          const aToday = a.scheduledDate === todayStr ? 1 : 0
+          const bToday = b.scheduledDate === todayStr ? 1 : 0
+          if (aToday !== bToday) return bToday - aToday
+          if ((a.urgency || 0) !== (b.urgency || 0)) return (b.urgency || 0) - (a.urgency || 0)
+          return 0
+        })
+        const mostUrgent = sortedByUrgency[0] ?? null
+
+        // Per-category progress — for a quick structural overview
+        const categoryProgress = cats.map(c => {
+          const cTotal = c.tasks?.length || 0
+          const cDone = c.tasks?.filter(t => t.isCompleted).length || 0
+          return {
+            id: c.id,
+            name: c.name,
+            total: cTotal,
+            completed: cDone,
+            percent: cTotal > 0 ? Math.round((cDone / cTotal) * 100) : 0,
+          }
+        })
+
+        // Health signal — at-a-glance trust indicator
+        const overdueRatio = total > 0 ? overdueTasks.length / total : 0
+        let health: 'healthy' | 'caution' | 'warning' = 'healthy'
+        if (overdueTasks.length >= 5 || overdueRatio > 0.3) health = 'warning'
+        else if (overdueTasks.length >= 1 || stuckTasks.length >= 3) health = 'caution'
 
         return {
           ...ws,
+          categoryProgress,
+          mostUrgent,
           stats: {
             total,
-            completed,
-            pending: total - completed,
-            overdue,
-            today,
-            completionRate: total > 0 ? Math.round((completed / total) * 100) : 0
-          }
+            completed: completed.length,
+            pending: pending.length,
+            overdue: overdueTasks.length,
+            today: todayTasks.length,
+            upcoming: upcomingTasks.length,
+            stuck: stuckTasks.length,
+            estimatedMin,
+            completionRate: total > 0 ? Math.round((completed.length / total) * 100) : 0,
+            health,
+          },
         }
       })
       .filter(ws => ws.stats.total > 0)
@@ -213,7 +306,7 @@ export function FullScreenTaskView({
     
     const tomorrow = new Date(now)
     tomorrow.setDate(tomorrow.getDate() + 1)
-    if (dateStr === tomorrow.toISOString().split('T')[0]) return '明天'
+    if (dateStr === toDateString(tomorrow)) return '明天'
     
     return date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })
   }
@@ -587,18 +680,24 @@ export function FullScreenTaskView({
                 <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary">
                   <button
                     onClick={() => setViewMode('grouped')}
+                    aria-pressed={viewMode === 'grouped'}
                     className={cn(
-                      "px-2.5 py-1 rounded text-xs font-medium transition-colors",
-                      viewMode === 'grouped' ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      "px-2.5 py-1 rounded text-xs font-medium transition-all",
+                      viewMode === 'grouped'
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-card/60"
                     )}
                   >
                     依分類
                   </button>
                   <button
                     onClick={() => setViewMode('flat')}
+                    aria-pressed={viewMode === 'flat'}
                     className={cn(
-                      "px-2.5 py-1 rounded text-xs font-medium transition-colors",
-                      viewMode === 'flat' ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      "px-2.5 py-1 rounded text-xs font-medium transition-all",
+                      viewMode === 'flat'
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-card/60"
                     )}
                   >
                     列表
@@ -660,9 +759,12 @@ export function FullScreenTaskView({
                     <button
                       key={d.id}
                       onClick={() => setDensity(d.id as typeof density)}
+                      aria-pressed={density === d.id}
                       className={cn(
-                        "px-2 py-1 rounded text-xs font-medium transition-colors",
-                        density === d.id ? "bg-card shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        "px-2.5 py-1 rounded text-xs font-medium transition-all",
+                        density === d.id
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground hover:bg-card/60"
                       )}
                     >
                       {d.label}
@@ -799,14 +901,14 @@ export function FullScreenTaskView({
                                           )}
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
-                                          {task.urgency && (
+                                          {task.urgency > 0 && (
                                             <span className={cn(
                                               "px-1.5 py-0.5 rounded text-[10px] font-medium",
-                                              task.urgency === 'high' && "bg-red-500/10 text-red-600",
-                                              task.urgency === 'medium' && "bg-orange-500/10 text-orange-600",
-                                              task.urgency === 'low' && "bg-green-500/10 text-green-600"
+                                              task.urgency >= 8 && "bg-red-500/10 text-red-600",
+                                              task.urgency >= 5 && task.urgency < 8 && "bg-orange-500/10 text-orange-600",
+                                              task.urgency < 5 && "bg-green-500/10 text-green-600"
                                             )}>
-                                              {task.urgency === 'high' ? '高' : task.urgency === 'medium' ? '中' : '低'}
+                                              {task.urgency >= 8 ? '高' : task.urgency >= 5 ? '中' : '低'}
                                             </span>
                                           )}
                                           {task.dueDate && (
@@ -875,199 +977,591 @@ export function FullScreenTaskView({
                   )
                 })
               ) : (
-                /* Flat List View */
-                filteredTasks.map(task => (
-                  <div
-                    key={task.id}
-                    className={cn(
-                      "flex items-center gap-4 rounded-xl border transition-all cursor-pointer group",
-                      taskFilter === 'overdue'
-                        ? "bg-red-500/5 border-red-500/20 hover:bg-red-500/10"
-                        : "bg-card border-border hover:border-primary/30 hover:shadow-sm",
-                      density === 'compact' && "p-3",
-                      density === 'comfortable' && "p-4",
-                      density === 'relaxed' && "p-5"
-                    )}
-                    onClick={() => onTaskClick?.(task)}
-                  >
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id) }}
+                /* Flat List View — density controls how much information is shown:
+                   緊湊 = title + workspace tag only
+                   舒適 = + category, duration, urgency badge, due date
+                   寬鬆 = + description preview, larger spacing */
+                filteredTasks.map(task => {
+                  const isOverdue = !!(task.dueDate && new Date(task.dueDate) < now)
+                  return (
+                    <div
+                      key={task.id}
                       className={cn(
-                        "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0",
+                        'flex rounded-xl border transition-all cursor-pointer group',
                         taskFilter === 'overdue'
-                          ? "border-red-400 hover:bg-red-500/20"
-                          : "border-muted-foreground hover:border-primary hover:bg-primary/10"
+                          ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10'
+                          : 'bg-card border-border hover:border-primary/30 hover:shadow-sm',
+                        density === 'compact' && 'items-center gap-3 px-3 py-2',
+                        density === 'comfortable' && 'items-center gap-4 px-4 py-3',
+                        density === 'relaxed' && 'items-start gap-4 px-5 py-4'
                       )}
-                    />
+                      onClick={() => onTaskClick?.(task)}
+                    >
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id) }}
+                        aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
+                        className={cn(
+                          'rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0',
+                          density === 'compact' ? 'w-4 h-4 mt-0' : 'w-5 h-5',
+                          density === 'relaxed' && 'mt-1',
+                          isOverdue
+                            ? 'border-red-400 hover:bg-red-500/20'
+                            : 'border-muted-foreground hover:border-primary hover:bg-primary/10'
+                        )}
+                      />
 
-                    <div 
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: task.workspaceColor }}
-                    />
+                      <div className="flex-1 min-w-0">
+                        {/* Title row: workspace tag + title (always visible) */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          {/* Workspace tag in front — identifies the bucket at a glance */}
+                          <span
+                            className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor: `${task.workspaceColor}20`,
+                              color: task.workspaceColor,
+                            }}
+                          >
+                            <span
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: task.workspaceColor }}
+                            />
+                            {task.workspaceName}
+                          </span>
+                          <div
+                            className={cn(
+                              'font-medium truncate',
+                              density === 'compact' ? 'text-sm' : 'text-base'
+                            )}
+                          >
+                            {task.title}
+                          </div>
+                        </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className={cn("font-medium truncate", density === 'compact' && "text-sm")}>{task.title}</div>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                        <span>{task.workspaceName}</span>
-                        <span>·</span>
-                        <span>{task.categoryName}</span>
-                        {task.estimatedMinutes && (
-                          <>
-                            <span>·</span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {task.estimatedMinutes}m
-                            </span>
-                          </>
+                        {/* Comfortable + Relaxed: meta line */}
+                        {density !== 'compact' && (
+                          <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1 text-xs text-muted-foreground">
+                            <span>{task.categoryName}</span>
+                            {task.estimatedMinutes && (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" aria-hidden="true" />
+                                  {task.estimatedMinutes}m
+                                </span>
+                              </>
+                            )}
+                            {task.scheduledDate && (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                <span>排程 {formatDate(task.scheduledDate)}</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Relaxed only: description preview */}
+                        {density === 'relaxed' && task.description && (
+                          <p className="mt-2 text-xs text-foreground/70 leading-relaxed line-clamp-2">
+                            {task.description}
+                          </p>
                         )}
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      {task.urgency === 'high' && (
-                        <span className="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 text-xs font-medium">
-                          高優先
-                        </span>
-                      )}
-                      {task.dueDate && (
-                        <span className={cn(
-                          "text-sm",
-                          new Date(task.dueDate) < now ? "text-red-500 font-medium" : "text-muted-foreground"
-                        )}>
-                          {new Date(task.dueDate) < now 
-                            ? `過期 ${getDaysOverdue(task.dueDate)} 天`
-                            : formatDate(task.dueDate)
-                          }
-                        </span>
-                      )}
-                      <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      {/* Right side: badges (舒適+寬鬆) — compact mode hides these */}
+                      <div
+                        className={cn(
+                          'flex items-center gap-2 flex-shrink-0',
+                          density === 'relaxed' && 'mt-0.5'
+                        )}
+                      >
+                        {density !== 'compact' && task.urgency >= 8 && (
+                          <span className="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 text-xs font-medium">
+                            高優先
+                          </span>
+                        )}
+                        {density !== 'compact' && task.dueDate && (
+                          <span
+                            className={cn(
+                              'text-xs whitespace-nowrap',
+                              isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground'
+                            )}
+                          >
+                            {isOverdue
+                              ? `過期 ${getDaysOverdue(task.dueDate)} 天`
+                              : formatDate(task.dueDate)}
+                          </span>
+                        )}
+                        {/* Compact: a single tiny urgency dot or overdue mark, no labels */}
+                        {density === 'compact' && task.urgency >= 8 && (
+                          <span
+                            className="w-1.5 h-1.5 rounded-full bg-orange-500"
+                            aria-label="高優先"
+                            title="高優先"
+                          />
+                        )}
+                        {density === 'compact' && isOverdue && (
+                          <span
+                            className="text-[10px] font-medium text-red-500 whitespace-nowrap"
+                            aria-label="已過期"
+                          >
+                            過期
+                          </span>
+                        )}
+                        <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
           </div>
         )}
 
         {activeTab === 'workspaces' && (
-          <div className="p-6">
-            <div className="grid grid-cols-3 gap-6">
-              {workspaceStats.map(ws => (
-                <div 
-                  key={ws.id}
-                  className={cn(
-                    "rounded-xl border transition-all overflow-hidden",
-                    selectedWorkspace === ws.id 
-                      ? "border-primary ring-2 ring-primary/20" 
-                      : "border-border hover:shadow-md"
-                  )}
-                >
-                  {/* Header */}
-                  <div 
-                    className="p-4 cursor-pointer"
-                    style={{ backgroundColor: `${ws.color}10` }}
-                    onClick={() => setSelectedWorkspace(selectedWorkspace === ws.id ? null : ws.id)}
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div 
-                        className="w-5 h-5 rounded-full"
-                        style={{ backgroundColor: ws.color }}
-                      />
-                      <span className="text-lg font-semibold">{ws.name}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {ws.stats.completed}/{ws.stats.total} 完成
-                      </span>
-                      <span className="font-bold text-lg">{ws.stats.completionRate}%</span>
-                    </div>
-                    <div className="mt-2 h-2 bg-white/50 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full rounded-full"
-                        style={{ 
-                          width: `${ws.stats.completionRate}%`,
-                          backgroundColor: ws.color 
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="p-4 bg-card grid grid-cols-3 gap-2 text-center border-t border-border">
-                    <div>
-                      <div className="text-lg font-bold text-blue-600">{ws.stats.today}</div>
-                      <div className="text-xs text-muted-foreground">今日</div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold text-red-600">{ws.stats.overdue}</div>
-                      <div className="text-xs text-muted-foreground">過期</div>
-                    </div>
-                    <div>
-                      <div className="text-lg font-bold">{ws.stats.pending}</div>
-                      <div className="text-xs text-muted-foreground">待處理</div>
-                    </div>
-                  </div>
-
-                  {/* Categories */}
-                  {selectedWorkspace === ws.id && (
-                    <div className="border-t border-border">
-                      {ws.categories?.filter(c => !c.isArchived).map(cat => {
-                        const catTasks = cat.tasks || []
-                        const catCompleted = catTasks.filter(t => t.isCompleted).length
-                        const catPending = catTasks.filter(t => !t.isCompleted)
-                        const isExpanded = expandedCategories.has(cat.id)
-
-                        return (
-                          <div key={cat.id} className="border-b border-border last:border-0">
-                            <button
-                              onClick={() => toggleCategory(cat.id)}
-                              className="w-full flex items-center justify-between p-3 hover:bg-secondary/50 transition-colors"
-                            >
-                              <div className="flex items-center gap-2">
-                                <ChevronDown className={cn(
-                                  "w-4 h-4 transition-transform",
-                                  !isExpanded && "-rotate-90"
-                                )} />
-                                <span className="font-medium text-sm">{cat.name}</span>
-                              </div>
-                              <span className="text-xs text-muted-foreground">
-                                {catCompleted}/{catTasks.length}
-                              </span>
-                            </button>
-                            
-                            {isExpanded && catPending.length > 0 && (
-                              <div className="px-3 pb-3 space-y-1">
-                                {catPending.slice(0, 5).map(task => (
-                                  <div
-                                    key={task.id}
-                                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-secondary/50 cursor-pointer text-sm"
-                                    onClick={() => onTaskClick?.(task)}
-                                  >
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id) }}
-                                      className="w-4 h-4 rounded-full border border-muted-foreground flex-shrink-0"
-                                    />
-                                    <span className="truncate">{task.title}</span>
-                                  </div>
-                                ))}
-                                {catPending.length > 5 && (
-                                  <div className="text-xs text-muted-foreground pl-6">
-                                    還有 {catPending.length - 5} 個任務...
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          <WorkspacesView
+            workspaceStats={workspaceStats}
+            now={now}
+            todayStr={todayStr}
+            formatDate={formatDate}
+            getDaysOverdue={getDaysOverdue}
+            onTaskClick={onTaskClick}
+            onToggleComplete={onToggleComplete}
+            onDrillIn={(wsId, filter) => {
+              setSelectedWorkspace(wsId)
+              setTaskFilter(filter)
+              setActiveTab('tasks')
+              setViewMode('flat')
+            }}
+          />
         )}
       </div>
     </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Workspaces tab — designed to answer the PM's primary question at a glance:
+//   "Can I trust this workspace to hit its targets, and what should I do
+//    about the ones I can't?"
+//
+// Layout:
+//   1. Cross-workspace summary banner (overall numbers, scannable)
+//   2. Per-workspace cards with:
+//        · Health badge (healthy / caution / warning) + workload
+//        · Visual progress ring + completion text
+//        · Three clickable KPI tiles (today / overdue / pending) → drill in
+//        · "Most urgent next-up" task (the one to act on first)
+//        · Top-N category progress bars
+//        · CTA to open the filtered task list
+// ────────────────────────────────────────────────────────────────────────────
+
+type DrillFilter = 'all' | 'today' | 'overdue' | 'unscheduled' | 'upcoming'
+
+interface WorkspaceStat {
+  id: string
+  name: string
+  color: string
+  icon?: string
+  categoryProgress: { id: string; name: string; total: number; completed: number; percent: number }[]
+  mostUrgent: Task | null
+  stats: {
+    total: number
+    completed: number
+    pending: number
+    overdue: number
+    today: number
+    upcoming: number
+    stuck: number
+    estimatedMin: number
+    completionRate: number
+    health: 'healthy' | 'caution' | 'warning'
+  }
+}
+
+function formatHours(minutes: number): string {
+  if (minutes <= 0) return '—'
+  if (minutes < 60) return `${minutes} 分`
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m === 0 ? `${h} 小時` : `${h}.${Math.round((m / 60) * 10)} 小時`
+}
+
+interface WorkspacesViewProps {
+  workspaceStats: WorkspaceStat[]
+  now: Date
+  todayStr: string
+  formatDate: (d: string) => string
+  getDaysOverdue: (d: string) => number
+  onTaskClick?: (task: Task) => void
+  onToggleComplete?: (taskId: string) => void
+  onDrillIn: (workspaceId: string, filter: DrillFilter) => void
+}
+
+function WorkspacesView({
+  workspaceStats,
+  now,
+  formatDate,
+  getDaysOverdue,
+  onTaskClick,
+  onToggleComplete,
+  onDrillIn,
+}: WorkspacesViewProps) {
+  // Aggregate cross-workspace summary
+  const summary = useMemo(() => {
+    return workspaceStats.reduce(
+      (acc, ws) => {
+        acc.total += ws.stats.total
+        acc.completed += ws.stats.completed
+        acc.pending += ws.stats.pending
+        acc.overdue += ws.stats.overdue
+        acc.today += ws.stats.today
+        acc.upcoming += ws.stats.upcoming
+        acc.stuck += ws.stats.stuck
+        acc.estimatedMin += ws.stats.estimatedMin
+        return acc
+      },
+      { total: 0, completed: 0, pending: 0, overdue: 0, today: 0, upcoming: 0, stuck: 0, estimatedMin: 0 }
+    )
+  }, [workspaceStats])
+
+  if (workspaceStats.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+        <LayoutGrid className="w-10 h-10 mb-3 opacity-40" aria-hidden="true" />
+        <p className="text-sm">尚無工作區，先建立一個來開始排程任務。</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Summary banner */}
+      <div className="rounded-xl border border-border bg-gradient-to-br from-card to-secondary/30 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">整體狀態</h2>
+            <p className="text-xs text-muted-foreground">
+              {workspaceStats.length} 個工作區 · {summary.pending} 個待處理任務
+            </p>
+          </div>
+          {summary.overdue > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 text-red-600 text-xs font-medium">
+              <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+              {summary.overdue} 個過期需處理
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <SummaryStat icon={<Calendar className="w-3.5 h-3.5" aria-hidden="true" />} label="今日排程" value={summary.today} tone="primary" />
+          <SummaryStat icon={<Clock className="w-3.5 h-3.5" aria-hidden="true" />} label="七日內到期" value={summary.upcoming} tone="amber" />
+          <SummaryStat icon={<AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />} label="過期" value={summary.overdue} tone={summary.overdue > 0 ? 'red' : 'neutral'} />
+          <SummaryStat icon={<Hourglass className="w-3.5 h-3.5" aria-hidden="true" />} label="估計工時" value={formatHours(summary.estimatedMin)} tone="neutral" />
+        </div>
+      </div>
+
+      {/* Workspace cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {workspaceStats.map((ws) => (
+          <WorkspaceCard
+            key={ws.id}
+            ws={ws}
+            now={now}
+            formatDate={formatDate}
+            getDaysOverdue={getDaysOverdue}
+            onTaskClick={onTaskClick}
+            onToggleComplete={onToggleComplete}
+            onDrillIn={onDrillIn}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SummaryStat({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: number | string
+  tone: 'primary' | 'red' | 'amber' | 'neutral'
+}) {
+  const toneClasses =
+    tone === 'red'
+      ? 'text-red-600'
+      : tone === 'amber'
+      ? 'text-amber-600'
+      : tone === 'primary'
+      ? 'text-primary'
+      : 'text-foreground'
+  return (
+    <div className="rounded-lg bg-background/60 border border-border/60 p-3">
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className={cn('text-xl font-bold tabular-nums', toneClasses)}>{value}</div>
+    </div>
+  )
+}
+
+interface WorkspaceCardProps {
+  ws: WorkspaceStat
+  now: Date
+  formatDate: (d: string) => string
+  getDaysOverdue: (d: string) => number
+  onTaskClick?: (task: Task) => void
+  onToggleComplete?: (taskId: string) => void
+  onDrillIn: (workspaceId: string, filter: DrillFilter) => void
+}
+
+function WorkspaceCard({
+  ws,
+  now,
+  formatDate,
+  getDaysOverdue,
+  onTaskClick,
+  onToggleComplete,
+  onDrillIn,
+}: WorkspaceCardProps) {
+  const { stats, mostUrgent, categoryProgress } = ws
+
+  // Sort categories by completion rate desc to surface progress; cap to 4
+  const topCategories = useMemo(() => {
+    return [...categoryProgress].sort((a, b) => b.percent - a.percent).slice(0, 4)
+  }, [categoryProgress])
+  const remainingCats = categoryProgress.length - topCategories.length
+
+  const urgentMeta = mostUrgent
+    ? mostUrgent.dueDate && new Date(mostUrgent.dueDate) < now
+      ? { tone: 'red' as const, label: `過期 ${getDaysOverdue(mostUrgent.dueDate)} 天` }
+      : mostUrgent.scheduledStartTime
+      ? { tone: 'primary' as const, label: `${mostUrgent.scheduledStartTime}` }
+      : mostUrgent.dueDate
+      ? { tone: 'amber' as const, label: `截止 ${formatDate(mostUrgent.dueDate)}` }
+      : { tone: 'neutral' as const, label: '未排程' }
+    : null
+
+  const r = 22
+  const c = 2 * Math.PI * r
+  const dash = (stats.completionRate / 100) * c
+
+  return (
+    <div className="rounded-2xl border border-border bg-card overflow-hidden flex flex-col transition-shadow hover:shadow-md">
+      {/* Card Header */}
+      <div className="px-5 pt-4 pb-3" style={{ backgroundColor: `${ws.color}10` }}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-2xl flex-shrink-0" aria-hidden="true">
+              {ws.icon || '📁'}
+            </span>
+            <div className="min-w-0">
+              <h3 className="font-semibold text-foreground truncate">{ws.name}</h3>
+              <p className="text-[11px] text-muted-foreground">
+                {stats.total} 個任務 · 估計 {formatHours(stats.estimatedMin)}
+              </p>
+            </div>
+          </div>
+          <HealthBadge health={stats.health} />
+        </div>
+      </div>
+
+      {/* Progress + KPIs */}
+      <div className="px-5 py-4 flex items-center gap-4 border-b border-border/60">
+        {/* Donut */}
+        <div className="relative w-16 h-16 flex-shrink-0">
+          <svg width="64" height="64" viewBox="0 0 64 64" className="-rotate-90">
+            <circle cx="32" cy="32" r={r} fill="none" strokeWidth="6" className="stroke-muted/40" />
+            <circle
+              cx="32"
+              cy="32"
+              r={r}
+              fill="none"
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeDasharray={`${dash} ${c}`}
+              style={{ stroke: ws.color }}
+              className="transition-[stroke-dasharray] duration-500"
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-base font-bold tabular-nums leading-none">
+              {stats.completionRate}%
+            </span>
+            <span className="text-[9px] text-muted-foreground leading-none mt-0.5">
+              {stats.completed}/{stats.total}
+            </span>
+          </div>
+        </div>
+        {/* KPI tiles (clickable, drill into filtered task list) */}
+        <div className="flex-1 grid grid-cols-3 gap-1.5 min-w-0">
+          <KpiTile label="今日" value={stats.today} tone="primary" onClick={() => onDrillIn(ws.id, 'today')} />
+          <KpiTile label="過期" value={stats.overdue} tone={stats.overdue > 0 ? 'red' : 'neutral'} onClick={() => onDrillIn(ws.id, 'overdue')} />
+          <KpiTile label="待處理" value={stats.pending} tone="neutral" onClick={() => onDrillIn(ws.id, 'all')} />
+        </div>
+      </div>
+
+      {/* Most urgent next-up */}
+      {mostUrgent && (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => onTaskClick?.(mostUrgent)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onTaskClick?.(mostUrgent)
+            }
+          }}
+          aria-label={`開啟最緊急任務：${mostUrgent.title}`}
+          className="text-left px-5 py-3 border-b border-border/60 hover:bg-secondary/40 transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset cursor-pointer"
+        >
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Flame className="w-3 h-3 text-orange-500" aria-hidden="true" />
+            <span className="text-[10px] font-semibold text-orange-600 uppercase tracking-wide">最緊急</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onToggleComplete?.(mostUrgent.id) }}
+              aria-label="標記為完成"
+              className="flex-shrink-0 mt-0.5 w-4 h-4 rounded-full border-2 border-muted-foreground hover:border-primary hover:bg-primary/10 transition"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-foreground truncate">{mostUrgent.title}</div>
+              <div className="flex items-center gap-2 mt-0.5 text-[11px]">
+                <span className="text-muted-foreground">{mostUrgent.categoryName}</span>
+                {urgentMeta && (
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 font-medium',
+                      urgentMeta.tone === 'red' && 'text-red-500',
+                      urgentMeta.tone === 'amber' && 'text-amber-600',
+                      urgentMeta.tone === 'primary' && 'text-primary',
+                      urgentMeta.tone === 'neutral' && 'text-muted-foreground'
+                    )}
+                  >
+                    · {urgentMeta.label}
+                  </span>
+                )}
+              </div>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+          </div>
+        </div>
+      )}
+
+      {/* Categories */}
+      {topCategories.length > 0 && (
+        <div className="px-5 py-3 space-y-2 flex-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">分類進度</span>
+            {remainingCats > 0 && (
+              <span className="text-[10px] text-muted-foreground/70">+{remainingCats} 個</span>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            {topCategories.map((c) => (
+              <div key={c.id} className="flex items-center gap-2 text-xs">
+                <span className="flex-1 min-w-0 truncate text-foreground/85">{c.name}</span>
+                <div className="w-16 h-1 rounded-full bg-muted overflow-hidden flex-shrink-0">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${c.percent}%`, backgroundColor: ws.color }}
+                  />
+                </div>
+                <span className="w-10 text-right tabular-nums text-muted-foreground text-[11px]">
+                  {c.completed}/{c.total}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Caution footer (stuck tasks) */}
+      {stats.stuck > 0 && (
+        <div className="px-5 py-2 border-t border-border/60 bg-amber-500/5">
+          <button
+            type="button"
+            onClick={() => onDrillIn(ws.id, 'unscheduled')}
+            className="w-full flex items-center gap-1.5 text-[11px] text-amber-700 hover:text-amber-800 transition-colors"
+          >
+            <AlertTriangle className="w-3 h-3" aria-hidden="true" />
+            <span>{stats.stuck} 個任務超過 7 天未排程</span>
+            <ArrowRight className="w-3 h-3 ml-auto" aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
+      {/* CTA footer */}
+      <button
+        type="button"
+        onClick={() => onDrillIn(ws.id, 'all')}
+        className="px-5 py-3 border-t border-border/60 flex items-center justify-between text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      >
+        <span>檢視所有任務</span>
+        <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+      </button>
+    </div>
+  )
+}
+
+function HealthBadge({ health }: { health: 'healthy' | 'caution' | 'warning' }) {
+  const config = {
+    healthy: { Icon: ShieldCheck, label: '健康', cls: 'bg-emerald-500/10 text-emerald-700' },
+    caution: { Icon: Shield, label: '注意', cls: 'bg-amber-500/10 text-amber-700' },
+    warning: { Icon: ShieldAlert, label: '警示', cls: 'bg-red-500/10 text-red-700' },
+  } as const
+  const { Icon, label, cls } = config[health]
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0',
+        cls
+      )}
+      aria-label={`狀態：${label}`}
+    >
+      <Icon className="w-3 h-3" aria-hidden="true" />
+      {label}
+    </span>
+  )
+}
+
+function KpiTile({
+  label,
+  value,
+  tone,
+  onClick,
+}: {
+  label: string
+  value: number
+  tone: 'primary' | 'red' | 'neutral'
+  onClick: () => void
+}) {
+  const toneClasses =
+    tone === 'red'
+      ? 'text-red-600'
+      : tone === 'primary'
+      ? 'text-primary'
+      : 'text-foreground'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={value === 0}
+      className={cn(
+        'rounded-lg px-2 py-1.5 text-left transition-all',
+        'bg-secondary/40 hover:bg-secondary border border-transparent hover:border-border',
+        'disabled:opacity-50 disabled:cursor-default disabled:hover:bg-secondary/40 disabled:hover:border-transparent',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+      )}
+    >
+      <div className="text-[10px] text-muted-foreground">{label}</div>
+      <div className={cn('text-lg font-bold tabular-nums', toneClasses)}>{value}</div>
+    </button>
   )
 }

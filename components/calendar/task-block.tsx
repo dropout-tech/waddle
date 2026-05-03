@@ -1,5 +1,6 @@
 'use client'
 
+import { memo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import {
@@ -42,7 +43,7 @@ function timeToMinutes(time: string): number {
   return h * 60 + m
 }
 
-export function TaskBlock({
+function TaskBlockImpl({
   task,
   calendarStartHour = 0,
   hourHeight = 60,
@@ -70,16 +71,28 @@ export function TaskBlock({
   const widthPercent = 100 / totalColumns
   const leftPercent = column * widthPercent
 
+  // Brief celebration burst when transitioning from unchecked → checked.
+  const [burst, setBurst] = useState(false)
+
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
+    if (!task.isCompleted) {
+      setBurst(true)
+      window.setTimeout(() => setBurst(false), 700)
+    }
     onToggleComplete?.(task.id)
   }
+
+  // Track mousedown to distinguish a click (open task) from a drag (move/resize).
+  // If mouseup happens with minimal movement and within ~300ms, treat as click.
+  const pressOrigin = useRef<{ x: number; y: number; t: number } | null>(null)
 
   const handleBodyMouseDown = (e: React.MouseEvent) => {
     if (!onDragStart) return
     if (e.button !== 0) return
     e.stopPropagation()
     e.preventDefault()
+    pressOrigin.current = { x: e.clientX, y: e.clientY, t: Date.now() }
     const blockEl = (e.currentTarget as HTMLElement).closest('[data-task-block]') as HTMLElement
     const blockRect = blockEl?.getBoundingClientRect()
     const offsetY = blockRect ? e.clientY - blockRect.top : 0
@@ -90,6 +103,23 @@ export function TaskBlock({
       originalEnd: timeToMinutes(task.scheduledEndTime!),
       offsetY,
     })
+  }
+
+  const handleBodyMouseUp = (e: React.MouseEvent) => {
+    const origin = pressOrigin.current
+    pressOrigin.current = null
+    if (!origin) return
+    const dx = e.clientX - origin.x
+    const dy = e.clientY - origin.y
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    const elapsed = Date.now() - origin.t
+    // Click threshold: 5px movement, 300ms.
+    // Don't stopPropagation — parent's grid mouseup must still run to clear
+    // activeTaskDrag state. Its no-op onRescheduleTask call (same values) is
+    // harmless; only bumps updatedAt. We then open the detail modal.
+    if (dist < 5 && elapsed < 300) {
+      onSelect(task)
+    }
   }
 
   const handleResizeTopMouseDown = (e: React.MouseEvent) => {
@@ -142,12 +172,27 @@ export function TaskBlock({
         cursor: isDragging ? 'grabbing' : 'grab',
       }
 
+  const ariaLabel = `${task.title}，${formatTime(task.scheduledStartTime!)} 到 ${formatTime(task.scheduledEndTime!)}${task.isCompleted ? '，已完成' : ''}`
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect(task)
+    }
+  }
+
   return (
     <div
       data-task-block
       data-block="true"
+      role="button"
+      tabIndex={0}
+      aria-label={ariaLabel}
+      aria-pressed={task.isCompleted}
+      onKeyDown={handleKeyDown}
       className={cn(
         'absolute rounded-xl overflow-hidden group select-none',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1',
         isDragging
           ? 'shadow-2xl opacity-90 z-50 ring-2 ring-white/40'
           : 'hover:shadow-lg hover:z-10 transition-shadow',
@@ -163,47 +208,84 @@ export function TaskBlock({
         <div className="w-6 h-0.5 bg-white/60 rounded-full" />
       </div>
 
-      {/* Block body — drag to move */}
+      {/* Block body — drag to move, click to open detail */}
       <div
-        className="h-full flex flex-col p-2 pt-3"
+        className={cn(
+          'h-full flex flex-col',
+          totalColumns > 1 ? 'p-1.5 pt-2 gap-0.5' : 'p-2 pt-3'
+        )}
         onMouseDown={handleBodyMouseDown}
+        onMouseUp={handleBodyMouseUp}
+        title={`${task.title} · ${formatTime(task.scheduledStartTime!)}–${formatTime(task.scheduledEndTime!)}`}
       >
         {/* Top Row: Checkbox + Title */}
-        <div className="flex items-start gap-1.5 min-w-0">
-          <div
-            role="checkbox"
-            aria-checked={task.isCompleted}
-            aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={handleCheckboxClick}
-            className={cn(
-              'flex-shrink-0 mt-0.5 w-3.5 h-3.5 rounded-full border-[1.5px] border-white/60 flex items-center justify-center transition-all',
-              'hover:border-white hover:bg-white/20 cursor-pointer',
-              task.isCompleted && 'bg-white border-white'
-            )}
-          >
-            {task.isCompleted && (
-              <Check className="w-2 h-2" style={{ color }} strokeWidth={3} />
+        <div className={cn('flex min-w-0', totalColumns > 1 ? 'items-start gap-1' : 'items-start gap-1.5')}>
+          <div className="relative flex-shrink-0">
+            <div
+              role="checkbox"
+              aria-checked={task.isCompleted}
+              aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={handleCheckboxClick}
+              className={cn(
+                'mt-0.5 w-3.5 h-3.5 rounded-full border-[1.5px] border-white/60 flex items-center justify-center transition-all',
+                'hover:border-white hover:bg-white/20 cursor-pointer',
+                task.isCompleted && 'bg-white border-white',
+                burst && 'animate-[task-pop_500ms_ease-out]'
+              )}
+            >
+              {task.isCompleted && (
+                <Check
+                  className={cn('w-2 h-2', burst && 'animate-[task-check_500ms_ease-out]')}
+                  style={{ color }}
+                  strokeWidth={3}
+                />
+              )}
+            </div>
+
+            {/* Sparkle burst — six particles flying outward */}
+            {burst && (
+              <div className="pointer-events-none absolute inset-0 mt-0.5">
+                {[0, 60, 120, 180, 240, 300].map((angle) => (
+                  <span
+                    key={angle}
+                    className="absolute top-1/2 left-1/2 w-1 h-1 rounded-full bg-white animate-[task-sparkle_600ms_ease-out_forwards]"
+                    style={{
+                      ['--task-sparkle-angle' as string]: `${angle}deg`,
+                    }}
+                  />
+                ))}
+              </div>
             )}
           </div>
 
+          {/* Title: wraps to multiple lines when narrow.
+              1 col → 2 lines max, normal size.
+              2-3 cols → up to 3 lines, slightly smaller.
+              4+ cols → vertical text (column too narrow for legible wrap). */}
           <span
             className={cn(
-              'font-semibold text-white leading-tight',
-              totalColumns > 2 ? 'text-[10px]' : 'text-xs truncate',
-              task.isCompleted && 'line-through opacity-80'
+              'font-semibold text-white leading-tight break-words flex-1 min-w-0',
+              totalColumns > 3
+                ? 'text-[10px]'
+                : totalColumns > 1
+                ? 'text-[11px] line-clamp-3'
+                : 'text-xs line-clamp-2'
             )}
-            style={totalColumns > 2 ? { writingMode: 'vertical-rl', textOrientation: 'mixed' } : {}}
+            style={totalColumns > 3 ? { writingMode: 'vertical-rl', textOrientation: 'mixed' } : undefined}
           >
             {task.title}
           </span>
         </div>
 
-        {/* Time + Type */}
-        {totalColumns <= 2 && (
+        {/* Time + Type — kept up to 3 columns; hidden at 4+ to give vertical title room */}
+        {totalColumns <= 3 && (
           <div className="mt-auto">
-            <span className="text-[10px] text-white/80 font-mono block">
-              {formatTime(task.scheduledStartTime!)}-{formatTime(task.scheduledEndTime!)}
+            <span className={cn(
+              'text-white/80 font-mono block',
+              totalColumns > 1 ? 'text-[9px]' : 'text-[10px]'
+            )}>
+              {formatTime(task.scheduledStartTime!)}–{formatTime(task.scheduledEndTime!)}
             </span>
             {totalColumns === 1 && (
               <div className="flex items-center gap-1 mt-0.5">
@@ -234,3 +316,5 @@ export function TaskBlock({
     </div>
   )
 }
+
+export const TaskBlock = memo(TaskBlockImpl)

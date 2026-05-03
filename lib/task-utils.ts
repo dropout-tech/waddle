@@ -1,4 +1,5 @@
 import type { Task, ColorStatus } from './types'
+import { toDateString } from './calendar-utils'
 
 /**
  * Returns inline CSS color values for the entire task row.
@@ -24,7 +25,7 @@ export function getUrgencyColor(task: Task): {
   /** Whether the task is overdue */
   isOverdue: boolean
 } {
-  const today = new Date().toISOString().split('T')[0]
+  const today = toDateString(new Date())
   const base = task.workspaceColor // always the workspace hex color
 
   // Background opacity increases with urgency (0.04 at low, 0.12 at critical)
@@ -82,7 +83,7 @@ export function getUrgencyColor(task: Task): {
 }
 
 export function getColorStatus(task: Task): ColorStatus {
-  const today = new Date().toISOString().split('T')[0]
+  const today = toDateString(new Date())
 
   if (task.isCompleted) return 'completed'
   if (task.dueDate && task.dueDate < today) return 'overdue'

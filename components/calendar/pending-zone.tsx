@@ -37,28 +37,33 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
 
   if (tasks.length === 0 && !isAdding) {
     return (
-      <div className="px-5 py-4 border-b border-border bg-muted/30">
-        <div 
+      <div className="px-5 py-4 border-b border-border bg-muted/30" role="region" aria-label="待排程任務">
+        <button
+          type="button"
           onClick={() => { setIsAdding(true); setTimeout(() => inputRef.current?.focus(), 0) }}
-          className="flex items-center justify-center gap-2 text-muted-foreground/50 cursor-pointer hover:text-muted-foreground transition-colors"
+          className="w-full flex items-center justify-center gap-2 text-muted-foreground/50 hover:text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4" aria-hidden="true" />
           <span className="text-xs">點擊新增待排程任務</span>
-        </div>
+        </button>
       </div>
     )
   }
 
   return (
-    <div className="px-5 py-4 border-b border-border bg-muted/20">
+    <div
+      className="px-5 py-4 border-b border-border bg-muted/20"
+      role="region"
+      aria-label="待排程任務"
+    >
       {/* Label */}
       <div className="flex items-center gap-2 mb-3">
-        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+        <Clock className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
         <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
           待排程
         </span>
         <span className="text-[10px] text-muted-foreground/60">
-          - 拖曳到下方時間軸
+          · 拖曳到下方時間軸
         </span>
       </div>
 
@@ -100,9 +105,11 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
           <div
             key={task.id}
             draggable
+            aria-label={`待排程任務：${task.title}`}
             className={cn(
-              'group flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-all cursor-grab',
+              'group flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-all cursor-grab active:cursor-grabbing',
               'bg-card border border-border hover:border-primary/30 hover:shadow-sm',
+              'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1',
               task.isCompleted && 'opacity-50'
             )}
           >

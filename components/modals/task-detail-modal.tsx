@@ -1,10 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat } from 'lucide-react'
+import { useState, useRef, useMemo } from 'react'
+import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat, List, CheckSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task, Workspace } from '@/lib/types'
-import { formatEstimatedTime } from '@/lib/task-utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -19,6 +18,8 @@ interface TaskDetailModalProps {
   task: Task
   workspaces?: Workspace[]
   isOpen: boolean
+  /** 'edit' (default) edits an existing task; 'create' uses task as a draft and saves as a new task. */
+  mode?: 'edit' | 'create'
   onClose: () => void
   onSave: (updates: Partial<Task>, newCategoryId?: string) => void
   onToggleComplete?: (taskId: string) => void
@@ -29,11 +30,13 @@ export function TaskDetailModal({
   task,
   workspaces = [],
   isOpen,
+  mode = 'edit',
   onClose,
   onSave,
   onToggleComplete,
   onDelete,
 }: TaskDetailModalProps) {
+  const isCreate = mode === 'create'
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description || '')
   const [urgency, setUrgency] = useState(task.urgency)
@@ -131,19 +134,21 @@ export function TaskDetailModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
-            {/* Completion Checkbox */}
-            <button
-              onClick={() => onToggleComplete?.(task.id)}
-              className={cn(
-                'flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all hover:scale-110',
-                task.isCompleted
-                  ? 'border-primary bg-primary'
-                  : 'border-muted-foreground/40 hover:border-primary'
-              )}
-              title={task.isCompleted ? '標記為未完成' : '標記為完成'}
-            >
-              {task.isCompleted && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
-            </button>
+            {/* Completion Checkbox (edit mode only) */}
+            {!isCreate && (
+              <button
+                onClick={() => onToggleComplete?.(task.id)}
+                className={cn(
+                  'flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all hover:scale-110',
+                  task.isCompleted
+                    ? 'border-primary bg-primary'
+                    : 'border-muted-foreground/40 hover:border-primary'
+                )}
+                title={task.isCompleted ? '標記為未完成' : '標記為完成'}
+              >
+                {task.isCompleted && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+              </button>
+            )}
             {/* Category Selector */}
             <div className="relative">
               <button
@@ -198,7 +203,7 @@ export function TaskDetailModal({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {onDelete && (
+            {!isCreate && onDelete && (
               <button
                 onClick={() => {
                   onDelete(task.id)
@@ -224,43 +229,29 @@ export function TaskDetailModal({
           {/* Title */}
           <div>
             <Input
+              autoFocus={isCreate}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="任務名稱"
+              placeholder={isCreate ? '輸入任務標題…' : '任務名稱'}
               className="text-lg font-semibold border-0 px-0 focus-visible:ring-0 bg-transparent"
             />
           </div>
 
-          {/* Properties Grid */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Urgency */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <AlertCircle className="w-3.5 h-3.5" />
-                急迫度
-              </label>
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => (
-                  <button
-                    key={level}
-                    onClick={() => setUrgency(level)}
-                    className={cn(
-                      'w-6 h-6 rounded text-xs font-medium transition-all',
-                      urgency === level
-                        ? level <= 3
-                          ? 'bg-emerald-500 text-white'
-                          : level <= 6
-                          ? 'bg-amber-500 text-white'
-                          : 'bg-red-500 text-white'
-                        : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
-                    )}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-            </div>
+          {/* Urgency — visual slider with color-coded level */}
+          <UrgencySlider value={urgency} onChange={setUrgency} />
 
+          {/* Time block: scheduled date + start/end + duration + quick presets */}
+          <TimeBlockSection
+            scheduledDate={scheduledDate}
+            startTime={scheduledStartTime}
+            endTime={scheduledEndTime}
+            onScheduledDateChange={setScheduledDate}
+            onStartTimeChange={setScheduledStartTime}
+            onEndTimeChange={setScheduledEndTime}
+          />
+
+          {/* Secondary metadata grid */}
+          <div className="grid grid-cols-2 gap-4">
             {/* Estimated Time */}
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -287,48 +278,6 @@ export function TaskDetailModal({
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 className="h-9"
-              />
-            </div>
-
-            {/* Scheduled Date */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Calendar className="w-3.5 h-3.5" />
-                排程日期
-              </label>
-              <Input
-                type="date"
-                value={scheduledDate}
-                onChange={(e) => setScheduledDate(e.target.value)}
-                className="h-9"
-              />
-            </div>
-
-            {/* Start Time */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Clock className="w-3.5 h-3.5" />
-                開始時間
-              </label>
-              <Input
-                type="time"
-                value={scheduledStartTime}
-                onChange={(e) => setScheduledStartTime(e.target.value)}
-                className="h-9 font-mono"
-              />
-            </div>
-
-            {/* End Time */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Clock className="w-3.5 h-3.5" />
-                結束時間
-              </label>
-              <Input
-                type="time"
-                value={scheduledEndTime}
-                onChange={(e) => setScheduledEndTime(e.target.value)}
-                className="h-9 font-mono"
               />
             </div>
           </div>
@@ -477,19 +426,8 @@ export function TaskDetailModal({
             />
           </div>
 
-          {/* Notes */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <FileText className="w-3.5 h-3.5" />
-              備註
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="添加備註..."
-              className="w-full min-h-[80px] px-3 py-2 rounded-lg border border-input bg-secondary/30 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
+          {/* Notes — supports bullet/checklist via toolbar */}
+          <NotesEditor value={notes} onChange={setNotes} />
         </div>
 
         {/* Footer */}
@@ -499,10 +437,382 @@ export function TaskDetailModal({
           </Button>
           <Button onClick={handleSave} className="gap-2">
             <Save className="w-4 h-4" />
-            儲存
+            {isCreate ? '建立任務' : '儲存'}
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Urgency: 1–10 with a colored slider track + emphasized current-level chip.
+// Bucket colors: 1–3 emerald (低), 4–6 amber (中), 7–10 red (高).
+// ────────────────────────────────────────────────────────────────────────────
+
+const URGENCY_BUCKETS = [
+  { label: '低', range: [1, 3], color: 'bg-emerald-500', text: 'text-emerald-700', ring: 'ring-emerald-500/40' },
+  { label: '中', range: [4, 6], color: 'bg-amber-500', text: 'text-amber-700', ring: 'ring-amber-500/40' },
+  { label: '高', range: [7, 10], color: 'bg-red-500', text: 'text-red-700', ring: 'ring-red-500/40' },
+] as const
+
+function urgencyBucket(level: number) {
+  return URGENCY_BUCKETS.find((b) => level >= b.range[0] && level <= b.range[1]) ?? URGENCY_BUCKETS[1]
+}
+
+interface UrgencySliderProps {
+  value: number
+  onChange: (v: number) => void
+}
+
+function UrgencySlider({ value, onChange }: UrgencySliderProps) {
+  const bucket = urgencyBucket(value)
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <AlertCircle className="w-3.5 h-3.5" />
+          急迫度
+        </label>
+        <div className="flex items-center gap-2">
+          <span className={cn('text-[10px] font-medium', bucket.text)}>{bucket.label}</span>
+          <span
+            className={cn(
+              'inline-flex items-center justify-center min-w-7 h-7 px-2 rounded-full text-sm font-semibold text-white shadow-sm',
+              bucket.color
+            )}
+          >
+            {value}
+          </span>
+        </div>
+      </div>
+
+      {/* Visual track with 10 segments. Click a segment to set; segments
+          before the current value are filled with their bucket color, the
+          rest are dim. */}
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => {
+          const lb = urgencyBucket(level)
+          const filled = level <= value
+          return (
+            <button
+              key={level}
+              type="button"
+              onClick={() => onChange(level)}
+              aria-label={`設為急迫度 ${level}`}
+              aria-pressed={value === level}
+              className={cn(
+                'group relative flex-1 h-6 rounded-md transition-all',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
+                filled ? cn(lb.color, 'opacity-90 hover:opacity-100') : 'bg-secondary hover:bg-secondary/80'
+              )}
+            >
+              <span className={cn(
+                'absolute inset-0 flex items-center justify-center text-[10px] font-semibold transition-opacity',
+                filled ? 'text-white opacity-90' : 'text-muted-foreground opacity-0 group-hover:opacity-100'
+              )}>
+                {level}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Bucket labels */}
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground/80 px-0.5">
+        <span>低</span>
+        <span>中</span>
+        <span>高</span>
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// TimeBlockSection: scheduled date + start/end time + duration display +
+// quick-duration chips. The chips set the end time relative to the start.
+// ────────────────────────────────────────────────────────────────────────────
+
+const QUICK_DURATIONS_MIN = [15, 30, 60, 90, 120] as const
+
+function parseTime(t: string): number | null {
+  if (!t) return null
+  const [h, m] = t.split(':').map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return null
+  return h * 60 + m
+}
+
+function formatTimeFromMinutes(total: number): string {
+  const h = Math.max(0, Math.min(23, Math.floor(total / 60)))
+  const m = Math.max(0, Math.min(59, total % 60))
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+function formatDuration(min: number): string {
+  if (min <= 0) return '0 分'
+  if (min < 60) return `${min} 分`
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return m === 0 ? `${h} 小時` : `${h} 小時 ${m} 分`
+}
+
+interface TimeBlockSectionProps {
+  scheduledDate: string
+  startTime: string
+  endTime: string
+  onScheduledDateChange: (v: string) => void
+  onStartTimeChange: (v: string) => void
+  onEndTimeChange: (v: string) => void
+}
+
+function TimeBlockSection({
+  scheduledDate,
+  startTime,
+  endTime,
+  onScheduledDateChange,
+  onStartTimeChange,
+  onEndTimeChange,
+}: TimeBlockSectionProps) {
+  const startMin = parseTime(startTime)
+  const endMin = parseTime(endTime)
+  const duration = useMemo(() => {
+    if (startMin === null || endMin === null) return null
+    return endMin - startMin
+  }, [startMin, endMin])
+
+  const setEndFromDuration = (minutes: number) => {
+    if (startMin === null) return
+    const newEnd = Math.min(24 * 60 - 1, startMin + minutes)
+    onEndTimeChange(formatTimeFromMinutes(newEnd))
+  }
+
+  const adjustEnd = (deltaMin: number) => {
+    const base = endMin ?? (startMin !== null ? startMin + 60 : 9 * 60)
+    const next = Math.max(0, Math.min(24 * 60 - 1, base + deltaMin))
+    onEndTimeChange(formatTimeFromMinutes(next))
+  }
+
+  return (
+    <div className="space-y-3 p-4 rounded-xl bg-secondary/30 border border-border">
+      {/* Date */}
+      <div className="space-y-1.5">
+        <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <Calendar className="w-3.5 h-3.5" />
+          排程日期
+        </label>
+        <Input
+          type="date"
+          value={scheduledDate}
+          onChange={(e) => onScheduledDateChange(e.target.value)}
+          className="h-9"
+        />
+      </div>
+
+      {/* Start / End time pair with duration */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Clock className="w-3.5 h-3.5" />
+            時段
+          </label>
+          {duration !== null && (
+            <span
+              className={cn(
+                'text-[11px] font-medium px-2 py-0.5 rounded-full',
+                duration <= 0
+                  ? 'bg-destructive/10 text-destructive'
+                  : 'bg-primary/10 text-primary'
+              )}
+            >
+              {duration <= 0 ? '結束需晚於開始' : `時長 ${formatDuration(duration)}`}
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <Input
+            type="time"
+            value={startTime}
+            onChange={(e) => {
+              const v = e.target.value
+              onStartTimeChange(v)
+              // Keep duration if user already had end time set
+              const newStart = parseTime(v)
+              if (newStart !== null && endMin !== null && duration && duration > 0) {
+                onEndTimeChange(formatTimeFromMinutes(Math.min(24 * 60 - 1, newStart + duration)))
+              }
+            }}
+            className="h-9 font-mono text-center"
+            aria-label="開始時間"
+          />
+          <span className="text-muted-foreground text-sm" aria-hidden="true">→</span>
+          <Input
+            type="time"
+            value={endTime}
+            onChange={(e) => onEndTimeChange(e.target.value)}
+            className="h-9 font-mono text-center"
+            aria-label="結束時間"
+          />
+        </div>
+
+        {/* Quick presets: snap end to start + N minutes */}
+        <div className="flex items-center gap-1.5 flex-wrap pt-1">
+          <span className="text-[10px] text-muted-foreground mr-0.5">快速設定</span>
+          {QUICK_DURATIONS_MIN.map((m) => {
+            const active = duration === m
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setEndFromDuration(m)}
+                disabled={startMin === null}
+                aria-pressed={active}
+                className={cn(
+                  'px-2 py-0.5 rounded-md text-[10px] font-medium transition-all',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  active
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-muted-foreground hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed'
+                )}
+              >
+                {formatDuration(m)}
+              </button>
+            )
+          })}
+          <span className="mx-0.5 w-px h-3 bg-border" />
+          <button
+            type="button"
+            onClick={() => adjustEnd(-15)}
+            aria-label="結束時間 -15 分鐘"
+            className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-secondary text-muted-foreground hover:bg-secondary/80 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            −15
+          </button>
+          <button
+            type="button"
+            onClick={() => adjustEnd(15)}
+            aria-label="結束時間 +15 分鐘"
+            className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-secondary text-muted-foreground hover:bg-secondary/80 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            +15
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// NotesEditor: textarea with bullet/checklist toolbar, auto-continue on Enter,
+// and click-to-toggle ☐ ↔ ☑.
+// ────────────────────────────────────────────────────────────────────────────
+
+interface NotesEditorProps {
+  value: string
+  onChange: (v: string) => void
+}
+
+function NotesEditor({ value, onChange }: NotesEditorProps) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  const insertLinePrefix = (prefix: string) => {
+    const ta = ref.current
+    if (!ta) return
+    const v = ta.value
+    const start = ta.selectionStart ?? v.length
+    const lineStart = v.lastIndexOf('\n', start - 1) + 1
+    const before = v.slice(0, lineStart)
+    const after = v.slice(lineStart)
+    let next: string
+    let cursor: number
+    if (after.startsWith(prefix)) {
+      next = before + after.slice(prefix.length)
+      cursor = start - prefix.length
+    } else {
+      const stripped = after.replace(/^(• |☐ |☑ )/, '')
+      const removed = after.length - stripped.length
+      next = before + prefix + stripped
+      cursor = start + prefix.length - removed
+    }
+    onChange(next)
+    requestAnimationFrame(() => {
+      ta.focus()
+      ta.setSelectionRange(cursor, cursor)
+    })
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <FileText className="w-3.5 h-3.5" />
+          備註
+        </label>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => insertLinePrefix('• ')}
+            title="加項目符號"
+            aria-label="加項目符號"
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <List className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => insertLinePrefix('☐ ')}
+            title="加待辦項目"
+            aria-label="加待辦項目"
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <CheckSquare className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+      <textarea
+        ref={ref}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            const ta = e.currentTarget
+            const pos = ta.selectionStart ?? 0
+            const v = ta.value
+            const lineStart = v.lastIndexOf('\n', pos - 1) + 1
+            const currentLine = v.slice(lineStart, pos)
+            const m = currentLine.match(/^(• |☐ |☑ )/)
+            if (m) {
+              if (currentLine === m[1]) {
+                e.preventDefault()
+                const next = v.slice(0, lineStart) + v.slice(pos)
+                onChange(next)
+                requestAnimationFrame(() => ta.setSelectionRange(lineStart, lineStart))
+              } else {
+                e.preventDefault()
+                const insert = '\n' + m[1]
+                const next = v.slice(0, pos) + insert + v.slice(pos)
+                onChange(next)
+                const newPos = pos + insert.length
+                requestAnimationFrame(() => ta.setSelectionRange(newPos, newPos))
+              }
+            }
+          }
+        }}
+        onClick={(e) => {
+          const ta = e.currentTarget
+          const pos = ta.selectionStart ?? 0
+          const v = ta.value
+          const lineStart = v.lastIndexOf('\n', pos - 1) + 1
+          const before = v.slice(0, lineStart)
+          const after = v.slice(lineStart)
+          const offsetInLine = pos - lineStart
+          if (offsetInLine === 0 || offsetInLine === 1) {
+            if (after.startsWith('☐ ')) onChange(before + '☑ ' + after.slice(2))
+            else if (after.startsWith('☑ ')) onChange(before + '☐ ' + after.slice(2))
+          }
+        }}
+        placeholder={'寫下細節 · 子彈或待辦清單\n例如：\n• 確認流程\n☐ 寄信給客戶\n☐ 整理會議紀錄'}
+        className="w-full min-h-[120px] px-3 py-2 rounded-lg border border-input bg-secondary/30 text-sm text-foreground placeholder:text-muted-foreground/60 resize-y focus:outline-none focus:ring-2 focus:ring-ring font-mono leading-relaxed"
+      />
     </div>
   )
 }

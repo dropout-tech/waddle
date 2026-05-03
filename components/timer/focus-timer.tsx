@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { Task, Workspace } from '@/lib/types'
+import { toDateString } from '@/lib/calendar-utils'
 
 interface FocusTimerProps {
   workspaces: Workspace[]
@@ -83,10 +84,8 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
     return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
   }
 
-  // Format date to YYYY-MM-DD
-  const formatDateISO = (date: Date) => {
-    return date.toISOString().split('T')[0]
-  }
+  // Format date to YYYY-MM-DD (local)
+  const formatDateISO = (date: Date) => toDateString(date)
 
   // Start timer
   const startTimer = () => {
@@ -483,16 +482,17 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
         ) : (
           /* Collapsed Button */
           <button
+            data-tour="focus-timer"
             onClick={() => setIsExpanded(true)}
             className={cn(
               "flex items-center gap-2 px-4 py-3 rounded-2xl shadow-lg transition-all hover:scale-105",
               "bg-card border border-border",
               state === 'running' && "ring-2 ring-offset-2",
             )}
-            style={state === 'running' ? { 
-              ringColor: session?.color,
-              borderColor: session?.color 
-            } : {}}
+            style={state === 'running' ? {
+              ['--tw-ring-color' as string]: session?.color,
+              borderColor: session?.color,
+            } : undefined}
           >
             <div className={cn(
               "w-2.5 h-2.5 rounded-full",

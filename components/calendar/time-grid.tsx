@@ -2,6 +2,14 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import type { Task, TimeBlock } from '@/lib/types'
+import {
+  timeToMinutes,
+  minutesToTime,
+  snap,
+  clamp,
+  calculateTaskColumns,
+} from '@/lib/calendar-utils'
+import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 import { TaskBlock } from './task-block'
 import type { TaskDragStart } from './task-block'
 import { TimeBlockItem } from './time-block-item'
@@ -31,92 +39,6 @@ const SLOT_TYPES = [
 ] as const
 
 type SlotKey = typeof SLOT_TYPES[number]['key']
-
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(':').map(Number)
-  return h * 60 + m
-}
-
-function minutesToTime(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
-
-function snap(minutes: number): number {
-  return Math.round(minutes / 15) * 15
-}
-
-function clamp(minutes: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, minutes))
-}
-
-function overlaps(a: Task, b: Task): boolean {
-  const aStart = timeToMinutes(a.scheduledStartTime!)
-  const aEnd   = timeToMinutes(a.scheduledEndTime!)
-  const bStart = timeToMinutes(b.scheduledStartTime!)
-  const bEnd   = timeToMinutes(b.scheduledEndTime!)
-  return aStart < bEnd && aEnd > bStart
-}
-
-function calculateTaskColumns(tasks: Task[]): Map<string, { column: number; totalColumns: number }> {
-  const result = new Map<string, { column: number; totalColumns: number }>()
-  const valid = tasks.filter(t => t.scheduledStartTime && t.scheduledEndTime)
-  if (!valid.length) return result
-
-  const sorted = [...valid].sort((a, b) => {
-    const d = timeToMinutes(a.scheduledStartTime!) - timeToMinutes(b.scheduledStartTime!)
-    return d !== 0 ? d :
-      (timeToMinutes(b.scheduledEndTime!) - timeToMinutes(b.scheduledStartTime!)) -
-      (timeToMinutes(a.scheduledEndTime!) - timeToMinutes(a.scheduledStartTime!))
-  })
-
-  const visited = new Set<string>()
-  const groups: Task[][] = []
-
-  for (const task of sorted) {
-    if (visited.has(task.id)) continue
-    const group: Task[] = []
-    const queue = [task]
-    while (queue.length) {
-      const cur = queue.shift()!
-      if (visited.has(cur.id)) continue
-      visited.add(cur.id)
-      group.push(cur)
-      for (const other of sorted) {
-        if (!visited.has(other.id) && overlaps(cur, other)) queue.push(other)
-      }
-    }
-    groups.push(group)
-  }
-
-  for (const group of groups) {
-    group.sort((a, b) => timeToMinutes(a.scheduledStartTime!) - timeToMinutes(b.scheduledStartTime!))
-    const columnEnds: number[] = []
-    for (const task of group) {
-      const taskStart = timeToMinutes(task.scheduledStartTime!)
-      let placed = false
-      for (let col = 0; col < columnEnds.length; col++) {
-        if (columnEnds[col] <= taskStart) {
-          result.set(task.id, { column: col, totalColumns: 0 })
-          columnEnds[col] = timeToMinutes(task.scheduledEndTime!)
-          placed = true
-          break
-        }
-      }
-      if (!placed) {
-        result.set(task.id, { column: columnEnds.length, totalColumns: 0 })
-        columnEnds.push(timeToMinutes(task.scheduledEndTime!))
-      }
-    }
-    const total = columnEnds.length
-    for (const task of group) {
-      const e = result.get(task.id)!
-      result.set(task.id, { column: e.column, totalColumns: total })
-    }
-  }
-  return result
-}
 
 // ─── Task drag state ─────────────────────────────────────────────────────────
 interface ActiveTaskDrag extends TaskDragStart {
@@ -148,6 +70,14 @@ export function TimeGrid({
 
   // ── Task block drag (move / resize) ─────────────────────────────────────
   const [activeTaskDrag, setActiveTaskDrag] = useState<ActiveTaskDrag | null>(null)
+
+  // Suppress panel-level swipe nav while any drag is active
+  const isAnyDragging = !!activeTaskDrag || isSlotDragging
+  useEffect(() => {
+    if (!isAnyDragging) return
+    beginGestureSuppression()
+    return () => endGestureSuppression()
+  }, [isAnyDragging])
 
   const taskColumns = useMemo(() => calculateTaskColumns(scheduledTasks), [scheduledTasks])
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i)

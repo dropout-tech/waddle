@@ -2,6 +2,24 @@
 
 import { useRef, useEffect } from 'react'
 
+/**
+ * Module-level flag that any in-calendar drag interaction (task block, time
+ * block, new-slot creation) flips during its lifetime so the panel-level swipe
+ * gesture knows to abort. This avoids the bug where a horizontal task drag
+ * (≥60 px) would also fire onSwipeLeft/Right and silently change selectedDate,
+ * making tasks appear to "jump weeks" after drop.
+ */
+let dragActiveCount = 0
+export function beginGestureSuppression() {
+  dragActiveCount++
+}
+export function endGestureSuppression() {
+  dragActiveCount = Math.max(0, dragActiveCount - 1)
+}
+function isDragActive() {
+  return dragActiveCount > 0
+}
+
 interface UseSwipeNavigationOptions {
   onSwipeLeft: () => void
   onSwipeRight: () => void
@@ -11,7 +29,8 @@ interface UseSwipeNavigationOptions {
   directionRatio?: number
   /** Element ref to attach native (non-React) listeners to */
   elementRef: React.RefObject<HTMLElement | null>
-  /** Also enable mouse drag navigation (default: true for week/month views) */
+  /** Also enable mouse drag navigation (default: false on desktop). Touch
+   * swipe always works regardless of this flag. */
   enableMouseDrag?: boolean
 }
 
@@ -26,7 +45,7 @@ export function useSwipeNavigation({
   threshold = 60,
   directionRatio = 2.0,
   elementRef,
-  enableMouseDrag = true,
+  enableMouseDrag = false,
 }: UseSwipeNavigationOptions) {
   const startX = useRef<number | null>(null)
   const startY = useRef<number | null>(null)
@@ -47,7 +66,11 @@ export function useSwipeNavigation({
     const onPointerDown = (e: PointerEvent) => {
       // For mouse, only track if enableMouseDrag is true
       if (e.pointerType === 'mouse' && !enableMouseDrag) return
-      
+      // Skip if any in-calendar drag has already started (e.g. task block,
+      // time block, new-slot drag). This is the safety net that prevents
+      // tasks from appearing to jump weeks when dragged horizontally.
+      if (isDragActive()) return
+
       startX.current = e.clientX
       startY.current = e.clientY
       pointerId.current = e.pointerId
@@ -73,7 +96,13 @@ export function useSwipeNavigation({
 
     const onPointerUp = (e: PointerEvent) => {
       if (e.pointerId !== pointerId.current) return
-      if (startX.current === null || committed.current !== 'horizontal') {
+      // Final guard: if a drag started after onPointerDown was tracked, do
+      // not navigate.
+      if (
+        startX.current === null ||
+        committed.current !== 'horizontal' ||
+        isDragActive()
+      ) {
         startX.current = null
         startY.current = null
         pointerId.current = null

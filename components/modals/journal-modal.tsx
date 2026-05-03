@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDate } from '@/lib/task-utils'
+import { toDateString } from '@/lib/calendar-utils'
 import type { Task, JournalEntry } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 
@@ -65,7 +66,7 @@ export function JournalModal({
 
   const handleSave = () => {
     onSave({
-      date: date.toISOString().split('T')[0],
+      date: toDateString(date),
       mood,
       content: content || undefined,
     })

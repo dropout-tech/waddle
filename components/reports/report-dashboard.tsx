@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { cn } from '@/lib/utils'
+import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
 import { 
   TrendingUp, 
@@ -111,8 +112,8 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
       !t.isCompleted && t.dueDate && new Date(t.dueDate) < now
     )
 
-    const highPriority = allTasks.filter(t => 
-      !t.isCompleted && t.priority === 'high'
+    const highPriority = allTasks.filter(t =>
+      !t.isCompleted && t.urgency >= 8
     )
 
     const scheduled = currentPeriodTasks.filter(t => t.scheduledDate)
@@ -141,7 +142,7 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
     for (let i = dayCount - 1; i >= 0; i--) {
       const date = new Date()
       date.setDate(date.getDate() - i)
-      const dateStr = date.toISOString().split('T')[0]
+      const dateStr = toDateString(date)
       
       const completed = allTasks.filter(t => 
         t.isCompleted && t.completedAt?.split('T')[0] === dateStr
@@ -174,7 +175,7 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
         return {
           id: ws.id,
           name: ws.name,
-          emoji: ws.emoji,
+          icon: ws.icon,
           color: ws.color,
           total: tasks.length,
           completed: completed.length,
@@ -221,7 +222,7 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
     for (let i = 0; i < 30; i++) {
       const date = new Date()
       date.setDate(date.getDate() - i)
-      const dateStr = date.toISOString().split('T')[0]
+      const dateStr = toDateString(date)
       
       const hasCompletedTask = allTasks.some(t => 
         t.isCompleted && t.completedAt?.split('T')[0] === dateStr
@@ -242,14 +243,14 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
     return { current: currentStreak, max: maxStreak }
   }, [allTasks])
 
-  // Priority breakdown
+  // Priority breakdown — urgency 8-10 high, 5-7 medium, 1-4 low
   const priorityStats = useMemo(() => {
     const pending = allTasks.filter(t => !t.isCompleted)
     return {
-      high: pending.filter(t => t.priority === 'high').length,
-      medium: pending.filter(t => t.priority === 'medium').length,
-      low: pending.filter(t => t.priority === 'low').length,
-      none: pending.filter(t => !t.priority).length
+      high: pending.filter(t => t.urgency >= 8).length,
+      medium: pending.filter(t => t.urgency >= 5 && t.urgency < 8).length,
+      low: pending.filter(t => t.urgency >= 1 && t.urgency < 5).length,
+      none: pending.filter(t => !t.urgency).length,
     }
   }, [allTasks])
 
@@ -436,7 +437,11 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
                 <div key={ws.id} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span>{ws.emoji}</span>
+                      <div
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: ws.color }}
+                        aria-hidden="true"
+                      />
                       <span className="font-medium text-sm">{ws.name}</span>
                     </div>
                     <div className="flex items-center gap-3 text-sm">
@@ -642,7 +647,7 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
                       const currentDay = date.getDay()
                       const daysBack = (currentDay - dayIndex + 7) % 7 + weekIndex * 7
                       date.setDate(date.getDate() - daysBack)
-                      const dateStr = date.toISOString().split('T')[0]
+                      const dateStr = toDateString(date)
                       
                       const completed = allTasks.filter(t => 
                         t.isCompleted && t.completedAt?.split('T')[0] === dateStr

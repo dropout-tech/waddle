@@ -1,4 +1,4 @@
-// FlowDesk Type Definitions
+// Waddle Type Definitions
 
 // Scratchpad (Focus Capture) Types
 export interface ScratchpadItem {
@@ -54,6 +54,8 @@ export interface Task {
   calendarColor: string
   isCompleted: boolean
   completedAt?: string
+  isArchived?: boolean
+  archivedAt?: string
   notes?: string
   sortOrder: number
   createdAt: string

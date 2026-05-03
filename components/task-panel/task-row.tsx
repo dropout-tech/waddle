@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { Check, Clock, Calendar, MessageSquare, Timer, AlertCircle, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/types'
@@ -24,7 +25,7 @@ interface TaskRowProps {
 
 const DEFAULT_META_ORDER: MetaField[] = ['duration', 'date', 'time']
 
-export function TaskRow({
+function TaskRowImpl({
   task,
   density = 'comfortable',
   metaOrder = DEFAULT_META_ORDER,
@@ -44,6 +45,7 @@ export function TaskRow({
   if (density === 'compact') {
     return (
       <div
+        data-tour="task-row"
         onClick={() => onSelect(task)}
         className={cn(
           'flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-all duration-150 rounded-md',
@@ -116,6 +118,7 @@ export function TaskRow({
   // ─── COMFORTABLE (default): full detail, extra padding, notes always visible ────────
   return (
     <div
+      data-tour="task-row"
       className={cn(
         'group relative flex items-start gap-3 px-3.5 py-3 rounded-xl transition-all duration-200 cursor-pointer',
         'border hover:brightness-[0.97]',
@@ -248,3 +251,5 @@ export function TaskRow({
     </div>
   )
 }
+
+export const TaskRow = memo(TaskRowImpl)

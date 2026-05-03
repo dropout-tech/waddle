@@ -1,29 +1,23 @@
 'use client'
 
-import { useMemo, useState, useRef, useCallback, useEffect } from 'react'
+import { useMemo, useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
+import { positionPopover } from '@/lib/popover-position'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock, SlotType } from '@/lib/types'
+import {
+  WEEKDAY_NAMES,
+  timeToMinutes,
+  minutesToTime,
+  snap,
+  clamp,
+  calculateTaskColumns,
+  toDateString,
+} from '@/lib/calendar-utils'
+import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 import { CurrentTimeLine } from './current-time-line'
 import { TaskBlock, type TaskDragStart } from './task-block'
-import { CheckSquare, Coffee, Clock, Crosshair, User, Layers, X, ChevronLeft } from 'lucide-react'
-
-// Map icon names to components
-const ICON_MAP: Record<string, React.ElementType> = {
-  CheckSquare, Coffee, Clock, Crosshair, User, Layers,
-}
-
-// Render icon based on type (lucide or emoji/custom)
-const renderSlotIcon = (slotType: SlotType) => {
-  if (slotType.iconType === 'lucide') {
-    const IconComp = ICON_MAP[slotType.icon] || Clock
-    return <IconComp className="w-4 h-4" style={{ color: slotType.color }} />
-  }
-  // emoji or custom text - fallback to colored circle if empty
-  if (!slotType.icon) {
-    return <div className="w-3 h-3 rounded-full" style={{ backgroundColor: slotType.color }} />
-  }
-  return <span className="text-base">{slotType.icon}</span>
-}
+import { SlotIcon } from './slot-icon'
+import { X, ChevronLeft } from 'lucide-react'
 
 interface DayScrollViewProps {
   selectedDate: Date
@@ -33,8 +27,11 @@ interface DayScrollViewProps {
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (date: string, startTime: string, endTime: string) => void
-  onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string) => void
+  onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string, notes?: string, description?: string) => void
+  /** Fired when user picks a workspace category — opens the full task detail modal in create mode */
+  onOpenCreateTask?: (slotType: SlotType, date: string, startTime: string, endTime: string) => void
   onRescheduleTask?: (taskId: string, date: string, newStart: string, newEnd: string) => void
+  onUnscheduleTask?: (taskId: string, date?: string) => void
   onNavigate?: (direction: 'prev' | 'next') => void
   onDateChange?: (date: Date) => void
   startHour?: number
@@ -48,97 +45,14 @@ interface ActiveTaskDrag extends TaskDragStart {
   dayIndex: number
 }
 
-const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六']
 const DAY_WIDTH = 280
-const DAYS_TO_RENDER = 7
-const CENTER_DAY_INDEX = 3
-const TIME_COL_WIDTH = 56 // time label column width
-
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(':').map(Number)
-  return h * 60 + m
-}
-
-function minutesToTime(minutes: number): string {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
-
-function snap(minutes: number): number {
-  return Math.round(minutes / 15) * 15
-}
-
-function clamp(val: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, val))
-}
-
-function overlaps(a: Task, b: Task): boolean {
-  const aStart = timeToMinutes(a.scheduledStartTime!)
-  const aEnd = timeToMinutes(a.scheduledEndTime!)
-  const bStart = timeToMinutes(b.scheduledStartTime!)
-  const bEnd = timeToMinutes(b.scheduledEndTime!)
-  return aStart < bEnd && aEnd > bStart
-}
-
-function calculateTaskColumns(tasks: Task[]): Map<string, { column: number; totalColumns: number }> {
-  const result = new Map<string, { column: number; totalColumns: number }>()
-  const valid = tasks.filter(t => t.scheduledStartTime && t.scheduledEndTime)
-  if (!valid.length) return result
-
-  const sorted = [...valid].sort((a, b) => {
-    const d = timeToMinutes(a.scheduledStartTime!) - timeToMinutes(b.scheduledStartTime!)
-    return d !== 0 ? d :
-      (timeToMinutes(b.scheduledEndTime!) - timeToMinutes(b.scheduledStartTime!)) -
-      (timeToMinutes(a.scheduledEndTime!) - timeToMinutes(a.scheduledStartTime!))
-  })
-
-  const visited = new Set<string>()
-  const groups: Task[][] = []
-
-  for (const task of sorted) {
-    if (visited.has(task.id)) continue
-    const group: Task[] = []
-    const queue = [task]
-    while (queue.length) {
-      const cur = queue.shift()!
-      if (visited.has(cur.id)) continue
-      visited.add(cur.id)
-      group.push(cur)
-      for (const other of sorted) {
-        if (!visited.has(other.id) && overlaps(cur, other)) queue.push(other)
-      }
-    }
-    groups.push(group)
-  }
-
-  for (const group of groups) {
-    group.sort((a, b) => timeToMinutes(a.scheduledStartTime!) - timeToMinutes(b.scheduledStartTime!))
-    const columnEnds: number[] = []
-    for (const task of group) {
-      const taskStart = timeToMinutes(task.scheduledStartTime!)
-      let placed = false
-      for (let col = 0; col < columnEnds.length; col++) {
-        if (columnEnds[col] <= taskStart) {
-          result.set(task.id, { column: col, totalColumns: 0 })
-          columnEnds[col] = timeToMinutes(task.scheduledEndTime!)
-          placed = true
-          break
-        }
-      }
-      if (!placed) {
-        result.set(task.id, { column: columnEnds.length, totalColumns: 0 })
-        columnEnds.push(timeToMinutes(task.scheduledEndTime!))
-      }
-    }
-    const total = columnEnds.length
-    for (const task of group) {
-      const e = result.get(task.id)!
-      result.set(task.id, { column: e.column, totalColumns: total })
-    }
-  }
-  return result
-}
+// Initial window: 21 days centered on selectedDate. Window extends in both
+// directions on demand as user scrolls toward an edge — see handleScroll.
+const INITIAL_DAYS_BEFORE = 10
+const INITIAL_DAYS_AFTER = 10
+const EXTEND_BATCH = 14            // days to add per extension
+const EXTEND_THRESHOLD = DAY_WIDTH * 2  // start extending when within 2 days of edge
+const TIME_COL_WIDTH = 56
 
 export function DayScrollView({
   selectedDate,
@@ -149,7 +63,9 @@ export function DayScrollView({
   onToggleComplete,
   onCreateTask,
   onCreateTimeBlock,
+  onOpenCreateTask,
   onRescheduleTask,
+  onUnscheduleTask,
   onNavigate,
   onDateChange,
   startHour = 0,
@@ -183,38 +99,104 @@ export function DayScrollView({
   // Slot picker nested navigation
   const [selectedParent, setSelectedParent] = useState<string | null>(null)
 
+  // Popover positioning — measured after render so it can flip when there
+  // isn't enough room below the click.
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null)
+  useLayoutEffect(() => {
+    if (!pendingSlot || !popoverRef.current) {
+      setPopoverPos(null)
+      return
+    }
+    const el = popoverRef.current
+    const rect = el.getBoundingClientRect()
+    const { top, left } = positionPopover(
+      { x: pendingSlot.anchorX, y: pendingSlot.anchorY },
+      { width: rect.width, height: rect.height },
+      { width: window.innerWidth, height: window.innerHeight }
+    )
+    setPopoverPos({ top, left })
+  }, [pendingSlot, selectedParent])
+
+  // Suppress panel-level swipe navigation while any in-calendar drag is
+  // active. Without this, dragging a task ≥60 px horizontally would also
+  // trigger a week navigate, making the task appear to jump weeks.
+  const isAnyDragging = !!activeTaskDrag || !!pendingTaskDrag || isDragging
+  useEffect(() => {
+    if (!isAnyDragging) return
+    beginGestureSuppression()
+    return () => endGestureSuppression()
+  }, [isAnyDragging])
+
   // Organized slot types
   const topLevelSlotTypes = useMemo(() => slotTypes.filter(s => !s.parentId).sort((a, b) => a.sortOrder - b.sortOrder), [slotTypes])
   const getChildSlotTypes = useCallback((parentId: string) => slotTypes.filter(s => s.parentId === parentId).sort((a, b) => a.sortOrder - b.sortOrder), [slotTypes])
   
-  const todayString = new Date().toISOString().split('T')[0]
+  const todayString = toDateString(new Date())
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i)
 
-  // Generate dates centered around selectedDate
+  // Days extended beyond the initial window. Both grow as the user scrolls
+  // toward an edge, giving the view an infinite feel without resetting on nav.
+  const [extraBefore, setExtraBefore] = useState(0)
+  const [extraAfter, setExtraAfter] = useState(0)
+  // When prepending dates, we shift scrollLeft by N*DAY_WIDTH in a useLayoutEffect
+  // so the same day stays under the cursor. This ref carries the pending shift.
+  const pendingScrollAdjust = useRef(0)
+
+  // Generate dates centered around selectedDate, extended by extras on each side
   const allDates = useMemo(() => {
     const dates: Date[] = []
+    const before = INITIAL_DAYS_BEFORE + extraBefore
+    const after = INITIAL_DAYS_AFTER + extraAfter
     const centerDate = new Date(selectedDate)
-    
-    for (let i = -CENTER_DAY_INDEX; i < DAYS_TO_RENDER - CENTER_DAY_INDEX; i++) {
+    for (let i = -before; i <= after; i++) {
       const d = new Date(centerDate)
       d.setDate(centerDate.getDate() + i)
       dates.push(d)
     }
     return dates
+  }, [selectedDate, extraBefore, extraAfter])
+
+  // Index of selectedDate within allDates (depends on extras)
+  const centerIndex = INITIAL_DAYS_BEFORE + extraBefore
+
+  // When user explicitly navigates (selectedDate changes), reset extras and
+  // recenter scroll. The extras-reset and selectedDate change happen in the
+  // same render cycle so the centerIndex math below stays correct.
+  useEffect(() => {
+    pendingScrollAdjust.current = 0
+    setExtraBefore(0)
+    setExtraAfter(0)
   }, [selectedDate])
 
-  // Scroll to center on mount and when selectedDate changes
   useEffect(() => {
     const container = scrollContainerRef.current
     const header = headerScrollRef.current
     if (!container || !header) return
-    
-    const timeColumnWidth = 56
-    const targetScrollLeft = CENTER_DAY_INDEX * DAY_WIDTH
-    
+
+    const targetScrollLeft = INITIAL_DAYS_BEFORE * DAY_WIDTH
+
+    isScrolling.current = true
     container.scrollLeft = targetScrollLeft
     header.scrollLeft = targetScrollLeft
+    lastScrollLeft.current = container.scrollLeft
+
+    const t = window.setTimeout(() => { isScrolling.current = false }, 150)
+    return () => window.clearTimeout(t)
   }, [selectedDate])
+
+  // After prepending days, shift scrollLeft so the day previously under the
+  // cursor stays put visually. Runs synchronously after DOM mutation.
+  useLayoutEffect(() => {
+    if (pendingScrollAdjust.current === 0) return
+    const container = scrollContainerRef.current
+    const header = headerScrollRef.current
+    if (!container) return
+    container.scrollLeft += pendingScrollAdjust.current
+    if (header) header.scrollLeft = container.scrollLeft
+    lastScrollLeft.current = container.scrollLeft
+    pendingScrollAdjust.current = 0
+  }, [extraBefore])
 
   // Sync scroll between header and grid
   const syncScroll = useCallback((source: 'header' | 'grid') => {
@@ -234,65 +216,47 @@ export function DayScrollView({
   // Cooldown after drag ends to prevent accidental navigation
   const dragEndCooldown = useRef(false)
 
-  // Handle scroll to detect edges - only trigger on horizontal scroll
+  // Horizontal scroll: pan freely; extend the date window on demand as the
+  // user approaches either edge so it feels infinite. selectedDate is not
+  // touched by scrolling — explicit nav uses chevrons / keyboard / swipe.
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current
     if (!container || isScrolling.current) return
-    
-    // Don't trigger navigation while dragging tasks or during cooldown (use ref for sync access)
-    if (isDraggingTaskRef.current || dragEndCooldown.current) {
-      console.log("[v0] Scroll blocked - isDragging:", isDraggingTaskRef.current, "cooldown:", dragEndCooldown.current)
+    if (isDraggingTaskRef.current) {
       lastScrollLeft.current = container.scrollLeft
       return
     }
 
-    const scrollLeft = container.scrollLeft
-    const maxScroll = container.scrollWidth - container.clientWidth
-
-    // Only trigger navigation if horizontal scroll changed significantly
-    const horizontalDelta = Math.abs(scrollLeft - lastScrollLeft.current)
-    if (horizontalDelta < 10) {
-      // Likely a vertical scroll, ignore
-      return
-    }
-
-    // Determine scroll direction
-    const scrollDirection = scrollLeft - lastScrollLeft.current
-
-    console.log("[v0] Scroll check - scrollLeft:", scrollLeft, "maxScroll:", maxScroll, "direction:", scrollDirection)
-
-    // Only navigate when both at edge AND scrolling toward that edge
-    if (scrollLeft < DAY_WIDTH * 0.5 && scrollDirection < 0) {
-      console.log("[v0] NAVIGATING PREV")
-      isScrolling.current = true
-      onNavigate?.('prev')
-      requestAnimationFrame(() => { isScrolling.current = false })
-    } else if (scrollLeft > maxScroll - DAY_WIDTH * 0.5 && scrollDirection > 0) {
-      console.log("[v0] NAVIGATING NEXT")
-      isScrolling.current = true
-      onNavigate?.('next')
-      requestAnimationFrame(() => { isScrolling.current = false })
-    }
-
+    const { scrollLeft, scrollWidth, clientWidth } = container
     lastScrollLeft.current = scrollLeft
-  }, [onNavigate])
+
+    if (scrollLeft < EXTEND_THRESHOLD) {
+      // Prepend more days. Compensate scrollLeft in useLayoutEffect so the
+      // current visual position is preserved.
+      pendingScrollAdjust.current += EXTEND_BATCH * DAY_WIDTH
+      setExtraBefore(prev => prev + EXTEND_BATCH)
+    } else if (scrollWidth - scrollLeft - clientWidth < EXTEND_THRESHOLD) {
+      // Append more days. No scrollLeft adjustment needed — content grows on the right.
+      setExtraAfter(prev => prev + EXTEND_BATCH)
+    }
+  }, [])
 
   // Get tasks for a specific date
   const getTasksForDate = useCallback((date: Date) => {
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = toDateString(date)
     return tasks.filter(t => t.scheduledDate === dateStr && t.scheduledStartTime)
   }, [tasks])
 
   // Get time blocks for a specific date
   const getBlocksForDate = useCallback((date: Date) => {
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = toDateString(date)
     return timeBlocks.filter(b => b.date === dateStr)
   }, [timeBlocks])
 
   // Get all-day tasks
   const getAllDayTasksForDate = useCallback((date: Date) => {
-    const dateStr = date.toISOString().split('T')[0]
-    return tasks.filter(t => 
+    const dateStr = toDateString(date)
+    return tasks.filter(t =>
       (t.scheduledDate === dateStr && !t.scheduledStartTime) ||
       (t.dueDate === dateStr && !t.scheduledDate)
     )
@@ -322,13 +286,10 @@ export function DayScrollView({
   const MAX = endHour * 60
 
   const handleTaskDragStart = useCallback((info: TaskDragStart, dayIndex: number) => {
-    console.log("[v0] DRAG START - setting isDraggingTaskRef to true, dayIndex:", dayIndex)
     isDraggingTaskRef.current = true
     setActiveTaskDrag({ ...info, currentStart: info.originalStart, currentEnd: info.originalEnd, dayIndex })
     setPendingSlot(null)
   }, [])
-
-  const TIME_COL_WIDTH = 56
 
   // Track if this is a click vs drag
   const mouseDownTime = useRef<number>(0)
@@ -345,7 +306,7 @@ export function DayScrollView({
     // Start at 9:00 AM or current grid position if over grid
     const gridEl = gridRef.current
     let startMinutes = 9 * 60
-    let dayIndex = CENTER_DAY_INDEX
+    let dayIndex = centerIndex
     
     if (gridEl) {
       const gridRect = gridEl.getBoundingClientRect()
@@ -401,8 +362,6 @@ export function DayScrollView({
     const relX = mouseXInContent - TIME_COL_WIDTH
     const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
     
-    console.log("[v0] MouseMove - relX:", relX, "DAY_WIDTH:", DAY_WIDTH, "calc dayIdx:", Math.floor(relX / DAY_WIDTH), "clamped:", newDayIndex, "allDates.length:", allDates.length)
-    
     // Calculate time from Y position
     const minutes = snap(MIN + mouseYInContent)
     
@@ -444,8 +403,9 @@ export function DayScrollView({
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     // Handle pending task drop
     if (pendingTaskDrag) {
-      const date = allDates[pendingTaskDrag.currentDayIndex]?.toISOString().split('T')[0]
-      if (date) {
+      const dropTarget = allDates[pendingTaskDrag.currentDayIndex]
+      if (dropTarget) {
+        const date = toDateString(dropTarget)
         const startTime = minutesToTime(pendingTaskDrag.currentMinutes)
         const endTime = minutesToTime(pendingTaskDrag.currentMinutes + pendingTaskDrag.duration)
         onRescheduleTask?.(pendingTaskDrag.task.id, date, startTime, endTime)
@@ -460,9 +420,9 @@ export function DayScrollView({
 
     // Commit scheduled task block drag
     if (activeTaskDrag) {
-      const date = allDates[activeTaskDrag.dayIndex]?.toISOString().split('T')[0]
-      console.log("[v0] DRAG END - dayIndex:", activeTaskDrag.dayIndex, "date:", date, "allDates:", allDates.map(d => d.toISOString().split('T')[0]))
-      if (date) {
+      const dropTarget = allDates[activeTaskDrag.dayIndex]
+      if (dropTarget) {
+        const date = toDateString(dropTarget)
         onRescheduleTask?.(activeTaskDrag.taskId, date, minutesToTime(activeTaskDrag.currentStart), minutesToTime(activeTaskDrag.currentEnd))
       }
       setActiveTaskDrag(null)
@@ -486,23 +446,21 @@ export function DayScrollView({
     const isClick = elapsed < 200 && movedDistance < 10
 
     if (isClick) {
-      // Click: create a default duration slot at clicked position
       const startTime = yToTime(dragStart.y)
       const startMinutes = parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1])
       const endMinutes = Math.min(startMinutes + DEFAULT_DURATION, endHour * 60)
       const endTime = `${Math.floor(endMinutes / 60).toString().padStart(2, '0')}:${(endMinutes % 60).toString().padStart(2, '0')}`
-      const date = allDates[dragStart.day].toISOString().split('T')[0]
-      const anchorX = TIME_COL_WIDTH + dragStart.day * DAY_WIDTH + DAY_WIDTH / 2
-      setPendingSlot({ date, startTime, endTime, anchorX, anchorY: dragStart.y })
+      const date = toDateString(allDates[dragStart.day])
+      // Anchor in viewport coords (clientX/Y), so the popover positioner can
+      // flip above when there isn't room below.
+      setPendingSlot({ date, startTime, endTime, anchorX: e.clientX, anchorY: e.clientY })
     } else if (dragStart.day === dragEnd.day && Math.abs(dragEnd.y - dragStart.y) > 15) {
-      // Drag: use dragged range
       const minY = Math.min(dragStart.y, dragEnd.y)
       const maxY = Math.max(dragStart.y, dragEnd.y)
       const startTime = yToTime(minY)
       const endTime = yToTime(maxY)
-      const date = allDates[dragStart.day].toISOString().split('T')[0]
-      const anchorX = TIME_COL_WIDTH + dragStart.day * DAY_WIDTH + DAY_WIDTH / 2
-      setPendingSlot({ date, startTime, endTime, anchorX, anchorY: minY })
+      const date = toDateString(allDates[dragStart.day])
+      setPendingSlot({ date, startTime, endTime, anchorX: e.clientX, anchorY: e.clientY })
     }
 
     setIsDragging(false)
@@ -512,17 +470,25 @@ export function DayScrollView({
   }, [isDragging, dragStart, dragEnd, allDates, yToTime, activeTaskDrag, pendingTaskDrag, onRescheduleTask, endHour])
 
   // Handle slot type selection
-const handleSelectType = useCallback((slotType: SlotType) => {
+  const handleSelectType = useCallback((slotType: SlotType) => {
     if (!pendingSlot) return
     const { date, startTime, endTime } = pendingSlot
-    
+
     // Check if this type has children - if so, navigate into it
     const children = getChildSlotTypes(slotType.id)
     if (children.length > 0) {
       setSelectedParent(slotType.id)
       return
     }
-    
+
+    // Workspace-bound types create a task — open the full TaskDetailModal in create mode
+    if (slotType.workspaceId) {
+      onOpenCreateTask?.(slotType, date, startTime, endTime)
+      setPendingSlot(null)
+      setSelectedParent(null)
+      return
+    }
+
     if (slotType.key === 'task') {
       onCreateTask?.(date, startTime, endTime)
     } else {
@@ -530,7 +496,7 @@ const handleSelectType = useCallback((slotType: SlotType) => {
     }
     setPendingSlot(null)
     setSelectedParent(null)
-  }, [pendingSlot, onCreateTask, onCreateTimeBlock, getChildSlotTypes])
+  }, [pendingSlot, onCreateTask, onCreateTimeBlock, onOpenCreateTask, getChildSlotTypes])
 
   const getDragSelection = useCallback((dayIndex: number) => {
     if (!isDragging || !dragStart || !dragEnd) return null
@@ -590,9 +556,9 @@ const handleSelectType = useCallback((slotType: SlotType) => {
             onScroll={() => syncScroll('header')}
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
-            <div className="flex" style={{ width: `${DAYS_TO_RENDER * DAY_WIDTH}px` }}>
+            <div className="flex" style={{ width: `${allDates.length * DAY_WIDTH}px` }}>
               {allDates.map((date) => {
-                const dateStr = date.toISOString().split('T')[0]
+                const dateStr = toDateString(date)
                 const isToday = dateStr === todayString
                 const allDayTasks = getAllDayTasksForDate(date)
                 const weekdayIndex = date.getDay()
@@ -621,15 +587,34 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                         {date.getDate()}
                       </div>
                     </div>
-                    {/* Pending/All-day tasks - always visible with click to add */}
-                    <div 
-                      className="flex-1 px-1 pb-1.5 flex flex-col gap-0.5 overflow-hidden cursor-pointer hover:bg-secondary/30 transition-colors border-t border-border/50"
+                    {/* Pending/All-day tasks — also acts as drop zone for
+                         scheduled tasks dragged here to clear their time. */}
+                    <div
+                      data-pending-zone
+                      data-pending-zone-date={dateStr}
+                      className={cn(
+                        'flex-1 px-1 pb-1.5 flex flex-col gap-0.5 overflow-hidden cursor-pointer transition-colors border-t border-border/50',
+                        activeTaskDrag
+                          ? 'bg-primary/10 border-primary/40 ring-1 ring-primary/40 ring-inset'
+                          : 'hover:bg-secondary/30'
+                      )}
                       style={{ minHeight: `${headerHeight - HEADER_DATE_HEIGHT}px` }}
+                      onMouseUp={(e) => {
+                        if (activeTaskDrag) {
+                          e.stopPropagation()
+                          onUnscheduleTask?.(activeTaskDrag.taskId, dateStr)
+                          setActiveTaskDrag(null)
+                          isDraggingTaskRef.current = false
+                          dragEndCooldown.current = true
+                          setTimeout(() => { dragEndCooldown.current = false }, 300)
+                        }
+                      }}
                       onClick={(e) => {
                         if ((e.target as HTMLElement).closest('button')) return
+                        if (dragEndCooldown.current) return
                         onCreateTask?.(dateStr, '09:00', '09:30')
                       }}
-                      title="點擊新增任務"
+                      title={activeTaskDrag ? '放開以將任務移回待排程' : '點擊新增任務'}
                     >
                       {allDayTasks.map((task) => (
                         <div
@@ -685,7 +670,7 @@ const handleSelectType = useCallback((slotType: SlotType) => {
         <div 
           ref={gridRef}
           className="flex" 
-          style={{ width: `${TIME_COL_WIDTH + DAYS_TO_RENDER * DAY_WIDTH}px` }}
+          style={{ width: `${TIME_COL_WIDTH + allDates.length * DAY_WIDTH}px` }}
           onMouseMove={handleGlobalMouseMove}
           onMouseUp={(e) => handleMouseUp(e)}
           onMouseLeave={(e) => handleMouseUp(e)}
@@ -703,7 +688,7 @@ const handleSelectType = useCallback((slotType: SlotType) => {
 
           {/* Day columns */}
           {allDates.map((date, dayIndex) => {
-            const dateStr = date.toISOString().split('T')[0]
+            const dateStr = toDateString(date)
             const isToday = dateStr === todayString
             const dayTasks = getTasksForDate(date)
             const dayBlocks = getBlocksForDate(date)
@@ -847,20 +832,25 @@ const handleSelectType = useCallback((slotType: SlotType) => {
             onMouseDown={(e) => { e.stopPropagation(); setPendingSlot(null); setSelectedParent(null) }}
           />
           <div
-            className="absolute z-40 bg-card border border-border rounded-2xl shadow-2xl p-3 w-64"
+            ref={popoverRef}
+            className={cn(
+              'fixed z-40 bg-card border border-border rounded-2xl shadow-2xl p-3 w-64 transition-opacity duration-100',
+              popoverPos ? 'opacity-100' : 'opacity-0'
+            )}
             style={{
-              left: `${Math.min(pendingSlot.anchorX, (scrollContainerRef.current?.clientWidth || 400) - 280)}px`,
-              top: `${Math.min(pendingSlot.anchorY, hours.length * 60 - 220)}px`
+              left: `${popoverPos?.left ?? -9999}px`,
+              top: `${popoverPos?.top ?? -9999}px`,
             }}
             onMouseDown={(e) => e.stopPropagation()}
           >
+            {/* Pick a slot type. Workspace types open the full TaskDetailModal in create mode. */}
             <div className="flex items-center justify-between mb-2.5">
               {selectedParent ? (
                 <button
                   onClick={() => setSelectedParent(null)}
                   className="flex items-center gap-1 text-xs font-semibold text-foreground hover:text-primary transition-colors"
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
                   返回
                 </button>
               ) : (
@@ -868,8 +858,8 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                   {pendingSlot.startTime} - {pendingSlot.endTime}
                 </span>
               )}
-              <button onClick={() => { setPendingSlot(null); setSelectedParent(null) }} className="p-1 rounded-lg hover:bg-muted transition-colors">
-                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              <button onClick={() => { setPendingSlot(null); setSelectedParent(null) }} aria-label="關閉" className="p-1 rounded-lg hover:bg-muted transition-colors">
+                <X className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
               </button>
             </div>
             <p className="text-[10px] text-muted-foreground mb-2">
@@ -885,7 +875,7 @@ const handleSelectType = useCallback((slotType: SlotType) => {
                     className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
                   >
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${slotType.color}25` }}>
-                      {renderSlotIcon(slotType)}
+                      <SlotIcon slotType={slotType} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-foreground">{slotType.label}</div>

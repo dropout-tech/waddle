@@ -1,126 +1,54 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
+import { Loader2 } from 'lucide-react'
+import { Toaster } from 'sonner'
 import { MainLayout } from '@/components/layout/main-layout'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
-
+import { ErrorBoundary } from '@/components/error-boundary'
+import { KeyboardShortcutsHint } from '@/components/keyboard-shortcuts'
+import { UserMenu } from '@/components/user-menu'
+import { OnboardingTour } from '@/components/onboarding-tour'
 import { SettingsModal } from '@/components/modals/settings-modal'
-import { mockWorkspaces, mockTimeBlocks } from '@/lib/mock-data'
-import type { Workspace, Task, JournalEntry, ExportDataPayload, UserSettings, TimeBlock, SlotType } from '@/lib/types'
+import { WaddleMascot } from '@/components/branding/waddle-mascot'
+import { useWaddleData } from '@/hooks/use-waddle-data'
+import { toDateString } from '@/lib/calendar-utils'
+import type { Task, SlotType } from '@/lib/types'
 
-// Generate slot types based on workspaces
-const generateSlotTypesFromWorkspaces = (workspaces: Workspace[]): SlotType[] => {
-  const baseTypes: SlotType[] = [
-    // Top-level: Time Block category (parent) for non-task blocks
-    { id: 'timeblock', key: 'timeblock', label: '時間區塊', description: '各類時間安排', icon: 'Layers', iconType: 'lucide', color: '#9CA3AF', sortOrder: 0, isBuiltIn: true },
-    // Children of timeblock (no workspace association)
-    { id: 'break', key: 'break', label: '午休', description: '休息時間', icon: 'Coffee', iconType: 'lucide', color: '#F6A854', parentId: 'timeblock', sortOrder: 0, isBuiltIn: true },
-    { id: 'buffer', key: 'buffer', label: '緩衝', description: '彈性緩衝時間', icon: 'Clock', iconType: 'lucide', color: '#9BBFAC', parentId: 'timeblock', sortOrder: 1, isBuiltIn: true },
-    { id: 'focus', key: 'focus', label: '專注', description: '專注工作時段', icon: 'Crosshair', iconType: 'lucide', color: '#D46B8A', parentId: 'timeblock', sortOrder: 2, isBuiltIn: true },
-  ]
-  
-  // Add workspace-based slot types (these sync tasks to left sidebar)
-  const workspaceTypes: SlotType[] = workspaces
-    .filter(ws => !ws.isArchived)
-    .map((ws, index) => ({
-      id: `ws-${ws.id}`,
-      key: `ws-${ws.id}`,
-      label: ws.name,
-      description: `新增任務到「${ws.name}」`,
-      icon: ws.icon,
-      iconType: 'emoji' as const,
-      color: ws.color,
-      sortOrder: index + 1, // after timeblock
-      isBuiltIn: true,
-      workspaceId: ws.id,
-    }))
-  
-  return [...workspaceTypes, ...baseTypes]
-}
+export default function WaddlePage() {
+  const {
+    workspaces,
+    timeBlocks,
+    settings,
+    isLoading,
+    onboardingCompleted,
+    completeOnboarding,
+    applyOnboardingChoice,
+    addWorkspace,
+    updateWorkspace,
+    updateWorkspaceColor,
+    archiveWorkspace,
+    deleteWorkspace,
+    addCategory,
+    toggleCategoryCollapse,
+    addTask,
+    createTask,
+    updateTask,
+    toggleTaskComplete,
+    deleteTask,
+    rescheduleTask,
+    unscheduleTask,
+    addTimeBlock,
+    updateTimeBlock,
+    deleteTimeBlock,
+    saveSettings,
+  } = useWaddleData()
 
-const defaultSlotTypes: SlotType[] = generateSlotTypesFromWorkspaces(mockWorkspaces)
-
-const defaultSettings: UserSettings = {
-  calendarStartHour: 0,
-  calendarEndHour: 24,
-  defaultView: 'day',
-  weekStartDay: 0,
-  weatherCity: 'Taipei',
-  weatherUnit: 'celsius',
-  lunchBreak: {
-    enabled: true,
-    startTime: '12:00',
-    endTime: '13:00',
-    color: '#F5F5F5',
-  },
-  bufferTime: {
-    enabled: true,
-    defaultDuration: 30,
-    color: '#FFF8E1',
-  },
-  defaultTaskColors: {},
-  slotTypes: defaultSlotTypes,
-  notifications: {
-    enabled: true,
-    overdue: {
-      enabled: true,
-      criticalDays: 7,
-      showInBell: true,
-      dailyDigest: true,
-    },
-    dueSoon: {
-      enabled: true,
-      daysBeforeDue: 3,
-      notifyOnDueDay: true,
-      notifyDayBefore: true,
-    },
-    staleTasks: {
-      enabled: true,
-      daysUntilStale: 14,
-      includeUnscheduled: true,
-      includeNoDueDate: true,
-    },
-    highPriority: {
-      enabled: true,
-      minUrgency: 8,
-      alertWhenTooMany: true,
-      maxBeforeAlert: 5,
-    },
-    scheduling: {
-      enabled: true,
-      remindUnscheduled: true,
-      percentThreshold: 50,
-      dailyPlanningReminder: false,
-      planningReminderTime: '08:00',
-    },
-    workspaceOverrides: {},
-    quietHours: {
-      enabled: false,
-      startTime: '22:00',
-      endTime: '08:00',
-      allowUrgent: true,
-    },
-    appearance: {
-      showBadgeCount: true,
-      groupByType: true,
-      autoCollapse: false,
-      maxVisible: 10,
-    },
-  },
-}
-
-export default function FlowDeskPage() {
-  // State for workspaces and tasks
-  const [workspaces, setWorkspaces] = useState<Workspace[]>(mockWorkspaces)
-  const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>(mockTimeBlocks)
-  const [settings, setSettings] = useState<UserSettings>(defaultSettings)
-
-  // Generate slot types dynamically based on current workspaces
-  // This ensures workspace-based types are always in sync with the sidebar
-  const activeSlotTypes = useMemo(() => {
-    // Get workspace-based slot types
+  // Slot types — generated dynamically from current workspaces, plus static
+  // built-in time-block types (break/buffer/focus) and any user customs.
+  const activeSlotTypes = useMemo<SlotType[]>(() => {
     const workspaceTypes: SlotType[] = workspaces
-      .filter(ws => !ws.isArchived)
+      .filter((ws) => !ws.isArchived)
       .map((ws, index) => ({
         id: `ws-${ws.id}`,
         key: `ws-${ws.id}`,
@@ -133,314 +61,118 @@ export default function FlowDeskPage() {
         isBuiltIn: true,
         workspaceId: ws.id,
       }))
-    
-    // Get base time block types (non-workspace)
+
     const baseTypes: SlotType[] = [
       { id: 'timeblock', key: 'timeblock', label: '時間區塊', description: '各類時間安排', icon: 'Layers', iconType: 'lucide', color: '#9CA3AF', sortOrder: workspaceTypes.length, isBuiltIn: true },
       { id: 'break', key: 'break', label: '午休', description: '休息時間', icon: 'Coffee', iconType: 'lucide', color: '#F6A854', parentId: 'timeblock', sortOrder: 0, isBuiltIn: true },
       { id: 'buffer', key: 'buffer', label: '緩衝', description: '彈性緩衝時間', icon: 'Clock', iconType: 'lucide', color: '#9BBFAC', parentId: 'timeblock', sortOrder: 1, isBuiltIn: true },
       { id: 'focus', key: 'focus', label: '專注', description: '專注工作時段', icon: 'Crosshair', iconType: 'lucide', color: '#D46B8A', parentId: 'timeblock', sortOrder: 2, isBuiltIn: true },
     ]
-    
-    // Get custom slot types from settings (user-created)
-    const customTypes = settings.slotTypes?.filter(s => !s.isBuiltIn) || []
-    
+
+    const customTypes = settings.slotTypes?.filter((s) => !s.isBuiltIn) || []
     return [...workspaceTypes, ...baseTypes, ...customTypes]
   }, [workspaces, settings.slotTypes])
 
-  // Modal states
+  // Modal state. taskMode distinguishes editing an existing task vs.
+  // creating a new one through the same TaskDetailModal UI. In create mode,
+  // selectedTask holds an in-memory draft until the user hits Save.
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-
+  const [taskMode, setTaskMode] = useState<'edit' | 'create'>('edit')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
-  // Toggle category collapse
-  const handleToggleCategoryCollapse = useCallback((categoryId: string) => {
-    setWorkspaces((prev) =>
-      prev.map((workspace) => ({
-        ...workspace,
-        categories: workspace.categories.map((category) =>
-          category.id === categoryId
-            ? { ...category, isCollapsed: !category.isCollapsed }
-            : category
-        ),
-      }))
-    )
-  }, [])
-
-  // Toggle task completion
-  const handleToggleComplete = useCallback((taskId: string) => {
-    setWorkspaces((prev) =>
-      prev.map((workspace) => ({
-        ...workspace,
-        categories: workspace.categories.map((category) => ({
-          ...category,
-          tasks: category.tasks.map((task) =>
-            task.id === taskId
-              ? {
-                  ...task,
-                  isCompleted: !task.isCompleted,
-                  completedAt: !task.isCompleted
-                    ? new Date().toISOString()
-                    : undefined,
-                }
-              : task
-          ),
-        })),
-      }))
-    )
-  }, [])
-
-  // Select task to open detail modal
   const handleSelectTask = useCallback((task: Task) => {
+    setTaskMode('edit')
     setSelectedTask(task)
   }, [])
 
-  // Add new task
-  const handleAddTask = useCallback((categoryId: string, title: string) => {
-    const newTask: Task = {
-      id: `task-${Date.now()}`,
-      categoryId,
-      workspaceId: '',
-      workspaceName: '',
-      workspaceColor: '',
-      categoryName: '',
-      title,
-      taskType: 'one_time',
-      urgency: 5,
-      calendarColor: '',
-      isCompleted: false,
-      sortOrder: 999,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-
-    setWorkspaces((prev) =>
-      prev.map((workspace) => ({
-        ...workspace,
-        categories: workspace.categories.map((category) => {
-          if (category.id === categoryId) {
-            const enrichedTask = {
-              ...newTask,
-              workspaceId: workspace.id,
-              workspaceName: workspace.name,
-              workspaceColor: workspace.color,
-              categoryName: category.name,
-              calendarColor: workspace.color,
-            }
-            return {
-              ...category,
-              tasks: [...category.tasks, enrichedTask],
-            }
-          }
-          return category
-        }),
-      }))
-    )
-  }, [])
-
-  // Add new category
-  const handleAddCategory = useCallback((workspaceId: string, name: string) => {
-    const newCategory = {
-      id: `category-${Date.now()}`,
-      workspaceId,
-      name,
-      sortOrder: 999,
-      isCollapsed: false,
-      isArchived: false,
-      tasks: [],
-    }
-
-    setWorkspaces((prev) =>
-      prev.map((workspace) => {
-        if (workspace.id !== workspaceId) return workspace
-        return {
-          ...workspace,
-          categories: [...workspace.categories, newCategory],
-        }
-      })
-    )
-  }, [])
-
-  // Update workspace color — also updates workspaceColor on all tasks that haven't
-  // had their calendarColor manually overridden (i.e. calendarColor === old workspace color)
-  const handleUpdateWorkspaceColor = useCallback((workspaceId: string, newColor: string) => {
-    setWorkspaces((prev) =>
-      prev.map((workspace) => {
-        if (workspace.id !== workspaceId) return workspace
-        const oldColor = workspace.color
-        return {
-          ...workspace,
-          color: newColor,
-          categories: workspace.categories.map((category) => ({
-            ...category,
-            tasks: category.tasks.map((task) => ({
-              ...task,
-              workspaceColor: newColor,
-              // Only update calendarColor if it was still the default workspace color
-              calendarColor:
-                task.calendarColor === oldColor ? newColor : task.calendarColor,
-            })),
-          })),
-        }
-      })
-    )
-  }, [])
-
-  // Add new workspace
-  const handleAddWorkspace = useCallback((name: string, color: string, icon: string) => {
-    const newWorkspace: Workspace = {
-      id: `workspace-${Date.now()}`,
-      name,
-      color,
-      icon,
-      sortOrder: workspaces.length,
-      isArchived: false,
-      categories: [
-        {
-          id: `category-${Date.now()}-default`,
-          workspaceId: `workspace-${Date.now()}`,
-          name: '一般',
-          sortOrder: 0,
-          isCollapsed: false,
-          isArchived: false,
-          tasks: [],
-        },
-      ],
-    }
-
-    setWorkspaces((prev) => [...prev, newWorkspace])
-  }, [workspaces.length])
-
-  // Update workspace (name, color, icon) — color update also propagates to tasks
-  const handleUpdateWorkspace = useCallback((
-    workspaceId: string,
-    updates: Partial<Pick<Workspace, 'name' | 'color' | 'icon'>>
-  ) => {
-    setWorkspaces((prev) =>
-      prev.map((workspace) => {
-        if (workspace.id !== workspaceId) return workspace
-        const oldColor = workspace.color
-        const newColor = updates.color ?? workspace.color
-        return {
-          ...workspace,
-          ...updates,
-          categories: workspace.categories.map((category) => ({
-            ...category,
-            tasks: category.tasks.map((task) => ({
-              ...task,
-              workspaceName: updates.name ?? task.workspaceName,
-              workspaceColor: newColor,
-              calendarColor: task.calendarColor === oldColor ? newColor : task.calendarColor,
-            })),
-          })),
-        }
-      })
-    )
-  }, [])
-
-  // Archive workspace (hide from view, keep data)
-  const handleArchiveWorkspace = useCallback((workspaceId: string) => {
-    setWorkspaces((prev) =>
-      prev.map((w) => w.id === workspaceId ? { ...w, isArchived: true } : w)
-    )
-  }, [])
-
-  // Delete workspace (remove entirely)
-  const handleDeleteWorkspace = useCallback((workspaceId: string) => {
-    setWorkspaces((prev) => prev.filter((w) => w.id !== workspaceId))
-  }, [])
-
-  // Delete task
-  const handleDeleteTask = useCallback((taskId: string) => {
-    setWorkspaces((prev) =>
-      prev.map((workspace) => ({
-        ...workspace,
-        categories: workspace.categories.map((category) => ({
-          ...category,
-          tasks: category.tasks.filter((task) => task.id !== taskId),
-        })),
-      }))
-    )
-  }, [])
-
-  // Update task from modal
-  const handleSaveTask = useCallback((updates: Partial<Task>, newCategoryId?: string) => {
+  // Save handler shared by edit + create modes.
+  const handleSaveTask = useCallback(async (updates: Partial<Task>, newCategoryId?: string) => {
     if (!selectedTask) return
 
-    if (newCategoryId && newCategoryId !== selectedTask.categoryId) {
-      // Move task to new category
-      setWorkspaces((prev) => {
-        // First, remove task from old category
-        const updatedWorkspaces = prev.map((workspace) => ({
-          ...workspace,
-          categories: workspace.categories.map((category) => ({
-            ...category,
-            tasks: category.tasks.filter((task) => task.id !== selectedTask.id),
-          })),
-        }))
-
-        // Then, add task to new category
-        return updatedWorkspaces.map((workspace) => ({
-          ...workspace,
-          categories: workspace.categories.map((category) => {
-            if (category.id === newCategoryId) {
-              return {
-                ...category,
-                tasks: [
-                  ...category.tasks,
-                  { ...selectedTask, ...updates, updatedAt: new Date().toISOString() },
-                ],
-              }
-            }
-            return category
-          }),
-        }))
-      })
-    } else {
-      // Update task in place
-      setWorkspaces((prev) =>
-        prev.map((workspace) => ({
-          ...workspace,
-          categories: workspace.categories.map((category) => ({
-            ...category,
-            tasks: category.tasks.map((task) =>
-              task.id === selectedTask.id
-                ? { ...task, ...updates, updatedAt: new Date().toISOString() }
-                : task
-            ),
-          })),
-        }))
+    if (taskMode === 'create') {
+      const targetCategoryId = newCategoryId || selectedTask.categoryId
+      const targetWorkspace = workspaces.find((w) =>
+        w.categories.some((c) => c.id === targetCategoryId)
       )
+      const targetCategory = targetWorkspace?.categories.find((c) => c.id === targetCategoryId)
+      if (!targetWorkspace || !targetCategory) return
+      const now = new Date().toISOString()
+      const newTask: Task = {
+        ...selectedTask,
+        ...updates,
+        categoryId: targetCategoryId,
+        workspaceId: targetWorkspace.id,
+        workspaceName: targetWorkspace.name,
+        workspaceColor: targetWorkspace.color,
+        categoryName: targetCategory.name,
+        sortOrder: targetCategory.tasks.length,
+        createdAt: now,
+        updatedAt: now,
+      }
+      await createTask(newTask)
+      return
     }
-  }, [selectedTask])
 
-  // Save settings
-  const handleSaveSettings = useCallback((newSettings: UserSettings, newTimeBlocks: TimeBlock[]) => {
-    setSettings(newSettings)
-    setTimeBlocks(newTimeBlocks)
-  }, [])
+    // edit mode
+    await updateTask(selectedTask.id, updates, newCategoryId)
+  }, [selectedTask, taskMode, workspaces, createTask, updateTask])
 
-  // Create a new time block from calendar drag
-  // If the slot type has a workspaceId, create a task instead
-  const handleCreateTimeBlock = useCallback((
+  // Open the TaskDetailModal in create mode with a draft task pre-filled
+  // from the calendar slot the user clicked.
+  const handleOpenCreateTask = useCallback(
+    (slotType: SlotType, date: string, startTime: string, endTime: string) => {
+      const targetWorkspace = slotType.workspaceId
+        ? workspaces.find((w) => w.id === slotType.workspaceId)
+        : workspaces[0]
+      if (!targetWorkspace || targetWorkspace.categories.length === 0) return
+      const targetCategory = targetWorkspace.categories[0]
+      const now = new Date().toISOString()
+      const draft: Task = {
+        id: crypto.randomUUID(),
+        categoryId: targetCategory.id,
+        workspaceId: targetWorkspace.id,
+        workspaceName: targetWorkspace.name,
+        workspaceColor: targetWorkspace.color,
+        categoryName: targetCategory.name,
+        title: '',
+        taskType: 'one_time',
+        urgency: 5,
+        scheduledDate: date,
+        scheduledStartTime: startTime,
+        scheduledEndTime: endTime,
+        calendarColor: slotType.color || targetWorkspace.color,
+        isCompleted: false,
+        sortOrder: targetCategory.tasks.length,
+        createdAt: now,
+        updatedAt: now,
+      }
+      setTaskMode('create')
+      setSelectedTask(draft)
+    },
+    [workspaces]
+  )
+
+  // Calendar drag → either creates a task in workspace or a time block,
+  // depending on whether the slot type maps to a workspace.
+  const handleCreateTimeBlock = useCallback(async (
     date: string,
     startTime: string,
     endTime: string,
     type: string,
     label: string,
     color: string,
+    notes?: string,
+    description?: string,
   ) => {
-    // Find the slot type to check if it has a workspace association
-    const slotType = activeSlotTypes.find(s => s.key === type)
-    
+    const slotType = activeSlotTypes.find((s) => s.key === type)
+
     if (slotType?.workspaceId) {
-      // Create a task in the associated workspace instead of a time block
-      const workspace = workspaces.find(w => w.id === slotType.workspaceId)
+      const workspace = workspaces.find((w) => w.id === slotType.workspaceId)
       if (workspace && workspace.categories.length > 0) {
         const defaultCategory = workspace.categories[0]
         const now = new Date().toISOString()
         const newTask: Task = {
-          id: `task-${Date.now()}`,
+          id: crypto.randomUUID(),
           categoryId: defaultCategory.id,
           workspaceId: workspace.id,
           workspaceName: workspace.name,
@@ -454,93 +186,43 @@ export default function FlowDeskPage() {
           scheduledEndTime: endTime,
           calendarColor: color || workspace.color,
           isCompleted: false,
+          notes: notes || undefined,
+          description: description || undefined,
           sortOrder: defaultCategory.tasks.length,
           createdAt: now,
           updatedAt: now,
         }
-        setWorkspaces((prev) =>
-          prev.map((ws) =>
-            ws.id === workspace.id
-              ? {
-                  ...ws,
-                  categories: ws.categories.map((cat) =>
-                    cat.id === defaultCategory.id
-                      ? { ...cat, tasks: [...cat.tasks, newTask] }
-                      : cat
-                  ),
-                }
-              : ws
-          )
-        )
+        await createTask(newTask)
         return
       }
     }
-    
-    // Otherwise create a time block (no workspace association)
-    const newBlock: TimeBlock = {
-      id: `block-${Date.now()}`,
-      date,
-      startTime,
-      endTime,
-      type,
-      label,
-      color,
-      isRecurring: false,
-    }
-    setTimeBlocks((prev) => [...prev, newBlock])
-  }, [activeSlotTypes, workspaces])
 
-  // Reschedule a task by dragging/resizing on the calendar
-  // date is optional — only provided by day/week views when dragging across days
-  const handleRescheduleTask = useCallback((taskId: string, newStartOrDate: string, newEndOrStart: string, newEndOpt?: string) => {
-    // Support both 3-arg (taskId, newStart, newEnd) and 4-arg (taskId, date, newStart, newEnd)
+    await addTimeBlock({
+      date, startTime, endTime, type, label, color, isRecurring: false,
+    })
+  }, [activeSlotTypes, workspaces, createTask, addTimeBlock])
+
+  const handleRescheduleTask = useCallback((
+    taskId: string,
+    newStartOrDate: string,
+    newEndOrStart: string,
+    newEndOpt?: string,
+  ) => {
     const date = newEndOpt ? newStartOrDate : undefined
     const newStart = newEndOpt ? newEndOrStart : newStartOrDate
     const newEnd = newEndOpt ?? newEndOrStart
-    setWorkspaces((prev) =>
-      prev.map((workspace) => ({
-        ...workspace,
-        categories: workspace.categories.map((category) => ({
-          ...category,
-          tasks: category.tasks.map((task) =>
-            task.id === taskId
-              ? {
-                  ...task,
-                  scheduledStartTime: newStart,
-                  scheduledEndTime: newEnd,
-                  ...(date ? { scheduledDate: date } : {}),
-                  updatedAt: new Date().toISOString(),
-                }
-              : task
-          ),
-        })),
-      }))
-    )
-  }, [])
+    return rescheduleTask(taskId, date, newStart, newEnd)
+  }, [rescheduleTask])
 
-  // Update time block (drag/resize)
-  const handleUpdateTimeBlock = useCallback((id: string, updates: Partial<TimeBlock>) => {
-    setTimeBlocks((prev) =>
-      prev.map((block) =>
-        block.id === id ? { ...block, ...updates } : block
-      )
-    )
-  }, [])
-
-  // Delete time block
-  const handleDeleteTimeBlock = useCallback((id: string) => {
-    setTimeBlocks((prev) => prev.filter((block) => block.id !== id))
-  }, [])
-
-  // Create pending task (no scheduled time)
-  const handleCreatePendingTask = useCallback((title: string) => {
+  const handleCreatePendingTask = useCallback(async (title: string) => {
     const firstWorkspace = workspaces[0]
     const firstCategory = firstWorkspace?.categories[0]
     if (!firstWorkspace || !firstCategory) return
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = toDateString(new Date())
+    const now = new Date().toISOString()
     const newTask: Task = {
-      id: `task-${Date.now()}`,
+      id: crypto.randomUUID(),
       categoryId: firstCategory.id,
       workspaceId: firstWorkspace.id,
       workspaceName: firstWorkspace.name,
@@ -551,36 +233,22 @@ export default function FlowDeskPage() {
       urgency: 5,
       calendarColor: firstWorkspace.color,
       isCompleted: false,
-      sortOrder: 999,
+      sortOrder: firstCategory.tasks.length,
       scheduledDate: today,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     }
+    await createTask(newTask)
+  }, [workspaces, createTask])
 
-    setWorkspaces((prev) =>
-      prev.map((ws) => {
-        if (ws.id !== firstWorkspace.id) return ws
-        return {
-          ...ws,
-          categories: ws.categories.map((cat) => {
-            if (cat.id !== firstCategory.id) return cat
-            return { ...cat, tasks: [...cat.tasks, newTask] }
-          }),
-        }
-      })
-    )
-  }, [workspaces])
-
-  // Create task from calendar click or drag
-  const handleCreateCalendarTask = useCallback((date: string, startTime: string, endTime: string) => {
-    // Find the first available workspace and category
+  const handleCreateCalendarTask = useCallback(async (date: string, startTime: string, endTime: string) => {
     const firstWorkspace = workspaces[0]
     const firstCategory = firstWorkspace?.categories[0]
-
     if (!firstWorkspace || !firstCategory) return
 
+    const now = new Date().toISOString()
     const newTask: Task = {
-      id: `task-${Date.now()}`,
+      id: crypto.randomUUID(),
       categoryId: firstCategory.id,
       workspaceId: firstWorkspace.id,
       workspaceName: firstWorkspace.name,
@@ -591,82 +259,89 @@ export default function FlowDeskPage() {
       urgency: 5,
       calendarColor: firstWorkspace.color,
       isCompleted: false,
-      sortOrder: 999,
+      sortOrder: firstCategory.tasks.length,
       scheduledDate: date,
       scheduledStartTime: startTime,
       scheduledEndTime: endTime,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     }
-
-    setWorkspaces((prev) =>
-      prev.map((workspace) => {
-        if (workspace.id !== firstWorkspace.id) return workspace
-        return {
-          ...workspace,
-          categories: workspace.categories.map((category) => {
-            if (category.id !== firstCategory.id) return category
-            return {
-              ...category,
-              tasks: [...category.tasks, newTask],
-            }
-          }),
-        }
-      })
-    )
-
-    // Open the task detail modal so user can edit
+    await createTask(newTask)
     setSelectedTask(newTask)
-  }, [workspaces])
+  }, [workspaces, createTask])
+
+  if (isLoading) {
+    return (
+      <main className="h-screen w-full flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4 text-muted-foreground">
+          <WaddleMascot className="w-20 h-20 animate-waddle-bob" />
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-sm">載入中...</span>
+          </div>
+        </div>
+      </main>
+    )
+  }
 
   return (
-    <>
+    <ErrorBoundary>
       <MainLayout
         workspaces={workspaces}
         timeBlocks={timeBlocks}
         slotTypes={activeSlotTypes}
         settings={settings}
-        onToggleCategoryCollapse={handleToggleCategoryCollapse}
-        onToggleComplete={handleToggleComplete}
+        onToggleCategoryCollapse={toggleCategoryCollapse}
+        onToggleComplete={toggleTaskComplete}
         onSelectTask={handleSelectTask}
-        onAddTask={handleAddTask}
-        onAddCategory={handleAddCategory}
-        onAddWorkspace={handleAddWorkspace}
-        onUpdateWorkspaceColor={handleUpdateWorkspaceColor}
-        onUpdateWorkspace={handleUpdateWorkspace}
-        onDeleteWorkspace={handleDeleteWorkspace}
-        onArchiveWorkspace={handleArchiveWorkspace}
+        onAddTask={addTask}
+        onAddCategory={addCategory}
+        onAddWorkspace={addWorkspace}
+        onUpdateWorkspaceColor={updateWorkspaceColor}
+        onUpdateWorkspace={updateWorkspace}
+        onDeleteWorkspace={deleteWorkspace}
+        onArchiveWorkspace={archiveWorkspace}
         onCreateCalendarTask={handleCreateCalendarTask}
         onCreatePendingTask={handleCreatePendingTask}
         onCreateCalendarTimeBlock={handleCreateTimeBlock}
+        onOpenCreateTask={handleOpenCreateTask}
         onRescheduleTask={handleRescheduleTask}
+        onUnscheduleTask={unscheduleTask}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onUpdateTimeBlock={handleUpdateTimeBlock}
-        onDeleteTimeBlock={handleDeleteTimeBlock}
+        onUpdateTimeBlock={updateTimeBlock}
+        onDeleteTimeBlock={deleteTimeBlock}
       />
 
-      {/* Task Detail Modal */}
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}
+          mode={taskMode}
           workspaces={workspaces}
           isOpen={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           onSave={handleSaveTask}
-          onToggleComplete={handleToggleComplete}
-          onDelete={handleDeleteTask}
+          onToggleComplete={taskMode === 'edit' ? toggleTaskComplete : undefined}
+          onDelete={taskMode === 'edit' ? deleteTask : undefined}
         />
       )}
 
-      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         settings={settings}
         timeBlocks={timeBlocks}
         workspaces={workspaces}
         onClose={() => setIsSettingsOpen(false)}
-        onSave={handleSaveSettings}
+        onSave={saveSettings}
       />
-    </>
+
+      <UserMenu />
+      <OnboardingTour
+        open={!onboardingCompleted}
+        onComplete={completeOnboarding}
+        onChoose={applyOnboardingChoice}
+      />
+      <KeyboardShortcutsHint />
+      <Toaster position="bottom-right" richColors closeButton />
+    </ErrorBoundary>
   )
 }
