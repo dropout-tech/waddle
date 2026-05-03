@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import type { Task, TimeBlock, SlotType, Workspace } from '@/lib/types'
 // Re-import SlotType type as it's used in the callback signature
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { CalendarHeader } from './calendar-header'
 import { PendingZone } from './pending-zone'
 import { TimeGrid } from './time-grid'
@@ -100,13 +101,20 @@ export function CalendarPanel({
     onDateChange(d)
   }, [selectedDate, viewMode, onDateChange])
 
+  const isMobile = useIsMobile()
   // Touch swipe only — mouse drags are reserved for in-calendar interactions
   // (task block drag, time block resize, new-slot creation). Letting mouse
   // drags double as swipe-to-navigate caused tasks dragged ≥60px horizontally
-  // to incorrectly trigger week navigation, making them appear to jump weeks.
+  // to incorrectly trigger week navigation.
+  //
+  // On mobile + day view we disable this — the day-scroll-view itself uses
+  // scroll-snap (one day per viewport) so a swipe natively navigates by
+  // scrolling to the next snap point, then syncs selectedDate. Letting this
+  // fire too would double-navigate.
+  const swipeDisabled = isMobile && viewMode === 'day'
   useSwipeNavigation({
-    onSwipeLeft: () => navigate('next'),
-    onSwipeRight: () => navigate('prev'),
+    onSwipeLeft: () => { if (!swipeDisabled) navigate('next') },
+    onSwipeRight: () => { if (!swipeDisabled) navigate('prev') },
     elementRef: panelRef,
     enableMouseDrag: false,
   })

@@ -263,8 +263,15 @@ export function PanelHeader({
             </span>
           </div>
 
-          {/* Workspace Badges - Clean pills */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Workspace Badges. Mobile: horizontal scroll on a single row so
+              they don't wrap into messy multi-line clusters. Desktop: wrap. */}
+          <div
+            className={cn(
+              'flex items-center gap-2',
+              isMobile ? 'overflow-x-auto -mx-4 px-4 pb-1' : 'flex-wrap'
+            )}
+            style={isMobile ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : undefined}
+          >
             {workspaces
               .filter((w) => !w.isArchived)
               .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -275,7 +282,7 @@ export function PanelHeader({
                     key={workspace.id}
                     onClick={() => onWorkspaceClick(workspace.id)}
                     className={cn(
-                      'group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
+                      'group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex-shrink-0',
                       'border bg-card hover:bg-muted/50'
                     )}
                     style={{ borderColor: `${workspace.color}40`, color: workspace.color }}
@@ -311,7 +318,7 @@ export function PanelHeader({
         {/* Add Workspace Button */}
             <button
               onClick={() => setIsAdding(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-all"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-all flex-shrink-0"
             >
               <Plus className="w-3 h-3" />
               <span>新增</span>

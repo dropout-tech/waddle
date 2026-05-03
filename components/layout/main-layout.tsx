@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
@@ -13,6 +13,7 @@ import { FocusTimer } from '@/components/timer/focus-timer'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings } from '@/lib/types'
 
 interface MainLayoutProps {
@@ -83,11 +84,21 @@ export function MainLayout({
   const [mobileTab, setMobileTab] = useState<'tasks' | 'calendar'>('calendar')
   // Mobile-only — drives the FocusScratchpad open/close from the bottom tab bar.
   const [mobileScratchpadOpen, setMobileScratchpadOpen] = useState(false)
-
-  // Force day view on mobile — week/month grids don't fit a phone column.
-  useEffect(() => {
-    if (isMobile && viewMode !== 'day') setViewMode('day')
-  }, [isMobile, viewMode])
+  // Mobile horizontal swipe between Tasks and Calendar tabs.
+  const mobileContentRef = useRef<HTMLDivElement>(null)
+  useSwipeNavigation({
+    elementRef: mobileContentRef,
+    onSwipeLeft: () => {
+      // Tasks → Calendar. Calendar's own day-scroll consumes left swipes
+      // when it's the active tab, so this only fires from the tasks tab.
+      if (mobileTab === 'tasks') setMobileTab('calendar')
+    },
+    onSwipeRight: () => {
+      // Calendar → Tasks (only when calendar isn't intercepting horizontal
+      // gestures itself, e.g. month/year views without horizontal scroll).
+      if (mobileTab === 'calendar') setMobileTab('tasks')
+    },
+  })
 
   // Sidebar visibility states
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true)
@@ -171,7 +182,7 @@ export function MainLayout({
           hideTrigger
         />
 
-        <div className="flex-1 min-h-0 flex flex-col">
+        <div ref={mobileContentRef} className="flex-1 min-h-0 flex flex-col">
           {focusMode !== 'none' ? (
             // Journal/Report focus view full-screen on mobile too
             <div className="flex flex-col h-full bg-background">
@@ -233,7 +244,7 @@ export function MainLayout({
             <ErrorBoundary>
               <CalendarPanel
                 selectedDate={selectedDate}
-                viewMode="day"
+                viewMode={viewMode}
                 pendingTasks={pendingTasks}
                 scheduledTasks={scheduledTasks}
                 allTasks={allTasks}

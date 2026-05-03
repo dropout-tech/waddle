@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronLeft, ChevronRight, BookOpen, BarChart3, Settings, Sparkles, MoreHorizontal } from 'lucide-react'
+import { ZoomIn, ZoomOut, Clock, ChevronLeft, ChevronRight, ChevronDown, BookOpen, BarChart3, Settings, Sparkles, MoreHorizontal } from 'lucide-react'
 import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { UserMenu } from '@/components/user-menu'
@@ -55,16 +55,25 @@ export function CalendarHeader({
   const isMobile = useIsMobile()
   const [overflowOpen, setOverflowOpen] = useState(false)
   const overflowRef = useRef<HTMLDivElement>(null)
+  // Independent view-mode picker on mobile: tap a single button to pick 日 / 週 / 月.
+  const [viewPickerOpen, setViewPickerOpen] = useState(false)
+  const viewPickerRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
-    if (!overflowOpen) return
+    if (!overflowOpen && !viewPickerOpen) return
     function onClick(ev: MouseEvent) {
-      if (overflowRef.current && !overflowRef.current.contains(ev.target as Node)) {
+      if (overflowOpen && overflowRef.current && !overflowRef.current.contains(ev.target as Node)) {
         setOverflowOpen(false)
+      }
+      if (viewPickerOpen && viewPickerRef.current && !viewPickerRef.current.contains(ev.target as Node)) {
+        setViewPickerOpen(false)
       }
     }
     document.addEventListener('mousedown', onClick)
     return () => document.removeEventListener('mousedown', onClick)
-  }, [overflowOpen])
+  }, [overflowOpen, viewPickerOpen])
+
+  const viewModeLabel = viewMode === 'day' ? '日' : viewMode === 'week' ? '週' : '月'
 
   const isToday = () => {
     const today = new Date()
@@ -118,55 +127,106 @@ export function CalendarHeader({
         )}
       >
         {/* Left: Date Navigation */}
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="flex items-center gap-1">
-            {/* Prev/next chevrons — desktop only. Mobile uses swipe. */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-0.5 md:gap-1">
+            {/* Prev / next chevrons — visible on both mobile and desktop.
+                Mobile chevrons are slightly tighter to fit alongside the
+                month label and view-mode picker. */}
             <button
               type="button"
               onClick={handlePrevMonth}
               aria-label={`上一${navUnitLabel}`}
-              className="hidden md:flex p-1.5 rounded-md hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex p-1.5 rounded-md hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ChevronLeft className="w-4 h-4" aria-hidden="true" />
             </button>
-            <span className="text-sm font-semibold md:font-medium md:min-w-[140px] md:text-center" aria-live="polite">
+            <span
+              className="text-sm font-semibold md:font-medium md:min-w-[140px] md:text-center px-1"
+              aria-live="polite"
+            >
               {getDisplayText()}
             </span>
             <button
               type="button"
               onClick={handleNextMonth}
               aria-label={`下一${navUnitLabel}`}
-              className="hidden md:flex p-1.5 rounded-md hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex p-1.5 rounded-md hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ChevronRight className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
 
-          {/* View Mode Buttons — desktop only. Mobile is forced to day view. */}
-          <div
-            data-tour="view-modes"
-            className="hidden md:flex items-center border border-border rounded-lg overflow-hidden ml-auto"
-            role="group"
-            aria-label="檢視模式"
-          >
-            {(['day', 'week', 'month'] as const).map((mode) => (
+          {/* View Mode picker — desktop renders inline segmented control,
+              mobile renders a single button + popover so it's tappable. */}
+          {!isMobile ? (
+            <div
+              data-tour="view-modes"
+              className="hidden md:flex items-center border border-border rounded-lg overflow-hidden ml-auto"
+              role="group"
+              aria-label="檢視模式"
+            >
+              {(['day', 'week', 'month'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => onViewModeChange(mode)}
+                  aria-pressed={viewMode === mode}
+                  aria-label={mode === 'day' ? '日檢視' : mode === 'week' ? '週檢視' : '月檢視'}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                    viewMode === mode
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  )}
+                >
+                  {mode === 'day' ? '日' : mode === 'week' ? '週' : '月'}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="relative" ref={viewPickerRef}>
               <button
-                key={mode}
                 type="button"
-                onClick={() => onViewModeChange(mode)}
-                aria-pressed={viewMode === mode}
-                aria-label={mode === 'day' ? '日檢視' : mode === 'week' ? '週檢視' : '月檢視'}
+                onClick={() => setViewPickerOpen(v => !v)}
+                aria-haspopup="menu"
+                aria-expanded={viewPickerOpen}
+                aria-label={`目前是${viewModeLabel}檢視，點擊更換`}
                 className={cn(
-                  'px-3 py-1.5 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-                  viewMode === mode
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  'flex items-center gap-1 px-2.5 h-8 rounded-lg border border-border text-xs font-medium transition-colors',
+                  'hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  viewPickerOpen && 'bg-secondary'
                 )}
               >
-                {mode === 'day' ? '日' : mode === 'week' ? '週' : '月'}
+                <span>{viewModeLabel}</span>
+                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', viewPickerOpen && 'rotate-180')} />
               </button>
-            ))}
-          </div>
+              {viewPickerOpen && (
+                <div className="absolute left-0 top-full mt-1 w-32 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50" role="menu">
+                  {([
+                    { id: 'day' as const, label: '日檢視', desc: '單天時間軸' },
+                    { id: 'week' as const, label: '週檢視', desc: '七天概覽' },
+                    { id: 'month' as const, label: '月檢視', desc: '月曆格' },
+                  ]).map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { setViewPickerOpen(false); onViewModeChange(item.id) }}
+                      className={cn(
+                        'w-full text-left px-3 py-2 text-sm transition-colors',
+                        viewMode === item.id
+                          ? 'bg-primary/10 text-primary font-semibold'
+                          : 'hover:bg-muted/60 text-foreground'
+                      )}
+                    >
+                      <div>{item.label}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">{item.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right: Today + Bell + (mobile) overflow menu */}

@@ -15,6 +15,7 @@ import {
   autoScrollContainerNearEdge,
 } from '@/lib/calendar-utils'
 import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { CurrentTimeLine } from './current-time-line'
 import { TaskBlock, type TaskDragStart } from './task-block'
 import { SlotIcon } from './slot-icon'
@@ -46,13 +47,12 @@ interface ActiveTaskDrag extends TaskDragStart {
   dayIndex: number
 }
 
-const DAY_WIDTH = 280
+const DEFAULT_DAY_WIDTH = 280
 // Initial window: 21 days centered on selectedDate. Window extends in both
 // directions on demand as user scrolls toward an edge — see handleScroll.
 const INITIAL_DAYS_BEFORE = 10
 const INITIAL_DAYS_AFTER = 10
 const EXTEND_BATCH = 14            // days to add per extension
-const EXTEND_THRESHOLD = DAY_WIDTH * 2  // start extending when within 2 days of edge
 const TIME_COL_WIDTH = 56
 
 export function DayScrollView({
@@ -73,6 +73,20 @@ export function DayScrollView({
   endHour = 24,
   hourHeight = 60,
 }: DayScrollViewProps) {
+  const isMobile = useIsMobile()
+  // On mobile, each day fills (viewport - time column) so the user sees one
+  // full day per swipe and scroll-snap lands on day boundaries. Desktop keeps
+  // the fixed 280px width so multiple days are visible side-by-side.
+  const [viewportWidth, setViewportWidth] = useState(typeof window === 'undefined' ? 1024 : window.innerWidth)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onResize = () => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const DAY_WIDTH = isMobile ? Math.max(240, viewportWidth - TIME_COL_WIDTH) : DEFAULT_DAY_WIDTH
+  const EXTEND_THRESHOLD = DAY_WIDTH * 2
+
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const headerScrollRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -220,10 +234,14 @@ export function DayScrollView({
   const lastScrollLeft = useRef(0)
   // Cooldown after drag ends to prevent accidental navigation
   const dragEndCooldown = useRef(false)
+  // Mobile: debounced scroll → selectedDate sync. Set when scroll settles
+  // on a snap boundary; we then call onDateChange so the header label and
+  // pending zone match the visible day.
+  const scrollSyncTimer = useRef<number | null>(null)
 
   // Horizontal scroll: pan freely; extend the date window on demand as the
-  // user approaches either edge so it feels infinite. selectedDate is not
-  // touched by scrolling — explicit nav uses chevrons / keyboard / swipe.
+  // user approaches either edge so it feels infinite. On mobile each scroll
+  // settle also syncs selectedDate to the visible day.
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current
     if (!container || isScrolling.current) return
@@ -244,7 +262,23 @@ export function DayScrollView({
       // Append more days. No scrollLeft adjustment needed — content grows on the right.
       setExtraAfter(prev => prev + EXTEND_BATCH)
     }
-  }, [])
+
+    // Mobile-only: after the user stops scrolling, snap selectedDate to the
+    // day that's now centered in the viewport.
+    if (isMobile && onDateChange) {
+      if (scrollSyncTimer.current) window.clearTimeout(scrollSyncTimer.current)
+      scrollSyncTimer.current = window.setTimeout(() => {
+        const c = scrollContainerRef.current
+        if (!c || isScrolling.current || isDraggingTaskRef.current) return
+        const dayIndex = Math.round(c.scrollLeft / DAY_WIDTH)
+        const target = allDates[dayIndex]
+        if (!target) return
+        const targetStr = toDateString(target)
+        if (targetStr === toDateString(selectedDate)) return
+        onDateChange(target)
+      }, 140)
+    }
+  }, [isMobile, onDateChange, allDates, selectedDate, DAY_WIDTH, EXTEND_THRESHOLD])
 
   // Get tasks for a specific date
   const getTasksForDate = useCallback((date: Date) => {
@@ -669,7 +703,11 @@ export function DayScrollView({
             ref={headerScrollRef}
             className="flex-1 overflow-x-auto overflow-y-auto"
             onScroll={() => syncScroll('header')}
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            style={{
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              ...(isMobile ? { scrollSnapType: 'x mandatory' as const } : {}),
+            }}
           >
             <div className="flex" style={{ width: `${allDates.length * DAY_WIDTH}px` }}>
               {allDates.map((date) => {
@@ -709,7 +747,11 @@ export function DayScrollView({
                       'border-r border-border last:border-r-0 flex flex-col',
                       isToday && 'bg-primary/5'
                     )}
-                    style={{ width: `${DAY_WIDTH}px`, minWidth: `${DAY_WIDTH}px` }}
+                    style={{
+                      width: `${DAY_WIDTH}px`,
+                      minWidth: `${DAY_WIDTH}px`,
+                      ...(isMobile ? { scrollSnapAlign: 'start' } : {}),
+                    }}
                   >
                     {/* Date label - fixed height */}
                     <div className={cn(
@@ -809,10 +851,12 @@ export function DayScrollView({
         </div>
       </div>
 
-      {/* Scrollable Time Grid */}
-      <div 
+      {/* Scrollable Time Grid. Mobile snaps to whole days so one swipe =
+          one day; desktop keeps free panning. */}
+      <div
         ref={scrollContainerRef}
         className="flex-1 overflow-auto"
+        style={isMobile ? { scrollSnapType: 'x mandatory', scrollSnapStop: 'always' } : undefined}
         onScroll={() => {
           handleScroll()
           syncScroll('grid')
@@ -853,7 +897,11 @@ export function DayScrollView({
                   'relative border-r border-border last:border-r-0 cursor-crosshair',
                   isToday && 'bg-primary/5'
                 )}
-                style={{ width: `${DAY_WIDTH}px`, minWidth: `${DAY_WIDTH}px` }}
+                style={{
+                  width: `${DAY_WIDTH}px`,
+                  minWidth: `${DAY_WIDTH}px`,
+                  ...(isMobile ? { scrollSnapAlign: 'start' } : {}),
+                }}
                 onPointerDown={(e) => handleMouseDown(e, dayIndex)}
                 onPointerMove={(e) => handleMouseMove(e, dayIndex)}
                 onPointerUp={(e) => handleMouseUp(e)}

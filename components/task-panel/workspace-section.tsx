@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/use-mobile'
 import type { Workspace, Task } from '@/lib/types'
 import { CategorySection } from './category-section'
 import type { Density, MetaField } from './task-panel'
@@ -33,6 +35,7 @@ export function WorkspaceSection({
   onSendTaskToCalendar,
   onTaskDragActivate,
 }: WorkspaceSectionProps) {
+  const isMobile = useIsMobile()
   const [isAddingCategory, setIsAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
   // Count total pending tasks
@@ -83,8 +86,10 @@ export function WorkspaceSection({
         </div>
       </div>
 
-      {/* Categories */}
-      <div className="space-y-1 pl-3 border-l border-border ml-1">
+      {/* Categories. Desktop uses a left border + indent for visual hierarchy.
+          Mobile drops both — narrow viewports look better with full-width
+          sections, and the indent shifted content noticeably right. */}
+      <div className={cn('space-y-1', isMobile ? '' : 'pl-3 border-l border-border ml-1')}>
         {workspace.categories
           .filter((c) => !c.isArchived)
           .sort((a, b) => a.sortOrder - b.sortOrder)
