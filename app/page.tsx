@@ -241,12 +241,14 @@ export default function WaddlePage() {
     await createTask(newTask)
   }, [workspaces, createTask])
 
-  const handleCreateCalendarTask = useCallback(async (date: string, startTime: string, endTime: string) => {
+  const handleCreateCalendarTask = useCallback(async (date: string, startTime?: string, endTime?: string) => {
     const firstWorkspace = workspaces[0]
     const firstCategory = firstWorkspace?.categories[0]
     if (!firstWorkspace || !firstCategory) return
 
     const now = new Date().toISOString()
+    // No times → create as a pending (unscheduled) task on that date so it
+    // shows up in the calendar's pending zone instead of the timeline.
     const newTask: Task = {
       id: crypto.randomUUID(),
       categoryId: firstCategory.id,
@@ -261,8 +263,8 @@ export default function WaddlePage() {
       isCompleted: false,
       sortOrder: firstCategory.tasks.length,
       scheduledDate: date,
-      scheduledStartTime: startTime,
-      scheduledEndTime: endTime,
+      ...(startTime ? { scheduledStartTime: startTime } : {}),
+      ...(endTime ? { scheduledEndTime: endTime } : {}),
       createdAt: now,
       updatedAt: now,
     }

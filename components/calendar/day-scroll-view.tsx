@@ -26,7 +26,7 @@ interface DayScrollViewProps {
   slotTypes?: SlotType[]
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
-  onCreateTask?: (date: string, startTime: string, endTime: string) => void
+  onCreateTask?: (date: string, startTime?: string, endTime?: string) => void
   onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string, notes?: string, description?: string) => void
   /** Fired when user picks a workspace category — opens the full task detail modal in create mode */
   onOpenCreateTask?: (slotType: SlotType, date: string, startTime: string, endTime: string) => void
@@ -672,7 +672,10 @@ export function DayScrollView({
                       onClick={(e) => {
                         if ((e.target as HTMLElement).closest('button')) return
                         if (dragEndCooldown.current) return
-                        onCreateTask?.(dateStr, '09:00', '09:30')
+                        // No times → parent creates an unscheduled task for
+                        // this date so it lands in the pending zone, not the
+                        // timeline below.
+                        onCreateTask?.(dateStr)
                       }}
                       title={activeTaskDrag ? '放開以將任務移回待排程' : '點擊新增任務'}
                     >

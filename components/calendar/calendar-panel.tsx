@@ -32,7 +32,7 @@ interface CalendarPanelProps {
   onViewModeChange: (mode: 'day' | 'week' | 'month') => void
   onTaskSelect: (task: Task) => void
   onToggleComplete?: (taskId: string) => void
-  onCreateTask?: (date: string, startTime: string, endTime: string) => void
+  onCreateTask?: (date: string, startTime?: string, endTime?: string) => void
   onCreatePendingTask?: (title: string) => void
   onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string, notes?: string, description?: string) => void
   onOpenCreateTask?: (slotType: SlotType, date: string, startTime: string, endTime: string) => void
@@ -211,7 +211,8 @@ export function CalendarPanel({
             onViewModeChange('day')
           }}
           onCreateTask={(dateString) => {
-            onCreateTask?.(dateString, '09:00', '09:30')
+            // Month view → no time chosen → create as pending for that date.
+            onCreateTask?.(dateString)
           }}
           onNavigate={navigate}
         />

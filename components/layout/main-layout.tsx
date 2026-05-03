@@ -30,7 +30,7 @@ interface MainLayoutProps {
   onDeleteWorkspace?: (workspaceId: string) => void
   onArchiveWorkspace?: (workspaceId: string) => void
   onOpenSettings?: () => void
-  onCreateCalendarTask?: (date: string, startTime: string, endTime: string) => void
+  onCreateCalendarTask?: (date: string, startTime?: string, endTime?: string) => void
   onCreatePendingTask?: (title: string) => void
   onCreateCalendarTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string, notes?: string, description?: string) => void
   onOpenCreateTask?: (slotType: SlotType, date: string, startTime: string, endTime: string) => void
