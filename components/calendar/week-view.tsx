@@ -83,6 +83,10 @@ export function WeekView({
   // Task block drag state
   const [activeTaskDrag, setActiveTaskDrag] = useState<ActiveTaskDrag | null>(null)
 
+  // While dragging any task, the pending-zone date the cursor is currently
+  // over. Drives the live drop-target highlight + ghost preview.
+  const [hoveredPendingZoneDate, setHoveredPendingZoneDate] = useState<string | null>(null)
+
   // Pending task drag state (from header to grid)
   const [pendingTaskDrag, setPendingTaskDrag] = useState<{
     task: Task
@@ -340,6 +344,13 @@ export function WeekView({
         dragState = { ...dragState, currentEnd: clamp(snap(minutes), dragState.currentStart + 15, MAX) }
       }
       setActiveTaskDrag(dragState)
+
+      // Track which pending zone (if any) the cursor is over so the UI can
+      // show the live drop-target highlight + ghost preview.
+      const hoveredEl = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
+      const overPendingEl = hoveredEl?.closest('[data-pending-zone]') as HTMLElement | null
+      const hoveredDate = overPendingEl?.getAttribute('data-pending-zone-date') ?? null
+      setHoveredPendingZoneDate(prev => prev === hoveredDate ? prev : hoveredDate)
     }
 
     const onUp = (ev: MouseEvent) => {
@@ -349,6 +360,7 @@ export function WeekView({
       if (!movedBeyondThreshold || !dragState) {
         // Click. activeTaskDrag was never set — TaskBlock's own onMouseUp
         // opens the modal. Nothing to clean up here.
+        setHoveredPendingZoneDate(null)
         return
       }
 
@@ -357,6 +369,7 @@ export function WeekView({
 
       const finalState = dragState
       setActiveTaskDrag(null)
+      setHoveredPendingZoneDate(null)
       dragState = null
 
       if (overPending) {
@@ -423,6 +436,12 @@ export function WeekView({
         currentMinutes: lastMinutes,
         duration,
       })
+
+      // Track hovered pending zone for the drop-target highlight + ghost.
+      const hoveredEl = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
+      const overPendingEl = hoveredEl?.closest('[data-pending-zone]') as HTMLElement | null
+      const hoveredDate = overPendingEl?.getAttribute('data-pending-zone-date') ?? null
+      setHoveredPendingZoneDate(prev => prev === hoveredDate ? prev : hoveredDate)
     }
 
     const onUp = (ev: MouseEvent) => {
@@ -431,16 +450,25 @@ export function WeekView({
 
       if (!movedBeyondThreshold) {
         // Click — let onClick fire normally to open the detail modal.
+        setHoveredPendingZoneDate(null)
         return
       }
 
       const target = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
-      const overPending = target?.closest('[data-pending-zone]')
+      const overPending = target?.closest('[data-pending-zone]') as HTMLElement | null
 
       setPendingTaskDrag(null)
+      setHoveredPendingZoneDate(null)
 
-      // Drop back over the pending zone is a no-op (still pending).
-      if (!overPending) {
+      if (overPending) {
+        // Drop on a pending zone. Same date → no-op. Different date → move
+        // the task to that date but keep it pending (no time).
+        const targetDate = overPending.getAttribute('data-pending-zone-date') ?? undefined
+        if (targetDate && targetDate !== task.scheduledDate) {
+          onUnscheduleTask?.(task.id, targetDate)
+        }
+      } else {
+        // Drop on the timeline → schedule.
         const dropTarget = allDates[lastDayIndex]
         if (dropTarget) {
           onRescheduleTask?.(
@@ -459,7 +487,7 @@ export function WeekView({
 
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-  }, [allDates, MIN, MAX, onRescheduleTask])
+  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask])
 
   // Handle mouse down on grid to start new-slot drag or click
   const handleMouseDown = useCallback((e: React.MouseEvent, dayIndex: number) => {
@@ -643,6 +671,21 @@ export function WeekView({
                 const allDayTasks = getAllDayTasksForDate(date)
                 const weekdayIndex = date.getDay()
 
+                // Live drag preview state — see day-scroll-view for the full
+                // explanation. Same logic mirrored here.
+                const draggedTaskPreview =
+                  pendingTaskDrag?.task ??
+                  (activeTaskDrag ? tasks.find(t => t.id === activeTaskDrag.taskId) ?? null : null)
+                const isPendingOriginZone =
+                  !!pendingTaskDrag && pendingTaskDrag.task.scheduledDate === dateStr
+                const isHoveredDropTarget =
+                  !!draggedTaskPreview &&
+                  hoveredPendingZoneDate === dateStr &&
+                  !isPendingOriginZone
+                const pendingDragOnNonOriginTarget =
+                  !!pendingTaskDrag &&
+                  hoveredPendingZoneDate !== pendingTaskDrag.task.scheduledDate
+
                 return (
                   <div
                     key={dateStr}
@@ -674,10 +717,8 @@ export function WeekView({
                       data-pending-zone-date={dateStr}
                       className={cn(
                         'flex-1 px-0.5 pb-1 flex flex-col gap-px overflow-hidden cursor-pointer transition-colors border-t border-border/50',
-                        // Highlight strongly when a scheduled task is being dragged so the
-                        // user can see this is a valid drop target for unscheduling.
-                        activeTaskDrag
-                          ? 'bg-primary/10 border-primary/40 ring-1 ring-primary/40 ring-inset'
+                        isHoveredDropTarget
+                          ? 'bg-primary/15 ring-2 ring-primary/60 ring-inset'
                           : 'hover:bg-secondary/30'
                       )}
                       style={{ minHeight: `${headerHeight - HEADER_DATE_HEIGHT}px` }}
@@ -691,30 +732,50 @@ export function WeekView({
                         // timeline below.
                         onCreateTask?.(dateStr)
                       }}
-                      title={activeTaskDrag ? '放開以將任務移回待排程' : '點擊新增任務'}
+                      title={(activeTaskDrag || pendingTaskDrag) ? '放開以放到待排程' : '點擊新增任務'}
                     >
-                      {allDayTasks.map((task) => (
+                      {allDayTasks.map((task) => {
+                        const isThisTaskBeingDragged = pendingTaskDrag?.task.id === task.id
+                        return (
+                          <div
+                            key={task.id}
+                            onMouseDown={(e) => handlePendingTaskMouseDown(task, e)}
+                            onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
+                            className={cn(
+                              'w-full flex-shrink-0 text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate cursor-grab active:cursor-grabbing select-none',
+                              'hover:opacity-90 hover:shadow-sm transition-all',
+                              task.isCompleted && 'opacity-40 line-through',
+                              isThisTaskBeingDragged && (
+                                pendingDragOnNonOriginTarget ? 'invisible' : 'opacity-30'
+                              )
+                            )}
+                            style={{
+                              backgroundColor: task.calendarColor || task.workspaceColor,
+                              color: '#fff',
+                            }}
+                          >
+                            <span className="flex items-center gap-1 min-w-0">
+                              {task.isCompleted && <span className="flex-shrink-0">✓</span>}
+                              <span className="truncate">{task.title}</span>
+                            </span>
+                          </div>
+                        )
+                      })}
+
+                      {/* Ghost preview while the cursor is hovering this zone */}
+                      {isHoveredDropTarget && draggedTaskPreview && (
                         <div
-                          key={task.id}
-                          onMouseDown={(e) => handlePendingTaskMouseDown(task, e)}
-                          onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
-                          className={cn(
-                            'w-full flex-shrink-0 text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate cursor-grab active:cursor-grabbing select-none',
-                            'hover:opacity-90 hover:shadow-sm transition-all',
-                            task.isCompleted && 'opacity-40 line-through',
-                            pendingTaskDrag?.task.id === task.id && 'opacity-30'
-                          )}
+                          className="w-full flex-shrink-0 px-1.5 py-[3px] rounded text-[10px] font-medium truncate ring-2 ring-white/70 shadow-md select-none pointer-events-none"
                           style={{
-                            backgroundColor: task.calendarColor || task.workspaceColor,
+                            backgroundColor: draggedTaskPreview.calendarColor || draggedTaskPreview.workspaceColor,
                             color: '#fff',
                           }}
                         >
                           <span className="flex items-center gap-1 min-w-0">
-                            {task.isCompleted && <span className="flex-shrink-0">✓</span>}
-                            <span className="truncate">{task.title}</span>
+                            <span className="truncate">{draggedTaskPreview.title}</span>
                           </span>
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
                 )
@@ -809,8 +870,11 @@ export function WeekView({
                   const col = taskColumns.get(task.id)
                   const isDraggingThis = activeTaskDrag?.taskId === task.id
                   const isBeingDraggedAway = isDraggingThis && activeTaskDrag?.dayIndex !== dayIndex
-                  // Hide task if it's being dragged to another day
-                  if (isBeingDraggedAway) return null
+                  // Hide task if it's being dragged to another day, or if the
+                  // cursor has moved over a pending zone (the ghost preview
+                  // in that pending zone is the visible copy now).
+                  const isOverPendingZone = isDraggingThis && hoveredPendingZoneDate !== null
+                  if (isBeingDraggedAway || isOverPendingZone) return null
                   const dragOverride = isDraggingThis && activeTaskDrag
                     ? { top: activeTaskDrag.currentStart - MIN, height: activeTaskDrag.currentEnd - activeTaskDrag.currentStart }
                     : null
@@ -832,8 +896,10 @@ export function WeekView({
                   )
                 })}
 
-                {/* Show dragged task preview when dragging to this day */}
-                {activeTaskDrag && activeTaskDrag.dayIndex === dayIndex && !dayTasks.find(t => t.id === activeTaskDrag.taskId) && (
+                {/* Show dragged task preview when dragging to this day.
+                    Hidden while the cursor is over any pending zone (the
+                    ghost there is the visible preview). */}
+                {activeTaskDrag && activeTaskDrag.dayIndex === dayIndex && hoveredPendingZoneDate === null && !dayTasks.find(t => t.id === activeTaskDrag.taskId) && (
                   <div
                     className="absolute left-1 right-1 rounded-xl px-2 py-1.5 text-left overflow-hidden opacity-80 pointer-events-none z-30 shadow-lg"
                     style={{
@@ -851,8 +917,10 @@ export function WeekView({
                   </div>
                 )}
 
-                {/* Show pending task drag preview when dragging from header to this day */}
-                {pendingTaskDrag && pendingTaskDrag.currentDayIndex === dayIndex && (
+                {/* Show pending task drag preview when dragging from header
+                    to this day. Hidden while the cursor is over any pending
+                    zone (the ghost in that zone is the visible preview). */}
+                {pendingTaskDrag && pendingTaskDrag.currentDayIndex === dayIndex && hoveredPendingZoneDate === null && (
                   <div
                     className="absolute left-1 right-1 rounded-xl px-2 py-1.5 text-left overflow-hidden pointer-events-none z-30 shadow-xl border-2 border-white/50"
                     style={{
