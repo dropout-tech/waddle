@@ -35,6 +35,8 @@ export function CategorySection({
 }: CategorySectionProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  // Completed tasks default-collapsed so they don't pad out the active list.
+  const [showCompleted, setShowCompleted] = useState(false)
 
   const pendingCount = category.tasks.filter((t) => !t.isCompleted).length
   const completedCount = category.tasks.filter((t) => t.isCompleted).length
@@ -68,16 +70,15 @@ export function CategorySection({
     }
   }
 
-  // Sort tasks: incomplete first (by urgency desc), then completed
-  const sortedTasks = [...category.tasks].sort((a, b) => {
-    if (a.isCompleted !== b.isCompleted) {
-      return a.isCompleted ? 1 : -1
-    }
-    if (!a.isCompleted && !b.isCompleted) {
-      return b.urgency - a.urgency
-    }
-    return a.sortOrder - b.sortOrder
-  })
+  // Split incomplete (always shown, sorted by urgency desc) from completed
+  // (collapsed by default — toggled by the "已完成 (N)" subheader). Keeps
+  // active work front-and-center even when there are lots of done items.
+  const incompleteTasks = [...category.tasks]
+    .filter(t => !t.isCompleted)
+    .sort((a, b) => b.urgency - a.urgency)
+  const completedTasks = [...category.tasks]
+    .filter(t => t.isCompleted)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
 
   return (
     <div className="mb-3">
@@ -122,7 +123,7 @@ export function CategorySection({
       {/* Tasks */}
       {!category.isCollapsed && (
         <div className={cn('mt-1', density === 'compact' ? 'space-y-0.5' : 'space-y-3 mt-2')}>
-          {sortedTasks.map((task) => (
+          {incompleteTasks.map((task) => (
             <TaskRow
               key={task.id}
               task={task}
@@ -134,6 +135,38 @@ export function CategorySection({
               onDragActivate={onTaskDragActivate}
             />
           ))}
+
+          {/* Completed section — collapsible toggle */}
+          {completedTasks.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowCompleted(v => !v)}
+                className="flex items-center gap-1.5 px-2 py-1 mt-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                aria-expanded={showCompleted}
+              >
+                <ChevronDown
+                  className={cn(
+                    'w-3 h-3 transition-transform duration-150',
+                    !showCompleted && '-rotate-90'
+                  )}
+                />
+                <span>已完成 {completedTasks.length}</span>
+              </button>
+              {showCompleted && completedTasks.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  density={density}
+                  metaOrder={metaOrder}
+                  onToggleComplete={onToggleComplete}
+                  onSelect={onSelectTask}
+                  onSendToCalendar={onSendTaskToCalendar}
+                  onDragActivate={onTaskDragActivate}
+                />
+              ))}
+            </>
+          )}
 
           {/* Add Task Input */}
           {isAdding ? (
