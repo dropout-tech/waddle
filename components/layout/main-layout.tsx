@@ -211,6 +211,10 @@ export function MainLayout({
                 onAddCategory={onAddCategory}
                 onDeleteCategory={onDeleteCategory}
                 onSendTaskToCalendar={onSendTaskToCalendar}
+                // Auto-switch to calendar tab the moment a row's drag
+                // activates so the user's finger ends up over the
+                // calendar grid at release time.
+                onTaskDragActivate={() => setMobileTab('calendar')}
                 onAddWorkspace={onAddWorkspace}
                 onUpdateWorkspaceColor={onUpdateWorkspaceColor}
                 onUpdateWorkspace={onUpdateWorkspace}

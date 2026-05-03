@@ -29,6 +29,12 @@ interface TaskRowProps {
    *   - Drop somewhere else → not called (the drag is cancelled).
    */
   onSendToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
+  /**
+   * Fires once when the drag crosses DRAG_THRESHOLD. The mobile layout
+   * uses this to auto-switch its bottom tab to 日曆 so the user can drop
+   * onto the calendar without first switching tabs themselves.
+   */
+  onDragActivate?: () => void
   isDragging?: boolean
   showWorkspaceTag?: boolean
 }
@@ -43,6 +49,7 @@ function TaskRowImpl({
   onToggleComplete,
   onSelect,
   onSendToCalendar,
+  onDragActivate,
   isDragging,
   showWorkspaceTag = false,
 }: TaskRowProps) {
@@ -71,31 +78,61 @@ function TaskRowImpl({
     onSelect(task)
   }
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.PointerEvent) => {
     if (!onSendToCalendar) return
-    if (e.button !== 0) return
+    if (e.button !== 0 && e.pointerType === 'mouse') return
     // Don't start a drag from interactive children (checkbox).
     if ((e.target as HTMLElement).closest('button')) return
 
     const startX = e.clientX
     const startY = e.clientY
     let activated = false
+    // For touch input we want a long-press before drag activates so the
+    // user can still scroll the task list with their finger. Mouse keeps
+    // the snappy 5px threshold.
+    const isTouch = e.pointerType === 'touch'
+    const longPressMs = 280
+    let longPressTimer: number | null = isTouch
+      ? window.setTimeout(() => {
+          longPressTimer = null
+          // Long-press fires only if the finger hasn't already moved past
+          // threshold (in which case we'll treat it as a scroll, not a drag).
+          if (!activated && stillInThreshold) {
+            activated = true
+            setExternalDragActive(true)
+            onDragActivate?.()
+          }
+        }, longPressMs)
+      : null
+    let stillInThreshold = true
 
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX
       const dy = ev.clientY - startY
-      if (!activated && Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
-        activated = true
-        setExternalDragActive(true)
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist > DRAG_THRESHOLD) {
+        stillInThreshold = false
+        // Touch: only start drag via long-press timer; finger-drag without
+        // hold = scroll. Mouse: any movement past threshold activates.
+        if (!activated && !isTouch) {
+          activated = true
+          setExternalDragActive(true)
+          onDragActivate?.()
+        }
       }
       if (activated) {
         setGhostPos({ x: ev.clientX, y: ev.clientY })
       }
     }
 
-    const onUp = (ev: MouseEvent) => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      if (longPressTimer != null) {
+        window.clearTimeout(longPressTimer)
+        longPressTimer = null
+      }
 
       if (!activated) {
         // No drag — leave the trailing click alone so onSelect can fire.
@@ -126,8 +163,9 @@ function TaskRowImpl({
       onSendToCalendar(task.id, hit.date, minutesToTime(start), minutesToTime(end))
     }
 
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }
 
   // Floating ghost portal — only rendered while a drag is active. Lives in
@@ -156,7 +194,7 @@ function TaskRowImpl({
       <>
         <div
           data-tour="task-row"
-          onMouseDown={handleMouseDown}
+          onPointerDown={handleMouseDown}
           onClick={handleRowClick}
           className={cn(
             'flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-all duration-150 rounded-md select-none',
@@ -246,7 +284,7 @@ function TaskRowImpl({
           borderLeftWidth: '3px',
           borderLeftColor: colors.accentColor,
         }}
-        onMouseDown={handleMouseDown}
+        onPointerDown={handleMouseDown}
         onClick={handleRowClick}
       >
         {/* Drag Handle */}

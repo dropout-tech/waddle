@@ -87,15 +87,14 @@ function TaskBlockImpl({
     onToggleComplete?.(task.id)
   }
 
-  // Track mousedown to distinguish a click (open task) from a drag (move/resize).
-  // If mouseup happens with minimal movement and within ~300ms, treat as click.
+  // Track press origin to distinguish a click (open task) from a drag.
+  // Pointer events handle both mouse and touch identically.
   const pressOrigin = useRef<{ x: number; y: number; t: number } | null>(null)
 
-  const handleBodyMouseDown = (e: React.MouseEvent) => {
+  const handleBodyPointerDown = (e: React.PointerEvent) => {
     if (!onDragStart) return
-    if (e.button !== 0) return
+    if (e.button !== 0 && e.pointerType === 'mouse') return
     e.stopPropagation()
-    e.preventDefault()
     pressOrigin.current = { x: e.clientX, y: e.clientY, t: Date.now() }
     const blockEl = (e.currentTarget as HTMLElement).closest('[data-task-block]') as HTMLElement
     const blockRect = blockEl?.getBoundingClientRect()
@@ -111,7 +110,7 @@ function TaskBlockImpl({
     })
   }
 
-  const handleBodyMouseUp = (e: React.MouseEvent) => {
+  const handleBodyPointerUp = (e: React.PointerEvent) => {
     const origin = pressOrigin.current
     pressOrigin.current = null
     if (!origin) return
@@ -120,18 +119,15 @@ function TaskBlockImpl({
     const dist = Math.sqrt(dx * dx + dy * dy)
     const elapsed = Date.now() - origin.t
     // Click threshold: 5px movement, 300ms.
-    // Don't stopPropagation — parent's grid mouseup must still run to clear
-    // activeTaskDrag state. Its no-op onRescheduleTask call (same values) is
-    // harmless; only bumps updatedAt. We then open the detail modal.
     if (dist < 5 && elapsed < 300) {
       onSelect(task)
     }
   }
 
-  const handleResizeTopMouseDown = (e: React.MouseEvent) => {
+  const handleResizeTopPointerDown = (e: React.PointerEvent) => {
     if (!onDragStart) return
+    if (e.button !== 0 && e.pointerType === 'mouse') return
     e.stopPropagation()
-    e.preventDefault()
     onDragStart({
       taskId: task.id,
       dragType: 'resize-top',
@@ -143,10 +139,10 @@ function TaskBlockImpl({
     })
   }
 
-  const handleResizeBottomMouseDown = (e: React.MouseEvent) => {
+  const handleResizeBottomPointerDown = (e: React.PointerEvent) => {
     if (!onDragStart) return
+    if (e.button !== 0 && e.pointerType === 'mouse') return
     e.stopPropagation()
-    e.preventDefault()
     onDragStart({
       taskId: task.id,
       dragType: 'resize-bottom',
@@ -213,7 +209,8 @@ function TaskBlockImpl({
       {/* Resize handle — TOP */}
       <div
         className="absolute top-0 left-0 right-0 h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-        onMouseDown={handleResizeTopMouseDown}
+        onPointerDown={handleResizeTopPointerDown}
+        style={{ touchAction: 'none' }}
       >
         <div className="w-6 h-0.5 bg-white/60 rounded-full" />
       </div>
@@ -224,8 +221,9 @@ function TaskBlockImpl({
           'h-full flex flex-col',
           totalColumns > 1 ? 'p-1.5 pt-2 gap-0.5' : 'p-2 pt-3'
         )}
-        onMouseDown={handleBodyMouseDown}
-        onMouseUp={handleBodyMouseUp}
+        onPointerDown={handleBodyPointerDown}
+        onPointerUp={handleBodyPointerUp}
+        style={{ touchAction: 'none' }}
         title={`${task.title} · ${formatTime(task.scheduledStartTime!)}–${formatTime(task.scheduledEndTime!)}`}
       >
         {/* Top Row: Checkbox + Title */}
@@ -235,7 +233,7 @@ function TaskBlockImpl({
               role="checkbox"
               aria-checked={task.isCompleted}
               aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
-              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={handleCheckboxClick}
               className={cn(
                 'mt-0.5 w-3.5 h-3.5 rounded-full border-[1.5px] border-white/60 flex items-center justify-center transition-all',
@@ -319,7 +317,8 @@ function TaskBlockImpl({
       {/* Resize handle — BOTTOM */}
       <div
         className="absolute bottom-0 left-0 right-0 h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-        onMouseDown={handleResizeBottomMouseDown}
+        onPointerDown={handleResizeBottomPointerDown}
+        style={{ touchAction: 'none' }}
       >
         <div className="w-6 h-0.5 bg-white/60 rounded-full" />
       </div>

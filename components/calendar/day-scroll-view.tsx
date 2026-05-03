@@ -316,7 +316,7 @@ export function DayScrollView({
     // React's render phase and trip "setState during render" warnings.
     let dragState: ActiveTaskDrag | null = null
 
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX
       const dy = ev.clientY - startY
       if (!movedBeyondThreshold && Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
@@ -361,9 +361,10 @@ export function DayScrollView({
       setHoveredPendingZoneDate(prev => prev === hoveredDate ? prev : hoveredDate)
     }
 
-    const onUp = (ev: MouseEvent) => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
 
       if (!movedBeyondThreshold || !dragState) {
         // Click. activeTaskDrag was never set — TaskBlock's own onMouseUp
@@ -403,16 +404,16 @@ export function DayScrollView({
       setTimeout(() => { dragEndCooldown.current = false }, 300)
     }
 
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask])
 
   // Pending task drag — same window-level pattern. Drag preview only activates
   // after the cursor moves past the threshold, so a plain click on a pending
   // task opens the detail modal (via the React onClick) without scheduling.
-  const handlePendingTaskMouseDown = useCallback((task: Task, e: React.MouseEvent) => {
-    if (e.button !== 0) return
-    e.preventDefault()
+  const handlePendingTaskMouseDown = useCallback((task: Task, e: React.PointerEvent) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return
     e.stopPropagation()
 
     const startX = e.clientX
@@ -424,7 +425,7 @@ export function DayScrollView({
     let lastDayIndex = 0
     let lastMinutes = 0
 
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX
       const dy = ev.clientY - startY
       if (!movedBeyondThreshold && Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
@@ -456,9 +457,10 @@ export function DayScrollView({
       setHoveredPendingZoneDate(prev => prev === hoveredDate ? prev : hoveredDate)
     }
 
-    const onUp = (ev: MouseEvent) => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
 
       if (!movedBeyondThreshold) {
         // Click — let onClick fire normally to open the detail modal.
@@ -497,11 +499,12 @@ export function DayScrollView({
       setTimeout(() => { dragEndCooldown.current = false }, 300)
     }
 
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask])
 
-  const handleMouseDown = useCallback((e: React.MouseEvent, dayIndex: number) => {
+  const handleMouseDown = useCallback((e: React.PointerEvent, dayIndex: number) => {
     if ((e.target as HTMLElement).closest('[data-block]')) return
     if (e.button !== 0) return
     const rect = e.currentTarget.getBoundingClientRect()
@@ -517,7 +520,7 @@ export function DayScrollView({
   }, [])
 
   // Handle mouse move for new-slot drag (per column)
-  const handleMouseMove = useCallback((e: React.MouseEvent, dayIndex: number) => {
+  const handleMouseMove = useCallback((e: React.PointerEvent, dayIndex: number) => {
     if (activeTaskDrag || pendingTaskDrag) return // handled by window listeners
     if (!isDragging || !dragStart) return
     const rect = e.currentTarget.getBoundingClientRect()
@@ -525,7 +528,7 @@ export function DayScrollView({
     setDragEnd({ day: dayIndex, y })
   }, [isDragging, dragStart, activeTaskDrag, pendingTaskDrag])
 
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+  const handleMouseUp = useCallback((e: React.PointerEvent) => {
     // Task-block and pending-task drags are committed by window-level listeners
     // installed in handleTaskDragStart / handlePendingTaskMouseDown. This
     // handler only owns the "drag on empty grid to create a new slot" flow.
@@ -619,24 +622,26 @@ export function DayScrollView({
   const resizeStartY = useRef(0)
   const resizeStartH = useRef(0)
 
-  const handleHeaderResizeStart = useCallback((e: React.MouseEvent) => {
+  const handleHeaderResizeStart = useCallback((e: React.PointerEvent) => {
     e.preventDefault()
     isResizingHeader.current = true
     resizeStartY.current = e.clientY
     resizeStartH.current = headerHeight
 
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       if (!isResizingHeader.current) return
       const delta = ev.clientY - resizeStartY.current
       setHeaderHeight(Math.max(HEADER_MIN, Math.min(HEADER_MAX, resizeStartH.current + delta)))
     }
     const onUp = () => {
       isResizingHeader.current = false
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
     }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }, [headerHeight, HEADER_MIN])
 
   return (
@@ -736,7 +741,7 @@ export function DayScrollView({
                         return (
                           <div
                             key={task.id}
-                            onMouseDown={(e) => handlePendingTaskMouseDown(task, e)}
+                            onPointerDown={(e) => handlePendingTaskMouseDown(task, e)}
                             onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
                             className={cn(
                               'w-full flex-shrink-0 text-left px-2 py-1 rounded text-[11px] font-medium truncate cursor-grab active:cursor-grabbing select-none',
@@ -749,6 +754,7 @@ export function DayScrollView({
                             style={{
                               backgroundColor: task.calendarColor || task.workspaceColor,
                               color: '#fff',
+                              touchAction: 'none',
                             }}
                           >
                             <span className="flex items-center gap-1.5 min-w-0">
@@ -784,7 +790,8 @@ export function DayScrollView({
         {/* Drag handle */}
         <div
           className="flex-shrink-0 h-2 flex items-center justify-center cursor-row-resize group select-none border-t border-border/40 hover:border-primary/40 transition-colors"
-          onMouseDown={handleHeaderResizeStart}
+          onPointerDown={handleHeaderResizeStart}
+          style={{ touchAction: 'none' }}
         >
           <div className="w-8 h-0.5 rounded-full bg-border group-hover:bg-primary/50 transition-colors" />
         </div>
@@ -835,10 +842,10 @@ export function DayScrollView({
                   isToday && 'bg-primary/5'
                 )}
                 style={{ width: `${DAY_WIDTH}px`, minWidth: `${DAY_WIDTH}px` }}
-                onMouseDown={(e) => handleMouseDown(e, dayIndex)}
-                onMouseMove={(e) => handleMouseMove(e, dayIndex)}
-                onMouseUp={(e) => handleMouseUp(e)}
-                onMouseLeave={(e) => { if (isDragging) handleMouseUp(e) }}
+                onPointerDown={(e) => handleMouseDown(e, dayIndex)}
+                onPointerMove={(e) => handleMouseMove(e, dayIndex)}
+                onPointerUp={(e) => handleMouseUp(e)}
+                onPointerLeave={(e) => { if (isDragging) handleMouseUp(e) }}
               >
                 {/* Hour lines */}
                 {hours.map((hour) => (
@@ -967,7 +974,7 @@ export function DayScrollView({
           <>
           <div
             className="fixed inset-0 z-30"
-            onMouseDown={(e) => { e.stopPropagation(); setPendingSlot(null); setSelectedParent(null) }}
+            onPointerDown={(e) => { e.stopPropagation(); setPendingSlot(null); setSelectedParent(null) }}
           />
           <div
             ref={popoverRef}
@@ -979,7 +986,7 @@ export function DayScrollView({
               left: `${popoverPos?.left ?? -9999}px`,
               top: `${popoverPos?.top ?? -9999}px`,
             }}
-            onMouseDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
           >
             {/* Pick a slot type. Workspace types open the full TaskDetailModal in create mode. */}
             <div className="flex items-center justify-between mb-2.5">

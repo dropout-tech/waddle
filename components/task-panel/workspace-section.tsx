@@ -17,6 +17,7 @@ interface WorkspaceSectionProps {
   onAddCategory?: (workspaceId: string, name: string) => void
   onDeleteCategory?: (categoryId: string) => void
   onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
+  onTaskDragActivate?: () => void
 }
 
 export function WorkspaceSection({
@@ -30,6 +31,7 @@ export function WorkspaceSection({
   onAddCategory,
   onDeleteCategory,
   onSendTaskToCalendar,
+  onTaskDragActivate,
 }: WorkspaceSectionProps) {
   const [isAddingCategory, setIsAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -98,6 +100,7 @@ export function WorkspaceSection({
               onAddTask={onAddTask}
               onDelete={onDeleteCategory}
               onSendTaskToCalendar={onSendTaskToCalendar}
+              onTaskDragActivate={onTaskDragActivate}
             />
           ))}
 

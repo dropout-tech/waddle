@@ -162,7 +162,7 @@ export function ReportModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="w-screen h-[100dvh] max-w-none rounded-none border-0 p-4 overflow-hidden flex flex-col md:w-full md:h-auto md:max-w-2xl md:max-h-[85vh] md:rounded-2xl md:border md:p-6">
         <DialogHeader className="pb-2">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <BarChart3 className="w-5 h-5 text-primary" />

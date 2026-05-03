@@ -17,6 +17,8 @@ interface CategorySectionProps {
   onAddTask: (categoryId: string, title: string) => void
   onDelete?: (categoryId: string) => void
   onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
+  /** Mobile: forwards to TaskRow so drag-activation can switch the bottom tab. */
+  onTaskDragActivate?: () => void
 }
 
 export function CategorySection({
@@ -29,6 +31,7 @@ export function CategorySection({
   onAddTask,
   onDelete,
   onSendTaskToCalendar,
+  onTaskDragActivate,
 }: CategorySectionProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -128,6 +131,7 @@ export function CategorySection({
               onToggleComplete={onToggleComplete}
               onSelect={onSelectTask}
               onSendToCalendar={onSendTaskToCalendar}
+              onDragActivate={onTaskDragActivate}
             />
           ))}
 

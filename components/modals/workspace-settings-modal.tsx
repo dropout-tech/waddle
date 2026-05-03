@@ -127,12 +127,13 @@ export function WorkspaceSettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
 
-      <div className="relative bg-card rounded-2xl shadow-2xl border border-border w-full max-w-sm mx-4 overflow-hidden flex flex-col max-h-[90dvh]">
+      {/* Modal — full-screen sheet on mobile, centered card on desktop */}
+      <div className="relative bg-card w-full h-[100dvh] flex flex-col overflow-hidden md:h-auto md:max-h-[90dvh] md:max-w-sm md:mx-4 md:rounded-2xl md:shadow-2xl md:border md:border-border">
 
         {/* Color accent top bar */}
         <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
