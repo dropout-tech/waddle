@@ -85,7 +85,9 @@ export function PanelHeader({
   }
 
   return (
-    <div className="relative px-5 py-4 border-b border-border bg-card">
+    // Right padding leaves room for the floating UserMenu (top-3 right-3,
+    // ~40px wide) so its avatar doesn't sit on top of the header buttons.
+    <div className="relative pl-5 pr-14 py-4 border-b border-border bg-card">
       {/* Collapsed Mode - Single compact row */}
       {isHeaderCollapsed ? (
         <div className="flex items-center justify-between">

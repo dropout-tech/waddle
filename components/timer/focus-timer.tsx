@@ -9,6 +9,7 @@ import {
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { useIsMobile } from '@/hooks/use-mobile'
 import type { Task, Workspace } from '@/lib/types'
 import { toDateString } from '@/lib/calendar-utils'
 
@@ -44,6 +45,7 @@ const FOCUS_TYPES = [
 ]
 
 export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
+  const isMobile = useIsMobile()
   const [isExpanded, setIsExpanded] = useState(false)
   const [mode, setMode] = useState<TimerMode>('pomodoro')
   const [state, setState] = useState<TimerState>('idle')
@@ -212,10 +214,12 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
       {/* Hidden audio element for completion sound */}
       <audio ref={audioRef} src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6YjHhsa3N/ipWXkYZ6c3Z/ipOUjYN5dXh/ho2PioB3c3Z7goqMiYB2c3V6gIeLiYF3c3V5f4WJh4B2cnR4fYOHhX92cXN3e4GFg352cXJ2eX+DgX12cHF1d3yAf3x1cHBzdXl8fnt0cG9xcnV4e3p4c29ucXJ0dnh3dnJub3BxcnR2dnVyb25vcHFydHV0c29ubm9wcXJzdHNyb25ubm9wcXJyc3JwbmxubW9wb3BwcW9ubGxtbW5vb29wb25sbGxsbW1ubm5vbm1sa2tsbGxtbW1tbWxra2pqa2tsbGxsbGtqamppamtqa2tqaWlpaWlpamppaWlpaGhoaGhpaWhoaGdnZ2dnZ2doZ2dnZmZmZmZmZmdmZmZlZWVlZWVlZWVlZGRkZGRkZGRkZGRjY2NjY2NjY2NjYmJiYmJiYmJiYmJhYWFhYWFhYWFhYGBgYGBgYGBgYGBfX19fX19fX19fXl5eXl5eXl5eXl5dXV1dXV1dXV1dXFxcXFxcXFxcXFtbW1tbW1tbW1taWlpaWlpaWlpaWllZWVlZWVlZWVlYWFhYWFhYWFhYV1dXV1dXV1dXV1ZWVlZWVlZWVlZVVVVVVVVVVVVVVFRUVFRUVFRUVFNTU1NTU1NTU1NSUlJSUlJSUlJSUVFRUVFRUVFRUVBQUFBQUFBQUFBPT09PT09PT09PTk5OTk5OTk5OTk1NTU1NTU1NTU1MTExMTExMTExMS0tLS0tLS0tLS0pKSkpKSkpKSkpJSUlJSUlJSUlJSEhISEhISEhISEdHR0dHR0dHR0dGRkZGRkZGRkZGRUVFRUVFRUVFRURERERERERERENDQ0NDQ0NDQ0NCQkJCQkJCQkJCQUFBQUFBQUFBQUBAQEBAQEBAQEA/Pz8/Pz8/Pz8+Pj4+Pj4+Pj4+PT09PT09PT09PTw8PDw8PDw8PDw7Ozs7Ozs7Ozs7Ojo6Ojo6Ojo6Ojk5OTk5OTk5OTk4ODg4ODg4ODg4Nzc3Nzc3Nzc3NzY2NjY2NjY2NjY1NTU1NTU1NTU1NDQ0NDQ0NDQ0NDMzMzMzMzMzMzMyMjIyMjIyMjIyMTExMTExMTExMTAwMDAwMDAwMDAvLy8vLy8vLy8vLi4uLi4uLi4uLi0tLS0tLS0tLS0sLCwsLCwsLCwsKysrKysrKysrKyoqKioqKioqKiknJycnJycnJyc=" />
 
-      {/* Floating Timer Button/Widget */}
+      {/* Floating Timer Button/Widget — sits above the bottom tab bar
+          on mobile so it doesn't get covered. */}
       <div className={cn(
-        "fixed bottom-6 right-6 z-40 transition-all duration-300",
-        isExpanded ? "w-80" : "w-auto"
+        "fixed right-4 z-40 transition-all duration-300",
+        isMobile ? 'bottom-[78px]' : 'bottom-6 right-6',
+        isExpanded ? "w-80 max-w-[calc(100vw-2rem)]" : "w-auto"
       )}>
         {/* Expanded Panel */}
         {isExpanded ? (

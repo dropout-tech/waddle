@@ -1,17 +1,18 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
 import { FullScreenTaskView } from '@/components/task-panel/full-screen-task-view'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
-import { PanelLeftOpen, BookOpen, BarChart3, Minimize2 } from 'lucide-react'
+import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ListChecks, CalendarDays } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
 import { FocusScratchpad } from '@/components/scratchpad/focus-scratchpad'
 import { FocusTimer } from '@/components/timer/focus-timer'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { toDateString } from '@/lib/calendar-utils'
+import { useIsMobile } from '@/hooks/use-mobile'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings } from '@/lib/types'
 
 interface MainLayoutProps {
@@ -73,10 +74,19 @@ export function MainLayout({
   onUpdateTimeBlock,
   onDeleteTimeBlock,
 }: MainLayoutProps) {
+  const isMobile = useIsMobile()
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day')
-  
+
+  // Mobile single-panel tab. Only consulted when isMobile === true.
+  const [mobileTab, setMobileTab] = useState<'tasks' | 'calendar'>('calendar')
+
+  // Force day view on mobile — week/month grids don't fit a phone column.
+  useEffect(() => {
+    if (isMobile && viewMode !== 'day') setViewMode('day')
+  }, [isMobile, viewMode])
+
   // Sidebar visibility states
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true)
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true)
@@ -147,11 +157,150 @@ export function MainLayout({
     setFocusMode('report')
   }, [])
 
+  // ─── MOBILE LAYOUT ─────────────────────────────────────────────
+  // Single-panel layout: header (inside each panel) + active panel +
+  // bottom tab bar. Floating UserMenu still works at top-right.
+  if (isMobile) {
+    return (
+      <div className="flex flex-col h-[100dvh] bg-background overflow-hidden relative">
+        <FocusScratchpad />
+
+        <div className="flex-1 min-h-0 flex flex-col">
+          {focusMode !== 'none' ? (
+            // Journal/Report focus view full-screen on mobile too
+            <div className="flex flex-col h-full bg-background">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50 flex-shrink-0">
+                <div className="flex items-center gap-2.5">
+                  {focusMode === 'journal' ? (
+                    <>
+                      <BookOpen className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-semibold">日記</span>
+                    </>
+                  ) : (
+                    <>
+                      <BarChart3 className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-semibold">報告</span>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => setFocusMode('none')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                >
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  返回
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto p-4">
+                {focusMode === 'journal' ? (
+                  <JournalFocusView workspaces={workspaces} onClose={() => setFocusMode('none')} />
+                ) : (
+                  <ReportDashboard workspaces={workspaces} onClose={() => setFocusMode('none')} />
+                )}
+              </div>
+            </div>
+          ) : mobileTab === 'tasks' ? (
+            <ErrorBoundary>
+              <TaskPanel
+                workspaces={workspaces}
+                isExpanded={true}
+                onToggleCategoryCollapse={onToggleCategoryCollapse}
+                onToggleComplete={onToggleComplete}
+                onSelectTask={onSelectTask}
+                onAddTask={onAddTask}
+                onAddCategory={onAddCategory}
+                onDeleteCategory={onDeleteCategory}
+                onSendTaskToCalendar={onSendTaskToCalendar}
+                onAddWorkspace={onAddWorkspace}
+                onUpdateWorkspaceColor={onUpdateWorkspaceColor}
+                onUpdateWorkspace={onUpdateWorkspace}
+                onDeleteWorkspace={onDeleteWorkspace}
+                onArchiveWorkspace={onArchiveWorkspace}
+                onOpenSettings={onOpenSettings}
+              />
+            </ErrorBoundary>
+          ) : (
+            <ErrorBoundary>
+              <CalendarPanel
+                selectedDate={selectedDate}
+                viewMode="day"
+                pendingTasks={pendingTasks}
+                scheduledTasks={scheduledTasks}
+                allTasks={allTasks}
+                timeBlocks={filteredTimeBlocks}
+                slotTypes={slotTypes}
+                workspaces={workspaces}
+                startHour={startHour}
+                endHour={endHour}
+                hourHeight={hourHeight}
+                zoomLevel={zoomLevel}
+                onZoomChange={setZoomLevel}
+                onDateChange={setSelectedDate}
+                onViewModeChange={setViewMode}
+                onTaskSelect={onSelectTask}
+                onToggleComplete={onToggleComplete}
+                onCreateTask={onCreateCalendarTask}
+                onCreatePendingTask={onCreatePendingTask}
+                onCreateTimeBlock={onCreateCalendarTimeBlock}
+                onOpenCreateTask={onOpenCreateTask}
+                onRescheduleTask={onRescheduleTask}
+                onUnscheduleTask={onUnscheduleTask}
+                onUpdateTimeBlock={onUpdateTimeBlock}
+                onDeleteTimeBlock={onDeleteTimeBlock}
+                onOpenJournal={handleOpenJournalFocus}
+                onOpenReport={handleOpenReportFocus}
+                onOpenSettings={onOpenSettings}
+                leftPanelOpen={true}
+              />
+            </ErrorBoundary>
+          )}
+        </div>
+
+        {/* Bottom Tab Bar (hidden during focus mode) */}
+        {focusMode === 'none' && (
+          <nav className="flex-shrink-0 grid grid-cols-2 border-t border-border bg-card/95 backdrop-blur z-30 pb-[env(safe-area-inset-bottom)]" role="tablist" aria-label="主要分頁">
+            <button
+              role="tab"
+              aria-selected={mobileTab === 'tasks'}
+              onClick={() => setMobileTab('tasks')}
+              className={cn(
+                'flex flex-col items-center justify-center gap-1 py-2.5 transition-colors',
+                mobileTab === 'tasks' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <ListChecks className="w-5 h-5" />
+              <span className="text-[11px] font-medium">任務</span>
+            </button>
+            <button
+              role="tab"
+              aria-selected={mobileTab === 'calendar'}
+              onClick={() => setMobileTab('calendar')}
+              className={cn(
+                'flex flex-col items-center justify-center gap-1 py-2.5 transition-colors',
+                mobileTab === 'calendar' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <CalendarDays className="w-5 h-5" />
+              <span className="text-[11px] font-medium">日曆</span>
+            </button>
+          </nav>
+        )}
+
+        {/* Floating widgets — repositioned for mobile */}
+        <FocusTimer
+          workspaces={workspaces}
+          onCreateTimeBlock={onCreateCalendarTimeBlock}
+        />
+      </div>
+    )
+  }
+
+  // ─── DESKTOP LAYOUT ────────────────────────────────────────────
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden relative">
       {/* Focus Scratchpad - Pull down from top */}
       <FocusScratchpad />
-      
+
       <div className="flex flex-1 min-h-0 relative">
       {/* Left Panel Toggle Button (when panel is closed) */}
       {!isLeftPanelOpen && (

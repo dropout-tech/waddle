@@ -31,6 +31,47 @@ import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
 
+type TaskSortKey = 'category' | 'dueDate' | 'urgency' | 'created'
+
+/**
+ * Returns a new array of tasks sorted according to the chosen key.
+ *
+ * Used in two places: the flat list view (sorts the whole list) and the
+ * grouped view (sorts within each category). 'category' is a no-op for the
+ * grouped view because tasks are already grouped by workspace+category;
+ * the flat list version uses workspace/category names as the sort key
+ * instead, but for grouped per-category lists we just preserve insertion
+ * order (which already follows sortOrder).
+ */
+function applySortBy(tasks: Task[], sortBy: TaskSortKey): Task[] {
+  const sorted = [...tasks]
+  switch (sortBy) {
+    case 'urgency':
+      sorted.sort((a, b) => (b.urgency || 0) - (a.urgency || 0))
+      break
+    case 'dueDate':
+      sorted.sort((a, b) => {
+        if (!a.dueDate && !b.dueDate) return 0
+        if (!a.dueDate) return 1
+        if (!b.dueDate) return -1
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+      })
+      break
+    case 'created':
+      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      break
+    case 'category':
+    default:
+      sorted.sort((a, b) => {
+        const ws = (a.workspaceName || '').localeCompare(b.workspaceName || '')
+        if (ws !== 0) return ws
+        return (a.categoryName || '').localeCompare(b.categoryName || '')
+      })
+      break
+  }
+  return sorted
+}
+
 interface FullScreenTaskViewProps {
   workspaces: Workspace[]
   onTaskClick?: (task: Task) => void
@@ -185,36 +226,7 @@ export function FullScreenTaskView({
     }
 
     // Apply sort. Returns a new array — don't mutate the source filter result.
-    const sorted = [...tasks]
-    switch (sortBy) {
-      case 'urgency':
-        // High urgency first; missing urgency treated as 0
-        sorted.sort((a, b) => (b.urgency || 0) - (a.urgency || 0))
-        break
-      case 'dueDate':
-        // Earliest due first; tasks without due date sink to the bottom
-        sorted.sort((a, b) => {
-          if (!a.dueDate && !b.dueDate) return 0
-          if (!a.dueDate) return 1
-          if (!b.dueDate) return -1
-          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-        })
-        break
-      case 'created':
-        // Newest first
-        sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        break
-      case 'category':
-      default:
-        // Workspace → category → original order
-        sorted.sort((a, b) => {
-          const ws = a.workspaceName.localeCompare(b.workspaceName)
-          if (ws !== 0) return ws
-          return a.categoryName.localeCompare(b.categoryName)
-        })
-        break
-    }
-    return sorted
+    return applySortBy(tasks, sortBy)
   }, [allTasks, taskFilter, selectedWorkspace, searchQuery, sortBy, todayStr, now, workspaces])
 
   // Workspace stats
@@ -842,7 +854,12 @@ export function FullScreenTaskView({
                       {isExpanded && (
                         <div className="border-t border-border">
                           {workspace.categories?.filter(cat => !cat.isArchived).map(category => {
-                            const catTasks = wsTasks.filter(t => t.categoryId === category.id)
+                            // Apply the same sort key inside each category so the
+                            // sort dropdown actually does something in grouped view.
+                            const catTasks = applySortBy(
+                              wsTasks.filter(t => t.categoryId === category.id),
+                              sortBy
+                            )
                             if (catTasks.length === 0 && addingTaskInCategory !== category.id) return null
                             const isCatExpanded = expandedCategories.has(category.id)
                             

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Keyboard, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 interface ShortcutGroup {
   title: string
@@ -52,6 +53,13 @@ const GROUPS: ShortcutGroup[] = [
 ]
 
 export function KeyboardShortcutsHint() {
+  const isMobile = useIsMobile()
+  // Phones don't have keyboards; the hint is irrelevant noise on mobile.
+  if (isMobile) return null
+  return <KeyboardShortcutsHintInner />
+}
+
+function KeyboardShortcutsHintInner() {
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
