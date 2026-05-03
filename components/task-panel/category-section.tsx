@@ -16,6 +16,7 @@ interface CategorySectionProps {
   onSelectTask: (task: Task) => void
   onAddTask: (categoryId: string, title: string) => void
   onDelete?: (categoryId: string) => void
+  onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
 }
 
 export function CategorySection({
@@ -27,6 +28,7 @@ export function CategorySection({
   onSelectTask,
   onAddTask,
   onDelete,
+  onSendTaskToCalendar,
 }: CategorySectionProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -125,6 +127,7 @@ export function CategorySection({
               metaOrder={metaOrder}
               onToggleComplete={onToggleComplete}
               onSelect={onSelectTask}
+              onSendToCalendar={onSendTaskToCalendar}
             />
           ))}
 

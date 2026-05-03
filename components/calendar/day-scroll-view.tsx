@@ -826,6 +826,10 @@ export function DayScrollView({
             return (
               <div
                 key={dateStr}
+                data-day-grid
+                data-day-date={dateStr}
+                data-hour-height={hourHeight}
+                data-start-minute={MIN}
                 className={cn(
                   'relative border-r border-border last:border-r-0 cursor-crosshair',
                   isToday && 'bg-primary/5'

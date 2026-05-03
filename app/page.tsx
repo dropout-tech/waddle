@@ -215,6 +215,19 @@ export default function WaddlePage() {
     return rescheduleTask(taskId, date, newStart, newEnd)
   }, [rescheduleTask])
 
+  // Drag-from-task-row handler: drop on grid → schedule, drop on pending
+  // zone → just set the date (still pending). Routes to existing mutations.
+  const handleSendToCalendar = useCallback(
+    (taskId: string, date: string, startTime?: string, endTime?: string) => {
+      if (startTime && endTime) {
+        rescheduleTask(taskId, date, startTime, endTime)
+      } else {
+        unscheduleTask(taskId, date)
+      }
+    },
+    [rescheduleTask, unscheduleTask]
+  )
+
   const handleCreatePendingTask = useCallback(async (title: string) => {
     const firstWorkspace = workspaces[0]
     const firstCategory = firstWorkspace?.categories[0]
@@ -300,6 +313,7 @@ export default function WaddlePage() {
         onAddTask={addTask}
         onAddCategory={addCategory}
         onDeleteCategory={deleteCategory}
+        onSendTaskToCalendar={handleSendToCalendar}
         onAddWorkspace={addWorkspace}
         onUpdateWorkspaceColor={updateWorkspaceColor}
         onUpdateWorkspace={updateWorkspace}

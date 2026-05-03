@@ -35,6 +35,48 @@ export function snap(minutes: number, step: number = SNAP_MINUTES): number {
   return Math.round(minutes / step) * step
 }
 
+/**
+ * Result of hit-testing a viewport coordinate against the calendar's day
+ * grid + pending zones. Used by external drag sources (e.g. dragging a task
+ * row from the left panel onto the calendar) to figure out where the drop
+ * should land without each source needing knowledge of the calendar's
+ * internal layout. Day columns and pending zones expose the data
+ * attributes consumed below.
+ */
+export type CalendarHit =
+  | { kind: 'pending'; date: string }
+  | { kind: 'grid'; date: string; minutes: number }
+  | null
+
+export function calendarHitTest(clientX: number, clientY: number): CalendarHit {
+  const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null
+  if (!el) return null
+
+  // Pending zone takes precedence — it sits in the calendar header above the
+  // grid, so a cursor at the same X but in the header should resolve here.
+  const pendingEl = el.closest('[data-pending-zone]') as HTMLElement | null
+  if (pendingEl) {
+    const date = pendingEl.getAttribute('data-pending-zone-date')
+    if (date) return { kind: 'pending', date }
+  }
+
+  const gridEl = el.closest('[data-day-grid]') as HTMLElement | null
+  if (gridEl) {
+    const date = gridEl.getAttribute('data-day-date')
+    const hourHeight = Number(gridEl.getAttribute('data-hour-height') ?? 0)
+    const startMinute = Number(gridEl.getAttribute('data-start-minute') ?? 0)
+    if (date && hourHeight > 0) {
+      const rect = gridEl.getBoundingClientRect()
+      const yInGrid = clientY - rect.top
+      const minutes = startMinute + (yInGrid / hourHeight) * 60
+      const snapped = Math.max(startMinute, snap(minutes))
+      return { kind: 'grid', date, minutes: snapped }
+    }
+  }
+
+  return null
+}
+
 export function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val))
 }

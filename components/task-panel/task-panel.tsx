@@ -30,6 +30,7 @@ interface TaskPanelProps {
   onAddTask: (categoryId: string, title: string) => void
   onAddCategory?: (workspaceId: string, name: string) => void
   onDeleteCategory?: (categoryId: string) => void
+  onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
   onAddWorkspace?: (name: string, color: string, icon: string) => void
   onUpdateWorkspaceColor?: (workspaceId: string, color: string) => void
   onUpdateWorkspace?: (workspaceId: string, updates: Partial<Pick<import('@/lib/types').Workspace, 'name' | 'color' | 'icon'>>) => void
@@ -50,6 +51,7 @@ export function TaskPanel({
   onAddTask,
   onAddCategory,
   onDeleteCategory,
+  onSendTaskToCalendar,
   onAddWorkspace,
   onUpdateWorkspaceColor,
   onUpdateWorkspace,
@@ -266,6 +268,7 @@ export function TaskPanel({
                 onAddTask={onAddTask}
                 onAddCategory={onAddCategory}
                 onDeleteCategory={onDeleteCategory}
+                onSendTaskToCalendar={onSendTaskToCalendar}
               />
             </div>
           ))
