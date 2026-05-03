@@ -298,6 +298,11 @@ export function WeekView({
     const startX = info.startX
     const startY = info.startY
     let movedBeyondThreshold = false
+    // Closure-local mirror of activeTaskDrag. Side effects at mouseup read
+    // from this rather than from a functional setState callback — calling
+    // parent setters inside setActiveTaskDrag(curr => ...) would run during
+    // React's render phase and trip "setState during render" warnings.
+    let dragState: ActiveTaskDrag | null = null
 
     const onMove = (ev: MouseEvent) => {
       const dx = ev.clientX - startX
@@ -305,14 +310,15 @@ export function WeekView({
       if (!movedBeyondThreshold && Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
         movedBeyondThreshold = true
         isDraggingTaskRef.current = true
-        setActiveTaskDrag({
+        dragState = {
           ...info,
           currentStart: info.originalStart,
           currentEnd: info.originalEnd,
           dayIndex,
-        })
+        }
+        setActiveTaskDrag(dragState)
       }
-      if (!movedBeyondThreshold) return
+      if (!movedBeyondThreshold || !dragState) return
 
       const scrollContainer = scrollContainerRef.current
       if (!scrollContainer) return
@@ -323,29 +329,24 @@ export function WeekView({
       const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
       const minutes = snap(MIN + mouseYInContent)
 
-      setActiveTaskDrag(prev => {
-        if (!prev) return prev
-        const duration = prev.originalEnd - prev.originalStart
-        if (prev.dragType === 'move') {
-          const newStart = clamp(snap(minutes - prev.offsetY), MIN, MAX - 15)
-          const newEnd = clamp(newStart + duration, MIN + 15, MAX)
-          return { ...prev, dayIndex: newDayIndex, currentStart: newStart, currentEnd: newEnd }
-        }
-        if (prev.dragType === 'resize-top') {
-          return { ...prev, currentStart: clamp(snap(minutes), MIN, prev.currentEnd - 15) }
-        }
-        if (prev.dragType === 'resize-bottom') {
-          return { ...prev, currentEnd: clamp(snap(minutes), prev.currentStart + 15, MAX) }
-        }
-        return prev
-      })
+      const duration = dragState.originalEnd - dragState.originalStart
+      if (dragState.dragType === 'move') {
+        const newStart = clamp(snap(minutes - dragState.offsetY), MIN, MAX - 15)
+        const newEnd = clamp(newStart + duration, MIN + 15, MAX)
+        dragState = { ...dragState, dayIndex: newDayIndex, currentStart: newStart, currentEnd: newEnd }
+      } else if (dragState.dragType === 'resize-top') {
+        dragState = { ...dragState, currentStart: clamp(snap(minutes), MIN, dragState.currentEnd - 15) }
+      } else if (dragState.dragType === 'resize-bottom') {
+        dragState = { ...dragState, currentEnd: clamp(snap(minutes), dragState.currentStart + 15, MAX) }
+      }
+      setActiveTaskDrag(dragState)
     }
 
     const onUp = (ev: MouseEvent) => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
 
-      if (!movedBeyondThreshold) {
+      if (!movedBeyondThreshold || !dragState) {
         // Click. activeTaskDrag was never set — TaskBlock's own onMouseUp
         // opens the modal. Nothing to clean up here.
         return
@@ -354,24 +355,24 @@ export function WeekView({
       const target = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
       const overPending = target?.closest('[data-pending-zone]') as HTMLElement | null
 
-      setActiveTaskDrag(curr => {
-        if (!curr) return null
-        if (overPending) {
-          const pendingDate = overPending.getAttribute('data-pending-zone-date') ?? undefined
-          onUnscheduleTask?.(curr.taskId, pendingDate)
-        } else {
-          const dropTarget = allDates[curr.dayIndex]
-          if (dropTarget) {
-            onRescheduleTask?.(
-              curr.taskId,
-              toDateString(dropTarget),
-              minutesToTime(curr.currentStart),
-              minutesToTime(curr.currentEnd),
-            )
-          }
+      const finalState = dragState
+      setActiveTaskDrag(null)
+      dragState = null
+
+      if (overPending) {
+        const pendingDate = overPending.getAttribute('data-pending-zone-date') ?? undefined
+        onUnscheduleTask?.(finalState.taskId, pendingDate)
+      } else {
+        const dropTarget = allDates[finalState.dayIndex]
+        if (dropTarget) {
+          onRescheduleTask?.(
+            finalState.taskId,
+            toDateString(dropTarget),
+            minutesToTime(finalState.currentStart),
+            minutesToTime(finalState.currentEnd),
+          )
         }
-        return null
-      })
+      }
 
       isDraggingTaskRef.current = false
       dragEndCooldown.current = true
@@ -394,6 +395,9 @@ export function WeekView({
     const startY = e.clientY
     const duration = task.estimatedMinutes || 30
     let movedBeyondThreshold = false
+    // Closure-local mirror — same rationale as in handleTaskDragStart above.
+    let lastDayIndex = 0
+    let lastMinutes = 0
 
     const onMove = (ev: MouseEvent) => {
       const dx = ev.clientX - startX
@@ -410,13 +414,13 @@ export function WeekView({
       const mouseXInContent = ev.clientX - containerRect.left + scrollContainer.scrollLeft
       const mouseYInContent = ev.clientY - containerRect.top + scrollContainer.scrollTop
       const relX = mouseXInContent - TIME_COL_WIDTH
-      const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
-      const startMinutes = clamp(snap(MIN + Math.max(0, mouseYInContent)), MIN, MAX - 15)
+      lastDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
+      lastMinutes = clamp(snap(MIN + Math.max(0, mouseYInContent)), MIN, MAX - 15)
 
       setPendingTaskDrag({
         task,
-        currentDayIndex: newDayIndex,
-        currentMinutes: startMinutes,
+        currentDayIndex: lastDayIndex,
+        currentMinutes: lastMinutes,
         duration,
       })
     }
@@ -433,22 +437,20 @@ export function WeekView({
       const target = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
       const overPending = target?.closest('[data-pending-zone]')
 
-      setPendingTaskDrag(curr => {
-        if (!curr) return null
-        // Drop back over the pending zone is a no-op.
-        if (!overPending) {
-          const dropTarget = allDates[curr.currentDayIndex]
-          if (dropTarget) {
-            onRescheduleTask?.(
-              curr.task.id,
-              toDateString(dropTarget),
-              minutesToTime(curr.currentMinutes),
-              minutesToTime(curr.currentMinutes + curr.duration),
-            )
-          }
+      setPendingTaskDrag(null)
+
+      // Drop back over the pending zone is a no-op (still pending).
+      if (!overPending) {
+        const dropTarget = allDates[lastDayIndex]
+        if (dropTarget) {
+          onRescheduleTask?.(
+            task.id,
+            toDateString(dropTarget),
+            minutesToTime(lastMinutes),
+            minutesToTime(lastMinutes + duration),
+          )
         }
-        return null
-      })
+      }
 
       isDraggingTaskRef.current = false
       dragEndCooldown.current = true
