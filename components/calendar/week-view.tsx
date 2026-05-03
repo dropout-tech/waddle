@@ -517,6 +517,8 @@ export function WeekView({
   const handleMouseMove = useCallback((e: React.PointerEvent, dayIndex: number) => {
     if (activeTaskDrag || pendingTaskDrag) return // handled by window listeners
     if (!isDragging || !dragStart) return
+    // Touch: don't update dragEnd. See day-scroll-view for full rationale.
+    if (e.pointerType === 'touch') return
     const rect = e.currentTarget.getBoundingClientRect()
     const maxY = hours.length * 60
     const y = Math.max(0, Math.min(e.clientY - rect.top, maxY))

@@ -54,6 +54,9 @@ function TaskRowImpl({
   showWorkspaceTag = false,
 }: TaskRowProps) {
   const colors = getUrgencyColor(task)
+  // Empty-title tasks (e.g. created via drag with no save) should still be
+  // visible and tappable. Show a placeholder so the row never collapses.
+  const displayTitle = task.title?.trim() || '未命名任務'
 
   // Drag-to-calendar state. Activated only after the cursor crosses
   // DRAG_THRESHOLD so plain clicks still open the detail modal.
@@ -182,7 +185,7 @@ function TaskRowImpl({
             color: '#fff',
           }}
         >
-          {task.title}
+          {displayTitle}
         </div>,
         document.body
       )
@@ -240,10 +243,11 @@ function TaskRowImpl({
           <span
             className={cn(
               'flex-1 min-w-0 text-xs font-medium truncate text-foreground',
+              !task.title?.trim() && 'italic text-muted-foreground',
               task.isCompleted && 'line-through text-muted-foreground'
             )}
           >
-            {task.title}
+            {displayTitle}
           </span>
 
           {/* Time (if any) */}
@@ -319,9 +323,10 @@ function TaskRowImpl({
             )}
             <span className={cn(
               'text-sm font-medium leading-snug text-foreground flex-1 min-w-0',
+              !task.title?.trim() && 'italic text-muted-foreground',
               task.isCompleted && 'line-through text-muted-foreground'
             )}>
-              {task.title}
+              {displayTitle}
             </span>
 
             {/* Status / Urgency badge */}

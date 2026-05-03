@@ -8,6 +8,7 @@ import { TaskDetailModal } from '@/components/modals/task-detail-modal'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { KeyboardShortcutsHint } from '@/components/keyboard-shortcuts'
 import { UserMenu } from '@/components/user-menu'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { OnboardingTour } from '@/components/onboarding-tour'
 import { SettingsModal } from '@/components/modals/settings-modal'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
@@ -16,6 +17,7 @@ import { toDateString } from '@/lib/calendar-utils'
 import type { Task, SlotType } from '@/lib/types'
 
 export default function WaddlePage() {
+  const isMobile = useIsMobile()
   const {
     workspaces,
     timeBlocks,
@@ -352,7 +354,9 @@ export default function WaddlePage() {
         onSave={saveSettings}
       />
 
-      <UserMenu />
+      {/* Desktop: floating top-right. Mobile renders an inline UserMenu
+          inside each panel header so it doesn't cover content. */}
+      {!isMobile && <UserMenu />}
       <OnboardingTour
         open={!onboardingCompleted}
         onComplete={completeOnboarding}

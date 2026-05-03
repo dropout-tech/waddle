@@ -513,14 +513,14 @@ export function DayScrollView({
 
   const handleMouseDown = useCallback((e: React.PointerEvent, dayIndex: number) => {
     if ((e.target as HTMLElement).closest('[data-block]')) return
-    if (e.button !== 0) return
+    if (e.button !== 0 && e.pointerType === 'mouse') return
     const rect = e.currentTarget.getBoundingClientRect()
     const y = e.clientY - rect.top
-    
-    // Track mouse down time and position to detect click vs drag
+
+    // Track press time + position to detect click vs drag in handleMouseUp.
     mouseDownTime.current = Date.now()
     mouseDownPos.current = { x: e.clientX, y: e.clientY }
-    
+
     setIsDragging(true)
     setDragStart({ day: dayIndex, y })
     setDragEnd({ day: dayIndex, y })
@@ -530,6 +530,11 @@ export function DayScrollView({
   const handleMouseMove = useCallback((e: React.PointerEvent, dayIndex: number) => {
     if (activeTaskDrag || pendingTaskDrag) return // handled by window listeners
     if (!isDragging || !dragStart) return
+    // Touch input: don't update dragEnd. Finger movement on the grid is
+    // reserved for vertical scroll, not for drag-to-select-time-range.
+    // Tap-without-movement still opens the slot picker via handleMouseUp's
+    // "isClick" branch, which compares against mouseDownPos.
+    if (e.pointerType === 'touch') return
     const rect = e.currentTarget.getBoundingClientRect()
     const y = e.clientY - rect.top
     setDragEnd({ day: dayIndex, y })

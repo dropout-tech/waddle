@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react'
 import { Sun, Plus, X, Settings2, PanelLeftClose, Maximize2, Minimize2, ChevronUp, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/use-mobile'
 import type { Workspace } from '@/lib/types'
 import { WorkspaceSettingsModal } from '@/components/modals/workspace-settings-modal'
 import { WorkspaceIcon, PRESET_ICONS, PRESET_ICON_NAMES } from '@/lib/workspace-icons'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
+import { UserMenu } from '@/components/user-menu'
 
 interface PanelHeaderProps {
   workspaces: Workspace[]
@@ -37,6 +39,7 @@ export function PanelHeader({
   onClosePanel,
   onToggleExpand,
 }: PanelHeaderProps) {
+  const isMobile = useIsMobile()
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
   const [settingsWorkspaceId, setSettingsWorkspaceId] = useState<string | null>(null)
   const settingsWorkspace = workspaces.find((w) => w.id === settingsWorkspaceId) ?? null
@@ -85,9 +88,13 @@ export function PanelHeader({
   }
 
   return (
-    // Right padding leaves room for the floating UserMenu (top-3 right-3,
-    // ~40px wide) so its avatar doesn't sit on top of the header buttons.
-    <div className="relative pl-5 pr-14 py-4 border-b border-border bg-card">
+    // Desktop reserves right space for the floating UserMenu avatar.
+    // Mobile renders UserMenu inline (in MainLayout's mobile branch) so the
+    // header can use balanced padding here.
+    <div className={cn(
+      'relative py-4 border-b border-border bg-card',
+      isMobile ? 'px-4' : 'pl-5 pr-14'
+    )}>
       {/* Collapsed Mode - Single compact row */}
       {isHeaderCollapsed ? (
         <div className="flex items-center justify-between">
@@ -142,6 +149,8 @@ export function PanelHeader({
                 )}
               </button>
             )}
+            {/* Inline UserMenu on mobile (collapsed header) */}
+            {isMobile && <UserMenu className="relative ml-1" />}
             {/* Close Panel Button */}
             {onClosePanel && !isExpanded && (
               <button
@@ -219,6 +228,9 @@ export function PanelHeader({
                   <PanelLeftClose className="w-4 h-4 text-muted-foreground" />
                 </button>
               )}
+
+              {/* Inline UserMenu on mobile (replaces the floating one) */}
+              {isMobile && <UserMenu className="relative ml-1" />}
             </div>
           </div>
 

@@ -6,7 +6,7 @@ import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
 import { FullScreenTaskView } from '@/components/task-panel/full-screen-task-view'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
-import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ListChecks, CalendarDays } from 'lucide-react'
+import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ListChecks, CalendarDays, Sparkles } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
 import { FocusScratchpad } from '@/components/scratchpad/focus-scratchpad'
 import { FocusTimer } from '@/components/timer/focus-timer'
@@ -81,6 +81,8 @@ export function MainLayout({
 
   // Mobile single-panel tab. Only consulted when isMobile === true.
   const [mobileTab, setMobileTab] = useState<'tasks' | 'calendar'>('calendar')
+  // Mobile-only — drives the FocusScratchpad open/close from the bottom tab bar.
+  const [mobileScratchpadOpen, setMobileScratchpadOpen] = useState(false)
 
   // Force day view on mobile — week/month grids don't fit a phone column.
   useEffect(() => {
@@ -163,7 +165,11 @@ export function MainLayout({
   if (isMobile) {
     return (
       <div className="flex flex-col h-[100dvh] bg-background overflow-hidden relative">
-        <FocusScratchpad />
+        <FocusScratchpad
+          isOpen={mobileScratchpadOpen}
+          onOpenChange={setMobileScratchpadOpen}
+          hideTrigger
+        />
 
         <div className="flex-1 min-h-0 flex flex-col">
           {focusMode !== 'none' ? (
@@ -262,14 +268,14 @@ export function MainLayout({
 
         {/* Bottom Tab Bar (hidden during focus mode) */}
         {focusMode === 'none' && (
-          <nav className="flex-shrink-0 grid grid-cols-2 border-t border-border bg-card/95 backdrop-blur z-30 pb-[env(safe-area-inset-bottom)]" role="tablist" aria-label="主要分頁">
+          <nav className="flex-shrink-0 grid grid-cols-3 border-t border-border bg-card/95 backdrop-blur z-30 pb-[env(safe-area-inset-bottom)]" role="tablist" aria-label="主要分頁">
             <button
               role="tab"
-              aria-selected={mobileTab === 'tasks'}
-              onClick={() => setMobileTab('tasks')}
+              aria-selected={mobileTab === 'tasks' && !mobileScratchpadOpen}
+              onClick={() => { setMobileScratchpadOpen(false); setMobileTab('tasks') }}
               className={cn(
                 'flex flex-col items-center justify-center gap-1 py-2.5 transition-colors',
-                mobileTab === 'tasks' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                mobileTab === 'tasks' && !mobileScratchpadOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <ListChecks className="w-5 h-5" />
@@ -277,11 +283,23 @@ export function MainLayout({
             </button>
             <button
               role="tab"
-              aria-selected={mobileTab === 'calendar'}
-              onClick={() => setMobileTab('calendar')}
+              aria-selected={mobileScratchpadOpen}
+              onClick={() => setMobileScratchpadOpen(v => !v)}
               className={cn(
                 'flex flex-col items-center justify-center gap-1 py-2.5 transition-colors',
-                mobileTab === 'calendar' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                mobileScratchpadOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Sparkles className="w-5 h-5" />
+              <span className="text-[11px] font-medium">白板</span>
+            </button>
+            <button
+              role="tab"
+              aria-selected={mobileTab === 'calendar' && !mobileScratchpadOpen}
+              onClick={() => { setMobileScratchpadOpen(false); setMobileTab('calendar') }}
+              className={cn(
+                'flex flex-col items-center justify-center gap-1 py-2.5 transition-colors',
+                mobileTab === 'calendar' && !mobileScratchpadOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <CalendarDays className="w-5 h-5" />

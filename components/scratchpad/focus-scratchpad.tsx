@@ -11,6 +11,15 @@ import type { ScratchpadItem } from '@/lib/types'
 
 interface FocusScratchpadProps {
   className?: string
+  /**
+   * When provided, the component is controlled — internal isExpanded
+   * state is ignored. Used by the mobile layout so the bottom tab
+   * bar's 白板 button can drive the open state.
+   */
+  isOpen?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Hide the built-in pull-down trigger (mobile uses an external button). */
+  hideTrigger?: boolean
 }
 
 // Get all saved scratchpad dates from localStorage
@@ -28,9 +37,19 @@ function getSavedDates(): string[] {
   return dates.sort().reverse() // Most recent first
 }
 
-export function FocusScratchpad({ className }: FocusScratchpadProps) {
+export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }: FocusScratchpadProps) {
   const todayKey = toDateString(new Date())
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [internalExpanded, setInternalExpanded] = useState(false)
+  // Controlled when isOpen is provided; otherwise fall back to internal state.
+  const isControlled = isOpen !== undefined
+  const isExpanded = isControlled ? !!isOpen : internalExpanded
+  const setIsExpanded = (next: boolean) => {
+    if (isControlled) {
+      onOpenChange?.(next)
+    } else {
+      setInternalExpanded(next)
+    }
+  }
   const [selectedDate, setSelectedDate] = useState(todayKey)
   const [items, setItems] = useState<ScratchpadItem[]>([])
   const [savedDates, setSavedDates] = useState<string[]>([])
@@ -238,12 +257,12 @@ export function FocusScratchpad({ className }: FocusScratchpadProps) {
       )}
 
       <div className={cn('relative z-[70]', className)}>
-        {/* Pull Tab - Always Visible */}
-        <div 
+        {/* Pull Tab - hidden when controlled by parent (mobile bottom tab) */}
+        <div
           className={cn(
             'absolute left-1/2 -translate-x-1/2 top-0',
             'transition-all duration-300',
-            isExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            isExpanded || hideTrigger ? 'opacity-0 pointer-events-none' : 'opacity-100'
           )}
         >
           <button

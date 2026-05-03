@@ -1,11 +1,13 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronLeft, ChevronRight, BookOpen, BarChart3, Settings, Sparkles } from 'lucide-react'
+import { ZoomIn, ZoomOut, Clock, ChevronLeft, ChevronRight, BookOpen, BarChart3, Settings, Sparkles, MoreHorizontal } from 'lucide-react'
 import { toDateString } from '@/lib/calendar-utils'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { UserMenu } from '@/components/user-menu'
 import type { Workspace, Task } from '@/lib/types'
 
 interface CalendarHeaderProps {
@@ -50,6 +52,20 @@ export function CalendarHeader({
   onOpenSettings,
   leftPanelOpen = true,
 }: CalendarHeaderProps) {
+  const isMobile = useIsMobile()
+  const [overflowOpen, setOverflowOpen] = useState(false)
+  const overflowRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!overflowOpen) return
+    function onClick(ev: MouseEvent) {
+      if (overflowRef.current && !overflowRef.current.contains(ev.target as Node)) {
+        setOverflowOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [overflowOpen])
+
   const isToday = () => {
     const today = new Date()
     return (
@@ -95,38 +111,41 @@ export function CalendarHeader({
           notification bell. */}
       <div
         className={cn(
-          'flex items-center justify-between py-3 gap-4 transition-[padding] duration-200',
-          leftPanelOpen ? 'pl-4 pr-14' : 'pl-16 pr-14'
+          'flex items-center justify-between py-3 gap-3 transition-[padding] duration-200',
+          // Mobile uses balanced padding (no UserMenu floating overhead since
+          // it lives inside the panel header on mobile).
+          isMobile ? 'px-3' : leftPanelOpen ? 'pl-4 pr-14' : 'pl-16 pr-14'
         )}
       >
         {/* Left: Date Navigation */}
-        <div className="flex items-center gap-3 flex-1">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="flex items-center gap-1">
+            {/* Prev/next chevrons — desktop only. Mobile uses swipe. */}
             <button
               type="button"
               onClick={handlePrevMonth}
               aria-label={`上一${navUnitLabel}`}
-              className="p-1.5 rounded-md hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="hidden md:flex p-1.5 rounded-md hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ChevronLeft className="w-4 h-4" aria-hidden="true" />
             </button>
-            <span className="min-w-[140px] text-sm font-medium text-center" aria-live="polite">
+            <span className="text-sm font-semibold md:font-medium md:min-w-[140px] md:text-center" aria-live="polite">
               {getDisplayText()}
             </span>
             <button
               type="button"
               onClick={handleNextMonth}
               aria-label={`下一${navUnitLabel}`}
-              className="p-1.5 rounded-md hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="hidden md:flex p-1.5 rounded-md hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <ChevronRight className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
 
-          {/* View Mode Buttons */}
+          {/* View Mode Buttons — desktop only. Mobile is forced to day view. */}
           <div
             data-tour="view-modes"
-            className="flex items-center border border-border rounded-lg overflow-hidden ml-auto"
+            className="hidden md:flex items-center border border-border rounded-lg overflow-hidden ml-auto"
             role="group"
             aria-label="檢視模式"
           >
@@ -148,35 +167,86 @@ export function CalendarHeader({
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Today + Actions */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant={isToday() ? 'secondary' : 'outline'}
-              size="sm"
-              onClick={onTodayClick}
-              aria-label={isToday() ? '已是今天' : '回到今天'}
-              className={cn(
-                'text-xs font-medium rounded-lg h-8 border-border transition-colors',
-                isToday() && 'text-muted-foreground'
-              )}
-            >
-              今天
-            </Button>
+        {/* Right: Today + Bell + (mobile) overflow menu */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button
+            variant={isToday() ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={onTodayClick}
+            aria-label={isToday() ? '已是今天' : '回到今天'}
+            className={cn(
+              'text-xs font-medium rounded-lg h-8 border-border transition-colors',
+              isToday() && 'text-muted-foreground'
+            )}
+          >
+            今天
+          </Button>
 
+          <div className="hidden md:block">
             <TodayProgressRing workspaces={workspaces || []} />
-
-            {/* Notification Center */}
-            <NotificationCenter
-              workspaces={workspaces || []}
-              onTaskClick={onTaskClick}
-            />
           </div>
+
+          <NotificationCenter
+            workspaces={workspaces || []}
+            onTaskClick={onTaskClick}
+          />
+
+          {/* Inline UserMenu on mobile (replaces the floating one) */}
+          {isMobile && <UserMenu className="relative" />}
+
+          {/* Mobile-only overflow menu: 日記 / 報告 / 設定 */}
+          {isMobile && (onOpenJournal || onOpenReport || onOpenSettings) && (
+            <div className="relative" ref={overflowRef}>
+              <button
+                type="button"
+                onClick={() => setOverflowOpen(v => !v)}
+                aria-label="更多"
+                aria-expanded={overflowOpen}
+                className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
+              </button>
+              {overflowOpen && (
+                <div className="absolute right-0 top-full mt-1 w-44 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50" role="menu">
+                  {onOpenJournal && (
+                    <button
+                      onClick={() => { setOverflowOpen(false); onOpenJournal() }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      <span>日記</span>
+                    </button>
+                  )}
+                  {onOpenReport && (
+                    <button
+                      onClick={() => { setOverflowOpen(false); onOpenReport() }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                      <span>報告</span>
+                    </button>
+                  )}
+                  {onOpenSettings && (
+                    <button
+                      onClick={() => { setOverflowOpen(false); onOpenSettings() }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>設定</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Secondary Row: Zoom + Time Range + Focus Mode */}
-      <div className="flex items-center justify-between px-4 py-2 gap-4 border-t border-border/50 bg-muted/30">
+      {/* Secondary Row — desktop only. Mobile uses pinch zoom + the
+          overflow menu above for journal / report / settings. */}
+      <div className="hidden md:flex items-center justify-between px-4 py-2 gap-4 border-t border-border/50 bg-muted/30">
         {/* Left: Zoom Controls */}
         {viewMode !== 'month' && onZoomChange ? (
           <div className="flex items-center gap-2">

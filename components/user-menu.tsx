@@ -11,7 +11,17 @@ interface SessionInfo {
   avatarUrl: string | null
 }
 
-export function UserMenu() {
+interface UserMenuProps {
+  /**
+   * Override the wrapper className. The default places the menu floating
+   * at the top-right of the viewport; pass any other className (e.g.
+   * "relative") to render it inline alongside other header buttons —
+   * the mobile layout uses this so the avatar doesn't overlap content.
+   */
+  className?: string
+}
+
+export function UserMenu({ className }: UserMenuProps = {}) {
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [open, setOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -66,7 +76,7 @@ export function UserMenu() {
   const initials = (session.displayName || '?').slice(0, 1).toUpperCase()
 
   return (
-    <div ref={ref} className="fixed top-3 right-3 z-50">
+    <div ref={ref} className={className ?? 'fixed top-3 right-3 z-50'}>
       <button
         data-tour="user-menu"
         onClick={() => setOpen((v) => !v)}
