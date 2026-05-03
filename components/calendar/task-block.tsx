@@ -21,6 +21,10 @@ export interface TaskDragStart {
   originalEnd: number
   /** Mouse Y offset within the block (for move — to preserve click position) */
   offsetY: number
+  /** Mousedown viewport X — parent uses this for click-vs-drag detection. */
+  startX: number
+  /** Mousedown viewport Y — parent uses this for click-vs-drag detection. */
+  startY: number
 }
 
 interface TaskBlockProps {
@@ -102,6 +106,8 @@ function TaskBlockImpl({
       originalStart: timeToMinutes(task.scheduledStartTime!),
       originalEnd: timeToMinutes(task.scheduledEndTime!),
       offsetY,
+      startX: e.clientX,
+      startY: e.clientY,
     })
   }
 
@@ -132,6 +138,8 @@ function TaskBlockImpl({
       originalStart: timeToMinutes(task.scheduledStartTime!),
       originalEnd: timeToMinutes(task.scheduledEndTime!),
       offsetY: 0,
+      startX: e.clientX,
+      startY: e.clientY,
     })
   }
 
@@ -145,6 +153,8 @@ function TaskBlockImpl({
       originalStart: timeToMinutes(task.scheduledStartTime!),
       originalEnd: timeToMinutes(task.scheduledEndTime!),
       offsetY: 0,
+      startX: e.clientX,
+      startY: e.clientY,
     })
   }
 

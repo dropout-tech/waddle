@@ -277,46 +277,187 @@ export function WeekView({
   const MIN = startHour * 60
   const MAX = endHour * 60
 
-  const handleTaskDragStart = useCallback((info: TaskDragStart, dayIndex: number) => {
-    isDraggingTaskRef.current = true
-    setActiveTaskDrag({ ...info, currentStart: info.originalStart, currentEnd: info.originalEnd, dayIndex })
-    setPendingSlot(null)
-  }, [])
-
-  // Track if this is a click vs drag
+  // Track if this is a click vs drag (for new-slot drag on empty grid)
   const mouseDownTime = useRef<number>(0)
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null)
-  
+
   // Default duration for click-to-create (in minutes)
   const DEFAULT_DURATION = 30
 
-  // Handle pending task drag start from header
-  const handlePendingTaskDragStart = useCallback((task: Task, e: React.MouseEvent) => {
-    e.preventDefault()
-    isDraggingTaskRef.current = true
-    const duration = task.estimatedMinutes || 30
-    // Start at 9:00 AM or current grid position if over grid
-    const gridEl = gridRef.current
-    let startMinutes = 9 * 60
-    let dayIndex = centerIndex
-    
-    if (gridEl) {
-      const gridRect = gridEl.getBoundingClientRect()
-      const scrollTop = scrollContainerRef.current?.scrollTop ?? 0
-      const scrollLeft = scrollContainerRef.current?.scrollLeft ?? 0
-      const relX = e.clientX - gridRect.left - TIME_COL_WIDTH + scrollLeft
-      const relY = e.clientY - gridRect.top + scrollTop
-      dayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
-      startMinutes = snap(MIN + Math.max(0, relY))
+  // Threshold (px) to differentiate a click from a drag.
+  const DRAG_THRESHOLD = 5
+
+  // Scheduled task drag — install window-level mousemove/mouseup so the drag
+  // survives the cursor leaving the grid (e.g. moving up to the pending zone
+  // to unschedule). Uses elementFromPoint at mouseup to pick the drop target.
+  // The drag preview (lift / shadow) only activates after the cursor moves
+  // past DRAG_THRESHOLD — that way a click doesn't flicker the lift effect.
+  const handleTaskDragStart = useCallback((info: TaskDragStart, dayIndex: number) => {
+    setPendingSlot(null)
+
+    const startX = info.startX
+    const startY = info.startY
+    let movedBeyondThreshold = false
+
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      if (!movedBeyondThreshold && Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
+        movedBeyondThreshold = true
+        isDraggingTaskRef.current = true
+        setActiveTaskDrag({
+          ...info,
+          currentStart: info.originalStart,
+          currentEnd: info.originalEnd,
+          dayIndex,
+        })
+      }
+      if (!movedBeyondThreshold) return
+
+      const scrollContainer = scrollContainerRef.current
+      if (!scrollContainer) return
+      const containerRect = scrollContainer.getBoundingClientRect()
+      const mouseXInContent = ev.clientX - containerRect.left + scrollContainer.scrollLeft
+      const mouseYInContent = ev.clientY - containerRect.top + scrollContainer.scrollTop
+      const relX = mouseXInContent - TIME_COL_WIDTH
+      const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
+      const minutes = snap(MIN + mouseYInContent)
+
+      setActiveTaskDrag(prev => {
+        if (!prev) return prev
+        const duration = prev.originalEnd - prev.originalStart
+        if (prev.dragType === 'move') {
+          const newStart = clamp(snap(minutes - prev.offsetY), MIN, MAX - 15)
+          const newEnd = clamp(newStart + duration, MIN + 15, MAX)
+          return { ...prev, dayIndex: newDayIndex, currentStart: newStart, currentEnd: newEnd }
+        }
+        if (prev.dragType === 'resize-top') {
+          return { ...prev, currentStart: clamp(snap(minutes), MIN, prev.currentEnd - 15) }
+        }
+        if (prev.dragType === 'resize-bottom') {
+          return { ...prev, currentEnd: clamp(snap(minutes), prev.currentStart + 15, MAX) }
+        }
+        return prev
+      })
     }
-    
-    setPendingTaskDrag({
-      task,
-      currentDayIndex: dayIndex,
-      currentMinutes: startMinutes,
-      duration,
-    })
-  }, [allDates.length, MIN])
+
+    const onUp = (ev: MouseEvent) => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+
+      if (!movedBeyondThreshold) {
+        // Click. activeTaskDrag was never set — TaskBlock's own onMouseUp
+        // opens the modal. Nothing to clean up here.
+        return
+      }
+
+      const target = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
+      const overPending = target?.closest('[data-pending-zone]') as HTMLElement | null
+
+      setActiveTaskDrag(curr => {
+        if (!curr) return null
+        if (overPending) {
+          const pendingDate = overPending.getAttribute('data-pending-zone-date') ?? undefined
+          onUnscheduleTask?.(curr.taskId, pendingDate)
+        } else {
+          const dropTarget = allDates[curr.dayIndex]
+          if (dropTarget) {
+            onRescheduleTask?.(
+              curr.taskId,
+              toDateString(dropTarget),
+              minutesToTime(curr.currentStart),
+              minutesToTime(curr.currentEnd),
+            )
+          }
+        }
+        return null
+      })
+
+      isDraggingTaskRef.current = false
+      dragEndCooldown.current = true
+      setTimeout(() => { dragEndCooldown.current = false }, 300)
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask])
+
+  // Pending task drag — same window-level pattern. Drag preview only activates
+  // after the cursor moves past the threshold, so a plain click on a pending
+  // task opens the detail modal (via the React onClick) without scheduling.
+  const handlePendingTaskMouseDown = useCallback((task: Task, e: React.MouseEvent) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+
+    const startX = e.clientX
+    const startY = e.clientY
+    const duration = task.estimatedMinutes || 30
+    let movedBeyondThreshold = false
+
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      if (!movedBeyondThreshold && Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
+        movedBeyondThreshold = true
+        isDraggingTaskRef.current = true
+      }
+      if (!movedBeyondThreshold) return
+
+      const scrollContainer = scrollContainerRef.current
+      if (!scrollContainer) return
+      const containerRect = scrollContainer.getBoundingClientRect()
+      const mouseXInContent = ev.clientX - containerRect.left + scrollContainer.scrollLeft
+      const mouseYInContent = ev.clientY - containerRect.top + scrollContainer.scrollTop
+      const relX = mouseXInContent - TIME_COL_WIDTH
+      const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
+      const startMinutes = clamp(snap(MIN + Math.max(0, mouseYInContent)), MIN, MAX - 15)
+
+      setPendingTaskDrag({
+        task,
+        currentDayIndex: newDayIndex,
+        currentMinutes: startMinutes,
+        duration,
+      })
+    }
+
+    const onUp = (ev: MouseEvent) => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+
+      if (!movedBeyondThreshold) {
+        // Click — let onClick fire normally to open the detail modal.
+        return
+      }
+
+      const target = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
+      const overPending = target?.closest('[data-pending-zone]')
+
+      setPendingTaskDrag(curr => {
+        if (!curr) return null
+        // Drop back over the pending zone is a no-op.
+        if (!overPending) {
+          const dropTarget = allDates[curr.currentDayIndex]
+          if (dropTarget) {
+            onRescheduleTask?.(
+              curr.task.id,
+              toDateString(dropTarget),
+              minutesToTime(curr.currentMinutes),
+              minutesToTime(curr.currentMinutes + curr.duration),
+            )
+          }
+        }
+        return null
+      })
+
+      isDraggingTaskRef.current = false
+      dragEndCooldown.current = true
+      setTimeout(() => { dragEndCooldown.current = false }, 300)
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [allDates, MIN, MAX, onRescheduleTask])
 
   // Handle mouse down on grid to start new-slot drag or click
   const handleMouseDown = useCallback((e: React.MouseEvent, dayIndex: number) => {
@@ -334,99 +475,22 @@ export function WeekView({
     setDragEnd({ day: dayIndex, y })
   }, [])
 
-  // Global mouse move for cross-day task dragging (both scheduled and pending tasks)
-  const handleGlobalMouseMove = useCallback((e: React.MouseEvent) => {
-    const gridEl = gridRef.current
-    const scrollContainer = scrollContainerRef.current
-    if (!gridEl || !scrollContainer) return
-    
-    // Use scroll container rect for accurate positioning
-    const containerRect = scrollContainer.getBoundingClientRect()
-    const scrollTop = scrollContainer.scrollTop
-    const scrollLeft = scrollContainer.scrollLeft
-    
-    // Calculate mouse position in the scrollable content coordinate system
-    // e.clientX/Y is viewport position, containerRect.left/top is container's viewport position
-    // Adding scroll offset gives us position in the full scrollable content
-    const mouseXInContent = e.clientX - containerRect.left + scrollLeft
-    const mouseYInContent = e.clientY - containerRect.top + scrollTop
-    
-    // Calculate which day column the mouse is over (accounting for time column)
-    const relX = mouseXInContent - TIME_COL_WIDTH
-    const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
-    
-    // Calculate time from Y position (Y in content = minutes from startHour)
-    const minutes = snap(MIN + mouseYInContent)
-    
-    // Handle pending task drag (from header to grid)
-    if (pendingTaskDrag) {
-      const newStart = clamp(snap(minutes), MIN, MAX - 15)
-      setPendingTaskDrag(prev => prev ? { ...prev, currentDayIndex: newDayIndex, currentMinutes: newStart } : null)
-      return
-    }
-    
-    // Handle scheduled task drag
-    if (activeTaskDrag) {
-      const duration = activeTaskDrag.originalEnd - activeTaskDrag.originalStart
-      
-      if (activeTaskDrag.dragType === 'move') {
-        // Move: can change both day and time
-        const newStart = clamp(snap(minutes - activeTaskDrag.offsetY), MIN, MAX - 15)
-        const newEnd = clamp(newStart + duration, MIN + 15, MAX)
-        setActiveTaskDrag(prev => prev ? { ...prev, dayIndex: newDayIndex, currentStart: newStart, currentEnd: newEnd } : null)
-      } else if (activeTaskDrag.dragType === 'resize-top') {
-        // Resize top: only change start time, keep same day
-        setActiveTaskDrag(prev => prev ? { ...prev, currentStart: clamp(snap(minutes), MIN, prev.currentEnd - 15) } : null)
-      } else if (activeTaskDrag.dragType === 'resize-bottom') {
-        // Resize bottom: only change end time, keep same day
-        setActiveTaskDrag(prev => prev ? { ...prev, currentEnd: clamp(snap(minutes), prev.currentStart + 15, MAX) } : null)
-      }
-    }
-  }, [activeTaskDrag, pendingTaskDrag, allDates.length, MIN, MAX])
-
   // Handle mouse move for new-slot drag (per column)
   const handleMouseMove = useCallback((e: React.MouseEvent, dayIndex: number) => {
-    if (activeTaskDrag) return // handled by global
+    if (activeTaskDrag || pendingTaskDrag) return // handled by window listeners
     if (!isDragging || !dragStart) return
     const rect = e.currentTarget.getBoundingClientRect()
     const maxY = hours.length * 60
     const y = Math.max(0, Math.min(e.clientY - rect.top, maxY))
     setDragEnd({ day: dayIndex, y })
-  }, [isDragging, dragStart, activeTaskDrag, hours.length])
+  }, [isDragging, dragStart, activeTaskDrag, pendingTaskDrag, hours.length])
 
-  // Handle mouse up - detect click vs drag
+  // Handle mouse up - detect click vs drag (new-slot creation only)
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    // Handle pending task drop
-    if (pendingTaskDrag) {
-      const dropTarget = allDates[pendingTaskDrag.currentDayIndex]
-      if (dropTarget) {
-        const date = toDateString(dropTarget)
-        const startTime = minutesToTime(pendingTaskDrag.currentMinutes)
-        const endTime = minutesToTime(pendingTaskDrag.currentMinutes + pendingTaskDrag.duration)
-        onRescheduleTask?.(pendingTaskDrag.task.id, date, startTime, endTime)
-      }
-      setPendingTaskDrag(null)
-      // Reset drag ref and prevent navigation briefly
-      isDraggingTaskRef.current = false
-      dragEndCooldown.current = true
-      setTimeout(() => { dragEndCooldown.current = false }, 300)
-      return
-    }
-
-    // Handle scheduled task drop
-    if (activeTaskDrag) {
-      const dropTarget = allDates[activeTaskDrag.dayIndex]
-      if (dropTarget) {
-        const date = toDateString(dropTarget)
-        onRescheduleTask?.(activeTaskDrag.taskId, date, minutesToTime(activeTaskDrag.currentStart), minutesToTime(activeTaskDrag.currentEnd))
-      }
-      setActiveTaskDrag(null)
-      // Reset drag ref and prevent navigation briefly
-      isDraggingTaskRef.current = false
-      dragEndCooldown.current = true
-      setTimeout(() => { dragEndCooldown.current = false }, 300)
-      return
-    }
+    // Task-block and pending-task drags are committed by window-level listeners
+    // installed in handleTaskDragStart / handlePendingTaskMouseDown. This
+    // handler only owns the "drag on empty grid to create a new slot" flow.
+    if (activeTaskDrag || pendingTaskDrag) return
 
     if (!isDragging || !dragStart || !dragEnd) {
       setIsDragging(false)
@@ -615,18 +679,6 @@ export function WeekView({
                           : 'hover:bg-secondary/30'
                       )}
                       style={{ minHeight: `${headerHeight - HEADER_DATE_HEIGHT}px` }}
-                      onMouseUp={(e) => {
-                        // Drop a scheduled task here → unschedule (clear time, keep date).
-                        // Has to run BEFORE the click handler that creates a new task.
-                        if (activeTaskDrag) {
-                          e.stopPropagation()
-                          onUnscheduleTask?.(activeTaskDrag.taskId, dateStr)
-                          setActiveTaskDrag(null)
-                          isDraggingTaskRef.current = false
-                          dragEndCooldown.current = true
-                          setTimeout(() => { dragEndCooldown.current = false }, 300)
-                        }
-                      }}
                       onClick={(e) => {
                         // Only trigger if clicking on empty space, not a task,
                         // and not right after dropping a task here.
@@ -639,10 +691,7 @@ export function WeekView({
                       {allDayTasks.map((task) => (
                         <div
                           key={task.id}
-                          onMouseDown={(e) => {
-                            e.stopPropagation()
-                            handlePendingTaskDragStart(task, e)
-                          }}
+                          onMouseDown={(e) => handlePendingTaskMouseDown(task, e)}
                           onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
                           className={cn(
                             'w-full flex-shrink-0 text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate cursor-grab active:cursor-grabbing select-none',
@@ -688,16 +737,9 @@ export function WeekView({
         }}
       >
         <div 
-          ref={gridRef} 
-          className="flex" 
+          ref={gridRef}
+          className="flex"
           style={{ width: `${TIME_COL_WIDTH + allDates.length * DAY_WIDTH}px` }}
-          onMouseMove={handleGlobalMouseMove}
-          onMouseUp={(e) => handleMouseUp(e)}
-          onMouseLeave={(e) => {
-            handleMouseUp(e)
-            // Also cancel pending task drag on leave
-            if (pendingTaskDrag) setPendingTaskDrag(null)
-          }}
         >
           {/* Time labels column - sticky left */}
           <div className="w-14 flex-shrink-0 sticky left-0 z-20 bg-panel border-r border-border">
