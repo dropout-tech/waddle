@@ -15,6 +15,7 @@ interface WorkspaceSectionProps {
   onSelectTask: (task: Task) => void
   onAddTask: (categoryId: string, title: string) => void
   onAddCategory?: (workspaceId: string, name: string) => void
+  onDeleteCategory?: (categoryId: string) => void
 }
 
 export function WorkspaceSection({
@@ -26,6 +27,7 @@ export function WorkspaceSection({
   onSelectTask,
   onAddTask,
   onAddCategory,
+  onDeleteCategory,
 }: WorkspaceSectionProps) {
   const [isAddingCategory, setIsAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -92,6 +94,7 @@ export function WorkspaceSection({
               onToggleComplete={onToggleComplete}
               onSelectTask={onSelectTask}
               onAddTask={onAddTask}
+              onDelete={onDeleteCategory}
             />
           ))}
 

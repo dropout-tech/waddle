@@ -24,6 +24,7 @@ interface MainLayoutProps {
   onSelectTask: (task: Task) => void
   onAddTask: (categoryId: string, title: string) => void
   onAddCategory?: (workspaceId: string, name: string) => void
+  onDeleteCategory?: (categoryId: string) => void
   onAddWorkspace?: (name: string, color: string, icon: string) => void
   onUpdateWorkspaceColor?: (workspaceId: string, color: string) => void
   onUpdateWorkspace?: (workspaceId: string, updates: Partial<Pick<Workspace, 'name' | 'color' | 'icon'>>) => void
@@ -54,6 +55,7 @@ export function MainLayout({
   onSelectTask,
   onAddTask,
   onAddCategory,
+  onDeleteCategory,
   onAddWorkspace,
   onUpdateWorkspaceColor,
   onUpdateWorkspace,
@@ -193,6 +195,7 @@ export function MainLayout({
                 onSelectTask={onSelectTask}
                 onAddTask={onAddTask}
                 onAddCategory={onAddCategory}
+                onDeleteCategory={onDeleteCategory}
                 onAddWorkspace={onAddWorkspace}
                 onUpdateWorkspaceColor={onUpdateWorkspaceColor}
                 onUpdateWorkspace={onUpdateWorkspace}

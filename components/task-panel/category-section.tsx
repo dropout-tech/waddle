@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Plus } from 'lucide-react'
+import { ChevronDown, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Category, Task } from '@/lib/types'
 import { TaskRow } from './task-row'
@@ -15,6 +15,7 @@ interface CategorySectionProps {
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
   onAddTask: (categoryId: string, title: string) => void
+  onDelete?: (categoryId: string) => void
 }
 
 export function CategorySection({
@@ -25,6 +26,7 @@ export function CategorySection({
   onToggleComplete,
   onSelectTask,
   onAddTask,
+  onDelete,
 }: CategorySectionProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -37,6 +39,18 @@ export function CategorySection({
       onAddTask(category.id, newTaskTitle.trim())
       setNewTaskTitle('')
       setIsAdding(false)
+    }
+  }
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!onDelete) return
+    const taskCount = category.tasks.length
+    const message = taskCount > 0
+      ? `刪除分類「${category.name}」？這會連同 ${taskCount} 個任務一起刪除，無法復原。`
+      : `刪除分類「${category.name}」？`
+    if (window.confirm(message)) {
+      onDelete(category.id)
     }
   }
 
@@ -63,9 +77,9 @@ export function CategorySection({
   return (
     <div className="mb-3">
       {/* Category Header */}
-      <button
+      <div
         onClick={() => onToggleCollapse(category.id)}
-        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors group"
+        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer"
       >
         <ChevronDown
           className={cn(
@@ -87,8 +101,18 @@ export function CategorySection({
               {completedCount}
             </span>
           )}
+          {onDelete && (
+            <button
+              onClick={handleDelete}
+              className="p-0.5 rounded text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
+              title={`刪除分類「${category.name}」`}
+              aria-label={`刪除分類「${category.name}」`}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
-      </button>
+      </div>
 
       {/* Tasks */}
       {!category.isCollapsed && (

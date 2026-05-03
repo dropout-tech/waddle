@@ -30,6 +30,7 @@ export default function WaddlePage() {
     archiveWorkspace,
     deleteWorkspace,
     addCategory,
+    deleteCategory,
     toggleCategoryCollapse,
     addTask,
     createTask,
@@ -298,6 +299,7 @@ export default function WaddlePage() {
         onSelectTask={handleSelectTask}
         onAddTask={addTask}
         onAddCategory={addCategory}
+        onDeleteCategory={deleteCategory}
         onAddWorkspace={addWorkspace}
         onUpdateWorkspaceColor={updateWorkspaceColor}
         onUpdateWorkspace={updateWorkspace}

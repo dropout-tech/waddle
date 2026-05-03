@@ -76,6 +76,7 @@ interface UseWaddleData {
   deleteWorkspace: (workspaceId: string) => Promise<void>
   // Category
   addCategory: (workspaceId: string, name: string) => Promise<void>
+  deleteCategory: (categoryId: string) => Promise<void>
   toggleCategoryCollapse: (categoryId: string) => Promise<void>
   // Task
   addTask: (categoryId: string, title: string) => Promise<void>
@@ -378,6 +379,18 @@ export function useWaddleData(): UseWaddleData {
       id, user_id: userId, workspace_id: workspaceId, name, sort_order: sortOrder,
     })
     if (error) handleDbError('新增分類')(error)
+  }, [supabase])
+
+  const deleteCategory = useCallback(async (categoryId: string) => {
+    setWorkspaces((prev) =>
+      prev.map((w) => ({
+        ...w,
+        categories: w.categories.filter((c) => c.id !== categoryId),
+      }))
+    )
+    // Tasks in this category cascade-delete via the FK in the schema.
+    const { error } = await supabase.from('categories').delete().eq('id', categoryId)
+    if (error) handleDbError('刪除分類')(error)
   }, [supabase])
 
   const toggleCategoryCollapse = useCallback(async (categoryId: string) => {
@@ -896,6 +909,7 @@ export function useWaddleData(): UseWaddleData {
     archiveWorkspace,
     deleteWorkspace,
     addCategory,
+    deleteCategory,
     toggleCategoryCollapse,
     addTask,
     createTask,
