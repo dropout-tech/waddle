@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
 import { positionPopover } from '@/lib/popover-position'
-import { cn } from '@/lib/utils'
+import { cn, haptic } from '@/lib/utils'
 import type { Task, TimeBlock, SlotType } from '@/lib/types'
 import {
   WEEKDAY_NAMES,
@@ -357,6 +357,7 @@ export function DayScrollView({
       if (!movedBeyondThreshold && Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
         movedBeyondThreshold = true
         isDraggingTaskRef.current = true
+        haptic(12)
         dragState = {
           ...info,
           currentStart: info.originalStart,
@@ -470,6 +471,7 @@ export function DayScrollView({
       if (!movedBeyondThreshold && Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
         movedBeyondThreshold = true
         isDraggingTaskRef.current = true
+        haptic(12)
       }
       if (!movedBeyondThreshold) return
 

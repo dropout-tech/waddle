@@ -175,7 +175,12 @@ export function MainLayout({
   // bottom tab bar. Floating UserMenu still works at top-right.
   if (isMobile) {
     return (
-      <div className="flex flex-col h-[100dvh] bg-background overflow-hidden relative">
+      // pt-[env(safe-area-inset-top)] keeps content clear of the iOS notch /
+      // Dynamic Island. The tab bar already has pb-[env(safe-area-inset-bottom)].
+      <div
+        className="flex flex-col h-[100dvh] bg-background overflow-hidden relative"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
         <FocusScratchpad
           isOpen={mobileScratchpadOpen}
           onOpenChange={setMobileScratchpadOpen}
@@ -218,6 +223,9 @@ export function MainLayout({
             </div>
           ) : mobileTab === 'tasks' ? (
             <ErrorBoundary>
+              {/* key={mobileTab} forces a remount on tab change so the
+                  slide-in-from-right animation fires fresh each time. */}
+              <div key="tasks" className="h-full flex flex-col animate-in slide-in-from-left duration-200 fade-in">
               <TaskPanel
                 workspaces={workspaces}
                 isExpanded={true}
@@ -239,9 +247,11 @@ export function MainLayout({
                 onArchiveWorkspace={onArchiveWorkspace}
                 onOpenSettings={onOpenSettings}
               />
+              </div>
             </ErrorBoundary>
           ) : (
             <ErrorBoundary>
+              <div key="calendar" className="h-full flex flex-col animate-in slide-in-from-right duration-200 fade-in">
               <CalendarPanel
                 selectedDate={selectedDate}
                 viewMode={viewMode}
@@ -273,6 +283,7 @@ export function MainLayout({
                 onOpenSettings={onOpenSettings}
                 leftPanelOpen={true}
               />
+              </div>
             </ErrorBoundary>
           )}
         </div>

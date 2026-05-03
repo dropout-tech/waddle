@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react
 import { ArrowRight, ArrowLeft, X, Sparkles, LayoutTemplate, FilePlus2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 // ─────────────────────────────────────────────────────────
 // Tour step definitions
@@ -31,7 +32,7 @@ interface TourStep {
 // - Center modals for high-level concepts (welcome, sync, drag, finale).
 // - Spotlights for specific UI elements (panel, task row, calendar, view modes, scratchpad, timer, user menu).
 // - Interactive steps where the user actually clicks the highlighted element to advance.
-const STEPS: TourStep[] = [
+const DESKTOP_STEPS: TourStep[] = [
   {
     title: '歡迎來到 Waddle',
     body: '整合任務、時間排程、專注計時、日記反思的工作面板。慢慢搖擺，把事情做完。90 秒帶你走過。',
@@ -103,6 +104,49 @@ const STEPS: TourStep[] = [
     body: '登出在這。設定、日記、報告等其他功能散落在介面上，慢慢探索。',
     placement: 'bottom',
     padding: 4,
+  },
+  {
+    title: '✨ 你準備好了！',
+    body: '最後一步：你想怎麼開始？',
+  },
+]
+
+// Mobile gets a shorter, layout-appropriate tour. Targets that don't exist
+// on mobile (segmented view-mode picker, scratchpad pull tab) are replaced
+// or dropped; copy is rewritten for the bottom-tab + single-panel layout.
+const MOBILE_STEPS: TourStep[] = [
+  {
+    title: '歡迎來到 Waddle',
+    body: '整合任務、時間排程、專注計時、日記反思的工作面板。慢慢搖擺，把事情做完。',
+  },
+  {
+    target: '[data-tour="left-panel"]',
+    title: '任務分頁',
+    body: '工作區 → 分類 → 任務的三層結構。所有任務都在這。',
+    placement: 'top',
+    padding: 0,
+  },
+  {
+    target: '[data-tour="task-row"]',
+    title: '點任務 = 編輯，長按 = 拖到日曆',
+    body: '輕點任務開啟詳細頁；長按 0.3 秒後拖移可以直接排到日曆上的時間。',
+    placement: 'bottom',
+    padding: 4,
+  },
+  {
+    title: '🤚 左右滑動',
+    body: '在「任務」分頁向左滑 → 切到日曆。日曆內向左右滑 → 切換昨天 / 明天。',
+  },
+  {
+    target: '[data-tour="calendar-panel"]',
+    title: '日曆：上方待排程 / 下方時間軸',
+    body: '上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。',
+    placement: 'top',
+    padding: 0,
+  },
+  {
+    title: '✨ 底部三分頁',
+    body: '任務 / 白板 / 日曆。中間「白板」可以隨時記點子、貼圖、連結。',
   },
   {
     title: '✨ 你準備好了！',
@@ -257,6 +301,8 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
   const [choosing, setChoosing] = useState<'template' | 'blank' | null>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
 
+  const isMobile = useIsMobile()
+  const STEPS = isMobile ? MOBILE_STEPS : DESKTOP_STEPS
   const step = STEPS[stepIndex]
   const isFirst = stepIndex === 0
   const isLast = stepIndex === STEPS.length - 1

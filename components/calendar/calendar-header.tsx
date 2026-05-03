@@ -85,6 +85,12 @@ export function CalendarHeader({
   }
 
   const getDisplayText = () => {
+    // Mobile + day view: show the actual visible day so users always know
+    // where they are after swiping. Desktop keeps the year + month label.
+    if (isMobile && viewMode === 'day') {
+      const wd = ['日', '一', '二', '三', '四', '五', '六'][selectedDate.getDay()]
+      return `${selectedDate.getMonth() + 1}/${selectedDate.getDate()} 週${wd}`
+    }
     return `${selectedDate.getFullYear()}年 ${selectedDate.getMonth() + 1}月`
   }
 

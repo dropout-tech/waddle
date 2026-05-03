@@ -286,20 +286,37 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
           </button>
         </div>
 
-        {/* Expanded Panel */}
+        {/* Expanded Panel.
+            Desktop: slides DOWN from the top header (the pull-tab is up there).
+            Mobile (hideTrigger=true): the trigger lives in the bottom tab bar
+            so the panel acts like a bottom sheet — fixed full-screen, slides
+            up from bottom, sits above the tab bar. */}
         <div
           ref={panelRef}
           className={cn(
-            'absolute left-0 right-0 top-0',
-            'bg-card border-b border-border shadow-xl',
-            'transition-all duration-300 ease-out overflow-hidden',
-            isExpanded ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+            hideTrigger
+              ? cn(
+                  'fixed left-0 right-0 top-0 bottom-[58px]',
+                  'bg-card border-t border-border shadow-2xl',
+                  'transition-transform duration-300 ease-out',
+                  isExpanded ? 'translate-y-0' : 'translate-y-full pointer-events-none',
+                )
+              : cn(
+                  'absolute left-0 right-0 top-0',
+                  'bg-card border-b border-border shadow-xl',
+                  'transition-all duration-300 ease-out overflow-hidden',
+                  isExpanded ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0 pointer-events-none',
+                )
           )}
+          style={hideTrigger ? { paddingTop: 'env(safe-area-inset-top)' } : undefined}
           onPaste={handlePaste}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
         >
+        {/* Mobile: scroll the sheet content. Desktop: panel itself is
+            overflow-hidden (collapses via max-h transition). */}
+        <div className={hideTrigger ? 'h-full overflow-y-auto' : ''}>
         {/* Drag Overlay */}
         {isDragging && (
           <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary/50 z-50 flex items-center justify-center">
@@ -577,6 +594,7 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
           >
             <ChevronUp className="w-3 h-3" />
           </button>
+        </div>
         </div>
       </div>
     </div>

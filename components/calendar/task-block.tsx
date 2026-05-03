@@ -206,9 +206,10 @@ function TaskBlockImpl({
       )}
       style={styleProps}
     >
-      {/* Resize handle — TOP */}
+      {/* Resize handle — TOP. Larger touch target on mobile (the indicator
+          stays small; the hit area expands invisibly). */}
       <div
-        className="absolute top-0 left-0 right-0 h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute top-0 left-0 right-0 h-4 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
         onPointerDown={handleResizeTopPointerDown}
         style={{ touchAction: 'none' }}
       >
@@ -314,9 +315,9 @@ function TaskBlockImpl({
         <GripVertical className="w-3 h-3 text-white" />
       </div>
 
-      {/* Resize handle — BOTTOM */}
+      {/* Resize handle — BOTTOM. Same mobile sizing as TOP. */}
       <div
-        className="absolute bottom-0 left-0 right-0 h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute bottom-0 left-0 right-0 h-4 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
         onPointerDown={handleResizeBottomPointerDown}
         style={{ touchAction: 'none' }}
       >

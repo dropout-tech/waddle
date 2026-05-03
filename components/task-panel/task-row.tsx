@@ -3,7 +3,7 @@
 import { memo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, Clock, Calendar, MessageSquare, Timer, AlertCircle, GripVertical } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, haptic } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import { getUrgencyColor, formatEstimatedTime } from '@/lib/task-utils'
 import { calendarHitTest, minutesToTime } from '@/lib/calendar-utils'
@@ -104,6 +104,7 @@ function TaskRowImpl({
             activated = true
             setExternalDragActive(true)
             onDragActivate?.()
+            haptic(15)
           }
         }, longPressMs)
       : null
@@ -121,6 +122,7 @@ function TaskRowImpl({
           activated = true
           setExternalDragActive(true)
           onDragActivate?.()
+          haptic(12)
         }
       }
       if (activated) {
