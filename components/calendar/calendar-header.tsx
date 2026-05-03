@@ -147,7 +147,7 @@ export function CalendarHeader({
               <ChevronLeft className="w-4 h-4" aria-hidden="true" />
             </button>
             <span
-              className="text-sm font-semibold md:font-medium md:min-w-[140px] md:text-center px-1"
+              className="text-sm font-semibold md:font-medium min-w-[88px] md:min-w-[140px] text-center px-1 truncate"
               aria-live="polite"
             >
               {getDisplayText()}

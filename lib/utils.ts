@@ -22,3 +22,35 @@ export function haptic(durationMs = 15) {
     /* ignore — some browsers throw without prior user gesture */
   }
 }
+
+/**
+ * Lock <body> scroll while a modal / sheet is open. Reference-counted so
+ * nested modals (e.g. workspace settings inside settings) don't release
+ * the lock prematurely.
+ */
+let scrollLockCount = 0
+let savedBodyOverflow = ''
+let savedBodyPaddingRight = ''
+export function lockBodyScroll() {
+  if (typeof document === 'undefined') return
+  if (scrollLockCount === 0) {
+    savedBodyOverflow = document.body.style.overflow
+    savedBodyPaddingRight = document.body.style.paddingRight
+    // Compensate for vanishing scrollbar to avoid layout shift on desktop.
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`
+    }
+    document.body.style.overflow = 'hidden'
+  }
+  scrollLockCount++
+}
+export function unlockBodyScroll() {
+  if (typeof document === 'undefined') return
+  scrollLockCount = Math.max(0, scrollLockCount - 1)
+  if (scrollLockCount === 0) {
+    document.body.style.overflow = savedBodyOverflow
+    document.body.style.paddingRight = savedBodyPaddingRight
+  }
+}
+

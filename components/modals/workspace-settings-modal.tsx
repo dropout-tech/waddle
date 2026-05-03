@@ -9,6 +9,7 @@ import {
   Folder, Mail, Phone, ShoppingBag, Plane, Car, Gamepad2, Headphones
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import type { Workspace } from '@/lib/types'
 
 const PRESET_COLORS = [
@@ -81,6 +82,8 @@ export function WorkspaceSettingsModal({
       fileInputRef.current.value = ''
     }
   }
+
+  useBodyScrollLock(isOpen)
 
   if (!isOpen) return null
 

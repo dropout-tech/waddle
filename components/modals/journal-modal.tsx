@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import { formatDate } from '@/lib/task-utils'
 import { toDateString } from '@/lib/calendar-utils'
 import type { Task, JournalEntry } from '@/lib/types'
@@ -46,6 +47,8 @@ export function JournalModal({
 }: JournalModalProps) {
   const [mood, setMood] = useState<JournalEntry['mood']>(entry?.mood)
   const [content, setContent] = useState(entry?.content || '')
+
+  useBodyScrollLock(isOpen)
 
   if (!isOpen) return null
 

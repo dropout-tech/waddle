@@ -3,6 +3,7 @@
 import { useState, useRef, useMemo } from 'react'
 import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat, List, CheckSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import type { Task, Workspace } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,6 +74,8 @@ export function TaskDetailModal({
   const selectedCategory = workspaces
     .flatMap((w) => w.categories.map((c) => ({ ...c, workspace: w })))
     .find((c) => c.id === selectedCategoryId)
+
+  useBodyScrollLock(isOpen)
 
   if (!isOpen) return null
 

@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import type { UserSettings, TimeBlock, SlotType, Workspace, NotificationSettings } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -258,6 +259,8 @@ export function SettingsModal({
     }
     return <span className={textSize}>{slotType.icon}</span>
   }
+
+  useBodyScrollLock(isOpen)
 
   if (!isOpen) return null
 

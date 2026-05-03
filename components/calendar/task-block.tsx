@@ -200,8 +200,10 @@ function TaskBlockImpl({
         'absolute rounded-xl overflow-hidden group select-none',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1',
         isDragging
-          ? 'shadow-2xl opacity-90 z-50 ring-2 ring-white/40'
-          : 'hover:shadow-lg hover:z-10 transition-shadow',
+          // "Lift" the block while dragging — slight scale + rotation makes
+          // it feel like the user picked it up off the calendar.
+          ? 'shadow-2xl opacity-95 z-50 ring-2 ring-white/40 scale-[1.02] -rotate-1 transition-transform'
+          : 'hover:shadow-lg hover:z-10 transition-all',
         task.isCompleted && 'opacity-50'
       )}
       style={styleProps}

@@ -200,6 +200,21 @@ export function DayScrollView({
     header.scrollLeft = targetScrollLeft
     lastScrollLeft.current = container.scrollLeft
 
+    // First-mount only: vertically scroll the timeline so "now" is roughly
+    // centered. Without this users always see the day's start hour even
+    // when it's noon. Skip if the day is in the past or future.
+    const today = new Date()
+    const isViewingToday =
+      selectedDate.getFullYear() === today.getFullYear() &&
+      selectedDate.getMonth() === today.getMonth() &&
+      selectedDate.getDate() === today.getDate()
+    if (isViewingToday) {
+      const minsNow = today.getHours() * 60 + today.getMinutes()
+      const yPx = (minsNow - MIN) * (hourHeight / 60)
+      const targetY = Math.max(0, yPx - container.clientHeight / 3)
+      container.scrollTop = targetY
+    }
+
     const t = window.setTimeout(() => { isScrolling.current = false }, 150)
     return () => window.clearTimeout(t)
   }, [selectedDate])
@@ -708,7 +723,9 @@ export function DayScrollView({
             style={{
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
-              ...(isMobile ? { scrollSnapType: 'x mandatory' as const } : {}),
+              ...(isMobile && !activeTaskDrag && !pendingTaskDrag
+                ? { scrollSnapType: 'x mandatory' as const }
+                : {}),
             }}
           >
             <div className="flex" style={{ width: `${allDates.length * DAY_WIDTH}px` }}>
@@ -843,22 +860,28 @@ export function DayScrollView({
           </div>
         </div>
 
-        {/* Drag handle */}
-        <div
-          className="flex-shrink-0 h-2 flex items-center justify-center cursor-row-resize group select-none border-t border-border/40 hover:border-primary/40 transition-colors"
-          onPointerDown={handleHeaderResizeStart}
-          style={{ touchAction: 'none' }}
-        >
-          <div className="w-8 h-0.5 rounded-full bg-border group-hover:bg-primary/50 transition-colors" />
-        </div>
+        {/* Drag handle to resize the pending-zone height — desktop only.
+            On mobile the pending-zone is fixed-height (managed via
+            min-height) and resize-by-drag isn't meaningful. */}
+        {!isMobile && (
+          <div
+            className="flex-shrink-0 h-2 flex items-center justify-center cursor-row-resize group select-none border-t border-border/40 hover:border-primary/40 transition-colors"
+            onPointerDown={handleHeaderResizeStart}
+            style={{ touchAction: 'none' }}
+          >
+            <div className="w-8 h-0.5 rounded-full bg-border group-hover:bg-primary/50 transition-colors" />
+          </div>
+        )}
       </div>
 
       {/* Scrollable Time Grid. Mobile snaps to whole days so one swipe =
-          one day; desktop keeps free panning. */}
+          one day; desktop keeps free panning. While a task drag is active
+          we disable snap so horizontal task movement isn't yanked to a
+          day boundary mid-drag. */}
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-auto"
-        style={isMobile ? { scrollSnapType: 'x mandatory', scrollSnapStop: 'always' } : undefined}
+        style={isMobile && !activeTaskDrag && !pendingTaskDrag ? { scrollSnapType: 'x mandatory', scrollSnapStop: 'always' } : undefined}
         onScroll={() => {
           handleScroll()
           syncScroll('grid')

@@ -290,7 +290,23 @@ export function MainLayout({
 
         {/* Bottom Tab Bar (hidden during focus mode) */}
         {focusMode === 'none' && (
-          <nav className="flex-shrink-0 grid grid-cols-3 border-t border-border bg-card/95 backdrop-blur z-30 pb-[env(safe-area-inset-bottom)]" role="tablist" aria-label="主要分頁">
+          <nav className="relative flex-shrink-0 grid grid-cols-3 border-t border-border bg-card/95 backdrop-blur z-30 pb-[env(safe-area-inset-bottom)]" role="tablist" aria-label="主要分頁">
+            {/* Sliding active indicator — anchored to top edge, animates between
+                the three slots based on which one is selected. */}
+            <span
+              aria-hidden="true"
+              className="absolute top-0 h-0.5 bg-primary rounded-full transition-transform duration-200 ease-out"
+              style={{
+                width: 'calc(100% / 3)',
+                transform: `translateX(${
+                  mobileScratchpadOpen
+                    ? 100
+                    : mobileTab === 'tasks'
+                      ? 0
+                      : 200
+                }%)`,
+              }}
+            />
             <button
               role="tab"
               aria-selected={mobileTab === 'tasks' && !mobileScratchpadOpen}
