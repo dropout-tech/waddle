@@ -48,6 +48,27 @@ export type CalendarHit =
   | { kind: 'grid'; date: string; minutes: number }
   | null
 
+/**
+ * Scroll the given container towards the cursor when the cursor is near
+ * the top or bottom edge — used during a drag so users can drop on
+ * times currently scrolled off-screen. Idempotent: calling it on every
+ * pointermove during a drag does the right thing.
+ */
+export function autoScrollContainerNearEdge(container: HTMLElement, clientY: number) {
+  const rect = container.getBoundingClientRect()
+  const distFromTop = clientY - rect.top
+  const distFromBottom = rect.bottom - clientY
+  const edge = 80
+  const maxSpeed = 12
+  if (distFromTop < edge && distFromTop > -10) {
+    const factor = Math.max(0, (edge - distFromTop) / edge)
+    container.scrollTop -= maxSpeed * factor
+  } else if (distFromBottom < edge && distFromBottom > -10) {
+    const factor = Math.max(0, (edge - distFromBottom) / edge)
+    container.scrollTop += maxSpeed * factor
+  }
+}
+
 export function calendarHitTest(clientX: number, clientY: number): CalendarHit {
   const el = document.elementFromPoint(clientX, clientY) as HTMLElement | null
   if (!el) return null

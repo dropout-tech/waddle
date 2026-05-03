@@ -12,6 +12,7 @@ import {
   clamp,
   calculateTaskColumns,
   toDateString,
+  autoScrollContainerNearEdge,
 } from '@/lib/calendar-utils'
 import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 import { CurrentTimeLine } from './current-time-line'
@@ -359,6 +360,10 @@ export function DayScrollView({
       const overPendingEl = hoveredEl?.closest('[data-pending-zone]') as HTMLElement | null
       const hoveredDate = overPendingEl?.getAttribute('data-pending-zone-date') ?? null
       setHoveredPendingZoneDate(prev => prev === hoveredDate ? prev : hoveredDate)
+
+      // Auto-scroll the timeline when finger / cursor approaches the top or
+      // bottom edge so the user can reach off-screen times.
+      autoScrollContainerNearEdge(scrollContainer, ev.clientY)
     }
 
     const onUp = (ev: PointerEvent) => {
@@ -455,6 +460,8 @@ export function DayScrollView({
       const overPendingEl = hoveredEl?.closest('[data-pending-zone]') as HTMLElement | null
       const hoveredDate = overPendingEl?.getAttribute('data-pending-zone-date') ?? null
       setHoveredPendingZoneDate(prev => prev === hoveredDate ? prev : hoveredDate)
+
+      autoScrollContainerNearEdge(scrollContainer, ev.clientY)
     }
 
     const onUp = (ev: PointerEvent) => {

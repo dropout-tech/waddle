@@ -12,6 +12,7 @@ import {
   clamp,
   calculateTaskColumns,
   toDateString,
+  autoScrollContainerNearEdge,
 } from '@/lib/calendar-utils'
 import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 import { CurrentTimeLine } from './current-time-line'
@@ -351,6 +352,8 @@ export function WeekView({
       const overPendingEl = hoveredEl?.closest('[data-pending-zone]') as HTMLElement | null
       const hoveredDate = overPendingEl?.getAttribute('data-pending-zone-date') ?? null
       setHoveredPendingZoneDate(prev => prev === hoveredDate ? prev : hoveredDate)
+
+      autoScrollContainerNearEdge(scrollContainer, ev.clientY)
     }
 
     const onUp = (ev: PointerEvent) => {
@@ -443,6 +446,8 @@ export function WeekView({
       const overPendingEl = hoveredEl?.closest('[data-pending-zone]') as HTMLElement | null
       const hoveredDate = overPendingEl?.getAttribute('data-pending-zone-date') ?? null
       setHoveredPendingZoneDate(prev => prev === hoveredDate ? prev : hoveredDate)
+
+      autoScrollContainerNearEdge(scrollContainer, ev.clientY)
     }
 
     const onUp = (ev: PointerEvent) => {
