@@ -390,7 +390,7 @@ export function MainLayout({
               aria-selected={mobileTab === 'tasks' && !mobileScratchpadOpen}
               onClick={() => { setMobileScratchpadOpen(false); setMobileTab('tasks') }}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 py-2.5 transition-colors',
+                'flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-colors',
                 mobileTab === 'tasks' && !mobileScratchpadOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -402,7 +402,7 @@ export function MainLayout({
               aria-selected={mobileScratchpadOpen}
               onClick={() => setMobileScratchpadOpen(v => !v)}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 py-2.5 transition-colors',
+                'flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-colors',
                 mobileScratchpadOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -414,7 +414,7 @@ export function MainLayout({
               aria-selected={mobileTab === 'calendar' && !mobileScratchpadOpen}
               onClick={() => { setMobileScratchpadOpen(false); setMobileTab('calendar') }}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 py-2.5 transition-colors',
+                'flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-colors',
                 mobileTab === 'calendar' && !mobileScratchpadOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >

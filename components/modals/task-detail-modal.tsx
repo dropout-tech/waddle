@@ -175,9 +175,12 @@ export function TaskDetailModal({
                 <ChevronDown className="w-3 h-3 text-muted-foreground" />
               </button>
 
-              {/* Category Dropdown */}
+              {/* Category Dropdown — desktop: 16rem popover anchored to
+                  the trigger; mobile: full-width sheet with side margins
+                  so it never overflows on narrow phones (320 px screens
+                  ran 64 px past the right edge before this). */}
               {showCategoryPicker && workspaces.length > 0 && (
-                <div className="absolute top-full left-0 mt-1 w-64 bg-card rounded-xl border border-border shadow-xl z-50 py-2 max-h-64 overflow-y-auto">
+                <div className="fixed left-3 right-3 top-[calc(env(safe-area-inset-top,0px)+72px)] max-h-[60vh] md:absolute md:left-0 md:right-auto md:top-full md:mt-1 md:w-64 md:max-h-64 bg-card rounded-xl border border-border shadow-xl z-[60] py-2 overflow-y-auto">
                   {workspaces.map((workspace) => (
                     <div key={workspace.id}>
                       <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">

@@ -223,28 +223,35 @@ function TaskRowImpl({
             borderLeft: `3px solid ${colors.accentColor}`,
           }}
         >
-          {/* Checkbox — bigger touch target than visual circle. */}
+          {/* Checkbox — visual circle stays small; the actual <button>
+              gets p-2 -m-2 so the tap target is ~30 px even though the
+              visible dot is 14 px. Layout doesn't shift because the
+              negative margin cancels the padding. */}
           <div className="relative flex-shrink-0">
             <button
               onClick={handleCheck}
               className={cn(
-                'flex-shrink-0 w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all hover:scale-110 active:scale-95',
+                'flex-shrink-0 p-2 -m-2 rounded-full flex items-center justify-center transition-transform active:scale-95',
                 burst && 'animate-[task-pop_500ms_ease-out]'
               )}
-              style={{
-                backgroundColor: task.isCompleted ? colors.accentColor : 'transparent',
-                borderColor: `color-mix(in oklch, ${colors.accentColor} 60%, transparent)`,
-              }}
               aria-checked={task.isCompleted}
               aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
               role="checkbox"
             >
-              {task.isCompleted && (
-                <Check
-                  className={cn('w-2 h-2 text-white', burst && 'animate-[task-check_500ms_ease-out]')}
-                  strokeWidth={3.5}
-                />
-              )}
+              <span
+                className="block w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all"
+                style={{
+                  backgroundColor: task.isCompleted ? colors.accentColor : 'transparent',
+                  borderColor: `color-mix(in oklch, ${colors.accentColor} 60%, transparent)`,
+                }}
+              >
+                {task.isCompleted && (
+                  <Check
+                    className={cn('w-2 h-2 text-white', burst && 'animate-[task-check_500ms_ease-out]')}
+                    strokeWidth={3.5}
+                  />
+                )}
+              </span>
             </button>
             {burst && (
               <div className="pointer-events-none absolute inset-0">
@@ -335,28 +342,34 @@ function TaskRowImpl({
           <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
         </div>
 
-        {/* Checkbox with celebration burst */}
+        {/* Checkbox with celebration burst — same touch-target trick as
+            the compact variant: invisible padding extends the tap zone
+            without enlarging the rendered circle. */}
         <div className="relative flex-shrink-0 mt-0.5">
           <button
             onClick={handleCheck}
             className={cn(
-              'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-all hover:scale-110 active:scale-95',
+              'p-2 -m-2 rounded-full flex items-center justify-center transition-transform active:scale-95',
               burst && 'animate-[task-pop_500ms_ease-out]'
             )}
-            style={{
-              backgroundColor: task.isCompleted ? colors.accentColor : 'transparent',
-              borderColor: task.isCompleted ? colors.accentColor : `color-mix(in oklch, ${colors.accentColor} 50%, transparent)`,
-            }}
             aria-checked={task.isCompleted}
             aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
             role="checkbox"
           >
-            {task.isCompleted && (
-              <Check
-                className={cn('w-2.5 h-2.5 text-white', burst && 'animate-[task-check_500ms_ease-out]')}
-                strokeWidth={3}
-              />
-            )}
+            <span
+              className="block w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-all"
+              style={{
+                backgroundColor: task.isCompleted ? colors.accentColor : 'transparent',
+                borderColor: task.isCompleted ? colors.accentColor : `color-mix(in oklch, ${colors.accentColor} 50%, transparent)`,
+              }}
+            >
+              {task.isCompleted && (
+                <Check
+                  className={cn('w-2.5 h-2.5 text-white', burst && 'animate-[task-check_500ms_ease-out]')}
+                  strokeWidth={3}
+                />
+              )}
+            </span>
           </button>
           {burst && (
             <div className="pointer-events-none absolute inset-0">
