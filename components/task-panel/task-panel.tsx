@@ -156,7 +156,7 @@ export function TaskPanel({
       {/* Left Column: Task List */}
       <div className={cn(
         'flex flex-col h-full min-w-0',
-        isExpanded ? 'w-[360px] border-r border-border' : 'flex-1'
+        isExpanded ? 'w-full md:w-[360px] md:border-r md:border-border' : 'flex-1'
       )}>
         {/* Header */}
         <PanelHeader
