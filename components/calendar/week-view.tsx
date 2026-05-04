@@ -237,13 +237,17 @@ export function WeekView({
   }
 
   // Get all-day/unscheduled tasks for a specific date
-  // These are tasks that have scheduledDate or dueDate matching this day but NO specific time
+  // Pending zone tasks for this day. The two clauses make scheduledDate
+  // authoritative once set: a task with scheduledDate=A and dueDate=B only
+  // shows in A's pending zone, never B's. Without this dueDate-vs-scheduledDate
+  // priority a task that happens to have a dueDate at one day and a
+  // scheduledDate at another would show up in both columns — and dragging
+  // it across days would leave a "ghost" copy at the source.
   const getAllDayTasksForDate = (date: Date) => {
     const dateStr = toDateString(date)
-    return tasks.filter(
-      (t) =>
-        (t.scheduledDate === dateStr || t.dueDate === dateStr) &&
-        !t.scheduledStartTime
+    return tasks.filter(t =>
+      (t.scheduledDate === dateStr && !t.scheduledStartTime) ||
+      (t.dueDate === dateStr && !t.scheduledDate)
     )
   }
 
