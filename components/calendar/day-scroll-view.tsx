@@ -34,6 +34,9 @@ interface DayScrollViewProps {
   onOpenCreateTask?: (slotType: SlotType, date: string, startTime: string, endTime: string) => void
   onRescheduleTask?: (taskId: string, date: string, newStart: string, newEnd: string) => void
   onUnscheduleTask?: (taskId: string, date?: string) => void
+  onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
+  onDeleteTimeBlock?: (id: string) => void
+  onTimeBlockSelect?: (block: TimeBlock) => void
   onNavigate?: (direction: 'prev' | 'next') => void
   onDateChange?: (date: Date) => void
   startHour?: number
@@ -67,6 +70,8 @@ export function DayScrollView({
   onOpenCreateTask,
   onRescheduleTask,
   onUnscheduleTask,
+  onUpdateTimeBlock,
+  onTimeBlockSelect,
   onNavigate,
   onDateChange,
   startHour = 0,
@@ -107,6 +112,18 @@ export function DayScrollView({
   // over. Drives the live drop-target highlight + ghost preview.
   const [hoveredPendingZoneDate, setHoveredPendingZoneDate] = useState<string | null>(null)
 
+  // Time block drag state — for resizing/moving 午休 / 緩衝 / 專注 blocks.
+  const [activeBlockDrag, setActiveBlockDrag] = useState<{
+    blockId: string
+    dragType: 'move' | 'resize-top' | 'resize-bottom'
+    originalStart: number
+    originalEnd: number
+    offsetY: number
+    dayIndex: number
+    currentStart: number
+    currentEnd: number
+  } | null>(null)
+
   // Pending task drag state (from header to grid)
   const [pendingTaskDrag, setPendingTaskDrag] = useState<{
     task: Task
@@ -140,7 +157,7 @@ export function DayScrollView({
   // Suppress panel-level swipe navigation while any in-calendar drag is
   // active. Without this, dragging a task ≥60 px horizontally would also
   // trigger a week navigate, making the task appear to jump weeks.
-  const isAnyDragging = !!activeTaskDrag || !!pendingTaskDrag || isDragging
+  const isAnyDragging = !!activeTaskDrag || !!pendingTaskDrag || !!activeBlockDrag || isDragging
   useEffect(() => {
     if (!isAnyDragging) return
     beginGestureSuppression()
@@ -464,6 +481,106 @@ export function DayScrollView({
     window.addEventListener('pointercancel', onUp)
   }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask])
 
+  // Time block drag (move / resize-top / resize-bottom). Same window-level
+  // pattern as task drags — preview activates after cursor moves past
+  // threshold so a plain tap opens the detail modal instead of moving.
+  const handleTimeBlockDragStart = useCallback((
+    block: TimeBlock,
+    dragType: 'move' | 'resize-top' | 'resize-bottom',
+    dayIndex: number,
+    e: React.PointerEvent,
+  ) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return
+    e.stopPropagation()
+    const startX = e.clientX
+    const startY = e.clientY
+    const blockEl = (e.currentTarget as HTMLElement).closest('[data-block]') as HTMLElement | null
+    const blockRect = blockEl?.getBoundingClientRect()
+    const offsetY = blockRect ? e.clientY - blockRect.top : 0
+
+    const originalStart = timeToMinutes(block.startTime)
+    const originalEnd = timeToMinutes(block.endTime)
+    let movedBeyondThreshold = false
+    let dragState: NonNullable<typeof activeBlockDrag> | null = null
+
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      if (!movedBeyondThreshold && Math.sqrt(dx * dx + dy * dy) > DRAG_THRESHOLD) {
+        movedBeyondThreshold = true
+        isDraggingTaskRef.current = true
+        haptic(12)
+        dragState = {
+          blockId: block.id,
+          dragType,
+          originalStart,
+          originalEnd,
+          offsetY,
+          dayIndex,
+          currentStart: originalStart,
+          currentEnd: originalEnd,
+        }
+        setActiveBlockDrag(dragState)
+      }
+      if (!movedBeyondThreshold || !dragState) return
+
+      const scrollContainer = scrollContainerRef.current
+      if (!scrollContainer) return
+      const containerRect = scrollContainer.getBoundingClientRect()
+      const mouseXInContent = ev.clientX - containerRect.left + scrollContainer.scrollLeft
+      const mouseYInContent = ev.clientY - containerRect.top + scrollContainer.scrollTop
+      const relX = mouseXInContent - TIME_COL_WIDTH
+      const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
+      const minutes = snap(MIN + mouseYInContent)
+
+      const duration = dragState.originalEnd - dragState.originalStart
+      if (dragState.dragType === 'move') {
+        const newStart = clamp(snap(minutes - dragState.offsetY), MIN, MAX - 15)
+        const newEnd = clamp(newStart + duration, MIN + 15, MAX)
+        dragState = { ...dragState, dayIndex: newDayIndex, currentStart: newStart, currentEnd: newEnd }
+      } else if (dragState.dragType === 'resize-top') {
+        dragState = { ...dragState, currentStart: clamp(snap(minutes), MIN, dragState.currentEnd - 15) }
+      } else if (dragState.dragType === 'resize-bottom') {
+        dragState = { ...dragState, currentEnd: clamp(snap(minutes), dragState.currentStart + 15, MAX) }
+      }
+      setActiveBlockDrag(dragState)
+
+      autoScrollContainerNearEdge(scrollContainer, ev.clientY)
+    }
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+
+      if (!movedBeyondThreshold || !dragState) {
+        // Tap — open detail modal via the click handler that follows.
+        return
+      }
+
+      const finalState = dragState
+      setActiveBlockDrag(null)
+      dragState = null
+
+      const dropTarget = allDates[finalState.dayIndex]
+      if (dropTarget) {
+        onUpdateTimeBlock?.(finalState.blockId, {
+          date: toDateString(dropTarget),
+          startTime: minutesToTime(finalState.currentStart),
+          endTime: minutesToTime(finalState.currentEnd),
+        })
+      }
+
+      isDraggingTaskRef.current = false
+      dragEndCooldown.current = true
+      setTimeout(() => { dragEndCooldown.current = false }, 300)
+    }
+
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+  }, [allDates, MIN, MAX, DAY_WIDTH, onUpdateTimeBlock])
+
   // Pending task drag — same window-level pattern. Drag preview only activates
   // after the cursor moves past the threshold, so a plain click on a pending
   // task opens the detail modal (via the React onClick) without scheduling.
@@ -579,7 +696,7 @@ export function DayScrollView({
 
   // Handle mouse move for new-slot drag (per column)
   const handleMouseMove = useCallback((e: React.PointerEvent, dayIndex: number) => {
-    if (activeTaskDrag || pendingTaskDrag) return // handled by window listeners
+    if (activeTaskDrag || pendingTaskDrag || activeBlockDrag) return // handled by window listeners
     if (!isDragging || !dragStart) return
     // Touch input: don't update dragEnd. Finger movement on the grid is
     // reserved for vertical scroll, not for drag-to-select-time-range.
@@ -595,7 +712,7 @@ export function DayScrollView({
     // Task-block and pending-task drags are committed by window-level listeners
     // installed in handleTaskDragStart / handlePendingTaskMouseDown. This
     // handler only owns the "drag on empty grid to create a new slot" flow.
-    if (activeTaskDrag || pendingTaskDrag) return
+    if (activeTaskDrag || pendingTaskDrag || activeBlockDrag) return
 
     if (!isDragging || !dragStart || !dragEnd) {
       setIsDragging(false)
@@ -723,7 +840,7 @@ export function DayScrollView({
             style={{
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
-              ...(isMobile && !activeTaskDrag && !pendingTaskDrag
+              ...(isMobile && !activeTaskDrag && !pendingTaskDrag && !activeBlockDrag
                 ? { scrollSnapType: 'x mandatory' as const }
                 : {}),
             }}
@@ -881,7 +998,7 @@ export function DayScrollView({
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-auto"
-        style={isMobile && !activeTaskDrag && !pendingTaskDrag ? { scrollSnapType: 'x mandatory', scrollSnapStop: 'always' } : undefined}
+        style={isMobile && !activeTaskDrag && !pendingTaskDrag && !activeBlockDrag ? { scrollSnapType: 'x mandatory', scrollSnapStop: 'always' } : undefined}
         onScroll={() => {
           handleScroll()
           syncScroll('grid')
@@ -939,24 +1056,109 @@ export function DayScrollView({
                   </div>
                 ))}
 
-                {/* Time Blocks */}
-                {dayBlocks.map((block) => (
-                  <div
-                    key={block.id}
-                    data-task="true"
-                    className="absolute left-1 right-1 rounded px-2 py-1 text-xs font-medium overflow-hidden"
-                    style={{
-                      top: getTimePosition(block.startTime),
-                      height: getDurationHeight(block.startTime, block.endTime),
-                      backgroundColor: block.color + '30',
-                      borderLeft: `3px solid ${block.color}`,
-                      color: block.color,
-                    }}
-                  >
-                    <div className="truncate">{block.label}</div>
-                    <div className="text-[10px] opacity-70">{block.startTime}-{block.endTime}</div>
-                  </div>
-                ))}
+                {/* Time Blocks — tap to edit, drag body to move, drag
+                    top/bottom edge to resize. Mirrors TaskBlock affordances. */}
+                {dayBlocks.map((block) => {
+                  const isDraggingThis = activeBlockDrag?.blockId === block.id
+                  // While dragging, show the live preview position instead
+                  // of the persisted one so the user can see where it'll
+                  // land before releasing.
+                  const top = isDraggingThis && activeBlockDrag
+                    ? `${activeBlockDrag.currentStart - MIN}px`
+                    : getTimePosition(block.startTime)
+                  const height = isDraggingThis && activeBlockDrag
+                    ? `${Math.max(activeBlockDrag.currentEnd - activeBlockDrag.currentStart, 30)}px`
+                    : getDurationHeight(block.startTime, block.endTime)
+                  // Hide the source if the drag has moved to a different day
+                  // (the live preview rendered in that day's column is the
+                  // visible copy).
+                  const isMovingAway = isDraggingThis && activeBlockDrag && activeBlockDrag.dayIndex !== dayIndex
+                  if (isMovingAway) return null
+                  const previewStart = isDraggingThis && activeBlockDrag
+                    ? minutesToTime(activeBlockDrag.currentStart)
+                    : block.startTime
+                  const previewEnd = isDraggingThis && activeBlockDrag
+                    ? minutesToTime(activeBlockDrag.currentEnd)
+                    : block.endTime
+                  return (
+                    <div
+                      key={block.id}
+                      data-block
+                      data-task="true"
+                      className={cn(
+                        'absolute left-1 right-1 rounded text-xs font-medium overflow-hidden group select-none',
+                        isDraggingThis
+                          ? 'shadow-2xl z-50 ring-2 ring-white/40 scale-[1.02] -rotate-1 transition-transform'
+                          : 'hover:shadow-md transition-all'
+                      )}
+                      style={{
+                        top,
+                        height,
+                        backgroundColor: block.color + '30',
+                        borderLeft: `3px solid ${block.color}`,
+                        color: block.color,
+                        cursor: isDraggingThis ? 'grabbing' : 'grab',
+                        zIndex: isDraggingThis ? 50 : 1,
+                        touchAction: 'none',
+                      }}
+                    >
+                      {/* Resize handle — TOP */}
+                      <div
+                        className="absolute top-0 left-0 right-0 h-4 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        onPointerDown={(e) => handleTimeBlockDragStart(block, 'resize-top', dayIndex, e)}
+                        style={{ touchAction: 'none' }}
+                      >
+                        <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: block.color, opacity: 0.6 }} />
+                      </div>
+
+                      {/* Body — drag to move, tap to open edit modal */}
+                      <div
+                        className="px-2 py-1 h-full flex flex-col"
+                        onPointerDown={(e) => handleTimeBlockDragStart(block, 'move', dayIndex, e)}
+                        onClick={() => {
+                          if (dragEndCooldown.current) return
+                          onTimeBlockSelect?.(block)
+                        }}
+                        style={{ touchAction: 'none' }}
+                      >
+                        <div className="truncate">{block.label}</div>
+                        <div className="text-[10px] opacity-70">{previewStart}-{previewEnd}</div>
+                      </div>
+
+                      {/* Resize handle — BOTTOM */}
+                      <div
+                        className="absolute bottom-0 left-0 right-0 h-4 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        onPointerDown={(e) => handleTimeBlockDragStart(block, 'resize-bottom', dayIndex, e)}
+                        style={{ touchAction: 'none' }}
+                      >
+                        <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: block.color, opacity: 0.6 }} />
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Live preview when block is being dragged to a different day */}
+                {activeBlockDrag && activeBlockDrag.dayIndex === dayIndex && !dayBlocks.find(b => b.id === activeBlockDrag.blockId) && (() => {
+                  const block = timeBlocks.find(b => b.id === activeBlockDrag.blockId)
+                  if (!block) return null
+                  return (
+                    <div
+                      className="absolute left-1 right-1 rounded px-2 py-1 text-xs font-medium overflow-hidden shadow-2xl z-50 ring-2 ring-white/40 pointer-events-none"
+                      style={{
+                        top: `${activeBlockDrag.currentStart - MIN}px`,
+                        height: `${Math.max(activeBlockDrag.currentEnd - activeBlockDrag.currentStart, 30)}px`,
+                        backgroundColor: block.color + '30',
+                        borderLeft: `3px solid ${block.color}`,
+                        color: block.color,
+                      }}
+                    >
+                      <div className="truncate">{block.label}</div>
+                      <div className="text-[10px] opacity-70">
+                        {minutesToTime(activeBlockDrag.currentStart)}-{minutesToTime(activeBlockDrag.currentEnd)}
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* Scheduled Tasks with drag/resize via TaskBlock */}
                 {(() => {

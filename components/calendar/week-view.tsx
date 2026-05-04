@@ -34,6 +34,9 @@ interface WeekViewProps {
   onOpenCreateTask?: (slotType: SlotType, date: string, startTime: string, endTime: string) => void
   onRescheduleTask?: (taskId: string, date: string, newStart: string, newEnd: string) => void
   onUnscheduleTask?: (taskId: string, date?: string) => void
+  onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
+  onDeleteTimeBlock?: (id: string) => void
+  onTimeBlockSelect?: (block: TimeBlock) => void
   onNavigate?: (direction: 'prev' | 'next') => void
   onDateChange?: (date: Date) => void
   startHour?: number
@@ -69,6 +72,8 @@ export function WeekView({
   onOpenCreateTask,
   onRescheduleTask,
   onUnscheduleTask,
+  onUpdateTimeBlock,
+  onTimeBlockSelect,
   onNavigate,
   onDateChange,
   startHour = 0,
@@ -870,12 +875,16 @@ export function WeekView({
                   </div>
                 ))}
 
-                {/* Time Blocks */}
+                {/* Time Blocks — tap to open the editor. (Week view skips
+                    drag-to-resize because each day column is too narrow on
+                    mobile to make precise edge drags reliable; users go
+                    through the modal instead.) */}
                 {dayBlocks.map((block) => (
                   <div
                     key={block.id}
                     data-task="true"
-                    className="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-[9px] font-medium overflow-hidden"
+                    onClick={() => onTimeBlockSelect?.(block)}
+                    className="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-[9px] font-medium overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
                     style={{
                       top: getTimePosition(block.startTime),
                       height: getDurationHeight(block.startTime, block.endTime),

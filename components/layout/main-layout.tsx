@@ -42,6 +42,7 @@ interface MainLayoutProps {
   onUnscheduleTask?: (taskId: string, date?: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
+  onTimeBlockSelect?: (block: TimeBlock) => void
 }
 
 const MIN_PANEL_WIDTH = 280
@@ -74,6 +75,7 @@ export function MainLayout({
   onUnscheduleTask,
   onUpdateTimeBlock,
   onDeleteTimeBlock,
+  onTimeBlockSelect,
 }: MainLayoutProps) {
   const isMobile = useIsMobile()
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
@@ -278,6 +280,7 @@ export function MainLayout({
                 onUnscheduleTask={onUnscheduleTask}
                 onUpdateTimeBlock={onUpdateTimeBlock}
                 onDeleteTimeBlock={onDeleteTimeBlock}
+                onTimeBlockSelect={onTimeBlockSelect}
                 onOpenJournal={handleOpenJournalFocus}
                 onOpenReport={handleOpenReportFocus}
                 onOpenSettings={onOpenSettings}
@@ -498,6 +501,7 @@ export function MainLayout({
                   onUnscheduleTask={onUnscheduleTask}
                   onUpdateTimeBlock={onUpdateTimeBlock}
                   onDeleteTimeBlock={onDeleteTimeBlock}
+                  onTimeBlockSelect={onTimeBlockSelect}
                   onOpenJournal={handleOpenJournalFocus}
                   onOpenReport={handleOpenReportFocus}
                   onOpenSettings={onOpenSettings}

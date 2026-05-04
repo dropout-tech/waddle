@@ -41,6 +41,7 @@ interface CalendarPanelProps {
   onUnscheduleTask?: (taskId: string, date?: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
+  onTimeBlockSelect?: (block: TimeBlock) => void
   // Focus mode callbacks
   onOpenJournal?: () => void
   onOpenReport?: () => void
@@ -77,6 +78,7 @@ export function CalendarPanel({
   onUnscheduleTask,
   onUpdateTimeBlock,
   onDeleteTimeBlock,
+  onTimeBlockSelect,
   onOpenJournal,
   onOpenReport,
   onOpenSettings,
@@ -180,6 +182,9 @@ export function CalendarPanel({
           onOpenCreateTask={onOpenCreateTask}
           onRescheduleTask={onRescheduleTask}
           onUnscheduleTask={onUnscheduleTask}
+          onUpdateTimeBlock={onUpdateTimeBlock}
+          onDeleteTimeBlock={onDeleteTimeBlock}
+          onTimeBlockSelect={onTimeBlockSelect}
           onNavigate={navigate}
           onDateChange={onDateChange}
         />
@@ -202,6 +207,9 @@ export function CalendarPanel({
           onOpenCreateTask={onOpenCreateTask}
           onRescheduleTask={onRescheduleTask}
           onUnscheduleTask={onUnscheduleTask}
+          onUpdateTimeBlock={onUpdateTimeBlock}
+          onDeleteTimeBlock={onDeleteTimeBlock}
+          onTimeBlockSelect={onTimeBlockSelect}
           onNavigate={navigate}
           onDateChange={onDateChange}
         />

@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { MainLayout } from '@/components/layout/main-layout'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
+import { TimeBlockModal } from '@/components/modals/time-block-modal'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { KeyboardShortcutsHint } from '@/components/keyboard-shortcuts'
 import { UserMenu } from '@/components/user-menu'
@@ -14,7 +15,7 @@ import { SettingsModal } from '@/components/modals/settings-modal'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { toDateString } from '@/lib/calendar-utils'
-import type { Task, SlotType } from '@/lib/types'
+import type { Task, SlotType, TimeBlock } from '@/lib/types'
 
 export default function WaddlePage() {
   const isMobile = useIsMobile()
@@ -82,10 +83,15 @@ export default function WaddlePage() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [taskMode, setTaskMode] = useState<'edit' | 'create'>('edit')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [selectedTimeBlock, setSelectedTimeBlock] = useState<TimeBlock | null>(null)
 
   const handleSelectTask = useCallback((task: Task) => {
     setTaskMode('edit')
     setSelectedTask(task)
+  }, [])
+
+  const handleSelectTimeBlock = useCallback((block: TimeBlock) => {
+    setSelectedTimeBlock(block)
   }, [])
 
   // Save handler shared by edit + create modes.
@@ -330,6 +336,7 @@ export default function WaddlePage() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onUpdateTimeBlock={updateTimeBlock}
         onDeleteTimeBlock={deleteTimeBlock}
+        onTimeBlockSelect={handleSelectTimeBlock}
       />
 
       {selectedTask && (
@@ -352,6 +359,15 @@ export default function WaddlePage() {
         workspaces={workspaces}
         onClose={() => setIsSettingsOpen(false)}
         onSave={saveSettings}
+      />
+
+      <TimeBlockModal
+        block={selectedTimeBlock}
+        isOpen={!!selectedTimeBlock}
+        slotTypes={activeSlotTypes}
+        onClose={() => setSelectedTimeBlock(null)}
+        onSave={(id, updates) => updateTimeBlock(id, updates)}
+        onDelete={(id) => deleteTimeBlock(id)}
       />
 
       {/* Desktop: floating top-right. Mobile renders an inline UserMenu

@@ -65,9 +65,18 @@ function TaskRowImpl({
   // Once the drag activates, the trailing click event (if any) needs to be
   // suppressed so we don't open the modal at the same time as the drop.
   const suppressNextClickRef = useRef(false)
+  // Brief celebration burst when transitioning unchecked → checked. Same
+  // pattern as TaskBlock: pop the circle, scale-in the check icon, six
+  // sparkles flying outward.
+  const [burst, setBurst] = useState(false)
 
   const handleCheck = (e: React.MouseEvent) => {
     e.stopPropagation()
+    if (!task.isCompleted) {
+      setBurst(true)
+      window.setTimeout(() => setBurst(false), 700)
+      haptic(20)
+    }
     onToggleComplete(task.id)
   }
 
@@ -213,17 +222,44 @@ function TaskRowImpl({
             borderLeft: `3px solid ${colors.accentColor}`,
           }}
         >
-          {/* Checkbox */}
-          <button
-            onClick={handleCheck}
-            className="flex-shrink-0 w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all hover:scale-110"
-            style={{
-              backgroundColor: task.isCompleted ? colors.accentColor : 'transparent',
-              borderColor: `color-mix(in oklch, ${colors.accentColor} 60%, transparent)`,
-            }}
-          >
-            {task.isCompleted && <Check className="w-2 h-2 text-white" strokeWidth={3.5} />}
-          </button>
+          {/* Checkbox — bigger touch target than visual circle. */}
+          <div className="relative flex-shrink-0">
+            <button
+              onClick={handleCheck}
+              className={cn(
+                'flex-shrink-0 w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all hover:scale-110 active:scale-95',
+                burst && 'animate-[task-pop_500ms_ease-out]'
+              )}
+              style={{
+                backgroundColor: task.isCompleted ? colors.accentColor : 'transparent',
+                borderColor: `color-mix(in oklch, ${colors.accentColor} 60%, transparent)`,
+              }}
+              aria-checked={task.isCompleted}
+              aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
+              role="checkbox"
+            >
+              {task.isCompleted && (
+                <Check
+                  className={cn('w-2 h-2 text-white', burst && 'animate-[task-check_500ms_ease-out]')}
+                  strokeWidth={3.5}
+                />
+              )}
+            </button>
+            {burst && (
+              <div className="pointer-events-none absolute inset-0">
+                {[0, 60, 120, 180, 240, 300].map(angle => (
+                  <span
+                    key={angle}
+                    className="absolute top-1/2 left-1/2 w-1 h-1 rounded-full animate-[task-sparkle_600ms_ease-out_forwards]"
+                    style={{
+                      backgroundColor: colors.accentColor,
+                      ['--task-sparkle-angle' as string]: `${angle}deg`,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Urgency dot */}
           <span
@@ -298,17 +334,44 @@ function TaskRowImpl({
           <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
         </div>
 
-        {/* Checkbox */}
-        <button
-          onClick={handleCheck}
-          className="flex-shrink-0 w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-all mt-0.5 hover:scale-110"
-          style={{
-            backgroundColor: task.isCompleted ? colors.accentColor : 'transparent',
-            borderColor: task.isCompleted ? colors.accentColor : `color-mix(in oklch, ${colors.accentColor} 50%, transparent)`,
-          }}
-        >
-          {task.isCompleted && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
-        </button>
+        {/* Checkbox with celebration burst */}
+        <div className="relative flex-shrink-0 mt-0.5">
+          <button
+            onClick={handleCheck}
+            className={cn(
+              'w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-all hover:scale-110 active:scale-95',
+              burst && 'animate-[task-pop_500ms_ease-out]'
+            )}
+            style={{
+              backgroundColor: task.isCompleted ? colors.accentColor : 'transparent',
+              borderColor: task.isCompleted ? colors.accentColor : `color-mix(in oklch, ${colors.accentColor} 50%, transparent)`,
+            }}
+            aria-checked={task.isCompleted}
+            aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
+            role="checkbox"
+          >
+            {task.isCompleted && (
+              <Check
+                className={cn('w-2.5 h-2.5 text-white', burst && 'animate-[task-check_500ms_ease-out]')}
+                strokeWidth={3}
+              />
+            )}
+          </button>
+          {burst && (
+            <div className="pointer-events-none absolute inset-0">
+              {[0, 60, 120, 180, 240, 300].map(angle => (
+                <span
+                  key={angle}
+                  className="absolute top-1/2 left-1/2 w-1 h-1 rounded-full animate-[task-sparkle_600ms_ease-out_forwards]"
+                  style={{
+                    backgroundColor: colors.accentColor,
+                    ['--task-sparkle-angle' as string]: `${angle}deg`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Task Content */}
         <div className="flex-1 min-w-0">
