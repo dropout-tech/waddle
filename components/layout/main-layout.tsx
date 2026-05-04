@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
@@ -87,20 +87,86 @@ export function MainLayout({
   // Mobile-only — drives the FocusScratchpad open/close from the bottom tab bar.
   const [mobileScratchpadOpen, setMobileScratchpadOpen] = useState(false)
   // Mobile horizontal swipe between Tasks and Calendar tabs.
+  // Lower thresholds than the desktop calendar swipe — phone gestures are
+  // shorter and faster, and tab switching is binary (no chance of skipping
+  // an intermediate state) so being eager is fine.
   const mobileContentRef = useRef<HTMLDivElement>(null)
   useSwipeNavigation({
     elementRef: mobileContentRef,
+    threshold: 40,
+    directionRatio: 1.4,
     onSwipeLeft: () => {
       // Tasks → Calendar. Calendar's own day-scroll consumes left swipes
       // when it's the active tab, so this only fires from the tasks tab.
       if (mobileTab === 'tasks') setMobileTab('calendar')
     },
     onSwipeRight: () => {
-      // Calendar → Tasks (only when calendar isn't intercepting horizontal
-      // gestures itself, e.g. month/year views without horizontal scroll).
+      // Calendar → Tasks. The day-scroll-view normally swallows horizontal
+      // gestures into its own scroll-snap navigation, so this rarely fires
+      // from the calendar; the dedicated edge-swipe catcher below covers
+      // that path.
       if (mobileTab === 'calendar') setMobileTab('tasks')
     },
   })
+
+  // Calendar → Tasks edge swipe. The calendar tab embeds a horizontal
+  // scrolling day strip that natively absorbs horizontal pans, so the main
+  // swipe handler above can never fire from inside the grid. To still let
+  // users get back to the task list with a gesture, we attach a thin
+  // capture zone hugging the left screen edge. Pans starting there get
+  // their default scroll prevented and routed to a tab switch instead —
+  // mirroring the iOS "back" edge swipe people already know.
+  const leftEdgeRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = leftEdgeRef.current
+    if (!isMobile || mobileTab !== 'calendar' || !el) return
+
+    let startX = 0
+    let startY = 0
+    let active = false
+    let committed = false
+
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0]
+      startX = t.clientX
+      startY = t.clientY
+      active = true
+      committed = false
+    }
+    const onMove = (e: TouchEvent) => {
+      if (!active) return
+      const t = e.touches[0]
+      const dx = t.clientX - startX
+      const dy = Math.abs(t.clientY - startY)
+      // Once we're confident this is a horizontal-rightward gesture, take
+      // it over so the inner scroll doesn't compete.
+      if (!committed && dx > 8 && dx > dy * 1.4) {
+        committed = true
+      }
+      if (committed) e.preventDefault()
+    }
+    const onEnd = (e: TouchEvent) => {
+      if (!active) return
+      active = false
+      const t = e.changedTouches[0]
+      const dx = t.clientX - startX
+      const dy = Math.abs(t.clientY - startY)
+      if (committed && dx > 40 && dx > dy * 1.4) {
+        setMobileTab('tasks')
+      }
+    }
+
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: false })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    el.addEventListener('touchcancel', onEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+      el.removeEventListener('touchcancel', onEnd)
+    }
+  }, [isMobile, mobileTab])
 
   // Sidebar visibility states
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true)
@@ -184,6 +250,19 @@ export function MainLayout({
           onOpenChange={setMobileScratchpadOpen}
           hideTrigger
         />
+
+        {/* Calendar → Tasks edge-swipe capture zone. Only mounted on the
+            calendar tab; sits above the content so its touch handler runs
+            before day-scroll-view's native horizontal scroll. Stops short of
+            the bottom tab bar so taps on the tab buttons still register. */}
+        {mobileTab === 'calendar' && focusMode === 'none' && (
+          <div
+            ref={leftEdgeRef}
+            aria-hidden="true"
+            className="absolute left-0 top-0 bottom-[64px] w-5 z-30"
+            style={{ touchAction: 'pan-y' }}
+          />
+        )}
 
         <div ref={mobileContentRef} className="flex-1 min-h-0 flex flex-col">
           {focusMode !== 'none' ? (
