@@ -158,10 +158,6 @@ export function MainLayout({
       task.scheduledEndTime
   )
 
-  const filteredTimeBlocks = timeBlocks.filter(
-    (block) => block.date === dateString
-  )
-
   // Handle opening journal in focus mode
   const handleOpenJournalFocus = useCallback(() => {
     setFocusMode('journal')
@@ -260,7 +256,7 @@ export function MainLayout({
                 pendingTasks={pendingTasks}
                 scheduledTasks={scheduledTasks}
                 allTasks={allTasks}
-                timeBlocks={filteredTimeBlocks}
+                timeBlocks={timeBlocks}
                 slotTypes={slotTypes}
                 workspaces={workspaces}
                 startHour={startHour}
@@ -481,7 +477,7 @@ export function MainLayout({
                   pendingTasks={pendingTasks}
                   scheduledTasks={scheduledTasks}
                   allTasks={allTasks}
-                  timeBlocks={filteredTimeBlocks}
+                  timeBlocks={timeBlocks}
                   slotTypes={slotTypes}
                   workspaces={workspaces}
                   startHour={startHour}
