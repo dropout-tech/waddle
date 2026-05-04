@@ -168,7 +168,8 @@ export function SettingsModal({
   // Slot type management
   const handleAddSlotType = () => {
     if (!newSlotType.label) return
-    const id = `slot-${Date.now()}`
+    // DB column is uuid — must be a real UUID, not a Date.now()-derived string.
+    const id = crypto.randomUUID()
     const maxSort = Math.max(0, ...localSettings.slotTypes.filter(s => s.parentId === newSlotType.parentId).map(s => s.sortOrder))
     const newType: SlotType = {
       id,

@@ -213,9 +213,33 @@ export function useWaddleData(): UseWaddleData {
         .eq('user_id', user.id)
         .maybeSingle()
 
+      // 6) Custom slot types (built-in workspace + 午休/緩衝/專注 are
+      // synthesized in app/page.tsx; this table only stores user customs.)
+      const { data: slotTypeRows } = await supabase
+        .from('slot_types')
+        .select('*')
+        .order('sort_order', { ascending: true })
+
+      const customSlotTypes = (slotTypeRows ?? []).map((r) => ({
+        id: r.id,
+        key: r.key,
+        label: r.label,
+        description: r.description,
+        icon: r.icon,
+        iconType: r.icon_type,
+        color: r.color,
+        // parent_key holds synthetic-parent strings ('timeblock', 'ws-<id>')
+        // that can't fit the uuid parent_id column; fall back to parent_id
+        // for nested customs that point at a real DB row.
+        parentId: r.parent_key ?? r.parent_id ?? undefined,
+        sortOrder: r.sort_order,
+        isBuiltIn: r.is_built_in,
+        workspaceId: r.workspace_id ?? undefined,
+      }))
+
       const builtSettings = settingsRow
-        ? rowToSettings(settingsRow, DEFAULT_SETTINGS)
-        : DEFAULT_SETTINGS
+        ? { ...rowToSettings(settingsRow, DEFAULT_SETTINGS), slotTypes: customSlotTypes }
+        : { ...DEFAULT_SETTINGS, slotTypes: customSlotTypes }
 
       if (cancelled) return
       setWorkspaces(builtWorkspaces)
@@ -785,6 +809,38 @@ export function useWaddleData(): UseWaddleData {
       }))
       const { error: tbError } = await supabase.from('time_blocks').insert(rows)
       if (tbError) handleDbError('儲存時間區塊')(tbError)
+    }
+
+    // Slot types: same full-replace pattern. Only persist user-customs —
+    // built-in types (workspace tabs, 時間區塊/午休/緩衝/專注) are
+    // synthesized at runtime in app/page.tsx, so we don't write them.
+    await supabase.from('slot_types').delete().eq('user_id', userId)
+    const customSlotTypes = newSettings.slotTypes.filter((s) => !s.isBuiltIn)
+    if (customSlotTypes.length > 0) {
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      const slotRows = customSlotTypes.map((s) => {
+        // parent_id has a uuid FK to slot_types.id, so it can only hold
+        // strings that look like UUIDs and reference real rows. Synthetic
+        // parents ('timeblock', 'ws-<id>') go in parent_key instead.
+        const parentIsRealUuid = !!s.parentId && UUID_RE.test(s.parentId)
+        return {
+          id: s.id,
+          user_id: userId,
+          key: s.key,
+          label: s.label,
+          description: s.description,
+          icon: s.icon,
+          icon_type: s.iconType,
+          color: s.color,
+          parent_id: parentIsRealUuid ? s.parentId! : null,
+          parent_key: !parentIsRealUuid && s.parentId ? s.parentId : null,
+          workspace_id: s.workspaceId ?? null,
+          sort_order: s.sortOrder,
+          is_built_in: s.isBuiltIn,
+        }
+      })
+      const { error: stError } = await supabase.from('slot_types').insert(slotRows)
+      if (stError) handleDbError('儲存時間區塊類型')(stError)
     }
   }, [supabase])
 

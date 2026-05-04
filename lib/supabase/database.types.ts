@@ -135,6 +135,7 @@ type SlotTypesRow = {
   icon_type: 'lucide' | 'custom' | 'emoji'
   color: string
   parent_id: string | null
+  parent_key: string | null
   workspace_id: string | null
   sort_order: number
   is_built_in: boolean
@@ -271,6 +272,7 @@ type SlotTypesInsert = {
   icon_type?: 'lucide' | 'custom' | 'emoji'
   color: string
   parent_id?: string | null
+  parent_key?: string | null
   workspace_id?: string | null
   sort_order?: number
   is_built_in?: boolean
