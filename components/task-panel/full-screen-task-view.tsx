@@ -102,7 +102,9 @@ export function FullScreenTaskView({
   const now = new Date()
   const todayStr = toDateString(now)
   
-  // Gather all tasks
+  // Gather all tasks. Tasks marked 加入左側任務欄 = false (e.g. recurring
+  // meetings) live only on the calendar — exclude them from this view too
+  // so the task-management screen stays in sync with the left panel.
   const allTasks = useMemo(() => {
     const tasks: (Task & { workspaceName: string; workspaceColor: string; categoryName: string })[] = []
     workspaces.forEach(ws => {
@@ -110,6 +112,7 @@ export function FullScreenTaskView({
         ws.categories?.forEach(cat => {
           if (!cat.isArchived) {
             cat.tasks?.forEach(task => {
+              if (task.showInTaskList === false) return
               tasks.push({
                 ...task,
                 workspaceName: ws.name,

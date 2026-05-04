@@ -65,11 +65,14 @@ export function PanelHeader({
     localStorage.setItem('waddle-header-collapsed', String(newValue))
   }
 
-  // Count pending tasks per workspace
+  // Count pending tasks per workspace. Tasks marked 加入左側任務欄 = false
+  // (calendar-only) are excluded so the badge matches the rendered list.
   const getWorkspaceCount = (workspace: Workspace) => {
     let count = 0
     for (const category of workspace.categories) {
-      count += category.tasks.filter((t) => !t.isCompleted).length
+      count += category.tasks.filter(
+        (t) => !t.isCompleted && t.showInTaskList !== false
+      ).length
     }
     return count
   }
