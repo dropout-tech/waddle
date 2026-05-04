@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useRef, useState } from 'react'
-import { cn } from '@/lib/utils'
+import { cn, haptic } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import {
   calculateBlockHeight,
@@ -9,6 +9,14 @@ import {
   formatTime,
 } from '@/lib/task-utils'
 import { Check, GripVertical, RefreshCw, Layers, Clock } from 'lucide-react'
+
+// Touch input requires a long-press before any drag activates so the user
+// can scroll the calendar past tasks without accidentally moving them.
+// Matches the TaskRow long-press feel.
+const TOUCH_LONG_PRESS_MS = 280
+// During the long-press hold, allow up to this much finger jitter without
+// cancelling. Beyond this, treat the gesture as a scroll attempt.
+const TOUCH_HOLD_TOLERANCE_PX = 8
 
 export type TaskDragType = 'move' | 'resize-top' | 'resize-bottom'
 
@@ -90,29 +98,92 @@ function TaskBlockImpl({
   // Track press origin to distinguish a click (open task) from a drag.
   // Pointer events handle both mouse and touch identically.
   const pressOrigin = useRef<{ x: number; y: number; t: number } | null>(null)
+  // Long-press timer for touch input — drag only activates after the user
+  // has pressed and held for TOUCH_LONG_PRESS_MS. Cancelled if they release
+  // or move beyond TOUCH_HOLD_TOLERANCE_PX first.
+  const longPressTimer = useRef<number | null>(null)
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current !== null) {
+      window.clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
+  const fireDragStart = (
+    e: { clientX: number; clientY: number },
+    dragType: TaskDragType,
+  ) => {
+    if (!onDragStart) return
+    const blockEl = document.querySelector<HTMLElement>(`[data-task-block-id="${task.id}"]`)
+    const blockRect = blockEl?.getBoundingClientRect()
+    const offsetY = blockRect ? e.clientY - blockRect.top : 0
+    onDragStart({
+      taskId: task.id,
+      dragType,
+      originalStart: timeToMinutes(task.scheduledStartTime!),
+      originalEnd: timeToMinutes(task.scheduledEndTime!),
+      offsetY: dragType === 'move' ? offsetY : 0,
+      startX: e.clientX,
+      startY: e.clientY,
+    })
+  }
 
   const handleBodyPointerDown = (e: React.PointerEvent) => {
     if (!onDragStart) return
     if (e.button !== 0 && e.pointerType === 'mouse') return
     e.stopPropagation()
     pressOrigin.current = { x: e.clientX, y: e.clientY, t: Date.now() }
-    const blockEl = (e.currentTarget as HTMLElement).closest('[data-task-block]') as HTMLElement
-    const blockRect = blockEl?.getBoundingClientRect()
-    const offsetY = blockRect ? e.clientY - blockRect.top : 0
-    onDragStart({
-      taskId: task.id,
-      dragType: 'move',
-      originalStart: timeToMinutes(task.scheduledStartTime!),
-      originalEnd: timeToMinutes(task.scheduledEndTime!),
-      offsetY,
-      startX: e.clientX,
-      startY: e.clientY,
-    })
+
+    if (e.pointerType === 'mouse') {
+      // Desktop: drag activates immediately, parent uses 5px threshold.
+      fireDragStart(e, 'move')
+      return
+    }
+
+    // Touch: arm a long-press timer. The parent's pointermove listener
+    // isn't installed until fireDragStart runs, so we track jitter here
+    // ourselves and only commit the drag once the hold completes.
+    const startX = e.clientX
+    const startY = e.clientY
+    const onWindowMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      if (Math.sqrt(dx * dx + dy * dy) > TOUCH_HOLD_TOLERANCE_PX) {
+        // Treat as scroll attempt → abort drag intent. The default touch
+        // gesture (scroll) takes over.
+        cancelLongPress()
+        window.removeEventListener('pointermove', onWindowMove)
+        window.removeEventListener('pointerup', onWindowUp)
+        window.removeEventListener('pointercancel', onWindowUp)
+        pressOrigin.current = null
+      }
+    }
+    const onWindowUp = () => {
+      window.removeEventListener('pointermove', onWindowMove)
+      window.removeEventListener('pointerup', onWindowUp)
+      window.removeEventListener('pointercancel', onWindowUp)
+      // If the timer hasn't fired yet, cancel it — handleBodyPointerUp
+      // below will treat this as a tap and open the modal.
+      if (longPressTimer.current !== null) cancelLongPress()
+    }
+    window.addEventListener('pointermove', onWindowMove)
+    window.addEventListener('pointerup', onWindowUp)
+    window.addEventListener('pointercancel', onWindowUp)
+
+    longPressTimer.current = window.setTimeout(() => {
+      longPressTimer.current = null
+      haptic(15)
+      fireDragStart({ clientX: startX, clientY: startY }, 'move')
+      // Suppress the upcoming click on release — the parent owns drop now.
+      pressOrigin.current = null
+    }, TOUCH_LONG_PRESS_MS)
   }
 
   const handleBodyPointerUp = (e: React.PointerEvent) => {
     const origin = pressOrigin.current
     pressOrigin.current = null
+    cancelLongPress()
     if (!origin) return
     const dx = e.clientX - origin.x
     const dy = e.clientY - origin.y
@@ -124,35 +195,54 @@ function TaskBlockImpl({
     }
   }
 
-  const handleResizeTopPointerDown = (e: React.PointerEvent) => {
+  const handleResizePointerDown = (
+    e: React.PointerEvent,
+    dragType: 'resize-top' | 'resize-bottom',
+  ) => {
     if (!onDragStart) return
     if (e.button !== 0 && e.pointerType === 'mouse') return
     e.stopPropagation()
-    onDragStart({
-      taskId: task.id,
-      dragType: 'resize-top',
-      originalStart: timeToMinutes(task.scheduledStartTime!),
-      originalEnd: timeToMinutes(task.scheduledEndTime!),
-      offsetY: 0,
-      startX: e.clientX,
-      startY: e.clientY,
-    })
+
+    if (e.pointerType === 'mouse') {
+      fireDragStart(e, dragType)
+      return
+    }
+
+    // Touch: same long-press gate as the body. Otherwise a brushing finger
+    // on the resize handle while scrolling resizes the task by accident.
+    const startX = e.clientX
+    const startY = e.clientY
+    const onWindowMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      if (Math.sqrt(dx * dx + dy * dy) > TOUCH_HOLD_TOLERANCE_PX) {
+        cancelLongPress()
+        window.removeEventListener('pointermove', onWindowMove)
+        window.removeEventListener('pointerup', onWindowUp)
+        window.removeEventListener('pointercancel', onWindowUp)
+      }
+    }
+    const onWindowUp = () => {
+      window.removeEventListener('pointermove', onWindowMove)
+      window.removeEventListener('pointerup', onWindowUp)
+      window.removeEventListener('pointercancel', onWindowUp)
+      if (longPressTimer.current !== null) cancelLongPress()
+    }
+    window.addEventListener('pointermove', onWindowMove)
+    window.addEventListener('pointerup', onWindowUp)
+    window.addEventListener('pointercancel', onWindowUp)
+
+    longPressTimer.current = window.setTimeout(() => {
+      longPressTimer.current = null
+      haptic(15)
+      fireDragStart({ clientX: startX, clientY: startY }, dragType)
+    }, TOUCH_LONG_PRESS_MS)
   }
 
-  const handleResizeBottomPointerDown = (e: React.PointerEvent) => {
-    if (!onDragStart) return
-    if (e.button !== 0 && e.pointerType === 'mouse') return
-    e.stopPropagation()
-    onDragStart({
-      taskId: task.id,
-      dragType: 'resize-bottom',
-      originalStart: timeToMinutes(task.scheduledStartTime!),
-      originalEnd: timeToMinutes(task.scheduledEndTime!),
-      offsetY: 0,
-      startX: e.clientX,
-      startY: e.clientY,
-    })
-  }
+  const handleResizeTopPointerDown = (e: React.PointerEvent) =>
+    handleResizePointerDown(e, 'resize-top')
+  const handleResizeBottomPointerDown = (e: React.PointerEvent) =>
+    handleResizePointerDown(e, 'resize-bottom')
 
   const color = task.calendarColor || task.workspaceColor
 
@@ -190,6 +280,7 @@ function TaskBlockImpl({
   return (
     <div
       data-task-block
+      data-task-block-id={task.id}
       data-block="true"
       role="button"
       tabIndex={0}

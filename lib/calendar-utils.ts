@@ -20,6 +20,97 @@ export function toDateString(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+/**
+ * Parse a YYYY-MM-DD date string as local midnight (matching toDateString).
+ * Avoid `new Date(str)` which interprets bare YYYY-MM-DD as UTC midnight,
+ * shifting it by ±1 day depending on timezone.
+ */
+export function parseDateString(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function daysBetween(a: Date, b: Date): number {
+  const MS_PER_DAY = 86_400_000
+  // Normalize to local midnight to avoid DST off-by-one.
+  const aMid = new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime()
+  const bMid = new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime()
+  return Math.round((bMid - aMid) / MS_PER_DAY)
+}
+
+/**
+ * Whether a recurring task should appear on the given date — including
+ * future occurrences derived from `task.recurrence`.
+ *
+ * Returns true for the task's original `scheduledDate`, plus every
+ * date that matches its recurrence pattern up to `recurrence.endDate`
+ * (inclusive). Non-recurring tasks return true only for their exact date.
+ */
+export function taskOccursOnDate(task: Task, date: Date): boolean {
+  if (!task.scheduledDate) return false
+  const dateStr = toDateString(date)
+
+  // Original occurrence — always counts.
+  if (task.scheduledDate === dateStr) return true
+
+  if (!task.isRecurring || !task.recurrence) return false
+
+  const start = parseDateString(task.scheduledDate)
+  if (date.getTime() < start.getTime()) return false
+
+  if (task.recurrence.endDate && dateStr > task.recurrence.endDate) return false
+
+  const interval = Math.max(1, task.recurrence.interval || 1)
+  const days = daysBetween(start, date)
+  if (days <= 0) return false
+
+  switch (task.recurrence.type) {
+    case 'daily':
+      return days % interval === 0
+
+    case 'weekly': {
+      // For weekly: only same week-positions every `interval` weeks count.
+      // If daysOfWeek is set, the task fires on each chosen weekday in those
+      // weeks. Otherwise it fires on the original weekday.
+      const startOfWeek = (d: Date) => {
+        const day = d.getDay()
+        const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day)
+        return monday
+      }
+      const weeksSince = Math.floor(daysBetween(startOfWeek(start), startOfWeek(date)) / 7)
+      if (weeksSince % interval !== 0) return false
+      const dow = task.recurrence.daysOfWeek
+      if (dow && dow.length > 0) {
+        return dow.includes(date.getDay())
+      }
+      return date.getDay() === start.getDay()
+    }
+
+    case 'monthly': {
+      const months = (date.getFullYear() - start.getFullYear()) * 12 + (date.getMonth() - start.getMonth())
+      if (months <= 0 || months % interval !== 0) return false
+      return date.getDate() === start.getDate()
+    }
+
+    case 'custom':
+      // Custom = every `interval` days.
+      return days % interval === 0
+  }
+
+  return false
+}
+
+/**
+ * True iff the date is a *future* (virtual) occurrence — i.e. the task
+ * recurs on this date but `task.scheduledDate` is a different day. Use
+ * this to disable drag/resize on derived instances and to render a
+ * subtle "🔁" indicator.
+ */
+export function isVirtualOccurrence(task: Task, date: Date): boolean {
+  if (!task.isRecurring) return false
+  return task.scheduledDate !== toDateString(date) && taskOccursOnDate(task, date)
+}
+
 export function timeToMinutes(t: string): number {
   const [h, m] = t.split(':').map(Number)
   return h * 60 + m

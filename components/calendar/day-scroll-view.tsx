@@ -13,6 +13,7 @@ import {
   calculateTaskColumns,
   toDateString,
   autoScrollContainerNearEdge,
+  taskOccursOnDate,
 } from '@/lib/calendar-utils'
 import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -312,10 +313,10 @@ export function DayScrollView({
     }
   }, [isMobile, onDateChange, allDates, selectedDate, DAY_WIDTH, EXTEND_THRESHOLD])
 
-  // Get tasks for a specific date
+  // Get tasks for a specific date.
+  // Recurring tasks expand into virtual occurrences via taskOccursOnDate.
   const getTasksForDate = useCallback((date: Date) => {
-    const dateStr = toDateString(date)
-    return tasks.filter(t => t.scheduledDate === dateStr && t.scheduledStartTime)
+    return tasks.filter(t => taskOccursOnDate(t, date) && t.scheduledStartTime)
   }, [tasks])
 
   // Get time blocks for a specific date
@@ -324,11 +325,11 @@ export function DayScrollView({
     return timeBlocks.filter(b => b.date === dateStr)
   }, [timeBlocks])
 
-  // Get all-day tasks
+  // Get all-day tasks (including recurring expansions)
   const getAllDayTasksForDate = useCallback((date: Date) => {
     const dateStr = toDateString(date)
     return tasks.filter(t =>
-      (t.scheduledDate === dateStr && !t.scheduledStartTime) ||
+      (taskOccursOnDate(t, date) && !t.scheduledStartTime) ||
       (t.dueDate === dateStr && !t.scheduledDate)
     )
   }, [tasks])

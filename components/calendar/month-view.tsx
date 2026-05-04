@@ -4,7 +4,7 @@ import { useMemo, useRef, useCallback, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { Check, Plus } from 'lucide-react'
-import { toDateString } from '@/lib/calendar-utils'
+import { toDateString, taskOccursOnDate } from '@/lib/calendar-utils'
 
 interface MonthViewProps {
   selectedDate: Date
@@ -133,26 +133,23 @@ export function MonthView({
     return days
   }, [])
 
-  // Group tasks by date
-  const tasksByDate = useMemo(() => {
-    const map: Record<string, Task[]> = {}
-    for (const task of tasks) {
-      const date = task.scheduledDate || task.dueDate
-      if (date) {
-        if (!map[date]) map[date] = []
-        map[date].push(task)
+  // Lookup tasks for a given day, including recurring expansions.
+  // Computing per-day at render time (≤42 days per month × N tasks) is
+  // cheap and avoids precomputing a sparse map of all future occurrences.
+  const getTasksForDay = useCallback((date: Date, dateString: string): Task[] => {
+    const matched = tasks.filter((t) => {
+      if (taskOccursOnDate(t, date)) return true
+      // due-date tasks (no schedule) still pin to their dueDate column.
+      if (!t.scheduledDate && t.dueDate === dateString) return true
+      return false
+    })
+    return [...matched].sort((a, b) => {
+      if (b.urgency !== a.urgency) return b.urgency - a.urgency
+      if (a.scheduledStartTime && b.scheduledStartTime) {
+        return a.scheduledStartTime.localeCompare(b.scheduledStartTime)
       }
-    }
-    for (const date in map) {
-      map[date].sort((a, b) => {
-        if (b.urgency !== a.urgency) return b.urgency - a.urgency
-        if (a.scheduledStartTime && b.scheduledStartTime) {
-          return a.scheduledStartTime.localeCompare(b.scheduledStartTime)
-        }
-        return 0
-      })
-    }
-    return map
+      return 0
+    })
   }, [tasks])
 
   const blocksByDate = useMemo(() => {
@@ -226,7 +223,7 @@ export function MonthView({
               {/* Calendar Grid */}
               <div className="grid grid-cols-7 flex-1 gap-1">
                 {calendarDays.map((day, index) => {
-                  const dayTasks = tasksByDate[day.dateString] || []
+                  const dayTasks = getTasksForDay(day.date, day.dateString)
                   const dayBlocks = blocksByDate[day.dateString] || []
                   const pendingTasks = dayTasks.filter((t) => !t.isCompleted)
                   const completedTasks = dayTasks.filter((t) => t.isCompleted)

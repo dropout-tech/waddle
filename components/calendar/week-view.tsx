@@ -13,6 +13,7 @@ import {
   calculateTaskColumns,
   toDateString,
   autoScrollContainerNearEdge,
+  taskOccursOnDate,
 } from '@/lib/calendar-utils'
 import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 import { CurrentTimeLine } from './current-time-line'
@@ -233,15 +234,15 @@ export function WeekView({
   const today = new Date()
   const todayString = toDateString(today)
 
-  // Get scheduled tasks for a specific date (tasks with specific time)
+  // Get scheduled tasks for a specific date (tasks with specific time).
+  // Recurring tasks expand into virtual occurrences via taskOccursOnDate.
   const getScheduledTasksForDate = (date: Date) => {
-    const dateStr = toDateString(date)
     return tasks.filter(
-      (t) => t.scheduledDate === dateStr && t.scheduledStartTime && t.scheduledEndTime
+      (t) => taskOccursOnDate(t, date) && t.scheduledStartTime && t.scheduledEndTime
     )
   }
 
-  // Get all-day/unscheduled tasks for a specific date
+  // Get all-day/unscheduled tasks for a specific date.
   // Pending zone tasks for this day. The two clauses make scheduledDate
   // authoritative once set: a task with scheduledDate=A and dueDate=B only
   // shows in A's pending zone, never B's. Without this dueDate-vs-scheduledDate
@@ -251,7 +252,7 @@ export function WeekView({
   const getAllDayTasksForDate = (date: Date) => {
     const dateStr = toDateString(date)
     return tasks.filter(t =>
-      (t.scheduledDate === dateStr && !t.scheduledStartTime) ||
+      (taskOccursOnDate(t, date) && !t.scheduledStartTime) ||
       (t.dueDate === dateStr && !t.scheduledDate)
     )
   }

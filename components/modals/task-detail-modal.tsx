@@ -375,11 +375,21 @@ export function TaskDetailModal({
                 重複設定
               </label>
               <button
-                onClick={() => setIsRecurring(!isRecurring)}
+                onClick={() => {
+                  const next = !isRecurring
+                  setIsRecurring(next)
+                  // Recurring tasks would otherwise spawn unbounded copies in
+                  // the left task panel. Auto-hide on enable so the calendar
+                  // stays the source of truth for repeats; user can still
+                  // re-enable the toggle below if they prefer it visible.
+                  if (next) setShowInTaskList(false)
+                }}
+                aria-pressed={isRecurring}
                 className={cn(
-                  'relative w-10 h-5 rounded-full transition-colors',
+                  'relative w-10 h-5 flex-shrink-0 rounded-full transition-colors',
                   isRecurring ? 'bg-primary' : 'bg-muted'
                 )}
+                style={{ padding: 0, appearance: 'none' as const }}
               >
                 <span
                   className={cn(
