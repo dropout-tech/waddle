@@ -7,6 +7,7 @@ import { cn, haptic } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import { getUrgencyColor, formatEstimatedTime } from '@/lib/task-utils'
 import { calendarHitTest, minutesToTime } from '@/lib/calendar-utils'
+import { renderNotesWithLinks } from '@/lib/notes-render'
 import type { Density, MetaField } from './task-panel'
 import {
   Tooltip,
@@ -414,7 +415,9 @@ function TaskRowImpl({
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-[200px] text-xs bg-card border-border">
-                    <p className="whitespace-pre-wrap text-foreground">{task.notes}</p>
+                    <p className="whitespace-pre-wrap break-words text-foreground">
+                      {renderNotesWithLinks(task.notes!)}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -458,7 +461,8 @@ function TaskRowImpl({
             })}
           </div>
 
-          {/* Notes preview */}
+          {/* Notes preview — single-line clamp; full text + clickable links
+              live in the tooltip on the meta row, so we keep this concise. */}
           {task.notes && (
             <p
               className="mt-2 text-[11px] leading-relaxed line-clamp-1 pl-2"
@@ -467,7 +471,7 @@ function TaskRowImpl({
                 borderLeft: `2px solid ${colors.accentColor}40`,
               }}
             >
-              {task.notes}
+              {renderNotesWithLinks(task.notes)}
             </p>
           )}
         </div>

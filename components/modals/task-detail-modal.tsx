@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useRef, useMemo } from 'react'
-import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat, List, CheckSquare, ListChecks } from 'lucide-react'
+import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat, List, CheckSquare, ListChecks, Link2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import type { Task, Workspace } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { renderNotesWithLinks } from '@/lib/notes-render'
 
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -801,6 +802,31 @@ interface NotesEditorProps {
 function NotesEditor({ value, onChange }: NotesEditorProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
 
+  const insertLink = () => {
+    const ta = ref.current
+    if (!ta) return
+    const v = ta.value
+    const start = ta.selectionStart ?? v.length
+    const end = ta.selectionEnd ?? v.length
+    const selected = v.slice(start, end)
+
+    const url = window.prompt('輸入網址（例如 https://example.com）', selected.startsWith('http') ? selected : 'https://')
+    if (!url) return
+
+    const text = selected || window.prompt('連結要顯示的文字（留空則顯示網址）', '') || url
+    // Markdown-style link — kept verbatim in storage; rendered as <a> in
+    // display contexts (TaskRow notes preview/tooltip, task-detail rendered
+    // preview if added later).
+    const insertion = `[${text}](${url})`
+    const next = v.slice(0, start) + insertion + v.slice(end)
+    onChange(next)
+    requestAnimationFrame(() => {
+      ta.focus()
+      const cursorAt = start + insertion.length
+      ta.setSelectionRange(cursorAt, cursorAt)
+    })
+  }
+
   const insertLinePrefix = (prefix: string) => {
     const ta = ref.current
     if (!ta) return
@@ -853,6 +879,15 @@ function NotesEditor({ value, onChange }: NotesEditorProps) {
           >
             <CheckSquare className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
+          <button
+            type="button"
+            onClick={insertLink}
+            title="插入超連結"
+            aria-label="插入超連結"
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
         </div>
       </div>
       <textarea
@@ -900,6 +935,14 @@ function NotesEditor({ value, onChange }: NotesEditorProps) {
         placeholder={'寫下細節 · 子彈或待辦清單\n例如：\n• 確認流程\n☐ 寄信給客戶\n☐ 整理會議紀錄'}
         className="w-full min-h-[120px] px-3 py-2 rounded-lg border border-input bg-secondary/30 text-sm text-foreground placeholder:text-muted-foreground/60 resize-y focus:outline-none focus:ring-2 focus:ring-ring font-mono leading-relaxed"
       />
+      {/* Live preview — only shown when notes contain a link, so the user
+          can click to verify the URL without leaving the modal. */}
+      {/\[[^\]]+\]\([^)]+\)|https?:\/\//.test(value) && (
+        <div className="px-3 py-2 rounded-lg border border-dashed border-border bg-card text-xs leading-relaxed whitespace-pre-wrap break-words">
+          <div className="text-[10px] text-muted-foreground mb-1">預覽</div>
+          {renderNotesWithLinks(value)}
+        </div>
+      )}
     </div>
   )
 }
