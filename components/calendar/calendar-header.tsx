@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronLeft, ChevronRight, ChevronDown, BookOpen, BarChart3, Settings, Sparkles, MoreHorizontal } from 'lucide-react'
+import { ZoomIn, ZoomOut, Clock, ChevronDown, BookOpen, BarChart3, Settings, Sparkles, MoreHorizontal } from 'lucide-react'
 import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { UserMenu } from '@/components/user-menu'
@@ -94,28 +94,6 @@ export function CalendarHeader({
     return `${selectedDate.getFullYear()}年 ${selectedDate.getMonth() + 1}月`
   }
 
-  const handlePrevMonth = () => {
-    const newDate = new Date(selectedDate)
-    if (viewMode === 'week') {
-      newDate.setDate(newDate.getDate() - 7)
-    } else {
-      newDate.setMonth(newDate.getMonth() - 1)
-    }
-    onDateChange(newDate)
-  }
-
-  const handleNextMonth = () => {
-    const newDate = new Date(selectedDate)
-    if (viewMode === 'week') {
-      newDate.setDate(newDate.getDate() + 7)
-    } else {
-      newDate.setMonth(newDate.getMonth() + 1)
-    }
-    onDateChange(newDate)
-  }
-
-  const navUnitLabel = viewMode === 'week' ? '週' : '月'
-
   return (
     <div className="border-b border-border bg-card" role="toolbar" aria-label="日曆導航">
       {/* Primary Row: Navigation + View Mode + Today.
@@ -134,33 +112,14 @@ export function CalendarHeader({
       >
         {/* Left: Date Navigation */}
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="flex items-center gap-0.5 md:gap-1">
-            {/* Prev / next chevrons — visible on both mobile and desktop.
-                Mobile chevrons are slightly tighter to fit alongside the
-                month label and view-mode picker. */}
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              aria-label={`上一${navUnitLabel}`}
-              className="flex p-1.5 rounded-md hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <ChevronLeft className="w-4 h-4" aria-hidden="true" />
-            </button>
-            <span
-              className="text-sm font-semibold md:font-medium min-w-[88px] md:min-w-[140px] text-center px-1 truncate"
-              aria-live="polite"
-            >
-              {getDisplayText()}
-            </span>
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              aria-label={`下一${navUnitLabel}`}
-              className="flex p-1.5 rounded-md hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <ChevronRight className="w-4 h-4" aria-hidden="true" />
-            </button>
-          </div>
+          {/* Month/date label — pure indicator. Navigation lives in the
+              calendar grid itself (horizontal scroll / swipe). */}
+          <span
+            className="text-sm font-semibold md:font-medium px-1 truncate"
+            aria-live="polite"
+          >
+            {getDisplayText()}
+          </span>
 
           {/* View Mode picker — desktop renders inline segmented control,
               mobile renders a single button + popover so it's tappable. */}
