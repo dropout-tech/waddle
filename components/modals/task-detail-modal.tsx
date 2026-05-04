@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useMemo } from 'react'
-import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat, List, CheckSquare } from 'lucide-react'
+import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat, List, CheckSquare, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import type { Task, Workspace } from '@/lib/types'
@@ -70,6 +70,9 @@ export function TaskDetailModal({
   )
   const [recurrenceEndDate, setRecurrenceEndDate] = useState(task.recurrence?.endDate || '')
 
+  // 加入左側任務欄 — undefined ≡ true (legacy tasks default to visible).
+  const [showInTaskList, setShowInTaskList] = useState(task.showInTaskList !== false)
+
   // Find current selected category info
   const selectedCategory = workspaces
     .flatMap((w) => w.categories.map((c) => ({ ...c, workspace: w })))
@@ -97,6 +100,9 @@ export function TaskDetailModal({
       scheduledEndTime: scheduledEndTime || undefined,
       notes: notes || undefined,
       calendarColor,
+      // A task with no schedule must show in the list — otherwise it would
+      // be invisible everywhere. Force-true in that case.
+      showInTaskList: scheduledDate ? showInTaskList : true,
       isRecurring,
       recurrence: isRecurring
         ? {
@@ -252,6 +258,52 @@ export function TaskDetailModal({
             onStartTimeChange={setScheduledStartTime}
             onEndTimeChange={setScheduledEndTime}
           />
+
+          {/* List visibility toggle — uncheck for recurring meetings the user
+              wants on the calendar but not in the left task list. Only
+              meaningful for scheduled tasks; unscheduled ones must show in
+              the list or they'd be invisible everywhere. */}
+          {(() => {
+            const canToggle = !!scheduledDate
+            const effective = canToggle ? showInTaskList : true
+            return (
+              <button
+                type="button"
+                onClick={() => canToggle && setShowInTaskList(!showInTaskList)}
+                aria-pressed={effective}
+                aria-disabled={!canToggle}
+                className={cn(
+                  'w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-secondary/30 border border-border transition-colors text-left',
+                  canToggle ? 'hover:bg-secondary/50' : 'opacity-60 cursor-not-allowed'
+                )}
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <ListChecks className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-foreground">加入左側任務欄</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                      {canToggle
+                        ? '關閉後此任務僅顯示在日曆上，例如例行會議'
+                        : '需先排程才能僅顯示在日曆'}
+                    </div>
+                  </div>
+                </div>
+                <span
+                  className={cn(
+                    'relative w-10 h-5 rounded-full transition-colors flex-shrink-0',
+                    effective ? 'bg-primary' : 'bg-muted'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform',
+                      effective ? 'translate-x-5' : 'translate-x-0.5'
+                    )}
+                  />
+                </span>
+              </button>
+            )
+          })()}
 
           {/* Secondary metadata grid */}
           <div className="grid grid-cols-2 gap-4">

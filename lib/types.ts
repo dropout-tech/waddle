@@ -57,6 +57,10 @@ export interface Task {
   isArchived?: boolean
   archivedAt?: string
   notes?: string
+  /** When false, the task is hidden from the left task panel (依分類 / 依時間 /
+   * 依急迫程度) and only appears on the calendar. Used for recurring meetings
+   * the user doesn't want cluttering the to-do list. Undefined ≡ true. */
+  showInTaskList?: boolean
   sortOrder: number
   createdAt: string
   updatedAt: string

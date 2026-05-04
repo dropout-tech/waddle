@@ -75,6 +75,7 @@ type TasksRow = {
   recurrence_days_of_week: number[] | null
   recurrence_end_date: string | null
   google_event_id: string | null
+  show_in_task_list: boolean
   created_at: string
   updated_at: string
 }
@@ -218,6 +219,7 @@ type TasksInsert = {
   recurrence_days_of_week?: number[] | null
   recurrence_end_date?: string | null
   google_event_id?: string | null
+  show_in_task_list?: boolean
 }
 
 type JournalEntriesInsert = {

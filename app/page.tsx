@@ -151,6 +151,7 @@ export default function WaddlePage() {
         scheduledEndTime: endTime,
         calendarColor: slotType.color || targetWorkspace.color,
         isCompleted: false,
+        showInTaskList: true,
         sortOrder: targetCategory.tasks.length,
         createdAt: now,
         updatedAt: now,

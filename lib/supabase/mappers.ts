@@ -57,6 +57,8 @@ export function rowToTask(
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     isRecurring: row.is_recurring,
+    // Default true if column doesn't exist yet (pre-migration deployment).
+    showInTaskList: row.show_in_task_list ?? true,
     recurrence: row.recurrence_type
       ? {
           type: row.recurrence_type,
@@ -98,6 +100,7 @@ export function taskToRow(
   if (task.notes !== undefined) out.notes = task.notes ?? null
   if (task.sortOrder !== undefined) out.sort_order = task.sortOrder
   if (task.isRecurring !== undefined) out.is_recurring = task.isRecurring
+  if (task.showInTaskList !== undefined) out.show_in_task_list = task.showInTaskList
   if (task.recurrence !== undefined) {
     if (task.recurrence) {
       out.recurrence_type = task.recurrence.type

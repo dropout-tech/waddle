@@ -94,6 +94,10 @@ export function TaskPanel({
           .map((category) => ({
             ...category,
             tasks: category.tasks.filter((task) => {
+              // Calendar-only opt-out: user unchecked "加入左側任務欄" on this task.
+              if (task.showInTaskList === false) {
+                return false
+              }
               // Search filter
               if (filters.search && !task.title.toLowerCase().includes(filters.search.toLowerCase())) {
                 return false
