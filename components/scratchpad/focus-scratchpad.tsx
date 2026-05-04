@@ -299,7 +299,7 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
                   'fixed left-0 right-0 top-0 bottom-[58px]',
                   'bg-card border-t border-border shadow-2xl',
                   'transition-transform duration-300 ease-out',
-                  isExpanded ? 'translate-y-0' : 'translate-y-full pointer-events-none',
+                  isExpanded ? '' : 'pointer-events-none',
                 )
               : cn(
                   'absolute left-0 right-0 top-0',
@@ -308,7 +308,16 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
                   isExpanded ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0 pointer-events-none',
                 )
           )}
-          style={hideTrigger ? { paddingTop: 'env(safe-area-inset-top)' } : undefined}
+          style={hideTrigger ? {
+            paddingTop: 'env(safe-area-inset-top)',
+            // translate-y-full only shifts by the element's own height. With
+            // bottom:58 the height is (100vh − 58), so translate-y-full leaves
+            // a 58 px sliver of the panel header peeking above the tab bar.
+            // Pad the offset by that 58 to push it fully offscreen.
+            transform: isExpanded
+              ? 'translateY(0)'
+              : 'translateY(calc(100% + 58px))',
+          } : undefined}
           onPaste={handlePaste}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
           onDragLeave={() => setIsDragging(false)}
