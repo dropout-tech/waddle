@@ -21,6 +21,15 @@ type TimeBlockInsert = Database['public']['Tables']['time_blocks']['Insert']
 type JournalRow = Database['public']['Tables']['journal_entries']['Row']
 type SettingsRow = Database['public']['Tables']['user_settings']['Row']
 
+// Postgres `time` columns come back as "HH:MM:SS" (or "HH:MM:SS+TZ"). The
+// rest of the app stores and displays times as "HH:MM", so normalize at
+// the read boundary. Idempotent — values already in HH:MM pass through.
+function normalizeTimeString(t: string | null | undefined): string | undefined {
+  if (!t) return undefined
+  const m = t.match(/^(\d{2}):(\d{2})/)
+  return m ? `${m[1]}:${m[2]}` : t
+}
+
 // ─────────────────────────────────────────────────────────
 // Tasks
 // ─────────────────────────────────────────────────────────
@@ -45,8 +54,8 @@ export function rowToTask(
     actualMinutes: row.actual_minutes ?? undefined,
     dueDate: row.due_date ?? undefined,
     scheduledDate: row.scheduled_date ?? undefined,
-    scheduledStartTime: row.scheduled_start_time ?? undefined,
-    scheduledEndTime: row.scheduled_end_time ?? undefined,
+    scheduledStartTime: normalizeTimeString(row.scheduled_start_time),
+    scheduledEndTime: normalizeTimeString(row.scheduled_end_time),
     calendarColor: row.calendar_color,
     isCompleted: row.is_completed,
     completedAt: row.completed_at ?? undefined,
@@ -154,8 +163,8 @@ export function rowToTimeBlock(row: TimeBlockRow): TimeBlock {
   return {
     id: row.id,
     date: row.date,
-    startTime: row.start_time,
-    endTime: row.end_time,
+    startTime: normalizeTimeString(row.start_time) ?? row.start_time,
+    endTime: normalizeTimeString(row.end_time) ?? row.end_time,
     type: row.type,
     label: row.label,
     color: row.color,

@@ -145,13 +145,17 @@ export function TaskPanel({
     <div
       data-tour="left-panel"
       className={cn(
-        'flex h-full bg-card border-r border-border shadow-sm',
+        // min-w-0 + overflow-hidden so a task with long meta text (e.g. a
+        // DB-returned "08:15:00 - 09:15:00") can't push the inner column
+        // wider than the parent flex slot — without this, content spilled
+        // visibly into the calendar panel.
+        'flex h-full bg-card border-r border-border shadow-sm min-w-0 overflow-hidden',
         className
       )}
     >
       {/* Left Column: Task List */}
       <div className={cn(
-        'flex flex-col h-full',
+        'flex flex-col h-full min-w-0',
         isExpanded ? 'w-[360px] border-r border-border' : 'flex-1'
       )}>
         {/* Header */}
