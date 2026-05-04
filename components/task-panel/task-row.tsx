@@ -338,7 +338,7 @@ function TaskRowImpl({
         onClick={handleRowClick}
       >
         {/* Drag Handle */}
-        <div className="opacity-0 group-hover:opacity-40 transition-opacity cursor-grab active:cursor-grabbing pt-0.5">
+        <div className="opacity-40 md:opacity-0 md:group-hover:opacity-40 transition-opacity cursor-grab active:cursor-grabbing pt-0.5">
           <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
         </div>
 

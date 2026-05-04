@@ -255,7 +255,7 @@ export function MonthView({
                             e.stopPropagation()
                             onCreateTask?.(day.dateString)
                           }}
-                          className="opacity-0 group-hover:opacity-100 w-4 h-4 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-all"
+                          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-4 h-4 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-all"
                         >
                           <Plus className="w-2.5 h-2.5 text-primary" />
                         </button>

@@ -82,6 +82,9 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
               placeholder="任務名稱..."
               className="w-32 bg-transparent text-xs outline-none placeholder:text-muted-foreground/50"
               autoFocus
+              enterKeyHint="done"
+              autoCapitalize="sentences"
+              autoCorrect="off"
             />
             <button
               onClick={handleSubmit}

@@ -25,6 +25,15 @@ export const metadata: Metadata = {
   description:
     'Waddle — a unified workspace that merges task management, time-block scheduling, and daily journaling into a single split-screen interface. Take it slow, get it done.',
   generator: 'v0.app',
+  applicationName: 'Waddle',
+  appleWebApp: {
+    capable: true,
+    title: 'Waddle',
+    statusBarStyle: 'black-translucent',
+  },
+  formatDetection: {
+    telephone: false,
+  },
   icons: {
     icon: [
       {
@@ -45,8 +54,14 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#f4d977',
-  colorScheme: 'light',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f4d977' },
+    { media: '(prefers-color-scheme: dark)', color: '#2a2a2a' },
+  ],
+  colorScheme: 'light dark',
 }
 
 export default function RootLayout({
@@ -55,7 +70,16 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="zh-TW" className="bg-background">
+    <html lang="zh-TW" className="bg-background" suppressHydrationWarning>
+      <head>
+        {/* Set viewport class before hydration so CSS / hooks see the right
+            value on first paint and avoid the desktop-flash on mobile. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var m=window.matchMedia('(max-width:767px)').matches;document.documentElement.dataset.viewport=m?'mobile':'desktop';if(m)document.documentElement.classList.add('is-mobile');}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body
         className={`${geist.variable} ${geistMono.variable} ${notoSansTC.variable} font-sans antialiased`}
       >

@@ -110,7 +110,7 @@ export function CategorySection({
           {onDelete && (
             <button
               onClick={handleDelete}
-              className="p-0.5 rounded text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all"
+              className="p-0.5 rounded text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all"
               title={`刪除分類「${category.name}」`}
               aria-label={`刪除分類「${category.name}」`}
             >
@@ -185,6 +185,9 @@ export function CategorySection({
                 placeholder="輸入任務名稱..."
                 className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
                 autoFocus
+                enterKeyHint="done"
+                autoCapitalize="sentences"
+                autoCorrect="off"
               />
             </div>
           ) : (

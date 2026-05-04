@@ -487,7 +487,13 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
           {inputMode === 'link' && (
             <div className="mb-4 p-3 rounded-xl bg-secondary/50 border border-border space-y-2">
               <input
-                type="text"
+                type="url"
+                inputMode="url"
+                autoComplete="url"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="next"
                 value={linkInput}
                 onChange={(e) => setLinkInput(e.target.value)}
                 placeholder="輸入網址..."
@@ -543,7 +549,7 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
                   {/* Delete Button */}
                   <button
                     onClick={() => deleteItem(item.id)}
-                    className="absolute top-2 right-2 z-10 p-1 rounded-lg bg-background/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500 transition-all"
+                    className="absolute top-2 right-2 z-10 p-1 rounded-lg bg-background/80 backdrop-blur-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500 transition-all"
                   >
                     <X className="w-3 h-3" />
                   </button>

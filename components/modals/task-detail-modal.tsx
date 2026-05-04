@@ -578,7 +578,7 @@ function UrgencySlider({ value, onChange }: UrgencySliderProps) {
             >
               <span className={cn(
                 'absolute inset-0 flex items-center justify-center text-[10px] font-semibold transition-opacity',
-                filled ? 'text-white opacity-90' : 'text-muted-foreground opacity-0 group-hover:opacity-100'
+                filled ? 'text-white opacity-90' : 'text-muted-foreground opacity-50 md:opacity-0 md:group-hover:opacity-100'
               )}>
                 {level}
               </span>

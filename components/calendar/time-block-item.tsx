@@ -149,7 +149,7 @@ function TimeBlockItemImpl({
       )}>
         {/* Drag handle */}
         {onUpdate && !compact && (
-          <div className="opacity-0 group-hover:opacity-60 transition-opacity cursor-grab active:cursor-grabbing">
+          <div className="opacity-60 md:opacity-0 md:group-hover:opacity-60 transition-opacity cursor-grab active:cursor-grabbing">
             <GripVertical className="w-3 h-3 text-muted-foreground" />
           </div>
         )}
@@ -175,7 +175,7 @@ function TimeBlockItemImpl({
                   e.stopPropagation()
                   onDelete(block.id)
                 }}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all"
+                className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all"
               >
                 <span className="text-xs">×</span>
               </button>
