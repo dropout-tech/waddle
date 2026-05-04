@@ -270,8 +270,14 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
             onClick={() => setIsOpen(false)}
           />
           
-          {/* Panel */}
-          <div className="absolute right-0 top-full mt-2 w-96 max-h-[80vh] bg-card rounded-xl shadow-xl border border-border z-50 overflow-hidden">
+          {/* Panel:
+              - mobile: detach from the bell and fix to the viewport so it
+                doesn't overflow the left edge (the bell sits ~50px from
+                the right, so a right-anchored 24rem panel ran off-screen).
+                Sits below the header (safe area + header height).
+              - desktop: original behavior — right-aligned popover under
+                the bell. */}
+          <div className="fixed left-2 right-2 top-[calc(env(safe-area-inset-top,0px)+56px)] max-h-[70vh] z-50 md:absolute md:left-auto md:right-0 md:top-full md:max-h-[80vh] md:mt-2 md:w-96 bg-card rounded-xl shadow-xl border border-border overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/30">
               <div className="flex items-center gap-2">

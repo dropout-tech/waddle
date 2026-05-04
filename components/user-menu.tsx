@@ -104,7 +104,11 @@ export function UserMenu({ className }: UserMenuProps = {}) {
       {open && (
         <div
           className={cn(
-            'absolute right-0 mt-2 w-64',
+            // Top-right anchored, but with z-[60] so it stacks above
+            // calendar grid + workspace pills that come later in DOM order.
+            // Without this, on mobile the dropdown was being painted UNDER
+            // sibling content, leaving the menu items unreadable / unclickable.
+            'absolute right-0 mt-2 w-64 z-[60]',
             'bg-card border border-border rounded-xl shadow-lg overflow-hidden',
             'animate-in fade-in slide-in-from-top-2 duration-150'
           )}
