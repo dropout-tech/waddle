@@ -309,11 +309,21 @@ function TaskBlockImpl({
         <div className="w-6 h-0.5 bg-white/60 rounded-full" />
       </div>
 
-      {/* Block body — drag to move, click to open detail */}
+      {/* Block body — drag to move, click to open detail.
+          Short blocks (≤45px ≈ 45-min @ default hourHeight) drop the time
+          row and center the title vertically; otherwise keep title-on-top
+          + time-at-bottom. This avoids the bottom-heavy look that was
+          caused by asymmetric padding (pt-3 vs pb-2) plus mt-auto when
+          there wasn't enough room for both rows. */}
+      {(() => {
+        const isShort = height <= 45
+        return (
       <div
         className={cn(
           'h-full flex flex-col',
-          totalColumns > 1 ? 'p-1.5 pt-2 gap-0.5' : 'p-2 pt-3'
+          isShort
+            ? totalColumns > 1 ? 'px-1.5 py-1 justify-center' : 'px-2 py-1.5 justify-center'
+            : totalColumns > 1 ? 'p-1.5 pt-2 gap-0.5' : 'p-2 pt-3'
         )}
         onPointerDown={handleBodyPointerDown}
         onPointerUp={handleBodyPointerUp}
@@ -380,8 +390,9 @@ function TaskBlockImpl({
           </span>
         </div>
 
-        {/* Time + Type — kept up to 3 columns; hidden at 4+ to give vertical title room */}
-        {totalColumns <= 3 && (
+        {/* Time + Type — kept up to 3 columns; hidden at 4+ (vertical title)
+            and on short blocks (no room without making title look cramped). */}
+        {totalColumns <= 3 && !isShort && (
           <div className="mt-auto">
             <span className={cn(
               'text-white/80 font-mono block',
@@ -402,6 +413,8 @@ function TaskBlockImpl({
           </div>
         )}
       </div>
+        )
+      })()}
 
       {/* Grip icon — shows on hover (desktop) / always (mobile) to teach draggability */}
       <div className="absolute top-1/2 right-1 -translate-y-1/2 opacity-30 md:opacity-0 md:group-hover:opacity-40 transition-opacity pointer-events-none">

@@ -935,7 +935,11 @@ export function DayScrollView({
                             onPointerDown={(e) => handlePendingTaskMouseDown(task, e)}
                             onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
                             className={cn(
-                              'w-full flex-shrink-0 text-left px-2 py-1 rounded text-[11px] font-medium truncate cursor-grab active:cursor-grabbing select-none',
+                              // flex + items-center on the outer div locks the
+                              // text to the geometric vertical center; the old
+                              // block layout left line-height padding above the
+                              // glyph and made short pills look bottom-heavy.
+                              'w-full flex-shrink-0 flex items-center text-left px-2 py-1 rounded text-[11px] leading-tight font-medium cursor-grab active:cursor-grabbing select-none',
                               'hover:opacity-90 hover:shadow-sm transition-all',
                               task.isCompleted && 'opacity-40 line-through',
                               isThisTaskBeingDragged && (

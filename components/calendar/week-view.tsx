@@ -766,7 +766,7 @@ export function WeekView({
                             onPointerDown={(e) => handlePendingTaskMouseDown(task, e)}
                             onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
                             className={cn(
-                              'w-full flex-shrink-0 text-left px-1.5 py-[3px] rounded text-[10px] font-medium truncate cursor-grab active:cursor-grabbing select-none',
+                              'w-full flex-shrink-0 flex items-center text-left px-1.5 py-[3px] rounded text-[10px] leading-tight font-medium cursor-grab active:cursor-grabbing select-none',
                               'hover:opacity-90 hover:shadow-sm transition-all',
                               task.isCompleted && 'opacity-40 line-through',
                               isThisTaskBeingDragged && (
