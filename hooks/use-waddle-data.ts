@@ -632,11 +632,29 @@ export function useWaddleData(): UseWaddleData {
       }))
     )
 
-    const { error } = await supabase
+    // Use .select() so PostgREST returns the affected rows. If RLS silently
+    // blocks the update (auth.uid() mismatch / expired JWT) PostgREST returns
+    // an empty array with no error — that's the bug pattern we're hunting.
+    const { data, error } = await supabase
       .from('tasks')
       .update({ is_completed: nextValue, completed_at: completedAt })
       .eq('id', taskId)
-    if (error) handleDbError('切換任務狀態')(error)
+      .select('id, is_completed, user_id')
+    if (error) {
+      console.error('[toggleTaskComplete] supabase error', { taskId, error })
+      handleDbError('切換任務狀態')(error)
+      return
+    }
+    if (!data || data.length === 0) {
+      const { data: { user } } = await supabase.auth.getUser()
+      console.error('[toggleTaskComplete] 0 rows updated — RLS or stale session?', {
+        taskId,
+        nextValue,
+        jwtUserId: user?.id ?? null,
+      })
+      toast.error('儲存失敗：無法寫入這個任務（可能登入逾時，請重新整理或登出再登入）')
+      return
+    }
   }, [supabase])
 
   const deleteTask = useCallback(async (taskId: string) => {
