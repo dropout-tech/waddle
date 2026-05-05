@@ -24,6 +24,12 @@ type TimerState = 'idle' | 'running' | 'paused'
 interface TimerSession {
   mode: TimerMode
   startedAt: Date
+  /** Total ms accumulated across previous pause→resume cycles. */
+  pausedMs: number
+  /** Wall-clock when the current pause started, or null if running. */
+  pausedAt: Date | null
+  /** For pomodoro: target duration in seconds (locked at start). */
+  targetSeconds: number
   label: string
   color: string
   taskId?: string
@@ -92,36 +98,49 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   // Start timer
   const startTimer = () => {
     const now = new Date()
-    const label = customLabel || (mode === 'pomodoro' 
+    const label = customLabel || (mode === 'pomodoro'
       ? (useCustom ? `${customMinutes}分鐘專注` : POMODORO_PRESETS[selectedPreset].label)
       : focusType.label)
     const color = mode === 'pomodoro'
       ? (useCustom ? focusType.color : POMODORO_PRESETS[selectedPreset].color)
       : focusType.color
-    
+    const targetSeconds = getTargetSeconds()
+
     setSession({
       mode,
       startedAt: now,
+      pausedMs: 0,
+      pausedAt: null,
+      targetSeconds,
       label,
       color,
     })
-    
+
     if (mode === 'pomodoro') {
-      setTimeLeft(getTargetSeconds())
+      setTimeLeft(targetSeconds)
     } else {
       setElapsed(0)
     }
-    
+
     setState('running')
   }
 
-  // Pause timer
+  // Pause timer — record the wall-clock so we can subtract paused duration
+  // from the running total. Without this, idle time during pause would still
+  // be counted toward elapsed.
   const pauseTimer = () => {
+    setSession((s) => (s ? { ...s, pausedAt: new Date() } : s))
     setState('paused')
   }
 
-  // Resume timer
+  // Resume timer — fold the just-finished pause into pausedMs and clear the
+  // pausedAt anchor so the next tick reads only running time.
   const resumeTimer = () => {
+    setSession((s) => {
+      if (!s) return s
+      const addedPause = s.pausedAt ? Date.now() - s.pausedAt.getTime() : 0
+      return { ...s, pausedAt: null, pausedMs: s.pausedMs + addedPause }
+    })
     setState('running')
   }
 
@@ -162,38 +181,46 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
     }
   }
 
-  // Timer tick effect
+  // Timer tick — wall-clock based.
+  //
+  // The previous implementation incremented a counter on each setInterval
+  // tick, which silently broke when browsers throttled background tabs.
+  // Now setInterval only triggers a recompute; the actual time comes from
+  // (Date.now() - startedAt) so it stays accurate even after the tab was
+  // backgrounded, the laptop slept, or the OS throttled timers.
   useEffect(() => {
-    if (state === 'running') {
-      intervalRef.current = setInterval(() => {
-        if (mode === 'pomodoro') {
-          setTimeLeft((prev) => {
-            if (prev <= 1) {
-              // Timer completed
-              if (audioRef.current) {
-                audioRef.current.play().catch(() => {})
-              }
-              stopTimer(true)
-              return 0
-            }
-            return prev - 1
-          })
-        } else {
-          setElapsed((prev) => prev + 1)
-        }
-      }, 1000)
-    } else {
+    if (state !== 'running' || !session) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      return
+    }
+    const tick = () => {
+      const runningMs = Date.now() - session.startedAt.getTime() - session.pausedMs
+      const runningSec = Math.max(0, Math.floor(runningMs / 1000))
+      if (session.mode === 'pomodoro') {
+        const remaining = session.targetSeconds - runningSec
+        if (remaining <= 0) {
+          if (audioRef.current) audioRef.current.play().catch(() => {})
+          setTimeLeft(0)
+          stopTimer(true)
+          return
+        }
+        setTimeLeft(remaining)
+      } else {
+        setElapsed(runningSec)
       }
     }
-    
+    tick() // immediate update so state reflects reality on resume / restart
+    intervalRef.current = setInterval(tick, 1000)
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
+        intervalRef.current = null
       }
     }
-  }, [state, mode])
+  }, [state, session])
 
   // Update timeLeft when preset changes (only when idle)
   useEffect(() => {
