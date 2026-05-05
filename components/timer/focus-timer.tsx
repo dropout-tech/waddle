@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { 
-  Play, Pause, Square, RotateCcw, Timer, Clock, 
+import {
+  Play, Pause, Square, RotateCcw, Timer, Clock,
   ChevronDown, ChevronUp, Settings2, Check, X,
-  Coffee, Brain, Dumbbell, BookOpen
+  Coffee, Brain, Dumbbell, BookOpen, Volume2, VolumeX,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { useIsMobile } from '@/hooks/use-mobile'
 import type { Task, Workspace } from '@/lib/types'
 import { toDateString } from '@/lib/calendar-utils'
+import { playTimerSound, TIMER_SOUND_LABELS, type TimerSoundKind } from '@/lib/timer-sound'
 
 interface FocusTimerProps {
   workspaces: Workspace[]
@@ -20,9 +21,12 @@ interface FocusTimerProps {
 
 type TimerMode = 'pomodoro' | 'stopwatch'
 type TimerState = 'idle' | 'running' | 'paused'
+type TimerPhase = 'work' | 'break'
 
 interface TimerSession {
   mode: TimerMode
+  /** Whether this session is a work block or a break block (for pomodoro). */
+  phase: TimerPhase
   startedAt: Date
   /** Total ms accumulated across previous pause→resume cycles. */
   pausedMs: number
@@ -33,6 +37,36 @@ interface TimerSession {
   label: string
   color: string
   taskId?: string
+}
+
+interface TimerPrefs {
+  breakMinutes: number
+  autoStartBreak: boolean
+  sound: TimerSoundKind
+}
+
+const TIMER_PREFS_KEY = 'waddle-timer-prefs-v1'
+const DEFAULT_PREFS: TimerPrefs = {
+  breakMinutes: 5,
+  autoStartBreak: true,
+  sound: 'chime',
+}
+const BREAK_COLOR = '#9bbfac' // sage — calmer than the focus oranges
+
+function loadPrefs(): TimerPrefs {
+  if (typeof window === 'undefined') return DEFAULT_PREFS
+  try {
+    const raw = window.localStorage.getItem(TIMER_PREFS_KEY)
+    if (!raw) return DEFAULT_PREFS
+    const parsed = JSON.parse(raw)
+    return {
+      breakMinutes: typeof parsed.breakMinutes === 'number' ? parsed.breakMinutes : DEFAULT_PREFS.breakMinutes,
+      autoStartBreak: typeof parsed.autoStartBreak === 'boolean' ? parsed.autoStartBreak : DEFAULT_PREFS.autoStartBreak,
+      sound: ['chime', 'bell', 'beep', 'silent'].includes(parsed.sound) ? parsed.sound : DEFAULT_PREFS.sound,
+    }
+  } catch {
+    return DEFAULT_PREFS
+  }
 }
 
 const POMODORO_PRESETS = [
@@ -66,9 +100,18 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   const [timeLeft, setTimeLeft] = useState(25 * 60) // seconds for pomodoro
   const [elapsed, setElapsed] = useState(0) // seconds for stopwatch
   const [session, setSession] = useState<TimerSession | null>(null)
-  
+
+  // User preferences (break length, auto-break, sound choice). Loaded from
+  // localStorage on mount and persisted on every change so they survive
+  // refreshes and dev hot reloads.
+  const [prefs, setPrefs] = useState<TimerPrefs>(DEFAULT_PREFS)
+  useEffect(() => { setPrefs(loadPrefs()) }, [])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try { window.localStorage.setItem(TIMER_PREFS_KEY, JSON.stringify(prefs)) } catch {}
+  }, [prefs])
+
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // Get current timer duration based on mode
   const getTargetSeconds = useCallback(() => {
@@ -95,7 +138,7 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   // Format date to YYYY-MM-DD (local)
   const formatDateISO = (date: Date) => toDateString(date)
 
-  // Start timer
+  // Start a fresh work session.
   const startTimer = () => {
     const now = new Date()
     const label = customLabel || (mode === 'pomodoro'
@@ -108,6 +151,7 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
 
     setSession({
       mode,
+      phase: 'work',
       startedAt: now,
       pausedMs: 0,
       pausedAt: null,
@@ -124,6 +168,25 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
 
     setState('running')
   }
+
+  // Begin a break session of the configured length. Used both as the
+  // automatic continuation after a work pomodoro and as the manual button
+  // when auto-break is off.
+  const startBreak = useCallback(() => {
+    const breakSeconds = Math.max(1, Math.floor(prefs.breakMinutes)) * 60
+    setSession({
+      mode: 'pomodoro',
+      phase: 'break',
+      startedAt: new Date(),
+      pausedMs: 0,
+      pausedAt: null,
+      targetSeconds: breakSeconds,
+      label: `休息 ${prefs.breakMinutes} 分`,
+      color: BREAK_COLOR,
+    })
+    setTimeLeft(breakSeconds)
+    setState('running')
+  }, [prefs.breakMinutes])
 
   // Pause timer — record the wall-clock so we can subtract paused duration
   // from the running total. Without this, idle time during pause would still
@@ -144,28 +207,37 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
     setState('running')
   }
 
+  // Persist a finished/aborted session as a time block on today's calendar.
+  // Pulled out of stopTimer so we can record a work pomodoro before
+  // transitioning into the auto-break without going through idle.
+  const recordSessionToCalendar = useCallback(
+    (s: TimerSession, completed: boolean) => {
+      if (!onCreateTimeBlock) return
+      const now = new Date()
+      const startTime = formatTimeHHMM(s.startedAt)
+      const endTime = formatTimeHHMM(now)
+      const date = formatDateISO(s.startedAt)
+      const durationMinutes = Math.floor((now.getTime() - s.startedAt.getTime()) / 60000)
+      if (durationMinutes < 1) return
+      // Break sessions are typed as 'break' so they color-code differently
+      // and don't get counted as focus time in any future analytics.
+      const blockType =
+        s.phase === 'break' ? 'break' : s.mode === 'pomodoro' ? 'pomodoro' : 'focus'
+      onCreateTimeBlock(
+        date,
+        startTime,
+        endTime,
+        blockType,
+        s.label + (completed ? ' ✓' : ''),
+        s.color,
+      )
+    },
+    [onCreateTimeBlock],
+  )
+
   // Stop and save timer
   const stopTimer = (completed: boolean = false) => {
-    if (session && onCreateTimeBlock) {
-      const now = new Date()
-      const startTime = formatTimeHHMM(session.startedAt)
-      const endTime = formatTimeHHMM(now)
-      const date = formatDateISO(session.startedAt)
-      
-      // Only create time block if at least 1 minute passed
-      const durationMinutes = Math.floor((now.getTime() - session.startedAt.getTime()) / 60000)
-      if (durationMinutes >= 1) {
-        onCreateTimeBlock(
-          date,
-          startTime,
-          endTime,
-          session.mode === 'pomodoro' ? 'pomodoro' : 'focus',
-          session.label + (completed ? ' ✓' : ''),
-          session.color
-        )
-      }
-    }
-    
+    if (session) recordSessionToCalendar(session, completed)
     resetTimer()
   }
 
@@ -183,11 +255,12 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
 
   // Timer tick — wall-clock based.
   //
-  // The previous implementation incremented a counter on each setInterval
-  // tick, which silently broke when browsers throttled background tabs.
-  // Now setInterval only triggers a recompute; the actual time comes from
+  // setInterval only triggers a recompute; the actual time comes from
   // (Date.now() - startedAt) so it stays accurate even after the tab was
   // backgrounded, the laptop slept, or the OS throttled timers.
+  //
+  // On completion: play the configured sound, then either auto-start a
+  // break (if work phase + autoStartBreak) or finalize via stopTimer.
   useEffect(() => {
     if (state !== 'running' || !session) {
       if (intervalRef.current) {
@@ -202,9 +275,22 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
       if (session.mode === 'pomodoro') {
         const remaining = session.targetSeconds - runningSec
         if (remaining <= 0) {
-          if (audioRef.current) audioRef.current.play().catch(() => {})
+          // Stop ticking immediately so we don't double-fire while React
+          // batches the next state update / effect re-run.
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current)
+            intervalRef.current = null
+          }
+          playTimerSound(prefs.sound)
           setTimeLeft(0)
-          stopTimer(true)
+          if (session.phase === 'work' && prefs.autoStartBreak) {
+            // Record the work block, then transition to a break session
+            // without dropping into idle.
+            recordSessionToCalendar(session, true)
+            startBreak()
+          } else {
+            stopTimer(true)
+          }
           return
         }
         setTimeLeft(remaining)
@@ -220,7 +306,8 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
         intervalRef.current = null
       }
     }
-  }, [state, session])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, session, prefs.sound, prefs.autoStartBreak])
 
   // Update timeLeft when preset changes (only when idle)
   useEffect(() => {
@@ -238,9 +325,6 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
 
   return (
     <>
-      {/* Hidden audio element for completion sound */}
-      <audio ref={audioRef} src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2Onp6YjHhsa3N/ipWXkYZ6c3Z/ipOUjYN5dXh/ho2PioB3c3Z7goqMiYB2c3V6gIeLiYF3c3V5f4WJh4B2cnR4fYOHhX92cXN3e4GFg352cXJ2eX+DgX12cHF1d3yAf3x1cHBzdXl8fnt0cG9xcnV4e3p4c29ucXJ0dnh3dnJub3BxcnR2dnVyb25vcHFydHV0c29ubm9wcXJzdHNyb25ubm9wcXJyc3JwbmxubW9wb3BwcW9ubGxtbW5vb29wb25sbGxsbW1ubm5vbm1sa2tsbGxtbW1tbWxra2pqa2tsbGxsbGtqamppamtqa2tqaWlpaWlpamppaWlpaGhoaGhpaWhoaGdnZ2dnZ2doZ2dnZmZmZmZmZmdmZmZlZWVlZWVlZWVlZGRkZGRkZGRkZGRjY2NjY2NjY2NjYmJiYmJiYmJiYmJhYWFhYWFhYWFhYGBgYGBgYGBgYGBfX19fX19fX19fXl5eXl5eXl5eXl5dXV1dXV1dXV1dXFxcXFxcXFxcXFtbW1tbW1tbW1taWlpaWlpaWlpaWllZWVlZWVlZWVlYWFhYWFhYWFhYV1dXV1dXV1dXV1ZWVlZWVlZWVlZVVVVVVVVVVVVVVFRUVFRUVFRUVFNTU1NTU1NTU1NSUlJSUlJSUlJSUVFRUVFRUVFRUVBQUFBQUFBQUFBPT09PT09PT09PTk5OTk5OTk5OTk1NTU1NTU1NTU1MTExMTExMTExMS0tLS0tLS0tLS0pKSkpKSkpKSkpJSUlJSUlJSUlJSEhISEhISEhISEdHR0dHR0dHR0dGRkZGRkZGRkZGRUVFRUVFRUVFRURERERERERERENDQ0NDQ0NDQ0NCQkJCQkJCQkJCQUFBQUFBQUFBQUBAQEBAQEBAQEA/Pz8/Pz8/Pz8+Pj4+Pj4+Pj4+PT09PT09PT09PTw8PDw8PDw8PDw7Ozs7Ozs7Ozs7Ojo6Ojo6Ojo6Ojk5OTk5OTk5OTk4ODg4ODg4ODg4Nzc3Nzc3Nzc3NzY2NjY2NjY2NjY1NTU1NTU1NTU1NDQ0NDQ0NDQ0NDMzMzMzMzMzMzMyMjIyMjIyMjIyMTExMTExMTExMTAwMDAwMDAwMDAvLy8vLy8vLy8vLi4uLi4uLi4uLi0tLS0tLS0tLS0sLCwsLCwsLCwsKysrKysrKysrKyoqKioqKioqKiknJycnJycnJyc=" />
-
       {/* Floating Timer Button/Widget — sits above the bottom tab bar on
           mobile (with iOS safe-area-inset-bottom). */}
       <div
@@ -263,7 +347,11 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                   state === 'paused' ? "bg-amber-500" : "bg-muted-foreground"
                 )} />
                 <span className="text-sm font-medium">
-                  {state === 'running' ? '計時中' : state === 'paused' ? '已暫停' : '專注計時'}
+                  {state === 'idle'
+                    ? '專注計時'
+                    : session?.phase === 'break'
+                      ? state === 'running' ? '休息中' : '休息暫停'
+                      : state === 'running' ? '計時中' : '已暫停'}
                 </span>
               </div>
               <div className="flex items-center gap-1">
@@ -393,6 +481,79 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                   onChange={(e) => setCustomLabel(e.target.value)}
                   className="h-8 text-xs"
                 />
+
+                {/* Pomodoro flow settings — break length, auto-start, sound */}
+                {mode === 'pomodoro' && (
+                  <div className="space-y-2 pt-2 border-t border-border/60">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[11px] text-muted-foreground" htmlFor="timer-break-mins">
+                        休息時長（分）
+                      </label>
+                      <Input
+                        id="timer-break-mins"
+                        type="number"
+                        min={1}
+                        max={60}
+                        value={prefs.breakMinutes}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value)
+                          setPrefs((p) => ({ ...p, breakMinutes: Number.isFinite(v) && v > 0 ? v : 5 }))
+                        }}
+                        className="w-16 h-7 text-xs text-center"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPrefs((p) => ({ ...p, autoStartBreak: !p.autoStartBreak }))}
+                      aria-pressed={prefs.autoStartBreak}
+                      className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-secondary/50 text-left"
+                    >
+                      <span className="text-[11px] text-muted-foreground">完成後自動進入休息</span>
+                      <span
+                        className={cn(
+                          'relative w-8 h-4 rounded-full transition-colors flex-shrink-0',
+                          prefs.autoStartBreak ? 'bg-primary' : 'bg-muted',
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform',
+                            prefs.autoStartBreak ? 'translate-x-4' : 'translate-x-0.5',
+                          )}
+                        />
+                      </span>
+                    </button>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                        {prefs.sound === 'silent' ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                        提示音
+                      </label>
+                      <div className="flex gap-1">
+                        {(['chime', 'bell', 'beep', 'silent'] as TimerSoundKind[]).map((k) => (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => {
+                              setPrefs((p) => ({ ...p, sound: k }))
+                              // Preview the sound when picking, except for silent.
+                              if (k !== 'silent') playTimerSound(k)
+                            }}
+                            className={cn(
+                              'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
+                              prefs.sound === k
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
+                            )}
+                          >
+                            {TIMER_SOUND_LABELS[k]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
