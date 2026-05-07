@@ -148,6 +148,10 @@ type UserSettingsRow = {
   calendar_end_hour: number
   default_view: 'day' | 'week' | 'month'
   week_start_day: number
+  /** Migration 0006 — optional in case the column hasn't shipped yet. */
+  day_view_days?: number
+  /** Migration 0006 — optional in case the column hasn't shipped yet. */
+  week_view_days?: number
   weather_city: string
   weather_unit: 'celsius' | 'fahrenheit'
   lunch_break: Json
@@ -284,6 +288,8 @@ type UserSettingsInsert = {
   calendar_end_hour?: number
   default_view?: 'day' | 'week' | 'month'
   week_start_day?: number
+  day_view_days?: number
+  week_view_days?: number
   weather_city?: string
   weather_unit?: 'celsius' | 'fahrenheit'
   lunch_break?: Json

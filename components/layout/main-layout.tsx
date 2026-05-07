@@ -186,6 +186,9 @@ export function MainLayout({
   // Time range from settings (with defensive fallbacks)
   const startHour = settings?.calendarStartHour ?? 0
   const endHour = settings?.calendarEndHour ?? 24
+  // Visible day count per view mode (1-3 for day, 5-7 for week)
+  const dayViewDays = settings?.dayViewDays ?? 1
+  const weekViewDays = settings?.weekViewDays ?? 7
 
   const handleResize = useCallback((delta: number) => {
     setPanelWidth((prev) => {
@@ -342,6 +345,8 @@ export function MainLayout({
                 endHour={endHour}
                 hourHeight={hourHeight}
                 zoomLevel={zoomLevel}
+                dayViewDays={dayViewDays}
+                weekViewDays={weekViewDays}
                 onZoomChange={setZoomLevel}
                 onDateChange={setSelectedDate}
                 onViewModeChange={setViewMode}

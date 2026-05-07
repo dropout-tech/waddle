@@ -220,6 +220,10 @@ export function rowToSettings(
     calendarEndHour: row.calendar_end_hour,
     defaultView: row.default_view,
     weekStartDay: row.week_start_day,
+    // Migration 0006 added these — fall back to defaults if the row pre-dates
+    // the migration so the app keeps working before the user re-runs schema.
+    dayViewDays: row.day_view_days ?? fallbackSettings.dayViewDays,
+    weekViewDays: row.week_view_days ?? fallbackSettings.weekViewDays,
     weatherCity: row.weather_city,
     weatherUnit: row.weather_unit,
     lunchBreak: row.lunch_break as unknown as UserSettings['lunchBreak'],

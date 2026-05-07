@@ -43,6 +43,9 @@ interface DayScrollViewProps {
   startHour?: number
   endHour?: number
   hourHeight?: number
+  /** How many days should fit in the viewport at once (1-3). Desktop only;
+   *  mobile always shows one day per viewport for snap-scroll behavior. */
+  dayViewDays?: number
 }
 
 interface ActiveTaskDrag extends TaskDragStart {
@@ -78,25 +81,54 @@ export function DayScrollView({
   startHour = 0,
   endHour = 24,
   hourHeight = 60,
+  dayViewDays = 1,
 }: DayScrollViewProps) {
   const isMobile = useIsMobile()
   // On mobile, each day fills (viewport - time column) so the user sees one
-  // full day per swipe and scroll-snap lands on day boundaries. Desktop keeps
-  // the fixed 280px width so multiple days are visible side-by-side.
+  // full day per swipe and scroll-snap lands on day boundaries. Desktop
+  // measures the actual scroll container and divides by dayViewDays so the
+  // user-chosen number of days fits exactly within the visible area.
   const [viewportWidth, setViewportWidth] = useState(typeof window === 'undefined' ? 1024 : window.innerWidth)
+  const [containerWidth, setContainerWidth] = useState<number | null>(null)
   useEffect(() => {
     if (typeof window === 'undefined') return
     const onResize = () => setViewportWidth(window.innerWidth)
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
-  const DAY_WIDTH = isMobile ? Math.max(240, viewportWidth - TIME_COL_WIDTH) : DEFAULT_DAY_WIDTH
+  // We attach this resize observer to scrollContainerRef (declared just
+  // below) once it's mounted, so DAY_WIDTH stays accurate when the user
+  // resizes the task panel splitter (which changes the calendar's
+  // available width without changing window width).
+  const desktopDayWidth = (() => {
+    const safeDays = Math.max(1, Math.min(3, dayViewDays))
+    if (containerWidth && containerWidth > TIME_COL_WIDTH + 200) {
+      const w = (containerWidth - TIME_COL_WIDTH) / safeDays
+      return Math.max(220, Math.floor(w))
+    }
+    return safeDays > 1 ? Math.floor(DEFAULT_DAY_WIDTH * (1 / safeDays) * 1.6) : DEFAULT_DAY_WIDTH
+  })()
+  const DAY_WIDTH = isMobile ? Math.max(240, viewportWidth - TIME_COL_WIDTH) : desktopDayWidth
   const EXTEND_THRESHOLD = DAY_WIDTH * 2
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const headerScrollRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   const isScrolling = useRef(false)
+
+  // Observe scroll container size for the dayViewDays-aware DAY_WIDTH calc.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const el = scrollContainerRef.current
+    if (!el) return
+    setContainerWidth(el.clientWidth)
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width
+      if (typeof w === 'number') setContainerWidth(w)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   // Track dragging state synchronously for scroll handler
   const isDraggingTaskRef = useRef(false)
 

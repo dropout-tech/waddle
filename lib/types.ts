@@ -133,6 +133,10 @@ export interface UserSettings {
   calendarEndHour: number
   defaultView: 'day' | 'week' | 'month'
   weekStartDay: number
+  /** Day-mode visible days (1-3). Focus / planning scope. */
+  dayViewDays: number
+  /** Week-mode visible days (5-7). Overview scope. */
+  weekViewDays: number
   weatherCity: string
   weatherUnit: 'celsius' | 'fahrenheit'
   // Time block defaults

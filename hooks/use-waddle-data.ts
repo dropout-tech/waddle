@@ -29,6 +29,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   calendarEndHour: 24,
   defaultView: 'day',
   weekStartDay: 0,
+  dayViewDays: 1,
+  weekViewDays: 7,
   weatherCity: 'Taipei',
   weatherUnit: 'celsius',
   lunchBreak: { enabled: true, startTime: '12:00', endTime: '13:00', color: '#F5F5F5' },
@@ -815,6 +817,8 @@ export function useWaddleData(): UseWaddleData {
       calendar_end_hour: newSettings.calendarEndHour,
       default_view: newSettings.defaultView,
       week_start_day: newSettings.weekStartDay,
+      day_view_days: newSettings.dayViewDays,
+      week_view_days: newSettings.weekViewDays,
       weather_city: newSettings.weatherCity,
       weather_unit: newSettings.weatherUnit,
       // JSONB columns — UserSettings shapes are richer than the generic Json

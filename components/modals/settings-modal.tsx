@@ -401,6 +401,65 @@ export function SettingsModal({
             </div>
           </div>
 
+          {/* Visible day count per view — keeps day-mode (1-3) and
+              week-mode (5-7) ranges deliberately disjoint so the two
+              views always feel like distinct "zoom levels". */}
+          <div className="space-y-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Layers className="w-4 h-4" />
+              檢視範圍
+            </h3>
+            <p className="text-xs text-muted-foreground">控制日視圖與週視圖一次能看到幾天</p>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-medium text-foreground">日視圖</div>
+                  <div className="text-[10px] text-muted-foreground">適合單日聚焦或近 1-3 天規劃</div>
+                </div>
+                <div className="flex gap-1">
+                  {[1, 2, 3].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setLocalSettings(prev => ({ ...prev, dayViewDays: n }))}
+                      className={cn(
+                        'min-w-[40px] h-8 px-2 rounded-md text-xs font-medium transition-colors',
+                        localSettings.dayViewDays === n
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                      )}
+                    >
+                      {n} 天
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-medium text-foreground">週視圖</div>
+                  <div className="text-[10px] text-muted-foreground">5 天=工作週，7 天=完整週</div>
+                </div>
+                <div className="flex gap-1">
+                  {[5, 6, 7].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setLocalSettings(prev => ({ ...prev, weekViewDays: n }))}
+                      className={cn(
+                        'min-w-[40px] h-8 px-2 rounded-md text-xs font-medium transition-colors',
+                        localSettings.weekViewDays === n
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                      )}
+                    >
+                      {n} 天
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Week Start Day */}
           <div className="space-y-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">

@@ -43,6 +43,9 @@ interface WeekViewProps {
   startHour?: number
   endHour?: number
   hourHeight?: number
+  /** How many days to fit per "week unit" (5-7). Drives column width so the
+   *  user gets more horizontal room per day when 5-day work-week is chosen. */
+  weekViewDays?: number
 }
 
 interface ActiveTaskDrag extends TaskDragStart {
@@ -51,13 +54,12 @@ interface ActiveTaskDrag extends TaskDragStart {
   dayIndex: number
 }
 
-const DAY_WIDTH = 120
+const BASE_DAY_WIDTH = 120 // baseline column width when weekViewDays === 7
 // Initial 21-day window centered on selectedDate; extends in both directions
 // on demand as user scrolls toward an edge.
 const INITIAL_DAYS_BEFORE = 10
 const INITIAL_DAYS_AFTER = 10
 const EXTEND_BATCH = 21
-const EXTEND_THRESHOLD = DAY_WIDTH * 3
 const TIME_COL_WIDTH = 56
 
 export function WeekView({
@@ -80,7 +82,15 @@ export function WeekView({
   startHour = 0,
   endHour = 24,
   hourHeight = 60,
+  weekViewDays = 7,
 }: WeekViewProps) {
+  // Effective day-column width — scales inversely with weekViewDays so a
+  // 5-day work-week shows wider columns (more breathing room) and a 7-day
+  // full week stays at the legacy compact 120px baseline.
+  const safeWeekDays = Math.max(5, Math.min(7, weekViewDays))
+  const DAY_WIDTH = Math.round(BASE_DAY_WIDTH * (7 / safeWeekDays))
+  const EXTEND_THRESHOLD = DAY_WIDTH * 3
+
   // New-slot drag state
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState<{ day: number; y: number } | null>(null)

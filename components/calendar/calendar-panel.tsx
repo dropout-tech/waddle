@@ -49,6 +49,9 @@ interface CalendarPanelProps {
   /** When the left task panel is closed, the calendar header reserves space
    * on the left so the floating reopen button doesn't cover the prev chevron. */
   leftPanelOpen?: boolean
+  /** From UserSettings — controls how many days fit visibly in day / week mode. */
+  dayViewDays?: number
+  weekViewDays?: number
   className?: string
 }
 
@@ -83,6 +86,8 @@ export function CalendarPanel({
   onOpenReport,
   onOpenSettings,
   leftPanelOpen = true,
+  dayViewDays = 1,
+  weekViewDays = 7,
   className,
 }: CalendarPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
@@ -175,6 +180,7 @@ export function CalendarPanel({
           startHour={startHour}
           endHour={endHour}
           hourHeight={hourHeight}
+          dayViewDays={dayViewDays}
           onTaskSelect={onTaskSelect}
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}
@@ -200,6 +206,7 @@ export function CalendarPanel({
           startHour={startHour}
           endHour={endHour}
           hourHeight={hourHeight}
+          weekViewDays={weekViewDays}
           onTaskSelect={onTaskSelect}
           onToggleComplete={onToggleComplete}
           onCreateTask={onCreateTask}
