@@ -55,10 +55,14 @@ interface ActiveTaskDrag extends TaskDragStart {
 }
 
 const DEFAULT_DAY_WIDTH = 280
-// Initial window: 21 days centered on selectedDate. Window extends in both
-// directions on demand as user scrolls toward an edge — see handleScroll.
-const INITIAL_DAYS_BEFORE = 10
-const INITIAL_DAYS_AFTER = 10
+// Initial window centered on selectedDate. Mobile uses a tighter window
+// because each day fills the entire viewport (only ~1 visible at once)
+// so a wide DOM tree is mostly off-screen yet still costs to keep
+// interactive. Window extends on scroll — see handleScroll.
+const INITIAL_DAYS_BEFORE_DESKTOP = 10
+const INITIAL_DAYS_AFTER_DESKTOP = 10
+const INITIAL_DAYS_BEFORE_MOBILE = 4
+const INITIAL_DAYS_AFTER_MOBILE = 4
 const EXTEND_BATCH = 14            // days to add per extension
 const TIME_COL_WIDTH = 56
 
@@ -212,11 +216,14 @@ export function DayScrollView({
   // so the same day stays under the cursor. This ref carries the pending shift.
   const pendingScrollAdjust = useRef(0)
 
+  const initialBefore = isMobile ? INITIAL_DAYS_BEFORE_MOBILE : INITIAL_DAYS_BEFORE_DESKTOP
+  const initialAfter = isMobile ? INITIAL_DAYS_AFTER_MOBILE : INITIAL_DAYS_AFTER_DESKTOP
+
   // Generate dates centered around selectedDate, extended by extras on each side
   const allDates = useMemo(() => {
     const dates: Date[] = []
-    const before = INITIAL_DAYS_BEFORE + extraBefore
-    const after = INITIAL_DAYS_AFTER + extraAfter
+    const before = initialBefore + extraBefore
+    const after = initialAfter + extraAfter
     const centerDate = new Date(selectedDate)
     for (let i = -before; i <= after; i++) {
       const d = new Date(centerDate)
@@ -224,10 +231,10 @@ export function DayScrollView({
       dates.push(d)
     }
     return dates
-  }, [selectedDate, extraBefore, extraAfter])
+  }, [selectedDate, extraBefore, extraAfter, initialBefore, initialAfter])
 
   // Index of selectedDate within allDates (depends on extras)
-  const centerIndex = INITIAL_DAYS_BEFORE + extraBefore
+  const centerIndex = initialBefore + extraBefore
 
   // When user explicitly navigates (selectedDate changes), reset extras and
   // recenter scroll. The extras-reset and selectedDate change happen in the
@@ -243,7 +250,7 @@ export function DayScrollView({
     const header = headerScrollRef.current
     if (!container || !header) return
 
-    const targetScrollLeft = INITIAL_DAYS_BEFORE * DAY_WIDTH
+    const targetScrollLeft = initialBefore * DAY_WIDTH
 
     isScrolling.current = true
     container.scrollLeft = targetScrollLeft
@@ -1080,6 +1087,13 @@ export function DayScrollView({
                   width: `${DAY_WIDTH}px`,
                   minWidth: `${DAY_WIDTH}px`,
                   ...(isMobile ? { scrollSnapAlign: 'start' } : {}),
+                  // Skip layout/paint for off-screen day columns. Mobile
+                  // benefits the most because only ~1 day is visible at a
+                  // time but the DOM still holds the whole window. The
+                  // intrinsic-size hint prevents scrollbar jitter when the
+                  // browser swaps a day in/out of rendered state.
+                  contentVisibility: 'auto',
+                  containIntrinsicSize: `${DAY_WIDTH}px ${(endHour - startHour) * hourHeight}px`,
                 }}
                 onPointerDown={(e) => handleMouseDown(e, dayIndex)}
                 onPointerMove={(e) => handleMouseMove(e, dayIndex)}
