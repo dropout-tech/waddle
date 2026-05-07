@@ -107,35 +107,38 @@ export function useWaddleData(): UseWaddleData {
   const [isLoading, setIsLoading] = useState(true)
   const [onboardingCompleted, setOnboardingCompleted] = useState(true)
   const userIdRef = useRef<string | null>(null)
+  // Monotonic counter so a fresh load() can invalidate any in-flight older
+  // load() — only the latest call gets to commit state. Used by both the
+  // initial mount and the on-focus refetch path.
+  const loadVersionRef = useRef(0)
+  const lastRefetchRef = useRef(0)
 
-  // ─── Initial load ────────────────────────────────────
-  useEffect(() => {
-    let cancelled = false
+  const loadData = useCallback(
+    async ({ initial = false }: { initial?: boolean } = {}) => {
+      const myVersion = ++loadVersionRef.current
+      const isStale = () => myVersion !== loadVersionRef.current
 
-    async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        // Should never happen because middleware redirects, but guard anyway
-        if (!cancelled) setIsLoading(false)
+        if (initial && !isStale()) setIsLoading(false)
         return
       }
       userIdRef.current = user.id
 
-      // 1) Workspaces
       let { data: wsRows } = await supabase
         .from('workspaces')
         .select('*')
         .order('sort_order', { ascending: true })
 
-      if (!wsRows || wsRows.length === 0) {
-        // First-time user — seed data based on email (owner gets personal,
-        // others get demo content paired with the onboarding tour).
+      // Seed only on the very first mount — on a refetch we can safely
+      // assume workspaces already exist (user has been using the app).
+      if (initial && (!wsRows || wsRows.length === 0)) {
         try {
           await seedUserData(user.id, user.email ?? '', supabase)
         } catch (err) {
           console.error('[seed] failed:', err)
           toast.error('初始化資料失敗，請重新整理')
-          if (!cancelled) setIsLoading(false)
+          if (!isStale()) setIsLoading(false)
           return
         }
         const re = await supabase
@@ -145,19 +148,16 @@ export function useWaddleData(): UseWaddleData {
         wsRows = re.data
       }
 
-      // 2) Categories
       const { data: catRows } = await supabase
         .from('categories')
         .select('*')
         .order('sort_order', { ascending: true })
 
-      // 3) Tasks
       const { data: taskRows } = await supabase
         .from('tasks')
         .select('*')
         .order('sort_order', { ascending: true })
 
-      // Build nested structure
       const wsById = new Map(wsRows?.map((w) => [w.id, w]) ?? [])
       const catById = new Map(catRows?.map((c) => [c.id, c]) ?? [])
 
@@ -198,7 +198,6 @@ export function useWaddleData(): UseWaddleData {
         categories: categoriesByWorkspace.get(w.id) ?? [],
       }))
 
-      // 4) Time blocks
       const { data: tbRows } = await supabase
         .from('time_blocks')
         .select('*')
@@ -206,15 +205,12 @@ export function useWaddleData(): UseWaddleData {
 
       const builtTimeBlocks = (tbRows ?? []).map(rowToTimeBlock)
 
-      // 5) Settings
       const { data: settingsRow } = await supabase
         .from('user_settings')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle()
 
-      // 6) Custom slot types (built-in workspace + 午休/緩衝/專注 are
-      // synthesized in app/page.tsx; this table only stores user customs.)
       const { data: slotTypeRows } = await supabase
         .from('slot_types')
         .select('*')
@@ -228,9 +224,6 @@ export function useWaddleData(): UseWaddleData {
         icon: r.icon,
         iconType: r.icon_type,
         color: r.color,
-        // parent_key holds synthetic-parent strings ('timeblock', 'ws-<id>')
-        // that can't fit the uuid parent_id column; fall back to parent_id
-        // for nested customs that point at a real DB row.
         parentId: r.parent_key ?? r.parent_id ?? undefined,
         sortOrder: r.sort_order,
         isBuiltIn: r.is_built_in,
@@ -241,17 +234,45 @@ export function useWaddleData(): UseWaddleData {
         ? { ...rowToSettings(settingsRow, DEFAULT_SETTINGS), slotTypes: customSlotTypes }
         : { ...DEFAULT_SETTINGS, slotTypes: customSlotTypes }
 
-      if (cancelled) return
+      if (isStale()) return
       setWorkspaces(builtWorkspaces)
       setTimeBlocks(builtTimeBlocks)
       setSettings(builtSettings)
-      setOnboardingCompleted(settingsRow?.onboarding_completed ?? true)
-      setIsLoading(false)
-    }
+      if (initial) {
+        setOnboardingCompleted(settingsRow?.onboarding_completed ?? true)
+        setIsLoading(false)
+      }
+    },
+    [supabase],
+  )
 
-    load()
-    return () => { cancelled = true }
-  }, [supabase])
+  // ─── Initial load ────────────────────────────────────
+  useEffect(() => {
+    void loadData({ initial: true })
+  }, [loadData])
+
+  // ─── Cross-device sync: refetch when tab becomes visible / regains focus.
+  // This catches the common "I changed something on phone, switch to laptop,
+  // it's still showing the old version" pattern. Throttled to once per 3s
+  // so a quick alt-tab / cmd-tab burst doesn't hammer Supabase. We
+  // intentionally do NOT toggle isLoading on refetch so the UI doesn't
+  // flash the loading spinner.
+  useEffect(() => {
+    const REFETCH_THROTTLE_MS = 3000
+    const tryRefetch = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (now - lastRefetchRef.current < REFETCH_THROTTLE_MS) return
+      lastRefetchRef.current = now
+      void loadData({ initial: false })
+    }
+    document.addEventListener('visibilitychange', tryRefetch)
+    window.addEventListener('focus', tryRefetch)
+    return () => {
+      document.removeEventListener('visibilitychange', tryRefetch)
+      window.removeEventListener('focus', tryRefetch)
+    }
+  }, [loadData])
 
   // ─── Helpers ─────────────────────────────────────────
   const requireUserId = () => {
