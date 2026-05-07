@@ -568,6 +568,8 @@ export function MainLayout({
                   endHour={endHour}
                   hourHeight={hourHeight}
                   zoomLevel={zoomLevel}
+                  dayViewDays={dayViewDays}
+                  weekViewDays={weekViewDays}
                   onZoomChange={setZoomLevel}
                   onDateChange={setSelectedDate}
                   onViewModeChange={setViewMode}
