@@ -403,13 +403,16 @@ export function SettingsModal({
 
           {/* Visible day count per view — keeps day-mode (1-3) and
               week-mode (5-7) ranges deliberately disjoint so the two
-              views always feel like distinct "zoom levels". */}
+              views always feel like distinct "zoom levels".
+              Auto-saves on click (same pattern as slot types) so the
+              calendar reflects the change immediately without needing
+              the user to find the 儲存 button. */}
           <div className="space-y-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Layers className="w-4 h-4" />
               檢視範圍
             </h3>
-            <p className="text-xs text-muted-foreground">控制日視圖與週視圖一次能看到幾天</p>
+            <p className="text-xs text-muted-foreground">控制日視圖與週視圖一次能看到幾天（變更立即生效）</p>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
@@ -421,7 +424,11 @@ export function SettingsModal({
                   {[1, 2, 3].map((n) => (
                     <button
                       key={n}
-                      onClick={() => setLocalSettings(prev => ({ ...prev, dayViewDays: n }))}
+                      onClick={() => {
+                        const next = { ...localSettings, dayViewDays: n }
+                        setLocalSettings(next)
+                        onSave(next, localTimeBlocks)
+                      }}
                       className={cn(
                         'min-w-[40px] h-8 px-2 rounded-md text-xs font-medium transition-colors',
                         localSettings.dayViewDays === n
@@ -444,7 +451,11 @@ export function SettingsModal({
                   {[5, 6, 7].map((n) => (
                     <button
                       key={n}
-                      onClick={() => setLocalSettings(prev => ({ ...prev, weekViewDays: n }))}
+                      onClick={() => {
+                        const next = { ...localSettings, weekViewDays: n }
+                        setLocalSettings(next)
+                        onSave(next, localTimeBlocks)
+                      }}
                       className={cn(
                         'min-w-[40px] h-8 px-2 rounded-md text-xs font-medium transition-colors',
                         localSettings.weekViewDays === n
