@@ -165,7 +165,20 @@ export function SettingsModal({
     onClose()
   }
 
-  // Slot type management
+  // Slot type management.
+  //
+  // Each add/edit/delete writes through immediately. The previous design
+  // only updated localSettings and required the user to click 儲存 at the
+  // bottom of the modal — closing without saving silently lost any newly
+  // added slot type, which was the source of "I added a custom type and
+  // it disappeared after refresh" reports. Now every action persists in
+  // the same call so reload always reflects the latest state.
+  const persistSlotTypes = (nextSlotTypes: SlotType[]) => {
+    const nextSettings = { ...localSettings, slotTypes: nextSlotTypes }
+    setLocalSettings(nextSettings)
+    onSave(nextSettings, localTimeBlocks)
+  }
+
   const handleAddSlotType = () => {
     if (!newSlotType.label) return
     // DB column is uuid — must be a real UUID, not a Date.now()-derived string.
@@ -184,28 +197,19 @@ export function SettingsModal({
       isBuiltIn: false,
       workspaceId: newSlotType.workspaceId,
     }
-    setLocalSettings(prev => ({
-      ...prev,
-      slotTypes: [...prev.slotTypes, newType],
-    }))
+    persistSlotTypes([...localSettings.slotTypes, newType])
     setNewSlotType({ label: '', description: '', icon: 'Clock', iconType: 'lucide', color: '#6B7FD4', parentId: 'timeblock', workspaceId: undefined })
     setCustomIconInput('')
     setIsAddingNew(false)
   }
 
   const handleUpdateSlotType = (updated: SlotType) => {
-    setLocalSettings(prev => ({
-      ...prev,
-      slotTypes: prev.slotTypes.map(s => s.id === updated.id ? updated : s),
-    }))
+    persistSlotTypes(localSettings.slotTypes.map(s => s.id === updated.id ? updated : s))
     setEditingSlotType(null)
   }
 
   const handleDeleteSlotType = (id: string) => {
-    setLocalSettings(prev => ({
-      ...prev,
-      slotTypes: prev.slotTypes.filter(s => s.id !== id),
-    }))
+    persistSlotTypes(localSettings.slotTypes.filter(s => s.id !== id))
   }
 
   // Generate workspace-based slot types for display

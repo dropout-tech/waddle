@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronDown, BookOpen, BarChart3, Settings, Sparkles, MoreHorizontal } from 'lucide-react'
+import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, BarChart3, Settings, Sparkles, MoreHorizontal } from 'lucide-react'
 import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { UserMenu } from '@/components/user-menu'
@@ -94,6 +94,21 @@ export function CalendarHeader({
     return `${selectedDate.getFullYear()}年 ${selectedDate.getMonth() + 1}月`
   }
 
+  // Step amount per chevron click: day-view nudges by one day, week-view
+  // by a full week, month-view by a month. Keeps "previous / next" predictable
+  // regardless of which view the user is in.
+  const stepDate = (direction: -1 | 1) => {
+    const next = new Date(selectedDate)
+    if (viewMode === 'day') {
+      next.setDate(next.getDate() + direction)
+    } else if (viewMode === 'week') {
+      next.setDate(next.getDate() + direction * 7)
+    } else {
+      next.setMonth(next.getMonth() + direction)
+    }
+    onDateChange(next)
+  }
+
   return (
     <div className="border-b border-border bg-card" role="toolbar" aria-label="日曆導航">
       {/* Primary Row: Navigation + View Mode + Today.
@@ -112,8 +127,28 @@ export function CalendarHeader({
       >
         {/* Left: Date Navigation */}
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          {/* Month/date label — pure indicator. Navigation lives in the
-              calendar grid itself (horizontal scroll / swipe). */}
+          {/* Prev / Next chevrons — restored 2026-05-07 because horizontal
+              scroll is awkward on Windows trackpads / mice without a touch
+              gesture. Click steps by the current view's natural unit
+              (day / week / month). */}
+          <button
+            type="button"
+            onClick={() => stepDate(-1)}
+            aria-label={viewMode === 'day' ? '前一天' : viewMode === 'week' ? '前一週' : '前一個月'}
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => stepDate(1)}
+            aria-label={viewMode === 'day' ? '後一天' : viewMode === 'week' ? '後一週' : '後一個月'}
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ChevronRight className="w-4 h-4" aria-hidden="true" />
+          </button>
+
+          {/* Month/date label — companion to the chevrons. */}
           <span
             className="text-sm font-semibold md:font-medium px-1 truncate"
             aria-live="polite"
