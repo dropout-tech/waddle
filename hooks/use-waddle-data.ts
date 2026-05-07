@@ -236,6 +236,31 @@ export function useWaddleData(): UseWaddleData {
         ? { ...rowToSettings(settingsRow, DEFAULT_SETTINGS), slotTypes: customSlotTypes }
         : { ...DEFAULT_SETTINGS, slotTypes: customSlotTypes }
 
+      // View-range fields fall back to localStorage when the DB doesn't
+      // have those columns yet (pre-migration-0006). DB takes precedence
+      // when the columns ARE present, so once the migration ships the
+      // localStorage copy becomes a no-op.
+      if (typeof window !== 'undefined') {
+        const dbDay = (settingsRow as { day_view_days?: number } | null)?.day_view_days
+        const dbWeek = (settingsRow as { week_view_days?: number } | null)?.week_view_days
+        if (dbDay === undefined || dbWeek === undefined) {
+          try {
+            const raw = window.localStorage.getItem('waddle-view-range-v1')
+            if (raw) {
+              const parsed = JSON.parse(raw) as { dayViewDays?: number; weekViewDays?: number }
+              if (dbDay === undefined && typeof parsed.dayViewDays === 'number') {
+                builtSettings.dayViewDays = parsed.dayViewDays
+              }
+              if (dbWeek === undefined && typeof parsed.weekViewDays === 'number') {
+                builtSettings.weekViewDays = parsed.weekViewDays
+              }
+            }
+          } catch {
+            /* ignore corrupt localStorage */
+          }
+        }
+      }
+
       if (isStale()) return
       setWorkspaces(builtWorkspaces)
       setTimeBlocks(builtTimeBlocks)
@@ -810,15 +835,16 @@ export function useWaddleData(): UseWaddleData {
     setSettings(newSettings)
     setTimeBlocks(newTimeBlocks)
 
-    // Upsert settings
-    const { error } = await supabase.from('user_settings').upsert({
+    // Settings rows we attempt with all fields. If the migration-0006
+    // columns aren't on the DB yet, we strip them and retry — view-range
+    // values will fall back to localStorage so the feature still works
+    // before the migration ships.
+    const baseSettingsRow = {
       user_id: userId,
       calendar_start_hour: newSettings.calendarStartHour,
       calendar_end_hour: newSettings.calendarEndHour,
       default_view: newSettings.defaultView,
       week_start_day: newSettings.weekStartDay,
-      day_view_days: newSettings.dayViewDays,
-      week_view_days: newSettings.weekViewDays,
       weather_city: newSettings.weatherCity,
       weather_unit: newSettings.weatherUnit,
       // JSONB columns — UserSettings shapes are richer than the generic Json
@@ -828,7 +854,38 @@ export function useWaddleData(): UseWaddleData {
       buffer_time: newSettings.bufferTime as unknown as Json,
       default_task_colors: newSettings.defaultTaskColors as unknown as Json,
       notifications: newSettings.notifications as unknown as Json,
+    }
+    // Always mirror view-range values to localStorage so they persist even
+    // if the DB rejects them (pre-migration) or only the local device
+    // updated. Load logic prefers DB → localStorage in that order.
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(
+          'waddle-view-range-v1',
+          JSON.stringify({
+            dayViewDays: newSettings.dayViewDays,
+            weekViewDays: newSettings.weekViewDays,
+          }),
+        )
+      } catch {
+        /* localStorage unavailable; ignore */
+      }
+    }
+
+    let { error } = await supabase.from('user_settings').upsert({
+      ...baseSettingsRow,
+      day_view_days: newSettings.dayViewDays,
+      week_view_days: newSettings.weekViewDays,
     })
+    // PostgREST signals an unknown column with code PGRST204 / 42703 etc.
+    // Detect by message text — if it complains about either of the two
+    // migration-0006 columns, retry the upsert without them so the rest
+    // of the settings still save.
+    if (error && /day_view_days|week_view_days/.test(error.message ?? '')) {
+      console.warn('[settings] view-range columns missing — falling back to localStorage. Run migration 0006.', error)
+      const retry = await supabase.from('user_settings').upsert(baseSettingsRow)
+      error = retry.error
+    }
     if (error) {
       handleDbError('儲存設定')(error)
       return
