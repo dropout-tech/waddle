@@ -986,8 +986,10 @@ export function WeekView({
                   </div>
                 )}
 
-                {/* Current time line for today */}
-                {isToday && <CurrentTimeLine startHour={startHour} />}
+                {/* Current time line for today — compact: time gutter is
+                    rendered as a separate column, so the line should span
+                    the full day width. */}
+                {isToday && <CurrentTimeLine startHour={startHour} compact />}
               </div>
             )
           })}

@@ -1254,8 +1254,9 @@ export function DayScrollView({
                   </div>
                 )}
 
-                {/* Current time line for today */}
-                {isToday && <CurrentTimeLine startHour={startHour} />}
+                {/* Current time line for today — compact mode because the
+                    time gutter is a separate sticky column. */}
+                {isToday && <CurrentTimeLine startHour={startHour} compact />}
               </div>
             )
           })}
