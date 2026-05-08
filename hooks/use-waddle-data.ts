@@ -750,8 +750,30 @@ export function useWaddleData(): UseWaddleData {
       scheduled_end_time: endTime,
     }
     if (date) update.scheduled_date = date
-    const { error } = await supabase.from('tasks').update(update).eq('id', taskId)
-    if (error) handleDbError('重新排程')(error)
+    // .select() so PostgREST returns the rows the UPDATE touched. If RLS
+    // or a stale session silently filters the row out, error stays null
+    // but data is empty — exactly the "task disappears" failure mode.
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(update)
+      .eq('id', taskId)
+      .select('id, scheduled_date, scheduled_start_time, scheduled_end_time')
+    if (error) {
+      console.error('[rescheduleTask] supabase error', { taskId, update, error })
+      handleDbError('重新排程')(error)
+      return
+    }
+    if (!data || data.length === 0) {
+      const { data: { user } } = await supabase.auth.getUser()
+      console.error('[rescheduleTask] 0 rows updated — RLS / stale session?', {
+        taskId,
+        attemptedUpdate: update,
+        jwtUserId: user?.id ?? null,
+      })
+      toast.error('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入')
+      return
+    }
+    console.log('[rescheduleTask] OK', { taskId, persisted: data[0] })
   }, [supabase])
 
   const unscheduleTask = useCallback(async (taskId: string, date?: string) => {
@@ -780,8 +802,27 @@ export function useWaddleData(): UseWaddleData {
       scheduled_end_time: null,
     }
     if (date) update.scheduled_date = date
-    const { error } = await supabase.from('tasks').update(update).eq('id', taskId)
-    if (error) handleDbError('取消排程')(error)
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(update)
+      .eq('id', taskId)
+      .select('id, scheduled_date')
+    if (error) {
+      console.error('[unscheduleTask] supabase error', { taskId, update, error })
+      handleDbError('取消排程')(error)
+      return
+    }
+    if (!data || data.length === 0) {
+      const { data: { user } } = await supabase.auth.getUser()
+      console.error('[unscheduleTask] 0 rows updated — RLS / stale session?', {
+        taskId,
+        attemptedUpdate: update,
+        jwtUserId: user?.id ?? null,
+      })
+      toast.error('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入')
+      return
+    }
+    console.log('[unscheduleTask] OK', { taskId, persisted: data[0] })
   }, [supabase])
 
   // ═════════════════════════════════════════════════════
