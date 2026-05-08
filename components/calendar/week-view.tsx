@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
+import { toast } from 'sonner'
 import { positionPopover } from '@/lib/popover-position'
 import { cn, haptic } from '@/lib/utils'
 import type { Task, TimeBlock, SlotType } from '@/lib/types'
@@ -398,8 +399,30 @@ export function WeekView({
       dragState = null
 
       if (overPending) {
+        // See day-scroll-view for the full rationale: dropping on a pending
+        // zone clears the time slots, which is destructive enough that we
+        // surface an explicit undo. Without this, mis-aimed drags silently
+        // un-time tasks and they appear to vanish from the timeline.
         const pendingDate = overPending.getAttribute('data-pending-zone-date') ?? undefined
+        const taskTitle = tasks.find((t) => t.id === finalState.taskId)?.title || '任務'
+        const originalDate = tasks.find((t) => t.id === finalState.taskId)?.scheduledDate
+        const originalStart = minutesToTime(finalState.originalStart)
+        const originalEnd = minutesToTime(finalState.originalEnd)
         onUnscheduleTask?.(finalState.taskId, pendingDate)
+        toast(
+          `「${taskTitle}」已移到 ${pendingDate ?? '待排程'}（時間移除）`,
+          {
+            duration: 8000,
+            action: {
+              label: '復原',
+              onClick: () => {
+                if (originalDate) {
+                  onRescheduleTask?.(finalState.taskId, originalDate, originalStart, originalEnd)
+                }
+              },
+            },
+          },
+        )
       } else {
         const dropTarget = allDates[finalState.dayIndex]
         if (dropTarget) {
@@ -420,7 +443,7 @@ export function WeekView({
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
-  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask])
+  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask, tasks])
 
   // Pending task drag — same window-level pattern. Drag preview only activates
   // after the cursor moves past the threshold, so a plain click on a pending

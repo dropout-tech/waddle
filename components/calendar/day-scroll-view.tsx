@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
+import { toast } from 'sonner'
 import { positionPopover } from '@/lib/popover-position'
 import { cn, haptic } from '@/lib/utils'
 import type { Task, TimeBlock, SlotType } from '@/lib/types'
@@ -497,8 +498,30 @@ export function DayScrollView({
       dragState = null
 
       if (overPending) {
+        // Drop on a pending zone clears the time slots — the user might have
+        // meant this, or might have just missed the timeline edge. Either way
+        // the task vanishes from where they were looking, so we remember the
+        // pre-drag schedule and offer a one-tap undo.
         const pendingDate = overPending.getAttribute('data-pending-zone-date') ?? undefined
+        const taskTitle = tasks.find((t) => t.id === finalState.taskId)?.title || '任務'
+        const originalDate = tasks.find((t) => t.id === finalState.taskId)?.scheduledDate
+        const originalStart = minutesToTime(finalState.originalStart)
+        const originalEnd = minutesToTime(finalState.originalEnd)
         onUnscheduleTask?.(finalState.taskId, pendingDate)
+        toast(
+          `「${taskTitle}」已移到 ${pendingDate ?? '待排程'}（時間移除）`,
+          {
+            duration: 8000,
+            action: {
+              label: '復原',
+              onClick: () => {
+                if (originalDate) {
+                  onRescheduleTask?.(finalState.taskId, originalDate, originalStart, originalEnd)
+                }
+              },
+            },
+          },
+        )
       } else {
         const dropTarget = allDates[finalState.dayIndex]
         if (dropTarget) {
@@ -519,7 +542,7 @@ export function DayScrollView({
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
-  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask])
+  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask, tasks])
 
   // Time block drag (move / resize-top / resize-bottom). Same window-level
   // pattern as task drags — preview activates after cursor moves past
