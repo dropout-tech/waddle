@@ -49,9 +49,20 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
     return all
       .filter((m) => m.scheduledDate === todayStr)
       .filter((m) => {
+        // Compute the meeting's end timestamp. For midnight-crossing
+        // meetings (e.g. 23:00→01:00) the raw end hour resolves to
+        // *today* at 01:00, which is in the past for any current time
+        // past 01:00 — incorrectly filtering out an in-progress meeting.
+        // Detect by comparing end vs start in minute-of-day; if end is
+        // logically earlier, the meeting wraps so push end forward a
+        // day. CR-03 from the multi-agent code review.
+        const [sh, sm] = m.scheduledStartTime.split(':').map(Number)
         const [eh, em] = m.scheduledEndTime.split(':').map(Number)
+        const startMin = sh * 60 + sm
+        const endMin = eh * 60 + em
         const end = new Date(now)
         end.setHours(eh, em, 0, 0)
+        if (endMin < startMin) end.setDate(end.getDate() + 1)
         return end.getTime() > now.getTime()
       })
       .sort((a, b) => a.scheduledStartTime.localeCompare(b.scheduledStartTime))
@@ -148,9 +159,15 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
                   start &&
                   start.getTime() <= now.getTime() &&
                   (() => {
+                    // Same midnight-crossing handling as the filter
+                    // above — see the comment there for the rationale.
+                    const [sh, sm] = m.scheduledStartTime.split(':').map(Number)
                     const [eh, em] = m.scheduledEndTime.split(':').map(Number)
+                    const startMin = sh * 60 + sm
+                    const endMin = eh * 60 + em
                     const end = new Date(now)
                     end.setHours(eh, em, 0, 0)
+                    if (endMin < startMin) end.setDate(end.getDate() + 1)
                     return end.getTime() > now.getTime()
                   })()
                 const provider = detectMeetingProvider(m.meetingUrl)

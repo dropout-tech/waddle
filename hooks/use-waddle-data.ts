@@ -28,32 +28,50 @@ import type {
 // When a migration ships a new column, an older deployment can still
 // have task / settings writes hitting a DB without that column. Rather
 // than crashing every write, we detect the "column not found" error
-// and retry without the new fields. This module-level flag latches once
-// per session so we don't pay the failed-roundtrip cost on every call.
+// and retry without the new fields. Module-level latches keyed by
+// concern (`meeting`, `settings`) record which columns are known to be
+// missing in the current session so subsequent writes strip them
+// upfront — no per-call failed-roundtrip cost.
 // ─────────────────────────────────────────────────────────
-let meetingColsKnownMissing = false
-const MEETING_COL_KEYS = ['is_meeting', 'attendees', 'location', 'meeting_url'] as const
-const MEETING_COL_RE = /is_meeting|attendees|location|meeting_url/
+
+/** PGRST204 = "column not found in schema cache". 42703 = "undefined column". */
+const MISSING_COL_CODES = new Set(['PGRST204', '42703'])
+
+function hasCode(err: unknown): err is { code?: string; message?: string } {
+  return !!err && typeof err === 'object'
+}
 
 /**
- * PGRST204 = "column not found in schema cache".
- * 42703    = "undefined column" (raw Postgres code).
- * We require BOTH a known code and a message that names the missing
- * column — keeping it strict avoids silently swallowing unrelated
- * errors whose message happens to mention one of these tokens.
+ * True when the error signals a missing column AND the message names
+ * one of the columns in `regex`. Requiring both avoids silently
+ * swallowing unrelated errors whose message happens to contain a
+ * matching token.
  */
-function isMissingMeetingColumnError(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false
-  const e = err as { code?: string; message?: string }
-  if (e.code !== 'PGRST204' && e.code !== '42703') return false
-  return MEETING_COL_RE.test(e.message ?? '')
+function isMissingColumnError(err: unknown, regex: RegExp): boolean {
+  if (!hasCode(err)) return false
+  if (!err.code || !MISSING_COL_CODES.has(err.code)) return false
+  return regex.test(err.message ?? '')
 }
+
+// Meeting columns — migration 0008.
+const MEETING_COL_KEYS = ['is_meeting', 'attendees', 'location', 'meeting_url'] as const
+const MEETING_COL_RE = /is_meeting|attendees|location|meeting_url/
+let meetingColsKnownMissing = false
+const isMissingMeetingColumnError = (err: unknown) => isMissingColumnError(err, MEETING_COL_RE)
 
 function stripMeetingCols<T extends Record<string, unknown>>(row: T): T {
   const out = { ...row }
   for (const k of MEETING_COL_KEYS) delete out[k]
   return out
 }
+
+// User-settings extension columns — migrations 0006 (view-range) and 0007
+// (keep_completed_today_in_list). Same latch shape so saveSettings
+// matches createTask/updateTask instead of paying the failed-write cost
+// on every save.
+const SETTINGS_EXT_COL_RE = /day_view_days|week_view_days|keep_completed_today_in_list/
+let settingsExtColsKnownMissing = false
+const isMissingSettingsExtColumnError = (err: unknown) => isMissingColumnError(err, SETTINGS_EXT_COL_RE)
 
 // ─────────────────────────────────────────────────────────
 // Default settings — used as fallback for partial DB rows
@@ -1077,21 +1095,21 @@ export function useWaddleData(): UseWaddleData {
       }
     }
 
-    let { error } = await supabase.from('user_settings').upsert({
-      ...baseSettingsRow,
-      day_view_days: newSettings.dayViewDays,
-      week_view_days: newSettings.weekViewDays,
-      keep_completed_today_in_list: newSettings.keepCompletedTodayInList,
-    })
-    // PostgREST signals an unknown column with code PGRST204 / 42703.
-    // We require both a recognized error code AND a message that names
-    // one of the migration columns — keeping it strict avoids swallowing
-    // unrelated errors whose message happens to mention a column token.
-    if (
-      error &&
-      (error.code === 'PGRST204' || error.code === '42703') &&
-      /day_view_days|week_view_days|keep_completed_today_in_list/.test(error.message ?? '')
-    ) {
+    // Same session-latch pattern used by createTask / updateTask for
+    // meeting columns: once we know the migration columns are missing,
+    // strip them upfront so every settings save afterward skips the
+    // failed-write roundtrip. CR-04 from the multi-agent review.
+    const fullSettingsRow = settingsExtColsKnownMissing
+      ? baseSettingsRow
+      : {
+          ...baseSettingsRow,
+          day_view_days: newSettings.dayViewDays,
+          week_view_days: newSettings.weekViewDays,
+          keep_completed_today_in_list: newSettings.keepCompletedTodayInList,
+        }
+    let { error } = await supabase.from('user_settings').upsert(fullSettingsRow)
+    if (error && isMissingSettingsExtColumnError(error)) {
+      settingsExtColsKnownMissing = true
       console.warn('[settings] migration columns missing — falling back to localStorage. Run latest migration.', error)
       const retry = await supabase.from('user_settings').upsert(baseSettingsRow)
       error = retry.error

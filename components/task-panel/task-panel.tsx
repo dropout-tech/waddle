@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useMemo } from 'react'
+import { useRef, useState, useMemo, useEffect } from 'react'
 import { FolderTree, Clock, SlidersHorizontal, ChevronDown, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
@@ -95,11 +95,16 @@ export function TaskPanel({
     workspaceIds: [],
   })
 
-  // Recompute "today" once per render — cheap, and we don't need second
-  // precision. A user keeping the panel open across midnight will see
-  // yesterday's completed tasks slide out of the list on the next render
-  // (no special handling required).
-  const todayStr = useMemo(() => toDateString(new Date()), [])
+  // Tick once a minute so todayStr rolls over at local midnight without
+  // requiring a remount. Mirrors today-meetings-popover's identical
+  // pattern. The previous `useMemo([], [])` froze the value at mount —
+  // CR-02 from the multi-agent code review.
+  const [nowTick, setNowTick] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick((n) => n + 1), 60 * 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  const todayStr = useMemo(() => toDateString(new Date()), [nowTick])
 
   // Total count of completed tasks across all workspaces — drives the
   // "已完成 (N)" trigger badge. Built separately from filteredWorkspaces so
@@ -148,7 +153,12 @@ export function TaskPanel({
                 if (!filters.showCompleted) return false
                 if (!keepCompletedTodayInList) return false
                 if (!task.completedAt) return false
-                const completedDay = task.completedAt.split('T')[0]
+                // completedAt is UTC ISO; convert through Date so we
+                // compare against `todayStr` (local) on the same axis.
+                // The earlier `split('T')[0]` shortcut returned the UTC
+                // day and silently filtered out tasks completed in the
+                // local 00:00-08:00 window (UTC+8). CR-01 from review.
+                const completedDay = toDateString(new Date(task.completedAt))
                 if (completedDay !== todayStr) return false
               }
               return true
