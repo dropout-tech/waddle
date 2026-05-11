@@ -65,11 +65,11 @@ function stripMeetingCols<T extends Record<string, unknown>>(row: T): T {
   return out
 }
 
-// User-settings extension columns — migrations 0006 (view-range) and 0007
-// (keep_completed_today_in_list). Same latch shape so saveSettings
-// matches createTask/updateTask instead of paying the failed-write cost
-// on every save.
-const SETTINGS_EXT_COL_RE = /day_view_days|week_view_days|keep_completed_today_in_list/
+// User-settings extension columns — migrations 0006 (view-range), 0007
+// (keep_completed_today_in_list), and 0009 (quick_links). Same latch
+// shape so saveSettings matches createTask/updateTask instead of paying
+// the failed-write cost on every save.
+const SETTINGS_EXT_COL_RE = /day_view_days|week_view_days|keep_completed_today_in_list|quick_links/
 let settingsExtColsKnownMissing = false
 const isMissingSettingsExtColumnError = (err: unknown) => isMissingColumnError(err, SETTINGS_EXT_COL_RE)
 
@@ -84,6 +84,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   dayViewDays: 1,
   weekViewDays: 7,
   keepCompletedTodayInList: true,
+  quickLinks: [],
   weatherCity: 'Taipei',
   weatherUnit: 'celsius',
   lunchBreak: { enabled: true, startTime: '12:00', endTime: '13:00', color: '#F5F5F5' },
@@ -152,6 +153,12 @@ interface UseWaddleData {
   deleteTimeBlock: (id: string) => Promise<void>
   // Settings
   saveSettings: (newSettings: UserSettings, newTimeBlocks: TimeBlock[]) => Promise<void>
+  /**
+   * Narrow mutation for the bottom quick-links bar. Updates only the
+   * `quick_links` column so we don't pay the time-block-replace cost on
+   * every add/edit/delete from the bar.
+   */
+  setQuickLinks: (next: import('@/lib/types').QuickLink[]) => Promise<void>
 }
 
 export function useWaddleData(): UseWaddleData {
@@ -327,6 +334,21 @@ export function useWaddleData(): UseWaddleData {
               const parsed = JSON.parse(raw) as { keepCompletedTodayInList?: boolean }
               if (typeof parsed.keepCompletedTodayInList === 'boolean') {
                 builtSettings.keepCompletedTodayInList = parsed.keepCompletedTodayInList
+              }
+            }
+          } catch {
+            /* ignore corrupt localStorage */
+          }
+        }
+
+        const dbQuickLinks = settingsRow?.quick_links
+        if (dbQuickLinks === undefined) {
+          try {
+            const raw = window.localStorage.getItem('waddle-quick-links-v1')
+            if (raw) {
+              const parsed = JSON.parse(raw)
+              if (Array.isArray(parsed)) {
+                builtSettings.quickLinks = parsed as UserSettings['quickLinks']
               }
             }
           } catch {
@@ -1090,6 +1112,10 @@ export function useWaddleData(): UseWaddleData {
             keepCompletedTodayInList: newSettings.keepCompletedTodayInList,
           }),
         )
+        window.localStorage.setItem(
+          'waddle-quick-links-v1',
+          JSON.stringify(newSettings.quickLinks),
+        )
       } catch {
         /* localStorage unavailable; ignore */
       }
@@ -1106,6 +1132,7 @@ export function useWaddleData(): UseWaddleData {
           day_view_days: newSettings.dayViewDays,
           week_view_days: newSettings.weekViewDays,
           keep_completed_today_in_list: newSettings.keepCompletedTodayInList,
+          quick_links: newSettings.quickLinks as unknown as Json,
         }
     let { error } = await supabase.from('user_settings').upsert(fullSettingsRow)
     if (error && isMissingSettingsExtColumnError(error)) {
@@ -1203,6 +1230,46 @@ export function useWaddleData(): UseWaddleData {
         if (pruneError) handleDbError('儲存時間區塊類型')(pruneError)
       }
     }
+    } finally {
+      pendingWritesRef.current -= 1
+    }
+  }, [supabase])
+
+  /**
+   * Quick-links mutation surface for the bottom drawer. We could route
+   * everything through `saveSettings`, but that path also rewrites
+   * time_blocks + slot_types on every call — wasteful when the user is
+   * just toggling a single shortcut. Narrowing to a single column upsert
+   * keeps the write small and avoids the pending-writes throttle hitting
+   * unrelated surfaces.
+   */
+  const setQuickLinks = useCallback(async (next: import('@/lib/types').QuickLink[]) => {
+    const userId = requireUserId()
+    setSettings((prev) => ({ ...prev, quickLinks: next }))
+
+    // Mirror to localStorage so the bar still works pre-migration-0009
+    // and recovers on page reload even if the DB write fails.
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('waddle-quick-links-v1', JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+    }
+
+    pendingWritesRef.current += 1
+    try {
+      let { error } = await supabase
+        .from('user_settings')
+        .update({ quick_links: next as unknown as Json })
+        .eq('user_id', userId)
+      if (error && isMissingSettingsExtColumnError(error)) {
+        settingsExtColsKnownMissing = true
+        console.warn('[setQuickLinks] quick_links column missing — kept in localStorage only. Run migration 0009.', error)
+        // Already mirrored to localStorage; nothing more to do.
+        return
+      }
+      if (error) handleDbError('儲存常用連結')(error)
     } finally {
       pendingWritesRef.current -= 1
     }
@@ -1342,6 +1409,7 @@ export function useWaddleData(): UseWaddleData {
     updateTimeBlock,
     deleteTimeBlock,
     saveSettings,
+    setQuickLinks,
   }
 }
 

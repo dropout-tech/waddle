@@ -239,6 +239,11 @@ export function rowToSettings(
     // from localStorage if it exists.
     keepCompletedTodayInList:
       row.keep_completed_today_in_list ?? fallbackSettings.keepCompletedTodayInList,
+    // Migration 0009 — JSONB array. Default to fallback (typically `[]`)
+    // when the column is absent so older deployments degrade cleanly.
+    quickLinks: Array.isArray(row.quick_links)
+      ? (row.quick_links as unknown as UserSettings['quickLinks'])
+      : fallbackSettings.quickLinks,
     weatherCity: row.weather_city,
     weatherUnit: row.weather_unit,
     lunchBreak: row.lunch_break as unknown as UserSettings['lunchBreak'],

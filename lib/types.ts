@@ -180,6 +180,28 @@ export interface UserSettings {
   slotTypes: SlotType[]
   // Notification and reminder settings
   notifications: NotificationSettings
+  // User's pinned shortcuts surfaced in the bottom quick-links bar.
+  quickLinks: QuickLink[]
+}
+
+/**
+ * Pinned shortcut shown in the bottom quick-links drawer. Stored as
+ * a JSONB blob on user_settings so adding more fields later doesn't
+ * require a migration.
+ */
+export interface QuickLink {
+  id: string
+  title: string
+  url: string
+  /**
+   * Optional icon. Free-form string — typically an emoji (e.g. "📝")
+   * but a single letter or short text works. When empty the UI falls
+   * back to the first character of the title.
+   */
+  icon?: string
+  /** Optional hex color for the card's accent. Falls back to a default. */
+  color?: string
+  sortOrder: number
 }
 
 export interface NotificationSettings {

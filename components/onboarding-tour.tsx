@@ -113,6 +113,13 @@ const DESKTOP_STEPS: TourStep[] = [
     hint: '👉 點開計時器',
   },
   {
+    target: '[data-tour="quick-links-bar"]',
+    title: '常用連結（最底下）',
+    body: '螢幕底下那條薄薄的「常用連結」可以拉開，放上你常開的網址（Notion、GitHub、Gmail 之類）。點一下開新分頁，編輯按右上角小鉛筆。',
+    placement: 'top',
+    padding: 4,
+  },
+  {
     target: '[data-tour="user-menu"]',
     title: '右上角：使用者選單',
     body: '登出在這。設定、日記、報告等其他功能散落在介面上，慢慢探索。',
@@ -166,8 +173,8 @@ const MOBILE_STEPS: TourStep[] = [
     padding: 0,
   },
   {
-    title: '✨ 底部三分頁',
-    body: '任務 / 白板 / 日曆。中間「白板」可以隨時記點子、貼圖、連結。',
+    title: '✨ 底部四分頁',
+    body: '任務 / 白板 / 日曆 / 連結。中間「白板」隨時記點子；最右邊「連結」放你常開的網址（Notion、Gmail 等等），點一下開新分頁。',
   },
   {
     title: '✨ 你準備好了！',

@@ -15,7 +15,10 @@ import { ErrorBoundary } from '@/components/error-boundary'
 import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
-import type { Workspace, Task, TimeBlock, SlotType, UserSettings } from '@/lib/types'
+import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink } from '@/lib/types'
+import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
+import { QuickLinksTabContent } from '@/components/quick-links/quick-links-tab-content'
+import { Link2 } from 'lucide-react'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
@@ -44,6 +47,8 @@ interface MainLayoutProps {
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
   onTimeBlockSelect?: (block: TimeBlock) => void
+  /** Narrow mutation for the quick-links bar (separate from saveSettings). */
+  onSetQuickLinks?: (next: QuickLink[]) => void
 }
 
 const MIN_PANEL_WIDTH = 280
@@ -77,6 +82,7 @@ export function MainLayout({
   onUpdateTimeBlock,
   onDeleteTimeBlock,
   onTimeBlockSelect,
+  onSetQuickLinks,
 }: MainLayoutProps) {
   const isMobile = useIsMobile()
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
@@ -88,7 +94,9 @@ export function MainLayout({
   const [exportModalOpen, setExportModalOpen] = useState(false)
 
   // Mobile single-panel tab. Only consulted when isMobile === true.
-  const [mobileTab, setMobileTab] = useState<'tasks' | 'calendar'>('calendar')
+  // 'links' surfaces the user's pinned quick-links (parity with the
+  // desktop bottom drawer).
+  const [mobileTab, setMobileTab] = useState<'tasks' | 'calendar' | 'links'>('calendar')
   // Mobile-only — drives the FocusScratchpad open/close from the bottom tab bar.
   const [mobileScratchpadOpen, setMobileScratchpadOpen] = useState(false)
   // Mobile horizontal swipe between Tasks and Calendar tabs.
@@ -335,6 +343,15 @@ export function MainLayout({
               />
               </div>
             </ErrorBoundary>
+          ) : mobileTab === 'links' ? (
+            <ErrorBoundary>
+              <div key="links" className="h-full flex flex-col animate-in fade-in duration-200">
+                <QuickLinksTabContent
+                  links={settings?.quickLinks ?? []}
+                  onSave={onSetQuickLinks ?? (() => {})}
+                />
+              </div>
+            </ErrorBoundary>
           ) : (
             <ErrorBoundary>
               <div key="calendar" className="h-full flex flex-col animate-in slide-in-from-right duration-200 fade-in">
@@ -380,20 +397,24 @@ export function MainLayout({
 
         {/* Bottom Tab Bar (hidden during focus mode) */}
         {focusMode === 'none' && (
-          <nav className="relative flex-shrink-0 grid grid-cols-3 border-t border-border bg-card/95 backdrop-blur z-30 pb-[env(safe-area-inset-bottom)]" role="tablist" aria-label="主要分頁">
-            {/* Sliding active indicator — anchored to top edge, animates between
-                the three slots based on which one is selected. */}
+          <nav className="relative flex-shrink-0 grid grid-cols-4 border-t border-border bg-card/95 backdrop-blur z-30 pb-[env(safe-area-inset-bottom)]" role="tablist" aria-label="主要分頁">
+            {/* Sliding active indicator. Slots (left→right): 任務 / 白板 /
+                日曆 / 連結. The scratchpad isn't a tab but a toggle that
+                lights up its own slot when open; otherwise the indicator
+                tracks mobileTab. */}
             <span
               aria-hidden="true"
               className="absolute top-0 h-0.5 bg-primary rounded-full transition-transform duration-200 ease-out"
               style={{
-                width: 'calc(100% / 3)',
+                width: 'calc(100% / 4)',
                 transform: `translateX(${
                   mobileScratchpadOpen
                     ? 100
                     : mobileTab === 'tasks'
                       ? 0
-                      : 200
+                      : mobileTab === 'calendar'
+                        ? 200
+                        : 300
                 }%)`,
               }}
             />
@@ -432,6 +453,18 @@ export function MainLayout({
             >
               <CalendarDays className="w-5 h-5" />
               <span className="text-[11px] font-medium">日曆</span>
+            </button>
+            <button
+              role="tab"
+              aria-selected={mobileTab === 'links' && !mobileScratchpadOpen}
+              onClick={() => { setMobileScratchpadOpen(false); setMobileTab('links') }}
+              className={cn(
+                'flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-colors',
+                mobileTab === 'links' && !mobileScratchpadOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Link2 className="w-5 h-5" />
+              <span className="text-[11px] font-medium">連結</span>
             </button>
           </nav>
         )}
@@ -604,6 +637,15 @@ export function MainLayout({
         </>
       )}
       </div>
+
+      {/* Quick-links bar — bottom drawer with thin handle (desktop only).
+          flex-shrink-0 keeps it from being squeezed by the panel area;
+          its own internal transition handles the collapsed/expanded
+          animation. */}
+      <QuickLinksBar
+        links={settings?.quickLinks ?? []}
+        onSave={onSetQuickLinks ?? (() => {})}
+      />
 
       {/* Focus Timer - Floating Widget */}
       <FocusTimer

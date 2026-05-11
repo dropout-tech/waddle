@@ -48,6 +48,7 @@ export default function WaddlePage() {
     updateTimeBlock,
     deleteTimeBlock,
     saveSettings,
+    setQuickLinks,
   } = useWaddleData()
 
   // Watch all meetings and fire browser notifications N minutes before
@@ -358,6 +359,7 @@ export default function WaddlePage() {
         onUpdateTimeBlock={updateTimeBlock}
         onDeleteTimeBlock={deleteTimeBlock}
         onTimeBlockSelect={handleSelectTimeBlock}
+        onSetQuickLinks={setQuickLinks}
       />
 
       {liveSelectedTask && (

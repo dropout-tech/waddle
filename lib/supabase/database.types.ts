@@ -159,6 +159,8 @@ type UserSettingsRow = {
   week_view_days?: number
   /** Migration 0007 — optional in case the column hasn't shipped yet. */
   keep_completed_today_in_list?: boolean
+  /** Migration 0009 — optional in case the column hasn't shipped yet. */
+  quick_links?: Json
   weather_city: string
   weather_unit: 'celsius' | 'fahrenheit'
   lunch_break: Json
@@ -302,6 +304,7 @@ type UserSettingsInsert = {
   day_view_days?: number
   week_view_days?: number
   keep_completed_today_in_list?: boolean
+  quick_links?: Json
   weather_city?: string
   weather_unit?: 'celsius' | 'fahrenheit'
   lunch_break?: Json
