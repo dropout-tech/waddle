@@ -46,6 +46,7 @@ interface CalendarPanelProps {
   onOpenJournal?: () => void
   onOpenReport?: () => void
   onOpenSettings?: () => void
+  onOpenExport?: () => void
   /** When the left task panel is closed, the calendar header reserves space
    * on the left so the floating reopen button doesn't cover the prev chevron. */
   leftPanelOpen?: boolean
@@ -85,6 +86,7 @@ export function CalendarPanel({
   onOpenJournal,
   onOpenReport,
   onOpenSettings,
+  onOpenExport,
   leftPanelOpen = true,
   dayViewDays = 1,
   weekViewDays = 7,
@@ -168,6 +170,7 @@ export function CalendarPanel({
         onOpenJournal={onOpenJournal}
         onOpenReport={onOpenReport}
         onOpenSettings={onOpenSettings}
+        onOpenExport={onOpenExport}
         leftPanelOpen={leftPanelOpen}
       />
 

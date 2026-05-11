@@ -6,6 +6,7 @@ import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
 import { FullScreenTaskView } from '@/components/task-panel/full-screen-task-view'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
+import { CalendarExportModal } from '@/components/calendar/calendar-export-modal'
 import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ListChecks, CalendarDays, Sparkles } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
 import { FocusScratchpad } from '@/components/scratchpad/focus-scratchpad'
@@ -81,6 +82,10 @@ export function MainLayout({
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day')
+  // Export-as-image modal — lives here because all the required data
+  // (workspaces, timeBlocks, selectedDate, settings.calendarStartHour/EndHour)
+  // is already in scope. Toggled by the export button in CalendarHeader.
+  const [exportModalOpen, setExportModalOpen] = useState(false)
 
   // Mobile single-panel tab. Only consulted when isMobile === true.
   const [mobileTab, setMobileTab] = useState<'tasks' | 'calendar'>('calendar')
@@ -365,6 +370,7 @@ export function MainLayout({
                 onOpenJournal={handleOpenJournalFocus}
                 onOpenReport={handleOpenReportFocus}
                 onOpenSettings={onOpenSettings}
+                onOpenExport={() => setExportModalOpen(true)}
                 leftPanelOpen={true}
               />
               </div>
@@ -589,6 +595,7 @@ export function MainLayout({
                   onOpenJournal={handleOpenJournalFocus}
                   onOpenReport={handleOpenReportFocus}
                   onOpenSettings={onOpenSettings}
+                  onOpenExport={() => setExportModalOpen(true)}
                   leftPanelOpen={isLeftPanelOpen}
                 />
               </ErrorBoundary>
@@ -602,6 +609,17 @@ export function MainLayout({
       <FocusTimer
         workspaces={workspaces}
         onCreateTimeBlock={onCreateCalendarTimeBlock}
+      />
+
+      {/* Calendar Export Modal — image-of-schedule generator. */}
+      <CalendarExportModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        workspaces={workspaces}
+        timeBlocks={timeBlocks}
+        startHour={startHour}
+        endHour={endHour}
+        selectedDate={selectedDate}
       />
     </div>
   )

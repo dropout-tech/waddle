@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, BarChart3, Settings, Sparkles, MoreHorizontal } from 'lucide-react'
+import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, BarChart3, Settings, Sparkles, MoreHorizontal, Download } from 'lucide-react'
 import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { UserMenu } from '@/components/user-menu'
@@ -28,6 +28,10 @@ interface CalendarHeaderProps {
   onOpenJournal?: () => void
   onOpenReport?: () => void
   onOpenSettings?: () => void
+  /** Open the "export schedule as PNG" modal. Lives in the calendar header
+   *  next to journal / report / settings on desktop, in the overflow menu
+   *  on mobile (where horizontal space is at a premium). */
+  onOpenExport?: () => void
   /** When false, the top nav row is shifted right to leave room for the
    * floating "open task panel" button at the top-left of the calendar area. */
   leftPanelOpen?: boolean
@@ -50,6 +54,7 @@ export function CalendarHeader({
   onOpenJournal,
   onOpenReport,
   onOpenSettings,
+  onOpenExport,
   leftPanelOpen = true,
 }: CalendarHeaderProps) {
   const isMobile = useIsMobile()
@@ -257,7 +262,7 @@ export function CalendarHeader({
           {isMobile && <UserMenu className="relative" />}
 
           {/* Mobile-only overflow menu: 日記 / 報告 / 設定 */}
-          {isMobile && (onOpenJournal || onOpenReport || onOpenSettings) && (
+          {isMobile && (onOpenJournal || onOpenReport || onOpenSettings || onOpenExport) && (
             <div className="relative" ref={overflowRef}>
               <button
                 type="button"
@@ -286,6 +291,15 @@ export function CalendarHeader({
                     >
                       <BarChart3 className="w-4 h-4" />
                       <span>報告</span>
+                    </button>
+                  )}
+                  {onOpenExport && (
+                    <button
+                      onClick={() => { setOverflowOpen(false); onOpenExport() }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>匯出行程</span>
                     </button>
                   )}
                   {onOpenSettings && (
@@ -371,6 +385,17 @@ export function CalendarHeader({
             >
               <BarChart3 className="w-3.5 h-3.5" aria-hidden="true" />
               報告
+            </button>
+          )}
+          {onOpenExport && (
+            <button
+              type="button"
+              onClick={onOpenExport}
+              aria-label="匯出行程圖檔"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              匯出
             </button>
           )}
           {onOpenSettings && (
