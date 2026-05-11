@@ -18,16 +18,34 @@ interface QuickLinkEditModalProps {
   onDelete?: (id: string) => void
 }
 
-// Curated palette so user picks stay visually consistent with the
-// Waddle workspace colors. Empty = use default border.
+// Curated 18-color palette grouped into warm / cool / neutral families.
+// Tones chosen to match Waddle's hand-drawn aesthetic — slightly
+// desaturated, no neon. `null` = default card surface (no accent).
 const COLOR_OPTIONS = [
   null,
-  '#f4d977', // brand yellow
-  '#7ec8e3', // soft blue
-  '#f4a09e', // soft red
-  '#a4d4ae', // mint
-  '#c8a4e3', // lavender
+  // Warm
+  '#f4a09e', // coral
+  '#e89977', // terra
   '#f4c279', // peach
+  '#f4d977', // brand yellow
+  '#e8d4a0', // sand
+  // Greens
+  '#c4d99a', // lime
+  '#a4d4ae', // mint
+  '#7fc7a8', // jade
+  // Blues / cyans
+  '#9bd1d4', // aqua
+  '#7ec8e3', // sky
+  '#6ba8d4', // ocean
+  // Purples / pinks
+  '#8da3e3', // periwinkle
+  '#c8a4e3', // lavender
+  '#d4a0c8', // plum
+  '#e8a8c4', // rose
+  // Neutrals
+  '#c8c8d4', // slate
+  '#d4c8b8', // stone
+  '#9a9a9a', // graphite
 ] as const
 
 export function QuickLinkEditModal({
@@ -155,8 +173,7 @@ export function QuickLinkEditModal({
             <Input
               value={icon}
               onChange={(e) => setIcon(e.target.value)}
-              placeholder="📝 或 GH"
-              maxLength={4}
+              placeholder="📝 / GH / 🐧 / 任意文字皆可"
             />
           </div>
 
@@ -166,7 +183,7 @@ export function QuickLinkEditModal({
               <Palette className="w-3 h-3" />
               色彩
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-10 gap-1.5">
               {COLOR_OPTIONS.map((c, i) => (
                 <button
                   key={i}
@@ -175,10 +192,17 @@ export function QuickLinkEditModal({
                   aria-label={c ?? '預設'}
                   aria-pressed={color === c}
                   className={cn(
-                    'w-8 h-8 rounded-full border-2 transition-transform',
-                    color === c ? 'border-foreground scale-110' : 'border-transparent hover:scale-105',
+                    'aspect-square w-full rounded-full transition-all',
+                    'shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.08)]',
+                    color === c
+                      ? 'ring-2 ring-offset-2 ring-foreground scale-110'
+                      : 'ring-0 hover:scale-110',
                   )}
-                  style={c ? { backgroundColor: c } : undefined}
+                  style={
+                    c
+                      ? { backgroundImage: `linear-gradient(140deg, ${c} 0%, ${c}d0 100%)` }
+                      : undefined
+                  }
                 >
                   {!c && (
                     <span className="block w-full h-full rounded-full bg-muted border border-border" />

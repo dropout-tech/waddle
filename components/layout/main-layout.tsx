@@ -17,7 +17,6 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink } from '@/lib/types'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
-import { QuickLinksTabContent } from '@/components/quick-links/quick-links-tab-content'
 import { Link2 } from 'lucide-react'
 
 interface MainLayoutProps {
@@ -94,9 +93,11 @@ export function MainLayout({
   const [exportModalOpen, setExportModalOpen] = useState(false)
 
   // Mobile single-panel tab. Only consulted when isMobile === true.
-  // 'links' surfaces the user's pinned quick-links (parity with the
-  // desktop bottom drawer).
-  const [mobileTab, setMobileTab] = useState<'tasks' | 'calendar' | 'links'>('calendar')
+  const [mobileTab, setMobileTab] = useState<'tasks' | 'calendar'>('calendar')
+  // Mobile-only overlay: pull-up sheet for the quick-links bar (parity
+  // with scratchpad's pull-down). Toggled from the "連結" tab in the
+  // bottom bar; mutually exclusive with scratchpad open state.
+  const [mobileLinksOpen, setMobileLinksOpen] = useState(false)
   // Mobile-only — drives the FocusScratchpad open/close from the bottom tab bar.
   const [mobileScratchpadOpen, setMobileScratchpadOpen] = useState(false)
   // Mobile horizontal swipe between Tasks and Calendar tabs.
@@ -267,6 +268,17 @@ export function MainLayout({
           hideTrigger
         />
 
+        {/* Quick-links overlay — same pull-sheet pattern as scratchpad
+            but pulls up from the bottom. Triggered by the "連結" tab in
+            the bottom bar below. */}
+        <QuickLinksBar
+          isOpen={mobileLinksOpen}
+          onOpenChange={setMobileLinksOpen}
+          hideTrigger
+          links={settings?.quickLinks ?? []}
+          onSave={onSetQuickLinks ?? (() => {})}
+        />
+
         {/* Calendar → Tasks edge-swipe capture zone. Only mounted on the
             calendar tab; sits above the content so its touch handler runs
             before day-scroll-view's native horizontal scroll. Stops short of
@@ -343,15 +355,6 @@ export function MainLayout({
               />
               </div>
             </ErrorBoundary>
-          ) : mobileTab === 'links' ? (
-            <ErrorBoundary>
-              <div key="links" className="h-full flex flex-col animate-in fade-in duration-200">
-                <QuickLinksTabContent
-                  links={settings?.quickLinks ?? []}
-                  onSave={onSetQuickLinks ?? (() => {})}
-                />
-              </div>
-            </ErrorBoundary>
           ) : (
             <ErrorBoundary>
               <div key="calendar" className="h-full flex flex-col animate-in slide-in-from-right duration-200 fade-in">
@@ -399,32 +402,38 @@ export function MainLayout({
         {focusMode === 'none' && (
           <nav className="relative flex-shrink-0 grid grid-cols-4 border-t border-border bg-card/95 backdrop-blur z-30 pb-[env(safe-area-inset-bottom)]" role="tablist" aria-label="主要分頁">
             {/* Sliding active indicator. Slots (left→right): 任務 / 白板 /
-                日曆 / 連結. The scratchpad isn't a tab but a toggle that
-                lights up its own slot when open; otherwise the indicator
-                tracks mobileTab. */}
+                日曆 / 連結. Tasks + calendar are routes; scratchpad and
+                links are overlay toggles. Overlays take precedence over
+                the route indicator while open. */}
             <span
               aria-hidden="true"
               className="absolute top-0 h-0.5 bg-primary rounded-full transition-transform duration-200 ease-out"
               style={{
                 width: 'calc(100% / 4)',
                 transform: `translateX(${
-                  mobileScratchpadOpen
-                    ? 100
-                    : mobileTab === 'tasks'
-                      ? 0
-                      : mobileTab === 'calendar'
-                        ? 200
-                        : 300
+                  mobileLinksOpen
+                    ? 300
+                    : mobileScratchpadOpen
+                      ? 100
+                      : mobileTab === 'tasks'
+                        ? 0
+                        : 200
                 }%)`,
               }}
             />
             <button
               role="tab"
-              aria-selected={mobileTab === 'tasks' && !mobileScratchpadOpen}
-              onClick={() => { setMobileScratchpadOpen(false); setMobileTab('tasks') }}
+              aria-selected={mobileTab === 'tasks' && !mobileScratchpadOpen && !mobileLinksOpen}
+              onClick={() => {
+                setMobileScratchpadOpen(false)
+                setMobileLinksOpen(false)
+                setMobileTab('tasks')
+              }}
               className={cn(
                 'flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-colors',
-                mobileTab === 'tasks' && !mobileScratchpadOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                mobileTab === 'tasks' && !mobileScratchpadOpen && !mobileLinksOpen
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <ListChecks className="w-5 h-5" />
@@ -433,7 +442,10 @@ export function MainLayout({
             <button
               role="tab"
               aria-selected={mobileScratchpadOpen}
-              onClick={() => setMobileScratchpadOpen(v => !v)}
+              onClick={() => {
+                setMobileLinksOpen(false)
+                setMobileScratchpadOpen(v => !v)
+              }}
               className={cn(
                 'flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-colors',
                 mobileScratchpadOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
@@ -444,11 +456,17 @@ export function MainLayout({
             </button>
             <button
               role="tab"
-              aria-selected={mobileTab === 'calendar' && !mobileScratchpadOpen}
-              onClick={() => { setMobileScratchpadOpen(false); setMobileTab('calendar') }}
+              aria-selected={mobileTab === 'calendar' && !mobileScratchpadOpen && !mobileLinksOpen}
+              onClick={() => {
+                setMobileScratchpadOpen(false)
+                setMobileLinksOpen(false)
+                setMobileTab('calendar')
+              }}
               className={cn(
                 'flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-colors',
-                mobileTab === 'calendar' && !mobileScratchpadOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                mobileTab === 'calendar' && !mobileScratchpadOpen && !mobileLinksOpen
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <CalendarDays className="w-5 h-5" />
@@ -456,11 +474,14 @@ export function MainLayout({
             </button>
             <button
               role="tab"
-              aria-selected={mobileTab === 'links' && !mobileScratchpadOpen}
-              onClick={() => { setMobileScratchpadOpen(false); setMobileTab('links') }}
+              aria-selected={mobileLinksOpen}
+              onClick={() => {
+                setMobileScratchpadOpen(false)
+                setMobileLinksOpen(v => !v)
+              }}
               className={cn(
                 'flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-colors',
-                mobileTab === 'links' && !mobileScratchpadOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                mobileLinksOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <Link2 className="w-5 h-5" />
@@ -638,10 +659,9 @@ export function MainLayout({
       )}
       </div>
 
-      {/* Quick-links bar — bottom drawer with thin handle (desktop only).
-          flex-shrink-0 keeps it from being squeezed by the panel area;
-          its own internal transition handles the collapsed/expanded
-          animation. */}
+      {/* Quick-links bar — floating pull-up sheet (desktop). Pull-tab
+          lives at viewport bottom-center; expanded panel slides up as
+          an overlay. Mirror of the scratchpad's top pull-down. */}
       <QuickLinksBar
         links={settings?.quickLinks ?? []}
         onSave={onSetQuickLinks ?? (() => {})}

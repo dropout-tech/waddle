@@ -24,49 +24,82 @@ function openLink(url: string) {
 }
 
 export function QuickLinkCard({ link, onEdit }: QuickLinkCardProps) {
-  const fallbackIcon = link.title.trim().slice(0, 1) || '🔗'
+  // Fallback icon: first **grapheme** (full character) of the title so
+  // CJK glyphs render cleanly instead of half a codepoint. `Array.from`
+  // splits by code unit, good enough for the languages Waddle ships in.
+  const fallbackIcon = Array.from(link.title.trim())[0] ?? '🔗'
   const display = link.icon?.trim() || fallbackIcon
   const accent = link.color
-  // White-on-light is invisible; pick text tone based on accent luminance.
   const accentTextDark = accent ? isLightColor(accent) : true
 
   return (
-    <div className="relative group">
+    <div className="relative group aspect-square">
       <button
         type="button"
         onClick={() => openLink(link.url)}
         className={cn(
-          'flex flex-col items-center justify-center gap-1.5 w-20 h-20 rounded-xl border bg-card transition-all',
-          'hover:shadow-md hover:-translate-y-0.5 hover:border-foreground/30',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          // Outer card. Slightly larger corner radius + soft shadow for
+          // depth. Subtle border that nearly disappears against the
+          // accent wash — the color does the visual heavy lifting.
+          'relative flex flex-col items-center justify-center gap-2 w-full h-full',
+          'rounded-2xl border border-border/50 bg-card overflow-hidden',
+          // Smooth lift on hover. Shadow follows the accent color when
+          // present so the hover state feels "owned" by the card.
+          'transition-all duration-200 ease-out',
+          'hover:-translate-y-1 hover:border-foreground/20',
+          'active:scale-[0.97] active:translate-y-0',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
         )}
         style={
           accent
             ? {
-                borderColor: `${accent}80`,
-                backgroundColor: `${accent}1a`,
+                // Gentle gradient from accent at top to white at bottom.
+                // Layered radial-gradient adds a slight highlight at the
+                // top-center, mimicking soft top-down lighting.
+                backgroundImage: `
+                  radial-gradient(circle at 50% 0%, ${accent}40 0%, transparent 60%),
+                  linear-gradient(180deg, ${accent}1a 0%, transparent 100%)
+                `,
               }
             : undefined
         }
-        title={link.url}
+        title={`${link.title}\n${link.url}`}
       >
+        {/* Icon disc — slightly oversized + subtle outer ring + inset
+            highlight. Reads as a glossy app-icon when a color is set,
+            falls back to a muted disc otherwise. */}
         <span
           className={cn(
-            'flex items-center justify-center w-9 h-9 rounded-full text-sm font-semibold',
-            accent ? '' : 'bg-muted text-foreground',
+            'flex items-center justify-center w-11 h-11 rounded-xl',
+            'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.25)]',
+            'transition-transform duration-200 group-hover:scale-105',
+            accent ? '' : 'bg-muted/80 text-foreground/80',
           )}
           style={
             accent
               ? {
-                  backgroundColor: accent,
-                  color: accentTextDark ? '#1f1f1f' : '#fff',
+                  backgroundImage: `linear-gradient(140deg, ${accent} 0%, ${accent}d0 100%)`,
+                  color: accentTextDark ? 'rgba(31,31,31,0.92)' : '#fff',
                 }
               : undefined
           }
         >
-          {display}
+          {/* Icon text. Larger so emojis read clearly; tighter line
+              height so multi-character strings still center cleanly. */}
+          <span className="text-base font-semibold leading-none">
+            {display}
+          </span>
         </span>
-        <span className="text-[11px] font-medium text-foreground/85 truncate max-w-[68px]">
+
+        {/* Title. Two-line clamp so longer names don't truncate too
+            aggressively. Letter-spacing nudged tight for that
+            "app-grid label" feel. */}
+        <span
+          className={cn(
+            'px-2 text-center text-[11px] leading-tight tracking-tight font-medium',
+            'text-foreground/85 line-clamp-2',
+          )}
+        >
           {link.title}
         </span>
       </button>
@@ -80,14 +113,14 @@ export function QuickLinkCard({ link, onEdit }: QuickLinkCardProps) {
           }}
           aria-label={`編輯 ${link.title}`}
           className={cn(
-            // Edit affordance: visible on hover (desktop) and always
-            // visible on touch (where hover is unreliable).
-            'absolute -top-1 -right-1 flex items-center justify-center w-6 h-6 rounded-full',
-            'bg-card border border-border shadow-sm text-muted-foreground',
-            'opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100',
-            // On touch devices, force visible — relies on hover:none media query.
-            'touch:opacity-100',
+            'absolute top-1.5 right-1.5 flex items-center justify-center w-6 h-6 rounded-full',
+            'bg-card/95 backdrop-blur-sm border border-border shadow-sm text-muted-foreground',
+            // Hover-revealed on desktop, semi-visible on touch where
+            // hover is unreliable.
+            'opacity-0 group-hover:opacity-100',
             'transition-opacity hover:text-foreground hover:bg-muted',
+            // Force visible on coarse pointers (touch).
+            '[@media(hover:none)]:opacity-80',
           )}
         >
           <Pencil className="w-3 h-3" />
