@@ -7,6 +7,11 @@ import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import type { UserSettings, TimeBlock, SlotType, Workspace, NotificationSettings } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  getTaskCompleteSoundEnabled,
+  setTaskCompleteSoundEnabled,
+  playTaskCompleteSound,
+} from '@/lib/task-sound'
 
 // Map icon names to components
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -101,6 +106,9 @@ export function SettingsModal({
   const [localSettings, setLocalSettings] = useState<UserSettings>(settings)
   const [localTimeBlocks, setLocalTimeBlocks] = useState<TimeBlock[]>(timeBlocks)
   const [activeTab, setActiveTab] = useState<'general' | 'slotTypes' | 'notifications'>('general')
+  // Task-complete sound is a per-device pref stored in localStorage (same
+  // pattern as timer sound), so it lives outside localSettings/UserSettings.
+  const [taskSoundEnabled, setTaskSoundEnabledState] = useState<boolean>(() => getTaskCompleteSoundEnabled())
   const [editingSlotType, setEditingSlotType] = useState<SlotType | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [newSlotType, setNewSlotType] = useState<Partial<SlotType>>({
@@ -539,6 +547,28 @@ export function SettingsModal({
                   ...prev,
                   bufferTime: { ...prev.bufferTime, enabled: e.target.checked }
                 }))}
+                className="w-4 h-4 rounded border-border accent-primary"
+              />
+            </label>
+
+            {/* Task-complete sound */}
+            <label className="flex items-center justify-between cursor-pointer">
+              <div className="flex-1 pr-4">
+                <div className="flex items-center gap-2 text-sm text-foreground">
+                  <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
+                  任務完成音效
+                </div>
+                <div className="text-xs text-muted-foreground">勾選任務時播放可愛的提示音</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={taskSoundEnabled}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  setTaskSoundEnabledState(next)
+                  setTaskCompleteSoundEnabled(next)
+                  if (next) playTaskCompleteSound()
+                }}
                 className="w-4 h-4 rounded border-border accent-primary"
               />
             </label>

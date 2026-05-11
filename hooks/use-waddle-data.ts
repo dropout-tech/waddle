@@ -13,6 +13,7 @@ import {
   rowToSettings,
 } from '@/lib/supabase/mappers'
 import { toDateString } from '@/lib/calendar-utils'
+import { playTaskCompleteSound } from '@/lib/task-sound'
 import type {
   Workspace,
   Category,
@@ -114,6 +115,12 @@ export function useWaddleData(): UseWaddleData {
   // initial mount and the on-focus refetch path.
   const loadVersionRef = useRef(0)
   const lastRefetchRef = useRef(0)
+  // Number of writes currently in flight. Visibility/focus refetch checks
+  // this and skips when > 0 — otherwise an auto-refetch landing between a
+  // local optimistic update and the DB confirming the write can clobber the
+  // unsaved-yet state. Decrement happens in `finally` so a failed write
+  // still releases the lock.
+  const pendingWritesRef = useRef(0)
 
   const loadData = useCallback(
     async ({ initial = false }: { initial?: boolean } = {}) => {
@@ -288,6 +295,10 @@ export function useWaddleData(): UseWaddleData {
     const REFETCH_THROTTLE_MS = 3000
     const tryRefetch = () => {
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      // Skip refetch while local writes are in flight — otherwise a refetch
+      // landing between optimistic-update and DB-confirm clobbers the new
+      // state with the pre-write DB snapshot.
+      if (pendingWritesRef.current > 0) return
       const now = Date.now()
       if (now - lastRefetchRef.current < REFETCH_THROTTLE_MS) return
       lastRefetchRef.current = now
@@ -680,6 +691,10 @@ export function useWaddleData(): UseWaddleData {
       }))
     )
 
+    // Play the cute completion chime right after the optimistic flip so it
+    // feels instant. Only on the off→on transition; un-completing is silent.
+    if (nextValue) playTaskCompleteSound()
+
     // Use .select() so PostgREST returns the affected rows. If RLS silently
     // blocks the update (auth.uid() mismatch / expired JWT) PostgREST returns
     // an empty array with no error — that's the bug pattern we're hunting.
@@ -836,32 +851,98 @@ export function useWaddleData(): UseWaddleData {
 
     setTimeBlocks((prev) => [...prev, newBlock])
 
-    const row = timeBlockToRow(newBlock)
-    const { error } = await supabase.from('time_blocks').insert({
-      id, user_id: userId,
-      date: row.date!, start_time: row.start_time!, end_time: row.end_time!,
-      type: row.type!, label: row.label!, color: row.color!,
-      is_recurring: row.is_recurring,
-      recurrence_rule: row.recurrence_rule ?? null,
-    })
-    if (error) handleDbError('建立時間區塊')(error)
+    pendingWritesRef.current += 1
+    try {
+      const row = timeBlockToRow(newBlock)
+      // .select() so PostgREST returns the inserted row; 0 rows here means
+      // RLS or a session issue silently dropped the write — the same pattern
+      // that caused time blocks to "disappear" after a tab focus refetch
+      // wiped local state back to the DB snapshot.
+      const { data, error } = await supabase
+        .from('time_blocks')
+        .insert({
+          id, user_id: userId,
+          date: row.date!, start_time: row.start_time!, end_time: row.end_time!,
+          type: row.type!, label: row.label!, color: row.color!,
+          is_recurring: row.is_recurring,
+          recurrence_rule: row.recurrence_rule ?? null,
+        })
+        .select('id')
+      if (error) {
+        handleDbError('建立時間區塊')(error)
+        return
+      }
+      if (!data || data.length === 0) {
+        const { data: { user } } = await supabase.auth.getUser()
+        console.error('[addTimeBlock] 0 rows inserted — RLS or stale session?', {
+          blockId: id, jwtUserId: user?.id ?? null,
+        })
+        // Roll back the optimistic insert so it doesn't survive briefly
+        // and then vanish on the next refetch (the user-visible "blink and
+        // gone" pattern).
+        setTimeBlocks((prev) => prev.filter((b) => b.id !== id))
+        toast.error('儲存失敗：無法建立時間區塊（可能登入逾時，請重新整理或登出再登入）')
+      }
+    } finally {
+      pendingWritesRef.current -= 1
+    }
   }, [supabase])
 
   const updateTimeBlock = useCallback(async (id: string, updates: Partial<TimeBlock>) => {
-    setTimeBlocks((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, ...updates } : b))
-    )
-    const { error } = await supabase
-      .from('time_blocks')
-      .update(timeBlockToRow(updates))
-      .eq('id', id)
-    if (error) handleDbError('更新時間區塊')(error)
+    // Capture the pre-update copy so we can roll back on a silent RLS drop.
+    let previous: TimeBlock | undefined
+    setTimeBlocks((prev) => {
+      previous = prev.find((b) => b.id === id)
+      return prev.map((b) => (b.id === id ? { ...b, ...updates } : b))
+    })
+
+    pendingWritesRef.current += 1
+    try {
+      const { data, error } = await supabase
+        .from('time_blocks')
+        .update(timeBlockToRow(updates))
+        .eq('id', id)
+        .select('id')
+      if (error) {
+        handleDbError('更新時間區塊')(error)
+        return
+      }
+      if (!data || data.length === 0) {
+        console.error('[updateTimeBlock] 0 rows updated — RLS or stale session?', { id })
+        if (previous) setTimeBlocks((prev) => prev.map((b) => (b.id === id ? previous! : b)))
+        toast.error('儲存失敗：無法更新時間區塊（可能登入逾時，請重新整理或登出再登入）')
+      }
+    } finally {
+      pendingWritesRef.current -= 1
+    }
   }, [supabase])
 
   const deleteTimeBlock = useCallback(async (id: string) => {
-    setTimeBlocks((prev) => prev.filter((b) => b.id !== id))
-    const { error } = await supabase.from('time_blocks').delete().eq('id', id)
-    if (error) handleDbError('刪除時間區塊')(error)
+    let removed: TimeBlock | undefined
+    setTimeBlocks((prev) => {
+      removed = prev.find((b) => b.id === id)
+      return prev.filter((b) => b.id !== id)
+    })
+
+    pendingWritesRef.current += 1
+    try {
+      const { data, error } = await supabase
+        .from('time_blocks')
+        .delete()
+        .eq('id', id)
+        .select('id')
+      if (error) {
+        handleDbError('刪除時間區塊')(error)
+        return
+      }
+      if (!data || data.length === 0) {
+        console.error('[deleteTimeBlock] 0 rows deleted — RLS or stale session?', { id })
+        if (removed) setTimeBlocks((prev) => [...prev, removed!])
+        toast.error('儲存失敗：無法刪除時間區塊（可能登入逾時，請重新整理或登出再登入）')
+      }
+    } finally {
+      pendingWritesRef.current -= 1
+    }
   }, [supabase])
 
   // ═════════════════════════════════════════════════════
@@ -875,6 +956,8 @@ export function useWaddleData(): UseWaddleData {
     const userId = requireUserId()
     setSettings(newSettings)
     setTimeBlocks(newTimeBlocks)
+    pendingWritesRef.current += 1
+    try {
 
     // Settings rows we attempt with all fields. If the migration-0006
     // columns aren't on the DB yet, we strip them and retry — view-range
@@ -932,10 +1015,17 @@ export function useWaddleData(): UseWaddleData {
       return
     }
 
-    // For time blocks: cheap full-replace strategy. Settings save is
-    // infrequent and the row count is small, so simplicity wins over diffing.
-    await supabase.from('time_blocks').delete().eq('user_id', userId)
-    if (newTimeBlocks.length > 0) {
+    // Non-destructive write for time blocks: upsert all the rows we want
+    // present, then delete only the rows whose id is NOT in that list. The
+    // previous DELETE-then-INSERT pattern wiped everything if the INSERT
+    // failed for any reason (constraint, RLS, malformed row), and left a
+    // window where the user's DB had zero rows — if a refetch landed there,
+    // the UI flashed empty too.
+    if (newTimeBlocks.length === 0) {
+      const { error: tbError } = await supabase
+        .from('time_blocks').delete().eq('user_id', userId)
+      if (tbError) handleDbError('儲存時間區塊')(tbError)
+    } else {
       const rows = newTimeBlocks.map((tb) => ({
         id: tb.id || crypto.randomUUID(),
         user_id: userId,
@@ -948,16 +1038,29 @@ export function useWaddleData(): UseWaddleData {
         is_recurring: tb.isRecurring,
         recurrence_rule: tb.recurrenceRule ?? null,
       }))
-      const { error: tbError } = await supabase.from('time_blocks').insert(rows)
-      if (tbError) handleDbError('儲存時間區塊')(tbError)
+      const { error: upsertError } = await supabase
+        .from('time_blocks').upsert(rows, { onConflict: 'id' })
+      if (upsertError) {
+        handleDbError('儲存時間區塊')(upsertError)
+      } else {
+        const keepIds = rows.map((r) => r.id).join(',')
+        const { error: pruneError } = await supabase
+          .from('time_blocks').delete()
+          .eq('user_id', userId)
+          .not('id', 'in', `(${keepIds})`)
+        if (pruneError) handleDbError('儲存時間區塊')(pruneError)
+      }
     }
 
-    // Slot types: same full-replace pattern. Only persist user-customs —
+    // Slot types: same non-destructive pattern. Only persist user-customs —
     // built-in types (workspace tabs, 時間區塊/午休/緩衝/專注) are
     // synthesized at runtime in app/page.tsx, so we don't write them.
-    await supabase.from('slot_types').delete().eq('user_id', userId)
     const customSlotTypes = newSettings.slotTypes.filter((s) => !s.isBuiltIn)
-    if (customSlotTypes.length > 0) {
+    if (customSlotTypes.length === 0) {
+      const { error: stError } = await supabase
+        .from('slot_types').delete().eq('user_id', userId)
+      if (stError) handleDbError('儲存時間區塊類型')(stError)
+    } else {
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       const slotRows = customSlotTypes.map((s) => {
         // parent_id has a uuid FK to slot_types.id, so it can only hold
@@ -980,8 +1083,24 @@ export function useWaddleData(): UseWaddleData {
           is_built_in: s.isBuiltIn,
         }
       })
-      const { error: stError } = await supabase.from('slot_types').insert(slotRows)
-      if (stError) handleDbError('儲存時間區塊類型')(stError)
+      const { error: upsertError } = await supabase
+        .from('slot_types').upsert(slotRows, { onConflict: 'id' })
+      if (upsertError) {
+        handleDbError('儲存時間區塊類型')(upsertError)
+      } else {
+        const keepIds = slotRows.map((r) => r.id).join(',')
+        // Built-ins (is_built_in = true) live in the same table; don't prune
+        // them. We only prune user-custom rows that are no longer present.
+        const { error: pruneError } = await supabase
+          .from('slot_types').delete()
+          .eq('user_id', userId)
+          .eq('is_built_in', false)
+          .not('id', 'in', `(${keepIds})`)
+        if (pruneError) handleDbError('儲存時間區塊類型')(pruneError)
+      }
+    }
+    } finally {
+      pendingWritesRef.current -= 1
     }
   }, [supabase])
 
