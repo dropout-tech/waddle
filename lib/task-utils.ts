@@ -1,5 +1,61 @@
-import type { Task, ColorStatus } from './types'
+import type { Task, ColorStatus, Workspace, Category } from './types'
 import { toDateString } from './calendar-utils'
+
+// ─────────────────────────────────────────────────────────
+// Workspace-tree traversal helpers
+//
+// The workspaces→categories→tasks shape gets walked in five-plus
+// places (completed drawer, today-meetings popover, meeting reminder
+// scanner, panel counters, app-level lookup). Each callsite had its
+// own triple-nested loop with subtly different filtering — these
+// helpers consolidate the walk so changes (e.g. "skip archived") apply
+// once instead of being copy-pasted into drift.
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Walk every task in the workspace tree. Archived workspaces /
+ * categories are skipped — every caller did this manually, so it's
+ * baked into the helper. `cb` returns void; use `findTaskById` /
+ * `filterTasks` for read-style queries.
+ */
+export function forEachTask(
+  workspaces: Workspace[],
+  cb: (task: Task, category: Category, workspace: Workspace) => void,
+): void {
+  for (const ws of workspaces) {
+    if (ws.isArchived) continue
+    for (const cat of ws.categories) {
+      if (cat.isArchived) continue
+      for (const t of cat.tasks) {
+        cb(t, cat, ws)
+      }
+    }
+  }
+}
+
+/** Linear lookup by id. Returns null when not found. */
+export function findTaskById(workspaces: Workspace[], id: string): Task | null {
+  for (const ws of workspaces) {
+    for (const cat of ws.categories) {
+      for (const t of cat.tasks) {
+        if (t.id === id) return t
+      }
+    }
+  }
+  return null
+}
+
+/** Filtered flatten — returns matching tasks paired with their ws/category. */
+export function filterTasks(
+  workspaces: Workspace[],
+  predicate: (task: Task) => boolean,
+): Array<{ task: Task; category: Category; workspace: Workspace }> {
+  const out: Array<{ task: Task; category: Category; workspace: Workspace }> = []
+  forEachTask(workspaces, (task, category, workspace) => {
+    if (predicate(task)) out.push({ task, category, workspace })
+  })
+  return out
+}
 
 /**
  * Returns inline CSS color values for the entire task row.

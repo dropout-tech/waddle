@@ -9,6 +9,7 @@ import {
   persistFiredReminders,
   meetingStartAsDate,
 } from '@/lib/meeting-reminder'
+import { detectMeetingProvider } from '@/lib/meeting-utils'
 
 /**
  * Watches all meetings in the workspace tree and fires a browser
@@ -56,13 +57,30 @@ export function useMeetingReminders(workspaces: Workspace[]) {
         if (fired.has(reminderId)) continue
 
         const minutesUntil = Math.round((startMs - now) / 60000)
+        // Trim user-controlled text before sending to the OS toast.
+        // Long attendee strings (a 500-name CSV, say) or newline-laden
+        // notes can break rendering across browsers; cap each field and
+        // strip newlines so the body stays one cohesive paragraph.
+        const trim = (s: string, max: number) =>
+          s.replace(/\s+/g, ' ').trim().slice(0, max)
         const bodyLines: string[] = []
         bodyLines.push(`${m.scheduledStartTime} 開始（${minutesUntil} 分鐘後）`)
-        if (m.location) bodyLines.push(`地點：${m.location}`)
-        if (m.attendees) bodyLines.push(`參與者：${m.attendees}`)
+        if (m.location) bodyLines.push(`地點：${trim(m.location, 80)}`)
+        if (m.attendees) bodyLines.push(`參與者：${trim(m.attendees, 120)}`)
+        const safeTitle = trim(m.title, 80) || '會議'
+
+        // Only treat the URL as "openable" if it parses as a known video
+        // provider (or matches the http(s) catch-all). Anything else —
+        // including the dangerous `javascript:` / `data:` / `file:`
+        // schemes — falls back to just focusing the Waddle tab. This is
+        // belt-and-suspenders: the detail-modal also validates on save,
+        // but the notification path runs even if a URL leaked in via
+        // direct DB write / shared-workspace edit.
+        const provider = detectMeetingProvider(m.meetingUrl)
+        const openable = !!m.meetingUrl && provider !== null
 
         try {
-          const n = new Notification(`會議提醒 · ${m.title}`, {
+          const n = new Notification(`會議提醒 · ${safeTitle}`, {
             body: bodyLines.join('\n'),
             // Tag dedupes within the OS notification center — re-firing
             // the same id swaps the visible notification instead of
@@ -70,10 +88,7 @@ export function useMeetingReminders(workspaces: Workspace[]) {
             tag: reminderId,
             silent: false,
           })
-          // If a meeting URL is set, clicking the notification opens it.
-          // The window.focus() also brings the Waddle tab forward so a
-          // user without a video link still ends up looking at the meeting.
-          if (m.meetingUrl) {
+          if (openable) {
             n.onclick = () => {
               window.open(m.meetingUrl, '_blank', 'noopener,noreferrer')
               n.close()

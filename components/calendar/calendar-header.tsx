@@ -390,6 +390,7 @@ export function CalendarHeader({
           {onOpenExport && (
             <button
               type="button"
+              data-tour="calendar-export"
               onClick={onOpenExport}
               aria-label="匯出行程圖檔"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

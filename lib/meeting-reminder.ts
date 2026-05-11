@@ -5,6 +5,8 @@
 // scope for v1.
 
 import type { Task, Workspace } from '@/lib/types'
+import { forEachTask } from '@/lib/task-utils'
+import { toDateString } from '@/lib/calendar-utils'
 
 export const MEETING_REMINDER_PREF_KEY = 'waddle.meetingReminder.minutes'
 export const MEETING_REMINDER_FIRED_KEY = 'waddle.meetingReminder.fired'
@@ -41,30 +43,53 @@ export function setReminderLead(lead: ReminderLead) {
  * older than 7 days on every read so localStorage doesn't grow unbounded
  * over time. Reminder IDs encode the meeting date, so old entries are
  * easy to date-check.
+ *
+ * If the stored JSON is corrupted, we *delete* the key (rather than
+ * silently returning an empty set on every call). Otherwise the same
+ * parse failure on every 30-second poll would mean every in-window
+ * meeting re-fires forever until the user dismisses the start time.
  */
 export function getFiredRemindersAndPrune(): Set<string> {
   if (typeof window === 'undefined') return new Set()
-  try {
-    const raw = window.localStorage.getItem(MEETING_REMINDER_FIRED_KEY)
-    if (!raw) return new Set()
-    const all = JSON.parse(raw) as string[]
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - 7)
-    const cutoffStr = cutoff.toISOString().slice(0, 10)
-    const fresh = all.filter((id) => {
-      // ID shape: "<taskId>@YYYY-MM-DDTHH:mm" — extract the date.
-      const dateStart = id.indexOf('@')
-      if (dateStart < 0) return true
-      const dateStr = id.slice(dateStart + 1, dateStart + 11)
-      return dateStr >= cutoffStr
-    })
-    if (fresh.length !== all.length) {
-      window.localStorage.setItem(MEETING_REMINDER_FIRED_KEY, JSON.stringify(fresh))
+  const raw = (() => {
+    try {
+      return window.localStorage.getItem(MEETING_REMINDER_FIRED_KEY)
+    } catch {
+      return null
     }
-    return new Set(fresh)
+  })()
+  if (!raw) return new Set()
+  let all: string[]
+  try {
+    all = JSON.parse(raw) as string[]
+    if (!Array.isArray(all)) throw new Error('not an array')
   } catch {
+    // Corrupted blob — wipe so the next poll starts clean rather than
+    // re-firing every meeting every 30 seconds.
+    try {
+      window.localStorage.removeItem(MEETING_REMINDER_FIRED_KEY)
+    } catch {}
     return new Set()
   }
+  // Cutoff date in LOCAL time. Reminder IDs encode the meeting's
+  // scheduledDate which is local-Y-M-D — using toISOString() would
+  // shift by up to a day in non-UTC zones (Taiwan is UTC+8).
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 7)
+  const cutoffStr = toDateString(cutoff)
+  const fresh = all.filter((id) => {
+    // ID shape: "<taskId>@YYYY-MM-DDTHH:mm" — extract the date.
+    const dateStart = id.indexOf('@')
+    if (dateStart < 0) return true
+    const dateStr = id.slice(dateStart + 1, dateStart + 11)
+    return dateStr >= cutoffStr
+  })
+  if (fresh.length !== all.length) {
+    try {
+      window.localStorage.setItem(MEETING_REMINDER_FIRED_KEY, JSON.stringify(fresh))
+    } catch {}
+  }
+  return new Set(fresh)
 }
 
 export function persistFiredReminders(set: Set<string>) {
@@ -91,30 +116,24 @@ export interface MeetingTaskRef {
 /** Pull every meeting (with scheduled date + time) out of the workspace tree. */
 export function collectMeetings(workspaces: Workspace[]): MeetingTaskRef[] {
   const out: MeetingTaskRef[] = []
-  for (const ws of workspaces) {
-    if (ws.isArchived) continue
-    for (const cat of ws.categories) {
-      if (cat.isArchived) continue
-      for (const t of cat.tasks) {
-        if (!t.isMeeting) continue
-        if (t.isCompleted) continue
-        if (!t.scheduledDate || !t.scheduledStartTime || !t.scheduledEndTime) continue
-        out.push({
-          id: t.id,
-          title: t.title,
-          scheduledDate: t.scheduledDate,
-          scheduledStartTime: t.scheduledStartTime,
-          scheduledEndTime: t.scheduledEndTime,
-          attendees: t.attendees,
-          location: t.location,
-          meetingUrl: t.meetingUrl,
-          workspaceColor: ws.color,
-          workspaceName: ws.name,
-          categoryName: cat.name,
-        })
-      }
-    }
-  }
+  forEachTask(workspaces, (t, cat, ws) => {
+    if (!t.isMeeting) return
+    if (t.isCompleted) return
+    if (!t.scheduledDate || !t.scheduledStartTime || !t.scheduledEndTime) return
+    out.push({
+      id: t.id,
+      title: t.title,
+      scheduledDate: t.scheduledDate,
+      scheduledStartTime: t.scheduledStartTime,
+      scheduledEndTime: t.scheduledEndTime,
+      attendees: t.attendees,
+      location: t.location,
+      meetingUrl: t.meetingUrl,
+      workspaceColor: ws.color,
+      workspaceName: ws.name,
+      categoryName: cat.name,
+    })
+  })
   return out
 }
 

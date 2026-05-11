@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { CheckCircle2, Flame, Clock, TrendingUp, Calendar as CalendarIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
+import { forEachTask } from '@/lib/task-utils'
 import type { Workspace, Task } from '@/lib/types'
 import {
   Sheet,
@@ -62,29 +63,24 @@ export function CompletedTasksDrawer({
   onClose,
   onSelectTask,
 }: CompletedTasksDrawerProps) {
-  // Flatten all completed tasks. We require completedAt; rows without a
-  // timestamp (pre-toggleTaskComplete-write-through completions) won't appear
-  // here — the migration backfills them from updated_at, but if a user
-  // doesn't run it those rows are silently skipped. We could also include
-  // them under a "未知時間" bucket; opting for skip to keep stats honest.
+  // Flatten all completed tasks. Tasks without a completedAt timestamp
+  // (e.g. ones completed before the write-through fix shipped, or rows
+  // whose migration-0007 backfill didn't run) are kept in the list but
+  // routed to a "未知時間" bucket and excluded from time-based stats so
+  // they don't poison averages or the streak.
   const completed = useMemo<CompletedFlat[]>(() => {
     const out: CompletedFlat[] = []
-    for (const ws of workspaces) {
-      if (ws.isArchived) continue
-      for (const cat of ws.categories) {
-        if (cat.isArchived) continue
-        for (const t of cat.tasks) {
-          if (!t.isCompleted) continue
-          if (!t.completedAt) continue
-          out.push({
-            ...t,
-            workspaceColor: ws.color,
-            categoryName: cat.name,
-          })
-        }
-      }
-    }
+    forEachTask(workspaces, (t, cat, ws) => {
+      if (!t.isCompleted) return
+      out.push({
+        ...t,
+        workspaceColor: ws.color,
+        categoryName: cat.name,
+      })
+    })
     // Newest first — that's almost always what the user wants to see.
+    // Tasks without completedAt sort to the bottom of their group via the
+    // empty-string fallback in localeCompare.
     out.sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))
     return out
   }, [workspaces])
@@ -107,38 +103,39 @@ export function CompletedTasksDrawer({
     let totalMinutes = 0
     let totalMinutesCount = 0
     const hourBuckets = new Array(24).fill(0) as number[]
+    const completedDayset = new Set<string>()
 
     for (const t of completed) {
-      const dateStr = dateKey(t.completedAt!)
+      if (!t.completedAt) continue // unknown-time bucket excluded from stats
+      const dateStr = dateKey(t.completedAt)
+      completedDayset.add(dateStr)
       if (dateStr >= weekStartStr) weekCount++
       if (dateStr >= monthStartStr) monthCount++
       if (t.createdAt) {
-        const ms = new Date(t.completedAt!).getTime() - new Date(t.createdAt).getTime()
+        const ms = new Date(t.completedAt).getTime() - new Date(t.createdAt).getTime()
         if (ms > 0) {
           totalMinutes += ms / 60000
           totalMinutesCount++
         }
       }
-      const completedHour = new Date(t.completedAt!).getHours()
+      const completedHour = new Date(t.completedAt).getHours()
       hourBuckets[completedHour]++
     }
 
     // Streak: consecutive days with at least one completion, walking back
     // from today. Stops at the first day with zero. Capped at 365 so a
     // very long-running user doesn't pay an O(N) scan per render.
+    // Uses fresh Date constructions per iteration (relative to `now`)
+    // instead of cumulative setDate mutation — the latter can double-count
+    // a day across DST fall-back in non-Taiwan timezones.
     let streak = 0
-    const completedDayset = new Set(completed.map((t) => dateKey(t.completedAt!)))
-    const cursor = new Date(now)
-    cursor.setHours(0, 0, 0, 0)
-    // If today has no completion yet, the streak doesn't count today but
-    // may still continue from yesterday — that's the intuitive behavior.
-    if (!completedDayset.has(toDateString(cursor))) {
-      cursor.setDate(cursor.getDate() - 1)
-    }
-    for (let i = 0; i < 365; i++) {
-      if (completedDayset.has(toDateString(cursor))) {
+    const startBack = completedDayset.has(todayStr) ? 0 : 1
+    for (let i = startBack; i < 365 + startBack; i++) {
+      const d = new Date(now)
+      d.setDate(d.getDate() - i)
+      const dayStr = toDateString(d)
+      if (completedDayset.has(dayStr)) {
         streak++
-        cursor.setDate(cursor.getDate() - 1)
       } else {
         break
       }
@@ -181,8 +178,12 @@ export function CompletedTasksDrawer({
     const buckets: Array<{ label: string; tasks: CompletedFlat[] }> = []
     const indexByLabel = new Map<string, number>()
     for (const t of completed) {
-      const d = dateKey(t.completedAt!)
-      const label = groupLabel(d, today, yesterday, sevenStr, fourteenStr)
+      // Tasks without completedAt land in a dedicated bucket so they're
+      // still discoverable; the bucket renders last because the natural
+      // sort is "most recent first".
+      const label = t.completedAt
+        ? groupLabel(dateKey(t.completedAt), today, yesterday, sevenStr, fourteenStr)
+        : '未知時間'
       let idx = indexByLabel.get(label)
       if (idx === undefined) {
         idx = buckets.length
@@ -249,7 +250,13 @@ export function CompletedTasksDrawer({
           ) : (
             groups.map((g) => (
               <section key={g.label} className="mb-5 last:mb-2">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 sticky top-0 bg-background/95 backdrop-blur-sm py-1 -mx-1 px-1 z-10">
+                {/* Group header — non-sticky. Earlier this used sticky+
+                    backdrop-blur but the parent scroll container shares
+                    a stacking context with the KPI cards above, so the
+                    blur band bled over them. A plain section header reads
+                    cleanly and the list isn't long enough to justify
+                    sticky behavior. */}
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 py-1">
                   {g.label}
                   <span className="ml-2 text-muted-foreground/60 normal-case font-normal">{g.tasks.length}</span>
                 </h3>
@@ -291,18 +298,20 @@ function StatCard({
 }
 
 function CompletedRow({ task, onSelect }: { task: CompletedFlat; onSelect?: (t: Task) => void }) {
-  const completedAt = task.completedAt!
-  const t = new Date(completedAt)
-  const hh = String(t.getHours()).padStart(2, '0')
-  const mm = String(t.getMinutes()).padStart(2, '0')
-  const weekday = WEEKDAY_LABEL[t.getDay()]
-  const m = t.getMonth() + 1
-  const d = t.getDate()
+  // completedAt may be missing on rows completed before write-through
+  // shipped (or whose 0007 backfill wasn't run). We still render the row
+  // with an em-dash placeholder so the user can see the task exists.
+  const t = task.completedAt ? new Date(task.completedAt) : null
+  const hh = t ? String(t.getHours()).padStart(2, '0') : '—'
+  const mm = t ? String(t.getMinutes()).padStart(2, '0') : '—'
+  const weekday = t ? WEEKDAY_LABEL[t.getDay()] : ''
+  const m = t ? t.getMonth() + 1 : null
+  const d = t ? t.getDate() : null
 
   // Time-to-complete (createdAt → completedAt). Useful glance at how long
   // each task took to actually get done.
   let elapsed: string | null = null
-  if (task.createdAt) {
+  if (t && task.createdAt) {
     const mins = (t.getTime() - new Date(task.createdAt).getTime()) / 60000
     if (mins > 0) elapsed = humanizeMinutes(mins)
   }
@@ -332,12 +341,18 @@ function CompletedRow({ task, onSelect }: { task: CompletedFlat; onSelect?: (t: 
           </div>
         </div>
         <div className="flex-shrink-0 text-right">
-          <div className="text-[11px] font-mono text-muted-foreground">
-            {m}/{d}（{weekday}）
-          </div>
-          <div className="text-xs font-mono text-foreground/80">{hh}:{mm}</div>
-          {elapsed && (
-            <div className="text-[10px] text-muted-foreground/70 mt-0.5">耗時 {elapsed}</div>
+          {t ? (
+            <>
+              <div className="text-[11px] font-mono text-muted-foreground">
+                {m}/{d}（{weekday}）
+              </div>
+              <div className="text-xs font-mono text-foreground/80">{hh}:{mm}</div>
+              {elapsed && (
+                <div className="text-[10px] text-muted-foreground/70 mt-0.5">耗時 {elapsed}</div>
+              )}
+            </>
+          ) : (
+            <div className="text-[10px] text-muted-foreground/70 italic">時間未知</div>
           )}
         </div>
       </button>

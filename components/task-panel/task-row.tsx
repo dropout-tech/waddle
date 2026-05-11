@@ -411,11 +411,13 @@ function TaskRowImpl({
             )}
             {/* Meeting badge — small icon + label chip before the title so
                 a meeting reads as "meeting" before the user even parses
-                the words. Subtle palette to avoid competing with urgency. */}
+                the words. Uses bg-primary/15 + text-primary tokens so the
+                contrast holds in both light AND dark themes — the prior
+                hardcoded cream background turned the yellow text invisible
+                under the dark palette. */}
             {task.isMeeting && (
               <span
-                className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded text-primary"
-                style={{ backgroundColor: 'oklch(0.96 0.05 80 / 0.6)' }}
+                className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary"
                 title="會議"
               >
                 <Users className="w-2.5 h-2.5" />

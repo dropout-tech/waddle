@@ -125,29 +125,27 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
       }
 
       for (const b of timeBlocks) {
-        // Skip non-recurring blocks outside the visible range — saves work
-        // and keeps the visual output clean.
+        // Render time blocks on their own date only — matches the live
+        // calendar's `tb.date === dateStr` filter (week-view.tsx:274,
+        // day-scroll-view.tsx:365). The previous code stamped recurring
+        // blocks on every day in range; that produced a misleading export
+        // showing e.g. lunch on days the user never had lunch scheduled.
+        // Until a proper RRULE expander ships, parity beats convenience.
         const inRange = days.some((d) => toDateString(d) === b.date)
-        if (!inRange && !b.isRecurring) continue
-        // Recurring rendering is approximate — Waddle's time blocks for
-        // lunch/buffer get rendered every day in-range. Not exact RRULE
-        // but matches what users see in the app today.
-        const targetDates = b.isRecurring ? days.map(toDateString) : [b.date]
-        for (const date of targetDates) {
-          const item: ScheduledItem = {
-            id: `${b.id}-${date}`,
-            date,
-            startMin: timeToMinutes(b.startTime),
-            endMin: timeToMinutes(b.endTime),
-            color: b.color,
-            title: b.label,
-            isBlock: true,
-            isMeeting: false,
-          }
-          const arr = byDate.get(date) ?? []
-          arr.push(item)
-          byDate.set(date, arr)
+        if (!inRange) continue
+        const item: ScheduledItem = {
+          id: b.id,
+          date: b.date,
+          startMin: timeToMinutes(b.startTime),
+          endMin: timeToMinutes(b.endTime),
+          color: b.color,
+          title: b.label,
+          isBlock: true,
+          isMeeting: false,
         }
+        const arr = byDate.get(b.date) ?? []
+        arr.push(item)
+        byDate.set(b.date, arr)
       }
 
       return byDate

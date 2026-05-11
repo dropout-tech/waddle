@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useRef, useState } from 'react'
-import { cn, haptic } from '@/lib/utils'
+import { cn, haptic, isLightColor } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import {
   calculateBlockHeight,
@@ -274,8 +274,21 @@ function TaskBlockImpl({
   // overlay in the top-right (Video when a known URL is set, Users
   // otherwise). The overall block color stays the same so workspace
   // attribution still reads.
+  //
+  // For workspaces with pale colors (cream, light yellow), a white ring /
+  // white stripes are invisible. We flip the overlay tone to dark in
+  // that case so the meeting treatment stays legible across the palette.
   const meetingProvider = detectMeetingProvider(task.meetingUrl)
   const meetingIcon = task.isMeeting ? (meetingProvider ? Video : Users) : null
+  const colorIsLight = isLightColor(color)
+  const meetingRingClass = task.isMeeting && !isDragging
+    ? colorIsLight
+      ? 'ring-2 ring-inset ring-black/30'
+      : 'ring-2 ring-inset ring-white/45'
+    : ''
+  const meetingStripeColor = colorIsLight
+    ? 'rgba(0,0,0,0.12)'
+    : 'rgba(255,255,255,0.12)'
   const ariaLabel = `${task.isMeeting ? '會議 — ' : ''}${task.title}，${formatTime(task.scheduledStartTime!)} 到 ${formatTime(task.scheduledEndTime!)}${task.isCompleted ? '，已完成' : ''}`
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -304,9 +317,9 @@ function TaskBlockImpl({
           ? 'shadow-2xl opacity-95 z-50 ring-2 ring-white/40 scale-[1.02] -rotate-1 transition-transform'
           : 'hover:shadow-lg hover:z-10 transition-all',
         // Meeting-only: inset ring creates a "double border" feel against
-        // the workspace-colored background. Kept subtle so it reads as
-        // "different" rather than "loud".
-        task.isMeeting && !isDragging && 'ring-2 ring-inset ring-white/45',
+        // the workspace-colored background. Tone is chosen at runtime
+        // based on the background luminance.
+        meetingRingClass,
         task.isCompleted && 'opacity-50'
       )}
       style={styleProps}
@@ -314,14 +327,14 @@ function TaskBlockImpl({
       {/* Meeting diagonal-stripe wash. Sits above the solid background but
           below all content; pointer-events-none so it never eats clicks.
           The pattern is intentionally low-contrast (~10% alpha) — it's a
-          texture cue, not a focal point. */}
+          texture cue, not a focal point. Stripe tone flips dark on pale
+          backgrounds to stay visible. */}
       {task.isMeeting && (
         <div
           aria-hidden
           className="absolute inset-0 pointer-events-none"
           style={{
-            backgroundImage:
-              'repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0 6px, transparent 6px 14px)',
+            backgroundImage: `repeating-linear-gradient(45deg, ${meetingStripeColor} 0 6px, transparent 6px 14px)`,
           }}
         />
       )}
@@ -445,15 +458,25 @@ function TaskBlockImpl({
       {/* Meeting badge — top-right corner. Always visible (unlike the grip
           which only shows on hover) so a glance at the calendar tells you
           which blocks are meetings vs regular tasks. Renders Video when a
-          known meeting URL is set, otherwise the generic Users icon. */}
+          known meeting URL is set, otherwise the generic Users icon. Badge
+          tone follows the same light/dark luminance flip so it stays
+          visible across the workspace palette. */}
       {meetingIcon && (
         <div
-          className="absolute top-1 right-1 z-[5] pointer-events-none flex items-center justify-center w-4 h-4 rounded-full bg-white/30 backdrop-blur-sm"
+          className={cn(
+            'absolute top-1 right-1 z-[5] pointer-events-none flex items-center justify-center w-4 h-4 rounded-full backdrop-blur-sm',
+            colorIsLight ? 'bg-black/30' : 'bg-white/30',
+          )}
           aria-hidden
         >
           {(() => {
             const Icon = meetingIcon
-            return <Icon className="w-2.5 h-2.5 text-white" strokeWidth={2.5} />
+            return (
+              <Icon
+                className={cn('w-2.5 h-2.5', colorIsLight ? 'text-black' : 'text-white')}
+                strokeWidth={2.5}
+              />
+            )
           })()}
         </div>
       )}

@@ -165,7 +165,10 @@ export function CalendarExportModal({
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `waddle-行程-${startStr}_${endStr}.png`
+      // Pure-ASCII filename so it survives cross-platform downloads
+      // (some Windows browsers + corporate file servers mangle UTF-8
+       // names in Content-Disposition fallbacks).
+      a.download = `waddle-schedule-${startStr}_${endStr}.png`
       a.click()
       URL.revokeObjectURL(url)
       toast.success('已下載')
@@ -428,23 +431,35 @@ export function CalendarExportModal({
  */
 function PreviewScaler({ children }: { children: React.ReactNode }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(0.5)
+  const [naturalHeight, setNaturalHeight] = useState(0)
 
+  // Observe BOTH the outer container (for width-driven scale) and the
+  // inner 1080px-wide content (for height). Earlier the wrapper used a
+  // marginBottom of `calc(-100% * (1 - scale))`, which resolved against
+  // the parent's *width* rather than the child's *height* — produced
+  // either dead space or overlap depending on viewport. Measuring the
+  // child's actual height and applying it to the wrapper is the only way
+  // to correctly collapse the unused vertical space introduced by
+  // `transform: scale(...)`, which doesn't shrink the layout box.
   useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
+    const outer = containerRef.current
+    const inner = innerRef.current
+    if (!outer || !inner) return
     const update = () => {
-      const w = el.clientWidth
+      const w = outer.clientWidth
       if (w > 0) {
-        // 1080 is the export width; subtract a tiny gutter so the scaled
-        // node doesn't bump against the modal's scrollbar.
-        const next = Math.min(1, (w - 4) / 1080)
-        setScale(next)
+        // Subtract a small gutter so the scaled node doesn't bump the
+        // modal's scrollbar.
+        setScale(Math.min(1, (w - 4) / 1080))
       }
+      setNaturalHeight(inner.offsetHeight)
     }
     update()
     const ro = new ResizeObserver(update)
-    ro.observe(el)
+    ro.observe(outer)
+    ro.observe(inner)
     return () => ro.disconnect()
   }, [])
 
@@ -452,16 +467,26 @@ function PreviewScaler({ children }: { children: React.ReactNode }) {
     <div ref={containerRef} className="w-full">
       <div
         style={{
-          transform: `scale(${scale})`,
-          transformOrigin: 'top left',
-          width: 1080,
-          // Tell the parent how much vertical space the scaled child uses.
-          // Without this the parent thinks the child is full height even
-          // though we've squished it.
-          marginBottom: scale < 1 ? `calc(-100% * ${1 - scale})` : 0,
+          // Outer wrapper holds the SCALED layout box height so subsequent
+          // siblings flow correctly. Width is left to fill the container.
+          height: naturalHeight > 0 ? naturalHeight * scale : undefined,
+          width: '100%',
+          position: 'relative',
         }}
       >
-        {children}
+        <div
+          ref={innerRef}
+          style={{
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+            width: 1080,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   )

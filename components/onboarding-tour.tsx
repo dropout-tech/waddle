@@ -47,11 +47,18 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="task-row"]',
     title: '勾選 / 點開任務',
-    body: '左邊圈圈 = 完成；點任務本身 = 打開詳細編輯。試試看。',
+    body: '左邊圈圈 = 完成；點任務本身 = 打開詳細編輯。打開後可以把任務標為「會議」，會多三個欄位（參與者 / 地點 / 視訊連結）。',
     placement: 'right',
     padding: 4,
     interactive: true,
     hint: '👉 試試點一下這個任務',
+  },
+  {
+    target: '[data-tour="task-shortcut-row"]',
+    title: '今日會議 ＆ 已完成',
+    body: '左邊 chip 顯示今天還剩幾場會議，點開可一鍵加入視訊。右邊「已完成」進到專屬抽屜，內含 KPI 統計（連續天數、平均耗時）。',
+    placement: 'bottom',
+    padding: 4,
   },
   {
     title: '🔄 左邊 = 右邊',
@@ -79,6 +86,13 @@ const DESKTOP_STEPS: TourStep[] = [
     padding: 6,
     interactive: true,
     hint: '👉 點看看其他視圖',
+  },
+  {
+    target: '[data-tour="calendar-export"]',
+    title: '匯出行程圖檔',
+    body: '挑日期範圍，產出乾淨的 PNG — 適合分享到 LINE / IG / Slack。隱私模式可以只顯示時段顏色不洩漏內容。',
+    placement: 'bottom',
+    padding: 6,
   },
   {
     target: '[data-tour="scratchpad"]',
@@ -129,7 +143,14 @@ const MOBILE_STEPS: TourStep[] = [
   {
     target: '[data-tour="task-row"]',
     title: '點任務 = 編輯，長按 = 拖到日曆',
-    body: '輕點任務開啟詳細頁；長按 0.3 秒後拖移可以直接排到日曆上的時間。',
+    body: '輕點任務開啟詳細頁；長按 0.3 秒後拖移可以直接排到日曆上的時間。打開後可以把任務標為「會議」，會多參與者 / 地點 / 視訊連結。',
+    placement: 'bottom',
+    padding: 4,
+  },
+  {
+    target: '[data-tour="task-shortcut-row"]',
+    title: '今日會議 ＆ 已完成',
+    body: '今日會議 chip 點開可以一鍵加入視訊；已完成抽屜含 KPI（連續天數、平均耗時）。日曆頁右上「⋯」選單裡還有「匯出行程」可以產 PNG 分享。',
     placement: 'bottom',
     padding: 4,
   },

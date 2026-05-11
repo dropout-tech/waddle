@@ -7,6 +7,7 @@ import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
 import { collectMeetings, meetingStartAsDate } from '@/lib/meeting-reminder'
 import { detectMeetingProvider, MEETING_PROVIDER_LABEL } from '@/lib/meeting-utils'
+import { findTaskById } from '@/lib/task-utils'
 
 interface TodayMeetingsPopoverProps {
   workspaces: Workspace[]
@@ -26,8 +27,18 @@ interface TodayMeetingsPopoverProps {
 export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetingsPopoverProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-
-  const todayStr = useMemo(() => toDateString(new Date()), [])
+  // Tick once a minute so:
+  //   1. the "today" filter rolls over at local midnight without the user
+  //      having to refresh,
+  //   2. the "進行中" / "N 分鐘後" labels stay accurate as time passes.
+  // Cheap because the popover is small; only the meetings memo recomputes.
+  const [nowTick, setNowTick] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick((n) => n + 1), 60 * 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  // `nowTick` intentionally in deps so today rolls over without a remount.
+  const todayStr = useMemo(() => toDateString(new Date()), [nowTick])
 
   const meetings = useMemo(() => {
     // Today only, sorted by start time. Past meetings (already ended)
@@ -44,23 +55,27 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
         return end.getTime() > now.getTime()
       })
       .sort((a, b) => a.scheduledStartTime.localeCompare(b.scheduledStartTime))
-  }, [workspaces, todayStr])
+    // nowTick keeps this fresh as time progresses; pulling it in via
+    // a deps explicit reference instead of a no-op variable use.
+  }, [workspaces, todayStr, nowTick])
 
-  // Outside-click + Escape dismissal. Cheap to wire up here and avoids
-  // pulling in a popover library just for this surface.
+  // Outside-tap + Escape dismissal. We listen on pointerdown rather than
+  // mousedown so the dismiss fires on touch devices too — mousedown is
+  // not synthesized reliably for taps on iOS Safari, leaving the popover
+  // stuck open after a tap outside it.
   useEffect(() => {
     if (!open) return
-    const onDocClick = (e: MouseEvent) => {
+    const onDocPointerDown = (e: PointerEvent) => {
       if (!containerRef.current) return
       if (!containerRef.current.contains(e.target as Node)) setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
-    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('pointerdown', onDocPointerDown)
     document.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('pointerdown', onDocPointerDown)
       document.removeEventListener('keydown', onKey)
     }
   }, [open])
@@ -74,8 +89,10 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
+        // min-h ensures the chip stays a comfortable touch target on
+        // phones — the original ~22px height failed the 36-40px guideline.
         className={cn(
-          'flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium transition-colors',
+          'flex items-center gap-1.5 px-2.5 py-1.5 min-h-[32px] rounded-md text-[11px] font-medium transition-colors',
           count > 0
             ? 'bg-primary/10 text-primary hover:bg-primary/15'
             : 'bg-muted text-muted-foreground hover:bg-muted/80',
@@ -110,7 +127,7 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
               type="button"
               onClick={() => setOpen(false)}
               aria-label="關閉"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center justify-center w-8 h-8 -mr-1.5 rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -222,13 +239,4 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
   )
 }
 
-function findTaskById(workspaces: Workspace[], id: string): Task | null {
-  for (const ws of workspaces) {
-    for (const cat of ws.categories) {
-      for (const t of cat.tasks) {
-        if (t.id === id) return t
-      }
-    }
-  }
-  return null
-}
+// `findTaskById` lives in lib/task-utils.ts — used here and in app/page.tsx.

@@ -4,6 +4,7 @@ import { useRef, useState, useMemo } from 'react'
 import { FolderTree, Clock, SlidersHorizontal, ChevronDown, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
+import { forEachTask } from '@/lib/task-utils'
 import type { Workspace, Task } from '@/lib/types'
 import { PanelHeader } from './panel-header'
 import { WorkspaceSection } from './workspace-section'
@@ -106,15 +107,9 @@ export function TaskPanel({
   // completed" (it's the count for the drawer, not the inline list).
   const totalCompleted = useMemo(() => {
     let n = 0
-    for (const w of workspaces) {
-      if (w.isArchived) continue
-      for (const c of w.categories) {
-        if (c.isArchived) continue
-        for (const t of c.tasks) {
-          if (t.isCompleted) n++
-        }
-      }
-    }
+    forEachTask(workspaces, (t) => {
+      if (t.isCompleted) n++
+    })
     return n
   }, [workspaces])
 
@@ -221,13 +216,17 @@ export function TaskPanel({
         {/* Quick-access row: today's meetings (popover) + completed-tasks
             drawer. Two parallel entry points kept on one row so the panel
             header doesn't tower over the task list itself. */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-card/50">
+        <div
+          data-tour="task-shortcut-row"
+          className="flex items-center gap-2 px-3 py-2 border-b border-border bg-card/50"
+        >
           <TodayMeetingsPopover
             workspaces={workspaces}
             onSelectTask={onSelectTask}
           />
           <button
             type="button"
+            data-tour="completed-tasks-button"
             onClick={() => setCompletedDrawerOpen(true)}
             className="ml-auto flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium text-foreground hover:bg-muted/60 transition-colors group"
           >

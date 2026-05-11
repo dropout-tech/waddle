@@ -16,6 +16,7 @@ import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { useMeetingReminders } from '@/hooks/use-meeting-reminders'
 import { toDateString } from '@/lib/calendar-utils'
+import { findTaskById } from '@/lib/task-utils'
 import type { Task, SlotType, TimeBlock } from '@/lib/types'
 
 export default function WaddlePage() {
@@ -99,14 +100,7 @@ export default function WaddlePage() {
   const liveSelectedTask = useMemo<Task | null>(() => {
     if (!selectedTask) return null
     if (taskMode === 'create') return selectedTask
-    for (const w of workspaces) {
-      for (const c of w.categories) {
-        for (const t of c.tasks) {
-          if (t.id === selectedTask.id) return t
-        }
-      }
-    }
-    return selectedTask
+    return findTaskById(workspaces, selectedTask.id) ?? selectedTask
   }, [selectedTask, workspaces, taskMode])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [selectedTimeBlock, setSelectedTimeBlock] = useState<TimeBlock | null>(null)

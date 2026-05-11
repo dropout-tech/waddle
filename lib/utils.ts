@@ -54,3 +54,26 @@ export function unlockBodyScroll() {
   }
 }
 
+
+/**
+ * Rough perceived-brightness test for a hex color. Returns true when the
+ * color is bright enough that white overlays disappear against it (cream,
+ * pale yellow, light beige, etc). Uses the standard YIQ-style luminance
+ * approximation — fast, no perceptual library dependency.
+ *
+ * @example isLightColor('#ffe699')  // → true
+ * @example isLightColor('#3b82f6')  // → false
+ */
+export function isLightColor(hex: string | undefined): boolean {
+  if (!hex) return false
+  const m = hex.trim().match(/^#?([0-9a-f]{6}|[0-9a-f]{3})$/i)
+  if (!m) return false
+  const v = m[1]
+  const full = v.length === 3 ? v.split('').map((c) => c + c).join('') : v
+  const r = parseInt(full.slice(0, 2), 16)
+  const g = parseInt(full.slice(2, 4), 16)
+  const b = parseInt(full.slice(4, 6), 16)
+  // YIQ-style luminance; threshold tuned so Waddle's warm yellow (#f4d977)
+  // counts as "light" and the rest of the default workspace palette does not.
+  return (r * 299 + g * 587 + b * 114) / 1000 > 170
+}

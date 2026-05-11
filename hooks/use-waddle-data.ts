@@ -23,6 +23,39 @@ import type {
 } from '@/lib/types'
 
 // ─────────────────────────────────────────────────────────
+// Migration-aware write helpers
+//
+// When a migration ships a new column, an older deployment can still
+// have task / settings writes hitting a DB without that column. Rather
+// than crashing every write, we detect the "column not found" error
+// and retry without the new fields. This module-level flag latches once
+// per session so we don't pay the failed-roundtrip cost on every call.
+// ─────────────────────────────────────────────────────────
+let meetingColsKnownMissing = false
+const MEETING_COL_KEYS = ['is_meeting', 'attendees', 'location', 'meeting_url'] as const
+const MEETING_COL_RE = /is_meeting|attendees|location|meeting_url/
+
+/**
+ * PGRST204 = "column not found in schema cache".
+ * 42703    = "undefined column" (raw Postgres code).
+ * We require BOTH a known code and a message that names the missing
+ * column — keeping it strict avoids silently swallowing unrelated
+ * errors whose message happens to mention one of these tokens.
+ */
+function isMissingMeetingColumnError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const e = err as { code?: string; message?: string }
+  if (e.code !== 'PGRST204' && e.code !== '42703') return false
+  return MEETING_COL_RE.test(e.message ?? '')
+}
+
+function stripMeetingCols<T extends Record<string, unknown>>(row: T): T {
+  const out = { ...row }
+  for (const k of MEETING_COL_KEYS) delete out[k]
+  return out
+}
+
+// ─────────────────────────────────────────────────────────
 // Default settings — used as fallback for partial DB rows
 // ─────────────────────────────────────────────────────────
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -580,16 +613,31 @@ export function useWaddleData(): UseWaddleData {
     )
 
     const row = taskToRow(task)
-    const { error } = await supabase.from('tasks').insert({
-      ...row,
-      id: task.id,
-      user_id: userId,
-      workspace_id: task.workspaceId,
-      category_id: task.categoryId,
-      title: task.title,
-      urgency: task.urgency,
-      calendar_color: task.calendarColor,
-    })
+    const buildPayload = (strip: boolean) => {
+      const base = {
+        ...(strip ? stripMeetingCols(row) : row),
+        id: task.id,
+        user_id: userId,
+        workspace_id: task.workspaceId,
+        category_id: task.categoryId,
+        title: task.title,
+        urgency: task.urgency,
+        calendar_color: task.calendarColor,
+      }
+      return base
+    }
+    let { error } = await supabase
+      .from('tasks')
+      .insert(buildPayload(meetingColsKnownMissing))
+    // Pre-migration-0008 fallback: retry without meeting columns once we
+    // detect the column is unknown, then latch the flag for the rest of
+    // the session.
+    if (error && isMissingMeetingColumnError(error)) {
+      meetingColsKnownMissing = true
+      console.warn('[createTask] meeting columns missing — falling back. Run migration 0008.', error)
+      const retry = await supabase.from('tasks').insert(buildPayload(true))
+      error = retry.error
+    }
     if (error) handleDbError('建立任務')(error)
   }, [supabase])
 
@@ -681,7 +729,18 @@ export function useWaddleData(): UseWaddleData {
       if (catRow) dbUpdates.workspace_id = catRow.workspace_id
     }
 
-    const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', taskId)
+    const runUpdate = (strip: boolean) =>
+      supabase
+        .from('tasks')
+        .update(strip ? stripMeetingCols(dbUpdates) : dbUpdates)
+        .eq('id', taskId)
+    let { error } = await runUpdate(meetingColsKnownMissing)
+    if (error && isMissingMeetingColumnError(error)) {
+      meetingColsKnownMissing = true
+      console.warn('[updateTask] meeting columns missing — falling back. Run migration 0008.', error)
+      const retry = await runUpdate(true)
+      error = retry.error
+    }
     if (error) handleDbError('更新任務')(error)
   }, [supabase])
 
@@ -1024,12 +1083,15 @@ export function useWaddleData(): UseWaddleData {
       week_view_days: newSettings.weekViewDays,
       keep_completed_today_in_list: newSettings.keepCompletedTodayInList,
     })
-    // PostgREST signals an unknown column with code PGRST204 / 42703 etc.
-    // Detect by message text — if it complains about any migration-added
-    // column, retry the upsert without all of them so the rest of the
-    // settings still save. localStorage already mirrors the value so
-    // nothing is lost on the local device.
-    if (error && /day_view_days|week_view_days|keep_completed_today_in_list/.test(error.message ?? '')) {
+    // PostgREST signals an unknown column with code PGRST204 / 42703.
+    // We require both a recognized error code AND a message that names
+    // one of the migration columns — keeping it strict avoids swallowing
+    // unrelated errors whose message happens to mention a column token.
+    if (
+      error &&
+      (error.code === 'PGRST204' || error.code === '42703') &&
+      /day_view_days|week_view_days|keep_completed_today_in_list/.test(error.message ?? '')
+    ) {
       console.warn('[settings] migration columns missing — falling back to localStorage. Run latest migration.', error)
       const retry = await supabase.from('user_settings').upsert(baseSettingsRow)
       error = retry.error
