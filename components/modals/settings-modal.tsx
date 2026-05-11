@@ -12,6 +12,12 @@ import {
   setTaskCompleteSoundEnabled,
   playTaskCompleteSound,
 } from '@/lib/task-sound'
+import {
+  getReminderLead,
+  setReminderLead,
+  ensureNotificationPermission,
+  type ReminderLead,
+} from '@/lib/meeting-reminder'
 
 // Map icon names to components
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -109,6 +115,8 @@ export function SettingsModal({
   // Task-complete sound is a per-device pref stored in localStorage (same
   // pattern as timer sound), so it lives outside localSettings/UserSettings.
   const [taskSoundEnabled, setTaskSoundEnabledState] = useState<boolean>(() => getTaskCompleteSoundEnabled())
+  // Meeting reminder lead time (5/10/15 mins, or null = off). Per-device.
+  const [reminderLead, setReminderLeadState] = useState<ReminderLead>(() => getReminderLead())
   const [editingSlotType, setEditingSlotType] = useState<SlotType | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [newSlotType, setNewSlotType] = useState<Partial<SlotType>>({
@@ -572,6 +580,50 @@ export function SettingsModal({
                 className="w-4 h-4 rounded border-border accent-primary"
               />
             </label>
+
+            {/* Meeting reminder lead time */}
+            <div className="space-y-2">
+              <div>
+                <div className="text-sm text-foreground">會議提醒</div>
+                <div className="text-xs text-muted-foreground">
+                  在會議開始前透過瀏覽器通知提醒你（需要授權通知權限）
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  [null, '關閉'],
+                  [5, '5 分鐘'],
+                  [10, '10 分鐘'],
+                  [15, '15 分鐘'],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={String(value)}
+                    type="button"
+                    onClick={async () => {
+                      if (value !== null) {
+                        // Permission request has to live inside the click
+                        // handler — browsers gate it on a user gesture.
+                        const granted = await ensureNotificationPermission()
+                        if (!granted) {
+                          alert('通知權限被拒，請在瀏覽器設定中允許 Waddle 顯示通知後再試')
+                          return
+                        }
+                      }
+                      setReminderLeadState(value)
+                      setReminderLead(value)
+                    }}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                      reminderLead === value
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-card border border-border text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Keep today's completed in list */}
             <label className="flex items-center justify-between cursor-pointer">

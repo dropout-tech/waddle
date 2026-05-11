@@ -20,7 +20,8 @@ import {
   Award,
   ArrowRight,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Users,
 } from 'lucide-react'
 
 interface ReportDashboardProps {
@@ -119,6 +120,29 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
     const scheduled = currentPeriodTasks.filter(t => t.scheduledDate)
     const withDueDate = currentPeriodTasks.filter(t => t.dueDate)
 
+    // Meetings stats: total count + share of scheduled time spent on
+    // meetings vs other scheduled work. "Scheduled minutes" = sum of
+    // (endTime − startTime) over all tasks in the period that have a
+    // schedule attached, regardless of completion.
+    const meetingsInPeriod = currentPeriodTasks.filter(t => t.isMeeting && t.scheduledStartTime && t.scheduledEndTime)
+    const scheduledWithTime = currentPeriodTasks.filter(t => t.scheduledStartTime && t.scheduledEndTime)
+    const minutesBetween = (a: string, b: string) => {
+      const [ah, am] = a.split(':').map(Number)
+      const [bh, bm] = b.split(':').map(Number)
+      return Math.max(0, (bh * 60 + bm) - (ah * 60 + am))
+    }
+    const meetingMinutes = meetingsInPeriod.reduce(
+      (sum, t) => sum + minutesBetween(t.scheduledStartTime!, t.scheduledEndTime!),
+      0,
+    )
+    const scheduledMinutes = scheduledWithTime.reduce(
+      (sum, t) => sum + minutesBetween(t.scheduledStartTime!, t.scheduledEndTime!),
+      0,
+    )
+    const meetingTimeShare = scheduledMinutes > 0
+      ? Math.round((meetingMinutes / scheduledMinutes) * 100)
+      : 0
+
     return {
       total: currentPeriodTasks.length,
       completed: completed.length,
@@ -130,7 +154,11 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
       highPriority: highPriority.length,
       scheduled: scheduled.length,
       withDueDate: withDueDate.length,
-      pending: currentPeriodTasks.filter(t => !t.isCompleted).length
+      pending: currentPeriodTasks.filter(t => !t.isCompleted).length,
+      meetings: meetingsInPeriod.length,
+      meetingMinutes,
+      scheduledMinutes,
+      meetingTimeShare,
     }
   }, [currentPeriodTasks, previousPeriodTasks, allTasks, now])
 
@@ -558,6 +586,64 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
               <div className="p-4 rounded-xl bg-secondary/50 border border-border">
                 <div className="text-2xl font-bold">{priorityStats.none}</div>
                 <div className="text-sm text-muted-foreground mt-1">未設定</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Meeting Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-5 rounded-xl bg-card border border-border">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Users className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <div className="font-medium">會議佔比</div>
+                  <div className="text-sm text-muted-foreground">會議時數 ÷ 已排程時數</div>
+                </div>
+              </div>
+              <div className="text-3xl font-bold">{stats.meetingTimeShare}%</div>
+              <div className="text-sm text-muted-foreground mt-1">
+                {Math.round(stats.meetingMinutes / 60 * 10) / 10} 小時會議
+                {' · '}
+                共 {stats.meetings} 場
+              </div>
+              <div className="h-2 bg-secondary rounded-full mt-3 overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all"
+                  style={{ width: `${Math.min(100, stats.meetingTimeShare)}%` }}
+                />
+              </div>
+              {stats.meetingTimeShare > 50 && (
+                <div className="mt-2 text-xs text-muted-foreground italic">
+                  超過一半排程時間都在開會 — 留意專注時段
+                </div>
+              )}
+            </div>
+            <div className="p-5 rounded-xl bg-card border border-border">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-emerald-500/10">
+                  <Activity className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <div className="font-medium">深度工作時間</div>
+                  <div className="text-sm text-muted-foreground">非會議的已排程時數</div>
+                </div>
+              </div>
+              <div className="text-3xl font-bold">
+                {Math.round((stats.scheduledMinutes - stats.meetingMinutes) / 60 * 10) / 10}
+                <span className="text-base text-muted-foreground font-normal ml-1">小時</span>
+              </div>
+              <div className="text-sm text-muted-foreground mt-1">
+                {stats.scheduledMinutes > 0
+                  ? `${100 - stats.meetingTimeShare}% 的排程時間`
+                  : '尚無排程資料'}
+              </div>
+              <div className="h-2 bg-secondary rounded-full mt-3 overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, 100 - stats.meetingTimeShare)}%` }}
+                />
               </div>
             </div>
           </div>

@@ -14,6 +14,7 @@ import { OnboardingTour } from '@/components/onboarding-tour'
 import { SettingsModal } from '@/components/modals/settings-modal'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { useWaddleData } from '@/hooks/use-waddle-data'
+import { useMeetingReminders } from '@/hooks/use-meeting-reminders'
 import { toDateString } from '@/lib/calendar-utils'
 import type { Task, SlotType, TimeBlock } from '@/lib/types'
 
@@ -47,6 +48,11 @@ export default function WaddlePage() {
     deleteTimeBlock,
     saveSettings,
   } = useWaddleData()
+
+  // Watch all meetings and fire browser notifications N minutes before
+  // each one starts. Pref + permission live in localStorage / Notification
+  // API respectively; the hook is a no-op when either is missing.
+  useMeetingReminders(workspaces)
 
   // Slot types — generated dynamically from current workspaces, plus static
   // built-in time-block types (break/buffer/focus) and any user customs.

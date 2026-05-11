@@ -10,6 +10,7 @@ import { WorkspaceSection } from './workspace-section'
 import { FilterBar, type FilterState } from './filter-bar'
 import { UnifiedTaskList } from './unified-task-list'
 import { CompletedTasksDrawer } from './completed-tasks-drawer'
+import { TodayMeetingsPopover } from './today-meetings-popover'
 
 import { Button } from '@/components/ui/button'
 
@@ -217,24 +218,27 @@ export function TaskPanel({
           onToggleExpand={onToggleExpand}
         />
 
-        {/* Completed-tasks entrypoint. Always visible above the toolbar so
-            the user can pop into the drawer regardless of how many tasks
-            they currently have on screen. Renders as a flat row with a
-            count badge and a right-chevron so it reads as "tap to enter". */}
-        <button
-          type="button"
-          onClick={() => setCompletedDrawerOpen(true)}
-          className="w-full flex items-center justify-between px-4 py-2 border-b border-border bg-card/50 hover:bg-muted/40 transition-colors group"
-        >
-          <span className="flex items-center gap-2 text-xs font-medium text-foreground">
-            <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+        {/* Quick-access row: today's meetings (popover) + completed-tasks
+            drawer. Two parallel entry points kept on one row so the panel
+            header doesn't tower over the task list itself. */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-card/50">
+          <TodayMeetingsPopover
+            workspaces={workspaces}
+            onSelectTask={onSelectTask}
+          />
+          <button
+            type="button"
+            onClick={() => setCompletedDrawerOpen(true)}
+            className="ml-auto flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium text-foreground hover:bg-muted/60 transition-colors group"
+          >
+            <CheckCircle2 className="w-3 h-3 text-primary" />
             已完成
-            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[10px] font-semibold">
+            <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-primary/15 text-primary text-[9px] font-semibold">
               {totalCompleted}
             </span>
-          </span>
-          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-        </button>
+            <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+          </button>
+        </div>
 
         {/* Toolbar Toggle Row */}
       <div className="border-b border-border bg-card/50">
