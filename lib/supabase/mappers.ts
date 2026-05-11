@@ -68,6 +68,12 @@ export function rowToTask(
     isRecurring: row.is_recurring,
     // Default true if column doesn't exist yet (pre-migration deployment).
     showInTaskList: row.show_in_task_list ?? true,
+    // Migration 0008 — meeting fields. Default to false / undefined if the
+    // columns don't exist yet, so the app still works pre-migration.
+    isMeeting: row.is_meeting ?? false,
+    attendees: row.attendees ?? undefined,
+    location: row.location ?? undefined,
+    meetingUrl: row.meeting_url ?? undefined,
     recurrence: row.recurrence_type
       ? {
           type: row.recurrence_type,
@@ -110,6 +116,10 @@ export function taskToRow(
   if (task.sortOrder !== undefined) out.sort_order = task.sortOrder
   if (task.isRecurring !== undefined) out.is_recurring = task.isRecurring
   if (task.showInTaskList !== undefined) out.show_in_task_list = task.showInTaskList
+  if (task.isMeeting !== undefined) out.is_meeting = task.isMeeting
+  if (task.attendees !== undefined) out.attendees = task.attendees ?? null
+  if (task.location !== undefined) out.location = task.location ?? null
+  if (task.meetingUrl !== undefined) out.meeting_url = task.meetingUrl ?? null
   if (task.recurrence !== undefined) {
     if (task.recurrence) {
       out.recurrence_type = task.recurrence.type

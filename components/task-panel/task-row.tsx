@@ -2,7 +2,7 @@
 
 import { memo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Clock, Calendar, MessageSquare, Timer, AlertCircle, GripVertical } from 'lucide-react'
+import { Check, Clock, Calendar, MessageSquare, Timer, AlertCircle, GripVertical, Users } from 'lucide-react'
 import { cn, haptic } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import { getUrgencyColor, formatEstimatedTime } from '@/lib/task-utils'
@@ -285,6 +285,15 @@ function TaskRowImpl({
             </span>
           )}
 
+          {/* Meeting badge (compact layout). Icon-only — no label text —
+              because the compact row's whole point is dense info. */}
+          {task.isMeeting && (
+            <Users
+              className="flex-shrink-0 w-3 h-3 text-primary"
+              aria-label="會議"
+            />
+          )}
+
           {/* Title */}
           <span
             className={cn(
@@ -398,6 +407,19 @@ function TaskRowImpl({
                 style={{ backgroundColor: `${task.workspaceColor}20`, color: task.workspaceColor }}
               >
                 {task.workspaceName}
+              </span>
+            )}
+            {/* Meeting badge — small icon + label chip before the title so
+                a meeting reads as "meeting" before the user even parses
+                the words. Subtle palette to avoid competing with urgency. */}
+            {task.isMeeting && (
+              <span
+                className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded text-primary"
+                style={{ backgroundColor: 'oklch(0.96 0.05 80 / 0.6)' }}
+                title="會議"
+              >
+                <Users className="w-2.5 h-2.5" />
+                會議
               </span>
             )}
             <span className={cn(

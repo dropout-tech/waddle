@@ -76,6 +76,11 @@ type TasksRow = {
   recurrence_end_date: string | null
   google_event_id: string | null
   show_in_task_list: boolean
+  /** Migration 0008 — optional in case the column hasn't shipped yet. */
+  is_meeting?: boolean
+  attendees?: string | null
+  location?: string | null
+  meeting_url?: string | null
   created_at: string
   updated_at: string
 }
@@ -227,6 +232,10 @@ type TasksInsert = {
   recurrence_end_date?: string | null
   google_event_id?: string | null
   show_in_task_list?: boolean
+  is_meeting?: boolean
+  attendees?: string | null
+  location?: string | null
+  meeting_url?: string | null
 }
 
 type JournalEntriesInsert = {

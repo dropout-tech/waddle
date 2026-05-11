@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useMemo } from 'react'
-import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat, List, CheckSquare, ListChecks, Link2 } from 'lucide-react'
+import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat, List, CheckSquare, ListChecks, Link2, Users, MapPin, Video } from 'lucide-react'
+import { detectMeetingProvider, MEETING_PROVIDER_LABEL } from '@/lib/meeting-utils'
 import { cn } from '@/lib/utils'
 import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import type { Task, Workspace } from '@/lib/types'
@@ -74,6 +75,15 @@ export function TaskDetailModal({
   // 加入左側任務欄 — undefined ≡ true (legacy tasks default to visible).
   const [showInTaskList, setShowInTaskList] = useState(task.showInTaskList !== false)
 
+  // Meeting metadata (migration 0008). The toggle drives whether the
+  // attendee / location / URL inputs are shown; saving with isMeeting=false
+  // also clears the three text fields so a former-meeting task doesn't
+  // carry a ghost of its metadata around.
+  const [isMeeting, setIsMeeting] = useState<boolean>(task.isMeeting === true)
+  const [attendees, setAttendees] = useState(task.attendees || '')
+  const [location, setLocation] = useState(task.location || '')
+  const [meetingUrl, setMeetingUrl] = useState(task.meetingUrl || '')
+
   // Find current selected category info
   const selectedCategory = workspaces
     .flatMap((w) => w.categories.map((c) => ({ ...c, workspace: w })))
@@ -104,6 +114,14 @@ export function TaskDetailModal({
       // A task with no schedule must show in the list — otherwise it would
       // be invisible everywhere. Force-true in that case.
       showInTaskList: scheduledDate ? showInTaskList : true,
+      // Meeting fields. When the toggle is off, clear the three text
+      // fields so an old meeting that gets demoted back to a regular
+      // task doesn't keep stale attendees / location / URL data hidden
+      // in the DB.
+      isMeeting,
+      attendees: isMeeting ? (attendees || undefined) : undefined,
+      location: isMeeting ? (location || undefined) : undefined,
+      meetingUrl: isMeeting ? (meetingUrl || undefined) : undefined,
       isRecurring,
       recurrence: isRecurring
         ? {
@@ -476,6 +494,103 @@ export function TaskDetailModal({
                     onChange={(e) => setRecurrenceEndDate(e.target.value)}
                     className="h-8"
                   />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Meeting toggle + fields. Placed above Description because it
+              changes what kind of task this is — a higher-level switch — and
+              the related fields read better grouped at the top than buried
+              with the body text. */}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setIsMeeting((v) => !v)}
+              className={cn(
+                'w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border transition-all',
+                isMeeting
+                  ? 'border-primary/50 bg-primary/5'
+                  : 'border-border hover:bg-muted/40',
+              )}
+              aria-pressed={isMeeting}
+            >
+              <div className="flex items-center gap-2">
+                <Users className={cn('w-4 h-4', isMeeting ? 'text-primary' : 'text-muted-foreground')} />
+                <div className="text-left">
+                  <div className="text-sm font-medium text-foreground">標記為會議</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    在日曆上顯示專屬樣式，可記錄參與者 / 地點 / 視訊連結
+                  </div>
+                </div>
+              </div>
+              <div
+                className={cn(
+                  'relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors',
+                  isMeeting ? 'bg-primary' : 'bg-muted',
+                )}
+              >
+                <span
+                  className={cn(
+                    'inline-block h-4 w-4 transform rounded-full bg-background transition-transform',
+                    isMeeting ? 'translate-x-[18px]' : 'translate-x-0.5',
+                  )}
+                />
+              </div>
+            </button>
+
+            {isMeeting && (
+              <div className="space-y-2.5 pl-1 pr-1 pt-1">
+                {/* Attendees */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Users className="w-3 h-3" />
+                    參與者
+                  </label>
+                  <Input
+                    value={attendees}
+                    onChange={(e) => setAttendees(e.target.value)}
+                    placeholder="例：Alice、Bob、團隊全員"
+                    className="h-9"
+                  />
+                </div>
+
+                {/* Location */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <MapPin className="w-3 h-3" />
+                    地點
+                  </label>
+                  <Input
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="例：會議室 A / 線上"
+                    className="h-9"
+                  />
+                </div>
+
+                {/* Meeting URL */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Video className="w-3 h-3" />
+                    視訊連結
+                  </label>
+                  <Input
+                    type="url"
+                    value={meetingUrl}
+                    onChange={(e) => setMeetingUrl(e.target.value)}
+                    placeholder="https://zoom.us/j/..."
+                    className="h-9"
+                  />
+                  {(() => {
+                    const provider = detectMeetingProvider(meetingUrl)
+                    if (!provider) return null
+                    return (
+                      <div className="text-[10px] text-muted-foreground">
+                        已偵測：{MEETING_PROVIDER_LABEL[provider]}
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>
             )}

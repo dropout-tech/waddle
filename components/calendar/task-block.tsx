@@ -8,7 +8,8 @@ import {
   calculateBlockTop,
   formatTime,
 } from '@/lib/task-utils'
-import { Check, GripVertical, RefreshCw, Layers, Clock } from 'lucide-react'
+import { Check, GripVertical, RefreshCw, Layers, Clock, Users, Video } from 'lucide-react'
+import { detectMeetingProvider } from '@/lib/meeting-utils'
 
 // Touch input requires a long-press before any drag activates so the user
 // can scroll the calendar past tasks without accidentally moving them.
@@ -268,7 +269,14 @@ function TaskBlockImpl({
         cursor: isDragging ? 'grabbing' : 'grab',
       }
 
-  const ariaLabel = `${task.title}，${formatTime(task.scheduledStartTime!)} 到 ${formatTime(task.scheduledEndTime!)}${task.isCompleted ? '，已完成' : ''}`
+  // Meetings get a distinct visual: subtle diagonal-line wash over the
+  // base color + an inset ring for the "double border" look, and an icon
+  // overlay in the top-right (Video when a known URL is set, Users
+  // otherwise). The overall block color stays the same so workspace
+  // attribution still reads.
+  const meetingProvider = detectMeetingProvider(task.meetingUrl)
+  const meetingIcon = task.isMeeting ? (meetingProvider ? Video : Users) : null
+  const ariaLabel = `${task.isMeeting ? '會議 — ' : ''}${task.title}，${formatTime(task.scheduledStartTime!)} 到 ${formatTime(task.scheduledEndTime!)}${task.isCompleted ? '，已完成' : ''}`
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -295,10 +303,28 @@ function TaskBlockImpl({
           // it feel like the user picked it up off the calendar.
           ? 'shadow-2xl opacity-95 z-50 ring-2 ring-white/40 scale-[1.02] -rotate-1 transition-transform'
           : 'hover:shadow-lg hover:z-10 transition-all',
+        // Meeting-only: inset ring creates a "double border" feel against
+        // the workspace-colored background. Kept subtle so it reads as
+        // "different" rather than "loud".
+        task.isMeeting && !isDragging && 'ring-2 ring-inset ring-white/45',
         task.isCompleted && 'opacity-50'
       )}
       style={styleProps}
     >
+      {/* Meeting diagonal-stripe wash. Sits above the solid background but
+          below all content; pointer-events-none so it never eats clicks.
+          The pattern is intentionally low-contrast (~10% alpha) — it's a
+          texture cue, not a focal point. */}
+      {task.isMeeting && (
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(45deg, rgba(255,255,255,0.12) 0 6px, transparent 6px 14px)',
+          }}
+        />
+      )}
       {/* Resize handle — TOP. Larger touch target on mobile (the indicator
           stays small; the hit area expands invisibly). */}
       <div
@@ -415,6 +441,22 @@ function TaskBlockImpl({
       </div>
         )
       })()}
+
+      {/* Meeting badge — top-right corner. Always visible (unlike the grip
+          which only shows on hover) so a glance at the calendar tells you
+          which blocks are meetings vs regular tasks. Renders Video when a
+          known meeting URL is set, otherwise the generic Users icon. */}
+      {meetingIcon && (
+        <div
+          className="absolute top-1 right-1 z-[5] pointer-events-none flex items-center justify-center w-4 h-4 rounded-full bg-white/30 backdrop-blur-sm"
+          aria-hidden
+        >
+          {(() => {
+            const Icon = meetingIcon
+            return <Icon className="w-2.5 h-2.5 text-white" strokeWidth={2.5} />
+          })()}
+        </div>
+      )}
 
       {/* Grip icon — shows on hover (desktop) / always (mobile) to teach draggability */}
       <div className="absolute top-1/2 right-1 -translate-y-1/2 opacity-30 md:opacity-0 md:group-hover:opacity-40 transition-opacity pointer-events-none">

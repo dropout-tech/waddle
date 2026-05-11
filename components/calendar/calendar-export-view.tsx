@@ -76,6 +76,8 @@ interface ScheduledItem {
   notes?: string
   /** True for non-task time blocks; we render them with a softer style. */
   isBlock: boolean
+  /** Meeting tasks get a hatch overlay + icon badge in the export image. */
+  isMeeting: boolean
 }
 
 /**
@@ -113,6 +115,7 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
               title: t.title || '（未命名）',
               notes: t.notes,
               isBlock: false,
+              isMeeting: t.isMeeting === true,
             }
             const arr = byDate.get(t.scheduledDate) ?? []
             arr.push(item)
@@ -139,6 +142,7 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
             color: b.color,
             title: b.label,
             isBlock: true,
+            isMeeting: false,
           }
           const arr = byDate.get(date) ?? []
           arr.push(item)
@@ -400,8 +404,12 @@ function ItemBlock({
         height: height - 2,
         borderRadius: 8,
         backgroundColor: surfaceColor,
-        border: `1px solid ${item.color}${isDark ? '88' : '55'}`,
-        borderLeft: `3px solid ${item.color}`,
+        // Meeting blocks: thicker outer border to make them pop without
+        // changing the workspace color. Same hue, just bolder.
+        border: item.isMeeting
+          ? `2px solid ${item.color}${isDark ? 'bb' : '88'}`
+          : `1px solid ${item.color}${isDark ? '88' : '55'}`,
+        borderLeft: `${item.isMeeting ? 4 : 3}px solid ${item.color}`,
         boxShadow: isDark ? 'none' : `0 1px 2px rgba(0,0,0,0.04)`,
         overflow: 'hidden',
         padding: isShort ? '2px 6px' : '4px 8px',
@@ -419,6 +427,56 @@ function ItemBlock({
           pointerEvents: 'none',
         }}
       />
+
+      {/* Meeting-only: diagonal hatch pattern overlay so "this is a
+          meeting" reads at a glance even when the image is shared
+          downsized. Sits above the tint but below content. */}
+      {item.isMeeting && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            backgroundImage: `repeating-linear-gradient(45deg, ${item.color}${isDark ? '33' : '22'} 0 4px, transparent 4px 10px)`,
+          }}
+        />
+      )}
+
+      {/* Meeting-only: small icon badge in the top-right corner. Always
+          on, even when titles are hidden via privacy mode, because the
+          "this is a meeting" signal is more useful than not. */}
+      {item.isMeeting && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 4,
+            right: 4,
+            width: 14,
+            height: 14,
+            borderRadius: 7,
+            backgroundColor: item.color,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ffffff',
+            fontSize: 9,
+            fontWeight: 700,
+            lineHeight: 1,
+            zIndex: 1,
+          }}
+        >
+          {/* Tiny inline Users-icon approximation. Using SVG instead of a
+              lucide-react component because html-to-image's font-loading
+              path doesn't always pick up icon fonts cleanly; a hand-drawn
+              SVG renders identically every time. */}
+          <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        </div>
+      )}
       <div style={{ position: 'relative' }}>
         {options.showTitles ? (
           <>

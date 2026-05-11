@@ -61,6 +61,22 @@ export interface Task {
    * 依急迫程度) and only appears on the calendar. Used for recurring meetings
    * the user doesn't want cluttering the to-do list. Undefined ≡ true. */
   showInTaskList?: boolean
+  /**
+   * When true, this task is rendered as a meeting: distinct calendar
+   * block style, Users icon in the task list, and the attendees /
+   * location / meetingUrl fields are surfaced in the detail modal.
+   */
+  isMeeting?: boolean
+  /** Comma-separated names or free-form text. Optional. */
+  attendees?: string
+  /** Physical room or address. Optional. */
+  location?: string
+  /**
+   * Video conference URL. We auto-detect the provider (Zoom / Meet /
+   * Teams) at render time to pick the right icon — no schema change
+   * needed when a new provider is added.
+   */
+  meetingUrl?: string
   sortOrder: number
   createdAt: string
   updatedAt: string
