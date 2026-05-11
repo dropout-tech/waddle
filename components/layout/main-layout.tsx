@@ -309,6 +309,7 @@ export function MainLayout({
               <TaskPanel
                 workspaces={workspaces}
                 isExpanded={true}
+                keepCompletedTodayInList={settings?.keepCompletedTodayInList ?? true}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
                 onToggleComplete={onToggleComplete}
                 onSelectTask={onSelectTask}
@@ -484,6 +485,7 @@ export function MainLayout({
               <TaskPanel
                 workspaces={workspaces}
                 isExpanded={false}
+                keepCompletedTodayInList={settings?.keepCompletedTodayInList ?? true}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
                 onToggleComplete={onToggleComplete}
                 onSelectTask={onSelectTask}

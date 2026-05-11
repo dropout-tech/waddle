@@ -224,6 +224,11 @@ export function rowToSettings(
     // the migration so the app keeps working before the user re-runs schema.
     dayViewDays: row.day_view_days ?? fallbackSettings.dayViewDays,
     weekViewDays: row.week_view_days ?? fallbackSettings.weekViewDays,
+    // Migration 0007 — same graceful-fallback pattern. If the column is
+    // missing on the DB, we use the default (true) and surface the value
+    // from localStorage if it exists.
+    keepCompletedTodayInList:
+      row.keep_completed_today_in_list ?? fallbackSettings.keepCompletedTodayInList,
     weatherCity: row.weather_city,
     weatherUnit: row.weather_unit,
     lunchBreak: row.lunch_break as unknown as UserSettings['lunchBreak'],

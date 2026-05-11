@@ -137,6 +137,13 @@ export interface UserSettings {
   dayViewDays: number
   /** Week-mode visible days (5-7). Overview scope. */
   weekViewDays: number
+  /**
+   * When true (default), tasks completed today stay greyed-out in the
+   * main task list until the date rolls over. When false they vanish
+   * from the list as soon as they're completed. Either way they live
+   * in the "已完成" drawer keyed by completedAt.
+   */
+  keepCompletedTodayInList: boolean
   weatherCity: string
   weatherUnit: 'celsius' | 'fahrenheit'
   // Time block defaults

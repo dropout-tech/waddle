@@ -1,13 +1,15 @@
 'use client'
 
 import { useRef, useState, useMemo } from 'react'
-import { FolderTree, Clock, SlidersHorizontal, ChevronDown, AlertCircle } from 'lucide-react'
+import { FolderTree, Clock, SlidersHorizontal, ChevronDown, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
 import { PanelHeader } from './panel-header'
 import { WorkspaceSection } from './workspace-section'
 import { FilterBar, type FilterState } from './filter-bar'
 import { UnifiedTaskList } from './unified-task-list'
+import { CompletedTasksDrawer } from './completed-tasks-drawer'
 
 import { Button } from '@/components/ui/button'
 
@@ -24,6 +26,13 @@ const VIEW_MODE_LABEL: Record<ViewMode, string> = {
 interface TaskPanelProps {
   workspaces: Workspace[]
   isExpanded?: boolean
+  /**
+   * If true (the user setting default), tasks completed today stay
+   * greyed-out in the list until the date rolls over. If false they vanish
+   * from the list as soon as the user prompts complete; either way they
+   * stay reachable in the "已完成" drawer.
+   */
+  keepCompletedTodayInList?: boolean
   onToggleCategoryCollapse: (categoryId: string) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
@@ -46,6 +55,7 @@ interface TaskPanelProps {
 export function TaskPanel({
   workspaces,
   isExpanded = false,
+  keepCompletedTodayInList = true,
   onToggleCategoryCollapse,
   onToggleComplete,
   onSelectTask,
@@ -75,12 +85,37 @@ export function TaskPanel({
     return ['duration', 'date', 'time']
   })
   const [toolbarOpen, setToolbarOpen] = useState(false)
+  const [completedDrawerOpen, setCompletedDrawerOpen] = useState(false)
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     urgency: [],
     showCompleted: true,
     workspaceIds: [],
   })
+
+  // Recompute "today" once per render — cheap, and we don't need second
+  // precision. A user keeping the panel open across midnight will see
+  // yesterday's completed tasks slide out of the list on the next render
+  // (no special handling required).
+  const todayStr = useMemo(() => toDateString(new Date()), [])
+
+  // Total count of completed tasks across all workspaces — drives the
+  // "已完成 (N)" trigger badge. Built separately from filteredWorkspaces so
+  // the count never disappears when the filter bar is set to "hide
+  // completed" (it's the count for the drawer, not the inline list).
+  const totalCompleted = useMemo(() => {
+    let n = 0
+    for (const w of workspaces) {
+      if (w.isArchived) continue
+      for (const c of w.categories) {
+        if (c.isArchived) continue
+        for (const t of c.tasks) {
+          if (t.isCompleted) n++
+        }
+      }
+    }
+    return n
+  }, [workspaces])
 
   // Filter workspaces and tasks
   const filteredWorkspaces = useMemo(() => {
@@ -106,16 +141,26 @@ export function TaskPanel({
               if (filters.urgency.length > 0 && !filters.urgency.includes(task.urgency)) {
                 return false
               }
-              // Completed filter
-              if (!filters.showCompleted && task.isCompleted) {
-                return false
+              // Completed-task visibility: by default they all live in the
+              // "已完成" drawer, NOT inline with the active list. The
+              // exception is today's completions, which can stay greyed-out
+              // in place if the user has the setting on — handy for the
+              // "what did I get done today" glance without context-switching.
+              // The filter-bar showCompleted toggle is still respected as a
+              // hard hide-all-completed override.
+              if (task.isCompleted) {
+                if (!filters.showCompleted) return false
+                if (!keepCompletedTodayInList) return false
+                if (!task.completedAt) return false
+                const completedDay = task.completedAt.split('T')[0]
+                if (completedDay !== todayStr) return false
               }
               return true
             }),
           })),
       }))
       .sort((a, b) => a.sortOrder - b.sortOrder)
-  }, [workspaces, filters])
+  }, [workspaces, filters, keepCompletedTodayInList, todayStr])
 
   // Flatten all tasks for unified view
   const allFilteredTasks = useMemo(() => {
@@ -171,6 +216,25 @@ export function TaskPanel({
           onClosePanel={onClosePanel}
           onToggleExpand={onToggleExpand}
         />
+
+        {/* Completed-tasks entrypoint. Always visible above the toolbar so
+            the user can pop into the drawer regardless of how many tasks
+            they currently have on screen. Renders as a flat row with a
+            count badge and a right-chevron so it reads as "tap to enter". */}
+        <button
+          type="button"
+          onClick={() => setCompletedDrawerOpen(true)}
+          className="w-full flex items-center justify-between px-4 py-2 border-b border-border bg-card/50 hover:bg-muted/40 transition-colors group"
+        >
+          <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+            <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+            已完成
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary/15 text-primary text-[10px] font-semibold">
+              {totalCompleted}
+            </span>
+          </span>
+          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+        </button>
 
         {/* Toolbar Toggle Row */}
       <div className="border-b border-border bg-card/50">
@@ -296,6 +360,19 @@ export function TaskPanel({
       </div>
 
       </div>
+
+      {/* Completed-tasks drawer. Mounted at the panel root so the slide-in
+          animation lives outside the scroll container; the drawer itself
+          portals into <body>, so this just wires open/close. */}
+      <CompletedTasksDrawer
+        workspaces={workspaces}
+        isOpen={completedDrawerOpen}
+        onClose={() => setCompletedDrawerOpen(false)}
+        onSelectTask={(task) => {
+          setCompletedDrawerOpen(false)
+          onSelectTask(task)
+        }}
+      />
     </div>
   )
 }

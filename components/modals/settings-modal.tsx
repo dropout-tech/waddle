@@ -573,6 +573,24 @@ export function SettingsModal({
               />
             </label>
 
+            {/* Keep today's completed in list */}
+            <label className="flex items-center justify-between cursor-pointer">
+              <div className="flex-1 pr-4">
+                <div className="text-sm text-foreground">保留今日已完成任務</div>
+                <div className="text-xs text-muted-foreground">
+                  關掉的話，勾選完成後該任務馬上從列表消失（仍可在「已完成」中看到）
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={localSettings.keepCompletedTodayInList ?? true}
+                onChange={(e) =>
+                  setLocalSettings(prev => ({ ...prev, keepCompletedTodayInList: e.target.checked }))
+                }
+                className="w-4 h-4 rounded border-border accent-primary"
+              />
+            </label>
+
             {/* Default task duration */}
             <div className="flex items-center justify-between">
               <div>

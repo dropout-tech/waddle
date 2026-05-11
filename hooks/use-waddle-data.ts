@@ -32,6 +32,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   weekStartDay: 0,
   dayViewDays: 1,
   weekViewDays: 7,
+  keepCompletedTodayInList: true,
   weatherCity: 'Taipei',
   weatherUnit: 'celsius',
   lunchBreak: { enabled: true, startTime: '12:00', endTime: '13:00', color: '#F5F5F5' },
@@ -243,10 +244,10 @@ export function useWaddleData(): UseWaddleData {
         ? { ...rowToSettings(settingsRow, DEFAULT_SETTINGS), slotTypes: customSlotTypes }
         : { ...DEFAULT_SETTINGS, slotTypes: customSlotTypes }
 
-      // View-range fields fall back to localStorage when the DB doesn't
-      // have those columns yet (pre-migration-0006). DB takes precedence
-      // when the columns ARE present, so once the migration ships the
-      // localStorage copy becomes a no-op.
+      // Optional-column fallbacks: when the DB row pre-dates a migration
+      // and the column doesn't exist, hydrate from localStorage. DB takes
+      // precedence when the column IS present, so once the migration ships
+      // the localStorage copy effectively becomes a no-op.
       if (typeof window !== 'undefined') {
         const dbDay = (settingsRow as { day_view_days?: number } | null)?.day_view_days
         const dbWeek = (settingsRow as { week_view_days?: number } | null)?.week_view_days
@@ -260,6 +261,21 @@ export function useWaddleData(): UseWaddleData {
               }
               if (dbWeek === undefined && typeof parsed.weekViewDays === 'number') {
                 builtSettings.weekViewDays = parsed.weekViewDays
+              }
+            }
+          } catch {
+            /* ignore corrupt localStorage */
+          }
+        }
+
+        const dbKeep = settingsRow?.keep_completed_today_in_list
+        if (dbKeep === undefined) {
+          try {
+            const raw = window.localStorage.getItem('waddle-completed-pref-v1')
+            if (raw) {
+              const parsed = JSON.parse(raw) as { keepCompletedTodayInList?: boolean }
+              if (typeof parsed.keepCompletedTodayInList === 'boolean') {
+                builtSettings.keepCompletedTodayInList = parsed.keepCompletedTodayInList
               }
             }
           } catch {
@@ -979,9 +995,9 @@ export function useWaddleData(): UseWaddleData {
       default_task_colors: newSettings.defaultTaskColors as unknown as Json,
       notifications: newSettings.notifications as unknown as Json,
     }
-    // Always mirror view-range values to localStorage so they persist even
-    // if the DB rejects them (pre-migration) or only the local device
-    // updated. Load logic prefers DB → localStorage in that order.
+    // Always mirror view-range + completed-list values to localStorage so
+    // they persist even if the DB rejects them (pre-migration) or only the
+    // local device updated. Load logic prefers DB → localStorage in that order.
     if (typeof window !== 'undefined') {
       try {
         window.localStorage.setItem(
@@ -989,6 +1005,12 @@ export function useWaddleData(): UseWaddleData {
           JSON.stringify({
             dayViewDays: newSettings.dayViewDays,
             weekViewDays: newSettings.weekViewDays,
+          }),
+        )
+        window.localStorage.setItem(
+          'waddle-completed-pref-v1',
+          JSON.stringify({
+            keepCompletedTodayInList: newSettings.keepCompletedTodayInList,
           }),
         )
       } catch {
@@ -1000,13 +1022,15 @@ export function useWaddleData(): UseWaddleData {
       ...baseSettingsRow,
       day_view_days: newSettings.dayViewDays,
       week_view_days: newSettings.weekViewDays,
+      keep_completed_today_in_list: newSettings.keepCompletedTodayInList,
     })
     // PostgREST signals an unknown column with code PGRST204 / 42703 etc.
-    // Detect by message text — if it complains about either of the two
-    // migration-0006 columns, retry the upsert without them so the rest
-    // of the settings still save.
-    if (error && /day_view_days|week_view_days/.test(error.message ?? '')) {
-      console.warn('[settings] view-range columns missing — falling back to localStorage. Run migration 0006.', error)
+    // Detect by message text — if it complains about any migration-added
+    // column, retry the upsert without all of them so the rest of the
+    // settings still save. localStorage already mirrors the value so
+    // nothing is lost on the local device.
+    if (error && /day_view_days|week_view_days|keep_completed_today_in_list/.test(error.message ?? '')) {
+      console.warn('[settings] migration columns missing — falling back to localStorage. Run latest migration.', error)
       const retry = await supabase.from('user_settings').upsert(baseSettingsRow)
       error = retry.error
     }
