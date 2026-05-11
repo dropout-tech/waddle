@@ -82,6 +82,26 @@ export default function WaddlePage() {
   // selectedTask holds an in-memory draft until the user hits Save.
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [taskMode, setTaskMode] = useState<'edit' | 'create'>('edit')
+
+  // Modal task is derived live from workspaces so toggles (complete /
+  // uncomplete, edits) made through the modal reflect immediately. Before
+  // this, the modal used the snapshot in selectedTask and quickly drifted
+  // out of sync — clicking the checkbox once flipped the underlying state
+  // but the modal still showed the old value, so the next click read as
+  // "uncomplete" instead of a fresh "complete" (no chime). In create mode
+  // selectedTask is a draft not yet in workspaces, so we keep it as-is.
+  const liveSelectedTask = useMemo<Task | null>(() => {
+    if (!selectedTask) return null
+    if (taskMode === 'create') return selectedTask
+    for (const w of workspaces) {
+      for (const c of w.categories) {
+        for (const t of c.tasks) {
+          if (t.id === selectedTask.id) return t
+        }
+      }
+    }
+    return selectedTask
+  }, [selectedTask, workspaces, taskMode])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [selectedTimeBlock, setSelectedTimeBlock] = useState<TimeBlock | null>(null)
 
@@ -340,12 +360,12 @@ export default function WaddlePage() {
         onTimeBlockSelect={handleSelectTimeBlock}
       />
 
-      {selectedTask && (
+      {liveSelectedTask && (
         <TaskDetailModal
-          task={selectedTask}
+          task={liveSelectedTask}
           mode={taskMode}
           workspaces={workspaces}
-          isOpen={!!selectedTask}
+          isOpen={!!liveSelectedTask}
           onClose={() => setSelectedTask(null)}
           onSave={handleSaveTask}
           onToggleComplete={taskMode === 'edit' ? toggleTaskComplete : undefined}
