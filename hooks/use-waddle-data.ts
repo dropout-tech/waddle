@@ -20,6 +20,7 @@ import type {
   Task,
   TimeBlock,
   UserSettings,
+  ScratchpadItem,
 } from '@/lib/types'
 
 // ─────────────────────────────────────────────────────────
@@ -159,6 +160,13 @@ interface UseWaddleData {
    * every add/edit/delete from the bar.
    */
   setQuickLinks: (next: import('@/lib/types').QuickLink[]) => Promise<void>
+  // Scratchpad (focus board). Items are stored per-date in the DB so
+  // history navigation works across devices; the localStorage-only
+  // implementation it replaced lost everything on a browser switch.
+  scratchpadByDate: Record<string, ScratchpadItem[]>
+  addScratchpadItem: (date: string, item: ScratchpadItem) => Promise<void>
+  deleteScratchpadItem: (id: string) => Promise<void>
+  clearScratchpadDate: (date: string) => Promise<void>
 }
 
 export function useWaddleData(): UseWaddleData {
@@ -166,6 +174,7 @@ export function useWaddleData(): UseWaddleData {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([])
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
+  const [scratchpadByDate, setScratchpadByDate] = useState<Record<string, ScratchpadItem[]>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [onboardingCompleted, setOnboardingCompleted] = useState(true)
   const userIdRef = useRef<string | null>(null)
@@ -357,10 +366,95 @@ export function useWaddleData(): UseWaddleData {
         }
       }
 
+      // Scratchpad items — fetched flat then grouped by date for the
+      // focus-board UI. One-time localStorage migration: if the user has
+      // legacy `scratchpad-YYYY-MM-DD` keys and the cloud row count for
+      // that date is 0, we push them up and remove the keys so the next
+      // device sees them too.
+      const { data: scratchRows } = await supabase
+        .from('scratchpad_items')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      const builtScratchpad: Record<string, ScratchpadItem[]> = {}
+      for (const r of scratchRows ?? []) {
+        const item: ScratchpadItem = {
+          id: r.id,
+          type: r.type,
+          content: r.content,
+          title: r.title ?? undefined,
+          createdAt: r.created_at,
+        }
+        ;(builtScratchpad[r.date] ??= []).push(item)
+      }
+
+      if (initial && typeof window !== 'undefined') {
+        const MIGRATED_KEY = 'waddle-scratchpad-migrated-v1'
+        const alreadyMigrated = window.localStorage.getItem(MIGRATED_KEY) === '1'
+        if (!alreadyMigrated) {
+          // created_at is server-defaulted (Insert type forbids it), so
+          // legacy items will get a fresh timestamp at migration time
+          // rather than their original ones. The items themselves
+          // survive — only the relative ordering within a day changes.
+          const legacyRows: { id: string; user_id: string; date: string; type: 'text' | 'image' | 'link'; content: string; title: string | null }[] = []
+          const legacyKeys: string[] = []
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i)
+            if (!key?.startsWith('scratchpad-')) continue
+            const date = key.replace('scratchpad-', '')
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
+            // Skip dates that already have cloud rows so we don't double-insert.
+            if (builtScratchpad[date]?.length) continue
+            try {
+              const parsed = JSON.parse(window.localStorage.getItem(key) ?? '[]') as ScratchpadItem[]
+              for (const it of parsed) {
+                legacyRows.push({
+                  id: it.id,
+                  user_id: user.id,
+                  date,
+                  type: it.type,
+                  content: it.content,
+                  title: it.title ?? null,
+                })
+              }
+              legacyKeys.push(key)
+            } catch {
+              /* ignore corrupt localStorage entry */
+            }
+          }
+          if (legacyRows.length > 0) {
+            const { error: migErr } = await supabase
+              .from('scratchpad_items')
+              .insert(legacyRows)
+            if (migErr) {
+              console.warn('[scratchpad] localStorage migration failed — will retry next load', migErr)
+            } else {
+              const nowIso = new Date().toISOString()
+              for (const r of legacyRows) {
+                const item: ScratchpadItem = {
+                  id: r.id,
+                  type: r.type,
+                  content: r.content,
+                  title: r.title ?? undefined,
+                  createdAt: nowIso,
+                }
+                ;(builtScratchpad[r.date] ??= []).push(item)
+              }
+              for (const k of legacyKeys) window.localStorage.removeItem(k)
+              window.localStorage.setItem(MIGRATED_KEY, '1')
+            }
+          } else {
+            // Nothing to migrate; mark complete so we don't scan again.
+            window.localStorage.setItem(MIGRATED_KEY, '1')
+          }
+        }
+      }
+
       if (isStale()) return
       setWorkspaces(builtWorkspaces)
       setTimeBlocks(builtTimeBlocks)
       setSettings(builtSettings)
+      setScratchpadByDate(builtScratchpad)
       if (initial) {
         setOnboardingCompleted(settingsRow?.onboarding_completed ?? true)
         setIsLoading(false)
@@ -1259,10 +1353,15 @@ export function useWaddleData(): UseWaddleData {
 
     pendingWritesRef.current += 1
     try {
+      // Upsert (not update) — the row is normally created by the
+      // `handle_new_user` trigger, but defensively upserting means a
+      // missing row never silently swallows the user's links.
       let { error } = await supabase
         .from('user_settings')
-        .update({ quick_links: next as unknown as Json })
-        .eq('user_id', userId)
+        .upsert(
+          { user_id: userId, quick_links: next as unknown as Json },
+          { onConflict: 'user_id' },
+        )
       if (error && isMissingSettingsExtColumnError(error)) {
         settingsExtColsKnownMissing = true
         console.warn('[setQuickLinks] quick_links column missing — kept in localStorage only. Run migration 0009.', error)
@@ -1270,6 +1369,103 @@ export function useWaddleData(): UseWaddleData {
         return
       }
       if (error) handleDbError('儲存常用連結')(error)
+    } finally {
+      pendingWritesRef.current -= 1
+    }
+  }, [supabase])
+
+  // ═════════════════════════════════════════════════════
+  // Scratchpad mutations
+  // ═════════════════════════════════════════════════════
+
+  const addScratchpadItem = useCallback(async (date: string, item: ScratchpadItem) => {
+    const userId = requireUserId()
+    setScratchpadByDate((prev) => ({
+      ...prev,
+      [date]: [item, ...(prev[date] ?? [])],
+    }))
+    pendingWritesRef.current += 1
+    try {
+      // created_at is server-defaulted (Insert type omits it); the
+      // optimistic state above keeps the client-generated timestamp so
+      // the new item slots into the list at the right spot until the
+      // next refetch reconciles with the server-stamped row.
+      const { error } = await supabase.from('scratchpad_items').insert({
+        id: item.id,
+        user_id: userId,
+        date,
+        type: item.type,
+        content: item.content,
+        title: item.title ?? null,
+      })
+      if (error) {
+        // Roll back the optimistic insert so the UI matches reality
+        // instead of showing a phantom item that vanishes on refetch.
+        setScratchpadByDate((prev) => ({
+          ...prev,
+          [date]: (prev[date] ?? []).filter((i) => i.id !== item.id),
+        }))
+        handleDbError('儲存白板')(error)
+      }
+    } finally {
+      pendingWritesRef.current -= 1
+    }
+  }, [supabase])
+
+  const deleteScratchpadItem = useCallback(async (id: string) => {
+    let removedFromDate: string | null = null
+    let removedItem: ScratchpadItem | null = null
+    setScratchpadByDate((prev) => {
+      const next: Record<string, ScratchpadItem[]> = {}
+      for (const [date, items] of Object.entries(prev)) {
+        const found = items.find((i) => i.id === id)
+        if (found) {
+          removedFromDate = date
+          removedItem = found
+          next[date] = items.filter((i) => i.id !== id)
+        } else {
+          next[date] = items
+        }
+      }
+      return next
+    })
+    pendingWritesRef.current += 1
+    try {
+      const { error } = await supabase.from('scratchpad_items').delete().eq('id', id)
+      if (error) {
+        if (removedFromDate && removedItem) {
+          setScratchpadByDate((prev) => ({
+            ...prev,
+            [removedFromDate!]: [removedItem!, ...(prev[removedFromDate!] ?? [])],
+          }))
+        }
+        handleDbError('刪除白板項目')(error)
+      }
+    } finally {
+      pendingWritesRef.current -= 1
+    }
+  }, [supabase])
+
+  const clearScratchpadDate = useCallback(async (date: string) => {
+    const userId = requireUserId()
+    let snapshot: ScratchpadItem[] = []
+    setScratchpadByDate((prev) => {
+      snapshot = prev[date] ?? []
+      const next = { ...prev }
+      delete next[date]
+      return next
+    })
+    pendingWritesRef.current += 1
+    try {
+      const { error } = await supabase
+        .from('scratchpad_items')
+        .delete()
+        .eq('user_id', userId)
+        .eq('date', date)
+      if (error) {
+        setScratchpadByDate((prev) => ({ ...prev, [date]: snapshot }))
+        handleDbError('清空白板')(error)
+      }
     } finally {
       pendingWritesRef.current -= 1
     }
@@ -1410,6 +1606,10 @@ export function useWaddleData(): UseWaddleData {
     deleteTimeBlock,
     saveSettings,
     setQuickLinks,
+    scratchpadByDate,
+    addScratchpadItem,
+    deleteScratchpadItem,
+    clearScratchpadDate,
   }
 }
 

@@ -15,7 +15,7 @@ import { ErrorBoundary } from '@/components/error-boundary'
 import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
-import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink } from '@/lib/types'
+import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, ScratchpadItem } from '@/lib/types'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
 import { Link2 } from 'lucide-react'
 
@@ -48,6 +48,11 @@ interface MainLayoutProps {
   onTimeBlockSelect?: (block: TimeBlock) => void
   /** Narrow mutation for the quick-links bar (separate from saveSettings). */
   onSetQuickLinks?: (next: QuickLink[]) => void
+  // Scratchpad — DB-backed; per-date map plus narrow mutations.
+  scratchpadByDate?: Record<string, ScratchpadItem[]>
+  onAddScratchpadItem?: (date: string, item: ScratchpadItem) => void
+  onDeleteScratchpadItem?: (id: string) => void
+  onClearScratchpadDate?: (date: string) => void
 }
 
 const MIN_PANEL_WIDTH = 280
@@ -82,6 +87,10 @@ export function MainLayout({
   onDeleteTimeBlock,
   onTimeBlockSelect,
   onSetQuickLinks,
+  scratchpadByDate,
+  onAddScratchpadItem,
+  onDeleteScratchpadItem,
+  onClearScratchpadDate,
 }: MainLayoutProps) {
   const isMobile = useIsMobile()
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
@@ -266,6 +275,10 @@ export function MainLayout({
           isOpen={mobileScratchpadOpen}
           onOpenChange={setMobileScratchpadOpen}
           hideTrigger
+          scratchpadByDate={scratchpadByDate ?? {}}
+          onAddItem={onAddScratchpadItem ?? (() => {})}
+          onDeleteItem={onDeleteScratchpadItem ?? (() => {})}
+          onClearDate={onClearScratchpadDate ?? (() => {})}
         />
 
         {/* Quick-links overlay — same pull-sheet pattern as scratchpad
@@ -503,7 +516,12 @@ export function MainLayout({
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden relative">
       {/* Focus Scratchpad - Pull down from top */}
-      <FocusScratchpad />
+      <FocusScratchpad
+        scratchpadByDate={scratchpadByDate ?? {}}
+        onAddItem={onAddScratchpadItem ?? (() => {})}
+        onDeleteItem={onDeleteScratchpadItem ?? (() => {})}
+        onClearDate={onClearScratchpadDate ?? (() => {})}
+      />
 
       <div className="flex flex-1 min-h-0 relative">
       {/* Left Panel Toggle Button (when panel is closed) */}

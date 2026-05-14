@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { 
   ChevronDown, ChevronUp, X, Image, Link2, Type, 
   Trash2, ExternalLink, Calendar, Sparkles, ChevronLeft, ChevronRight
@@ -20,24 +20,24 @@ interface FocusScratchpadProps {
   onOpenChange?: (open: boolean) => void
   /** Hide the built-in pull-down trigger (mobile uses an external button). */
   hideTrigger?: boolean
+  // Cloud-synced scratchpad — see useWaddleData. Keyed by YYYY-MM-DD.
+  // Items within each date are already sorted newest-first by the loader.
+  scratchpadByDate: Record<string, ScratchpadItem[]>
+  onAddItem: (date: string, item: ScratchpadItem) => void
+  onDeleteItem: (id: string) => void
+  onClearDate: (date: string) => void
 }
 
-// Get all saved scratchpad dates from localStorage
-function getSavedDates(): string[] {
-  const dates: string[] = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key?.startsWith('scratchpad-')) {
-      const date = key.replace('scratchpad-', '')
-      if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        dates.push(date)
-      }
-    }
-  }
-  return dates.sort().reverse() // Most recent first
-}
-
-export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }: FocusScratchpadProps) {
+export function FocusScratchpad({
+  className,
+  isOpen,
+  onOpenChange,
+  hideTrigger,
+  scratchpadByDate,
+  onAddItem,
+  onDeleteItem,
+  onClearDate,
+}: FocusScratchpadProps) {
   const todayKey = toDateString(new Date())
   const [internalExpanded, setInternalExpanded] = useState(false)
   // Controlled when isOpen is provided; otherwise fall back to internal state.
@@ -51,8 +51,6 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
     }
   }
   const [selectedDate, setSelectedDate] = useState(todayKey)
-  const [items, setItems] = useState<ScratchpadItem[]>([])
-  const [savedDates, setSavedDates] = useState<string[]>([])
   const [inputMode, setInputMode] = useState<'text' | 'image' | 'link' | null>(null)
   const [textInput, setTextInput] = useState('')
   const [linkInput, setLinkInput] = useState('')
@@ -72,36 +70,20 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
     return `${year}年${month}月${day}日 星期${weekday}`
   }
 
-  // Load saved dates list
-  useEffect(() => {
-    setSavedDates(getSavedDates())
-  }, [isExpanded])
-
-  // Load items for selected date
-  useEffect(() => {
-    const saved = localStorage.getItem(`scratchpad-${selectedDate}`)
-    if (saved) {
-      try {
-        setItems(JSON.parse(saved))
-      } catch (e) {
-        console.error('Failed to parse scratchpad data')
-        setItems([])
-      }
-    } else {
-      setItems([])
-    }
-  }, [selectedDate])
-
-  // Save items to localStorage (only for today)
-  useEffect(() => {
-    if (isToday && items.length > 0) {
-      localStorage.setItem(`scratchpad-${todayKey}`, JSON.stringify(items))
-      // Update saved dates if needed
-      if (!savedDates.includes(todayKey)) {
-        setSavedDates(prev => [todayKey, ...prev])
-      }
-    }
-  }, [items, isToday, todayKey, savedDates])
+  // Derived from cloud-synced props. Memoized so the dependency stays
+  // stable across renders where nothing on this date actually changed.
+  const items = useMemo(
+    () => scratchpadByDate[selectedDate] ?? [],
+    [scratchpadByDate, selectedDate],
+  )
+  const savedDates = useMemo(
+    () =>
+      Object.keys(scratchpadByDate)
+        .filter((d) => (scratchpadByDate[d]?.length ?? 0) > 0)
+        .sort()
+        .reverse(),
+    [scratchpadByDate],
+  )
 
   // Navigate between dates
   const goToPreviousDate = () => {
@@ -138,7 +120,7 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
       content: textInput.trim(),
       createdAt: new Date().toISOString(),
     }
-    setItems(prev => [newItem, ...prev])
+    onAddItem(todayKey, newItem)
     setTextInput('')
     setInputMode(null)
   }
@@ -156,7 +138,7 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
       title: linkTitle.trim() || url,
       createdAt: new Date().toISOString(),
     }
-    setItems(prev => [newItem, ...prev])
+    onAddItem(todayKey, newItem)
     setLinkInput('')
     setLinkTitle('')
     setInputMode(null)
@@ -177,7 +159,7 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
           content: reader.result as string,
           createdAt: new Date().toISOString(),
         }
-        setItems(prev => [newItem, ...prev])
+        onAddItem(todayKey, newItem)
         setInputMode(null)
       }
       reader.readAsDataURL(file)
@@ -188,6 +170,11 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
   }
 
   const handlePaste = async (e: React.ClipboardEvent) => {
+    // The quick-add buttons hide on past-date views, but the panel-level
+    // paste listener is always attached. Gating here matches the button
+    // behavior — otherwise a paste while browsing yesterday silently
+    // writes to today and the new item appears to vanish.
+    if (!isToday) return
     const items_data = e.clipboardData.items
     for (const item of items_data) {
       if (item.type.startsWith('image/')) {
@@ -202,7 +189,7 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
               content: reader.result as string,
               createdAt: new Date().toISOString(),
             }
-            setItems(prev => [newItem, ...prev])
+            onAddItem(todayKey, newItem)
           }
           reader.readAsDataURL(file)
         }
@@ -214,7 +201,8 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
-    
+    if (!isToday) return
+
     const files = e.dataTransfer.files
     if (files.length > 0 && files[0].type.startsWith('image/')) {
       const file = files[0]
@@ -230,19 +218,19 @@ export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger }
           content: reader.result as string,
           createdAt: new Date().toISOString(),
         }
-        setItems(prev => [newItem, ...prev])
+        onAddItem(todayKey, newItem)
       }
       reader.readAsDataURL(file)
     }
   }
 
   const deleteItem = (id: string) => {
-    setItems(prev => prev.filter(item => item.id !== id))
+    onDeleteItem(id)
   }
 
   const clearAll = () => {
     if (confirm('確定要清除所有暫存內容嗎？')) {
-      setItems([])
+      onClearDate(todayKey)
     }
   }
 

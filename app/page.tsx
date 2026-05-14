@@ -49,6 +49,10 @@ export default function WaddlePage() {
     deleteTimeBlock,
     saveSettings,
     setQuickLinks,
+    scratchpadByDate,
+    addScratchpadItem,
+    deleteScratchpadItem,
+    clearScratchpadDate,
   } = useWaddleData()
 
   // Watch all meetings and fire browser notifications N minutes before
@@ -360,6 +364,10 @@ export default function WaddlePage() {
         onDeleteTimeBlock={deleteTimeBlock}
         onTimeBlockSelect={handleSelectTimeBlock}
         onSetQuickLinks={setQuickLinks}
+        scratchpadByDate={scratchpadByDate}
+        onAddScratchpadItem={addScratchpadItem}
+        onDeleteScratchpadItem={deleteScratchpadItem}
+        onClearScratchpadDate={clearScratchpadDate}
       />
 
       {liveSelectedTask && (

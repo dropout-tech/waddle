@@ -64,6 +64,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
 | 0006 | `user_settings.day_view_days / week_view_days` |
 | 0007 | `user_settings.keep_completed_today_in_list` + `tasks.completed_at` 回填 |
 | 0008 | `tasks.is_meeting / attendees / location / meeting_url` |
+| 0009 | `user_settings.quick_links`（pinned 常用連結 JSONB） |
 
 App 對新欄位 missing 有 graceful fallback（偵測 PGRST204 / 42703 自動降級），所以 migration 落後不會 hard-crash，但會走 localStorage / 預設值。
 
@@ -124,6 +125,7 @@ Workspace ─┬─ Category ─── Task ─── (is_meeting? → attendees
 TimeBlock          # 非任務時段（午休、緩衝、專注）
 SlotType           # 可自訂的時間區塊類別系統，可 parent → workspace
 UserSettings       # 視圖範圍、calendar hour range、通知偏好、slot types、會議提醒（localStorage）
+ScratchpadItem     # 焦點白板項目（text/image/link），依 date 分組，雲端同步
 ```
 
 ## 開發須知
@@ -134,3 +136,4 @@ UserSettings       # 視圖範圍、calendar hour range、通知偏好、slot ty
 - 跨檔案的 workspace 樹狀走訪用 [lib/task-utils.ts](lib/task-utils.ts) 的 `forEachTask / findTaskById / filterTasks`，不要自己寫 nested for
 - 部署到 Zeabur，`pnpm install --no-optional` 跳過 ESLint dependency tree（lint 走 optionalDependencies）
 - 新增功能時記得同步更新 [components/onboarding-tour.tsx](components/onboarding-tour.tsx) 的 spotlight steps
+- 白板（scratchpad）走 `scratchpad_items` 雲端表；首次載入會自動把舊 localStorage `scratchpad-YYYY-MM-DD` 鍵搬遷上去（一次性，記在 `waddle-scratchpad-migrated-v1` flag）。常用連結用 upsert 寫 `user_settings.quick_links`，避免 row 缺失時 silently 0-rows。
