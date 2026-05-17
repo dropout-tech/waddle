@@ -539,15 +539,20 @@ export function useWaddleData(): UseWaddleData {
       },
     ])
 
-    const { error: e1 } = await supabase.from('workspaces').insert({
-      id: wsId, user_id: userId, name, color, icon, sort_order: workspaces.length,
-    })
-    if (e1) return handleDbError('新增工作區')(e1)
+    pendingWritesRef.current += 1
+    try {
+      const { error: e1 } = await supabase.from('workspaces').insert({
+        id: wsId, user_id: userId, name, color, icon, sort_order: workspaces.length,
+      })
+      if (e1) return handleDbError('新增工作區')(e1)
 
-    const { error: e2 } = await supabase.from('categories').insert({
-      id: catId, user_id: userId, workspace_id: wsId, name: '一般', sort_order: 0,
-    })
-    if (e2) handleDbError('新增分類')(e2)
+      const { error: e2 } = await supabase.from('categories').insert({
+        id: catId, user_id: userId, workspace_id: wsId, name: '一般', sort_order: 0,
+      })
+      if (e2) handleDbError('新增分類')(e2)
+    } finally {
+      pendingWritesRef.current -= 1
+    }
   }, [supabase, workspaces.length])
 
   const updateWorkspace = useCallback(async (
@@ -581,16 +586,21 @@ export function useWaddleData(): UseWaddleData {
     if (updates.color !== undefined) dbUpdates.color = updates.color
     if (updates.icon !== undefined) dbUpdates.icon = updates.icon
 
-    const { error } = await supabase.from('workspaces').update(dbUpdates).eq('id', workspaceId)
-    if (error) return handleDbError('更新工作區')(error)
+    pendingWritesRef.current += 1
+    try {
+      const { error } = await supabase.from('workspaces').update(dbUpdates).eq('id', workspaceId)
+      if (error) return handleDbError('更新工作區')(error)
 
-    // If color changed, cascade calendar_color on matching tasks
-    if (updates.color !== undefined && oldColor && updates.color !== oldColor) {
-      await supabase
-        .from('tasks')
-        .update({ calendar_color: updates.color })
-        .eq('workspace_id', workspaceId)
-        .eq('calendar_color', oldColor)
+      // If color changed, cascade calendar_color on matching tasks
+      if (updates.color !== undefined && oldColor && updates.color !== oldColor) {
+        await supabase
+          .from('tasks')
+          .update({ calendar_color: updates.color })
+          .eq('workspace_id', workspaceId)
+          .eq('calendar_color', oldColor)
+      }
+    } finally {
+      pendingWritesRef.current -= 1
     }
   }, [supabase])
 
@@ -602,17 +612,27 @@ export function useWaddleData(): UseWaddleData {
     setWorkspaces((prev) =>
       prev.map((w) => (w.id === workspaceId ? { ...w, isArchived: true } : w))
     )
-    const { error } = await supabase
-      .from('workspaces')
-      .update({ is_archived: true })
-      .eq('id', workspaceId)
-    if (error) handleDbError('封存工作區')(error)
+    pendingWritesRef.current += 1
+    try {
+      const { error } = await supabase
+        .from('workspaces')
+        .update({ is_archived: true })
+        .eq('id', workspaceId)
+      if (error) handleDbError('封存工作區')(error)
+    } finally {
+      pendingWritesRef.current -= 1
+    }
   }, [supabase])
 
   const deleteWorkspace = useCallback(async (workspaceId: string) => {
     setWorkspaces((prev) => prev.filter((w) => w.id !== workspaceId))
-    const { error } = await supabase.from('workspaces').delete().eq('id', workspaceId)
-    if (error) handleDbError('刪除工作區')(error)
+    pendingWritesRef.current += 1
+    try {
+      const { error } = await supabase.from('workspaces').delete().eq('id', workspaceId)
+      if (error) handleDbError('刪除工作區')(error)
+    } finally {
+      pendingWritesRef.current -= 1
+    }
   }, [supabase])
 
   // ═════════════════════════════════════════════════════
@@ -641,10 +661,15 @@ export function useWaddleData(): UseWaddleData {
       })
     )
 
-    const { error } = await supabase.from('categories').insert({
-      id, user_id: userId, workspace_id: workspaceId, name, sort_order: sortOrder,
-    })
-    if (error) handleDbError('新增分類')(error)
+    pendingWritesRef.current += 1
+    try {
+      const { error } = await supabase.from('categories').insert({
+        id, user_id: userId, workspace_id: workspaceId, name, sort_order: sortOrder,
+      })
+      if (error) handleDbError('新增分類')(error)
+    } finally {
+      pendingWritesRef.current -= 1
+    }
   }, [supabase])
 
   const deleteCategory = useCallback(async (categoryId: string) => {
@@ -654,9 +679,14 @@ export function useWaddleData(): UseWaddleData {
         categories: w.categories.filter((c) => c.id !== categoryId),
       }))
     )
-    // Tasks in this category cascade-delete via the FK in the schema.
-    const { error } = await supabase.from('categories').delete().eq('id', categoryId)
-    if (error) handleDbError('刪除分類')(error)
+    pendingWritesRef.current += 1
+    try {
+      // Tasks in this category cascade-delete via the FK in the schema.
+      const { error } = await supabase.from('categories').delete().eq('id', categoryId)
+      if (error) handleDbError('刪除分類')(error)
+    } finally {
+      pendingWritesRef.current -= 1
+    }
   }, [supabase])
 
   const toggleCategoryCollapse = useCallback(async (categoryId: string) => {
@@ -672,11 +702,16 @@ export function useWaddleData(): UseWaddleData {
       }))
     )
 
-    const { error } = await supabase
-      .from('categories')
-      .update({ is_collapsed: nextValue })
-      .eq('id', categoryId)
-    if (error) handleDbError('切換分類折疊')(error)
+    pendingWritesRef.current += 1
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .update({ is_collapsed: nextValue })
+        .eq('id', categoryId)
+      if (error) handleDbError('切換分類折疊')(error)
+    } finally {
+      pendingWritesRef.current -= 1
+    }
   }, [supabase])
 
   // ═════════════════════════════════════════════════════
@@ -717,11 +752,16 @@ export function useWaddleData(): UseWaddleData {
 
     if (!workspaceId) return // category not found
 
-    const { error } = await supabase.from('tasks').insert({
-      id, user_id: userId, workspace_id: workspaceId, category_id: categoryId,
-      title, urgency: 5, calendar_color: workspaceColor, sort_order: sortOrder,
-    })
-    if (error) handleDbError('新增任務')(error)
+    pendingWritesRef.current += 1
+    try {
+      const { error } = await supabase.from('tasks').insert({
+        id, user_id: userId, workspace_id: workspaceId, category_id: categoryId,
+        title, urgency: 5, calendar_color: workspaceColor, sort_order: sortOrder,
+      })
+      if (error) handleDbError('新增任務')(error)
+    } finally {
+      pendingWritesRef.current -= 1
+    }
   }, [supabase])
 
   /**
@@ -760,19 +800,24 @@ export function useWaddleData(): UseWaddleData {
       }
       return base
     }
-    let { error } = await supabase
-      .from('tasks')
-      .insert(buildPayload(meetingColsKnownMissing))
-    // Pre-migration-0008 fallback: retry without meeting columns once we
-    // detect the column is unknown, then latch the flag for the rest of
-    // the session.
-    if (error && isMissingMeetingColumnError(error)) {
-      meetingColsKnownMissing = true
-      console.warn('[createTask] meeting columns missing — falling back. Run migration 0008.', error)
-      const retry = await supabase.from('tasks').insert(buildPayload(true))
-      error = retry.error
+    pendingWritesRef.current += 1
+    try {
+      let { error } = await supabase
+        .from('tasks')
+        .insert(buildPayload(meetingColsKnownMissing))
+      // Pre-migration-0008 fallback: retry without meeting columns once we
+      // detect the column is unknown, then latch the flag for the rest of
+      // the session.
+      if (error && isMissingMeetingColumnError(error)) {
+        meetingColsKnownMissing = true
+        console.warn('[createTask] meeting columns missing — falling back. Run migration 0008.', error)
+        const retry = await supabase.from('tasks').insert(buildPayload(true))
+        error = retry.error
+      }
+      if (error) handleDbError('建立任務')(error)
+    } finally {
+      pendingWritesRef.current -= 1
     }
-    if (error) handleDbError('建立任務')(error)
   }, [supabase])
 
   const updateTask = useCallback(async (
@@ -849,36 +894,45 @@ export function useWaddleData(): UseWaddleData {
     })
 
     const dbUpdates = taskToRow(updates)
-    if (isMove && newCategoryId) {
-      dbUpdates.category_id = newCategoryId
-      // Find the workspace_id for the new category from local state
-      // (the move already happened in setWorkspaces above so we just re-resolve)
-      // Note: we can't read workspaces here because closures capture old value;
-      // so instead let Supabase enforce via FK and update both fields.
-      const { data: catRow } = await supabase
-        .from('categories')
-        .select('workspace_id')
-        .eq('id', newCategoryId)
-        .maybeSingle()
-      if (catRow) dbUpdates.workspace_id = catRow.workspace_id
-    }
 
-    const runUpdate = (strip: boolean) =>
-      supabase
-        .from('tasks')
-        .update(strip ? stripMeetingCols(dbUpdates) : dbUpdates)
-        .eq('id', taskId)
-    let { error } = await runUpdate(meetingColsKnownMissing)
-    if (error && isMissingMeetingColumnError(error)) {
-      meetingColsKnownMissing = true
-      console.warn('[updateTask] meeting columns missing — falling back. Run migration 0008.', error)
-      const retry = await runUpdate(true)
-      error = retry.error
+    pendingWritesRef.current += 1
+    try {
+      if (isMove && newCategoryId) {
+        dbUpdates.category_id = newCategoryId
+        // Find the workspace_id for the new category from local state
+        // (the move already happened in setWorkspaces above so we just re-resolve)
+        // Note: we can't read workspaces here because closures capture old value;
+        // so instead let Supabase enforce via FK and update both fields.
+        const { data: catRow } = await supabase
+          .from('categories')
+          .select('workspace_id')
+          .eq('id', newCategoryId)
+          .maybeSingle()
+        if (catRow) dbUpdates.workspace_id = catRow.workspace_id
+      }
+
+      const runUpdate = (strip: boolean) =>
+        supabase
+          .from('tasks')
+          .update(strip ? stripMeetingCols(dbUpdates) : dbUpdates)
+          .eq('id', taskId)
+      let { error } = await runUpdate(meetingColsKnownMissing)
+      if (error && isMissingMeetingColumnError(error)) {
+        meetingColsKnownMissing = true
+        console.warn('[updateTask] meeting columns missing — falling back. Run migration 0008.', error)
+        const retry = await runUpdate(true)
+        error = retry.error
+      }
+      if (error) handleDbError('更新任務')(error)
+    } finally {
+      pendingWritesRef.current -= 1
     }
-    if (error) handleDbError('更新任務')(error)
   }, [supabase])
 
   const toggleTaskComplete = useCallback(async (taskId: string) => {
+    // Capture the previous state so we can roll back on a silent failure.
+    let previousCompleted: boolean | undefined
+    let previousCompletedAt: string | undefined
     let nextValue = false
     let completedAt: string | null = null
     setWorkspaces((prev) =>
@@ -888,6 +942,8 @@ export function useWaddleData(): UseWaddleData {
           ...c,
           tasks: c.tasks.map((t) => {
             if (t.id !== taskId) return t
+            previousCompleted = t.isCompleted
+            previousCompletedAt = t.completedAt
             nextValue = !t.isCompleted
             completedAt = nextValue ? new Date().toISOString() : null
             return {
@@ -904,28 +960,56 @@ export function useWaddleData(): UseWaddleData {
     // feels instant. Only on the off→on transition; un-completing is silent.
     if (nextValue) playTaskCompleteSound()
 
-    // Use .select() so PostgREST returns the affected rows. If RLS silently
-    // blocks the update (auth.uid() mismatch / expired JWT) PostgREST returns
-    // an empty array with no error — that's the bug pattern we're hunting.
-    const { data, error } = await supabase
-      .from('tasks')
-      .update({ is_completed: nextValue, completed_at: completedAt })
-      .eq('id', taskId)
-      .select('id, is_completed, user_id')
-    if (error) {
-      console.error('[toggleTaskComplete] supabase error', { taskId, error })
-      handleDbError('切換任務狀態')(error)
-      return
-    }
-    if (!data || data.length === 0) {
-      const { data: { user } } = await supabase.auth.getUser()
-      console.error('[toggleTaskComplete] 0 rows updated — RLS or stale session?', {
-        taskId,
-        nextValue,
-        jwtUserId: user?.id ?? null,
-      })
-      toast.error('儲存失敗：無法寫入這個任務（可能登入逾時，請重新整理或登出再登入）')
-      return
+    // Block any cross-device/tab-focus refetch from clobbering the optimistic
+    // toggle. Without this guard, a refetch that lands between the local
+    // setWorkspaces above and the DB write below replays the pre-toggle row
+    // and the checkbox visibly bounces back to its old state.
+    pendingWritesRef.current += 1
+    try {
+      // Use .select() so PostgREST returns the affected rows. If RLS silently
+      // blocks the update (auth.uid() mismatch / expired JWT) PostgREST returns
+      // an empty array with no error — that's the bug pattern we're hunting.
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ is_completed: nextValue, completed_at: completedAt })
+        .eq('id', taskId)
+        .select('id, is_completed, user_id')
+
+      const rollback = () => {
+        setWorkspaces((prev) =>
+          prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => ({
+              ...c,
+              tasks: c.tasks.map((t) =>
+                t.id === taskId
+                  ? { ...t, isCompleted: previousCompleted ?? false, completedAt: previousCompletedAt }
+                  : t,
+              ),
+            })),
+          })),
+        )
+      }
+
+      if (error) {
+        console.error('[toggleTaskComplete] supabase error', { taskId, error })
+        rollback()
+        handleDbError('切換任務狀態')(error)
+        return
+      }
+      if (!data || data.length === 0) {
+        const { data: { user } } = await supabase.auth.getUser()
+        console.error('[toggleTaskComplete] 0 rows updated — RLS or stale session?', {
+          taskId,
+          nextValue,
+          jwtUserId: user?.id ?? null,
+        })
+        rollback()
+        toast.error('儲存失敗：無法寫入這個任務（可能登入逾時，請重新整理或登出再登入）')
+        return
+      }
+    } finally {
+      pendingWritesRef.current -= 1
     }
   }, [supabase])
 
@@ -939,8 +1023,13 @@ export function useWaddleData(): UseWaddleData {
         })),
       }))
     )
-    const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-    if (error) handleDbError('刪除任務')(error)
+    pendingWritesRef.current += 1
+    try {
+      const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+      if (error) handleDbError('刪除任務')(error)
+    } finally {
+      pendingWritesRef.current -= 1
+    }
   }, [supabase])
 
   const rescheduleTask = useCallback(async (
@@ -974,30 +1063,36 @@ export function useWaddleData(): UseWaddleData {
       scheduled_end_time: endTime,
     }
     if (date) update.scheduled_date = date
-    // .select() so PostgREST returns the rows the UPDATE touched. If RLS
-    // or a stale session silently filters the row out, error stays null
-    // but data is empty — exactly the "task disappears" failure mode.
-    const { data, error } = await supabase
-      .from('tasks')
-      .update(update)
-      .eq('id', taskId)
-      .select('id, scheduled_date, scheduled_start_time, scheduled_end_time')
-    if (error) {
-      console.error('[rescheduleTask] supabase error', { taskId, update, error })
-      handleDbError('重新排程')(error)
-      return
+
+    pendingWritesRef.current += 1
+    try {
+      // .select() so PostgREST returns the rows the UPDATE touched. If RLS
+      // or a stale session silently filters the row out, error stays null
+      // but data is empty — exactly the "task disappears" failure mode.
+      const { data, error } = await supabase
+        .from('tasks')
+        .update(update)
+        .eq('id', taskId)
+        .select('id, scheduled_date, scheduled_start_time, scheduled_end_time')
+      if (error) {
+        console.error('[rescheduleTask] supabase error', { taskId, update, error })
+        handleDbError('重新排程')(error)
+        return
+      }
+      if (!data || data.length === 0) {
+        const { data: { user } } = await supabase.auth.getUser()
+        console.error('[rescheduleTask] 0 rows updated — RLS / stale session?', {
+          taskId,
+          attemptedUpdate: update,
+          jwtUserId: user?.id ?? null,
+        })
+        toast.error('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入')
+        return
+      }
+      console.log('[rescheduleTask] OK', { taskId, persisted: data[0] })
+    } finally {
+      pendingWritesRef.current -= 1
     }
-    if (!data || data.length === 0) {
-      const { data: { user } } = await supabase.auth.getUser()
-      console.error('[rescheduleTask] 0 rows updated — RLS / stale session?', {
-        taskId,
-        attemptedUpdate: update,
-        jwtUserId: user?.id ?? null,
-      })
-      toast.error('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入')
-      return
-    }
-    console.log('[rescheduleTask] OK', { taskId, persisted: data[0] })
   }, [supabase])
 
   const unscheduleTask = useCallback(async (taskId: string, date?: string) => {
@@ -1026,27 +1121,33 @@ export function useWaddleData(): UseWaddleData {
       scheduled_end_time: null,
     }
     if (date) update.scheduled_date = date
-    const { data, error } = await supabase
-      .from('tasks')
-      .update(update)
-      .eq('id', taskId)
-      .select('id, scheduled_date')
-    if (error) {
-      console.error('[unscheduleTask] supabase error', { taskId, update, error })
-      handleDbError('取消排程')(error)
-      return
+
+    pendingWritesRef.current += 1
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .update(update)
+        .eq('id', taskId)
+        .select('id, scheduled_date')
+      if (error) {
+        console.error('[unscheduleTask] supabase error', { taskId, update, error })
+        handleDbError('取消排程')(error)
+        return
+      }
+      if (!data || data.length === 0) {
+        const { data: { user } } = await supabase.auth.getUser()
+        console.error('[unscheduleTask] 0 rows updated — RLS / stale session?', {
+          taskId,
+          attemptedUpdate: update,
+          jwtUserId: user?.id ?? null,
+        })
+        toast.error('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入')
+        return
+      }
+      console.log('[unscheduleTask] OK', { taskId, persisted: data[0] })
+    } finally {
+      pendingWritesRef.current -= 1
     }
-    if (!data || data.length === 0) {
-      const { data: { user } } = await supabase.auth.getUser()
-      console.error('[unscheduleTask] 0 rows updated — RLS / stale session?', {
-        taskId,
-        attemptedUpdate: update,
-        jwtUserId: user?.id ?? null,
-      })
-      toast.error('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入')
-      return
-    }
-    console.log('[unscheduleTask] OK', { taskId, persisted: data[0] })
   }, [supabase])
 
   // ═════════════════════════════════════════════════════
