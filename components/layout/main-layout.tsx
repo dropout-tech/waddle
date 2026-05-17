@@ -412,96 +412,102 @@ export function MainLayout({
         </div>
 
         {/* Bottom Tab Bar (hidden during focus mode) */}
-        {focusMode === 'none' && (
-          <nav className="relative flex-shrink-0 grid grid-cols-4 border-t border-border bg-card/95 backdrop-blur z-30 pb-[env(safe-area-inset-bottom)]" role="tablist" aria-label="主要分頁">
-            {/* Sliding active indicator. Slots (left→right): 任務 / 白板 /
-                日曆 / 連結. Tasks + calendar are routes; scratchpad and
-                links are overlay toggles. Overlays take precedence over
-                the route indicator while open. */}
-            <span
-              aria-hidden="true"
-              className="absolute top-0 h-0.5 bg-primary rounded-full transition-transform duration-200 ease-out"
-              style={{
-                width: 'calc(100% / 4)',
-                transform: `translateX(${
-                  mobileLinksOpen
-                    ? 300
-                    : mobileScratchpadOpen
-                      ? 100
-                      : mobileTab === 'tasks'
-                        ? 0
-                        : 200
-                }%)`,
-              }}
-            />
-            <button
-              role="tab"
-              aria-selected={mobileTab === 'tasks' && !mobileScratchpadOpen && !mobileLinksOpen}
-              onClick={() => {
+        {focusMode === 'none' && (() => {
+          // Build the tab definitions in one place so the button render loop
+          // stays trivial. Position drives both the icon-pill highlight and
+          // the top sliding indicator — overlays (白板 / 連結) win over the
+          // route tabs while open.
+          const tabs = [
+            {
+              key: 'tasks' as const,
+              label: '任務',
+              Icon: ListChecks,
+              active: mobileTab === 'tasks' && !mobileScratchpadOpen && !mobileLinksOpen,
+              onClick: () => {
                 setMobileScratchpadOpen(false)
                 setMobileLinksOpen(false)
                 setMobileTab('tasks')
-              }}
-              className={cn(
-                'flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-colors',
-                mobileTab === 'tasks' && !mobileScratchpadOpen && !mobileLinksOpen
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <ListChecks className="w-5 h-5" />
-              <span className="text-[11px] font-medium">任務</span>
-            </button>
-            <button
-              role="tab"
-              aria-selected={mobileScratchpadOpen}
-              onClick={() => {
+              },
+            },
+            {
+              key: 'scratch' as const,
+              label: '白板',
+              Icon: Sparkles,
+              active: mobileScratchpadOpen,
+              onClick: () => {
                 setMobileLinksOpen(false)
                 setMobileScratchpadOpen(v => !v)
-              }}
-              className={cn(
-                'flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-colors',
-                mobileScratchpadOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Sparkles className="w-5 h-5" />
-              <span className="text-[11px] font-medium">白板</span>
-            </button>
-            <button
-              role="tab"
-              aria-selected={mobileTab === 'calendar' && !mobileScratchpadOpen && !mobileLinksOpen}
-              onClick={() => {
+              },
+            },
+            {
+              key: 'calendar' as const,
+              label: '日曆',
+              Icon: CalendarDays,
+              active: mobileTab === 'calendar' && !mobileScratchpadOpen && !mobileLinksOpen,
+              onClick: () => {
                 setMobileScratchpadOpen(false)
                 setMobileLinksOpen(false)
                 setMobileTab('calendar')
-              }}
-              className={cn(
-                'flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-colors',
-                mobileTab === 'calendar' && !mobileScratchpadOpen && !mobileLinksOpen
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <CalendarDays className="w-5 h-5" />
-              <span className="text-[11px] font-medium">日曆</span>
-            </button>
-            <button
-              role="tab"
-              aria-selected={mobileLinksOpen}
-              onClick={() => {
+              },
+            },
+            {
+              key: 'links' as const,
+              label: '連結',
+              Icon: Link2,
+              active: mobileLinksOpen,
+              onClick: () => {
                 setMobileScratchpadOpen(false)
                 setMobileLinksOpen(v => !v)
-              }}
-              className={cn(
-                'flex flex-col items-center justify-center gap-1 py-3 min-h-[56px] transition-colors',
-                mobileLinksOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-              )}
+              },
+            },
+          ]
+          const activeIndex = tabs.findIndex(t => t.active)
+          return (
+            <nav
+              className="relative flex-shrink-0 grid grid-cols-4 border-t border-border/70 bg-card/95 backdrop-blur z-30 pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_0_rgba(0,0,0,0.02)]"
+              role="tablist"
+              aria-label="主要分頁"
             >
-              <Link2 className="w-5 h-5" />
-              <span className="text-[11px] font-medium">連結</span>
-            </button>
-          </nav>
-        )}
+              {/* Sliding top indicator — wrapper takes one column width so
+                  translateX(N * 100%) moves it by exactly one tab. The inner
+                  pill is centered within the wrapper. */}
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'absolute top-0 left-0 h-[3px] w-1/4 flex items-center justify-center transition-transform duration-300 ease-out pointer-events-none',
+                  activeIndex < 0 && 'opacity-0',
+                )}
+                style={{ transform: `translateX(${Math.max(activeIndex, 0) * 100}%)` }}
+              >
+                <span className="block w-8 h-full bg-primary rounded-b-full" />
+              </span>
+              {tabs.map(({ key, label, Icon, active, onClick }) => (
+                <button
+                  key={key}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={onClick}
+                  className={cn(
+                    'group flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[60px] transition-all active:scale-[0.96]',
+                    active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'flex items-center justify-center w-11 h-7 rounded-full transition-all',
+                      active ? 'bg-primary/10 scale-100' : 'scale-95 group-active:bg-secondary/60',
+                    )}
+                  >
+                    <Icon className={cn('w-5 h-5 transition-transform', active && 'scale-105')} />
+                  </span>
+                  <span className={cn('text-[11px] tracking-tight', active ? 'font-semibold' : 'font-medium')}>
+                    {label}
+                  </span>
+                </button>
+              ))}
+            </nav>
+          )
+        })()}
 
         {/* Floating widgets — repositioned for mobile */}
         <FocusTimer

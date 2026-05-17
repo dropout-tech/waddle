@@ -344,7 +344,7 @@ export function SettingsModal({
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-6 max-h-[60vh] overflow-y-auto">
+        <div className="p-5 space-y-6 flex-1 min-h-0 md:flex-initial md:min-h-[unset] md:max-h-[60vh] overflow-y-auto pb-[max(env(safe-area-inset-bottom),1.25rem)] md:pb-5">
           {activeTab === 'general' && (<>
           {/* Calendar Time Range */}
           <div className="space-y-3">
@@ -948,7 +948,7 @@ export function SettingsModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border bg-secondary/20">
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border bg-secondary/20 pb-[max(env(safe-area-inset-bottom),1rem)] md:pb-4">
           <Button variant="secondary" onClick={onClose}>
             取消
           </Button>

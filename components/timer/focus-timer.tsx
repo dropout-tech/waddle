@@ -415,21 +415,55 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
 
   const displayTime = mode === 'pomodoro' ? timeLeft : elapsed
 
+  // Mobile expanded mode renders as a backdrop + bottom sheet (full-width,
+  // slide-up from above the tab bar). Desktop keeps the corner card.
+  const mobileExpanded = isMobile && isExpanded
+
   return (
     <>
+      {/* Mobile sheet backdrop — clicking it collapses the panel. */}
+      {mobileExpanded && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsExpanded(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Floating Timer Button/Widget — sits above the bottom tab bar on
-          mobile (with iOS safe-area-inset-bottom). */}
+          mobile (with iOS safe-area-inset-bottom). On mobile, the expanded
+          panel becomes a full-width bottom sheet that slides up from the
+          screen edge. */}
       <div
         className={cn(
-          "fixed right-4 z-40 transition-all duration-300",
-          isMobile ? '' : 'bottom-6 right-6',
-          isExpanded ? "w-80 max-w-[calc(100vw-2rem)]" : "w-auto"
+          "fixed z-40 transition-all duration-300",
+          // Collapsed mobile: floating chip in the right corner above the
+          // tab bar. Expanded mobile: full-width sheet anchored to bottom.
+          mobileExpanded
+            ? 'inset-x-0 bottom-0 animate-in slide-in-from-bottom duration-300'
+            : isMobile
+              ? 'right-3'
+              : 'bottom-6 right-6',
+          !isMobile && (isExpanded ? "w-80 max-w-[calc(100vw-2rem)]" : "w-auto")
         )}
-        style={isMobile ? { bottom: 'calc(78px + env(safe-area-inset-bottom))' } : undefined}
+        style={isMobile && !mobileExpanded ? { bottom: 'calc(78px + env(safe-area-inset-bottom))' } : undefined}
       >
         {/* Expanded Panel */}
         {isExpanded ? (
-          <div className="bg-card border border-border rounded-2xl shadow-xl overflow-hidden">
+          <div
+            className={cn(
+              "bg-card",
+              mobileExpanded
+                ? "border-t border-border rounded-t-3xl shadow-2xl max-h-[88dvh] overflow-y-auto overscroll-contain pb-[max(env(safe-area-inset-bottom),0.5rem)]"
+                : "overflow-hidden border border-border rounded-2xl shadow-xl"
+            )}
+          >
+            {/* Mobile sheet grab handle */}
+            {mobileExpanded && (
+              <div className="flex justify-center pt-2 pb-1 flex-shrink-0">
+                <span className="block w-10 h-1 rounded-full bg-muted-foreground/30" />
+              </div>
+            )}
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
               <div className="flex items-center gap-2">

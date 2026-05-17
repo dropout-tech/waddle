@@ -326,7 +326,7 @@ export function WorkspaceSettingsModal({
         </div>
 
         {/* Footer */}
-        <div className="px-5 pb-5 pt-3 space-y-3 border-t border-border bg-card flex-shrink-0">
+        <div className="px-5 pt-3 pb-[max(env(safe-area-inset-bottom),1.25rem)] md:pb-5 space-y-3 border-t border-border bg-card flex-shrink-0">
           {/* Save */}
           <button
             onClick={handleSave}

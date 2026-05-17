@@ -124,14 +124,16 @@ export function CalendarHeader({
           notification bell. */}
       <div
         className={cn(
-          'flex items-center justify-between py-3 gap-3 transition-[padding] duration-200',
+          'flex items-center justify-between gap-2 transition-[padding] duration-200',
           // Mobile uses balanced padding (no UserMenu floating overhead since
-          // it lives inside the panel header on mobile).
-          isMobile ? 'px-3' : leftPanelOpen ? 'pl-4 pr-14' : 'pl-16 pr-14'
+          // it lives inside the panel header on mobile). Slimmer vertical
+          // rhythm on mobile so the calendar grid gets more screen estate.
+          isMobile ? 'px-2.5 py-2' : 'py-3 gap-3',
+          !isMobile && (leftPanelOpen ? 'pl-4 pr-14' : 'pl-16 pr-14')
         )}
       >
         {/* Left: Date Navigation */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className={cn('flex items-center flex-1 min-w-0', isMobile ? 'gap-1' : 'gap-2')}>
           {/* Prev / Next chevrons — restored 2026-05-07 because horizontal
               scroll is awkward on Windows trackpads / mice without a touch
               gesture. Click steps by the current view's natural unit
@@ -155,7 +157,10 @@ export function CalendarHeader({
 
           {/* Month/date label — companion to the chevrons. */}
           <span
-            className="text-sm font-semibold md:font-medium px-1 truncate"
+            className={cn(
+              'px-1 truncate',
+              isMobile ? 'text-[15px] font-semibold' : 'text-sm md:font-medium'
+            )}
             aria-live="polite"
           >
             {getDisplayText()}

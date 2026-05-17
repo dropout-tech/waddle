@@ -256,7 +256,7 @@ export function TaskDetailModal({
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-5 max-h-[60vh] overflow-y-auto">
+        <div className="p-5 space-y-5 flex-1 min-h-0 md:flex-initial md:min-h-[unset] md:max-h-[60vh] overflow-y-auto">
           {/* Title */}
           <div>
             <Input
@@ -615,7 +615,7 @@ export function TaskDetailModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border bg-secondary/20">
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border bg-secondary/20 pb-[max(env(safe-area-inset-bottom),1rem)] md:pb-4">
           <Button variant="secondary" onClick={onClose}>
             取消
           </Button>
