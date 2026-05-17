@@ -13,6 +13,11 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import type { Task, Workspace } from '@/lib/types'
 import { toDateString } from '@/lib/calendar-utils'
 import { playTimerSound, TIMER_SOUND_LABELS, type TimerSoundKind } from '@/lib/timer-sound'
+import {
+  BGM_MUSIC, BGM_AMBIENT, getBgmEngine,
+  type BgmMusicId, type BgmAmbientId,
+} from '@/lib/timer-bgm'
+import { Music2 } from 'lucide-react'
 
 interface FocusTimerProps {
   workspaces: Workspace[]
@@ -39,17 +44,33 @@ interface TimerSession {
   taskId?: string
 }
 
+interface AmbientPref { enabled: boolean; volume: number }
 interface TimerPrefs {
   breakMinutes: number
   autoStartBreak: boolean
   sound: TimerSoundKind
+  // Background music during the session (null = off). At most one.
+  music: BgmMusicId | null
+  musicVolume: number
+  // Stackable ambient overlays, each with its own enable + volume.
+  ambient: Record<BgmAmbientId, AmbientPref>
 }
 
 const TIMER_PREFS_KEY = 'waddle-timer-prefs-v1'
+// Derive default ambient state from the BGM_AMBIENT manifest so adding a new
+// overlay needs only one edit (in lib/timer-bgm.ts).
+const DEFAULT_AMBIENT = Object.fromEntries(
+  BGM_AMBIENT.map((a) => [a.id, { enabled: false, volume: 0.5 }]),
+) as Record<BgmAmbientId, AmbientPref>
+const VALID_MUSIC_IDS: readonly BgmMusicId[] = BGM_MUSIC.map((m) => m.id)
+const VALID_AMBIENT_IDS: readonly BgmAmbientId[] = BGM_AMBIENT.map((a) => a.id)
 const DEFAULT_PREFS: TimerPrefs = {
   breakMinutes: 5,
   autoStartBreak: true,
   sound: 'chime',
+  music: null,
+  musicVolume: 0.5,
+  ambient: DEFAULT_AMBIENT,
 }
 const BREAK_COLOR = '#9bbfac' // sage — calmer than the focus oranges
 
@@ -59,10 +80,25 @@ function loadPrefs(): TimerPrefs {
     const raw = window.localStorage.getItem(TIMER_PREFS_KEY)
     if (!raw) return DEFAULT_PREFS
     const parsed = JSON.parse(raw)
+    const mergedAmbient = { ...DEFAULT_AMBIENT }
+    if (parsed.ambient && typeof parsed.ambient === 'object') {
+      for (const id of VALID_AMBIENT_IDS) {
+        const a = parsed.ambient[id]
+        if (a && typeof a === 'object') {
+          mergedAmbient[id] = {
+            enabled: !!a.enabled,
+            volume: typeof a.volume === 'number' ? Math.max(0, Math.min(1, a.volume)) : 0.5,
+          }
+        }
+      }
+    }
     return {
       breakMinutes: typeof parsed.breakMinutes === 'number' ? parsed.breakMinutes : DEFAULT_PREFS.breakMinutes,
       autoStartBreak: typeof parsed.autoStartBreak === 'boolean' ? parsed.autoStartBreak : DEFAULT_PREFS.autoStartBreak,
       sound: ['chime', 'bell', 'beep', 'silent'].includes(parsed.sound) ? parsed.sound : DEFAULT_PREFS.sound,
+      music: VALID_MUSIC_IDS.includes(parsed.music) ? parsed.music : null,
+      musicVolume: typeof parsed.musicVolume === 'number' ? Math.max(0, Math.min(1, parsed.musicVolume)) : DEFAULT_PREFS.musicVolume,
+      ambient: mergedAmbient,
     }
   } catch {
     return DEFAULT_PREFS
@@ -110,6 +146,62 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
     if (typeof window === 'undefined') return
     try { window.localStorage.setItem(TIMER_PREFS_KEY, JSON.stringify(prefs)) } catch {}
   }, [prefs])
+
+  // Sync prefs → BGM engine. Engine handles crossfades + per-track volume.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const eng = getBgmEngine()
+    if (!eng) return
+    eng.setMusic(prefs.music)
+    eng.setMusicVolume(prefs.musicVolume)
+    for (const a of BGM_AMBIENT) {
+      const p = prefs.ambient[a.id]
+      eng.setAmbient(a.id, p.enabled, p.volume)
+    }
+  }, [prefs.music, prefs.musicVolume, prefs.ambient])
+
+  // Track which audio files have 404'd so the UI can disable those buttons
+  // and show a hint. The engine reports unavailability the first time a
+  // track tries to load and fails; we re-render to reflect that.
+  const [unavailableSrcs, setUnavailableSrcs] = useState<Set<string>>(() => new Set())
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const eng = getBgmEngine()
+    if (!eng) return
+    // Pull current state + subscribe. We rebuild the Set on each notify so
+    // React sees a new reference and re-renders.
+    const snapshot = () => {
+      const next = new Set<string>()
+      for (const m of BGM_MUSIC) if (!eng.isAvailable(m.src)) next.add(m.src)
+      for (const a of BGM_AMBIENT) if (!eng.isAvailable(a.src)) next.add(a.src)
+      setUnavailableSrcs(next)
+    }
+    // Eagerly instantiate every track so the `error` listener fires before
+    // the user clicks anything — otherwise missing files don't show as
+    // disabled until first selection.
+    eng.preload()
+    snapshot()
+    return eng.subscribe(snapshot)
+  }, [])
+
+  // Drive the engine play/pause from timer state. Running = on, anything
+  // else (idle / paused) = off so audio doesn't keep playing while paused.
+  // Re-runs of the prefs-sync effect above set the targets; this one flips
+  // the master playing switch.
+  // Audio is also killed on unmount so the timer module doesn't leak sound
+  // when the panel closes.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const eng = getBgmEngine()
+    if (!eng) return
+    eng.setPlaying(state === 'running')
+  }, [state])
+  useEffect(() => {
+    return () => {
+      const eng = typeof window !== 'undefined' ? getBgmEngine() : null
+      eng?.setPlaying(false)
+    }
+  }, [])
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -552,8 +644,131 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                         ))}
                       </div>
                     </div>
+
                   </div>
                 )}
+
+                {/* Background music + ambient overlays — available in both
+                    pomodoro and stopwatch so users get the same focus
+                    soundscape whether they're timing 25 min or open-ended. */}
+                <div className="space-y-2 pt-2 border-t border-border/60">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                        <Music2 className="w-3 h-3" />
+                        背景音樂
+                      </label>
+                      <div className="flex gap-1 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => setPrefs((p) => ({ ...p, music: null }))}
+                          className={cn(
+                            'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
+                            prefs.music === null
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
+                          )}
+                        >
+                          無
+                        </button>
+                        {BGM_MUSIC.map((m) => {
+                          const missing = unavailableSrcs.has(m.src)
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => setPrefs((p) => ({ ...p, music: m.id }))}
+                              disabled={missing}
+                              title={missing ? '音檔尚未加入（見 public/audio/README.md）' : undefined}
+                              className={cn(
+                                'px-2 py-0.5 rounded text-[10px] font-medium transition-colors flex items-center gap-1',
+                                missing
+                                  ? 'bg-secondary/30 text-muted-foreground/50 line-through cursor-not-allowed'
+                                  : prefs.music === m.id
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
+                              )}
+                            >
+                              <span>{m.emoji}</span>{m.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {prefs.music && (
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={prefs.musicVolume}
+                          onChange={(e) => setPrefs((p) => ({ ...p, musicVolume: parseFloat(e.target.value) }))}
+                          aria-label="背景音樂音量"
+                          className="w-full h-1 accent-primary"
+                        />
+                      )}
+                    </div>
+
+                    {/* Ambient overlays — multi-select, each with its own slider */}
+                    <div className="space-y-1.5 pt-1">
+                      <label className="text-[11px] text-muted-foreground">
+                        環境音（可疊加）
+                      </label>
+                      <div className="space-y-1">
+                        {BGM_AMBIENT.map((a) => {
+                          const p = prefs.ambient[a.id]
+                          const missing = unavailableSrcs.has(a.src)
+                          return (
+                            <div key={a.id} className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setPrefs((prev) => ({
+                                  ...prev,
+                                  ambient: {
+                                    ...prev.ambient,
+                                    [a.id]: { ...prev.ambient[a.id], enabled: !prev.ambient[a.id].enabled },
+                                  },
+                                }))}
+                                aria-pressed={p.enabled}
+                                disabled={missing}
+                                title={missing ? '音檔尚未加入（見 public/audio/README.md）' : undefined}
+                                className={cn(
+                                  'px-2 py-0.5 rounded text-[10px] font-medium transition-colors flex items-center gap-1 w-[68px] justify-start',
+                                  missing
+                                    ? 'bg-secondary/30 text-muted-foreground/50 line-through cursor-not-allowed'
+                                    : p.enabled
+                                      ? 'bg-primary text-primary-foreground'
+                                      : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
+                                )}
+                              >
+                                <span>{a.emoji}</span>{a.label}
+                              </button>
+                              <input
+                                type="range"
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                value={p.volume}
+                                disabled={!p.enabled || missing}
+                                onChange={(e) => setPrefs((prev) => ({
+                                  ...prev,
+                                  ambient: {
+                                    ...prev.ambient,
+                                    [a.id]: { ...prev.ambient[a.id], volume: parseFloat(e.target.value) },
+                                  },
+                                }))}
+                                aria-label={`${a.label}音量`}
+                                className="flex-1 h-1 accent-primary disabled:opacity-40"
+                              />
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    {(unavailableSrcs.size > 0) && (
+                      <p className="text-[10px] text-muted-foreground/70 italic pt-0.5">
+                        灰色項目尚未放入音檔 · 詳見 public/audio/README.md
+                      </p>
+                    )}
+                  </div>
               </div>
             )}
 

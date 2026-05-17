@@ -3,6 +3,12 @@
 // sounds are short tonal chimes — pleasant enough not to startle but loud
 // enough to notice. Each call is independent; no shared AudioContext state
 // to leak across hot reloads.
+//
+// Note: background music + ambient overlays (lib/timer-bgm.ts) intentionally
+// take the opposite tradeoff — they need rich timbre and long loops, which
+// WebAudio synthesis can't deliver. The BGM engine handles 404s gracefully
+// (UI shows tracks as disabled) and starts on user gesture (timer start),
+// sidestepping the autoplay concerns that drove the design choice here.
 
 export type TimerSoundKind = 'chime' | 'bell' | 'beep' | 'silent'
 

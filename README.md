@@ -14,7 +14,7 @@
 - **匯出行程 PNG** — 選日期範圍輸出 1080px 圖檔，含 Waddle 品牌標記；隱私模式只顯示時段顏色不洩漏細節
 - **瀏覽器通知提醒** — 會議開始前 5/10/15 分鐘 OS 通知，點擊直接跳轉視訊連結（Notification API；分頁需開著）
 - **右側報告** — 完成率、urgency 分佈、workspace 對比（recharts）；含「會議佔比」與「深度工作時間」KPI
-- **焦點工具** — 番茄鐘（含可選音效 + 自動休息）、暫存板、日記反思模式
+- **焦點工具** — 番茄鐘 / 碼錶（含可選音效 + 自動休息、背景音樂 + 可疊加環境音）、暫存板、日記反思模式
 - **設定** — 時間偏好、視圖範圍（日 1-3 天 / 週 5-7 天）、通知、自訂 slot type、workspace 管理、任務完成音效、今日完成任務是否保留在列表
 
 ## 技術棧
@@ -102,7 +102,8 @@ lib/
   meeting-utils.ts        # 會議 URL provider 偵測（Zoom/Meet/Teams/Webex/generic）
   meeting-reminder.ts     # 提醒偏好 + collectMeetings + Notification API helpers
   task-sound.ts           # 任務完成音效（Web Audio API，無音檔依賴）
-  timer-sound.ts          # 番茄鐘音效
+  timer-sound.ts          # 番茄鐘完成音效（合成）
+  timer-bgm.ts            # 背景音樂 + 環境音引擎（淡入淡出、loop、多軌混音）
   notes-render.tsx        # 備註的 link 解析
   popover-position.ts     # 共用 popover 定位
   workspace-icons.tsx     # workspace icon mapping

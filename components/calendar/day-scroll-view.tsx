@@ -113,7 +113,16 @@ export function DayScrollView({
     }
     return safeDays > 1 ? Math.floor(DEFAULT_DAY_WIDTH * (1 / safeDays) * 1.6) : DEFAULT_DAY_WIDTH
   })()
-  const DAY_WIDTH = isMobile ? Math.max(240, viewportWidth - TIME_COL_WIDTH) : desktopDayWidth
+  // Mobile day cell must equal the *measured* scrollable width minus the
+  // sticky time column so scroll-snap lands exactly one day per swipe.
+  // Using window.innerWidth as a proxy drifts a few px (safe-area inset,
+  // scrollbar, container padding) and the error accumulates → visible
+  // half-cell at the edges. Falls back to viewport math only until the
+  // ResizeObserver delivers the real container width.
+  const mobileDayWidth = containerWidth && containerWidth > TIME_COL_WIDTH + 100
+    ? Math.max(240, Math.floor(containerWidth - TIME_COL_WIDTH))
+    : Math.max(240, viewportWidth - TIME_COL_WIDTH)
+  const DAY_WIDTH = isMobile ? mobileDayWidth : desktopDayWidth
   const EXTEND_THRESHOLD = DAY_WIDTH * 2
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -246,10 +255,18 @@ export function DayScrollView({
     setExtraAfter(0)
   }, [selectedDate])
 
+  // Recenter horizontally on selectedDate. Also re-runs when DAY_WIDTH
+  // changes while the user hasn't navigated away (extras still 0), because
+  // DAY_WIDTH resolves in two phases: first render uses a fallback (no
+  // containerWidth yet), then ResizeObserver fires and the real width
+  // arrives. Without re-running, the scrollLeft set with the fallback
+  // width points to a day several days before today once the real (often
+  // larger) width takes effect.
   useEffect(() => {
     const container = scrollContainerRef.current
     const header = headerScrollRef.current
     if (!container || !header) return
+    if (extraBefore !== 0 || extraAfter !== 0) return
 
     const targetScrollLeft = initialBefore * DAY_WIDTH
 
@@ -275,7 +292,7 @@ export function DayScrollView({
 
     const t = window.setTimeout(() => { isScrolling.current = false }, 150)
     return () => window.clearTimeout(t)
-  }, [selectedDate])
+  }, [selectedDate, DAY_WIDTH])
 
   // After prepending days, shift scrollLeft so the day previously under the
   // cursor stays put visually. Runs synchronously after DOM mutation.
@@ -904,7 +921,7 @@ export function DayScrollView({
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
               ...(isMobile && !activeTaskDrag && !pendingTaskDrag && !activeBlockDrag
-                ? { scrollSnapType: 'x mandatory' as const }
+                ? { scrollSnapType: 'x mandatory' as const, scrollSnapStop: 'always' as const }
                 : {}),
             }}
           >
