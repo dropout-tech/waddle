@@ -222,9 +222,9 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'text-red-500 bg-red-50'
-      case 'medium': return 'text-amber-500 bg-amber-50'
-      case 'low': return 'text-blue-500 bg-blue-50'
+      case 'high': return 'text-urgency-critical bg-urgency-critical/10'
+      case 'medium': return 'text-urgency-medium bg-urgency-medium/10'
+      case 'low': return 'text-info bg-info/10'
       default: return 'text-muted-foreground bg-secondary'
     }
   }
@@ -254,7 +254,7 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
         {totalCount > 0 && (
           <span className={cn(
             'absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white',
-            highPriorityCount > 0 ? 'bg-red-500' : 'bg-amber-500'
+            highPriorityCount > 0 ? 'bg-urgency-critical' : 'bg-urgency-high'
           )}>
             {totalCount > 9 ? '9+' : totalCount}
           </span>
@@ -301,8 +301,8 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
             <div className="overflow-y-auto max-h-[calc(80vh-60px)]">
               {notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
-                    <CheckCircle2 className="w-6 h-6 text-green-600" />
+                  <div className="w-12 h-12 rounded-full bg-success/15 flex items-center justify-center mb-3">
+                    <CheckCircle2 className="w-6 h-6 text-success" />
                   </div>
                   <p className="font-medium text-foreground">一切順利！</p>
                   <p className="text-sm text-muted-foreground mt-1">

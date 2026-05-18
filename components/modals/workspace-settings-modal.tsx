@@ -367,8 +367,8 @@ export function WorkspaceSettingsModal({
                 className={cn(
                   'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-xs font-medium transition-all',
                   confirmDelete
-                    ? 'border-red-400 bg-red-50 text-red-600 dark:bg-red-950/30'
-                    : 'border-border text-muted-foreground hover:border-red-300 hover:text-red-500 hover:bg-red-50/50 dark:hover:bg-red-950/20'
+                    ? 'border-destructive/60 bg-destructive/10 text-destructive'
+                    : 'border-border text-muted-foreground hover:border-destructive/40 hover:text-destructive hover:bg-destructive/5'
                 )}
               >
                 <Trash2 className="w-3.5 h-3.5" />

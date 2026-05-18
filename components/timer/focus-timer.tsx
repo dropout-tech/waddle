@@ -14,10 +14,11 @@ import type { Task, Workspace } from '@/lib/types'
 import { toDateString } from '@/lib/calendar-utils'
 import { playTimerSound, TIMER_SOUND_LABELS, type TimerSoundKind } from '@/lib/timer-sound'
 import {
-  BGM_MUSIC, BGM_AMBIENT, getBgmEngine,
-  type BgmMusicId, type BgmAmbientId,
+  BGM_MUSIC, BGM_AMBIENT, getBgmEngine, summarizeBgm,
+  type AmbientPref, type BgmMusicId, type BgmAmbientId,
 } from '@/lib/timer-bgm'
 import { Music2 } from 'lucide-react'
+import { FocusTimerImmersive } from './focus-timer-immersive'
 
 interface FocusTimerProps {
   workspaces: Workspace[]
@@ -44,7 +45,6 @@ interface TimerSession {
   taskId?: string
 }
 
-interface AmbientPref { enabled: boolean; volume: number }
 interface TimerPrefs {
   breakMinutes: number
   autoStartBreak: boolean
@@ -134,6 +134,10 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   // Sound/music subsection collapse — default closed so the settings panel
   // doesn't look like a wall of chips and sliders the first time it opens.
   const [showBgmSettings, setShowBgmSettings] = useState(false)
+  // Standalone music playback — independent of timer state so the user can
+  // listen without starting a session. Combined with timer state below so
+  // running a timer still auto-plays as before.
+  const [bgmManualPlaying, setBgmManualPlaying] = useState(false)
   
   // Timer state
   const [timeLeft, setTimeLeft] = useState(25 * 60) // seconds for pomodoro
@@ -197,8 +201,14 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
     if (typeof window === 'undefined') return
     const eng = getBgmEngine()
     if (!eng) return
-    eng.setPlaying(state === 'running')
-  }, [state])
+    eng.setPlaying(bgmManualPlaying || state === 'running')
+  }, [state, bgmManualPlaying])
+  // If the user clears all selections, drop the manual-playing flag so the
+  // play button doesn't appear "on" with nothing to play.
+  useEffect(() => {
+    const hasSelection = !!prefs.music || BGM_AMBIENT.some(a => prefs.ambient[a.id]?.enabled)
+    if (!hasSelection && bgmManualPlaying) setBgmManualPlaying(false)
+  }, [prefs.music, prefs.ambient, bgmManualPlaying])
   useEffect(() => {
     return () => {
       const eng = typeof window !== 'undefined' ? getBgmEngine() : null
@@ -422,6 +432,33 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   // slide-up from above the tab bar). Desktop keeps the corner card.
   const mobileExpanded = isMobile && isExpanded
 
+  // On mobile, once a session is running/paused, the experience takes over
+  // the full screen instead of sitting in a sheet. The sheet remains the
+  // setup surface (idle state only).
+  const showImmersive = isMobile && isExpanded && state !== 'idle' && session !== null
+
+  if (showImmersive && session) {
+    return (
+      <FocusTimerImmersive
+        visible
+        state={state}
+        phase={session.phase}
+        label={session.label}
+        color={session.color}
+        timeText={formatTime(displayTime)}
+        progress={mode === 'pomodoro' ? progress : Math.min(100, (elapsed % 3600) / 36)}
+        startedAtText={formatTimeHHMM(session.startedAt)}
+        music={prefs.music}
+        ambient={prefs.ambient}
+        bgmPlaying={(bgmManualPlaying || state === 'running')}
+        onPause={pauseTimer}
+        onResume={resumeTimer}
+        onExit={() => { stopTimer(false); setIsExpanded(false) }}
+        onToggleBgm={() => setBgmManualPlaying(v => !v)}
+      />
+    )
+  }
+
   return (
     <>
       {/* Mobile sheet backdrop — clicking it collapses the panel. */}
@@ -472,8 +509,8 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
               <div className="flex items-center gap-2">
                 <div className={cn(
                   "w-2 h-2 rounded-full",
-                  state === 'running' ? "bg-green-500 animate-pulse" : 
-                  state === 'paused' ? "bg-amber-500" : "bg-muted-foreground"
+                  state === 'running' ? "bg-success" :
+                  state === 'paused' ? "bg-urgency-medium" : "bg-muted-foreground"
                 )} />
                 <span className="text-sm font-medium">
                   {state === 'idle'
@@ -692,41 +729,55 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                 {(() => {
                   const allMissing = BGM_MUSIC.every(m => unavailableSrcs.has(m.src))
                     && BGM_AMBIENT.every(a => unavailableSrcs.has(a.src))
-                  const activeAmbients = BGM_AMBIENT.filter(a => prefs.ambient[a.id]?.enabled)
-                  const summary = (() => {
-                    if (allMissing) return '尚未加入音檔'
-                    const parts: string[] = []
-                    if (prefs.music) {
-                      const m = BGM_MUSIC.find(x => x.id === prefs.music)
-                      if (m) parts.push(m.label)
-                    }
-                    if (activeAmbients.length > 0) {
-                      parts.push(activeAmbients.map(a => a.label).join('·'))
-                    }
-                    return parts.length === 0 ? '關閉' : parts.join(' + ')
-                  })()
+                  // Pull the summary string from the shared util so the
+                  // immersive bar (focus-timer-immersive.tsx) and this
+                  // settings panel render the same canonical text.
+                  const { summary, hasSelection } = summarizeBgm(prefs.music, prefs.ambient, { allMissing })
+                  const isPlaying = bgmManualPlaying || (state as TimerState) === 'running'
                   return (
                 <div className="pt-2 border-t border-border/60">
-                  <button
-                    type="button"
-                    onClick={() => setShowBgmSettings(v => !v)}
-                    aria-expanded={showBgmSettings}
-                    className="w-full flex items-center justify-between gap-2 py-1.5 px-1 -mx-1 rounded-md hover:bg-secondary/40 transition-colors"
-                  >
-                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-                      <Music2 className="w-3 h-3" />
-                      背景音 / 環境音
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className={cn(
-                        'text-[10px] truncate max-w-[140px]',
-                        allMissing ? 'text-muted-foreground/60 italic' : 'text-foreground/70'
-                      )}>
-                        {summary}
+                  <div className="w-full flex items-center justify-between gap-2 py-1.5 px-1 -mx-1 rounded-md hover:bg-secondary/40 transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!hasSelection || allMissing) return
+                        setBgmManualPlaying(v => !v)
+                      }}
+                      disabled={!hasSelection || allMissing}
+                      aria-pressed={isPlaying}
+                      title={!hasSelection ? '請先選擇音樂或環境音' : isPlaying ? '暫停' : '播放'}
+                      className={cn(
+                        'w-6 h-6 shrink-0 rounded-full flex items-center justify-center transition-colors',
+                        !hasSelection || allMissing
+                          ? 'bg-secondary/30 text-muted-foreground/40 cursor-not-allowed'
+                          : isPlaying
+                            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                            : 'bg-secondary/60 text-foreground hover:bg-secondary',
+                      )}
+                    >
+                      {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 translate-x-[0.5px]" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowBgmSettings(v => !v)}
+                      aria-expanded={showBgmSettings}
+                      className="flex-1 min-w-0 flex items-center justify-between gap-2"
+                    >
+                      <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                        <Music2 className="w-3 h-3" />
+                        背景音 / 環境音
                       </span>
-                      <ChevronDown className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', showBgmSettings && 'rotate-180')} />
-                    </span>
-                  </button>
+                      <span className="flex items-center gap-1.5">
+                        <span className={cn(
+                          'text-[10px] truncate max-w-[140px]',
+                          allMissing ? 'text-muted-foreground/60 italic' : 'text-foreground/70'
+                        )}>
+                          {summary}
+                        </span>
+                        <ChevronDown className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', showBgmSettings && 'rotate-180')} />
+                      </span>
+                    </button>
+                  </div>
                   {showBgmSettings && (
                 <div className="space-y-2 pt-2">
                     <div className="space-y-1.5">

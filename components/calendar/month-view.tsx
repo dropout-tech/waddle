@@ -212,7 +212,7 @@ export function MonthView({
                     key={day}
                     className={cn(
                       'text-center text-xs font-medium py-2',
-                      index === 0 ? 'text-red-400' : index === 6 ? 'text-blue-400' : 'text-muted-foreground'
+                      index === 0 || index === 6 ? 'text-foreground/65' : 'text-muted-foreground'
                     )}
                   >
                     週{day}

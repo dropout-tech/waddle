@@ -460,7 +460,7 @@ function TodayProgressRing({ workspaces }: TodayProgressRingProps) {
   // Color shifts as the user makes progress: muted → primary → emerald.
   const stroke =
     stats.allDone
-      ? 'stroke-emerald-500'
+      ? 'stroke-success'
       : stats.pct > 0
       ? 'stroke-primary'
       : 'stroke-muted-foreground/30'
@@ -502,7 +502,7 @@ function TodayProgressRing({ workspaces }: TodayProgressRingProps) {
         {stats.total === 0 ? (
           <Sparkles className="w-3.5 h-3.5 text-muted-foreground/50" aria-hidden="true" />
         ) : stats.allDone ? (
-          <Sparkles className="w-3.5 h-3.5 text-emerald-500 animate-pulse" aria-hidden="true" />
+          <Sparkles className="w-3.5 h-3.5 text-success" aria-hidden="true" />
         ) : (
           <span className="text-[9px] font-semibold text-foreground tabular-nums">
             {stats.completed}/{stats.total}

@@ -631,14 +631,19 @@ export function TaskDetailModal({
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Urgency: 1–10 with a colored slider track + emphasized current-level chip.
-// Bucket colors: 1–3 emerald (低), 4–6 amber (中), 7–10 red (高).
+// Urgency: 1-10 with a colored slider track + emphasized current-level chip.
+// Buckets map to Waddle urgency tokens (warm OKLCH; sage -> warm orange ->
+// terracotta). No pure red, even at level 10.
 // ────────────────────────────────────────────────────────────────────────────
 
 const URGENCY_BUCKETS = [
-  { label: '低', range: [1, 3], color: 'bg-emerald-500', text: 'text-emerald-700', ring: 'ring-emerald-500/40' },
-  { label: '中', range: [4, 6], color: 'bg-amber-500', text: 'text-amber-700', ring: 'ring-amber-500/40' },
-  { label: '高', range: [7, 10], color: 'bg-red-500', text: 'text-red-700', ring: 'ring-red-500/40' },
+  // chipText is the foreground color when a number sits on top of `color`.
+  // Light urgency tokens (sage / yellow-green) fail WCAG with pure white,
+  // so low/medium chips read against the warm charcoal foreground instead.
+  { label: '低', range: [1, 3], color: 'bg-urgency-low', text: 'text-urgency-low', chipText: 'text-foreground', ring: 'ring-urgency-low/50' },
+  { label: '中', range: [4, 5], color: 'bg-urgency-medium', text: 'text-urgency-medium', chipText: 'text-foreground', ring: 'ring-urgency-medium/50' },
+  { label: '高', range: [6, 8], color: 'bg-urgency-high', text: 'text-urgency-high', chipText: 'text-white', ring: 'ring-urgency-high/50' },
+  { label: '緊急', range: [9, 10], color: 'bg-urgency-critical', text: 'text-urgency-critical', chipText: 'text-white', ring: 'ring-urgency-critical/50' },
 ] as const
 
 function urgencyBucket(level: number) {
@@ -663,8 +668,9 @@ function UrgencySlider({ value, onChange }: UrgencySliderProps) {
           <span className={cn('text-[10px] font-medium', bucket.text)}>{bucket.label}</span>
           <span
             className={cn(
-              'inline-flex items-center justify-center min-w-7 h-7 px-2 rounded-full text-sm font-semibold text-white shadow-sm',
-              bucket.color
+              'inline-flex items-center justify-center min-w-7 h-7 px-2 rounded-full text-sm font-semibold shadow-sm',
+              bucket.color,
+              bucket.chipText,
             )}
           >
             {value}

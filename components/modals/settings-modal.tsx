@@ -1022,7 +1022,7 @@ function NotificationsSettingsTab({
           {/* Overdue Tasks */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
+              <AlertTriangle className="w-4 h-4 text-urgency-critical" />
               <h3 className="text-sm font-semibold text-foreground">過期任務提醒</h3>
             </div>
             
@@ -1083,7 +1083,7 @@ function NotificationsSettingsTab({
           {/* Due Soon */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-amber-500" />
+              <Clock className="w-4 h-4 text-chart-5" />
               <h3 className="text-sm font-semibold text-foreground">即將到期提醒</h3>
             </div>
             
@@ -1144,7 +1144,7 @@ function NotificationsSettingsTab({
           {/* Stale Tasks */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-blue-500" />
+              <Sparkles className="w-4 h-4 text-info" />
               <h3 className="text-sm font-semibold text-foreground">閒置任務提醒</h3>
             </div>
             
@@ -1205,7 +1205,7 @@ function NotificationsSettingsTab({
           {/* High Priority */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-orange-500" />
+              <AlertTriangle className="w-4 h-4 text-urgency-high" />
               <h3 className="text-sm font-semibold text-foreground">高優先任務提醒</h3>
             </div>
             
@@ -1273,7 +1273,7 @@ function NotificationsSettingsTab({
           {/* Scheduling Reminders */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-green-500" />
+              <Calendar className="w-4 h-4 text-chart-3" />
               <h3 className="text-sm font-semibold text-foreground">排程提醒</h3>
             </div>
             
@@ -1335,7 +1335,7 @@ function NotificationsSettingsTab({
           {/* Quiet Hours */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Moon className="w-4 h-4 text-indigo-500" />
+              <Moon className="w-4 h-4 text-chart-4" />
               <h3 className="text-sm font-semibold text-foreground">勿擾時段</h3>
             </div>
             
@@ -1390,7 +1390,7 @@ function NotificationsSettingsTab({
           {/* Workspace Overrides */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-purple-500" />
+              <Layers className="w-4 h-4 text-chart-3" />
               <h3 className="text-sm font-semibold text-foreground">工作區設定</h3>
             </div>
             <p className="text-xs text-muted-foreground pl-6">為不同工作區設定不同的提醒規則</p>

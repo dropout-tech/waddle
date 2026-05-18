@@ -54,7 +54,7 @@ export function CurrentTimeLine({ calendarStartHour, startHour, compact }: Curre
           the same container) leaves room for the labels on the left. */}
       <div
         className={cn(
-          'absolute h-[2px] bg-red-500',
+          'absolute h-[2px] bg-current-time',
           compact ? 'left-0 right-0' : 'left-[52px] right-0',
         )}
       />
@@ -63,7 +63,7 @@ export function CurrentTimeLine({ calendarStartHour, startHour, compact }: Curre
           line regardless of compact mode. */}
       <div
         className={cn(
-          'absolute w-3 h-3 rounded-full bg-red-500 current-time-dot',
+          'absolute w-3 h-3 rounded-full bg-current-time current-time-dot',
           compact ? '-left-1.5' : 'left-[46px]',
         )}
         style={{ top: '-5px' }}

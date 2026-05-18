@@ -113,6 +113,37 @@
   --border-subtle: oklch(0.26 0.012 55);
   --input: oklch(0.26 0.015 55);
   --ring: oklch(0.72 0.14 35);
+
+  /* Urgency — lift saturation slightly on dark cards so the warm hues read
+     against the charcoal background without losing the brand warmth. */
+  --urgency-low: oklch(0.68 0.12 155);
+  --urgency-medium: oklch(0.72 0.14 95);
+  --urgency-high: oklch(0.7 0.16 55);
+  --urgency-critical: oklch(0.65 0.18 25);
+  --overdue: oklch(0.6 0.2 25);
+
+  /* Status colors — slightly more saturated for dark. */
+  --success: oklch(0.68 0.14 155);
+  --warning: oklch(0.72 0.16 85);
+  --danger: oklch(0.65 0.18 25);
+  --info: oklch(0.68 0.12 230);
+
+  /* Workspace + chart — keep hues, lift lightness modestly so they don't
+     blend into the dark card. */
+  --workspace-1: oklch(0.72 0.14 35);
+  --workspace-2: oklch(0.68 0.12 230);
+  --workspace-3: oklch(0.72 0.12 155);
+  --workspace-4: oklch(0.74 0.1 300);
+
+  --calendar-grid: oklch(0.28 0.015 55);
+  --calendar-grid-subtle: oklch(0.24 0.012 55);
+  --current-time: oklch(0.72 0.14 35);
+
+  --chart-1: oklch(0.72 0.14 35);
+  --chart-2: oklch(0.68 0.12 230);
+  --chart-3: oklch(0.72 0.12 155);
+  --chart-4: oklch(0.74 0.1 300);
+  --chart-5: oklch(0.74 0.14 55);
 }
 
 @theme inline {

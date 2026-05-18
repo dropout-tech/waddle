@@ -160,12 +160,12 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
                     'w-6 h-6 rounded text-[10px] font-bold transition-all',
                     filters.urgency.includes(level)
                       ? level <= 3
-                        ? 'bg-blue-500 text-white'
+                        ? 'bg-urgency-low text-foreground'
                         : level <= 5
-                        ? 'bg-emerald-500 text-white'
-                        : level <= 7
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-red-500 text-white'
+                        ? 'bg-urgency-medium text-foreground'
+                        : level <= 8
+                        ? 'bg-urgency-high text-white'
+                        : 'bg-urgency-critical text-white'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                   )}
                 >

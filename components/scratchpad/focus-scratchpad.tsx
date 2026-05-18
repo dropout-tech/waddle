@@ -363,7 +363,7 @@ export function FocusScratchpad({
               {items.length > 0 && isToday && (
                 <button
                   onClick={clearAll}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                 >
                   <Trash2 className="w-3 h-3" />
                   清除
@@ -537,7 +537,7 @@ export function FocusScratchpad({
                   {/* Delete Button */}
                   <button
                     onClick={() => deleteItem(item.id)}
-                    className="absolute top-2 right-2 z-10 p-1 rounded-lg bg-background/80 backdrop-blur-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-500 transition-all"
+                    className="absolute top-2 right-2 z-10 p-1 rounded-lg bg-background/80 backdrop-blur-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
                   >
                     <X className="w-3 h-3" />
                   </button>

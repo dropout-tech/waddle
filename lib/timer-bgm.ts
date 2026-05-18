@@ -217,3 +217,37 @@ export function getBgmEngine(): BgmEngine | null {
   if (!engine) engine = new BgmEngine()
   return engine
 }
+
+export interface AmbientPref { enabled: boolean; volume: number }
+
+export interface BgmSummary {
+  summary: string
+  hasSelection: boolean
+  activeAmbients: AmbientMeta[]
+  musicMeta: MusicMeta | null
+}
+
+// Single source of truth for the "what's playing" string. Both the desktop
+// settings panel and the mobile immersive bar read from this so they don't
+// drift.
+export function summarizeBgm(
+  music: BgmMusicId | null,
+  ambient: Record<BgmAmbientId, AmbientPref>,
+  opts: { allMissingLabel?: string; offLabel?: string; allMissing?: boolean } = {},
+): BgmSummary {
+  const activeAmbients = BGM_AMBIENT.filter((a) => ambient[a.id]?.enabled)
+  const musicMeta = music ? BGM_MUSIC.find((m) => m.id === music) ?? null : null
+  const hasSelection = !!music || activeAmbients.length > 0
+  let summary: string
+  if (opts.allMissing) {
+    summary = opts.allMissingLabel ?? '尚未加入音檔'
+  } else if (!hasSelection) {
+    summary = opts.offLabel ?? '關閉'
+  } else {
+    const parts: string[] = []
+    if (musicMeta) parts.push(musicMeta.label)
+    if (activeAmbients.length > 0) parts.push(activeAmbients.map((a) => a.label).join('·'))
+    summary = parts.join(' + ')
+  }
+  return { summary, hasSelection, activeAmbients, musicMeta }
+}

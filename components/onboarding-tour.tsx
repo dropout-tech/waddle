@@ -246,7 +246,10 @@ function computeTooltipPosition(
 // Confetti — small CSS particle burst
 // ─────────────────────────────────────────────────────────
 
-const CONFETTI_COLORS = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#a855f7']
+// Warm-palette confetti — mirrors workspace + chart tokens so the burst feels
+// like Waddle, not Linear. Hues stay in 25-300 OKLCH range (no cool indigo /
+// blue / pure red).
+const CONFETTI_COLORS = ['#e07b5a', '#8fae8b', '#c4a4b5', '#d4a76a', '#b58fae', '#7da2b8']
 
 function Confetti({ x, y }: { x: number; y: number }) {
   return (
@@ -482,13 +485,16 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
             width: rect.width,
             height: rect.height,
             borderRadius: 12,
-            boxShadow: '0 0 0 9999px rgba(0,0,0,0.65), 0 0 0 2px rgba(99, 102, 241, 0.7), 0 0 32px 4px rgba(99, 102, 241, 0.45)',
+            // Warm dim + spotlight ring read from tokens so dark mode and
+            // future brand-hue tweaks track automatically. color-mix is
+            // supported in box-shadow values in all evergreen browsers.
+            boxShadow: '0 0 0 9999px color-mix(in oklch, var(--foreground) 55%, transparent), 0 0 0 2px color-mix(in oklch, var(--primary) 85%, transparent), 0 0 32px 4px color-mix(in oklch, var(--primary) 40%, transparent)',
           }}
         />
       ) : (
         <div
           className={cn(
-            'absolute inset-0 bg-black/65 pointer-events-auto transition-opacity duration-300',
+            'absolute inset-0 bg-foreground/55 pointer-events-auto transition-opacity duration-300',
             mounted ? 'opacity-100' : 'opacity-0'
           )}
           onClick={() => {
@@ -509,6 +515,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
           top: tooltipPos.top,
           left: tooltipPos.left,
           width: TOOLTIP_WIDTH,
+          maxWidth: 'calc(100vw - 24px)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -629,7 +636,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
         {!isLast && (
           <button
             onClick={onComplete}
-            className="absolute -bottom-7 left-1/2 -translate-x-1/2 text-xs text-white/70 hover:text-white transition-colors"
+            className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[11px] px-3 py-1 rounded-full bg-foreground/80 text-background hover:bg-foreground transition-colors backdrop-blur-sm"
           >
             略過導覽
           </button>
