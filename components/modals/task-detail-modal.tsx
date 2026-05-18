@@ -9,6 +9,7 @@ import type { Task, Workspace } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { renderNotesWithLinks } from '@/lib/notes-render'
+import { toDateString } from '@/lib/calendar-utils'
 
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -785,55 +786,91 @@ function TimeBlockSection({
     onEndTimeChange('')
   }
 
+  // Quick-date helpers — most tasks land on today, tomorrow, or "next Mon".
+  // Native date picker is still available for anything farther out.
+  const todayStr = toDateString(new Date())
+  const tomorrowStr = toDateString(new Date(Date.now() + 86400000))
+  const quickDates: { label: string; value: string }[] = [
+    { label: '今天', value: todayStr },
+    { label: '明天', value: tomorrowStr },
+  ]
+
   return (
-    <div className="space-y-3 p-4 rounded-xl bg-secondary/30 border border-border">
-      {/* Date */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <Calendar className="w-3.5 h-3.5" />
-            排程日期
-          </label>
-          {hasSchedule && (
-            <button
-              type="button"
-              onClick={handleClearAll}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              title="清空日期與時段，任務移回左側待排程"
-            >
-              <X className="w-3 h-3" />
-              取消排程
-            </button>
-          )}
-        </div>
-        <Input
-          type="date"
-          value={scheduledDate}
-          onChange={(e) => onScheduledDateChange(e.target.value)}
-          className="h-9"
-        />
+    <div className="space-y-4 p-4 rounded-xl bg-secondary/30 border border-border">
+      {/* Header: section title + clear shortcut */}
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
+          <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+          排程
+        </label>
+        {hasSchedule && (
+          <button
+            type="button"
+            onClick={handleClearAll}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            title="清空日期與時段，任務移回左側待排程"
+          >
+            <X className="w-3 h-3" />
+            取消排程
+          </button>
+        )}
       </div>
 
-      {/* Start / End time pair with duration */}
+      {/* Date row: quick chips + native picker side-by-side */}
       <div className="space-y-1.5">
+        <div className="flex items-center gap-1.5">
+          {quickDates.map(d => {
+            const active = scheduledDate === d.value
+            return (
+              <button
+                key={d.value}
+                type="button"
+                onClick={() => onScheduledDateChange(active ? '' : d.value)}
+                aria-pressed={active}
+                className={cn(
+                  'px-2.5 h-8 rounded-lg text-xs font-medium transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  active
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card text-foreground border border-border hover:bg-secondary'
+                )}
+              >
+                {d.label}
+              </button>
+            )
+          })}
+          <Input
+            type="date"
+            value={scheduledDate}
+            onChange={(e) => onScheduledDateChange(e.target.value)}
+            className="h-8 flex-1 text-xs"
+            aria-label="排程日期"
+          />
+        </div>
+      </div>
+
+      {/* Time row: start → end with inline ± stepper on end */}
+      <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <label className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
             <Clock className="w-3.5 h-3.5" />
             時段
           </label>
           {duration !== null && (
             <span
               className={cn(
-                'text-[11px] font-medium px-2 py-0.5 rounded-full',
+                'text-[11px] font-medium px-2 py-0.5 rounded-full tabular-nums',
                 duration <= 0
                   ? 'bg-destructive/10 text-destructive'
                   : 'bg-primary/10 text-primary'
               )}
             >
-              {duration <= 0 ? '結束需晚於開始' : `時長 ${formatDuration(duration)}`}
+              {duration <= 0 ? '結束需晚於開始' : formatDuration(duration)}
             </span>
           )}
         </div>
+
+        {/* Start / End inputs — end has integrated ±15 stepper */}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           <Input
             type="time"
@@ -841,7 +878,6 @@ function TimeBlockSection({
             onChange={(e) => {
               const v = e.target.value
               onStartTimeChange(v)
-              // Keep duration if user already had end time set
               const newStart = parseTime(v)
               if (newStart !== null && endMin !== null && duration && duration > 0) {
                 onEndTimeChange(formatTimeFromMinutes(Math.min(24 * 60 - 1, newStart + duration)))
@@ -851,18 +887,41 @@ function TimeBlockSection({
             aria-label="開始時間"
           />
           <span className="text-muted-foreground text-sm" aria-hidden="true">→</span>
-          <Input
-            type="time"
-            value={endTime}
-            onChange={(e) => onEndTimeChange(e.target.value)}
-            className="h-9 font-mono text-center"
-            aria-label="結束時間"
-          />
+          <div className="relative">
+            <Input
+              type="time"
+              value={endTime}
+              onChange={(e) => onEndTimeChange(e.target.value)}
+              className="h-9 font-mono text-center pr-12"
+              aria-label="結束時間"
+            />
+            {/* End-time stepper — placed where the right edge of the input
+                would otherwise sit, so adjustments feel attached to the
+                field they modify rather than buried in a chips row. */}
+            <div className="absolute inset-y-0 right-1 flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => adjustEnd(-15)}
+                aria-label="結束時間 -15 分鐘"
+                className="w-5 h-5 flex items-center justify-center rounded text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                onClick={() => adjustEnd(15)}
+                aria-label="結束時間 +15 分鐘"
+                className="w-5 h-5 flex items-center justify-center rounded text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                +
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Quick presets: snap end to start + N minutes */}
-        <div className="flex items-center gap-1.5 flex-wrap pt-1">
-          <span className="text-[10px] text-muted-foreground mr-0.5">快速設定</span>
+        {/* Quick duration chips — snap end = start + N. No leading label;
+            the chips are self-explanatory next to the time inputs above. */}
+        <div className="flex items-center gap-1.5 flex-wrap">
           {QUICK_DURATIONS_MIN.map((m) => {
             const active = duration === m
             return (
@@ -873,34 +932,17 @@ function TimeBlockSection({
                 disabled={startMin === null}
                 aria-pressed={active}
                 className={cn(
-                  'px-2 py-0.5 rounded-md text-[10px] font-medium transition-all',
+                  'px-2.5 h-7 rounded-md text-[11px] font-medium transition-all',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   active
                     ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-muted-foreground hover:bg-secondary/80 disabled:opacity-40 disabled:cursor-not-allowed'
+                    : 'bg-card text-muted-foreground border border-border hover:bg-secondary disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-card'
                 )}
               >
                 {formatDuration(m)}
               </button>
             )
           })}
-          <span className="mx-0.5 w-px h-3 bg-border" />
-          <button
-            type="button"
-            onClick={() => adjustEnd(-15)}
-            aria-label="結束時間 -15 分鐘"
-            className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-secondary text-muted-foreground hover:bg-secondary/80 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            −15
-          </button>
-          <button
-            type="button"
-            onClick={() => adjustEnd(15)}
-            aria-label="結束時間 +15 分鐘"
-            className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-secondary text-muted-foreground hover:bg-secondary/80 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            +15
-          </button>
         </div>
       </div>
     </div>

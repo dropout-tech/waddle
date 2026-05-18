@@ -131,6 +131,9 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   const [focusType, setFocusType] = useState(FOCUS_TYPES[0])
   const [customLabel, setCustomLabel] = useState('')
   const [showSettings, setShowSettings] = useState(false)
+  // Sound/music subsection collapse — default closed so the settings panel
+  // doesn't look like a wall of chips and sliders the first time it opens.
+  const [showBgmSettings, setShowBgmSettings] = useState(false)
   
   // Timer state
   const [timeLeft, setTimeLeft] = useState(25 * 60) // seconds for pomodoro
@@ -682,10 +685,50 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                   </div>
                 )}
 
-                {/* Background music + ambient overlays — available in both
-                    pomodoro and stopwatch so users get the same focus
-                    soundscape whether they're timing 25 min or open-ended. */}
-                <div className="space-y-2 pt-2 border-t border-border/60">
+                {/* Background music + ambient overlays — collapsible so the
+                    settings panel stays scannable. Available in both pomodoro
+                    and stopwatch. When closed, summarizes the active selection
+                    so the user knows whether anything is playing. */}
+                {(() => {
+                  const allMissing = BGM_MUSIC.every(m => unavailableSrcs.has(m.src))
+                    && BGM_AMBIENT.every(a => unavailableSrcs.has(a.src))
+                  const activeAmbients = BGM_AMBIENT.filter(a => prefs.ambient[a.id]?.enabled)
+                  const summary = (() => {
+                    if (allMissing) return '尚未加入音檔'
+                    const parts: string[] = []
+                    if (prefs.music) {
+                      const m = BGM_MUSIC.find(x => x.id === prefs.music)
+                      if (m) parts.push(m.label)
+                    }
+                    if (activeAmbients.length > 0) {
+                      parts.push(activeAmbients.map(a => a.label).join('·'))
+                    }
+                    return parts.length === 0 ? '關閉' : parts.join(' + ')
+                  })()
+                  return (
+                <div className="pt-2 border-t border-border/60">
+                  <button
+                    type="button"
+                    onClick={() => setShowBgmSettings(v => !v)}
+                    aria-expanded={showBgmSettings}
+                    className="w-full flex items-center justify-between gap-2 py-1.5 px-1 -mx-1 rounded-md hover:bg-secondary/40 transition-colors"
+                  >
+                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                      <Music2 className="w-3 h-3" />
+                      背景音 / 環境音
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className={cn(
+                        'text-[10px] truncate max-w-[140px]',
+                        allMissing ? 'text-muted-foreground/60 italic' : 'text-foreground/70'
+                      )}>
+                        {summary}
+                      </span>
+                      <ChevronDown className={cn('w-3.5 h-3.5 text-muted-foreground transition-transform', showBgmSettings && 'rotate-180')} />
+                    </span>
+                  </button>
+                  {showBgmSettings && (
+                <div className="space-y-2 pt-2">
                     <div className="space-y-1.5">
                       <label className="text-[11px] text-muted-foreground flex items-center gap-1.5">
                         <Music2 className="w-3 h-3" />
@@ -803,6 +846,10 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                       </p>
                     )}
                   </div>
+                  )}
+                </div>
+                  )
+                })()}
               </div>
             )}
 
