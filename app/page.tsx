@@ -15,6 +15,8 @@ import { SettingsModal } from '@/components/modals/settings-modal'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { useMeetingReminders } from '@/hooks/use-meeting-reminders'
+import { useWaterReminder } from '@/hooks/use-water-reminder'
+import { WaterReminderModal } from '@/components/modals/water-reminder-modal'
 import { toDateString } from '@/lib/calendar-utils'
 import { findTaskById } from '@/lib/task-utils'
 import type { Task, SlotType, TimeBlock } from '@/lib/types'
@@ -59,6 +61,9 @@ export default function WaddlePage() {
   // each one starts. Pref + permission live in localStorage / Notification
   // API respectively; the hook is a no-op when either is missing.
   useMeetingReminders(workspaces)
+
+  // Hourly (default) water-break nudge — friendly popup, off via settings.
+  const water = useWaterReminder()
 
   // Slot types — generated dynamically from current workspaces, plus static
   // built-in time-block types (break/buffer/focus) and any user customs.
@@ -411,6 +416,11 @@ export default function WaddlePage() {
       />
       <KeyboardShortcutsHint />
       <Toaster position="bottom-right" richColors closeButton />
+      <WaterReminderModal
+        isOpen={water.isOpen}
+        onDrink={water.dismiss}
+        onSnooze={water.snooze}
+      />
     </ErrorBoundary>
   )
 }

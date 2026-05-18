@@ -18,6 +18,15 @@ import {
   ensureNotificationPermission,
   type ReminderLead,
 } from '@/lib/meeting-reminder'
+import {
+  WATER_REMINDER_INTERVALS,
+  type WaterReminderInterval,
+  getWaterReminderEnabled,
+  getWaterReminderInterval,
+  scheduleNextWaterReminder,
+  setWaterReminderEnabled,
+  setWaterReminderInterval,
+} from '@/lib/water-reminder'
 
 // Map icon names to components
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -117,6 +126,9 @@ export function SettingsModal({
   const [taskSoundEnabled, setTaskSoundEnabledState] = useState<boolean>(() => getTaskCompleteSoundEnabled())
   // Meeting reminder lead time (5/10/15 mins, or null = off). Per-device.
   const [reminderLead, setReminderLeadState] = useState<ReminderLead>(() => getReminderLead())
+  // Water-break reminder prefs — per-device, same pattern as the others.
+  const [waterEnabled, setWaterEnabledState] = useState<boolean>(() => getWaterReminderEnabled())
+  const [waterInterval, setWaterIntervalState] = useState<WaterReminderInterval>(() => getWaterReminderInterval())
   const [editingSlotType, setEditingSlotType] = useState<SlotType | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [newSlotType, setNewSlotType] = useState<Partial<SlotType>>({
@@ -623,6 +635,52 @@ export function SettingsModal({
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Water-break reminder */}
+            <div className="space-y-2">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div className="flex-1 pr-4">
+                  <div className="text-sm text-foreground">喝水提醒</div>
+                  <div className="text-xs text-muted-foreground">每隔一段時間，Waddle 會跳出來提醒你補水</div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={waterEnabled}
+                  onChange={(e) => {
+                    const next = e.target.checked
+                    setWaterEnabledState(next)
+                    setWaterReminderEnabled(next)
+                    // Re-arm the next reminder relative to "now" so toggling
+                    // on doesn't immediately fire from a stale past timestamp.
+                    if (next) scheduleNextWaterReminder(waterInterval)
+                  }}
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+              </label>
+              {waterEnabled && (
+                <div className="flex flex-wrap gap-1.5">
+                  {WATER_REMINDER_INTERVALS.map((mins) => (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => {
+                        setWaterIntervalState(mins)
+                        setWaterReminderInterval(mins)
+                        scheduleNextWaterReminder(mins)
+                      }}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                        waterInterval === mins
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-card border border-border text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {mins} 分鐘
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Keep today's completed in list */}

@@ -105,12 +105,16 @@ const DESKTOP_STEPS: TourStep[] = [
   },
   {
     target: '[data-tour="focus-timer"]',
-    title: '專注計時器',
-    body: '右下角番茄鐘。設定 25 分鐘專心做一件事，時間到提醒。',
+    title: '專注計時器 ＋ 背景音',
+    body: '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Waddle 會輕輕提醒你。',
     placement: 'left',
     padding: 6,
     interactive: true,
     hint: '👉 點開計時器',
+  },
+  {
+    title: '💧 喝水小提醒',
+    body: '預設每 60 分鐘，Waddle 會跳出來提醒你喝口水。可以選「再過一下」snooze 五分鐘，或在設定裡改成 30/90/120 分鐘，不想要也可以關掉。',
   },
   {
     target: '[data-tour="quick-links-bar"]',
@@ -175,6 +179,18 @@ const MOBILE_STEPS: TourStep[] = [
   {
     title: '✨ 底部四分頁',
     body: '任務 / 白板 / 日曆 / 連結。中間「白板」隨時記點子；最右邊「連結」放你常開的網址（Notion、Gmail 等等），點一下開新分頁。',
+  },
+  {
+    target: '[data-tour="focus-timer"]',
+    title: '專注計時器 ＋ 背景音',
+    body: '右下角浮動小球是番茄鐘。點開可全螢幕進入專注模式、配 Lo-fi / 雨聲 / 咖啡店白噪音，結束時 Waddle 輕輕提醒。',
+    placement: 'top',
+    padding: 6,
+    hint: '👉 點開試試',
+  },
+  {
+    title: '💧 喝水小提醒',
+    body: '預設每 60 分鐘，Waddle 會跳出來提醒你喝口水。可以「再過一下」snooze 五分鐘，或在設定裡改間隔 / 關掉。',
   },
   {
     title: '✨ 你準備好了！',
