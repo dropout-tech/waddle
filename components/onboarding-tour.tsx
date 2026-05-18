@@ -90,7 +90,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="calendar-export"]',
     title: '匯出行程圖檔',
-    body: '挑日期範圍，產出乾淨的 PNG — 適合分享到 LINE / IG / Slack。隱私模式可以只顯示時段顏色不洩漏內容。',
+    body: '挑日期範圍，產出乾淨的 PNG，適合分享到 LINE / IG / Slack。隱私模式可以只顯示時段顏色不洩漏內容。',
     placement: 'bottom',
     padding: 6,
   },

@@ -402,7 +402,7 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
             <MetricCard
               title="過期任務"
               value={stats.overdue}
-              subtitle="需要立即處理"
+              subtitle="可以挑個時間做"
               icon={AlertTriangle}
               color={stats.overdue > 0 ? "red" : "green"}
             />
@@ -421,11 +421,11 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
               <h3 className="font-medium">每日完成趨勢</h3>
               <div className="flex items-center gap-4 text-xs">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <div className="w-3 h-3 rounded-full bg-success" />
                   <span className="text-muted-foreground">已完成</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <div className="w-3 h-3 rounded-full bg-info" />
                   <span className="text-muted-foreground">新建立</span>
                 </div>
               </div>
@@ -440,12 +440,12 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
                   <div key={i} className="flex-1 flex flex-col items-center gap-1">
                     <div className="w-full flex items-end justify-center gap-0.5 h-32">
                       <div 
-                        className="w-2 bg-green-500 rounded-t transition-all"
+                        className="w-2 bg-success rounded-t transition-all"
                         style={{ height: `${completedHeight}%`, minHeight: day.completed > 0 ? '4px' : '0' }}
                         title={`完成: ${day.completed}`}
                       />
                       <div 
-                        className="w-2 bg-blue-500 rounded-t transition-all"
+                        className="w-2 bg-info rounded-t transition-all"
                         style={{ height: `${createdHeight}%`, minHeight: day.created > 0 ? '4px' : '0' }}
                         title={`建立: ${day.created}`}
                       />
@@ -478,7 +478,7 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
                       </span>
                       <span className={cn(
                         "font-medium",
-                        ws.rate >= 80 ? "text-green-600" : ws.rate >= 50 ? "text-yellow-600" : "text-red-600"
+                        ws.rate >= 80 ? "text-success" : ws.rate >= 50 ? "text-urgency-medium" : "text-urgency-critical"
                       )}>
                         {ws.rate}%
                       </span>
@@ -550,11 +550,11 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
                   key={peak.hour}
                   className={cn(
                     "p-4 rounded-xl border",
-                    i === 0 ? "bg-yellow-500/10 border-yellow-500/30" : "bg-secondary/30 border-border"
+                    i === 0 ? "bg-urgency-medium/10 border-urgency-medium/40" : "bg-secondary/30 border-border"
                   )}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    {i === 0 && <Award className="w-5 h-5 text-yellow-600" />}
+                    {i === 0 && <Award className="w-5 h-5 text-urgency-medium" />}
                     <span className="text-2xl font-bold">
                       {peak.hour.toString().padStart(2, '0')}:00
                     </span>
@@ -571,16 +571,16 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
           <div className="p-5 rounded-xl bg-card border border-border">
             <h3 className="font-medium mb-4">待處理任務優先級</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
-                <div className="text-2xl font-bold text-red-600">{priorityStats.high}</div>
+              <div className="p-4 rounded-xl bg-urgency-critical/10 border border-urgency-critical/30">
+                <div className="text-2xl font-bold text-urgency-critical">{priorityStats.high}</div>
                 <div className="text-sm text-muted-foreground mt-1">高優先</div>
               </div>
-              <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-                <div className="text-2xl font-bold text-yellow-600">{priorityStats.medium}</div>
+              <div className="p-4 rounded-xl bg-urgency-medium/10 border border-urgency-medium/30">
+                <div className="text-2xl font-bold text-urgency-medium">{priorityStats.medium}</div>
                 <div className="text-sm text-muted-foreground mt-1">中優先</div>
               </div>
-              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                <div className="text-2xl font-bold text-blue-600">{priorityStats.low}</div>
+              <div className="p-4 rounded-xl bg-info/10 border border-info/30">
+                <div className="text-2xl font-bold text-info">{priorityStats.low}</div>
                 <div className="text-sm text-muted-foreground mt-1">低優先</div>
               </div>
               <div className="p-4 rounded-xl bg-secondary/50 border border-border">
@@ -616,14 +616,14 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
               </div>
               {stats.meetingTimeShare > 50 && (
                 <div className="mt-2 text-xs text-muted-foreground italic">
-                  超過一半排程時間都在開會 — 留意專注時段
+                  超過一半排程時間都在開會，記得也留點專注的空檔給自己
                 </div>
               )}
             </div>
             <div className="p-5 rounded-xl bg-card border border-border">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-emerald-500/10">
-                  <Activity className="w-5 h-5 text-emerald-600" />
+                <div className="p-2 rounded-lg bg-success/10">
+                  <Activity className="w-5 h-5 text-success" />
                 </div>
                 <div>
                   <div className="font-medium">深度工作時間</div>
@@ -641,7 +641,7 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
               </div>
               <div className="h-2 bg-secondary rounded-full mt-3 overflow-hidden">
                 <div
-                  className="h-full bg-emerald-500 rounded-full transition-all"
+                  className="h-full bg-success rounded-full transition-all"
                   style={{ width: `${Math.min(100, 100 - stats.meetingTimeShare)}%` }}
                 />
               </div>
@@ -652,8 +652,8 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-5 rounded-xl bg-card border border-border">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-blue-500/10">
-                  <Calendar className="w-5 h-5 text-blue-600" />
+                <div className="p-2 rounded-lg bg-info/10">
+                  <Calendar className="w-5 h-5 text-info" />
                 </div>
                 <div>
                   <div className="font-medium">排程率</div>
@@ -665,15 +665,15 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
               </div>
               <div className="h-2 bg-secondary rounded-full mt-3 overflow-hidden">
                 <div 
-                  className="h-full bg-blue-500 rounded-full transition-all"
+                  className="h-full bg-info rounded-full transition-all"
                   style={{ width: `${stats.total > 0 ? (stats.scheduled / stats.total) * 100 : 0}%` }}
                 />
               </div>
             </div>
             <div className="p-5 rounded-xl bg-card border border-border">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-purple-500/10">
-                  <Clock className="w-5 h-5 text-purple-600" />
+                <div className="p-2 rounded-lg bg-chart-4/10">
+                  <Clock className="w-5 h-5 text-chart-4" />
                 </div>
                 <div>
                   <div className="font-medium">截止日設定率</div>
@@ -685,7 +685,7 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
               </div>
               <div className="h-2 bg-secondary rounded-full mt-3 overflow-hidden">
                 <div 
-                  className="h-full bg-purple-500 rounded-full transition-all"
+                  className="h-full bg-chart-4 rounded-full transition-all"
                   style={{ width: `${stats.total > 0 ? (stats.withDueDate / stats.total) * 100 : 0}%` }}
                 />
               </div>
@@ -698,22 +698,22 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
       {activeTab === 'habits' && (
         <div className="space-y-6">
           {/* Streak Card */}
-          <div className="p-6 rounded-xl bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/30">
+          <div className="p-6 rounded-xl bg-urgency-high/15 border border-urgency-high/30">
             <div className="flex items-center gap-4">
-              <div className="p-3 rounded-full bg-orange-500/20">
-                <Flame className="w-8 h-8 text-orange-600" />
+              <div className="p-3 rounded-full bg-urgency-high/20">
+                <Flame className="w-8 h-8 text-urgency-high" />
               </div>
               <div>
                 <div className="text-4xl font-bold">{streak.current} 天</div>
                 <div className="text-sm text-muted-foreground mt-1">
-                  目前連續完成天數 {streak.current > 0 && '(繼續保持!)'}
+                  目前連續完成天數 {streak.current > 0 && '(保持這個節奏)'}
                 </div>
               </div>
             </div>
             {streak.max > streak.current && (
               <div className="mt-4 p-3 rounded-lg bg-background/50">
                 <div className="flex items-center gap-2 text-sm">
-                  <Award className="w-4 h-4 text-yellow-600" />
+                  <Award className="w-4 h-4 text-urgency-medium" />
                   <span>最高紀錄: {streak.max} 天連續完成</span>
                 </div>
               </div>
@@ -813,8 +813,8 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
               <h3 className="font-medium mb-3">習慣建議</h3>
               <div className="space-y-3">
                 {streak.current === 0 && (
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-yellow-500/10">
-                    <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-urgency-medium/10">
+                    <AlertTriangle className="w-5 h-5 text-urgency-medium flex-shrink-0 mt-0.5" />
                     <div className="text-sm">
                       <p className="font-medium">開始新的連續紀錄</p>
                       <p className="text-muted-foreground mt-1">今天完成至少一個任務來開始你的連續天數</p>
@@ -822,8 +822,8 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
                   </div>
                 )}
                 {streak.current >= 3 && streak.current < 7 && (
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/10">
-                    <TrendingUp className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-info/10">
+                    <TrendingUp className="w-5 h-5 text-info flex-shrink-0 mt-0.5" />
                     <div className="text-sm">
                       <p className="font-medium">保持勢頭</p>
                       <p className="text-muted-foreground mt-1">再 {7 - streak.current} 天就能達到一週連續！</p>
@@ -831,8 +831,8 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
                   </div>
                 )}
                 {streak.current >= 7 && (
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-green-500/10">
-                    <Award className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-success/10">
+                    <Award className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
                     <div className="text-sm">
                       <p className="font-medium">太棒了！</p>
                       <p className="text-muted-foreground mt-1">你已經連續 {streak.current} 天保持生產力</p>
@@ -860,7 +860,7 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
             <div className="space-y-4">
               {overdueAnalysis.critical.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-red-600">嚴重過期 ({">"}7 天)</h4>
+                  <h4 className="text-sm font-medium text-urgency-critical">很久沒看了 ({">"}7 天)</h4>
                   {overdueAnalysis.critical.slice(0, 5).map(task => (
                     <TaskRow key={task.id} task={task} />
                   ))}
@@ -868,7 +868,7 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
               )}
               {overdueAnalysis.warning.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-yellow-600">需要關注 (3-7 天)</h4>
+                  <h4 className="text-sm font-medium text-urgency-medium">放著有點久了 (3-7 天)</h4>
                   {overdueAnalysis.warning.slice(0, 5).map(task => (
                     <TaskRow key={task.id} task={task} />
                   ))}
@@ -876,15 +876,15 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
               )}
               {overdueAnalysis.minor.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-orange-600">輕微過期 ({"<"}3 天)</h4>
+                  <h4 className="text-sm font-medium text-urgency-high">稍微晚了一點 ({"<"}3 天)</h4>
                   {overdueAnalysis.minor.slice(0, 5).map(task => (
                     <TaskRow key={task.id} task={task} />
                   ))}
                 </div>
               )}
               {stats.overdue === 0 && (
-                <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10">
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-success/10">
+                  <CheckCircle2 className="w-5 h-5 text-success" />
                   <span className="text-sm">太棒了！目前沒有過期的任務</span>
                 </div>
               )}
@@ -931,7 +931,7 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
                 <SuggestionCard
                   type="success"
                   title="表現優秀"
-                  description="你的完成率超過 80%！繼續保持這個節奏，並考慮挑戰更具野心的目標。"
+                  description="你的完成率超過 80%，狀態很好。可以試著放一些更有挑戰的事情進來。"
                 />
               )}
               {streak.current >= 7 && (
@@ -976,11 +976,11 @@ function MetricCard({
   color: 'green' | 'blue' | 'red' | 'orange' | 'purple'
 }) {
   const colorClasses = {
-    green: 'bg-green-500/10 border-green-500/20 text-green-600',
-    blue: 'bg-blue-500/10 border-blue-500/20 text-blue-600',
-    red: 'bg-red-500/10 border-red-500/20 text-red-600',
-    orange: 'bg-orange-500/10 border-orange-500/20 text-orange-600',
-    purple: 'bg-purple-500/10 border-purple-500/20 text-purple-600'
+    green: 'bg-success/10 border-success/30 text-success',
+    blue: 'bg-info/10 border-info/30 text-info',
+    red: 'bg-urgency-critical/10 border-urgency-critical/30 text-urgency-critical',
+    orange: 'bg-urgency-high/10 border-urgency-high/30 text-urgency-high',
+    purple: 'bg-chart-4/10 border-chart-4/30 text-chart-4'
   }
 
   return (
@@ -990,7 +990,7 @@ function MetricCard({
         {trend !== undefined && (
           <div className={cn(
             "flex items-center gap-1 text-xs font-medium",
-            trend >= 0 ? "text-green-600" : "text-red-600"
+            trend >= 0 ? "text-success" : "text-urgency-critical"
           )}>
             {trend >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
             <span>{Math.abs(trend)}%</span>
@@ -1035,9 +1035,9 @@ function CollapsibleSection({
           {badge !== undefined && (
             <span className={cn(
               "px-2 py-0.5 rounded-full text-xs font-medium",
-              badgeColor === 'red' ? "bg-red-500/20 text-red-600" :
-              badgeColor === 'yellow' ? "bg-yellow-500/20 text-yellow-600" :
-              "bg-green-500/20 text-green-600"
+              badgeColor === 'red' ? "bg-urgency-critical/20 text-urgency-critical" :
+              badgeColor === 'yellow' ? "bg-urgency-medium/20 text-urgency-medium" :
+              "bg-success/20 text-success"
             )}>
               {badge}
             </span>
@@ -1064,7 +1064,7 @@ function TaskRow({ task }: { task: Task }) {
         />
         <span className="text-sm truncate">{task.title}</span>
       </div>
-      <span className="text-xs text-red-600 font-medium whitespace-nowrap ml-2">
+      <span className="text-xs text-urgency-critical font-medium whitespace-nowrap ml-2">
         {daysOverdue} 天
       </span>
     </div>
@@ -1083,17 +1083,17 @@ function SuggestionCard({
   action?: string
 }) {
   const styles = {
-    info: 'bg-blue-500/10 border-blue-500/20',
-    warning: 'bg-yellow-500/10 border-yellow-500/20',
-    error: 'bg-red-500/10 border-red-500/20',
-    success: 'bg-green-500/10 border-green-500/20'
+    info: 'bg-info/10 border-info/30',
+    warning: 'bg-urgency-medium/10 border-urgency-medium/30',
+    error: 'bg-urgency-critical/10 border-urgency-critical/30',
+    success: 'bg-success/10 border-success/30'
   }
 
   const iconColors = {
-    info: 'text-blue-600',
-    warning: 'text-yellow-600',
-    error: 'text-red-600',
-    success: 'text-green-600'
+    info: 'text-info',
+    warning: 'text-urgency-medium',
+    error: 'text-urgency-critical',
+    success: 'text-success'
   }
 
   const icons = {
@@ -1138,7 +1138,7 @@ function QuickStat({
   return (
     <div className={cn(
       "p-4 rounded-xl border",
-      warning ? "bg-yellow-500/10 border-yellow-500/20" : "bg-card border-border"
+      warning ? "bg-urgency-medium/10 border-yellow-500/20" : "bg-card border-border"
     )}>
       <div className="text-2xl font-bold">
         {value}

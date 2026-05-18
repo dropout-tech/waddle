@@ -94,7 +94,7 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
           id: 'critical-overdue',
           type: 'overdue',
           priority: 'high',
-          title: `${criticalOverdue.length} 個任務已嚴重過期`,
+          title: `${criticalOverdue.length} 個任務已經放了一陣子`,
           message: `最久的任務已過期 ${formatRelativeTime(daysOverdue)}。建議重新評估這些任務是否仍然需要執行，或考慮刪除/歸檔。`,
           tasks: criticalOverdue,
           actionLabel: '整理任務',
@@ -201,7 +201,7 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
         type: 'reminder',
         priority: 'low',
         title: '多數任務未排程',
-        message: `有 ${noScheduleTasks.length} 個任務沒有設定時間。將任務放入日曆可以大幅提高完成率。`,
+        message: `有 ${noScheduleTasks.length} 個任務還沒排到日曆上。挑個時段放進去，比較容易把事情做完。`,
         tasks: noScheduleTasks.slice(0, 5),
         actionLabel: '排程任務',
         createdAt: new Date(),
@@ -245,6 +245,9 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
       {/* Notification Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
+        aria-label={totalCount > 0 ? `通知 (${totalCount})` : '通知'}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
         className={cn(
           'relative p-2 rounded-lg transition-colors',
           isOpen ? 'bg-secondary' : 'hover:bg-secondary/50'
@@ -252,10 +255,14 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
       >
         <Bell className="w-5 h-5 text-muted-foreground" />
         {totalCount > 0 && (
-          <span className={cn(
-            'absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white',
-            highPriorityCount > 0 ? 'bg-urgency-critical' : 'bg-urgency-high'
-          )}>
+          <span
+            role="status"
+            aria-live="polite"
+            className={cn(
+              'absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white',
+              highPriorityCount > 0 ? 'bg-urgency-critical' : 'bg-urgency-high'
+            )}
+          >
             {totalCount > 9 ? '9+' : totalCount}
           </span>
         )}

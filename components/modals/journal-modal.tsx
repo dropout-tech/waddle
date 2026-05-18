@@ -154,8 +154,8 @@ export function JournalModal({
                       key={task.id}
                       className="flex items-center gap-2 text-sm"
                     >
-                      <div className="w-4 h-4 rounded bg-emerald-500/20 flex items-center justify-center">
-                        <Check className="w-3 h-3 text-emerald-500" />
+                      <div className="w-4 h-4 rounded bg-success/20 flex items-center justify-center">
+                        <Check className="w-3 h-3 text-success" />
                       </div>
                       <span className="text-muted-foreground line-through">
                         {task.title}

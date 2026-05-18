@@ -384,7 +384,7 @@ export function CalendarExportModal({
                 className="w-full gap-2"
               >
                 {justCopied ? (
-                  <Check className="w-4 h-4 text-emerald-500" />
+                  <Check className="w-4 h-4 text-success" />
                 ) : (
                   <Copy className="w-4 h-4" />
                 )}

@@ -188,7 +188,7 @@ export function PanelHeader({
             <div className="flex items-center gap-1.5">
               {/* Weather Widget - Minimal */}
               <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary/50 border border-border">
-                <Sun className="w-3.5 h-3.5 text-amber-500" />
+                <Sun className="w-3.5 h-3.5 text-urgency-medium" />
                 <span className="text-xs font-medium text-foreground">26°</span>
               </div>
 

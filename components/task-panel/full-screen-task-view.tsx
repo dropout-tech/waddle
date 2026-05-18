@@ -412,14 +412,14 @@ export function FullScreenTaskView({
                 className={cn(
                   "p-4 rounded-xl cursor-pointer transition-all",
                   taskFilter === 'today' 
-                    ? "bg-blue-500/10 border-2 border-blue-500" 
-                    : "bg-card border border-border hover:border-blue-500/50"
+                    ? "bg-info/10 border-2 border-info" 
+                    : "bg-card border border-border hover:border-info/50"
                 )}
                 onClick={() => { setActiveTab('tasks'); setTaskFilter('today') }}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 rounded-lg bg-blue-500/10">
-                    <Calendar className="w-4 h-4 text-blue-500" />
+                  <div className="p-2 rounded-lg bg-info/10">
+                    <Calendar className="w-4 h-4 text-info" />
                   </div>
                   <span className="text-sm text-muted-foreground">今日任務</span>
                 </div>
@@ -433,14 +433,14 @@ export function FullScreenTaskView({
                 className={cn(
                   "p-4 rounded-xl cursor-pointer transition-all",
                   taskFilter === 'upcoming' 
-                    ? "bg-amber-500/10 border-2 border-amber-500" 
-                    : "bg-card border border-border hover:border-amber-500/50"
+                    ? "bg-urgency-medium/10 border-2 border-urgency-medium" 
+                    : "bg-card border border-border hover:border-urgency-medium/50"
                 )}
                 onClick={() => { setActiveTab('tasks'); setTaskFilter('upcoming') }}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 rounded-lg bg-amber-500/10">
-                    <Clock className="w-4 h-4 text-amber-500" />
+                  <div className="p-2 rounded-lg bg-urgency-medium/10">
+                    <Clock className="w-4 h-4 text-urgency-medium" />
                   </div>
                   <span className="text-sm text-muted-foreground">即將到期</span>
                 </div>
@@ -452,31 +452,31 @@ export function FullScreenTaskView({
                 className={cn(
                   "p-4 rounded-xl cursor-pointer transition-all",
                   taskFilter === 'overdue' 
-                    ? "bg-red-500/10 border-2 border-red-500" 
-                    : "bg-card border border-border hover:border-red-500/50"
+                    ? "bg-urgency-critical/10 border-2 border-urgency-critical" 
+                    : "bg-card border border-border hover:border-urgency-critical/50"
                 )}
                 onClick={() => { setActiveTab('tasks'); setTaskFilter('overdue') }}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 rounded-lg bg-red-500/10">
-                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                  <div className="p-2 rounded-lg bg-urgency-critical/10">
+                    <AlertTriangle className="w-4 h-4 text-urgency-critical" />
                   </div>
                   <span className="text-sm text-muted-foreground">已過期</span>
                 </div>
-                <div className="text-2xl font-bold text-red-600">{stats.overdue.length}</div>
-                <div className="text-xs text-red-500 mt-1">需要處理</div>
+                <div className="text-2xl font-bold text-urgency-critical">{stats.overdue.length}</div>
+                <div className="text-xs text-urgency-critical mt-1">可以先看看</div>
               </div>
 
-              <div className="p-4 rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20">
+              <div className="p-4 rounded-xl bg-urgency-high/10 border border-urgency-high/30">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 rounded-lg bg-orange-500/20">
-                    <Flame className="w-4 h-4 text-orange-500" />
+                  <div className="p-2 rounded-lg bg-urgency-high/20">
+                    <Flame className="w-4 h-4 text-urgency-high" />
                   </div>
                   <span className="text-sm text-muted-foreground">連續天數</span>
                 </div>
-                <div className="text-2xl font-bold text-orange-600">{stats.streak}</div>
+                <div className="text-2xl font-bold text-urgency-high">{stats.streak}</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {stats.streak > 0 ? '繼續保持！' : '今天開始'}
+                  {stats.streak > 0 ? '保持這個節奏' : '今天開始'}
                 </div>
               </div>
             </div>
@@ -506,12 +506,12 @@ export function FullScreenTaskView({
                         </div>
                         <div className="flex items-center gap-4 text-sm">
                           {ws.stats.overdue > 0 && (
-                            <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-red-600 text-xs font-medium">
+                            <span className="px-2 py-0.5 rounded-full bg-urgency-critical/10 text-urgency-critical text-xs font-medium">
                               {ws.stats.overdue} 過期
                             </span>
                           )}
                           {ws.stats.today > 0 && (
-                            <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 text-xs font-medium">
+                            <span className="px-2 py-0.5 rounded-full bg-info/10 text-info text-xs font-medium">
                               {ws.stats.today} 今日
                             </span>
                           )}
@@ -540,24 +540,24 @@ export function FullScreenTaskView({
                 {/* Overdue Alert */}
                 {stats.overdue.length > 0 && (
                   <div className="space-y-3">
-                    <h2 className="text-lg font-semibold flex items-center gap-2 text-red-600">
+                    <h2 className="text-lg font-semibold flex items-center gap-2 text-urgency-critical">
                       <AlertTriangle className="w-5 h-5" />
-                      需要立即處理
+                      可以先處理
                     </h2>
                     <div className="space-y-2">
                       {stats.overdue.slice(0, 5).map(task => (
                         <div
                           key={task.id}
-                          className="flex items-center gap-3 p-3 rounded-lg bg-red-500/5 border border-red-500/20 hover:bg-red-500/10 transition-colors cursor-pointer"
+                          className="flex items-center gap-3 p-3 rounded-lg bg-urgency-critical/5 border border-urgency-critical/30 hover:bg-urgency-critical/10 transition-colors cursor-pointer"
                           onClick={() => onTaskClick?.(task)}
                         >
                           <button
                             onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id) }}
-                            className="w-5 h-5 rounded-full border-2 border-red-400 hover:bg-red-500/20 flex-shrink-0"
+                            className="w-5 h-5 rounded-full border-2 border-urgency-critical/50 hover:bg-urgency-critical/20 flex-shrink-0"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium truncate">{task.title}</div>
-                            <div className="text-xs text-red-500">
+                            <div className="text-xs text-urgency-critical">
                               過期 {getDaysOverdue(task.dueDate!)} 天
                             </div>
                           </div>
@@ -569,7 +569,7 @@ export function FullScreenTaskView({
                       ))}
                       {stats.overdue.length > 5 && (
                         <button 
-                          className="w-full text-center text-sm text-red-600 py-2 hover:underline"
+                          className="w-full text-center text-sm text-urgency-critical py-2 hover:underline"
                           onClick={() => { setActiveTab('tasks'); setTaskFilter('overdue') }}
                         >
                           查看全部 {stats.overdue.length} 個過期任務
@@ -583,19 +583,19 @@ export function FullScreenTaskView({
                 {stats.highPriority.length > 0 && (
                   <div className="space-y-3">
                     <h2 className="text-lg font-semibold flex items-center gap-2">
-                      <Target className="w-5 h-5 text-orange-500" />
+                      <Target className="w-5 h-5 text-urgency-high" />
                       高優先任務
                     </h2>
                     <div className="space-y-2">
                       {stats.highPriority.slice(0, 4).map(task => (
                         <div
                           key={task.id}
-                          className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border hover:border-orange-500/50 transition-colors cursor-pointer"
+                          className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border hover:border-urgency-high/50 transition-colors cursor-pointer"
                           onClick={() => onTaskClick?.(task)}
                         >
                           <button
                             onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id) }}
-                            className="w-5 h-5 rounded-full border-2 border-orange-400 hover:bg-orange-500/20 flex-shrink-0"
+                            className="w-5 h-5 rounded-full border-2 border-urgency-high/50 hover:bg-urgency-high/20 flex-shrink-0"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium truncate">{task.title}</div>
@@ -924,9 +924,9 @@ export function FullScreenTaskView({
                                           {task.urgency > 0 && (
                                             <span className={cn(
                                               "px-1.5 py-0.5 rounded text-[10px] font-medium",
-                                              task.urgency >= 8 && "bg-red-500/10 text-red-600",
-                                              task.urgency >= 5 && task.urgency < 8 && "bg-orange-500/10 text-orange-600",
-                                              task.urgency < 5 && "bg-green-500/10 text-green-600"
+                                              task.urgency >= 8 && "bg-urgency-critical/10 text-urgency-critical",
+                                              task.urgency >= 5 && task.urgency < 8 && "bg-urgency-high/10 text-urgency-high",
+                                              task.urgency < 5 && "bg-success/10 text-success"
                                             )}>
                                               {task.urgency >= 8 ? '高' : task.urgency >= 5 ? '中' : '低'}
                                             </span>
@@ -934,7 +934,7 @@ export function FullScreenTaskView({
                                           {task.dueDate && (
                                             <span className={cn(
                                               "text-xs",
-                                              new Date(task.dueDate) < now ? "text-red-500 font-medium" : "text-muted-foreground"
+                                              new Date(task.dueDate) < now ? "text-urgency-critical font-medium" : "text-muted-foreground"
                                             )}>
                                               {formatDate(task.dueDate)}
                                             </span>
@@ -1009,7 +1009,7 @@ export function FullScreenTaskView({
                       className={cn(
                         'flex rounded-xl border transition-all cursor-pointer group',
                         taskFilter === 'overdue'
-                          ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10'
+                          ? 'bg-urgency-critical/5 border-urgency-critical/30 hover:bg-urgency-critical/10'
                           : 'bg-card border-border hover:border-primary/30 hover:shadow-sm',
                         density === 'compact' && 'items-center gap-3 px-3 py-2',
                         density === 'comfortable' && 'items-center gap-4 px-4 py-3',
@@ -1025,7 +1025,7 @@ export function FullScreenTaskView({
                           density === 'compact' ? 'w-4 h-4 mt-0' : 'w-5 h-5',
                           density === 'relaxed' && 'mt-1',
                           isOverdue
-                            ? 'border-red-400 hover:bg-red-500/20'
+                            ? 'border-urgency-critical/50 hover:bg-urgency-critical/20'
                             : 'border-muted-foreground hover:border-primary hover:bg-primary/10'
                         )}
                       />
@@ -1095,7 +1095,7 @@ export function FullScreenTaskView({
                         )}
                       >
                         {density !== 'compact' && task.urgency >= 8 && (
-                          <span className="px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 text-xs font-medium">
+                          <span className="px-2 py-0.5 rounded-full bg-urgency-high/10 text-urgency-high text-xs font-medium">
                             高優先
                           </span>
                         )}
@@ -1103,7 +1103,7 @@ export function FullScreenTaskView({
                           <span
                             className={cn(
                               'text-xs whitespace-nowrap',
-                              isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground'
+                              isOverdue ? 'text-urgency-critical font-medium' : 'text-muted-foreground'
                             )}
                           >
                             {isOverdue
@@ -1114,14 +1114,14 @@ export function FullScreenTaskView({
                         {/* Compact: a single tiny urgency dot or overdue mark, no labels */}
                         {density === 'compact' && task.urgency >= 8 && (
                           <span
-                            className="w-1.5 h-1.5 rounded-full bg-orange-500"
+                            className="w-1.5 h-1.5 rounded-full bg-urgency-high"
                             aria-label="高優先"
                             title="高優先"
                           />
                         )}
                         {density === 'compact' && isOverdue && (
                           <span
-                            className="text-[10px] font-medium text-red-500 whitespace-nowrap"
+                            className="text-[10px] font-medium text-urgency-critical whitespace-nowrap"
                             aria-label="已過期"
                           >
                             過期
@@ -1265,7 +1265,7 @@ function WorkspacesView({
             </p>
           </div>
           {summary.overdue > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 text-red-600 text-xs font-medium">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-urgency-critical/10 text-urgency-critical text-xs font-medium">
               <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
               {summary.overdue} 個過期需處理
             </span>
@@ -1311,9 +1311,9 @@ function SummaryStat({
 }) {
   const toneClasses =
     tone === 'red'
-      ? 'text-red-600'
+      ? 'text-urgency-critical'
       : tone === 'amber'
-      ? 'text-amber-600'
+      ? 'text-urgency-medium'
       : tone === 'primary'
       ? 'text-primary'
       : 'text-foreground'
@@ -1440,8 +1440,8 @@ function WorkspaceCard({
           className="text-left px-5 py-3 border-b border-border/60 hover:bg-secondary/40 transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset cursor-pointer"
         >
           <div className="flex items-center gap-1.5 mb-1.5">
-            <Flame className="w-3 h-3 text-orange-500" aria-hidden="true" />
-            <span className="text-[10px] font-semibold text-orange-600 uppercase tracking-wide">最緊急</span>
+            <Flame className="w-3 h-3 text-urgency-high" aria-hidden="true" />
+            <span className="text-[10px] font-semibold text-urgency-high uppercase tracking-wide">最緊急</span>
           </div>
           <div className="flex items-start gap-2">
             <button
@@ -1458,8 +1458,8 @@ function WorkspaceCard({
                   <span
                     className={cn(
                       'inline-flex items-center gap-1 font-medium',
-                      urgentMeta.tone === 'red' && 'text-red-500',
-                      urgentMeta.tone === 'amber' && 'text-amber-600',
+                      urgentMeta.tone === 'red' && 'text-urgency-critical',
+                      urgentMeta.tone === 'amber' && 'text-urgency-medium',
                       urgentMeta.tone === 'primary' && 'text-primary',
                       urgentMeta.tone === 'neutral' && 'text-muted-foreground'
                     )}
@@ -1504,11 +1504,11 @@ function WorkspaceCard({
 
       {/* Caution footer (stuck tasks) */}
       {stats.stuck > 0 && (
-        <div className="px-5 py-2 border-t border-border/60 bg-amber-500/5">
+        <div className="px-5 py-2 border-t border-border/60 bg-urgency-medium/5">
           <button
             type="button"
             onClick={() => onDrillIn(ws.id, 'unscheduled')}
-            className="w-full flex items-center gap-1.5 text-[11px] text-amber-700 hover:text-amber-800 transition-colors"
+            className="w-full flex items-center gap-1.5 text-[11px] text-urgency-medium hover:text-urgency-high transition-colors"
           >
             <AlertTriangle className="w-3 h-3" aria-hidden="true" />
             <span>{stats.stuck} 個任務超過 7 天未排程</span>
@@ -1532,9 +1532,9 @@ function WorkspaceCard({
 
 function HealthBadge({ health }: { health: 'healthy' | 'caution' | 'warning' }) {
   const config = {
-    healthy: { Icon: ShieldCheck, label: '健康', cls: 'bg-emerald-500/10 text-emerald-700' },
-    caution: { Icon: Shield, label: '注意', cls: 'bg-amber-500/10 text-amber-700' },
-    warning: { Icon: ShieldAlert, label: '警示', cls: 'bg-red-500/10 text-red-700' },
+    healthy: { Icon: ShieldCheck, label: '健康', cls: 'bg-success/10 text-success' },
+    caution: { Icon: Shield, label: '注意', cls: 'bg-urgency-medium/10 text-urgency-medium' },
+    warning: { Icon: ShieldAlert, label: '警示', cls: 'bg-urgency-critical/10 text-urgency-critical' },
   } as const
   const { Icon, label, cls } = config[health]
   return (
@@ -1564,7 +1564,7 @@ function KpiTile({
 }) {
   const toneClasses =
     tone === 'red'
-      ? 'text-red-600'
+      ? 'text-urgency-critical'
       : tone === 'primary'
       ? 'text-primary'
       : 'text-foreground'

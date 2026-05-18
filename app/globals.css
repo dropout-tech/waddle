@@ -204,6 +204,9 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Register the brand easing so `ease-quart` and `transition-timing-function: var(--ease-quart)` both work. */
+  --ease-quart: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @layer base {
@@ -450,4 +453,29 @@
 .animate-waddle-bob {
   animation: waddle-bob 1.6s ease-in-out infinite;
   transform-origin: 50% 90%;
+}
+
+/* ------------------------------------------------------------
+ * Motion baseline — Waddle's "慢慢搖擺" rhythm.
+ *
+ * 1) Brand easing token. Anywhere a one-shot transition or animation
+ *    needs a curve, prefer `transition-timing-function: var(--ease-quart)`
+ *    or the Tailwind utility `ease-quart`. No bounce, no spring.
+ * 2) Honor prefers-reduced-motion globally — collapse all transitions
+ *    and animations to a near-instant fade. Components that need full
+ *    motion despite the OS preference (rare) opt back in via the
+ *    `motion-safe:` Tailwind variant.
+ * ------------------------------------------------------------ */
+
+:root {
+  --ease-quart: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

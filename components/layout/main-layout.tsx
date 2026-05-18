@@ -560,7 +560,7 @@ export function MainLayout({
           {/* Left Panel - Task Panel */}
           <div
             className={cn(
-              "h-full transition-all duration-300 ease-in-out relative flex-shrink-0",
+              "h-full transition-all duration-300 ease-quart relative flex-shrink-0",
               isLeftPanelOpen ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
             )}
             style={{ width: isLeftPanelOpen ? `${panelWidth}px` : '0px' }}
@@ -757,16 +757,16 @@ function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], on
 
       {/* Daily Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-          <div className="text-2xl font-bold text-green-600">{completedTasks.length}</div>
+        <div className="p-4 rounded-xl bg-success/10 border border-success/30">
+          <div className="text-2xl font-bold text-success">{completedTasks.length}</div>
           <div className="text-sm text-muted-foreground">已完成任務</div>
         </div>
-        <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
-          <div className="text-2xl font-bold text-orange-600">{incompleteTasks.length}</div>
+        <div className="p-4 rounded-xl bg-urgency-high/10 border border-urgency-high/30">
+          <div className="text-2xl font-bold text-urgency-high">{incompleteTasks.length}</div>
           <div className="text-sm text-muted-foreground">未完成任務</div>
         </div>
-        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-          <div className="text-2xl font-bold text-blue-600">{tasksForDate.length}</div>
+        <div className="p-4 rounded-xl bg-info/10 border border-info/30">
+          <div className="text-2xl font-bold text-info">{tasksForDate.length}</div>
           <div className="text-sm text-muted-foreground">總任務數</div>
         </div>
       </div>
@@ -782,7 +782,7 @@ function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], on
                 className={cn(
                   "flex items-center gap-3 p-3 rounded-lg border",
                   task.isCompleted 
-                    ? "bg-green-500/5 border-green-500/20" 
+                    ? "bg-success/5 border-success/30"
                     : "bg-card border-border"
                 )}
               >
@@ -790,7 +790,7 @@ function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], on
                   className={cn(
                     "w-4 h-4 rounded-full border-2 flex-shrink-0",
                     task.isCompleted 
-                      ? "bg-green-500 border-green-500" 
+                      ? "bg-success border-success"
                       : "border-muted-foreground"
                   )}
                 />

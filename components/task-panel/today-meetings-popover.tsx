@@ -207,8 +207,8 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
                             </span>
                           </span>
                           {isCurrent && (
-                            <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="inline-flex items-center gap-1 text-success font-semibold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-success" />
                               進行中
                             </span>
                           )}
