@@ -101,20 +101,29 @@ class BgmEngine {
   private fadeHandles = new WeakMap<HTMLAudioElement, number>()
 
   /** Fade element volume to a target over FADE_MS using rAF. Cancels any
-   *  in-flight fade on the same element first. */
+   *  in-flight fade on the same element first.
+   *
+   *  Every write to `el.volume` is clamped to [0, 1]: HTMLMediaElement
+   *  throws IndexSizeError on out-of-range values, and floating-point
+   *  drift in the interpolation (or stale el.volume left mid-fade from a
+   *  cancelled tick) can produce tiny negatives like -0.007. One throw
+   *  kills the entire BGM chain — defensive clamp is cheaper than the
+   *  recovery cost. */
   private fadeTo(el: HTMLAudioElement, to: number, ms = FADE_MS) {
     const prev = this.fadeHandles.get(el)
     if (prev !== undefined) cancelAnimationFrame(prev)
-    const from = el.volume
-    if (Math.abs(from - to) < 0.01) {
-      el.volume = to
+    const target = Math.max(0, Math.min(1, to))
+    const from = Math.max(0, Math.min(1, el.volume))
+    if (Math.abs(from - target) < 0.01) {
+      el.volume = target
       this.fadeHandles.delete(el)
       return
     }
     const start = performance.now()
     const tick = (now: number) => {
       const p = Math.min(1, (now - start) / ms)
-      el.volume = from + (to - from) * p
+      const next = from + (target - from) * p
+      el.volume = Math.max(0, Math.min(1, next))
       if (p < 1) {
         this.fadeHandles.set(el, requestAnimationFrame(tick))
       } else {
