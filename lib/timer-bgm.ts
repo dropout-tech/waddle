@@ -90,6 +90,16 @@ class BgmEngine {
   private buffers = new Map<RealMusicId, BufferState>()
   /** Promises for in-flight loads so concurrent calls don't double-fetch. */
   private loading = new Map<RealMusicId, Promise<AudioBuffer | null>>()
+  /** Raw fetched bytes, kept around so we can decode lazily once the
+   *  AudioContext exists. We separate fetch (does not need a gesture) from
+   *  decode + ctx creation (do). This is the key fix for the "press play
+   *  → nothing happens" bug: previously preload() created an AudioContext
+   *  during a mount useEffect (outside any user gesture), and several
+   *  browsers refuse to resume() a context born like that — even if
+   *  resume() is later called inside a click. Now the context is created
+   *  exclusively from synchronous click handlers via unlockAudio(). */
+  private prefetched = new Map<RealMusicId, ArrayBuffer | 'failed'>()
+  private prefetching = new Map<RealMusicId, Promise<ArrayBuffer | null>>()
 
   /** The currently-audible music node, if any. */
   private active: ActiveMusic | null = null
@@ -145,10 +155,42 @@ class BgmEngine {
     return this.ctx
   }
 
+  /** Fetch the raw MP3 bytes for an id, without touching AudioContext.
+   *  Safe to call at any time (mount, no user gesture required). */
+  private async prefetchBytes(id: RealMusicId): Promise<ArrayBuffer | null> {
+    const cached = this.prefetched.get(id)
+    if (cached && cached !== 'failed') return cached
+    if (cached === 'failed') return null
+    const inflight = this.prefetching.get(id)
+    if (inflight) return inflight
+
+    const meta = BGM_MUSIC.find(m => m.id === id)
+    if (!meta) return null
+
+    const p = (async () => {
+      try {
+        const resp = await fetch(meta.src)
+        if (!resp.ok) throw new Error(`http ${resp.status}`)
+        const arr = await resp.arrayBuffer()
+        this.prefetched.set(id, arr)
+        return arr
+      } catch {
+        this.prefetched.set(id, 'failed')
+        this.unavailable.add(meta.src)
+        this.notify()
+        return null
+      } finally {
+        this.prefetching.delete(id)
+      }
+    })()
+    this.prefetching.set(id, p)
+    return p
+  }
+
   /** Idempotent per-id. Returns the decoded AudioBuffer, or null if the
-   *  file 404'd or decoding failed. Caller paths share an in-flight
-   *  Promise so two near-simultaneous plays of the same id don't double-
-   *  fetch the same MP3. */
+   *  file 404'd or decoding failed. Requires an AudioContext, so callers
+   *  must come from a user-gesture path (startPlaylistEntry, which is
+   *  triggered by setPlaying(true) from a click handler). */
   private async loadBuffer(id: RealMusicId): Promise<AudioBuffer | null> {
     const cached = this.buffers.get(id)
     if (cached && typeof cached !== 'string') return cached
@@ -164,13 +206,19 @@ class BgmEngine {
     this.buffers.set(id, 'loading')
     const p = (async () => {
       try {
-        const resp = await fetch(meta.src)
-        if (!resp.ok) throw new Error(`http ${resp.status}`)
-        const arr = await resp.arrayBuffer()
-        const buf = await ctx.decodeAudioData(arr)
+        // Reuse prefetched bytes if available; otherwise fetch now.
+        let arr = this.prefetched.get(id)
+        if (!arr || arr === 'failed') {
+          const fetched = await this.prefetchBytes(id)
+          if (!fetched) throw new Error('fetch failed')
+          arr = fetched
+        }
+        // decodeAudioData detaches the ArrayBuffer; clone so a second
+        // decode (after a failed gesture, say) still has bytes.
+        const buf = await ctx.decodeAudioData((arr as ArrayBuffer).slice(0))
         this.buffers.set(id, buf)
         return buf
-      } catch (err) {
+      } catch {
         this.buffers.set(id, 'failed')
         this.unavailable.add(meta.src)
         this.notify()
@@ -183,14 +231,14 @@ class BgmEngine {
     return p
   }
 
-  /** Preload all music + ambient so the UI can render unavailability
-   *  before the user picks anything. */
+  /** Pre-fetch all music bytes and pre-construct ambient <audio> elements
+   *  so the UI can render which files 404'd before the user clicks. Does
+   *  NOT create an AudioContext — that's deferred to the first click via
+   *  unlockAudio(). */
   preload() {
-    // Kick off decode for every music track (fire-and-forget; load state
-    // is cached so subsequent plays are instant).
     for (const m of BGM_MUSIC) {
-      if (!this.buffers.has(m.id)) {
-        this.loadBuffer(m.id).catch(() => {})
+      if (!this.prefetched.has(m.id)) {
+        this.prefetchBytes(m.id).catch(() => {})
       }
     }
     for (const a of BGM_AMBIENT) this.getOrCreateAmbient(a.id, a.src)

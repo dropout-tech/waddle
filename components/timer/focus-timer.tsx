@@ -803,7 +803,10 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                       <div className="flex gap-1 flex-wrap">
                         <button
                           type="button"
-                          onClick={() => setPrefs((p) => ({ ...p, music: null }))}
+                          onClick={() => {
+                            getBgmEngine()?.unlockAudio()
+                            setPrefs((p) => ({ ...p, music: null }))
+                          }}
                           className={cn(
                             'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
                             prefs.music === null
@@ -819,7 +822,10 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                             <button
                               key={m.id}
                               type="button"
-                              onClick={() => setPrefs((p) => ({ ...p, music: m.id }))}
+                              onClick={() => {
+                                getBgmEngine()?.unlockAudio()
+                                setPrefs((p) => ({ ...p, music: m.id }))
+                              }}
                               disabled={missing}
                               title={missing ? '音檔尚未加入（見 public/audio/README.md）' : undefined}
                               className={cn(
@@ -844,7 +850,10 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                           return (
                             <button
                               type="button"
-                              onClick={() => setPrefs((p) => ({ ...p, music: ALL_MUSIC_ID }))}
+                              onClick={() => {
+                                getBgmEngine()?.unlockAudio()
+                                setPrefs((p) => ({ ...p, music: ALL_MUSIC_ID }))
+                              }}
                               disabled={everyMissing}
                               title={everyMissing ? '尚未加入任何音檔（見 public/audio/README.md）' : '依序循環播放所有背景音樂'}
                               className={cn(
@@ -888,13 +897,16 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                             <div key={a.id} className="flex items-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => setPrefs((prev) => ({
-                                  ...prev,
-                                  ambient: {
-                                    ...prev.ambient,
-                                    [a.id]: { ...prev.ambient[a.id], enabled: !prev.ambient[a.id].enabled },
-                                  },
-                                }))}
+                                onClick={() => {
+                                  getBgmEngine()?.unlockAudio()
+                                  setPrefs((prev) => ({
+                                    ...prev,
+                                    ambient: {
+                                      ...prev.ambient,
+                                      [a.id]: { ...prev.ambient[a.id], enabled: !prev.ambient[a.id].enabled },
+                                    },
+                                  }))
+                                }}
                                 aria-pressed={p.enabled}
                                 disabled={missing}
                                 title={missing ? '音檔尚未加入（見 public/audio/README.md）' : undefined}
