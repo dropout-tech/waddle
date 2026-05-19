@@ -15,6 +15,7 @@ import { toDateString } from '@/lib/calendar-utils'
 import { playTimerSound, TIMER_SOUND_LABELS, type TimerSoundKind } from '@/lib/timer-sound'
 import {
   BGM_MUSIC, BGM_AMBIENT, getBgmEngine, summarizeBgm,
+  ALL_MUSIC_ID, ALL_MUSIC_LABEL, ALL_MUSIC_EMOJI,
   type AmbientPref, type BgmMusicId, type BgmAmbientId,
 } from '@/lib/timer-bgm'
 import { Music2 } from 'lucide-react'
@@ -62,7 +63,7 @@ const TIMER_PREFS_KEY = 'waddle-timer-prefs-v1'
 const DEFAULT_AMBIENT = Object.fromEntries(
   BGM_AMBIENT.map((a) => [a.id, { enabled: false, volume: 0.5 }]),
 ) as Record<BgmAmbientId, AmbientPref>
-const VALID_MUSIC_IDS: readonly BgmMusicId[] = BGM_MUSIC.map((m) => m.id)
+const VALID_MUSIC_IDS: readonly BgmMusicId[] = [...BGM_MUSIC.map((m) => m.id), ALL_MUSIC_ID]
 const VALID_AMBIENT_IDS: readonly BgmAmbientId[] = BGM_AMBIENT.map((a) => a.id)
 const DEFAULT_PREFS: TimerPrefs = {
   breakMinutes: 5,
@@ -820,6 +821,31 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                             </button>
                           )
                         })}
+                        {/* "全部循環" — engine cycles through every available music
+                            track in order, dual-buffering the handoff so the
+                            transition is seamless. Disabled iff every music file
+                            is missing. */}
+                        {(() => {
+                          const everyMissing = BGM_MUSIC.every((m) => unavailableSrcs.has(m.src))
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setPrefs((p) => ({ ...p, music: ALL_MUSIC_ID }))}
+                              disabled={everyMissing}
+                              title={everyMissing ? '尚未加入任何音檔（見 public/audio/README.md）' : '依序循環播放所有背景音樂'}
+                              className={cn(
+                                'px-2 py-0.5 rounded text-[10px] font-medium transition-colors flex items-center gap-1',
+                                everyMissing
+                                  ? 'bg-secondary/30 text-muted-foreground/50 line-through cursor-not-allowed'
+                                  : prefs.music === ALL_MUSIC_ID
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
+                              )}
+                            >
+                              <span>{ALL_MUSIC_EMOJI}</span>{ALL_MUSIC_LABEL}
+                            </button>
+                          )
+                        })()}
                       </div>
                       {prefs.music && (
                         <input

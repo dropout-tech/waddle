@@ -1,21 +1,34 @@
 // Background music + ambient overlay engine for the focus timer.
 //
 // Two channels:
-//  - music: at most one track at a time (mood). Switching crossfades.
-//  - ambient: any number of overlays (rain, fire, etc.), each with its own gain.
+//  - music: at most one *selection* at a time. Selection may be a real
+//    track id, OR the sentinel 'all' meaning "cycle the playlist".
+//    Switching crossfades.
+//  - ambient: any number of overlays (rain, fire, etc.), each with its
+//    own gain.
 //
-// All sources are looping HTMLAudioElements pointed at files under
-// /public/audio/. Missing files (404) resolve quietly and mark the track
-// unavailable — the UI surfaces that as a disabled state.
+// All sources are HTMLAudioElements pointed at files under /public/audio/.
+// Missing files (404) resolve quietly and mark the track unavailable —
+// the UI surfaces that as a disabled state.
 //
-// Volumes are 0..1 and applied per channel; tracks fade in/out over 300ms
-// so a swipe between moods doesn't pop.
+// Looping is dual-buffered: each music track holds *two* Audio elements
+// (a/b) and we hand off from one to the other ~0.3s before end-of-file.
+// HTMLAudioElement's native `loop = true` produces an audible click at
+// the loop seam (MP3 decoder priming silence + decoder reset), which
+// the user reported as "音樂會一直斷斷續續". Dual-buffer hides the seam
+// by playing the second buffer over the tail of the first.
+//
+// In 'all' mode the same handoff machinery walks the playlist instead
+// of looping in place, so the user hears every track once before any
+// repeats.
 
-export type BgmMusicId = 'relax' | 'energetic' | 'nature'
+export type RealMusicId = 'relax' | 'energetic' | 'nature'
+/** Music selection. 'all' = cycle the whole playlist. */
+export type BgmMusicId = RealMusicId | 'all'
 export type BgmAmbientId = 'rain' | 'fire' | 'waves' | 'cafe'
 
 interface MusicMeta {
-  id: BgmMusicId
+  id: RealMusicId
   label: string
   src: string
   emoji: string
@@ -41,48 +54,93 @@ export const BGM_AMBIENT: AmbientMeta[] = [
   { id: 'cafe',  label: '咖啡廳',   src: '/audio/ambient/cafe.mp3',  emoji: '☕' },
 ]
 
-const FADE_MS = 300
+export const ALL_MUSIC_ID = 'all' as const
+export const ALL_MUSIC_LABEL = '全部循環'
+export const ALL_MUSIC_EMOJI = '🔀'
 
-interface Track {
+const FADE_MS = 300
+/** Start the next buffer this many seconds before the current one ends.
+ *  Picked to comfortably cover MP3 priming silence (~50ms) plus a margin
+ *  for `timeupdate` event jitter (browsers fire it every ~250ms). */
+const HANDOFF_LEAD_S = 0.4
+
+interface MusicPair {
+  /** Two Audio elements pointing at the same src, used alternately for
+   *  gapless looping. */
+  a: HTMLAudioElement
+  b: HTMLAudioElement
+  current: 'a' | 'b'
+}
+
+interface AmbientTrack {
   el: HTMLAudioElement
   targetVol: number
-  available: boolean
 }
 
 class BgmEngine {
-  private music = new Map<BgmMusicId, Track>()
-  private ambient = new Map<BgmAmbientId, Track>()
-  private currentMusic: BgmMusicId | null = null
+  private musicPairs = new Map<RealMusicId, MusicPair>()
+  private ambient = new Map<BgmAmbientId, AmbientTrack>()
+  /** Whatever the user picked: 'all', a real id, or null. */
+  private selection: BgmMusicId | null = null
+  /** Ordered playlist of *real* ids to walk through. Length 1 when the
+   *  selection is a single track, length N when 'all'. */
+  private playlist: RealMusicId[] = []
+  private playlistIndex = 0
+  /** The audio element that is currently audible (or just started fading
+   *  in). Volume slider edits target this element only. */
+  private currentEl: HTMLAudioElement | null = null
+  /** Handoff listener bookkeeping so a re-arm or stop reliably removes
+   *  the previous timeupdate handler — leaks here cause double-plays. */
+  private handoffEl: HTMLAudioElement | null = null
+  private handoffListener: (() => void) | null = null
+
   private musicVol = 0.5
   private playing = false
-  /** Tracks (by src) that 404'd. UI consults via isAvailable(). */
   private unavailable = new Set<string>()
-  /** Subscribers notified when availability changes (after a load failure). */
   private listeners = new Set<() => void>()
 
   subscribe(fn: () => void): () => void {
     this.listeners.add(fn)
-    // Wrap so the returned unsubscribe has a void return — Set.delete leaks
-    // a boolean, which trips React's useEffect cleanup type.
     return () => { this.listeners.delete(fn) }
   }
   private notify() { this.listeners.forEach(fn => fn()) }
 
   isAvailable(src: string) { return !this.unavailable.has(src) }
 
-  /** Instantiate every track up-front so the `error` listener fires before
-   *  the user touches any button. Without this, missing tracks don't show
-   *  as disabled until first click. Safe to call repeatedly — getOrCreate
-   *  is idempotent per id. */
+  /** Instantiate every track up-front so `error` listeners fire before
+   *  the user touches any button. Idempotent. */
   preload() {
-    for (const m of BGM_MUSIC) this.getOrCreate(this.music, m.id, m.src)
-    for (const a of BGM_AMBIENT) this.getOrCreate(this.ambient, a.id, a.src)
+    for (const m of BGM_MUSIC) this.getOrCreateMusicPair(m.id, m.src)
+    for (const a of BGM_AMBIENT) this.getOrCreateAmbient(a.id, a.src)
   }
 
-  private getOrCreate<T extends string>(map: Map<T, Track>, id: T, src: string): Track {
-    let t = map.get(id)
+  private getOrCreateMusicPair(id: RealMusicId, src: string): MusicPair {
+    let pair = this.musicPairs.get(id)
+    if (pair) return pair
+    const make = () => {
+      const el = new Audio(src)
+      // We do our own loop via dual-buffer handoff, so leave loop=false.
+      // (Native loop=true produces an audible click at the seam.)
+      el.loop = false
+      el.preload = 'auto'
+      el.volume = 0
+      el.addEventListener('error', () => {
+        this.unavailable.add(src)
+        this.notify()
+      })
+      return el
+    }
+    pair = { a: make(), b: make(), current: 'a' }
+    this.musicPairs.set(id, pair)
+    return pair
+  }
+
+  private getOrCreateAmbient(id: BgmAmbientId, src: string): AmbientTrack {
+    let t = this.ambient.get(id)
     if (t) return t
     const el = new Audio(src)
+    // Ambient overlays are noise — native loop is fine (any seam click is
+    // masked by the noise floor) and avoids doubling memory.
     el.loop = true
     el.preload = 'auto'
     el.volume = 0
@@ -90,25 +148,18 @@ class BgmEngine {
       this.unavailable.add(src)
       this.notify()
     })
-    t = { el, targetVol: 0, available: true }
-    map.set(id, t)
+    t = { el, targetVol: 0 }
+    this.ambient.set(id, t)
     return t
   }
 
   /** rAF handle per element so a new fade cancels any in-flight one — prevents
-   *  overlapping fades writing el.volume on the same frame (which produces
-   *  audible bounce when the user drags the volume slider). */
+   *  overlapping fades writing el.volume on the same frame. */
   private fadeHandles = new WeakMap<HTMLAudioElement, number>()
 
-  /** Fade element volume to a target over FADE_MS using rAF. Cancels any
-   *  in-flight fade on the same element first.
-   *
-   *  Every write to `el.volume` is clamped to [0, 1]: HTMLMediaElement
-   *  throws IndexSizeError on out-of-range values, and floating-point
-   *  drift in the interpolation (or stale el.volume left mid-fade from a
-   *  cancelled tick) can produce tiny negatives like -0.007. One throw
-   *  kills the entire BGM chain — defensive clamp is cheaper than the
-   *  recovery cost. */
+  /** Fade element volume to a target. Every write to `el.volume` is
+   *  clamped to [0, 1]: HTMLMediaElement throws IndexSizeError on
+   *  out-of-range values, and one throw kills the entire BGM chain. */
   private fadeTo(el: HTMLAudioElement, to: number, ms = FADE_MS) {
     const prev = this.fadeHandles.get(el)
     if (prev !== undefined) cancelAnimationFrame(prev)
@@ -133,43 +184,144 @@ class BgmEngine {
     this.fadeHandles.set(el, requestAnimationFrame(tick))
   }
 
-  /** Set the active music mood (or null for none). Crossfades. */
-  setMusic(id: BgmMusicId | null) {
-    if (id === this.currentMusic) return
-    // Fade out previous
-    if (this.currentMusic) {
-      const prev = this.music.get(this.currentMusic)
-      if (prev) {
-        this.fadeTo(prev.el, 0)
-        window.setTimeout(() => { prev.el.pause() }, FADE_MS + 50)
-      }
+  /** Build the real-id playlist for a given selection. Filters out any
+   *  track whose src is known to be missing so 'all' mode doesn't try to
+   *  play 3 seconds of silence per absent file. */
+  private buildPlaylist(sel: BgmMusicId | null): RealMusicId[] {
+    if (sel === null) return []
+    if (sel === 'all') {
+      return BGM_MUSIC
+        .filter(m => !this.unavailable.has(m.src))
+        .map(m => m.id)
     }
-    this.currentMusic = id
-    if (id && this.playing) {
-      const meta = BGM_MUSIC.find(m => m.id === id)
-      if (!meta) return
-      const t = this.getOrCreate(this.music, id, meta.src)
-      if (this.unavailable.has(meta.src)) return
-      t.el.play().catch(() => { /* autoplay blocked — will retry on user gesture */ })
-      this.fadeTo(t.el, this.musicVol)
+    const meta = BGM_MUSIC.find(m => m.id === sel)
+    if (!meta || this.unavailable.has(meta.src)) return []
+    return [sel]
+  }
+
+  /** Switch music selection. Crossfades if anything was playing. */
+  setMusic(id: BgmMusicId | null) {
+    if (id === this.selection) return
+    this.stopAllMusic()
+    this.selection = id
+    this.playlist = this.buildPlaylist(id)
+    this.playlistIndex = 0
+    if (this.playing && this.playlist.length > 0) {
+      this.playCurrentPlaylistEntry()
     }
   }
 
   setMusicVolume(v: number) {
     this.musicVol = Math.max(0, Math.min(1, v))
-    if (this.currentMusic) {
-      const t = this.music.get(this.currentMusic)
-      // Fade rather than direct-assign so a slider drag that interrupts a
-      // crossfade doesn't pop — the WeakMap cancellation makes this cheap.
-      if (t) this.fadeTo(t.el, this.musicVol, 80)
+    if (this.currentEl) this.fadeTo(this.currentEl, this.musicVol, 80)
+  }
+
+  /** Start the playlist[playlistIndex] track from 0 (using the pair's
+   *  currently-armed buffer). Fades it in and arms the next handoff. */
+  private playCurrentPlaylistEntry() {
+    if (this.playlist.length === 0) return
+    const id = this.playlist[this.playlistIndex]
+    const meta = BGM_MUSIC.find(m => m.id === id)
+    if (!meta || this.unavailable.has(meta.src)) return
+    const pair = this.getOrCreateMusicPair(id, meta.src)
+    const el = pair.current === 'a' ? pair.a : pair.b
+    try {
+      el.currentTime = 0
+    } catch {
+      // Some browsers throw on .currentTime= before metadata loads.
+      // It's fine — playback still starts at 0 on first play().
     }
+    el.play().catch(() => { /* autoplay blocked — will retry on user gesture */ })
+    this.fadeTo(el, this.musicVol)
+    this.currentEl = el
+    this.armHandoff(el, id)
+  }
+
+  /** Listen for timeupdate on the playing element; when remaining drops
+   *  below HANDOFF_LEAD_S, start the next entry over the tail of this one.
+   *  For a single-track selection (playlist length 1) the "next entry"
+   *  is the same track on the other buffer — that's the gapless loop.
+   *  For 'all' mode it's the next real track. */
+  private armHandoff(el: HTMLAudioElement, currentId: RealMusicId) {
+    // Tear down any prior handoff so we never have two listeners racing
+    // on the same element across selection / volume changes.
+    if (this.handoffListener && this.handoffEl) {
+      this.handoffEl.removeEventListener('timeupdate', this.handoffListener)
+    }
+
+    const listener = () => {
+      const dur = el.duration
+      if (!isFinite(dur) || dur <= 0) return
+      const remaining = dur - el.currentTime
+      if (remaining > HANDOFF_LEAD_S) return
+
+      el.removeEventListener('timeupdate', listener)
+      if (this.handoffEl === el) {
+        this.handoffEl = null
+        this.handoffListener = null
+      }
+
+      // Pick the next entry in the playlist (looping back to 0).
+      const nextIdx = (this.playlistIndex + 1) % Math.max(1, this.playlist.length)
+      const nextId = this.playlist[nextIdx]
+      this.playlistIndex = nextIdx
+
+      const nextMeta = BGM_MUSIC.find(m => m.id === nextId)
+      if (!nextMeta) return
+      const nextPair = this.getOrCreateMusicPair(nextId, nextMeta.src)
+
+      // Same-track loop → flip the active buffer so the *other* element
+      // plays. Cross-track → use whichever buffer is currently armed on
+      // the next track's pair (it's been paused since last play).
+      if (nextId === currentId) {
+        nextPair.current = nextPair.current === 'a' ? 'b' : 'a'
+      }
+      const nextEl = nextPair.current === 'a' ? nextPair.a : nextPair.b
+
+      try { nextEl.currentTime = 0 } catch {}
+      // Start at target volume so the seam is inaudible. The outgoing
+      // element will fade to 0 over the remaining tail.
+      nextEl.volume = this.musicVol
+      nextEl.play().catch(() => {})
+      this.currentEl = nextEl
+
+      // Fade the old element out so end-of-file decoder noise (some MP3s
+      // have a tail click) is masked. Pause shortly after the fade completes.
+      const tailMs = Math.max(80, Math.round(remaining * 1000))
+      this.fadeTo(el, 0, tailMs)
+      window.setTimeout(() => el.pause(), tailMs + 50)
+
+      this.armHandoff(nextEl, nextId)
+    }
+
+    this.handoffEl = el
+    this.handoffListener = listener
+    el.addEventListener('timeupdate', listener)
+  }
+
+  /** Fade-out + pause every music element, tear down handoff. */
+  private stopAllMusic() {
+    if (this.handoffListener && this.handoffEl) {
+      this.handoffEl.removeEventListener('timeupdate', this.handoffListener)
+    }
+    this.handoffEl = null
+    this.handoffListener = null
+    for (const pair of this.musicPairs.values()) {
+      for (const el of [pair.a, pair.b]) {
+        if (!el.paused) {
+          this.fadeTo(el, 0)
+          window.setTimeout(() => el.pause(), FADE_MS + 50)
+        }
+      }
+    }
+    this.currentEl = null
   }
 
   /** Enable or disable an ambient overlay. */
   setAmbient(id: BgmAmbientId, enabled: boolean, volume = 0.5) {
     const meta = BGM_AMBIENT.find(a => a.id === id)
     if (!meta) return
-    const t = this.getOrCreate(this.ambient, id, meta.src)
+    const t = this.getOrCreateAmbient(id, meta.src)
     if (this.unavailable.has(meta.src)) return
     t.targetVol = enabled ? Math.max(0, Math.min(1, volume)) : 0
     if (enabled && this.playing) {
@@ -188,13 +340,12 @@ class BgmEngine {
     if (on === this.playing) return
     this.playing = on
     if (on) {
-      if (this.currentMusic) {
-        const meta = BGM_MUSIC.find(m => m.id === this.currentMusic)
-        if (meta && !this.unavailable.has(meta.src)) {
-          const t = this.getOrCreate(this.music, this.currentMusic, meta.src)
-          t.el.play().catch(() => {})
-          this.fadeTo(t.el, this.musicVol)
-        }
+      if (this.selection && this.playlist.length > 0) {
+        // Resume by replaying the current playlist entry from start.
+        // We don't try to preserve mid-track position — focus sessions
+        // start fresh, and starting a music selection mid-track on
+        // resume is a UX surprise.
+        this.playCurrentPlaylistEntry()
       }
       for (const [id, t] of this.ambient) {
         if (t.targetVol > 0) {
@@ -205,14 +356,12 @@ class BgmEngine {
         }
       }
     } else {
-      // Fade everything out, then pause
-      for (const t of this.music.values()) {
-        this.fadeTo(t.el, 0)
-        window.setTimeout(() => t.el.pause(), FADE_MS + 50)
-      }
+      this.stopAllMusic()
       for (const t of this.ambient.values()) {
-        this.fadeTo(t.el, 0)
-        window.setTimeout(() => t.el.pause(), FADE_MS + 50)
+        if (!t.el.paused) {
+          this.fadeTo(t.el, 0)
+          window.setTimeout(() => t.el.pause(), FADE_MS + 50)
+        }
       }
     }
   }
@@ -234,6 +383,8 @@ export interface BgmSummary {
   hasSelection: boolean
   activeAmbients: AmbientMeta[]
   musicMeta: MusicMeta | null
+  /** True iff the user picked 'all' mode (cycle the playlist). */
+  isShuffle: boolean
 }
 
 // Single source of truth for the "what's playing" string. Both the desktop
@@ -245,7 +396,8 @@ export function summarizeBgm(
   opts: { allMissingLabel?: string; offLabel?: string; allMissing?: boolean } = {},
 ): BgmSummary {
   const activeAmbients = BGM_AMBIENT.filter((a) => ambient[a.id]?.enabled)
-  const musicMeta = music ? BGM_MUSIC.find((m) => m.id === music) ?? null : null
+  const isShuffle = music === 'all'
+  const musicMeta = music && music !== 'all' ? BGM_MUSIC.find((m) => m.id === music) ?? null : null
   const hasSelection = !!music || activeAmbients.length > 0
   let summary: string
   if (opts.allMissing) {
@@ -254,9 +406,10 @@ export function summarizeBgm(
     summary = opts.offLabel ?? '關閉'
   } else {
     const parts: string[] = []
-    if (musicMeta) parts.push(musicMeta.label)
+    if (isShuffle) parts.push(ALL_MUSIC_LABEL)
+    else if (musicMeta) parts.push(musicMeta.label)
     if (activeAmbients.length > 0) parts.push(activeAmbients.map((a) => a.label).join('·'))
     summary = parts.join(' + ')
   }
-  return { summary, hasSelection, activeAmbients, musicMeta }
+  return { summary, hasSelection, activeAmbients, musicMeta, isShuffle }
 }

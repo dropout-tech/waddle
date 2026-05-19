@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Pause, Play, X, Check, ChevronUp, ChevronDown, Music2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
-  BGM_AMBIENT, summarizeBgm,
+  BGM_AMBIENT, summarizeBgm, ALL_MUSIC_LABEL, ALL_MUSIC_EMOJI,
   type AmbientPref, type BgmMusicId, type BgmAmbientId,
 } from '@/lib/timer-bgm'
 
@@ -353,11 +353,16 @@ function BgmBar({ music, ambient, playing, color, expanded, onToggleExpand, onTo
   // Source of truth for the "what's playing" string lives in lib/timer-bgm
   // so the desktop settings panel and this mobile bar can't drift. The
   // emoji formatting is a presentation choice we apply on top.
-  const { hasSelection, activeAmbients, musicMeta } = summarizeBgm(music, ambient, { offLabel: '靜音專注' })
+  const { hasSelection, activeAmbients, musicMeta, isShuffle } = summarizeBgm(music, ambient, { offLabel: '靜音專注' })
+  const musicChip = isShuffle
+    ? `${ALL_MUSIC_EMOJI} ${ALL_MUSIC_LABEL}`
+    : musicMeta
+      ? `${musicMeta.emoji} ${musicMeta.label}`
+      : null
   const summary = !hasSelection
     ? '靜音專注'
     : [
-        musicMeta ? `${musicMeta.emoji} ${musicMeta.label}` : null,
+        musicChip,
         activeAmbients.length > 0 ? activeAmbients.map((a) => a.emoji).join('') : null,
       ].filter(Boolean).join(' · ')
 
