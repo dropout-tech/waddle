@@ -246,6 +246,10 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
 
   // Start a fresh work session.
   const startTimer = () => {
+    // Sync-resume the AudioContext from this user gesture so BGM can
+    // actually play when state flips to 'running' (Web Audio autoplay
+    // policy gates resume() on a hot gesture token).
+    getBgmEngine()?.unlockAudio()
     const now = new Date()
     const label = customLabel || (mode === 'pomodoro'
       ? (useCustom ? `${customMinutes}分鐘專注` : POMODORO_PRESETS[selectedPreset].label)
@@ -305,6 +309,7 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   // Resume timer — fold the just-finished pause into pausedMs and clear the
   // pausedAt anchor so the next tick reads only running time.
   const resumeTimer = () => {
+    getBgmEngine()?.unlockAudio()
     setSession((s) => {
       if (!s) return s
       const addedPause = s.pausedAt ? Date.now() - s.pausedAt.getTime() : 0
@@ -455,7 +460,10 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
         onPause={pauseTimer}
         onResume={resumeTimer}
         onExit={() => { stopTimer(false); setIsExpanded(false) }}
-        onToggleBgm={() => setBgmManualPlaying(v => !v)}
+        onToggleBgm={() => {
+          getBgmEngine()?.unlockAudio()
+          setBgmManualPlaying(v => !v)
+        }}
       />
     )
   }
@@ -742,6 +750,12 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                       type="button"
                       onClick={() => {
                         if (!hasSelection || allMissing) return
+                        // Web Audio autoplay policy: must resume the
+                        // context synchronously from the click handler,
+                        // before any awaits / React re-renders eat the
+                        // user-gesture token. Without this, the play
+                        // button "does nothing" — ctx stays suspended.
+                        getBgmEngine()?.unlockAudio()
                         setBgmManualPlaying(v => !v)
                       }}
                       disabled={!hasSelection || allMissing}

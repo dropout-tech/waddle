@@ -115,6 +115,25 @@ class BgmEngine {
 
   isAvailable(src: string) { return !this.unavailable.has(src) }
 
+  /** Synchronously create + resume the AudioContext from inside a click
+   *  handler. Browsers (esp. Safari, recent Chrome) only honour
+   *  `ctx.resume()` while the user-gesture token is still hot — that
+   *  token does NOT survive React's render → useEffect roundtrip nor a
+   *  preceding `await`. So every button that wants audio must call this
+   *  *synchronously* in its onClick, before any state updates.
+   *
+   *  Safe to call repeatedly; resume() on an already-running context is
+   *  a no-op. Fire-and-forget — we never await it because awaiting would
+   *  itself burn the gesture credit. */
+  unlockAudio() {
+    const ctx = this.ensureCtx()
+    if (!ctx) return
+    if (ctx.state === 'suspended') {
+      // Intentionally not awaited — caller is in a sync click path.
+      ctx.resume().catch(() => {})
+    }
+  }
+
   private ensureCtx(): AudioContext | null {
     if (this.ctx) return this.ctx
     if (typeof window === 'undefined') return null
