@@ -5,6 +5,17 @@ export const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'] a
 export const SNAP_MINUTES = 15
 
 /**
+ * Left gutter reserved on each calendar day column for the "state" strip
+ * (TimeBlocks rendered as a thin vertical color band). Tasks shift right
+ * by this amount so they never overlap the state indicator. Keep the
+ * three derived values consistent — strip starts after STATE_STRIP_LEFT,
+ * occupies STATE_STRIP_WIDTH, and tasks begin at STATE_GUTTER_PX.
+ */
+export const STATE_STRIP_LEFT = 2 // px from column's left edge
+export const STATE_STRIP_WIDTH = 10 // px, fits a small icon centered
+export const STATE_GUTTER_PX = 14 // px, where the task area begins
+
+/**
  * Format a Date as a local-time YYYY-MM-DD string.
  *
  * Important: never use `date.toISOString().split('T')[0]` for app-internal

@@ -8,6 +8,7 @@ import {
   calculateBlockTop,
   formatTime,
 } from '@/lib/task-utils'
+import { STATE_GUTTER_PX } from '@/lib/calendar-utils'
 import { Check, GripVertical, RefreshCw, Layers, Clock, Users, Video } from 'lucide-react'
 import { detectMeetingProvider } from '@/lib/meeting-utils'
 
@@ -247,14 +248,18 @@ function TaskBlockImpl({
 
   const color = task.calendarColor || task.workspaceColor
 
-  // Compact mode: positioned within column, uses percentage-based width
-  // Non-compact: uses time label offset calculation
+  // Compact mode: positioned within column, uses percentage-based width.
+  // The left `STATE_GUTTER_PX` is reserved for the TimeBlock "state strip"
+  // so the two never overlap — column splits are computed against the
+  // narrower (W - STATE_GUTTER_PX) usable width.
+  // Non-compact: uses time label offset calculation; same state-strip
+  // gutter applied on top of the 56px time-axis gutter.
   const styleProps = compact
     ? {
         top: `${top}px`,
         height: `${height}px`,
-        left: `calc(${leftPercent}% + 2px)`,
-        width: `calc(${widthPercent}% - 4px)`,
+        left: `calc(${STATE_GUTTER_PX}px + (100% - ${STATE_GUTTER_PX}px) * ${column} / ${totalColumns} + 2px)`,
+        width: `calc((100% - ${STATE_GUTTER_PX}px) / ${totalColumns} - 4px)`,
         backgroundColor: color,
         zIndex: isDragging ? 50 : column + 1,
         cursor: isDragging ? 'grabbing' : 'grab',
@@ -262,8 +267,8 @@ function TaskBlockImpl({
     : {
         top: `${top}px`,
         height: `${height}px`,
-        left: `calc(56px + ${leftPercent}% * (100% - 60px) / 100)`,
-        width: `calc((100% - 60px) / ${totalColumns} - 2px)`,
+        left: `calc(${56 + STATE_GUTTER_PX}px + ${leftPercent}% * (100% - ${60 + STATE_GUTTER_PX}px) / 100)`,
+        width: `calc((100% - ${60 + STATE_GUTTER_PX}px) / ${totalColumns} - 2px)`,
         backgroundColor: color,
         zIndex: isDragging ? 50 : column + 1,
         cursor: isDragging ? 'grabbing' : 'grab',

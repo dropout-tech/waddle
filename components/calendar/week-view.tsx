@@ -15,6 +15,9 @@ import {
   toDateString,
   autoScrollContainerNearEdge,
   taskOccursOnDate,
+  STATE_STRIP_LEFT,
+  STATE_STRIP_WIDTH,
+  STATE_GUTTER_PX,
 } from '@/lib/calendar-utils'
 import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 import { CurrentTimeLine } from './current-time-line'
@@ -917,18 +920,19 @@ export function WeekView({
                   <div
                     key={block.id}
                     data-task="true"
+                    role="button"
+                    aria-label={`${block.label} ${block.startTime}–${block.endTime}`}
+                    title={`${block.label} · ${block.startTime}–${block.endTime}`}
                     onClick={() => onTimeBlockSelect?.(block)}
-                    className="absolute left-0.5 right-0.5 rounded px-1 py-0.5 text-[9px] font-medium overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                    className="absolute rounded-md overflow-hidden cursor-pointer hover:brightness-110 hover:shadow-md transition-all"
                     style={{
                       top: getTimePosition(block.startTime),
                       height: getDurationHeight(block.startTime, block.endTime),
-                      backgroundColor: block.color + '30',
-                      borderLeft: `3px solid ${block.color}`,
-                      color: block.color,
+                      left: `${STATE_STRIP_LEFT}px`,
+                      width: `${STATE_STRIP_WIDTH}px`,
+                      backgroundColor: block.color,
                     }}
-                  >
-                    <div className="truncate">{block.label}</div>
-                  </div>
+                  />
                 ))}
 
                 {/* Scheduled Tasks with drag/resize via TaskBlock */}
@@ -967,10 +971,12 @@ export function WeekView({
                     ghost there is the visible preview). */}
                 {activeTaskDrag && activeTaskDrag.dayIndex === dayIndex && hoveredPendingZoneDate === null && !dayTasks.find(t => t.id === activeTaskDrag.taskId) && (
                   <div
-                    className="absolute left-1 right-1 rounded-xl px-2 py-1.5 text-left overflow-hidden opacity-80 pointer-events-none z-30 shadow-lg"
+                    className="absolute rounded-xl px-2 py-1.5 text-left overflow-hidden opacity-80 pointer-events-none z-30 shadow-lg"
                     style={{
                       top: `${activeTaskDrag.currentStart - MIN}px`,
                       height: `${activeTaskDrag.currentEnd - activeTaskDrag.currentStart}px`,
+                      left: `${STATE_GUTTER_PX + 2}px`,
+                      right: '4px',
                       backgroundColor: tasks.find(t => t.id === activeTaskDrag.taskId)?.calendarColor || '#6B7FD4',
                     }}
                   >
@@ -988,10 +994,12 @@ export function WeekView({
                     zone (the ghost in that zone is the visible preview). */}
                 {pendingTaskDrag && pendingTaskDrag.currentDayIndex === dayIndex && hoveredPendingZoneDate === null && (
                   <div
-                    className="absolute left-1 right-1 rounded-xl px-2 py-1.5 text-left overflow-hidden pointer-events-none z-30 shadow-xl border-2 border-white/50"
+                    className="absolute rounded-xl px-2 py-1.5 text-left overflow-hidden pointer-events-none z-30 shadow-xl border-2 border-white/50"
                     style={{
                       top: `${pendingTaskDrag.currentMinutes - MIN}px`,
                       height: `${Math.max(pendingTaskDrag.duration, 30)}px`,
+                      left: `${STATE_GUTTER_PX + 2}px`,
+                      right: '4px',
                       backgroundColor: pendingTaskDrag.task.calendarColor || pendingTaskDrag.task.workspaceColor || '#6B7FD4',
                     }}
                   >
