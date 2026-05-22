@@ -71,7 +71,7 @@ export function JournalModal({
     onSave({
       date: toDateString(date),
       mood,
-      content: content || undefined,
+      content: content || '',
     })
     onClose()
   }

@@ -438,10 +438,12 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   // slide-up from above the tab bar). Desktop keeps the corner card.
   const mobileExpanded = isMobile && isExpanded
 
-  // On mobile, once a session is running/paused, the experience takes over
-  // the full screen instead of sitting in a sheet. The sheet remains the
-  // setup surface (idle state only).
-  const showImmersive = isMobile && isExpanded && state !== 'idle' && session !== null
+  // Once a session is running/paused, the experience takes over the full
+  // viewport instead of sitting in a corner card / bottom sheet. The
+  // corner/sheet remains the setup surface (idle state only). Applies to
+  // both mobile and desktop — desktop users get the same fullscreen focus
+  // mode plus an in-immersive BgmBar so they can swap music mid-session.
+  const showImmersive = isExpanded && state !== 'idle' && session !== null
 
   if (showImmersive && session) {
     return (
@@ -455,8 +457,10 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
         progress={mode === 'pomodoro' ? progress : Math.min(100, (elapsed % 3600) / 36)}
         startedAtText={formatTimeHHMM(session.startedAt)}
         music={prefs.music}
+        musicVolume={prefs.musicVolume}
         ambient={prefs.ambient}
         bgmPlaying={(bgmManualPlaying || state === 'running')}
+        unavailableSrcs={unavailableSrcs}
         onPause={pauseTimer}
         onResume={resumeTimer}
         onExit={() => { stopTimer(false); setIsExpanded(false) }}
@@ -464,6 +468,28 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
           getBgmEngine()?.unlockAudio()
           setBgmManualPlaying(v => !v)
         }}
+        onSelectMusic={(id) => {
+          getBgmEngine()?.unlockAudio()
+          setPrefs((p) => ({ ...p, music: id }))
+        }}
+        onMusicVolumeChange={(v) => setPrefs((p) => ({ ...p, musicVolume: v }))}
+        onToggleAmbient={(id) => {
+          getBgmEngine()?.unlockAudio()
+          setPrefs((prev) => ({
+            ...prev,
+            ambient: {
+              ...prev.ambient,
+              [id]: { ...prev.ambient[id], enabled: !prev.ambient[id].enabled },
+            },
+          }))
+        }}
+        onAmbientVolumeChange={(id, v) => setPrefs((prev) => ({
+          ...prev,
+          ambient: {
+            ...prev.ambient,
+            [id]: { ...prev.ambient[id], volume: v },
+          },
+        }))}
       />
     )
   }

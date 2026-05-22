@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Pause, Play, X, Check, ChevronUp, ChevronDown, Music2 } from 'lucide-react'
+import { Pause, Play, X, Check, ChevronUp, ChevronDown, Music2, Maximize2, Minimize2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
-  BGM_AMBIENT, summarizeBgm, ALL_MUSIC_LABEL, ALL_MUSIC_EMOJI,
+  BGM_MUSIC, BGM_AMBIENT, summarizeBgm,
+  ALL_MUSIC_ID, ALL_MUSIC_LABEL, ALL_MUSIC_EMOJI,
   type AmbientPref, type BgmMusicId, type BgmAmbientId,
 } from '@/lib/timer-bgm'
 
@@ -18,12 +19,21 @@ export interface ImmersiveProps {
   progress: number
   startedAtText: string
   music: BgmMusicId | null
+  musicVolume: number
   ambient: Record<BgmAmbientId, AmbientPref>
   bgmPlaying: boolean
+  unavailableSrcs: Set<string>
   onPause: () => void
   onResume: () => void
   onExit: () => void
   onToggleBgm: () => void
+  // Music picker callbacks so the bar can actually swap tracks mid-session
+  // instead of only play/pause. Each call should also unlock audio (Web
+  // Audio autoplay policy) before mutating prefs.
+  onSelectMusic: (id: BgmMusicId | null) => void
+  onMusicVolumeChange: (volume: number) => void
+  onToggleAmbient: (id: BgmAmbientId) => void
+  onAmbientVolumeChange: (id: BgmAmbientId, volume: number) => void
 }
 
 const EXIT_HOLD_MS = 900
@@ -32,18 +42,55 @@ const DIM_DELAY_MS = 5000
 export function FocusTimerImmersive(props: ImmersiveProps) {
   const {
     visible, state, phase, label, color, timeText, progress, startedAtText,
-    music, ambient, bgmPlaying,
+    music, musicVolume, ambient, bgmPlaying, unavailableSrcs,
     onPause, onResume, onExit, onToggleBgm,
+    onSelectMusic, onMusicVolumeChange, onToggleAmbient, onAmbientVolumeChange,
   } = props
 
   const [dimmed, setDimmed] = useState(false)
   const [showCompletion, setShowCompletion] = useState(false)
   const [showBgmBar, setShowBgmBar] = useState(false)
   const [exitHoldProgress, setExitHoldProgress] = useState(0)
+  const [isNativeFullscreen, setIsNativeFullscreen] = useState(false)
+  const [fullscreenSupported, setFullscreenSupported] = useState(false)
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const dimTimerRef = useRef<NodeJS.Timeout | null>(null)
   const exitHoldRef = useRef<{ raf: number; cleared: boolean } | null>(null)
   const prevPhaseRef = useRef<'work' | 'break'>(phase)
   const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Mirror the browser's fullscreen state so the Maximize/Minimize toggle
+  // stays in sync even when the user hits Esc to leave native fullscreen.
+  // Pressing Esc only drops out of OS-level fullscreen — we DON'T exit
+  // the immersive overlay or stop the timer, so the experience degrades
+  // gracefully to the CSS overlay.
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    setFullscreenSupported(!!document.fullscreenEnabled)
+    const onChange = () => setIsNativeFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
+  const toggleNativeFullscreen = () => {
+    if (typeof document === 'undefined') return
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => { /* ignore — Esc may have already exited */ })
+    } else if (containerRef.current?.requestFullscreen) {
+      void containerRef.current.requestFullscreen().catch(() => { /* permission/timing — silent */ })
+    }
+  }
+
+  // When the immersive view unmounts (long-press exit / session end), make
+  // sure we drop OS-level fullscreen too. Without this, exiting the timer
+  // would leave the browser stuck in fullscreen with no UI to undo it.
+  useEffect(() => {
+    return () => {
+      if (typeof document !== 'undefined' && document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {})
+      }
+    }
+  }, [])
 
   const resetDim = () => {
     setDimmed(false)
@@ -122,6 +169,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
 
   return (
     <div
+      ref={containerRef}
       className={cn(
         'fixed inset-0 z-[80] flex flex-col select-none',
         'transition-colors duration-700 ease-out',
@@ -187,31 +235,44 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
           </span>
           <span className="text-sm text-foreground/80 mt-0.5">{label}</span>
         </div>
-        <button
-          type="button"
-          onPointerDown={(e) => { e.preventDefault(); startExitHold() }}
-          onPointerUp={cancelExitHold}
-          onPointerCancel={cancelExitHold}
-          onPointerLeave={cancelExitHold}
-          aria-label="長按結束（0.9 秒）"
-          className="relative h-10 w-10 rounded-full grid place-items-center text-foreground/60 hover:text-foreground hover:bg-foreground/5 transition-colors touch-none"
-        >
-          <X className="w-5 h-5" />
-          {exitHoldProgress > 0 && (
-            <svg className="absolute inset-0 -rotate-90 pointer-events-none" viewBox="0 0 40 40">
-              <circle
-                cx="20" cy="20" r="18"
-                fill="none"
-                stroke={color}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeDasharray={2 * Math.PI * 18}
-                strokeDashoffset={2 * Math.PI * 18 * (1 - exitHoldProgress)}
-                style={{ transition: 'stroke-dashoffset 60ms linear' }}
-              />
-            </svg>
+        <div className="flex items-center gap-1">
+          {fullscreenSupported && (
+            <button
+              type="button"
+              onClick={toggleNativeFullscreen}
+              aria-label={isNativeFullscreen ? '退出全螢幕' : '進入瀏覽器全螢幕'}
+              title={isNativeFullscreen ? '退出全螢幕（或按 Esc）' : '進入瀏覽器全螢幕'}
+              className="h-10 w-10 rounded-full grid place-items-center text-foreground/60 hover:text-foreground hover:bg-foreground/5 transition-colors"
+            >
+              {isNativeFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
           )}
-        </button>
+          <button
+            type="button"
+            onPointerDown={(e) => { e.preventDefault(); startExitHold() }}
+            onPointerUp={cancelExitHold}
+            onPointerCancel={cancelExitHold}
+            onPointerLeave={cancelExitHold}
+            aria-label="長按結束（0.9 秒）"
+            className="relative h-10 w-10 rounded-full grid place-items-center text-foreground/60 hover:text-foreground hover:bg-foreground/5 transition-colors touch-none"
+          >
+            <X className="w-5 h-5" />
+            {exitHoldProgress > 0 && (
+              <svg className="absolute inset-0 -rotate-90 pointer-events-none" viewBox="0 0 40 40">
+                <circle
+                  cx="20" cy="20" r="18"
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 18}
+                  strokeDashoffset={2 * Math.PI * 18 * (1 - exitHoldProgress)}
+                  style={{ transition: 'stroke-dashoffset 60ms linear' }}
+                />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
 
       <div
@@ -283,12 +344,18 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
       >
         <BgmBar
           music={music}
+          musicVolume={musicVolume}
           ambient={ambient}
           playing={bgmPlaying}
           color={color}
           expanded={showBgmBar}
+          unavailableSrcs={unavailableSrcs}
           onToggleExpand={() => setShowBgmBar(v => !v)}
           onTogglePlay={onToggleBgm}
+          onSelectMusic={onSelectMusic}
+          onMusicVolumeChange={onMusicVolumeChange}
+          onToggleAmbient={onToggleAmbient}
+          onAmbientVolumeChange={onAmbientVolumeChange}
         />
         <div className="flex justify-center pt-1">
           {state === 'paused' ? (
@@ -341,15 +408,25 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
 
 interface BgmBarProps {
   music: BgmMusicId | null
+  musicVolume: number
   ambient: Record<BgmAmbientId, AmbientPref>
   playing: boolean
   color: string
   expanded: boolean
+  unavailableSrcs: Set<string>
   onToggleExpand: () => void
   onTogglePlay: () => void
+  onSelectMusic: (id: BgmMusicId | null) => void
+  onMusicVolumeChange: (v: number) => void
+  onToggleAmbient: (id: BgmAmbientId) => void
+  onAmbientVolumeChange: (id: BgmAmbientId, v: number) => void
 }
 
-function BgmBar({ music, ambient, playing, color, expanded, onToggleExpand, onTogglePlay }: BgmBarProps) {
+function BgmBar({
+  music, musicVolume, ambient, playing, color, expanded, unavailableSrcs,
+  onToggleExpand, onTogglePlay,
+  onSelectMusic, onMusicVolumeChange, onToggleAmbient, onAmbientVolumeChange,
+}: BgmBarProps) {
   // Source of truth for the "what's playing" string lives in lib/timer-bgm
   // so the desktop settings panel and this mobile bar can't drift. The
   // emoji formatting is a presentation choice we apply on top.
@@ -401,8 +478,130 @@ function BgmBar({ music, ambient, playing, color, expanded, onToggleExpand, onTo
         </button>
       </div>
       {expanded && (
-        <div className="px-3 pb-3 pt-1 text-[11px] text-muted-foreground border-t border-border/40">
-          詳細音樂與環境音設定請在開始前於計時器面板調整。
+        <div className="px-3 pb-3 pt-2 border-t border-border/40 space-y-3">
+          {/* Music picker — chips for None / each track / 全部循環. Mirror
+              of the desktop setup panel, so users can swap tracks without
+              leaving focus mode. */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+              <Music2 className="w-3 h-3" />
+              背景音樂
+            </label>
+            <div className="flex gap-1 flex-wrap">
+              <button
+                type="button"
+                onClick={() => onSelectMusic(null)}
+                className={cn(
+                  'px-2 py-0.5 rounded text-[10px] font-medium transition-colors',
+                  music === null
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
+                )}
+              >
+                無
+              </button>
+              {BGM_MUSIC.map((m) => {
+                const missing = unavailableSrcs.has(m.src)
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => onSelectMusic(m.id)}
+                    disabled={missing}
+                    title={missing ? '音檔尚未加入（見 public/audio/README.md）' : undefined}
+                    className={cn(
+                      'px-2 py-0.5 rounded text-[10px] font-medium transition-colors flex items-center gap-1',
+                      missing
+                        ? 'bg-secondary/30 text-muted-foreground/50 line-through cursor-not-allowed'
+                        : music === m.id
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
+                    )}
+                  >
+                    <span>{m.emoji}</span>{m.label}
+                  </button>
+                )
+              })}
+              {(() => {
+                const everyMissing = BGM_MUSIC.every((m) => unavailableSrcs.has(m.src))
+                return (
+                  <button
+                    type="button"
+                    onClick={() => onSelectMusic(ALL_MUSIC_ID)}
+                    disabled={everyMissing}
+                    title={everyMissing ? '尚未加入任何音檔（見 public/audio/README.md）' : '依序循環播放所有背景音樂'}
+                    className={cn(
+                      'px-2 py-0.5 rounded text-[10px] font-medium transition-colors flex items-center gap-1',
+                      everyMissing
+                        ? 'bg-secondary/30 text-muted-foreground/50 line-through cursor-not-allowed'
+                        : music === ALL_MUSIC_ID
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
+                    )}
+                  >
+                    <span>{ALL_MUSIC_EMOJI}</span>{ALL_MUSIC_LABEL}
+                  </button>
+                )
+              })()}
+            </div>
+            {music && (
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={musicVolume}
+                onChange={(e) => onMusicVolumeChange(parseFloat(e.target.value))}
+                aria-label="背景音樂音量"
+                className="w-full h-1 accent-primary"
+              />
+            )}
+          </div>
+
+          {/* Ambient overlays — multi-select, independent volumes. */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground">
+              環境音（可疊加）
+            </label>
+            <div className="space-y-1">
+              {BGM_AMBIENT.map((a) => {
+                const p = ambient[a.id]
+                const missing = unavailableSrcs.has(a.src)
+                return (
+                  <div key={a.id} className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onToggleAmbient(a.id)}
+                      aria-pressed={p.enabled}
+                      disabled={missing}
+                      title={missing ? '音檔尚未加入（見 public/audio/README.md）' : undefined}
+                      className={cn(
+                        'px-2 py-0.5 rounded text-[10px] font-medium transition-colors flex items-center gap-1 w-[68px] justify-start',
+                        missing
+                          ? 'bg-secondary/30 text-muted-foreground/50 line-through cursor-not-allowed'
+                          : p.enabled
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
+                      )}
+                    >
+                      <span>{a.emoji}</span>{a.label}
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={p.volume}
+                      disabled={!p.enabled || missing}
+                      onChange={(e) => onAmbientVolumeChange(a.id, parseFloat(e.target.value))}
+                      aria-label={`${a.label}音量`}
+                      className="flex-1 h-1 accent-primary disabled:opacity-40"
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>

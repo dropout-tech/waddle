@@ -128,7 +128,7 @@ export function TaskDetailModal({
             type: recurrenceType,
             interval: parseInt(recurrenceInterval) || 1,
             daysOfWeek: recurrenceType === 'weekly' ? recurrenceDays : undefined,
-            endDate: recurrenceEndDate || undefined,
+            endDate: recurrenceEndDate || '',
           }
         : undefined,
     }
