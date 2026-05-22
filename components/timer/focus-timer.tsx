@@ -21,6 +21,8 @@ import {
 } from '@/lib/timer-bgm'
 import { Music2 } from 'lucide-react'
 import { FocusTimerImmersive } from './focus-timer-immersive'
+import { FocusTimerMini } from './focus-timer-mini'
+import { loadPomodoroCount, recordPomodoroCompletion, type PomodoroDayCount } from '@/lib/pomodoro-count'
 
 interface FocusTimerProps {
   workspaces: Workspace[]
@@ -169,6 +171,19 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   const [elapsed, setElapsed] = useState(0) // seconds for stopwatch
   const [session, setSession] = useState<TimerSession | null>(null)
 
+  // When a session is active, `view` decides whether to render the corner
+  // mini pill or the fullscreen immersive overlay. Decoupled from `isExpanded`
+  // (which now only controls the idle setup card) so the user can freely
+  // shrink the timer back to the corner mid-session — the main reason being
+  // that a corner pill lets the calendar stay visible behind it.
+  const [view, setView] = useState<'mini' | 'immersive'>('mini')
+
+  // Today's completed-work-pomodoro count. Used by the immersive view to
+  // render a row of progress dots ("第 3 顆"). loadPomodoroCount is
+  // SSR-safe (returns zero on the server), so we can read it on mount.
+  const [pomodoroCount, setPomodoroCount] = useState<PomodoroDayCount | null>(null)
+  useEffect(() => { setPomodoroCount(loadPomodoroCount()) }, [])
+
   // User preferences (break length, auto-break, sound choice). Loaded from
   // localStorage on mount and persisted on every change so they survive
   // refreshes and dev hot reloads.
@@ -300,6 +315,13 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
       setElapsed(0)
     }
 
+    // Pick the starting view. If the user enabled native browser fullscreen
+    // on the setup card they explicitly opted into a chromeless surface, so
+    // jump straight to immersive. Mobile also defaults to immersive — a
+    // corner pill on a phone leaves too little surface for the calendar to
+    // be useful anyway, and the immersive mode is genuinely better there.
+    setView(isAppFullscreen || isMobile ? 'immersive' : 'mini')
+
     setState('running')
   }
 
@@ -418,6 +440,12 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
           }
           playTimerSound(prefs.sound)
           setTimeLeft(0)
+          // Bump today's pomodoro count when a *work* phase completes (not
+          // breaks). The immersive view's progress dots subscribe to this
+          // via the state setter below.
+          if (session.phase === 'work') {
+            setPomodoroCount(recordPomodoroCompletion())
+          }
           if (session.phase === 'work' && prefs.autoStartBreak) {
             // Record the work block, then transition to a break session
             // without dropping into idle.
@@ -462,58 +490,82 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   // slide-up from above the tab bar). Desktop keeps the corner card.
   const mobileExpanded = isMobile && isExpanded
 
-  // Once a session is running/paused, the experience takes over the full
-  // viewport instead of sitting in a corner card / bottom sheet. The
-  // corner/sheet remains the setup surface (idle state only). Applies to
-  // both mobile and desktop — desktop users get the same fullscreen focus
-  // mode plus an in-immersive BgmBar so they can swap music mid-session.
-  const showImmersive = isExpanded && state !== 'idle' && session !== null
-
-  if (showImmersive && session) {
-    return (
-      <FocusTimerImmersive
-        visible
-        state={state}
-        phase={session.phase}
-        label={session.label}
-        color={session.color}
-        timeText={formatTime(displayTime)}
-        progress={mode === 'pomodoro' ? progress : Math.min(100, (elapsed % 3600) / 36)}
-        startedAtText={formatTimeHHMM(session.startedAt)}
-        music={prefs.music}
-        musicVolume={prefs.musicVolume}
-        ambient={prefs.ambient}
-        bgmPlaying={(bgmManualPlaying || state === 'running')}
-        unavailableSrcs={unavailableSrcs}
-        onPause={pauseTimer}
-        onResume={resumeTimer}
-        onExit={() => { stopTimer(false); setIsExpanded(false) }}
-        onToggleBgm={() => {
-          getBgmEngine()?.unlockAudio()
-          setBgmManualPlaying(v => !v)
-        }}
-        onSelectMusic={(id) => {
-          getBgmEngine()?.unlockAudio()
-          setPrefs((p) => ({ ...p, music: id }))
-        }}
-        onMusicVolumeChange={(v) => setPrefs((p) => ({ ...p, musicVolume: v }))}
-        onToggleAmbient={(id) => {
-          getBgmEngine()?.unlockAudio()
-          setPrefs((prev) => ({
+  // Once a session is running/paused, we hand off to one of two surfaces
+  // based on `view`:
+  //   • immersive — fullscreen overlay (legacy default, opt-in via the
+  //     setup-card fullscreen toggle, or mobile)
+  //   • mini      — corner pill so the calendar / day view stays visible
+  // The setup-card branch below is only reached while the timer is idle.
+  if (state !== 'idle' && session) {
+    const computedProgress = mode === 'pomodoro' ? progress : Math.min(100, (elapsed % 3600) / 36)
+    if (view === 'immersive') {
+      return (
+        <FocusTimerImmersive
+          visible
+          state={state}
+          phase={session.phase}
+          label={session.label}
+          color={session.color}
+          timeText={formatTime(displayTime)}
+          progress={computedProgress}
+          startedAtText={formatTimeHHMM(session.startedAt)}
+          targetSeconds={session.targetSeconds}
+          startedAt={session.startedAt}
+          remainingSeconds={mode === 'pomodoro' ? timeLeft : null}
+          pomodoroCount={pomodoroCount?.count ?? 0}
+          music={prefs.music}
+          musicVolume={prefs.musicVolume}
+          ambient={prefs.ambient}
+          bgmPlaying={(bgmManualPlaying || state === 'running')}
+          unavailableSrcs={unavailableSrcs}
+          onPause={pauseTimer}
+          onResume={resumeTimer}
+          onExit={() => { stopTimer(false); setIsExpanded(false) }}
+          onMinimize={() => setView('mini')}
+          onToggleBgm={() => {
+            getBgmEngine()?.unlockAudio()
+            setBgmManualPlaying(v => !v)
+          }}
+          onSelectMusic={(id) => {
+            getBgmEngine()?.unlockAudio()
+            setPrefs((p) => ({ ...p, music: id }))
+          }}
+          onMusicVolumeChange={(v) => setPrefs((p) => ({ ...p, musicVolume: v }))}
+          onToggleAmbient={(id) => {
+            getBgmEngine()?.unlockAudio()
+            setPrefs((prev) => ({
+              ...prev,
+              ambient: {
+                ...prev.ambient,
+                [id]: { ...prev.ambient[id], enabled: !prev.ambient[id].enabled },
+              },
+            }))
+          }}
+          onAmbientVolumeChange={(id, v) => setPrefs((prev) => ({
             ...prev,
             ambient: {
               ...prev.ambient,
-              [id]: { ...prev.ambient[id], enabled: !prev.ambient[id].enabled },
+              [id]: { ...prev.ambient[id], volume: v },
             },
-          }))
-        }}
-        onAmbientVolumeChange={(id, v) => setPrefs((prev) => ({
-          ...prev,
-          ambient: {
-            ...prev.ambient,
-            [id]: { ...prev.ambient[id], volume: v },
-          },
-        }))}
+          }))}
+        />
+      )
+    }
+    // Mini pill. Keeps the same session/state — only the visual surface
+    // differs from immersive.
+    return (
+      <FocusTimerMini
+        state={state}
+        phase={session.phase}
+        color={session.color}
+        timeText={formatTime(displayTime)}
+        progress={computedProgress}
+        label={session.label}
+        isMobile={isMobile}
+        onPause={pauseTimer}
+        onResume={resumeTimer}
+        onExpand={() => setView('immersive')}
+        onStop={() => { stopTimer(false) }}
       />
     )
   }
