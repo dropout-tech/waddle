@@ -5,6 +5,7 @@ import {
   Play, Pause, Square, RotateCcw, Timer, Clock,
   ChevronDown, ChevronUp, Settings2, Check, X,
   Coffee, Brain, Dumbbell, BookOpen, Volume2, VolumeX,
+  Maximize2, Minimize2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -139,6 +140,29 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   // listen without starting a session. Combined with timer state below so
   // running a timer still auto-plays as before.
   const [bgmManualPlaying, setBgmManualPlaying] = useState(false)
+
+  // Browser native fullscreen on the whole app — entered from the setup
+  // card header so the user can hide chrome BEFORE starting a session.
+  // The immersive overlay (which kicks in when the timer starts) then
+  // lives inside an already-chromeless viewport. Mirroring the API event
+  // means Esc still works to leave and our icon stays in sync.
+  const [isAppFullscreen, setIsAppFullscreen] = useState(false)
+  const [appFullscreenSupported, setAppFullscreenSupported] = useState(false)
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    setAppFullscreenSupported(!!document.fullscreenEnabled)
+    const onChange = () => setIsAppFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+  const toggleAppFullscreen = () => {
+    if (typeof document === 'undefined') return
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {})
+    } else {
+      void document.documentElement.requestFullscreen().catch(() => {})
+    }
+  }
   
   // Timer state
   const [timeLeft, setTimeLeft] = useState(25 * 60) // seconds for pomodoro
@@ -556,6 +580,19 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                 </span>
               </div>
               <div className="flex items-center gap-1">
+                {appFullscreenSupported && (
+                  <button
+                    onClick={toggleAppFullscreen}
+                    aria-label={isAppFullscreen ? '退出全螢幕' : '進入全螢幕'}
+                    title={isAppFullscreen ? '退出全螢幕（或按 Esc）' : '進入全螢幕：藏掉瀏覽器工具列，開始計時後沉浸效果更完整'}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-colors",
+                      isAppFullscreen ? "bg-primary/10 text-primary" : "hover:bg-secondary text-muted-foreground"
+                    )}
+                  >
+                    {isAppFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                  </button>
+                )}
                 <button
                   onClick={() => setShowSettings(!showSettings)}
                   className={cn(
