@@ -101,28 +101,27 @@ export function TaskDetailModal({
   }
 
   const handleSave = () => {
+    // Send `''` (not `undefined`) for cleared fields so taskToRow writes
+    // DB NULL — otherwise the mapper drops the key and the old value
+    // sticks around. Same goes for meeting fields when isMeeting is off.
     const updates: Partial<Task> = {
       title,
-      description: description || undefined,
+      description: description || '',
       urgency,
       estimatedMinutes: estimatedMinutes ? parseInt(estimatedMinutes) : undefined,
-      dueDate: dueDate || undefined,
-      scheduledDate: scheduledDate || undefined,
-      scheduledStartTime: scheduledStartTime || undefined,
-      scheduledEndTime: scheduledEndTime || undefined,
-      notes: notes || undefined,
+      dueDate: dueDate || '',
+      scheduledDate: scheduledDate || '',
+      scheduledStartTime: scheduledStartTime || '',
+      scheduledEndTime: scheduledEndTime || '',
+      notes: notes || '',
       calendarColor,
       // A task with no schedule must show in the list — otherwise it would
       // be invisible everywhere. Force-true in that case.
       showInTaskList: scheduledDate ? showInTaskList : true,
-      // Meeting fields. When the toggle is off, clear the three text
-      // fields so an old meeting that gets demoted back to a regular
-      // task doesn't keep stale attendees / location / URL data hidden
-      // in the DB.
       isMeeting,
-      attendees: isMeeting ? (attendees || undefined) : undefined,
-      location: isMeeting ? (location || undefined) : undefined,
-      meetingUrl: isMeeting ? (meetingUrl || undefined) : undefined,
+      attendees: isMeeting ? (attendees || '') : '',
+      location: isMeeting ? (location || '') : '',
+      meetingUrl: isMeeting ? (meetingUrl || '') : '',
       isRecurring,
       recurrence: isRecurring
         ? {

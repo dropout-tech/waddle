@@ -98,34 +98,38 @@ export function taskToRow(
   if (task.categoryId !== undefined) out.category_id = task.categoryId
   if (task.workspaceId !== undefined) out.workspace_id = task.workspaceId
   if (task.title !== undefined) out.title = task.title
-  if (task.description !== undefined) out.description = task.description ?? null
+  // For nullable string/date/time columns we use `|| null` (not `?? null`)
+  // so an empty string from a "cleared" form field is persisted as DB NULL
+  // rather than written back as ''. An empty `''` in a `date` / `time`
+  // column would also throw a Postgres type error.
+  if (task.description !== undefined) out.description = task.description || null
   if (task.taskType !== undefined) out.task_type = task.taskType
   if (task.urgency !== undefined) out.urgency = task.urgency
   if (task.estimatedMinutes !== undefined) out.estimated_minutes = task.estimatedMinutes ?? null
   if (task.actualMinutes !== undefined) out.actual_minutes = task.actualMinutes ?? null
-  if (task.dueDate !== undefined) out.due_date = task.dueDate ?? null
-  if (task.scheduledDate !== undefined) out.scheduled_date = task.scheduledDate ?? null
-  if (task.scheduledStartTime !== undefined) out.scheduled_start_time = task.scheduledStartTime ?? null
-  if (task.scheduledEndTime !== undefined) out.scheduled_end_time = task.scheduledEndTime ?? null
+  if (task.dueDate !== undefined) out.due_date = task.dueDate || null
+  if (task.scheduledDate !== undefined) out.scheduled_date = task.scheduledDate || null
+  if (task.scheduledStartTime !== undefined) out.scheduled_start_time = task.scheduledStartTime || null
+  if (task.scheduledEndTime !== undefined) out.scheduled_end_time = task.scheduledEndTime || null
   if (task.calendarColor !== undefined) out.calendar_color = task.calendarColor
   if (task.isCompleted !== undefined) out.is_completed = task.isCompleted
-  if (task.completedAt !== undefined) out.completed_at = task.completedAt ?? null
+  if (task.completedAt !== undefined) out.completed_at = task.completedAt || null
   if (task.isArchived !== undefined) out.is_archived = task.isArchived
-  if (task.archivedAt !== undefined) out.archived_at = task.archivedAt ?? null
-  if (task.notes !== undefined) out.notes = task.notes ?? null
+  if (task.archivedAt !== undefined) out.archived_at = task.archivedAt || null
+  if (task.notes !== undefined) out.notes = task.notes || null
   if (task.sortOrder !== undefined) out.sort_order = task.sortOrder
   if (task.isRecurring !== undefined) out.is_recurring = task.isRecurring
   if (task.showInTaskList !== undefined) out.show_in_task_list = task.showInTaskList
   if (task.isMeeting !== undefined) out.is_meeting = task.isMeeting
-  if (task.attendees !== undefined) out.attendees = task.attendees ?? null
-  if (task.location !== undefined) out.location = task.location ?? null
-  if (task.meetingUrl !== undefined) out.meeting_url = task.meetingUrl ?? null
+  if (task.attendees !== undefined) out.attendees = task.attendees || null
+  if (task.location !== undefined) out.location = task.location || null
+  if (task.meetingUrl !== undefined) out.meeting_url = task.meetingUrl || null
   if (task.recurrence !== undefined) {
     if (task.recurrence) {
       out.recurrence_type = task.recurrence.type
       out.recurrence_interval = task.recurrence.interval
       out.recurrence_days_of_week = task.recurrence.daysOfWeek ?? null
-      out.recurrence_end_date = task.recurrence.endDate ?? null
+      out.recurrence_end_date = task.recurrence.endDate || null
     } else {
       out.recurrence_type = null
       out.recurrence_interval = null

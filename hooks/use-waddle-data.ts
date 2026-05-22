@@ -1107,7 +1107,11 @@ export function useWaddleData(): UseWaddleData {
                   ...t,
                   scheduledStartTime: undefined,
                   scheduledEndTime: undefined,
-                  ...(date ? { scheduledDate: date } : {}),
+                  // No date argument = full unschedule → also clear the
+                  // date. Without this the DB row keeps its old
+                  // scheduled_date and a focus/cross-device refetch
+                  // resurrects the task on the calendar.
+                  scheduledDate: date ?? undefined,
                   updatedAt: new Date().toISOString(),
                 }
               : t
@@ -1116,11 +1120,11 @@ export function useWaddleData(): UseWaddleData {
       }))
     )
 
-    const update: { scheduled_start_time: null; scheduled_end_time: null; scheduled_date?: string } = {
+    const update: { scheduled_start_time: null; scheduled_end_time: null; scheduled_date: string | null } = {
       scheduled_start_time: null,
       scheduled_end_time: null,
+      scheduled_date: date ?? null,
     }
-    if (date) update.scheduled_date = date
 
     pendingWritesRef.current += 1
     try {
