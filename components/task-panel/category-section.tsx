@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, GripVertical, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Category, Task } from '@/lib/types'
 import { TaskRow } from './task-row'
@@ -19,6 +19,16 @@ interface CategorySectionProps {
   onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
   /** Mobile: forwards to TaskRow so drag-activation can switch the bottom tab. */
   onTaskDragActivate?: () => void
+  // Drag-reorder integration. Owned by WorkspaceSection — this component just
+  // exposes the grip handle and the drop indicator. Disabled on mobile because
+  // HTML5 drag-and-drop doesn't fire reliably on touch devices.
+  isReorderable?: boolean
+  isDragging?: boolean
+  dropIndicator?: 'before' | 'after' | null
+  onHeaderDragStart?: (e: React.DragEvent) => void
+  onHeaderDragOver?: (e: React.DragEvent) => void
+  onHeaderDrop?: (e: React.DragEvent) => void
+  onHeaderDragEnd?: () => void
 }
 
 export function CategorySection({
@@ -32,6 +42,13 @@ export function CategorySection({
   onDelete,
   onSendTaskToCalendar,
   onTaskDragActivate,
+  isReorderable = false,
+  isDragging = false,
+  dropIndicator = null,
+  onHeaderDragStart,
+  onHeaderDragOver,
+  onHeaderDrop,
+  onHeaderDragEnd,
 }: CategorySectionProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -85,8 +102,28 @@ export function CategorySection({
       {/* Category Header */}
       <div
         onClick={() => onToggleCollapse(category.id)}
-        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer"
+        onDragOver={isReorderable ? onHeaderDragOver : undefined}
+        onDrop={isReorderable ? onHeaderDrop : undefined}
+        className={cn(
+          'relative flex items-center gap-2 w-full px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors group cursor-pointer',
+          isDragging && 'opacity-40',
+          dropIndicator === 'before' && 'before:absolute before:left-1 before:right-1 before:-top-0.5 before:h-0.5 before:rounded-full before:bg-primary',
+          dropIndicator === 'after' && 'after:absolute after:left-1 after:right-1 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-primary'
+        )}
       >
+        {isReorderable && (
+          <span
+            draggable
+            onDragStart={onHeaderDragStart}
+            onDragEnd={onHeaderDragEnd}
+            onClick={(e) => e.stopPropagation()}
+            className="-ml-1 flex items-center justify-center text-muted-foreground/40 hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+            title="拖曳調整分類順序"
+            aria-label="拖曳調整分類順序"
+          >
+            <GripVertical className="w-3.5 h-3.5" />
+          </span>
+        )}
         <ChevronDown
           className={cn(
             'w-3.5 h-3.5 text-muted-foreground transition-transform duration-200',

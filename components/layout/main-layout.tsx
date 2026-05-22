@@ -25,6 +25,7 @@ interface MainLayoutProps {
   slotTypes?: SlotType[]
   settings: UserSettings
   onToggleCategoryCollapse: (categoryId: string) => void
+  onReorderCategories?: (workspaceId: string, orderedCategoryIds: string[]) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
   onAddTask: (categoryId: string, title: string) => void
@@ -65,6 +66,7 @@ export function MainLayout({
   slotTypes,
   settings,
   onToggleCategoryCollapse,
+  onReorderCategories,
   onToggleComplete,
   onSelectTask,
   onAddTask,
@@ -349,6 +351,7 @@ export function MainLayout({
                 isExpanded={true}
                 keepCompletedTodayInList={settings?.keepCompletedTodayInList ?? true}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
+                onReorderCategories={onReorderCategories}
                 onToggleComplete={onToggleComplete}
                 onSelectTask={onSelectTask}
                 onAddTask={onAddTask}
@@ -571,6 +574,7 @@ export function MainLayout({
                 isExpanded={false}
                 keepCompletedTodayInList={settings?.keepCompletedTodayInList ?? true}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
+                onReorderCategories={onReorderCategories}
                 onToggleComplete={onToggleComplete}
                 onSelectTask={onSelectTask}
                 onAddTask={onAddTask}

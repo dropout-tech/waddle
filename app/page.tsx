@@ -39,6 +39,7 @@ export default function WaddlePage() {
     addCategory,
     deleteCategory,
     toggleCategoryCollapse,
+    reorderCategories,
     addTask,
     createTask,
     updateTask,
@@ -347,6 +348,7 @@ export default function WaddlePage() {
         slotTypes={activeSlotTypes}
         settings={settings}
         onToggleCategoryCollapse={toggleCategoryCollapse}
+        onReorderCategories={reorderCategories}
         onToggleComplete={toggleTaskComplete}
         onSelectTask={handleSelectTask}
         onAddTask={addTask}

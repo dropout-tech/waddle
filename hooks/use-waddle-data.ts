@@ -135,6 +135,7 @@ interface UseWaddleData {
   addCategory: (workspaceId: string, name: string) => Promise<void>
   deleteCategory: (categoryId: string) => Promise<void>
   toggleCategoryCollapse: (categoryId: string) => Promise<void>
+  reorderCategories: (workspaceId: string, orderedCategoryIds: string[]) => Promise<void>
   // Task
   addTask: (categoryId: string, title: string) => Promise<void>
   updateTask: (taskId: string, updates: Partial<Task>, newCategoryId?: string) => Promise<void>
@@ -684,6 +685,34 @@ export function useWaddleData(): UseWaddleData {
       // Tasks in this category cascade-delete via the FK in the schema.
       const { error } = await supabase.from('categories').delete().eq('id', categoryId)
       if (error) handleDbError('刪除分類')(error)
+    } finally {
+      pendingWritesRef.current -= 1
+    }
+  }, [supabase])
+
+  const reorderCategories = useCallback(async (workspaceId: string, orderedCategoryIds: string[]) => {
+    const orderIndex = new Map(orderedCategoryIds.map((id, idx) => [id, idx]))
+    setWorkspaces((prev) =>
+      prev.map((w) => {
+        if (w.id !== workspaceId) return w
+        return {
+          ...w,
+          categories: w.categories.map((c) => {
+            const next = orderIndex.get(c.id)
+            return next === undefined ? c : { ...c, sortOrder: next }
+          }),
+        }
+      })
+    )
+
+    pendingWritesRef.current += 1
+    try {
+      const updates = orderedCategoryIds.map((id, idx) =>
+        supabase.from('categories').update({ sort_order: idx }).eq('id', id)
+      )
+      const results = await Promise.all(updates)
+      const failed = results.find((r) => r.error)
+      if (failed?.error) handleDbError('調整分類順序')(failed.error)
     } finally {
       pendingWritesRef.current -= 1
     }
@@ -1699,6 +1728,7 @@ export function useWaddleData(): UseWaddleData {
     addCategory,
     deleteCategory,
     toggleCategoryCollapse,
+    reorderCategories,
     addTask,
     createTask,
     updateTask,

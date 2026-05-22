@@ -36,6 +36,7 @@ interface TaskPanelProps {
    */
   keepCompletedTodayInList?: boolean
   onToggleCategoryCollapse: (categoryId: string) => void
+  onReorderCategories?: (workspaceId: string, orderedCategoryIds: string[]) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
   onAddTask: (categoryId: string, title: string) => void
@@ -59,6 +60,7 @@ export function TaskPanel({
   isExpanded = false,
   keepCompletedTodayInList = true,
   onToggleCategoryCollapse,
+  onReorderCategories,
   onToggleComplete,
   onSelectTask,
   onAddTask,
@@ -350,6 +352,7 @@ export function TaskPanel({
                 density={density}
                 metaOrder={metaOrder}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
+                onReorderCategories={onReorderCategories}
                 onToggleComplete={onToggleComplete}
                 onSelectTask={onSelectTask}
                 onAddTask={onAddTask}
