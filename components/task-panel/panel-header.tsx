@@ -173,7 +173,7 @@ export function PanelHeader({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2.5">
-                <WaddleMascot withBackground className="w-9 h-9 rounded-lg" />
+                <WaddleMascot withBackground phase="auto" className="w-9 h-9 rounded-lg" />
                 <div>
                   <h1 className="text-lg font-bold text-foreground tracking-tight">
                     Waddle
