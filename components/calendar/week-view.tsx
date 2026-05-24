@@ -11,13 +11,10 @@ import {
   minutesToTime,
   snap,
   clamp,
-  calculateTaskColumns,
+  calculateUnifiedColumns,
   toDateString,
   autoScrollContainerNearEdge,
   taskOccursOnDate,
-  STATE_STRIP_LEFT,
-  STATE_STRIP_WIDTH,
-  STATE_GUTTER_PX,
 } from '@/lib/calendar-utils'
 import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 import { CurrentTimeLine } from './current-time-line'
@@ -886,7 +883,10 @@ export function WeekView({
             const dayTasks = getScheduledTasksForDate(date)
             const dayBlocks = getTimeBlocksForDate(date)
             const dragSelection = getDragSelection(dayIndex)
-            const taskColumns = calculateTaskColumns(dayTasks)
+            // Pack tasks and TimeBlocks into shared columns so an
+            // overlapping block lands in a sibling column instead of
+            // burying the task (or vice-versa). See calculateUnifiedColumns.
+            const { tasks: taskColumns, blocks: blockColumns } = calculateUnifiedColumns(dayTasks, dayBlocks)
 
             return (
               <div
@@ -915,25 +915,38 @@ export function WeekView({
                 {/* Time Blocks — tap to open the editor. (Week view skips
                     drag-to-resize because each day column is too narrow on
                     mobile to make precise edge drags reliable; users go
-                    through the modal instead.) */}
-                {dayBlocks.map((block) => (
-                  <div
-                    key={block.id}
-                    data-task="true"
-                    role="button"
-                    aria-label={`${block.label} ${block.startTime}–${block.endTime}`}
-                    title={`${block.label} · ${block.startTime}–${block.endTime}`}
-                    onClick={() => onTimeBlockSelect?.(block)}
-                    className="absolute rounded-md overflow-hidden cursor-pointer hover:brightness-110 hover:shadow-md transition-all"
-                    style={{
-                      top: getTimePosition(block.startTime),
-                      height: getDurationHeight(block.startTime, block.endTime),
-                      left: `${STATE_STRIP_LEFT}px`,
-                      width: `${STATE_STRIP_WIDTH}px`,
-                      backgroundColor: block.color,
-                    }}
-                  />
-                ))}
+                    through the modal instead.) Translucent card that shares
+                    columns with tasks so overlaps fan out instead of stacking. */}
+                {dayBlocks.map((block) => {
+                  const col = blockColumns.get(block.id)
+                  const colIdx = col?.column ?? 0
+                  const totalCols = col?.totalColumns ?? 1
+                  const widthPct = 100 / totalCols
+                  const leftPct = colIdx * widthPct
+                  return (
+                    <div
+                      key={block.id}
+                      data-task="true"
+                      role="button"
+                      aria-label={`${block.label} ${block.startTime}–${block.endTime}`}
+                      title={`${block.label} · ${block.startTime}–${block.endTime}`}
+                      onClick={() => onTimeBlockSelect?.(block)}
+                      className="absolute rounded px-2 py-1 text-xs font-medium overflow-hidden cursor-pointer hover:shadow-md transition-all"
+                      style={{
+                        top: getTimePosition(block.startTime),
+                        height: getDurationHeight(block.startTime, block.endTime),
+                        left: `calc(${leftPct}% + 2px)`,
+                        width: `calc(${widthPct}% - 4px)`,
+                        backgroundColor: block.color + '30',
+                        borderLeft: `3px solid ${block.color}`,
+                        color: block.color,
+                      }}
+                    >
+                      <div className="truncate">{block.label}</div>
+                      <div className="text-[10px] opacity-70">{block.startTime}-{block.endTime}</div>
+                    </div>
+                  )
+                })}
 
                 {/* Scheduled Tasks with drag/resize via TaskBlock */}
                 {dayTasks.map((task) => {
@@ -971,12 +984,10 @@ export function WeekView({
                     ghost there is the visible preview). */}
                 {activeTaskDrag && activeTaskDrag.dayIndex === dayIndex && hoveredPendingZoneDate === null && !dayTasks.find(t => t.id === activeTaskDrag.taskId) && (
                   <div
-                    className="absolute rounded-xl px-2 py-1.5 text-left overflow-hidden opacity-80 pointer-events-none z-30 shadow-lg"
+                    className="absolute left-1 right-1 rounded-xl px-2 py-1.5 text-left overflow-hidden opacity-80 pointer-events-none z-30 shadow-lg"
                     style={{
                       top: `${activeTaskDrag.currentStart - MIN}px`,
                       height: `${activeTaskDrag.currentEnd - activeTaskDrag.currentStart}px`,
-                      left: `${STATE_GUTTER_PX + 2}px`,
-                      right: '4px',
                       backgroundColor: tasks.find(t => t.id === activeTaskDrag.taskId)?.calendarColor || '#6B7FD4',
                     }}
                   >
@@ -994,12 +1005,10 @@ export function WeekView({
                     zone (the ghost in that zone is the visible preview). */}
                 {pendingTaskDrag && pendingTaskDrag.currentDayIndex === dayIndex && hoveredPendingZoneDate === null && (
                   <div
-                    className="absolute rounded-xl px-2 py-1.5 text-left overflow-hidden pointer-events-none z-30 shadow-xl border-2 border-white/50"
+                    className="absolute left-1 right-1 rounded-xl px-2 py-1.5 text-left overflow-hidden pointer-events-none z-30 shadow-xl border-2 border-white/50"
                     style={{
                       top: `${pendingTaskDrag.currentMinutes - MIN}px`,
                       height: `${Math.max(pendingTaskDrag.duration, 30)}px`,
-                      left: `${STATE_GUTTER_PX + 2}px`,
-                      right: '4px',
                       backgroundColor: pendingTaskDrag.task.calendarColor || pendingTaskDrag.task.workspaceColor || '#6B7FD4',
                     }}
                   >

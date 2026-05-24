@@ -1,19 +1,8 @@
-import type { Task } from './types'
+import type { Task, TimeBlock } from './types'
 
 export const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六'] as const
 
 export const SNAP_MINUTES = 15
-
-/**
- * Left gutter reserved on each calendar day column for the "state" strip
- * (TimeBlocks rendered as a thin vertical color band). Tasks shift right
- * by this amount so they never overlap the state indicator. Keep the
- * three derived values consistent — strip starts after STATE_STRIP_LEFT,
- * occupies STATE_STRIP_WIDTH, and tasks begin at STATE_GUTTER_PX.
- */
-export const STATE_STRIP_LEFT = 2 // px from column's left edge
-export const STATE_STRIP_WIDTH = 10 // px, fits a small icon centered
-export const STATE_GUTTER_PX = 14 // px, where the task area begins
 
 /**
  * Format a Date as a local-time YYYY-MM-DD string.
@@ -60,6 +49,9 @@ function daysBetween(a: Date, b: Date): number {
 export function taskOccursOnDate(task: Task, date: Date): boolean {
   if (!task.scheduledDate) return false
   const dateStr = toDateString(date)
+
+  // If this date is explicitly excluded, it never occurs.
+  if (task.exdates?.includes(dateStr)) return false
 
   // Original occurrence — always counts.
   if (task.scheduledDate === dateStr) return true
@@ -281,4 +273,46 @@ export function calculateTaskColumns(
     }
   }
   return result
+}
+
+/**
+ * Pack tasks AND TimeBlocks into the same column layout so a block that
+ * shares a time range with a task gets a sibling column instead of
+ * stacking underneath. Returns two maps keyed by their respective ids
+ * (Task.id and TimeBlock.id); each map only contains the items it owns,
+ * so callers can look up "what column does this task / block live in"
+ * without worrying about id collisions.
+ *
+ * Blocks are converted to a Task-shaped shim with a `__block__` id prefix
+ * to keep them separable in the packed result.
+ */
+export function calculateUnifiedColumns(
+  tasks: Task[],
+  blocks: TimeBlock[]
+): {
+  tasks: Map<string, { column: number; totalColumns: number }>
+  blocks: Map<string, { column: number; totalColumns: number }>
+} {
+  const BLOCK_PREFIX = '__block__'
+  const blockShims = blocks.map(
+    (b) =>
+      ({
+        id: `${BLOCK_PREFIX}${b.id}`,
+        scheduledStartTime: b.startTime,
+        scheduledEndTime: b.endTime,
+      }) as unknown as Task
+  )
+  const packed = calculateTaskColumns([...tasks, ...blockShims])
+
+  const taskCols = new Map<string, { column: number; totalColumns: number }>()
+  const blockCols = new Map<string, { column: number; totalColumns: number }>()
+  for (const t of tasks) {
+    const v = packed.get(t.id)
+    if (v) taskCols.set(t.id, v)
+  }
+  for (const b of blocks) {
+    const v = packed.get(`${BLOCK_PREFIX}${b.id}`)
+    if (v) blockCols.set(b.id, v)
+  }
+  return { tasks: taskCols, blocks: blockCols }
 }

@@ -11,13 +11,10 @@ import {
   minutesToTime,
   snap,
   clamp,
-  calculateTaskColumns,
+  calculateUnifiedColumns,
   toDateString,
   autoScrollContainerNearEdge,
   taskOccursOnDate,
-  STATE_STRIP_LEFT,
-  STATE_STRIP_WIDTH,
-  STATE_GUTTER_PX,
 } from '@/lib/calendar-utils'
 import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -1114,6 +1111,11 @@ export function DayScrollView({
             const dayTasks = getTasksForDate(date)
             const dayBlocks = getBlocksForDate(date)
             const dragSelection = getDragSelection(dayIndex)
+            // Pack tasks and TimeBlocks into shared columns so a block that
+            // overlaps a task's time range gets a sibling column instead of
+            // hiding underneath. Both layers consume {column, totalColumns}
+            // from the same grid.
+            const { tasks: taskCols, blocks: blockCols } = calculateUnifiedColumns(dayTasks, dayBlocks)
 
             return (
               <div
@@ -1151,7 +1153,11 @@ export function DayScrollView({
                 ))}
 
                 {/* Time Blocks — tap to edit, drag body to move, drag
-                    top/bottom edge to resize. Mirrors TaskBlock affordances. */}
+                    top/bottom edge to resize. Mirrors TaskBlock affordances.
+                    Rendered as a translucent card that shares column slots
+                    with tasks (see calculateUnifiedColumns), so an
+                    overlapping task lands in a sibling column instead of
+                    burying the block. */}
                 {dayBlocks.map((block) => {
                   const isDraggingThis = activeBlockDrag?.blockId === block.id
                   // While dragging, show the live preview position instead
@@ -1174,6 +1180,11 @@ export function DayScrollView({
                   const previewEnd = isDraggingThis && activeBlockDrag
                     ? minutesToTime(activeBlockDrag.currentEnd)
                     : block.endTime
+                  const col = blockCols.get(block.id)
+                  const colIdx = col?.column ?? 0
+                  const totalCols = col?.totalColumns ?? 1
+                  const widthPct = 100 / totalCols
+                  const leftPct = colIdx * widthPct
                   return (
                     <div
                       key={block.id}
@@ -1183,71 +1194,87 @@ export function DayScrollView({
                       aria-label={`${block.label} ${previewStart}–${previewEnd}`}
                       title={`${block.label} · ${previewStart}–${previewEnd}`}
                       className={cn(
-                        'absolute rounded-md overflow-hidden group select-none',
+                        'absolute rounded text-xs font-medium overflow-hidden group select-none',
                         isDraggingThis
-                          ? 'z-50 ring-2 ring-white/60 shadow-2xl scale-x-150 transition-transform'
-                          : 'hover:brightness-110 hover:shadow-md transition-all'
+                          ? 'shadow-2xl z-50 ring-2 ring-white/40 scale-[1.02] -rotate-1 transition-transform'
+                          : 'hover:shadow-md transition-all'
                       )}
                       style={{
                         top,
                         height,
-                        left: `${STATE_STRIP_LEFT}px`,
-                        width: `${STATE_STRIP_WIDTH}px`,
-                        backgroundColor: block.color,
+                        left: `calc(${leftPct}% + 2px)`,
+                        width: `calc(${widthPct}% - 4px)`,
+                        backgroundColor: block.color + '30',
+                        borderLeft: `3px solid ${block.color}`,
+                        color: block.color,
                         cursor: isDraggingThis ? 'grabbing' : 'grab',
                         zIndex: isDraggingThis ? 50 : 1,
                         touchAction: 'none',
                       }}
-                      onClick={() => {
-                        if (dragEndCooldown.current) return
-                        onTimeBlockSelect?.(block)
-                      }}
                     >
-                      {/* Resize zones — top/bottom edges. Invisible because
-                          a 10px-wide strip has no room for a visible handle;
-                          the cursor change still telegraphs the affordance.
-                          The middle zone is drag-to-move. */}
+                      {/* Resize handle — TOP. Larger touch target on mobile. */}
                       <div
-                        className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize z-10"
+                        className="absolute top-0 left-0 right-0 h-4 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         onPointerDown={(e) => handleTimeBlockDragStart(block, 'resize-top', dayIndex, e)}
                         style={{ touchAction: 'none' }}
-                      />
+                      >
+                        <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: block.color, opacity: 0.6 }} />
+                      </div>
+
+                      {/* Body — drag to move, tap to open edit modal */}
                       <div
-                        className="absolute inset-x-0 top-2 bottom-2"
+                        className="px-2 py-1 h-full flex flex-col"
                         onPointerDown={(e) => handleTimeBlockDragStart(block, 'move', dayIndex, e)}
+                        onClick={() => {
+                          if (dragEndCooldown.current) return
+                          onTimeBlockSelect?.(block)
+                        }}
                         style={{ touchAction: 'none' }}
-                      />
+                      >
+                        <div className="truncate">{block.label}</div>
+                        <div className="text-[10px] opacity-70">{previewStart}-{previewEnd}</div>
+                      </div>
+
+                      {/* Resize handle — BOTTOM. */}
                       <div
-                        className="absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize z-10"
+                        className="absolute bottom-0 left-0 right-0 h-4 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         onPointerDown={(e) => handleTimeBlockDragStart(block, 'resize-bottom', dayIndex, e)}
                         style={{ touchAction: 'none' }}
-                      />
+                      >
+                        <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: block.color, opacity: 0.6 }} />
+                      </div>
                     </div>
                   )
                 })}
 
-                {/* Live preview when block is being dragged to a different day */}
+                {/* Live preview when block is being dragged to a different day.
+                    The destination day's packing is unknown until drop, so
+                    the preview takes the full column width — it's a hovering
+                    ghost, not a final placement. */}
                 {activeBlockDrag && activeBlockDrag.dayIndex === dayIndex && !dayBlocks.find(b => b.id === activeBlockDrag.blockId) && (() => {
                   const block = timeBlocks.find(b => b.id === activeBlockDrag.blockId)
                   if (!block) return null
                   return (
                     <div
-                      className="absolute rounded-md overflow-hidden shadow-2xl z-50 ring-2 ring-white/60 pointer-events-none"
-                      title={`${block.label} · ${minutesToTime(activeBlockDrag.currentStart)}-${minutesToTime(activeBlockDrag.currentEnd)}`}
+                      className="absolute left-1 right-1 rounded px-2 py-1 text-xs font-medium overflow-hidden shadow-2xl z-50 ring-2 ring-white/40 pointer-events-none"
                       style={{
                         top: `${activeBlockDrag.currentStart - MIN}px`,
                         height: `${Math.max(activeBlockDrag.currentEnd - activeBlockDrag.currentStart, 30)}px`,
-                        left: `${STATE_STRIP_LEFT}px`,
-                        width: `${STATE_STRIP_WIDTH}px`,
-                        backgroundColor: block.color,
+                        backgroundColor: block.color + '30',
+                        borderLeft: `3px solid ${block.color}`,
+                        color: block.color,
                       }}
-                    />
+                    >
+                      <div className="truncate">{block.label}</div>
+                      <div className="text-[10px] opacity-70">
+                        {minutesToTime(activeBlockDrag.currentStart)}-{minutesToTime(activeBlockDrag.currentEnd)}
+                      </div>
+                    </div>
                   )
                 })()}
 
                 {/* Scheduled Tasks with drag/resize via TaskBlock */}
                 {(() => {
-                  const taskCols = calculateTaskColumns(dayTasks)
                   return dayTasks.map((task) => {
                     const col = taskCols.get(task.id)
                     const isDraggingThis = activeTaskDrag?.taskId === task.id
@@ -1282,12 +1309,10 @@ export function DayScrollView({
                 {/* Show dragged task preview when dragging to this day */}
                 {activeTaskDrag && activeTaskDrag.dayIndex === dayIndex && !dayTasks.find(t => t.id === activeTaskDrag.taskId) && (
                   <div
-                    className="absolute rounded-xl px-2 py-1.5 text-left overflow-hidden opacity-80 pointer-events-none z-30 shadow-lg"
+                    className="absolute left-1 right-1 rounded-xl px-2 py-1.5 text-left overflow-hidden opacity-80 pointer-events-none z-30 shadow-lg"
                     style={{
                       top: `${activeTaskDrag.currentStart - MIN}px`,
                       height: `${activeTaskDrag.currentEnd - activeTaskDrag.currentStart}px`,
-                      left: `${STATE_GUTTER_PX + 2}px`,
-                      right: '4px',
                       backgroundColor: tasks.find(t => t.id === activeTaskDrag.taskId)?.calendarColor || '#6B7FD4',
                     }}
                   >
@@ -1305,12 +1330,10 @@ export function DayScrollView({
                     zone (the ghost in that zone is the visible preview). */}
                 {pendingTaskDrag && pendingTaskDrag.currentDayIndex === dayIndex && hoveredPendingZoneDate === null && (
                   <div
-                    className="absolute rounded-xl px-2 py-1.5 text-left overflow-hidden pointer-events-none z-30 shadow-xl border-2 border-white/50"
+                    className="absolute left-1 right-1 rounded-xl px-2 py-1.5 text-left overflow-hidden pointer-events-none z-30 shadow-xl border-2 border-white/50"
                     style={{
                       top: `${pendingTaskDrag.currentMinutes - MIN}px`,
                       height: `${Math.max(pendingTaskDrag.duration, 30)}px`,
-                      left: `${STATE_GUTTER_PX + 2}px`,
-                      right: '4px',
                       backgroundColor: pendingTaskDrag.task.calendarColor || pendingTaskDrag.task.workspaceColor || '#6B7FD4',
                     }}
                   >
