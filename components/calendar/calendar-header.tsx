@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
 import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, BarChart3, Settings, Sparkles, MoreHorizontal, Download } from 'lucide-react'
+import { UndoRedoButtons } from '@/components/undo-redo-buttons'
 import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { UserMenu } from '@/components/user-menu'
@@ -370,8 +371,9 @@ export function CalendarHeader({
           <div />
         )}
 
-        {/* Right: Journal / Report / Settings */}
+        {/* Right: Undo/Redo / Journal / Report / Settings */}
         <div className="flex items-center gap-1">
+          <UndoRedoButtons className="mr-1" />
           {onOpenJournal && (
             <button
               type="button"

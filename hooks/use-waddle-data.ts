@@ -14,6 +14,7 @@ import {
 } from '@/lib/supabase/mappers'
 import { toDateString, parseDateString } from '@/lib/calendar-utils'
 import { playTaskCompleteSound } from '@/lib/task-sound'
+import { pushUndoableAction } from '@/lib/undo-stack'
 import type {
   Workspace,
   Category,
@@ -713,7 +714,21 @@ export function useWaddleData(): UseWaddleData {
     }
   }, [supabase])
 
-  const reorderCategories = useCallback(async (workspaceId: string, orderedCategoryIds: string[]) => {
+  const reorderCategories = useCallback(async (workspaceId: string, orderedCategoryIds: string[], recordUndo: boolean = true) => {
+    // Capture the pre-reorder sequence so undo can restore it. We only look
+    // at the categories the caller intends to reorder — other categories in
+    // the workspace keep their existing sortOrder untouched.
+    let previousOrder: string[] = []
+    for (const w of workspacesRef.current) {
+      if (w.id !== workspaceId) continue
+      const idSet = new Set(orderedCategoryIds)
+      previousOrder = w.categories
+        .filter((c) => idSet.has(c.id))
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((c) => c.id)
+      break
+    }
+
     const orderIndex = new Map(orderedCategoryIds.map((id, idx) => [id, idx]))
     setWorkspaces((prev) =>
       prev.map((w) => {
@@ -738,6 +753,19 @@ export function useWaddleData(): UseWaddleData {
       if (failed?.error) handleDbError('調整分類順序')(failed.error)
     } finally {
       pendingWritesRef.current -= 1
+    }
+
+    // Skip recording when the order didn't actually change — happens when
+    // the user drags but releases over the same slot.
+    const isUnchanged =
+      previousOrder.length === orderedCategoryIds.length &&
+      previousOrder.every((id, i) => id === orderedCategoryIds[i])
+    if (recordUndo && previousOrder.length > 0 && !isUnchanged) {
+      pushUndoableAction({
+        label: '調整分類順序',
+        undo: () => reorderCategories(workspaceId, previousOrder, false),
+        redo: () => reorderCategories(workspaceId, orderedCategoryIds, false),
+      })
     }
   }, [supabase])
 
@@ -877,7 +905,8 @@ export function useWaddleData(): UseWaddleData {
     updates: Partial<Task>,
     newCategoryId?: string,
     recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice,
-    targetDate?: string
+    targetDate?: string,
+    recordUndo: boolean = true
   ) => {
     // Find the task in local state via ref so the callback doesn't need
     // to depend on `workspaces` (which would re-create it on every keystroke).
@@ -978,6 +1007,27 @@ export function useWaddleData(): UseWaddleData {
         if (error) handleDbError('更新任務')(error)
       } finally {
         pendingWritesRef.current -= 1
+      }
+
+      // Record undo: snapshot the fields touched by `updates`, plus the
+      // categoryId if this was a cross-category move. The inverse calls
+      // updateTask with the captured before-values, restoring exactly what
+      // changed (not the whole row — avoids stepping on concurrent edits).
+      if (recordUndo) {
+        const before: Partial<Task> = {}
+        const existingRow = existing as unknown as Record<string, unknown>
+        const beforeRow = before as Record<string, unknown>
+        for (const key of Object.keys(updates)) {
+          beforeRow[key] = existingRow[key]
+        }
+        const previousCategoryId = existing.categoryId
+        const title = existing.title
+        const wasMove = isMove && newCategoryId !== existing.categoryId
+        pushUndoableAction({
+          label: wasMove ? `移動「${title}」` : `編輯「${title}」`,
+          undo: () => updateTask(taskId, before, wasMove ? previousCategoryId : undefined, 'all', undefined, false),
+          redo: () => updateTask(taskId, updates, newCategoryId, 'all', undefined, false),
+        })
       }
       return
     }
@@ -1096,12 +1146,19 @@ export function useWaddleData(): UseWaddleData {
     }
   }, [supabase])
 
-  const toggleTaskComplete = useCallback(async (taskId: string) => {
+  const toggleTaskComplete = useCallback(async (taskId: string, recordUndo: boolean = true) => {
     // Capture the previous state so we can roll back on a silent failure.
     let previousCompleted: boolean | undefined
     let previousCompletedAt: string | undefined
     let nextValue = false
     let completedAt: string | null = null
+    // Title for the undo toast label — read once before the optimistic flip
+    // so the undo action stays meaningful even if the task is later mutated.
+    let taskTitle = '任務'
+    for (const w of workspacesRef.current) for (const c of w.categories) {
+      const t = c.tasks.find((x) => x.id === taskId)
+      if (t) { taskTitle = t.title; break }
+    }
     setWorkspaces((prev) =>
       prev.map((w) => ({
         ...w,
@@ -1178,9 +1235,18 @@ export function useWaddleData(): UseWaddleData {
     } finally {
       pendingWritesRef.current -= 1
     }
+
+    // Record undo: a toggle is its own inverse, so undo simply re-toggles.
+    if (recordUndo) {
+      pushUndoableAction({
+        label: `${nextValue ? '完成' : '取消完成'}「${taskTitle}」`,
+        undo: () => toggleTaskComplete(taskId, false),
+        redo: () => toggleTaskComplete(taskId, false),
+      })
+    }
   }, [supabase])
 
-  const deleteTask = useCallback(async (taskId: string, targetDate?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice) => {
+  const deleteTask = useCallback(async (taskId: string, targetDate?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, recordUndo: boolean = true) => {
     // Find the task in local state via ref so this callback is stable.
     let task: Task | null = null
     for (const w of workspacesRef.current) {
@@ -1240,6 +1306,49 @@ export function useWaddleData(): UseWaddleData {
         }
       } finally {
         pendingWritesRef.current -= 1
+      }
+
+      // Record undo: recreate the task with its original id + restore the
+      // parent's exdates if we cleaned them up. We snapshot the full Task
+      // object so all fields (subtasks, color, recurrence config, etc.) round
+      // trip through createTask intact.
+      if (recordUndo) {
+        const snapshot = task
+        const exdateRestore = parentExdateCleanup
+        pushUndoableAction({
+          label: `刪除「${snapshot.title}」`,
+          undo: async () => {
+            await createTask(snapshot)
+            if (exdateRestore) {
+              // Re-add the date back to parent's exdates so the master skips
+              // it again (matching the pre-delete state).
+              const parent = (() => {
+                for (const w of workspacesRef.current) for (const c of w.categories) {
+                  const p = c.tasks.find((x) => x.id === exdateRestore.parentId)
+                  if (p) return p
+                }
+                return null
+              })()
+              const restored = [...(parent?.exdates ?? []), snapshot.scheduledDate!].filter(Boolean)
+              setWorkspaces((prev) =>
+                prev.map((w) => ({
+                  ...w,
+                  categories: w.categories.map((c) => ({
+                    ...c,
+                    tasks: c.tasks.map((t) =>
+                      t.id === exdateRestore.parentId ? { ...t, exdates: restored } : t,
+                    ),
+                  })),
+                })),
+              )
+              await supabase
+                .from('tasks')
+                .update({ exdates: restored })
+                .eq('id', exdateRestore.parentId)
+            }
+          },
+          redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
+        })
       }
       return
     }
@@ -1359,7 +1468,8 @@ export function useWaddleData(): UseWaddleData {
     startTime: string,
     endTime: string,
     recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice,
-    targetDate?: string
+    targetDate?: string,
+    recordUndo: boolean = true
   ) => {
     // Find the task in local state via ref so this callback is stable.
     let task: Task | null = null
@@ -1428,6 +1538,30 @@ export function useWaddleData(): UseWaddleData {
         }
       } finally {
         pendingWritesRef.current -= 1
+      }
+
+      // Record undo: re-call reschedule (or unschedule if the task was
+      // previously pending) with the captured before-state. The redo path
+      // re-applies the new time. Recurrence-specific branches below are
+      // not undoable in this pass — they touch exdates / spawn detached
+      // children, which is harder to reverse safely.
+      if (recordUndo) {
+        const beforeDate = task.scheduledDate
+        const beforeStart = task.scheduledStartTime
+        const beforeEnd = task.scheduledEndTime
+        const title = task.title
+        const newDate = date ?? beforeDate
+        pushUndoableAction({
+          label: `重排「${title}」`,
+          undo: () => {
+            if (beforeStart && beforeEnd) {
+              return rescheduleTask(taskId, beforeDate, beforeStart, beforeEnd, 'all', undefined, false)
+            }
+            // Task was pending before — undo by unscheduling.
+            return unscheduleTask(taskId, beforeDate, 'all', undefined, false)
+          },
+          redo: () => rescheduleTask(taskId, newDate, startTime, endTime, 'all', undefined, false),
+        })
       }
       return
     }
@@ -1585,7 +1719,10 @@ export function useWaddleData(): UseWaddleData {
     taskId: string,
     date?: string,
     recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice,
-    targetDate?: string
+    targetDate?: string,
+    // Currently invoked from rescheduleTask's undo path; the param is here so
+    // future call sites can opt out of redundant recording when needed.
+    _recordUndo: boolean = true
   ) => {
     // Find the task via ref to stay decoupled from `workspaces`.
     let task: Task | null = null
@@ -1791,9 +1928,11 @@ export function useWaddleData(): UseWaddleData {
   // Time-block mutations
   // ═════════════════════════════════════════════════════
 
-  const addTimeBlock = useCallback(async (block: Omit<TimeBlock, 'id'>) => {
+  const addTimeBlock = useCallback(async (block: Omit<TimeBlock, 'id'> & { id?: string }) => {
     const userId = requireUserId()
-    const id = crypto.randomUUID()
+    // Undo-restore uses the original id so any downstream references (e.g.,
+    // toasts, focused selection) still resolve. Normal creates generate fresh.
+    const id = block.id ?? crypto.randomUUID()
     const newBlock: TimeBlock = { ...block, id }
 
     setTimeBlocks((prev) => [...prev, newBlock])
@@ -1835,7 +1974,7 @@ export function useWaddleData(): UseWaddleData {
     }
   }, [supabase])
 
-  const updateTimeBlock = useCallback(async (id: string, updates: Partial<TimeBlock>) => {
+  const updateTimeBlock = useCallback(async (id: string, updates: Partial<TimeBlock>, recordUndo: boolean = true) => {
     // Capture the pre-update copy so we can roll back on a silent RLS drop.
     let previous: TimeBlock | undefined
     setTimeBlocks((prev) => {
@@ -1858,13 +1997,32 @@ export function useWaddleData(): UseWaddleData {
         console.error('[updateTimeBlock] 0 rows updated — RLS or stale session?', { id })
         if (previous) setTimeBlocks((prev) => prev.map((b) => (b.id === id ? previous! : b)))
         toast.error('儲存失敗：無法更新時間區塊（可能登入逾時，請重新整理或登出再登入）')
+        return
       }
     } finally {
       pendingWritesRef.current -= 1
     }
+
+    // Record undo: snapshot the pre-update fields touched by `updates` so
+    // the inverse restores exactly what changed (not the whole row, to keep
+    // redo from clobbering unrelated concurrent edits).
+    if (recordUndo && previous) {
+      const before: Partial<TimeBlock> = {}
+      const previousRow = previous as unknown as Record<string, unknown>
+      const beforeRow = before as Record<string, unknown>
+      for (const key of Object.keys(updates)) {
+        beforeRow[key] = previousRow[key]
+      }
+      const label = previous.label
+      pushUndoableAction({
+        label: `更新「${label}」`,
+        undo: () => updateTimeBlock(id, before, false),
+        redo: () => updateTimeBlock(id, updates, false),
+      })
+    }
   }, [supabase])
 
-  const deleteTimeBlock = useCallback(async (id: string) => {
+  const deleteTimeBlock = useCallback(async (id: string, recordUndo: boolean = true) => {
     let removed: TimeBlock | undefined
     setTimeBlocks((prev) => {
       removed = prev.find((b) => b.id === id)
@@ -1886,9 +2044,21 @@ export function useWaddleData(): UseWaddleData {
         console.error('[deleteTimeBlock] 0 rows deleted — RLS or stale session?', { id })
         if (removed) setTimeBlocks((prev) => [...prev, removed!])
         toast.error('儲存失敗：無法刪除時間區塊（可能登入逾時，請重新整理或登出再登入）')
+        return
       }
     } finally {
       pendingWritesRef.current -= 1
+    }
+
+    // Record undo: re-create the block with the same id so any UI references
+    // (selected block, focused row) still resolve after undo.
+    if (recordUndo && removed) {
+      const snapshot = removed
+      pushUndoableAction({
+        label: `刪除「${snapshot.label}」`,
+        undo: () => addTimeBlock(snapshot),
+        redo: () => deleteTimeBlock(id, false),
+      })
     }
   }, [supabase])
 
