@@ -3,7 +3,7 @@
 import { useMemo, useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
 import { toast } from 'sonner'
 import { positionPopover } from '@/lib/popover-position'
-import { cn, haptic } from '@/lib/utils'
+import { cn, haptic, isLightColor } from '@/lib/utils'
 import type { Task, TimeBlock, SlotType } from '@/lib/types'
 import {
   WEEKDAY_NAMES,
@@ -1251,6 +1251,12 @@ export function DayScrollView({
                   const totalCols = col?.totalColumns ?? 1
                   const widthPct = 100 / totalCols
                   const leftPct = colIdx * widthPct
+                  // Tint strong enough to read against the cream calendar
+                  // background but still clearly translucent so the block
+                  // reads as "state" rather than another solid task. Text
+                  // color flips by luminance — black/dark blocks need white
+                  // text; cream/pale blocks need dark text.
+                  const textColor = isLightColor(block.color) ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.95)'
                   return (
                     <div
                       key={block.id}
@@ -1270,9 +1276,9 @@ export function DayScrollView({
                         height,
                         left: `calc(${leftPct}% + 2px)`,
                         width: `calc(${widthPct}% - 4px)`,
-                        backgroundColor: block.color + '30',
+                        backgroundColor: block.color + '99',
                         borderLeft: `3px solid ${block.color}`,
-                        color: block.color,
+                        color: textColor,
                         cursor: isDraggingThis ? 'grabbing' : 'grab',
                         zIndex: isDraggingThis ? 50 : 1,
                         touchAction: 'none',
@@ -1320,15 +1326,16 @@ export function DayScrollView({
                 {activeBlockDrag && activeBlockDrag.dayIndex === dayIndex && !dayBlocks.find(b => b.id === activeBlockDrag.blockId) && (() => {
                   const block = timeBlocks.find(b => b.id === activeBlockDrag.blockId)
                   if (!block) return null
+                  const textColor = isLightColor(block.color) ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.95)'
                   return (
                     <div
                       className="absolute left-1 right-1 rounded px-2 py-1 text-xs font-medium overflow-hidden shadow-2xl z-50 ring-2 ring-white/40 pointer-events-none"
                       style={{
                         top: `${activeBlockDrag.currentStart - MIN}px`,
                         height: `${Math.max(activeBlockDrag.currentEnd - activeBlockDrag.currentStart, 30)}px`,
-                        backgroundColor: block.color + '30',
+                        backgroundColor: block.color + '99',
                         borderLeft: `3px solid ${block.color}`,
-                        color: block.color,
+                        color: textColor,
                       }}
                     >
                       <div className="truncate">{block.label}</div>

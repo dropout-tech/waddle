@@ -3,7 +3,7 @@
 import { useMemo, useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react'
 import { toast } from 'sonner'
 import { positionPopover } from '@/lib/popover-position'
-import { cn, haptic } from '@/lib/utils'
+import { cn, haptic, isLightColor } from '@/lib/utils'
 import type { Task, TimeBlock, SlotType } from '@/lib/types'
 import {
   WEEKDAY_NAMES,
@@ -990,6 +990,9 @@ export function WeekView({
                   const totalCols = col?.totalColumns ?? 1
                   const widthPct = 100 / totalCols
                   const leftPct = colIdx * widthPct
+                  // See day-scroll-view for rationale: tint strong enough to
+                  // read on cream bg, text color flips by luminance.
+                  const textColor = isLightColor(block.color) ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.95)'
                   return (
                     <div
                       key={block.id}
@@ -1004,9 +1007,9 @@ export function WeekView({
                         height: getDurationHeight(block.startTime, block.endTime),
                         left: `calc(${leftPct}% + 2px)`,
                         width: `calc(${widthPct}% - 4px)`,
-                        backgroundColor: block.color + '30',
+                        backgroundColor: block.color + '99',
                         borderLeft: `3px solid ${block.color}`,
-                        color: block.color,
+                        color: textColor,
                       }}
                     >
                       <div className="truncate">{block.label}</div>
