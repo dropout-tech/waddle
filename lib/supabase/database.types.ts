@@ -81,6 +81,8 @@ type TasksRow = {
   attendees?: string | null
   location?: string | null
   meeting_url?: string | null
+  exdates?: string[] | null
+  parent_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -238,6 +240,8 @@ type TasksInsert = {
   attendees?: string | null
   location?: string | null
   meeting_url?: string | null
+  exdates?: string[] | null
+  parent_id?: string | null
 }
 
 type JournalEntriesInsert = {

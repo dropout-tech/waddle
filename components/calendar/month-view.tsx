@@ -10,7 +10,7 @@ interface MonthViewProps {
   selectedDate: Date
   tasks: Task[]
   timeBlocks: TimeBlock[]
-  onTaskSelect: (task: Task) => void
+  onTaskSelect: (task: Task, occurrenceDate?: string) => void
   onToggleComplete?: (taskId: string) => void
   onDateSelect?: (date: Date) => void
   onCreateTask?: (date: string) => void
@@ -281,7 +281,7 @@ export function MonthView({
                             key={task.id}
                             onClick={(e) => {
                               e.stopPropagation()
-                              onTaskSelect(task)
+                              onTaskSelect(task, day.dateString)
                             }}
                             className="flex items-center gap-1 px-1 py-0.5 rounded text-[9px] cursor-pointer hover:brightness-95 transition-all"
                             style={{

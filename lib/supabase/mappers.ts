@@ -74,6 +74,8 @@ export function rowToTask(
     attendees: row.attendees ?? undefined,
     location: row.location ?? undefined,
     meetingUrl: row.meeting_url ?? undefined,
+    parentId: row.parent_id ?? undefined,
+    exdates: row.exdates ?? undefined,
     recurrence: row.recurrence_type
       ? {
           type: row.recurrence_type,
@@ -124,6 +126,8 @@ export function taskToRow(
   if (task.attendees !== undefined) out.attendees = task.attendees || null
   if (task.location !== undefined) out.location = task.location || null
   if (task.meetingUrl !== undefined) out.meeting_url = task.meetingUrl || null
+  if (task.parentId !== undefined) out.parent_id = task.parentId || null
+  if (task.exdates !== undefined) out.exdates = task.exdates || null
   if (task.recurrence !== undefined) {
     if (task.recurrence) {
       out.recurrence_type = task.recurrence.type

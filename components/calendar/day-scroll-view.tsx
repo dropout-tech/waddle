@@ -22,20 +22,21 @@ import { CurrentTimeLine } from './current-time-line'
 import { TaskBlock, type TaskDragStart } from './task-block'
 import { SlotIcon } from './slot-icon'
 import { X, ChevronLeft } from 'lucide-react'
+import { RecurrenceChoiceModal, type RecurrenceChoice } from '../modals/recurrence-choice-modal'
 
 interface DayScrollViewProps {
   selectedDate: Date
   tasks: Task[]
   timeBlocks: TimeBlock[]
   slotTypes?: SlotType[]
-  onTaskSelect: (task: Task) => void
+  onTaskSelect: (task: Task, occurrenceDate?: string) => void
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (date: string, startTime?: string, endTime?: string) => void
   onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string, notes?: string, description?: string) => void
   /** Fired when user picks a workspace category — opens the full task detail modal in create mode */
   onOpenCreateTask?: (slotType: SlotType, date: string, startTime: string, endTime: string) => void
-  onRescheduleTask?: (taskId: string, date: string, newStart: string, newEnd: string) => void
-  onUnscheduleTask?: (taskId: string, date?: string) => void
+  onRescheduleTask?: (taskId: string, date: string, newStart: string, newEnd: string, recurrenceChoice?: RecurrenceChoice, targetDate?: string) => void
+  onUnscheduleTask?: (taskId: string, date?: string, recurrenceChoice?: RecurrenceChoice, targetDate?: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
   onTimeBlockSelect?: (block: TimeBlock) => void
@@ -181,6 +182,17 @@ export function DayScrollView({
 
   // Slot picker nested navigation
   const [selectedParent, setSelectedParent] = useState<string | null>(null)
+
+  // Recurrence choice modal state
+  const [recurrenceModal, setRecurrenceModal] = useState<{
+    isOpen: boolean
+    taskId: string
+    targetDate: string
+    newDate?: string
+    newStart: string
+    newEnd: string
+    type: 'reschedule' | 'unschedule' | 'delete'
+  } | null>(null)
 
   // Popover positioning — measured after render so it can flip when there
   // isn't enough room below the click.
@@ -524,7 +536,23 @@ export function DayScrollView({
         const originalDate = tasks.find((t) => t.id === finalState.taskId)?.scheduledDate
         const originalStart = minutesToTime(finalState.originalStart)
         const originalEnd = minutesToTime(finalState.originalEnd)
-        onUnscheduleTask?.(finalState.taskId, pendingDate)
+        const task = tasks.find(t => t.id === finalState.taskId)
+        const occurrenceDate = toDateString(allDates[dayIndex])
+
+        if (task?.isRecurring) {
+          setRecurrenceModal({
+            isOpen: true,
+            taskId: task.id,
+            targetDate: occurrenceDate,
+            newDate: pendingDate,
+            newStart: '',
+            newEnd: '',
+            type: 'unschedule',
+          })
+        } else {
+          onUnscheduleTask?.(finalState.taskId, pendingDate)
+        }
+        
         toast(
           `「${taskTitle}」已移到 ${pendingDate ?? '待排程'}（時間移除）`,
           {
@@ -542,12 +570,30 @@ export function DayScrollView({
       } else {
         const dropTarget = allDates[finalState.dayIndex]
         if (dropTarget) {
-          onRescheduleTask?.(
-            finalState.taskId,
-            toDateString(dropTarget),
-            minutesToTime(finalState.currentStart),
-            minutesToTime(finalState.currentEnd),
-          )
+          const task = tasks.find(t => t.id === finalState.taskId)
+          const occurrenceDate = toDateString(allDates[dayIndex])
+          const newDate = toDateString(dropTarget)
+          const newStart = minutesToTime(finalState.currentStart)
+          const newEnd = minutesToTime(finalState.currentEnd)
+
+          if (task?.isRecurring) {
+            setRecurrenceModal({
+              isOpen: true,
+              taskId: task.id,
+              targetDate: occurrenceDate,
+              newDate,
+              newStart,
+              newEnd,
+              type: 'reschedule',
+            })
+          } else {
+            onRescheduleTask?.(
+              finalState.taskId,
+              newDate,
+              newStart,
+              newEnd,
+            )
+          }
         }
       }
 
@@ -904,8 +950,28 @@ export function DayScrollView({
     window.addEventListener('pointercancel', onUp)
   }, [headerHeight, HEADER_MIN])
 
+  const handleRecurrenceConfirm = (choice: RecurrenceChoice) => {
+    if (!recurrenceModal) return
+    const { taskId, targetDate, newDate, newStart, newEnd, type } = recurrenceModal
+
+    if (type === 'reschedule' && newDate) {
+      onRescheduleTask?.(taskId, newDate, newStart, newEnd, choice, targetDate)
+    } else if (type === 'unschedule') {
+      onUnscheduleTask?.(taskId, newDate, choice, targetDate)
+    }
+    setRecurrenceModal(null)
+  }
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-panel-secondary">
+      {recurrenceModal && (
+        <RecurrenceChoiceModal
+          isOpen={recurrenceModal.isOpen}
+          onClose={() => setRecurrenceModal(null)}
+          onConfirm={handleRecurrenceConfirm}
+          title={recurrenceModal.type === 'reschedule' ? '重新排程重複任務' : '取消排程重複任務'}
+        />
+      )}
       {/* Resizable Header Row */}
       <div
         className="flex-shrink-0 flex flex-col border-b border-border bg-panel"
@@ -1291,6 +1357,7 @@ export function DayScrollView({
                         <TaskBlock
                           key={task.id}
                           task={task}
+                          date={dateStr}
                           calendarStartHour={startHour}
                           hourHeight={hourHeight}
                           onSelect={onTaskSelect}

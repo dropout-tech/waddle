@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { renderNotesWithLinks } from '@/lib/notes-render'
 import { toDateString } from '@/lib/calendar-utils'
+import { RecurrenceChoiceModal, type RecurrenceChoice } from './recurrence-choice-modal'
 
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -22,18 +23,21 @@ interface TaskDetailModalProps {
   task: Task
   workspaces?: Workspace[]
   isOpen: boolean
+  /** The specific date of the occurrence being edited, if opened from calendar. */
+  occurrenceDate?: string
   /** 'edit' (default) edits an existing task; 'create' uses task as a draft and saves as a new task. */
   mode?: 'edit' | 'create'
   onClose: () => void
-  onSave: (updates: Partial<Task>, newCategoryId?: string) => void
+  onSave: (updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('./recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => void
   onToggleComplete?: (taskId: string) => void
-  onDelete?: (taskId: string) => void
+  onDelete?: (taskId: string, targetDate?: string, recurrenceChoice?: import('./recurrence-choice-modal').RecurrenceChoice) => void
 }
 
 export function TaskDetailModal({
   task,
   workspaces = [],
   isOpen,
+  occurrenceDate,
   mode = 'edit',
   onClose,
   onSave,
@@ -85,6 +89,11 @@ export function TaskDetailModal({
   const [location, setLocation] = useState(task.location || '')
   const [meetingUrl, setMeetingUrl] = useState(task.meetingUrl || '')
 
+  const [recurrenceModal, setRecurrenceModal] = useState<{
+    isOpen: boolean
+    type: 'save' | 'delete'
+  } | null>(null)
+
   // Find current selected category info
   const selectedCategory = workspaces
     .flatMap((w) => w.categories.map((c) => ({ ...c, workspace: w })))
@@ -101,6 +110,14 @@ export function TaskDetailModal({
   }
 
   const handleSave = () => {
+    if (!isCreate && task.isRecurring) {
+      setRecurrenceModal({ isOpen: true, type: 'save' })
+      return
+    }
+    commitSave()
+  }
+
+  const commitSave = (choice?: RecurrenceChoice) => {
     // Send `''` (not `undefined`) for cleared fields so taskToRow writes
     // DB NULL — otherwise the mapper drops the key and the old value
     // sticks around. Same goes for meeting fields when isMeeting is off.
@@ -145,12 +162,31 @@ export function TaskDetailModal({
       }
     }
 
-    onSave(updates, selectedCategoryId !== task.categoryId ? selectedCategoryId : undefined)
+    onSave(updates, selectedCategoryId !== task.categoryId ? selectedCategoryId : undefined, choice, occurrenceDate)
     onClose()
+  }
+
+  const handleRecurrenceConfirm = (choice: RecurrenceChoice) => {
+    if (!recurrenceModal) return
+    if (recurrenceModal.type === 'save') {
+      commitSave(choice)
+    } else {
+      onDelete?.(task.id, occurrenceDate, choice)
+      onClose()
+    }
+    setRecurrenceModal(null)
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center">
+      {recurrenceModal && (
+        <RecurrenceChoiceModal
+          isOpen={recurrenceModal.isOpen}
+          onClose={() => setRecurrenceModal(null)}
+          onConfirm={handleRecurrenceConfirm}
+          title={recurrenceModal.type === 'save' ? '儲存重複任務' : '刪除重複任務'}
+        />
+      )}
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -237,8 +273,12 @@ export function TaskDetailModal({
             {!isCreate && onDelete && (
               <button
                 onClick={() => {
-                  onDelete(task.id)
-                  onClose()
+                  if (task.isRecurring) {
+                    setRecurrenceModal({ isOpen: true, type: 'delete' })
+                  } else {
+                    onDelete(task.id)
+                    onClose()
+                  }
                 }}
                 className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                 title="刪除任務"

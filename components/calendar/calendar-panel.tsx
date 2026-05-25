@@ -31,14 +31,14 @@ interface CalendarPanelProps {
   // Callbacks
   onDateChange: (date: Date) => void
   onViewModeChange: (mode: 'day' | 'week' | 'month') => void
-  onTaskSelect: (task: Task) => void
+  onTaskSelect: (task: Task, occurrenceDate?: string) => void
   onToggleComplete?: (taskId: string) => void
   onCreateTask?: (date: string, startTime?: string, endTime?: string) => void
   onCreatePendingTask?: (title: string) => void
   onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string, notes?: string, description?: string) => void
   onOpenCreateTask?: (slotType: SlotType, date: string, startTime: string, endTime: string) => void
-  onRescheduleTask?: (taskId: string, newStartOrDate: string, newEndOrStart: string, newEnd?: string) => void
-  onUnscheduleTask?: (taskId: string, date?: string) => void
+  onRescheduleTask?: (taskId: string, newStartOrDate: string, newEndOrStart: string, newEnd?: string, recurrenceChoice?: import('../modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => void
+  onUnscheduleTask?: (taskId: string, date?: string, recurrenceChoice?: import('../modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
   onTimeBlockSelect?: (block: TimeBlock) => void

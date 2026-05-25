@@ -99,6 +99,7 @@ export default function WaddlePage() {
   // creating a new one through the same TaskDetailModal UI. In create mode,
   // selectedTask holds an in-memory draft until the user hits Save.
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [selectedOccurrenceDate, setSelectedOccurrenceDate] = useState<string | undefined>()
   const [taskMode, setTaskMode] = useState<'edit' | 'create'>('edit')
 
   // Modal task is derived live from workspaces so toggles (complete /
@@ -116,9 +117,10 @@ export default function WaddlePage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [selectedTimeBlock, setSelectedTimeBlock] = useState<TimeBlock | null>(null)
 
-  const handleSelectTask = useCallback((task: Task) => {
+  const handleSelectTask = useCallback((task: Task, occurrenceDate?: string) => {
     setTaskMode('edit')
     setSelectedTask(task)
+    setSelectedOccurrenceDate(occurrenceDate)
   }, [])
 
   const handleSelectTimeBlock = useCallback((block: TimeBlock) => {
@@ -126,7 +128,7 @@ export default function WaddlePage() {
   }, [])
 
   // Save handler shared by edit + create modes.
-  const handleSaveTask = useCallback(async (updates: Partial<Task>, newCategoryId?: string) => {
+  const handleSaveTask = useCallback(async (updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => {
     if (!selectedTask) return
 
     if (taskMode === 'create') {
@@ -154,7 +156,7 @@ export default function WaddlePage() {
     }
 
     // edit mode
-    await updateTask(selectedTask.id, updates, newCategoryId)
+    await updateTask(selectedTask.id, updates, newCategoryId, recurrenceChoice, targetDate)
   }, [selectedTask, taskMode, workspaces, createTask, updateTask])
 
   // Open the TaskDetailModal in create mode with a draft task pre-filled
@@ -248,11 +250,13 @@ export default function WaddlePage() {
     newStartOrDate: string,
     newEndOrStart: string,
     newEndOpt?: string,
+    recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice,
+    targetDate?: string
   ) => {
     const date = newEndOpt ? newStartOrDate : undefined
     const newStart = newEndOpt ? newEndOrStart : newStartOrDate
     const newEnd = newEndOpt ?? newEndOrStart
-    return rescheduleTask(taskId, date, newStart, newEnd)
+    return rescheduleTask(taskId, date, newStart, newEnd, recurrenceChoice, targetDate)
   }, [rescheduleTask])
 
   // Drag-from-task-row handler: drop on grid → schedule, drop on pending
@@ -380,10 +384,14 @@ export default function WaddlePage() {
       {liveSelectedTask && (
         <TaskDetailModal
           task={liveSelectedTask}
+          occurrenceDate={selectedOccurrenceDate}
           mode={taskMode}
           workspaces={workspaces}
           isOpen={!!liveSelectedTask}
-          onClose={() => setSelectedTask(null)}
+          onClose={() => {
+            setSelectedTask(null)
+            setSelectedOccurrenceDate(undefined)
+          }}
           onSave={handleSaveTask}
           onToggleComplete={taskMode === 'edit' ? toggleTaskComplete : undefined}
           onDelete={taskMode === 'edit' ? deleteTask : undefined}

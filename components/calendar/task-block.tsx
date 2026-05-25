@@ -8,7 +8,7 @@ import {
   calculateBlockTop,
   formatTime,
 } from '@/lib/task-utils'
-import { Check, GripVertical, RefreshCw, Layers, Clock, Users, Video } from 'lucide-react'
+import { Check, GripVertical, RefreshCw, Layers, Clock, Users, Video, Link2, Settings2 } from 'lucide-react'
 import { detectMeetingProvider } from '@/lib/meeting-utils'
 
 // Touch input requires a long-press before any drag activates so the user
@@ -38,9 +38,13 @@ export interface TaskDragStart {
 
 interface TaskBlockProps {
   task: Task
+  /** The date this block is rendered on. Forwarded to onSelect so callers
+   * can scope overrides to the right occurrence. Falls back to the task's
+   * own scheduledDate when omitted (e.g. legacy single-day grids). */
+  date?: string
   calendarStartHour?: number
   hourHeight?: number
-  onSelect: (task: Task) => void
+  onSelect: (task: Task, occurrenceDate?: string) => void
   onToggleComplete?: (taskId: string) => void
   onDragStart?: (info: TaskDragStart) => void
   compact?: boolean
@@ -58,6 +62,7 @@ function timeToMinutes(time: string): number {
 
 function TaskBlockImpl({
   task,
+  date,
   calendarStartHour = 0,
   hourHeight = 60,
   onSelect,
@@ -69,6 +74,7 @@ function TaskBlockImpl({
   dragOverride = null,
   isDragging = false,
 }: TaskBlockProps) {
+  const occurrenceDate = date ?? task.scheduledDate
   if (!task.scheduledStartTime || !task.scheduledEndTime) return null
 
   // For compact mode (day/week scroll views), position is relative to column, not time label
@@ -192,7 +198,7 @@ function TaskBlockImpl({
     const elapsed = Date.now() - origin.t
     // Click threshold: 5px movement, 300ms.
     if (dist < 5 && elapsed < 300) {
-      onSelect(task)
+      onSelect(task, occurrenceDate)
     }
   }
 
@@ -294,7 +300,7 @@ function TaskBlockImpl({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
-      onSelect(task)
+      onSelect(task, occurrenceDate)
     }
   }
 
@@ -441,6 +447,7 @@ function TaskBlockImpl({
             </span>
             {totalColumns === 1 && (
               <div className="flex items-center gap-1 mt-0.5">
+                {task.parentId && <Link2 className="w-2.5 h-2.5 text-white/50 flex-shrink-0" />}
                 {task.taskType === 'routine' && <RefreshCw className="w-2.5 h-2.5 text-white/50 flex-shrink-0" />}
                 {task.taskType === 'project' && <Layers className="w-2.5 h-2.5 text-white/50 flex-shrink-0" />}
                 {task.taskType === 'one_time' && <Clock className="w-2.5 h-2.5 text-white/50 flex-shrink-0" />}

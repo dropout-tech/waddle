@@ -12,7 +12,7 @@ import {
   timeBlockToRow,
   rowToSettings,
 } from '@/lib/supabase/mappers'
-import { toDateString } from '@/lib/calendar-utils'
+import { toDateString, parseDateString } from '@/lib/calendar-utils'
 import { playTaskCompleteSound } from '@/lib/task-sound'
 import type {
   Workspace,
@@ -64,6 +64,20 @@ function stripMeetingCols<T extends Record<string, unknown>>(row: T): T {
   const out = { ...row }
   for (const k of MEETING_COL_KEYS) delete out[k]
   return out
+}
+
+// Build an insert payload from a fully-formed Task. taskToRow returns a
+// Partial so the required-field types stay `string | undefined` — we
+// re-assert them here so supabase-js's insert signature is happy.
+function buildTaskInsert(task: Task, userId: string) {
+  return {
+    ...taskToRow(task),
+    id: task.id,
+    user_id: userId,
+    workspace_id: task.workspaceId,
+    category_id: task.categoryId,
+    title: task.title,
+  }
 }
 
 // User-settings extension columns — migrations 0006 (view-range), 0007
@@ -138,16 +152,16 @@ interface UseWaddleData {
   reorderCategories: (workspaceId: string, orderedCategoryIds: string[]) => Promise<void>
   // Task
   addTask: (categoryId: string, title: string) => Promise<void>
-  updateTask: (taskId: string, updates: Partial<Task>, newCategoryId?: string) => Promise<void>
+  updateTask: (taskId: string, updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => Promise<void>
   toggleTaskComplete: (taskId: string) => Promise<void>
-  deleteTask: (taskId: string) => Promise<void>
-  rescheduleTask: (taskId: string, date: string | undefined, startTime: string, endTime: string) => Promise<void>
+  deleteTask: (taskId: string, targetDate?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice) => Promise<void>
+  rescheduleTask: (taskId: string, date: string | undefined, startTime: string, endTime: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => Promise<void>
   /**
    * Send a task back to the unscheduled (all-day / 待排程) bucket. Clears
    * the time fields and, if a date is provided, sets scheduledDate to it
    * so the task lands in that day's pending area.
    */
-  unscheduleTask: (taskId: string, date?: string) => Promise<void>
+  unscheduleTask: (taskId: string, date?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => Promise<void>
   createTask: (task: Task) => Promise<void>
   // Time blocks
   addTimeBlock: (block: Omit<TimeBlock, 'id'>) => Promise<void>
@@ -190,6 +204,15 @@ export function useWaddleData(): UseWaddleData {
   // unsaved-yet state. Decrement happens in `finally` so a failed write
   // still releases the lock.
   const pendingWritesRef = useRef(0)
+
+  // Mirrors `workspaces` so mutation callbacks can read the current task
+  // tree without listing `workspaces` in their dependency arrays — which
+  // would re-create the callbacks on every state change and bust the
+  // memoization chain through TaskBlock + calendar views.
+  const workspacesRef = useRef<Workspace[]>([])
+  useEffect(() => {
+    workspacesRef.current = workspaces
+  }, [workspaces])
 
   const loadData = useCallback(
     async ({ initial = false }: { initial?: boolean } = {}) => {
@@ -852,109 +875,224 @@ export function useWaddleData(): UseWaddleData {
   const updateTask = useCallback(async (
     taskId: string,
     updates: Partial<Task>,
-    newCategoryId?: string
+    newCategoryId?: string,
+    recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice,
+    targetDate?: string
   ) => {
-    const isMove = newCategoryId !== undefined
+    // Find the task in local state via ref so the callback doesn't need
+    // to depend on `workspaces` (which would re-create it on every keystroke).
+    let existing: Task | null = null
+    for (const w of workspacesRef.current) for (const c of w.categories) {
+      const t = c.tasks.find((x) => x.id === taskId)
+      if (t) { existing = t; break }
+    }
+    if (!existing) return
 
-    setWorkspaces((prev) => {
-      // Find the existing task across the tree
-      let existing: Task | null = null
-      for (const w of prev) for (const c of w.categories) {
-        const t = c.tasks.find((x) => x.id === taskId)
-        if (t) { existing = t; break }
-      }
-      if (!existing) return prev
+    // Non-recurring or "all" or missing choice
+    if (!existing.isRecurring || recurrenceChoice === 'all' || !recurrenceChoice) {
+      const isMove = newCategoryId !== undefined
 
-      if (isMove && newCategoryId !== existing.categoryId) {
-        // Detach from old category, attach to new
-        let targetWs = ''
-        let targetWsName = ''
-        let targetWsColor = ''
-        let targetCatName = ''
-        for (const w of prev) for (const c of w.categories) {
-          if (c.id === newCategoryId) {
-            targetWs = w.id
-            targetWsName = w.name
-            targetWsColor = w.color
-            targetCatName = c.name
+      setWorkspaces((prev) => {
+        if (isMove && newCategoryId !== existing!.categoryId) {
+          // Detach from old category, attach to new
+          let targetWs = ''
+          let targetWsName = ''
+          let targetWsColor = ''
+          let targetCatName = ''
+          for (const w of prev) for (const c of w.categories) {
+            if (c.id === newCategoryId) {
+              targetWs = w.id
+              targetWsName = w.name
+              targetWsColor = w.color
+              targetCatName = c.name
+            }
           }
+          return prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => {
+              if (c.id === existing!.categoryId) {
+                return { ...c, tasks: c.tasks.filter((t) => t.id !== taskId) }
+              }
+              if (c.id === newCategoryId) {
+                return {
+                  ...c,
+                  tasks: [
+                    ...c.tasks,
+                    {
+                      ...existing!,
+                      ...updates,
+                      categoryId: newCategoryId,
+                      workspaceId: targetWs,
+                      workspaceName: targetWsName,
+                      workspaceColor: targetWsColor,
+                      categoryName: targetCatName,
+                      updatedAt: new Date().toISOString(),
+                    },
+                  ],
+                }
+              }
+              return c
+            }),
+          }))
         }
+
+        // In-place update
         return prev.map((w) => ({
           ...w,
+          categories: w.categories.map((c) => ({
+            ...c,
+            tasks: c.tasks.map((t) =>
+              t.id === taskId
+                ? { ...t, ...updates, updatedAt: new Date().toISOString() }
+                : t
+            ),
+          })),
+        }))
+      })
+
+      const dbUpdates = taskToRow(updates)
+
+      pendingWritesRef.current += 1
+      try {
+        if (isMove && newCategoryId) {
+          dbUpdates.category_id = newCategoryId
+          const { data: catRow } = await supabase
+            .from('categories')
+            .select('workspace_id')
+            .eq('id', newCategoryId)
+            .maybeSingle()
+          if (catRow) dbUpdates.workspace_id = catRow.workspace_id
+        }
+
+        const runUpdate = (strip: boolean) =>
+          supabase
+            .from('tasks')
+            .update(strip ? stripMeetingCols(dbUpdates) : dbUpdates)
+            .eq('id', taskId)
+        let { error } = await runUpdate(meetingColsKnownMissing)
+        if (error && isMissingMeetingColumnError(error)) {
+          meetingColsKnownMissing = true
+          const retry = await runUpdate(true)
+          error = retry.error
+        }
+        if (error) handleDbError('更新任務')(error)
+      } finally {
+        pendingWritesRef.current -= 1
+      }
+      return
+    }
+
+    // "Only this"
+    if (recurrenceChoice === 'only_this' && targetDate) {
+      if (existing.parentId) {
+        // Already detached. Just update in place.
+        // For simplicity, we use the same update logic as "all" but targeted to this ID
+        // (which is already detached).
+        setWorkspaces((prev) => prev.map((w) => ({
+          ...w,
+          categories: w.categories.map((c) => ({
+            ...c,
+            tasks: c.tasks.map((t) => t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t)
+          }))
+        })))
+        pendingWritesRef.current += 1
+        try {
+          const dbUpdates = taskToRow(updates)
+          const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', taskId)
+          if (error) handleDbError('更新任務')(error)
+        } finally {
+          pendingWritesRef.current -= 1
+        }
+      } else {
+        // Virtual occurrence — materialize as a detached child task.
+        // showInTaskList:false keeps the unified task list showing one entry
+        // (the master); the override is calendar-only.
+        const nextExdates = [...(existing.exdates || []), targetDate]
+        const newTask: Task = {
+          ...existing,
+          ...updates,
+          id: crypto.randomUUID(),
+          isRecurring: false,
+          recurrence: undefined,
+          parentId: existing.id,
+          exdates: undefined,
+          showInTaskList: false,
+          scheduledDate: targetDate,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+
+        setWorkspaces((prev) => prev.map((w) => ({
+          ...w,
           categories: w.categories.map((c) => {
-            if (c.id === existing!.categoryId) {
-              return { ...c, tasks: c.tasks.filter((t) => t.id !== taskId) }
-            }
-            if (c.id === newCategoryId) {
+            if (c.tasks.some(t => t.id === taskId)) {
               return {
                 ...c,
                 tasks: [
-                  ...c.tasks,
-                  {
-                    ...existing!,
-                    ...updates,
-                    categoryId: newCategoryId,
-                    workspaceId: targetWs,
-                    workspaceName: targetWsName,
-                    workspaceColor: targetWsColor,
-                    categoryName: targetCatName,
-                    updatedAt: new Date().toISOString(),
-                  },
-                ],
+                  ...c.tasks.map(t => t.id === taskId ? { ...t, exdates: nextExdates } : t),
+                  newTask
+                ]
               }
             }
             return c
-          }),
-        }))
+          })
+        })))
+
+        pendingWritesRef.current += 1
+        try {
+          await supabase.from('tasks').update({ exdates: nextExdates }).eq('id', taskId)
+          const userId = (await supabase.auth.getUser()).data.user?.id
+          await supabase.from('tasks').insert(buildTaskInsert(newTask, userId!))
+        } finally {
+          pendingWritesRef.current -= 1
+        }
+      }
+      return
+    }
+
+    // "This and following"
+    if (recurrenceChoice === 'this_and_following' && targetDate) {
+      const dayBefore = new Date(parseDateString(targetDate))
+      dayBefore.setDate(dayBefore.getDate() - 1)
+      const endDate = toDateString(dayBefore)
+
+      const newTask: Task = {
+        ...existing,
+        ...updates,
+        id: crypto.randomUUID(),
+        scheduledDate: targetDate,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        recurrence: {
+          ...existing.recurrence!,
+          ...(updates.recurrence || {}),
+        }
       }
 
-      // In-place update
-      return prev.map((w) => ({
+      setWorkspaces((prev) => prev.map((w) => ({
         ...w,
-        categories: w.categories.map((c) => ({
-          ...c,
-          tasks: c.tasks.map((t) =>
-            t.id === taskId
-              ? { ...t, ...updates, updatedAt: new Date().toISOString() }
-              : t
-          ),
-        })),
-      }))
-    })
+        categories: w.categories.map((c) => {
+          if (c.tasks.some(t => t.id === taskId)) {
+            return {
+              ...c,
+              tasks: [
+                ...c.tasks.map(t => t.id === taskId ? { ...t, recurrence: { ...t.recurrence!, endDate } } : t),
+                newTask
+              ]
+            }
+          }
+          return c
+        })
+      })))
 
-    const dbUpdates = taskToRow(updates)
-
-    pendingWritesRef.current += 1
-    try {
-      if (isMove && newCategoryId) {
-        dbUpdates.category_id = newCategoryId
-        // Find the workspace_id for the new category from local state
-        // (the move already happened in setWorkspaces above so we just re-resolve)
-        // Note: we can't read workspaces here because closures capture old value;
-        // so instead let Supabase enforce via FK and update both fields.
-        const { data: catRow } = await supabase
-          .from('categories')
-          .select('workspace_id')
-          .eq('id', newCategoryId)
-          .maybeSingle()
-        if (catRow) dbUpdates.workspace_id = catRow.workspace_id
+      pendingWritesRef.current += 1
+      try {
+        const userId = (await supabase.auth.getUser()).data.user?.id
+        await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
+        await supabase.from('tasks').insert(buildTaskInsert(newTask, userId!))
+      } finally {
+        pendingWritesRef.current -= 1
       }
-
-      const runUpdate = (strip: boolean) =>
-        supabase
-          .from('tasks')
-          .update(strip ? stripMeetingCols(dbUpdates) : dbUpdates)
-          .eq('id', taskId)
-      let { error } = await runUpdate(meetingColsKnownMissing)
-      if (error && isMissingMeetingColumnError(error)) {
-        meetingColsKnownMissing = true
-        console.warn('[updateTask] meeting columns missing — falling back. Run migration 0008.', error)
-        const retry = await runUpdate(true)
-        error = retry.error
-      }
-      if (error) handleDbError('更新任務')(error)
-    } finally {
-      pendingWritesRef.current -= 1
     }
   }, [supabase])
 
@@ -1042,22 +1180,176 @@ export function useWaddleData(): UseWaddleData {
     }
   }, [supabase])
 
-  const deleteTask = useCallback(async (taskId: string) => {
-    setWorkspaces((prev) =>
-      prev.map((w) => ({
-        ...w,
-        categories: w.categories.map((c) => ({
-          ...c,
-          tasks: c.tasks.filter((t) => t.id !== taskId),
-        })),
-      }))
-    )
-    pendingWritesRef.current += 1
-    try {
-      const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-      if (error) handleDbError('刪除任務')(error)
-    } finally {
-      pendingWritesRef.current -= 1
+  const deleteTask = useCallback(async (taskId: string, targetDate?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice) => {
+    // Find the task in local state via ref so this callback is stable.
+    let task: Task | null = null
+    for (const w of workspacesRef.current) {
+      for (const c of w.categories) {
+        const t = c.tasks.find((x) => x.id === taskId)
+        if (t) { task = t; break }
+      }
+      if (task) break
+    }
+
+    if (!task) return
+
+    // If it's a non-recurring task or they chose 'all'
+    if (!task.isRecurring || recurrenceChoice === 'all' || !recurrenceChoice) {
+      // If this is a detached child of a recurring master, also remove its
+      // date from the master's exdates so the master re-occupies that day.
+      // (Otherwise "delete this override" leaves the day permanently blank.)
+      let parentExdateCleanup: { parentId: string; nextExdates: string[] } | null = null
+      if (task.parentId && task.scheduledDate) {
+        let parent: Task | null = null
+        for (const w of workspacesRef.current) for (const c of w.categories) {
+          const p = c.tasks.find((x) => x.id === task!.parentId)
+          if (p) { parent = p; break }
+        }
+        if (parent?.exdates?.includes(task.scheduledDate)) {
+          parentExdateCleanup = {
+            parentId: parent.id,
+            nextExdates: parent.exdates.filter((d) => d !== task!.scheduledDate),
+          }
+        }
+      }
+
+      setWorkspaces((prev) =>
+        prev.map((w) => ({
+          ...w,
+          categories: w.categories.map((c) => ({
+            ...c,
+            tasks: c.tasks
+              .filter((t) => t.id !== taskId)
+              .map((t) =>
+                parentExdateCleanup && t.id === parentExdateCleanup.parentId
+                  ? { ...t, exdates: parentExdateCleanup.nextExdates }
+                  : t
+              ),
+          })),
+        }))
+      )
+      pendingWritesRef.current += 1
+      try {
+        const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+        if (error) handleDbError('刪除任務')(error)
+        if (parentExdateCleanup) {
+          await supabase
+            .from('tasks')
+            .update({ exdates: parentExdateCleanup.nextExdates })
+            .eq('id', parentExdateCleanup.parentId)
+        }
+      } finally {
+        pendingWritesRef.current -= 1
+      }
+      return
+    }
+
+    // "Only this"
+    if (recurrenceChoice === 'only_this' && targetDate) {
+      // If it's already a detached task, just delete it.
+      if (task.parentId) {
+        setWorkspaces((prev) =>
+          prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => ({
+              ...c,
+              tasks: c.tasks.filter((t) => t.id !== taskId),
+            })),
+          }))
+        )
+        pendingWritesRef.current += 1
+        try {
+          const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+          if (error) handleDbError('刪除任務')(error)
+        } finally {
+          pendingWritesRef.current -= 1
+        }
+      } else {
+        // It's a virtual occurrence of a master task.
+        // Add targetDate to exdates.
+        const nextExdates = [...(task.exdates || []), targetDate]
+        setWorkspaces((prev) =>
+          prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => ({
+              ...c,
+              tasks: c.tasks.map((t) =>
+                t.id === taskId ? { ...t, exdates: nextExdates } : t
+              ),
+            })),
+          }))
+        )
+        pendingWritesRef.current += 1
+        try {
+          const { error } = await supabase
+            .from('tasks')
+            .update({ exdates: nextExdates })
+            .eq('id', taskId)
+          if (error) handleDbError('更新重複任務例外')(error)
+        } finally {
+          pendingWritesRef.current -= 1
+        }
+      }
+      return
+    }
+
+    // "This and following"
+    if (recurrenceChoice === 'this_and_following' && targetDate) {
+      // If the targetDate is the original scheduledDate, it's effectively "all"
+      if (targetDate === task.scheduledDate) {
+        // Reuse "all" logic
+        setWorkspaces((prev) =>
+          prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => ({
+              ...c,
+              tasks: c.tasks.filter((t) => t.id !== taskId),
+            })),
+          }))
+        )
+        pendingWritesRef.current += 1
+        try {
+          const { error } = await supabase.from('tasks').delete().eq('id', taskId)
+          if (error) handleDbError('刪除任務')(error)
+        } finally {
+          pendingWritesRef.current -= 1
+        }
+        return
+      }
+
+      // 1. Cap the master task
+      const dayBefore = new Date(parseDateString(targetDate))
+      dayBefore.setDate(dayBefore.getDate() - 1)
+      const endDate = toDateString(dayBefore)
+
+      setWorkspaces((prev) =>
+        prev.map((w) => ({
+          ...w,
+          categories: w.categories.map((c) => ({
+            ...c,
+            tasks: c.tasks.map((t) =>
+              t.id === taskId
+                ? { ...t, recurrence: { ...t.recurrence!, endDate } }
+                : t
+            ),
+          })),
+        }))
+      )
+
+      pendingWritesRef.current += 1
+      try {
+        const { error } = await supabase
+          .from('tasks')
+          .update({ recurrence_end_date: endDate })
+          .eq('id', taskId)
+        if (error) handleDbError('更新重複任務結束日')(error)
+        
+        // 2. We don't need to create a new task since it's a delete.
+        // But we should re-parent or delete detached tasks past targetDate.
+        // For simplicity, we just delete the master's "future" via endDate.
+      } finally {
+        pendingWritesRef.current -= 1
+      }
     }
   }, [supabase])
 
@@ -1066,120 +1358,432 @@ export function useWaddleData(): UseWaddleData {
     date: string | undefined,
     startTime: string,
     endTime: string,
+    recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice,
+    targetDate?: string
   ) => {
-    setWorkspaces((prev) =>
-      prev.map((w) => ({
-        ...w,
-        categories: w.categories.map((c) => ({
-          ...c,
-          tasks: c.tasks.map((t) =>
-            t.id === taskId
-              ? {
-                  ...t,
-                  scheduledStartTime: startTime,
-                  scheduledEndTime: endTime,
-                  ...(date ? { scheduledDate: date } : {}),
-                  updatedAt: new Date().toISOString(),
-                }
-              : t
-          ),
-        })),
-      }))
-    )
-
-    const update: { scheduled_start_time: string; scheduled_end_time: string; scheduled_date?: string } = {
-      scheduled_start_time: startTime,
-      scheduled_end_time: endTime,
+    // Find the task in local state via ref so this callback is stable.
+    let task: Task | null = null
+    for (const w of workspacesRef.current) {
+      for (const c of w.categories) {
+        const t = c.tasks.find((x) => x.id === taskId)
+        if (t) { task = t; break }
+      }
+      if (task) break
     }
-    if (date) update.scheduled_date = date
 
-    pendingWritesRef.current += 1
-    try {
-      // .select() so PostgREST returns the rows the UPDATE touched. If RLS
-      // or a stale session silently filters the row out, error stays null
-      // but data is empty — exactly the "task disappears" failure mode.
-      const { data, error } = await supabase
-        .from('tasks')
-        .update(update)
-        .eq('id', taskId)
-        .select('id, scheduled_date, scheduled_start_time, scheduled_end_time')
-      if (error) {
-        console.error('[rescheduleTask] supabase error', { taskId, update, error })
-        handleDbError('重新排程')(error)
-        return
+    if (!task) return
+
+    // Non-recurring or "all" or missing choice
+    if (!task.isRecurring || recurrenceChoice === 'all' || !recurrenceChoice) {
+      setWorkspaces((prev) =>
+        prev.map((w) => ({
+          ...w,
+          categories: w.categories.map((c) => ({
+            ...c,
+            tasks: c.tasks.map((t) =>
+              t.id === taskId
+                ? {
+                    ...t,
+                    scheduledStartTime: startTime,
+                    scheduledEndTime: endTime,
+                    ...(date ? { scheduledDate: date } : {}),
+                    updatedAt: new Date().toISOString(),
+                  }
+                : t
+            ),
+          })),
+        }))
+      )
+
+      const update: { scheduled_start_time: string; scheduled_end_time: string; scheduled_date?: string } = {
+        scheduled_start_time: startTime,
+        scheduled_end_time: endTime,
       }
-      if (!data || data.length === 0) {
-        const { data: { user } } = await supabase.auth.getUser()
-        console.error('[rescheduleTask] 0 rows updated — RLS / stale session?', {
-          taskId,
-          attemptedUpdate: update,
-          jwtUserId: user?.id ?? null,
-        })
-        toast.error('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入')
-        return
+      if (date) update.scheduled_date = date
+
+      pendingWritesRef.current += 1
+      try {
+        // .select() so PostgREST returns the rows the UPDATE touched. If RLS
+        // or a stale session silently filters the row out, error stays null
+        // but data is empty — exactly the "task disappears" failure mode.
+        const { data, error } = await supabase
+          .from('tasks')
+          .update(update)
+          .eq('id', taskId)
+          .select('id, scheduled_date, scheduled_start_time, scheduled_end_time')
+        if (error) {
+          console.error('[rescheduleTask] supabase error', { taskId, update, error })
+          handleDbError('重新排程')(error)
+          return
+        }
+        if (!data || data.length === 0) {
+          const { data: { user } } = await supabase.auth.getUser()
+          console.error('[rescheduleTask] 0 rows updated — RLS / stale session?', {
+            taskId,
+            attemptedUpdate: update,
+            jwtUserId: user?.id ?? null,
+          })
+          toast.error('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入')
+          return
+        }
+      } finally {
+        pendingWritesRef.current -= 1
       }
-      console.log('[rescheduleTask] OK', { taskId, persisted: data[0] })
-    } finally {
-      pendingWritesRef.current -= 1
+      return
+    }
+
+    // "Only this"
+    if (recurrenceChoice === 'only_this' && targetDate && date) {
+      if (task.parentId) {
+        // Already detached. Just update.
+        setWorkspaces((prev) =>
+          prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => ({
+              ...c,
+              tasks: c.tasks.map((t) =>
+                t.id === taskId
+                  ? {
+                      ...t,
+                      scheduledDate: date,
+                      scheduledStartTime: startTime,
+                      scheduledEndTime: endTime,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : t
+              ),
+            })),
+          }))
+        )
+        pendingWritesRef.current += 1
+        try {
+          const { error } = await supabase
+            .from('tasks')
+            .update({
+              scheduled_date: date,
+              scheduled_start_time: startTime,
+              scheduled_end_time: endTime,
+            })
+            .eq('id', taskId)
+          if (error) handleDbError('重新排程')(error)
+        } finally {
+          pendingWritesRef.current -= 1
+        }
+      } else {
+        // Virtual occurrence — materialize as a detached child task. See
+        // updateTask above for why showInTaskList:false.
+        const nextExdates = [...(task.exdates || []), targetDate]
+        const newTask: Task = {
+          ...task,
+          id: crypto.randomUUID(),
+          isRecurring: false,
+          recurrence: undefined,
+          parentId: task.id,
+          exdates: undefined,
+          showInTaskList: false,
+          scheduledDate: date,
+          scheduledStartTime: startTime,
+          scheduledEndTime: endTime,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+
+        setWorkspaces((prev) =>
+          prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => {
+              if (c.tasks.some((t) => t.id === taskId)) {
+                return {
+                  ...c,
+                  tasks: [
+                    ...c.tasks.map((t) =>
+                      t.id === taskId ? { ...t, exdates: nextExdates } : t
+                    ),
+                    newTask,
+                  ],
+                }
+              }
+              return c
+            }),
+          }))
+        )
+
+        pendingWritesRef.current += 1
+        try {
+          const { error: updateError } = await supabase
+            .from('tasks')
+            .update({ exdates: nextExdates })
+            .eq('id', taskId)
+          if (updateError) handleDbError('更新重複任務例外')(updateError)
+
+          const userId = (await supabase.auth.getUser()).data.user?.id
+          const { error: insertError } = await supabase
+            .from('tasks')
+            .insert(buildTaskInsert(newTask, userId!))
+          if (insertError) handleDbError('建立任務例外')(insertError)
+        } finally {
+          pendingWritesRef.current -= 1
+        }
+      }
+      return
+    }
+
+    // "This and following"
+    if (recurrenceChoice === 'this_and_following' && targetDate && date) {
+      const dayBefore = new Date(parseDateString(targetDate))
+      dayBefore.setDate(dayBefore.getDate() - 1)
+      const endDate = toDateString(dayBefore)
+
+      const newTask: Task = {
+        ...task,
+        id: crypto.randomUUID(),
+        scheduledDate: date,
+        scheduledStartTime: startTime,
+        scheduledEndTime: endTime,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        recurrence: {
+          ...task.recurrence!,
+          // Note: we should potentially adjust daysOfWeek if moved to different day.
+        }
+      }
+
+      setWorkspaces((prev) =>
+        prev.map((w) => ({
+          ...w,
+          categories: w.categories.map((c) => {
+            if (c.tasks.some((t) => t.id === taskId)) {
+              return {
+                ...c,
+                tasks: [
+                  ...c.tasks.map((t) =>
+                    t.id === taskId
+                      ? { ...t, recurrence: { ...t.recurrence!, endDate } }
+                      : t
+                  ),
+                  newTask,
+                ],
+              }
+            }
+            return c
+          }),
+        }))
+      )
+
+      pendingWritesRef.current += 1
+      try {
+        const userId = (await supabase.auth.getUser()).data.user?.id
+        await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
+        await supabase.from('tasks').insert(buildTaskInsert(newTask, userId!))
+      } finally {
+        pendingWritesRef.current -= 1
+      }
     }
   }, [supabase])
 
-  const unscheduleTask = useCallback(async (taskId: string, date?: string) => {
-    setWorkspaces((prev) =>
-      prev.map((w) => ({
-        ...w,
-        categories: w.categories.map((c) => ({
-          ...c,
-          tasks: c.tasks.map((t) =>
-            t.id === taskId
-              ? {
-                  ...t,
-                  scheduledStartTime: undefined,
-                  scheduledEndTime: undefined,
-                  // No date argument = full unschedule → also clear the
-                  // date. Without this the DB row keeps its old
-                  // scheduled_date and a focus/cross-device refetch
-                  // resurrects the task on the calendar.
-                  scheduledDate: date ?? undefined,
-                  updatedAt: new Date().toISOString(),
-                }
-              : t
-          ),
-        })),
-      }))
-    )
+  const unscheduleTask = useCallback(async (
+    taskId: string,
+    date?: string,
+    recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice,
+    targetDate?: string
+  ) => {
+    // Find the task via ref to stay decoupled from `workspaces`.
+    let task: Task | null = null
+    for (const w of workspacesRef.current) {
+      for (const c of w.categories) {
+        const t = c.tasks.find((x) => x.id === taskId)
+        if (t) { task = t; break }
+      }
+      if (task) break
+    }
+    if (!task) return
 
-    const update: { scheduled_start_time: null; scheduled_end_time: null; scheduled_date: string | null } = {
-      scheduled_start_time: null,
-      scheduled_end_time: null,
-      scheduled_date: date ?? null,
+    // Non-recurring or "all" → clear the master's time fields (and date if
+    // fully unscheduled). Earlier delegation to rescheduleTask with `''`
+    // times wrote empty strings into the DB; we explicitly null them here.
+    if (!task.isRecurring || recurrenceChoice === 'all' || !recurrenceChoice) {
+      setWorkspaces((prev) =>
+        prev.map((w) => ({
+          ...w,
+          categories: w.categories.map((c) => ({
+            ...c,
+            tasks: c.tasks.map((t) =>
+              t.id === taskId
+                ? {
+                    ...t,
+                    scheduledStartTime: undefined,
+                    scheduledEndTime: undefined,
+                    scheduledDate: date ?? undefined,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : t
+            ),
+          })),
+        }))
+      )
+
+      const update = {
+        scheduled_start_time: null as string | null,
+        scheduled_end_time: null as string | null,
+        scheduled_date: date ?? null,
+      }
+
+      pendingWritesRef.current += 1
+      try {
+        const { data, error } = await supabase
+          .from('tasks')
+          .update(update)
+          .eq('id', taskId)
+          .select('id, scheduled_date')
+        if (error) {
+          console.error('[unscheduleTask] supabase error', { taskId, update, error })
+          handleDbError('取消排程')(error)
+          return
+        }
+        if (!data || data.length === 0) {
+          const { data: { user } } = await supabase.auth.getUser()
+          console.error('[unscheduleTask] 0 rows updated — RLS / stale session?', {
+            taskId,
+            attemptedUpdate: update,
+            jwtUserId: user?.id ?? null,
+          })
+          toast.error('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入')
+          return
+        }
+      } finally {
+        pendingWritesRef.current -= 1
+      }
+      return
     }
 
-    pendingWritesRef.current += 1
-    try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .update(update)
-        .eq('id', taskId)
-        .select('id, scheduled_date')
-      if (error) {
-        console.error('[unscheduleTask] supabase error', { taskId, update, error })
-        handleDbError('取消排程')(error)
-        return
+    // Recurring + only_this/this_and_following → materialize an override
+    // and clear its time fields. Detached child carries showInTaskList:false
+    // so the unified list still shows a single entry (the master).
+    if (recurrenceChoice === 'only_this' && targetDate) {
+      if (task.parentId) {
+        // Already detached — clear its time/date in place.
+        setWorkspaces((prev) =>
+          prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => ({
+              ...c,
+              tasks: c.tasks.map((t) =>
+                t.id === taskId
+                  ? {
+                      ...t,
+                      scheduledStartTime: undefined,
+                      scheduledEndTime: undefined,
+                      scheduledDate: date ?? undefined,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : t
+              ),
+            })),
+          }))
+        )
+        pendingWritesRef.current += 1
+        try {
+          await supabase
+            .from('tasks')
+            .update({
+              scheduled_start_time: null,
+              scheduled_end_time: null,
+              scheduled_date: date ?? null,
+            })
+            .eq('id', taskId)
+        } finally {
+          pendingWritesRef.current -= 1
+        }
+      } else {
+        // Virtual occurrence — detach with null times.
+        const nextExdates = [...(task.exdates || []), targetDate]
+        const newTask: Task = {
+          ...task,
+          id: crypto.randomUUID(),
+          isRecurring: false,
+          recurrence: undefined,
+          parentId: task.id,
+          exdates: undefined,
+          showInTaskList: false,
+          scheduledDate: date,
+          scheduledStartTime: undefined,
+          scheduledEndTime: undefined,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+        setWorkspaces((prev) =>
+          prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => {
+              if (c.tasks.some(t => t.id === taskId)) {
+                return {
+                  ...c,
+                  tasks: [
+                    ...c.tasks.map(t => t.id === taskId ? { ...t, exdates: nextExdates } : t),
+                    newTask,
+                  ],
+                }
+              }
+              return c
+            }),
+          }))
+        )
+        pendingWritesRef.current += 1
+        try {
+          await supabase.from('tasks').update({ exdates: nextExdates }).eq('id', taskId)
+          const userId = (await supabase.auth.getUser()).data.user?.id
+          await supabase.from('tasks').insert(buildTaskInsert(newTask, userId!))
+        } finally {
+          pendingWritesRef.current -= 1
+        }
       }
-      if (!data || data.length === 0) {
-        const { data: { user } } = await supabase.auth.getUser()
-        console.error('[unscheduleTask] 0 rows updated — RLS / stale session?', {
-          taskId,
-          attemptedUpdate: update,
-          jwtUserId: user?.id ?? null,
-        })
-        toast.error('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入')
-        return
+      return
+    }
+
+    // this_and_following — unschedule from this date onward: cap the master
+    // and start a continuation that's already unscheduled.
+    if (recurrenceChoice === 'this_and_following' && targetDate) {
+      const dayBefore = new Date(parseDateString(targetDate))
+      dayBefore.setDate(dayBefore.getDate() - 1)
+      const endDate = toDateString(dayBefore)
+
+      const newTask: Task = {
+        ...task,
+        id: crypto.randomUUID(),
+        scheduledDate: date,
+        scheduledStartTime: undefined,
+        scheduledEndTime: undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        recurrence: { ...task.recurrence! },
       }
-      console.log('[unscheduleTask] OK', { taskId, persisted: data[0] })
-    } finally {
-      pendingWritesRef.current -= 1
+
+      setWorkspaces((prev) =>
+        prev.map((w) => ({
+          ...w,
+          categories: w.categories.map((c) => {
+            if (c.tasks.some(t => t.id === taskId)) {
+              return {
+                ...c,
+                tasks: [
+                  ...c.tasks.map(t => t.id === taskId ? { ...t, recurrence: { ...t.recurrence!, endDate } } : t),
+                  newTask,
+                ],
+              }
+            }
+            return c
+          }),
+        }))
+      )
+
+      pendingWritesRef.current += 1
+      try {
+        const userId = (await supabase.auth.getUser()).data.user?.id
+        await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
+        await supabase.from('tasks').insert(buildTaskInsert(newTask, userId!))
+      } finally {
+        pendingWritesRef.current -= 1
+      }
     }
   }, [supabase])
 

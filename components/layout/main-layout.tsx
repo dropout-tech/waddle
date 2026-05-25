@@ -27,7 +27,7 @@ interface MainLayoutProps {
   onToggleCategoryCollapse: (categoryId: string) => void
   onReorderCategories?: (workspaceId: string, orderedCategoryIds: string[]) => void
   onToggleComplete: (taskId: string) => void
-  onSelectTask: (task: Task) => void
+  onSelectTask: (task: Task, occurrenceDate?: string) => void
   onAddTask: (categoryId: string, title: string) => void
   onAddCategory?: (workspaceId: string, name: string) => void
   onDeleteCategory?: (categoryId: string) => void

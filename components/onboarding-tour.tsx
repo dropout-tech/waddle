@@ -74,7 +74,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="calendar-panel"]',
     title: '🤚 拖曳就是排程',
-    body: '把任務拖到時間軸 = 排時間。從時間軸拖回上方待排程 = 取消時間（日期保留）。完全自由。',
+    body: '把任務拖到時間軸 = 排時間。從時間軸拖回上方待排程 = 取消時間（日期保留）。每週循環的任務拖到別的時間時，Waddle 會問你：只改這一天、改這天與之後、還是改所有循環 — 像 Google 日曆一樣自由。',
     placement: 'left',
     padding: 0,
   },
@@ -172,7 +172,7 @@ const MOBILE_STEPS: TourStep[] = [
   {
     target: '[data-tour="calendar-panel"]',
     title: '日曆：上方待排程 / 下方時間軸',
-    body: '上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。',
+    body: '上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。每週循環的任務拖到別的時間時，Waddle 會問「只改這一天 / 之後也改 / 全部改」，像 Google 日曆一樣自由。',
     placement: 'top',
     padding: 0,
   },

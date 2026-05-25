@@ -88,6 +88,10 @@ export interface Task {
     daysOfWeek?: number[] // 0-6 for weekly (0=Sunday)
     endDate?: string // ISO date string
   }
+  /** The master recurring task this occurrence belongs to. */
+  parentId?: string
+  /** Dates (YYYY-MM-DD) to exclude from the master recurrence rule. */
+  exdates?: string[]
 }
 
 export interface TimeBlock {
