@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { LogOut, Mail, User, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -22,6 +23,7 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ className }: UserMenuProps = {}) {
+  const router = useRouter()
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [open, setOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -63,12 +65,12 @@ export function UserMenu({ className }: UserMenuProps = {}) {
 
   async function handleSignOut() {
     setSigningOut(true)
-    // Use the POST /auth/signout route so cookies clear correctly
-    const form = document.createElement('form')
-    form.method = 'POST'
-    form.action = '/auth/signout'
-    document.body.appendChild(form)
-    form.submit()
+    // Client-side sign-out works on both web and the Capacitor WebView (there
+    // is no server route to POST to under static export). Clears the local
+    // session, then the AuthGuard / login redirect takes over.
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.replace('/login')
   }
 
   if (!session) return null

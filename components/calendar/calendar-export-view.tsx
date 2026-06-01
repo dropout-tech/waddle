@@ -349,7 +349,7 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
             color: textMuted,
           }}
         >
-          <span>以 Waddle 規劃 · waddle.app</span>
+          <span>以 Huddle 規劃 · huddle.app</span>
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>
             匯出於 {new Date().getFullYear()}/{new Date().getMonth() + 1}/{new Date().getDate()}
           </span>

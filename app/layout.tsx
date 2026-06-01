@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Noto_Sans_TC } from 'next/font/google'
 import './globals.css'
+import { AuthProvider } from '@/components/auth/auth-provider'
+import { NativeShell } from '@/components/native/native-shell'
 
 const geist = Geist({
   subsets: ['latin'],
@@ -20,14 +22,14 @@ const notoSansTC = Noto_Sans_TC({
 })
 
 export const metadata: Metadata = {
-  title: 'Waddle | Unified Workspace',
+  title: 'Huddle | Unified Workspace',
   description:
-    'Waddle — a unified workspace that merges task management, time-block scheduling, and daily journaling into a single split-screen interface. Take it slow, get it done.',
+    'Huddle — a unified workspace that merges task management, time-block scheduling, and daily journaling into a single split-screen interface. Take it slow, get it done.',
   generator: 'v0.app',
-  applicationName: 'Waddle',
+  applicationName: 'Huddle',
   appleWebApp: {
     capable: true,
-    title: 'Waddle',
+    title: 'Huddle',
     statusBarStyle: 'black-translucent',
   },
   formatDetection: {
@@ -82,7 +84,8 @@ export default function RootLayout({
       <body
         className={`${geist.variable} ${geistMono.variable} ${notoSansTC.variable} font-sans antialiased`}
       >
-        {children}
+        <NativeShell />
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   )

@@ -10,6 +10,8 @@ import {
   meetingStartAsDate,
 } from '@/lib/meeting-reminder'
 import { detectMeetingProvider } from '@/lib/meeting-utils'
+import { isNative } from '@/lib/platform'
+import { syncMeetingReminders } from '@/lib/notifications'
 
 /**
  * Watches all meetings in the workspace tree and fires a browser
@@ -29,6 +31,16 @@ import { detectMeetingProvider } from '@/lib/meeting-utils'
 export function useMeetingReminders(workspaces: Workspace[]) {
   useEffect(() => {
     if (typeof window === 'undefined') return
+
+    // Native: schedule local notifications ahead of time so reminders fire even
+    // when the app is backgrounded/closed. Re-sync whenever the meeting set
+    // changes. (The lead-time pref is re-synced from the settings modal.)
+    if (isNative()) {
+      void syncMeetingReminders(collectMeetings(workspaces), getReminderLead())
+      return
+    }
+
+    // Web: poll every 30s and fire a browser Notification while the tab is open.
     if (!('Notification' in window)) return
 
     const check = () => {

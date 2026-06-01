@@ -34,7 +34,7 @@ interface TourStep {
 // - Interactive steps where the user actually clicks the highlighted element to advance.
 const DESKTOP_STEPS: TourStep[] = [
   {
-    title: '歡迎來到 Waddle',
+    title: '歡迎來到 Huddle',
     body: '整合任務、時間排程、專注計時、日記反思的工作面板。慢慢搖擺，把事情做完。90 秒帶你走過。',
   },
   {
@@ -74,7 +74,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="calendar-panel"]',
     title: '🤚 拖曳就是排程',
-    body: '把任務拖到時間軸 = 排時間。從時間軸拖回上方待排程 = 取消時間（日期保留）。每週循環的任務拖到別的時間時，Waddle 會問你：只改這一天、改這天與之後、還是改所有循環 — 像 Google 日曆一樣自由。',
+    body: '把任務拖到時間軸 = 排時間。從時間軸拖回上方待排程 = 取消時間（日期保留）。每週循環的任務拖到別的時間時，Huddle 會問你：只改這一天、改這天與之後、還是改所有循環 — 像 Google 日曆一樣自由。',
     placement: 'left',
     padding: 0,
   },
@@ -106,7 +106,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="focus-timer"]',
     title: '專注計時器 ＋ 背景音',
-    body: '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Waddle 會輕輕提醒你。',
+    body: '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Huddle 會輕輕提醒你。',
     placement: 'left',
     padding: 6,
     interactive: true,
@@ -114,7 +114,7 @@ const DESKTOP_STEPS: TourStep[] = [
   },
   {
     title: '💧 喝水小提醒',
-    body: '預設每 60 分鐘，Waddle 會跳出來提醒你喝口水。可以選「再過一下」snooze 五分鐘，或在設定裡改成 30/90/120 分鐘，不想要也可以關掉。',
+    body: '預設每 60 分鐘，Huddle 會跳出來提醒你喝口水。可以選「再過一下」snooze 五分鐘，或在設定裡改成 30/90/120 分鐘，不想要也可以關掉。',
   },
   {
     target: '[data-tour="quick-links-bar"]',
@@ -141,7 +141,7 @@ const DESKTOP_STEPS: TourStep[] = [
 // or dropped; copy is rewritten for the bottom-tab + single-panel layout.
 const MOBILE_STEPS: TourStep[] = [
   {
-    title: '歡迎來到 Waddle',
+    title: '歡迎來到 Huddle',
     body: '整合任務、時間排程、專注計時、日記反思的工作面板。慢慢搖擺，把事情做完。',
   },
   {
@@ -172,7 +172,7 @@ const MOBILE_STEPS: TourStep[] = [
   {
     target: '[data-tour="calendar-panel"]',
     title: '日曆：上方待排程 / 下方時間軸',
-    body: '上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。每週循環的任務拖到別的時間時，Waddle 會問「只改這一天 / 之後也改 / 全部改」，像 Google 日曆一樣自由。',
+    body: '上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。每週循環的任務拖到別的時間時，Huddle 會問「只改這一天 / 之後也改 / 全部改」，像 Google 日曆一樣自由。',
     placement: 'top',
     padding: 0,
   },
@@ -183,14 +183,14 @@ const MOBILE_STEPS: TourStep[] = [
   {
     target: '[data-tour="focus-timer"]',
     title: '專注計時器 ＋ 背景音',
-    body: '右下角浮動小球是番茄鐘。點開可全螢幕進入專注模式、配 Lo-fi / 雨聲 / 咖啡店白噪音，結束時 Waddle 輕輕提醒。',
+    body: '右下角浮動小球是番茄鐘。點開可全螢幕進入專注模式、配 Lo-fi / 雨聲 / 咖啡店白噪音，結束時 Huddle 輕輕提醒。',
     placement: 'top',
     padding: 6,
     hint: '👉 點開試試',
   },
   {
     title: '💧 喝水小提醒',
-    body: '預設每 60 分鐘，Waddle 會跳出來提醒你喝口水。可以「再過一下」snooze 五分鐘，或在設定裡改間隔 / 關掉。',
+    body: '預設每 60 分鐘，Huddle 會跳出來提醒你喝口水。可以「再過一下」snooze 五分鐘，或在設定裡改間隔 / 關掉。',
   },
   {
     title: '✨ 你準備好了！',

@@ -20,9 +20,10 @@ import { useUndoShortcuts } from '@/hooks/use-undo-shortcuts'
 import { WaterReminderModal } from '@/components/modals/water-reminder-modal'
 import { toDateString } from '@/lib/calendar-utils'
 import { findTaskById } from '@/lib/task-utils'
+import { AuthGuard } from '@/components/auth/auth-guard'
 import type { Task, SlotType, TimeBlock } from '@/lib/types'
 
-export default function WaddlePage() {
+function WaddlePage() {
   const isMobile = useIsMobile()
   const {
     workspaces,
@@ -436,5 +437,16 @@ export default function WaddlePage() {
         onSnooze={water.snooze}
       />
     </ErrorBoundary>
+  )
+}
+
+// AuthGuard ensures WaddlePage (and its useWaddleData fetch) only mounts for an
+// authenticated user; otherwise it redirects to /login. This replaces the
+// server middleware that previously gated this route.
+export default function Page() {
+  return (
+    <AuthGuard>
+      <WaddlePage />
+    </AuthGuard>
   )
 }

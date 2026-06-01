@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,6 +22,14 @@ function GoogleIcon({ className }: { className?: string }) {
   )
 }
 
+function AppleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M16.365 1.43c0 1.14-.42 2.2-1.13 2.99-.78.86-2.04 1.52-3.1 1.44-.13-1.1.42-2.27 1.07-3 .73-.83 2-1.46 3.07-1.5.02.02.02.04.02.07h.07zM20.5 17.06c-.46 1.07-.68 1.55-1.27 2.5-.83 1.32-2 2.96-3.45 2.97-1.29.01-1.62-.84-3.37-.83-1.75.01-2.11.85-3.4.84-1.45-.01-2.56-1.49-3.39-2.81-2.32-3.7-2.57-8.03-1.13-10.34 1.02-1.64 2.63-2.6 4.15-2.6 1.54 0 2.51.85 3.78.85 1.24 0 1.99-.85 3.78-.85 1.35 0 2.78.74 3.8 2.01-3.34 1.83-2.8 6.6.17 7.6z"/>
+    </svg>
+  )
+}
+
 export default function SignupPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -30,8 +39,10 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [appleLoading, setAppleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [needsConfirmation, setNeedsConfirmation] = useState(false)
+  const oauthBusy = loading || googleLoading || appleLoading
 
   async function handleEmailSignup(e: FormEvent) {
     e.preventDefault()
@@ -73,17 +84,22 @@ export default function SignupPage() {
   async function handleGoogleSignup() {
     setError(null)
     setGoogleLoading(true)
-
-    const { error: err } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
-
-    if (err) {
-      setError(translateError(err.message))
+    try {
+      await signInWithGoogle()
+    } catch (err) {
+      setError(translateError(err instanceof Error ? err.message : String(err)))
       setGoogleLoading(false)
+    }
+  }
+
+  async function handleAppleSignup() {
+    setError(null)
+    setAppleLoading(true)
+    try {
+      await signInWithApple()
+    } catch (err) {
+      setError(translateError(err instanceof Error ? err.message : String(err)))
+      setAppleLoading(false)
     }
   }
 
@@ -115,23 +131,40 @@ export default function SignupPage() {
     <div className="bg-card border border-border rounded-2xl shadow-sm p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">建立帳號</h1>
-        <p className="text-sm text-muted-foreground mt-1">幾秒鐘就能開始使用 Waddle</p>
+        <p className="text-sm text-muted-foreground mt-1">幾秒鐘就能開始使用 Huddle</p>
       </div>
 
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full h-11"
-        onClick={handleGoogleSignup}
-        disabled={googleLoading || loading}
-      >
-        {googleLoading ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <GoogleIcon className="w-4 h-4" />
-        )}
-        <span className="ml-2">使用 Google 註冊</span>
-      </Button>
+      <div className="space-y-2.5">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full h-11"
+          onClick={handleGoogleSignup}
+          disabled={oauthBusy}
+        >
+          {googleLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <GoogleIcon className="w-4 h-4" />
+          )}
+          <span className="ml-2">使用 Google 註冊</span>
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full h-11"
+          onClick={handleAppleSignup}
+          disabled={oauthBusy}
+        >
+          {appleLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <AppleIcon className="w-4 h-4" />
+          )}
+          <span className="ml-2">使用 Apple 註冊</span>
+        </Button>
+      </div>
 
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
@@ -195,7 +228,7 @@ export default function SignupPage() {
           </div>
         )}
 
-        <Button type="submit" className="w-full h-11" disabled={loading || googleLoading}>
+        <Button type="submit" className="w-full h-11" disabled={oauthBusy}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : '建立帳號'}
         </Button>
       </form>

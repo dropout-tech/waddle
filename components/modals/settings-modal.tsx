@@ -15,9 +15,11 @@ import {
 import {
   getReminderLead,
   setReminderLead,
-  ensureNotificationPermission,
+  collectMeetings,
   type ReminderLead,
 } from '@/lib/meeting-reminder'
+import { requestReminderPermission, syncMeetingReminders } from '@/lib/notifications'
+import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 import {
   WATER_REMINDER_INTERVALS,
   type WaterReminderInterval,
@@ -598,7 +600,7 @@ export function SettingsModal({
               <div>
                 <div className="text-sm text-foreground">會議提醒</div>
                 <div className="text-xs text-muted-foreground">
-                  在會議開始前透過瀏覽器通知提醒你（需要授權通知權限）
+                  在會議開始前通知你（需要授權通知權限）
                 </div>
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -614,15 +616,19 @@ export function SettingsModal({
                     onClick={async () => {
                       if (value !== null) {
                         // Permission request has to live inside the click
-                        // handler — browsers gate it on a user gesture.
-                        const granted = await ensureNotificationPermission()
+                        // handler — both web and native gate it on a user
+                        // gesture. requestReminderPermission branches per platform.
+                        const granted = await requestReminderPermission()
                         if (!granted) {
-                          alert('通知權限被拒，請在瀏覽器設定中允許 Waddle 顯示通知後再試')
+                          alert('通知權限被拒，請在系統設定中允許 Huddle 顯示通知後再試')
                           return
                         }
                       }
                       setReminderLeadState(value)
                       setReminderLead(value)
+                      // Native: reschedule the ahead-of-time notifications now
+                      // that the lead changed (web reschedules via its poll).
+                      void syncMeetingReminders(collectMeetings(workspaces), value)
                     }}
                     className={cn(
                       'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
@@ -642,7 +648,7 @@ export function SettingsModal({
               <label className="flex items-center justify-between cursor-pointer">
                 <div className="flex-1 pr-4">
                   <div className="text-sm text-foreground">喝水提醒</div>
-                  <div className="text-xs text-muted-foreground">每隔一段時間，Waddle 會跳出來提醒你補水</div>
+                  <div className="text-xs text-muted-foreground">每隔一段時間，Huddle 會跳出來提醒你補水</div>
                 </div>
                 <input
                   type="checkbox"
@@ -721,6 +727,19 @@ export function SettingsModal({
                   className="h-8 w-20 text-center"
                 />
                 <span className="text-xs text-muted-foreground">分鐘</span>
+              </div>
+            </div>
+
+            {/* Danger zone — in-app account deletion (App Store requirement). */}
+            <div className="pt-2 mt-2 border-t border-border/70 space-y-2">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm text-destructive">刪除帳號</div>
+                  <div className="text-xs text-muted-foreground">
+                    永久刪除帳號與所有資料，無法復原
+                  </div>
+                </div>
+                <DeleteAccountButton />
               </div>
             </div>
           </div>

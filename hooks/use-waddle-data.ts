@@ -14,6 +14,7 @@ import {
 } from '@/lib/supabase/mappers'
 import { toDateString, parseDateString } from '@/lib/calendar-utils'
 import { playTaskCompleteSound } from '@/lib/task-sound'
+import { hapticTaskComplete } from '@/lib/haptics'
 import { pushUndoableAction } from '@/lib/undo-stack'
 import type {
   Workspace,
@@ -1182,7 +1183,11 @@ export function useWaddleData(): UseWaddleData {
 
     // Play the cute completion chime right after the optimistic flip so it
     // feels instant. Only on the off→on transition; un-completing is silent.
-    if (nextValue) playTaskCompleteSound()
+    // The native Taptic "click" rides along on the same transition.
+    if (nextValue) {
+      playTaskCompleteSound()
+      hapticTaskComplete()
+    }
 
     // Block any cross-device/tab-focus refetch from clobbering the optimistic
     // toggle. Without this guard, a refetch that lands between the local
