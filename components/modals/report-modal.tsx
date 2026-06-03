@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
+import { saveOrShareBlob } from '@/lib/share'
 import type { Task, Workspace, ExportDataPayload } from '@/lib/types'
 
 interface ReportModalProps {
@@ -149,14 +150,9 @@ export function ReportModal({
     if (onExport) {
       onExport(exportData)
     } else {
-      // Download as JSON
+      // Download as JSON (native: opens the share sheet instead).
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `waddle-report-${exportData.dateRange.start}-${exportData.dateRange.end}.json`
-      a.click()
-      URL.revokeObjectURL(url)
+      void saveOrShareBlob(blob, `huddle-report-${exportData.dateRange.start}-${exportData.dateRange.end}.json`)
     }
   }
 

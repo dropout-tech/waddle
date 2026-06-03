@@ -215,6 +215,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Native feel inside the Capacitor WebView: no rubber-band overscroll on
+       the document (the app scrolls inside its own panels), and don't let the
+       OS hijack long-press text selection / tap highlight on chrome. Harmless
+       on web — the app shell is a fixed-height SPA with no document scroll. */
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 

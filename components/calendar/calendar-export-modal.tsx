@@ -6,6 +6,8 @@ import { toPng } from 'html-to-image'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
+import { isNative } from '@/lib/platform'
+import { saveOrShareBlob, copyImageToClipboard } from '@/lib/share'
 import type { Workspace, TimeBlock } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -162,16 +164,11 @@ export function CalendarExportModal({
     try {
       const blob = await captureImage()
       if (!blob) throw new Error('capture failed')
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      // Pure-ASCII filename so it survives cross-platform downloads
-      // (some Windows browsers + corporate file servers mangle UTF-8
-       // names in Content-Disposition fallbacks).
-      a.download = `waddle-schedule-${startStr}_${endStr}.png`
-      a.click()
-      URL.revokeObjectURL(url)
-      toast.success('已下載')
+      // Pure-ASCII filename so it survives cross-platform downloads and the
+      // native share sheet. On native this opens the iOS share sheet; on web it
+      // triggers a normal download.
+      await saveOrShareBlob(blob, `huddle-schedule-${startStr}_${endStr}.png`)
+      toast.success(isNative() ? '已開啟分享' : '已下載')
     } catch (err) {
       console.error('[export] download failed', err)
       toast.error('匯出失敗，請再試一次')
@@ -185,22 +182,24 @@ export function CalendarExportModal({
       toast.error('日期範圍無效')
       return
     }
-    // navigator.clipboard.write needs a ClipboardItem, which is gated on
-    // a secure context. Modern browsers + HTTPS handle it fine; fall back
-    // to a friendly error message if not supported.
-    if (!navigator.clipboard || !('write' in navigator.clipboard)) {
-      toast.error('此瀏覽器不支援複製圖片，請改用下載')
-      return
-    }
     setIsExporting(true)
     try {
       const blob = await captureImage()
       if (!blob) throw new Error('capture failed')
-      // ClipboardItem expects a Promise<Blob> in some flows; pass directly.
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
-      setJustCopied(true)
-      window.setTimeout(() => setJustCopied(false), 1800)
-      toast.success('已複製到剪貼簿')
+      // Web copies the image to the clipboard; native degrades to the share
+      // sheet (clipboard image write isn't supported there).
+      const result = await copyImageToClipboard(blob, `huddle-schedule-${startStr}_${endStr}.png`)
+      if (result === 'unsupported') {
+        toast.error('此裝置不支援複製圖片，請改用下載')
+        return
+      }
+      if (result === 'copied') {
+        setJustCopied(true)
+        window.setTimeout(() => setJustCopied(false), 1800)
+        toast.success('已複製到剪貼簿')
+      } else {
+        toast.success('已開啟分享')
+      }
     } catch (err) {
       console.error('[export] copy failed', err)
       toast.error('複製失敗，請改用下載')

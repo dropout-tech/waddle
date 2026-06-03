@@ -176,7 +176,7 @@ export function PanelHeader({
                 <WaddleMascot withBackground phase="auto" className="w-9 h-9 rounded-lg" />
                 <div>
                   <h1 className="text-lg font-bold text-foreground tracking-tight">
-                    Waddle
+                    Huddle
                   </h1>
                   <p className="text-[10px] text-muted-foreground -mt-0.5">
                     慢慢搖擺，把事情做完

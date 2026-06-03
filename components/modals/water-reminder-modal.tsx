@@ -107,7 +107,7 @@ function WaddleWithWater({ className }: { className?: string }) {
       viewBox="0 0 120 120"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="Waddle 拿著水杯"
+      aria-label="Huddle 拿著水杯"
       className={className}
     >
       {/* Soft yellow halo so the penguin reads as a focal token */}

@@ -1,20 +1,16 @@
 ---
-reviewed: 2026-05-18T00:00:00Z
-base: 1540aaa72fc6fbce355c5d576af408889d761807
-head: working-tree
+reviewed: 2026-06-01T03:28:48Z
+base: 73223af (working tree — uncommitted)
+head: 73223afa655f3e464454176288b79d98cc6f672b
 files_reviewed_list:
-  - components/calendar/calendar-header.tsx
-  - components/calendar/current-time-line.tsx
-  - components/calendar/month-view.tsx
-  - components/modals/settings-modal.tsx
-  - components/modals/task-detail-modal.tsx
-  - components/modals/workspace-settings-modal.tsx
-  - components/notifications/notification-center.tsx
+  - app/page.tsx
+  - components/layout/main-layout.tsx
   - components/onboarding-tour.tsx
   - components/scratchpad/focus-scratchpad.tsx
-  - components/task-panel/filter-bar.tsx
-  - components/timer/focus-timer.tsx
-  - components/timer/focus-timer-immersive.tsx
+  - hooks/use-waddle-data.ts
+  - lib/supabase/database.types.ts
+  - lib/types.ts
+  - supabase/migrations/0011_scratchpad_blocks.sql
 findings:
   critical: 1
   warning: 10
@@ -26,147 +22,108 @@ status: issues_found
 
 **Status:** issues_found — 11 findings (1 critical, 10 warning).
 
-**Files reviewed:** 12
-**Diff range:** `1540aaa..working-tree`
-**Intent:** New mobile immersive focus timer overlay + token sweep replacing Tailwind preset colors with Waddle warm OKLCH tokens across 11 components + onboarding tour rebrand (indigo spotlight → terracotta, warm confetti palette).
+**Files reviewed:** 8 changed files + the new untracked migration `0011_scratchpad_blocks.sql`
+**Diff range:** working tree vs `73223af`
+**Intent:** Salvage review of a Phase-1 "Notion-style block scratchpad" implementation an external Gemini agent wrote in parallel (overstepping read-only plan mode), plus the migration `0011_scratchpad_blocks.sql` written to back it (type enum→text; adds sort_order/is_checked/parent_id/metadata; backfills order).
 
-**Note:** Only 2 of the 5 prescribed review agents ran (bugs-security, quality-architecture). No CLAUDE.md, no plan file, no commit history (all changes uncommitted) made the other three (claude-md, plan-adherence, git-history) inapplicable. Confidence scoring was applied judgmentally rather than via per-finding Haiku scorers, with the same ≥80 threshold.
+> 4 fan-out agents (bugs-security, quality-architecture, plan-adherence, db-migration-consistency). Heavy cross-agent overlap was deduped; the bugs agent's self-cancelling "…not a bug" candidates and pure-style items (`any` casts, 16-prop `SortableItem` drilling) scored below the 80 threshold and were dropped. The DB-consistency agent confirmed all columns the frontend touches now exist in 0011/0001 with matching names/nullability and that RLS (row-level on `user_id`) covers the new columns without policy edits — so the migration closes the runtime-break. Findings below are what remains to fix before trusting the salvaged code.
 
 ## Bugs & Security
 
-### CR-01 — Dark-mode tokens missing for every newly-used token
+### CR-01 — Promote-to-task deletes the source note before the task is persisted
 
-**File:** `app/globals.css:94-116` (the `.dark` block); affects all 11 modified files
+**File:** `components/scratchpad/focus-scratchpad.tsx` (promoteToTask) + `app/page.tsx:136` (handlePromoteToTask)
 **Severity:** Critical
 **Confidence:** 95
-**Issue:** The `.dark` override block defines only `--primary`, `--destructive`, etc., and has no overrides for `--urgency-low/medium/high/critical`, `--success`, `--info`, `--current-time`, or `--chart-1..5`. Every token swap introduced in this PR will inherit light-mode values in dark mode. Light-mode OKLCH lightness values (0.75-0.8) chosen against a cream background will look washed-out or fail contrast on `oklch(0.22 ...)` dark cards.
-**Fix:** Add dark-mode overrides for each token in the `.dark` block:
-```css
-.dark {
-  --urgency-low: oklch(0.65 0.1 155);
-  --urgency-medium: oklch(0.68 0.12 95);
-  --urgency-high: oklch(0.7 0.14 55);
-  --urgency-critical: oklch(0.65 0.18 25);
-  --success: oklch(0.65 0.12 155);
-  --info: oklch(0.7 0.1 230);
-  --current-time: oklch(0.72 0.14 35);
-  --chart-1: oklch(0.72 0.14 35);
-  /* chart-2..5 similar */
-}
-```
+**Issue:** `promoteToTask` calls `onPromoteToTask(item.content, …)` then immediately `onDeleteItem(item.id)`. But `handlePromoteToTask` only stages an in-memory draft (`setTaskMode('create')` + `setSelectedTask({…})`) — nothing is written to the DB until the user hits Save in the modal. The scratchpad row is already deleted. If the user closes/cancels the create modal, the note is permanently gone. Two independent agents flagged this.
+**Fix:** Don't delete on promote. Either (a) delete the scratchpad item only in the modal's Save handler after the task actually persists, or (b) keep the note and mark it linked/done. Simplest: pass the source item id into the draft and have `handleSaveTask` (create mode) delete it after a successful insert; on cancel, the note survives.
 
-### WR-01 — RAF loop in long-press exit not cancelled on unmount
+### WR-01 — Reorder rollback can write `undefined` into the date bucket
 
-**File:** `components/timer/focus-timer-immersive.tsx:73-100`
-**Severity:** Warning
-**Confidence:** 90
-**Issue:** `startExitHold` schedules `requestAnimationFrame(step)` and stores the id in `exitHoldRef.current.raf`, but there is no `useEffect` cleanup that cancels this RAF on unmount. If the parent unmounts the overlay during an active long-press (e.g., session auto-completes while user is holding exit), the RAF loop keeps running and eventually calls `setExitHoldProgress(...)` on an unmounted component AND `onExit()` (which calls `stopTimer(false)`), potentially double-firing.
-**Fix:**
-```tsx
-useEffect(() => () => cancelExitHold(), [])
-```
-
-### WR-02 — `${color}33` hex-alpha concatenation breaks for non-hex colors
-
-**File:** `components/timer/focus-timer-immersive.tsx:151, 304`
-**Severity:** Warning
-**Confidence:** 85
-**Issue:** `radial-gradient(circle at 50% 42%, ${color}33 0%, ${color}11 38%, ...)` assumes `color` is a 6-digit hex like `#e07b5a`. If a workspace or category color is ever stored as `oklch(...)`, `rgb(...)`, or a CSS variable, the concatenation produces invalid CSS and the gradient silently fails. Today the input is always hex (POMODORO_PRESETS), but the assumption is undocumented and fragile.
-**Fix:** Use `color-mix(in oklch, ${color} 20%, transparent)` instead of the hex-alpha trick.
-
-### WR-03 — `text-white` on light urgency tokens risks WCAG AA failure
-
-**File:** `components/timer/focus-timer-immersive.tsx:282, 312, 360`; `components/task-panel/filter-bar.tsx:163-169`
+**File:** `hooks/use-waddle-data.ts` (reorderScratchpadItems)
 **Severity:** Warning
 **Confidence:** 80
-**Issue:** Play button, completion check, BGM play button, and all 4 filter-bar urgency pills paint `text-white` on a workspace or urgency-token background. `--urgency-low` (sage at oklch 0.78) and `--urgency-medium` (yellow-green at 0.8) are light enough that 10-12px white text likely fails 4.5:1 contrast.
-**Fix:** Use `text-foreground` for low/medium pills and `text-white` for high/critical only, or pick `--primary-foreground` instead of `text-white`.
+**Issue:** On a DB error the mutation restores `setScratchpadByDate(prev => ({ …prev, [date]: previousItems }))` where `previousItems = scratchpadByDate[date]` captured from a possibly-stale render closure. If that key is absent it assigns `undefined`, and downstream `.map`/`.length` on the bucket throw. Diverges from `reorderCategories`, which reads `workspacesRef.current` and depends only on `[supabase]`.
+**Fix:** Read from a ref (mirror `reorderCategories`) and guard: `[date]: previousItems ?? []`. Drop `scratchpadByDate` from the dep array.
+
+### WR-02 — Parallel per-row reorder UPDATEs leave the DB half-reordered on partial failure
+
+**File:** `hooks/use-waddle-data.ts` (reorderScratchpadItems)
+**Severity:** Warning
+**Confidence:** 80
+**Issue:** Reorder fires N independent `.update({ sort_order })` calls via `Promise.all`. If one rejects, the others have already committed; the code then rolls back only the client state, so the DB is left partially reordered and disagrees with the UI until the next refetch. The author's own leftover comment concedes an RPC would be better.
+**Fix:** On any rejection, trigger a reconciling refetch instead of a client-only rollback — or batch the writes (single `upsert` of `{id, sort_order}` rows, or a Postgres RPC). At minimum, refetch on error.
+
+### WR-03 — `sort_order` collisions from a stale `items` snapshot on rapid adds
+
+**File:** `components/scratchpad/focus-scratchpad.tsx` (getNextSortOrder) + `hooks/use-waddle-data.ts:2313` (optimistic append)
+**Severity:** Warning
+**Confidence:** 80
+**Issue:** `getNextSortOrder()` computes `Math.max(...items.map(i => i.sortOrder)) + 10` from the memoized prop `items`, which doesn't reflect an optimistic item added milliseconds earlier (parent hasn't re-rendered). Two quick adds (easy via markdown shortcuts) get identical `sort_order`. The optimistic insert also appends without re-sorting, so order can jump on the next refetch.
+**Fix:** Track the max in the hook (where state is authoritative) and assign there, or derive from `prev[date]` inside the `setScratchpadByDate` updater rather than from props.
 
 ## Quality & Architecture
 
-### WR-04 — Glassmorphism in BgmBar + completion overlay violates DESIGN.md ban
+### WR-04 — Mobile regression: item actions and drag handle are hover-only (invisible on touch)
 
-**File:** `components/timer/focus-timer-immersive.tsx:302, 347`
+**File:** `components/scratchpad/focus-scratchpad.tsx` (Floating actions + drag handle)
+**Severity:** Warning
+**Confidence:** 90
+**Issue:** The action cluster and grip use `opacity-0 group-hover:opacity-100` with no touch fallback. The pre-existing grid used `opacity-100 md:opacity-0 md:group-hover:opacity-100` — visible on mobile. The scratchpad's mobile surface is a bottom sheet (no hover), so delete/edit/promote/drag are now unreachable on phones — the primary native (Capacitor) surface.
+**Fix:** Restore the `opacity-100 md:opacity-0 md:group-hover:opacity-100` pattern for the action cluster and the drag handle.
+
+### WR-05 — Touch drag activation fights scroll (no delay sensor)
+
+**File:** `components/scratchpad/focus-scratchpad.tsx` (PointerSensor)
+**Severity:** Warning
+**Confidence:** 80
+**Issue:** `useSensor(PointerSensor, { activationConstraint: { distance: 5 } })`. In the scrollable bottom sheet a 5px vertical move starts a drag, conflicting with scroll. The standard touch-list pattern is a delay+tolerance activation.
+**Fix:** Use `{ delay: 200, tolerance: 5 }` (or a separate `TouchSensor`) so a press-and-hold initiates drag while taps/scrolls pass through.
+
+### WR-06 — `- ` markdown shortcut fakes a list as `type:'text'` with a literal `'• '` glyph
+
+**File:** `components/scratchpad/focus-scratchpad.tsx` (handleTextInputChange)
+**Severity:** Warning
+**Confidence:** 84
+**Issue:** `[] ` → `todo` and `# ` → `heading` create real block types, but `- ` creates `type:'text'` with `content:'• '`, baking a presentation character into stored content. Inconsistent block modeling; the bullet won't behave like other structural blocks and pollutes the data.
+**Fix:** Either model a real `list` block type, or drop the `- ` shortcut for Phase 1 rather than faking it. Don't store the glyph in `content`.
+
+### WR-07 — Divider blocks have no creation path (Phase-1 requirement unmet)
+
+**File:** `components/scratchpad/focus-scratchpad.tsx` (render branch `item.type === 'divider'`)
 **Severity:** Warning
 **Confidence:** 85
-**Anchor:** `DESIGN.md` 重要禁區 — "glassmorphism 預設"
-**Issue:** BgmBar uses `bg-card/70 backdrop-blur-md border border-border/60` and completion overlay uses `backdrop-blur-md` over a radial gradient. Both are textbook glassmorphism. DESIGN.md ban applies to glass-as-default; neither use here is justified by meaningful content behind.
-**Fix:** Drop `backdrop-blur-md`; use solid `bg-card` for BgmBar and a solid tinted overlay for completion.
+**Issue:** A divider render branch exists, but nothing can create a divider — the only shortcuts are `[] `/`- `/`# ` and there's no toolbar button emitting `type:'divider'`. The plan's "heading / divider blocks" is half-done: render-only dead UI.
+**Fix:** Add a divider creation affordance (e.g. `---` shortcut or a toolbar button), or drop the divider render branch until it's wired.
 
-### WR-05 — Spotlight ring hardcodes terracotta hex instead of `--primary`
+### WR-08 — Dead imports leaking deferred-feature surface
 
-**File:** `components/onboarding-tour.tsx:490`
+**File:** `components/scratchpad/focus-scratchpad.tsx:7-8` + `@dnd-kit/core` import
 **Severity:** Warning
 **Confidence:** 85
-**Issue:** boxShadow uses `rgba(224, 123, 90, 0.85)` / `rgba(224, 123, 90, 0.4)` — an RGB approximation of `oklch(0.68 0.14 35)`. Will not flip in dark mode (`--primary` in dark is `oklch(0.72 0.14 35)`), and any future brand-hue tweak leaves this dead-coded. The dim layer at `:496` correctly uses `bg-foreground/45` which does theme-flip.
-**Fix:**
-```js
-boxShadow: '0 0 0 9999px color-mix(in oklch, var(--foreground) 50%, transparent), 0 0 0 2px color-mix(in oklch, var(--primary) 85%, transparent), 0 0 32px 4px color-mix(in oklch, var(--primary) 40%, transparent)'
-```
+**Issue:** `MessageSquare`, `MoreHorizontal` (Phase-2/3 callout/overflow surface), `Heading1`, `Minus` (unused heading/divider icons), and `defaultDropAnimationSideEffects` are imported but referenced nowhere. Dead code from the scaffold; CI lint is broken in this repo so it won't catch them.
+**Fix:** Remove the unused imports.
 
-### WR-06 — `z-[60]` collides with menus and dropdowns
+### WR-09 — Silent grid→vertical-list layout change + full-width images (needs sign-off)
 
-**File:** `components/timer/focus-timer-immersive.tsx:111`
+**File:** `components/scratchpad/focus-scratchpad.tsx` (items container + image block)
+**Severity:** Warning
+**Confidence:** 84
+**Issue:** The shipped feature was a responsive card grid (`grid-cols-2 md:grid-cols-3 lg:grid-cols-4`); the diff replaces it wholesale with a single-column list (`verticalListSortingStrategy`, container `max-w-4xl`→`max-w-3xl`) and renders images full-width `max-h-96 object-contain` instead of `h-32 object-cover` thumbnails. A day with several screenshots becomes a huge scroll, and the per-item `createdAt` timestamp was dropped. This is a deliberate IA/visual decision for a polished, shipped surface — it should be a sign-off, not a side effect.
+**Fix:** Confirm the list direction is intended; if so, restore image density (cap height / thumbnail-and-expand) and reinstate the timestamp, or keep a grid for media blocks.
+
+### WR-10 — Order semantics inverted for existing data; incoherent comparator
+
+**File:** `supabase/migrations/0011_scratchpad_blocks.sql:31` + `hooks/use-waddle-data.ts` (loader sort)
 **Severity:** Warning
 **Confidence:** 82
-**Anchor:** `components/user-menu.tsx:111`, `components/calendar/calendar-header.tsx:214`, `components/modals/task-detail-modal.tsx:202`, `components/quick-links/quick-link-edit-modal.tsx:109`, `components/scratchpad/focus-scratchpad.tsx:242` — all at or near `z-[60]`
-**Issue:** A full-screen immersive timer at the same z-level as contextual menus creates stacking ambiguity. If a dropdown is open when the timer launches, pointer events and visual stacking are undefined.
-**Fix:** Define a scale: menus `z-40`, sheets `z-50`, immersive timer `z-[80]`, toast `z-[90]`, onboarding `z-[100]`.
+**Issue:** Backfill numbers `sort_order` by `created_at ASC`, and the loader now sorts by `sort_order ASC` — so migrated days flip from the old newest-first to oldest-first. The in-memory comparator also mixes `sort_order ASC` primary with a `created_at DESC` tiebreak (two opposing intents), and `addScratchpadItem` changed from prepend to append. The net display order for existing users silently inverts.
+**Fix:** Pick one model. If "append to bottom, oldest-first" is intended, say so and make the tiebreak `created_at ASC` to match; if newest-first is to be preserved, backfill `DESC` and prepend new items. Either way, align backfill + comparator + insert.
 
-### WR-07 — Notification priority mapping shifts every level toward critical
+### WR-11 — Migration drops the enum but `database.types.ts` still declares it; "app-level validation" doesn't exist
 
-**File:** `components/notifications/notification-center.tsx:225-227`
-**Severity:** Warning
-**Confidence:** 82
-**Issue:** New mapping: `high → urgency-critical`, `medium → urgency-high`, `low → info`. The `medium` priority should map to `urgency-medium`, not `urgency-high`. As written, medium and high notifications use visually-similar warm-orange / terracotta tones.
-**Fix:**
-```ts
-case 'high': return 'text-urgency-critical bg-urgency-critical/10'
-case 'medium': return 'text-urgency-medium bg-urgency-medium/10'
-case 'low': return 'text-info bg-info/10'
-```
-
-### WR-08 — `text-chart-2` reintroduces a cool blue into icon palette
-
-**File:** `components/modals/settings-modal.tsx:1147`
+**File:** `supabase/migrations/0011_scratchpad_blocks.sql:13-14` + `lib/supabase/database.types.ts` (Enums)
 **Severity:** Warning
 **Confidence:** 80
-**Anchor:** `app/globals.css:74` — `--chart-2: oklch(0.65 0.12 230)` (only "allowed cool color")
-**Issue:** `--chart-2` is the project's one low-chroma blue reserved for data viz. Using it as a decorative section-icon color reintroduces a cool blue accent into Settings — the rest of the sweep is removing those. Also `text-chart-4` is reused for both 勿擾時段 (Moon) and 工作區設定 (Layers).
-**Fix:** Pick `text-info` (semantically suited) or another warm chart token; pick distinct tokens for adjacent sections.
-
-### WR-09 — URGENCY_BUCKETS range shift silently re-categorizes existing data
-
-**File:** `components/modals/task-detail-modal.tsx:642-645`; `components/task-panel/filter-bar.tsx:162-169`
-**Severity:** Warning
-**Confidence:** 80
-**Issue:** Buckets changed from 3-tier (1-3 / 4-6 / 7-10) to 4-tier (1-3 / 4-5 / 6-8 / 9-10). Tasks at level 6 visually move from 中 to 高; tasks at 9-10 are newly classified as 緊急. No data migration needed (numeric value unchanged), but UI labeling shifts for any user with saved tasks.
-**Fix:** Acceptable if intentional; mention in commit message so the visual shift isn't surprising.
-
-### WR-10 — Onboarding dim opacity dropped from 65% to 45%
-
-**File:** `components/onboarding-tour.tsx:496`
-**Severity:** Warning
-**Confidence:** 80
-**Issue:** `bg-black/65` → `bg-foreground/45`. In light mode `--foreground` is `oklch(0.28 0.025 55)` at 45% ≈ visually similar to black at 30%. Background bleeds through more, diluting the "focus user on tooltip" purpose of the dim layer.
-**Fix:** Bump to `bg-foreground/55` to keep warmth but recover backdrop weight.
-
-### WR-11 — Duplicated BgmBar UI between focus-timer.tsx and focus-timer-immersive.tsx
-
-**File:** `components/timer/focus-timer-immersive.tsx:332-387` vs `components/timer/focus-timer.tsx:744-792`
-**Severity:** Warning
-**Confidence:** 78 (borderline, included for actionable refactor)
-**Issue:** Both compute a `summary` string from `prefs.music` + `prefs.ambient`, track `hasSelection`, and render near-identical play/pause UI. They will drift over time.
-**Fix:** Extract `useBgmSummary(prefs)` hook returning `{ summary, hasSelection, activeAmbients, musicMeta }`; optionally a shared `<BgmPlayChip>`.
-
----
-
-## Summary
-
-**CR-01 (dark-mode tokens missing) gates everything.** If shipped as-is, every dark-mode user sees regressed colors across 11 files. Fix this first.
-
-The immersive timer has two structural issues (WR-01 RAF leak, WR-02 hex-alpha fragility) that should be patched before commit. Glassmorphism (WR-04) and z-index collision (WR-06) are visible-to-user but not blocking.
-
-Onboarding rebrand is mostly correct but the hardcoded hex (WR-05) and dim opacity drop (WR-10) arguably overcorrected.
-
-Recommended fix order: CR-01 → WR-01 → WR-02 → WR-07 → rest as time permits.
+**Issue:** `0011` runs `DROP TYPE scratchpad_type_enum`, but the generated `Enums` map still lists `scratchpad_type_enum` (now stale/unbacked). The migration comment claims the type set is "validated in the app layer (lib/types.ts)", but that's a compile-time TS union with zero runtime enforcement — the column is now free text and `updateScratchpadItem` passes `patch.type` straight through. Currently harmless (all writes are within the union) but the promised guarantee is absent.
+**Fix:** Remove the stale `scratchpad_type_enum` from the `Enums` map, and either add a tiny runtime guard (a `BLOCK_TYPES` const + check in the add/update mutations) or soften the migration comment to reflect that validation is type-only.

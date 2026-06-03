@@ -111,9 +111,13 @@ type ScratchpadItemsRow = {
   id: string
   user_id: string
   date: string
-  type: 'text' | 'image' | 'link'
+  type: 'text' | 'image' | 'link' | 'todo'
   content: string
   title: string | null
+  is_checked: boolean | null
+  sort_order: number | null
+  parent_id: string | null
+  metadata: Json | null
   created_at: string
 }
 
@@ -265,9 +269,13 @@ type ScratchpadItemsInsert = {
   id?: string
   user_id: string
   date: string
-  type: 'text' | 'image' | 'link'
+  type: 'text' | 'image' | 'link' | 'todo'
   content: string
   title?: string | null
+  is_checked?: boolean | null
+  sort_order?: number | null
+  parent_id?: string | null
+  metadata?: Json | null
 }
 
 type TimeBlocksInsert = {
@@ -351,7 +359,6 @@ export type Database = {
       task_type_enum: 'one_time' | 'routine' | 'project'
       recurrence_type_enum: 'daily' | 'weekly' | 'monthly' | 'custom'
       mood_enum: 'great' | 'good' | 'neutral' | 'bad' | 'terrible'
-      scratchpad_type_enum: 'text' | 'image' | 'link'
       icon_type_enum: 'lucide' | 'custom' | 'emoji'
     }
     CompositeTypes: Record<string, never>
