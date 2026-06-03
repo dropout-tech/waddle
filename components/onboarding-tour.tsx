@@ -97,7 +97,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="scratchpad"]',
     title: '專注白板',
-    body: '工作中冒出靈感？拉開白板丟文字、貼圖、連結。每天分開存。',
+    body: '工作中冒出靈感？拉開白板丟文字、貼圖、連結，事後還能隨手編輯。每天分開存。',
     placement: 'bottom',
     padding: 6,
     interactive: true,

@@ -182,7 +182,9 @@ interface UseWaddleData {
   // implementation it replaced lost everything on a browser switch.
   scratchpadByDate: Record<string, ScratchpadItem[]>
   addScratchpadItem: (date: string, item: ScratchpadItem) => Promise<void>
+  updateScratchpadItem: (id: string, patch: Partial<ScratchpadItem>) => Promise<void>
   deleteScratchpadItem: (id: string) => Promise<void>
+  reorderScratchpadItems: (date: string, items: ScratchpadItem[]) => Promise<void>
   clearScratchpadDate: (date: string) => Promise<void>
 }
 
@@ -409,20 +411,33 @@ export function useWaddleData(): UseWaddleData {
           type: r.type,
           content: r.content,
           title: r.title ?? undefined,
+          isChecked: r.is_checked ?? undefined,
+          sortOrder: r.sort_order ?? 0,
+          parentId: r.parent_id ?? undefined,
+          metadata: (r.metadata as any) ?? undefined,
           createdAt: r.created_at,
         }
         ;(builtScratchpad[r.date] ??= []).push(item)
+      }
+
+      // Oldest-first within each date (document order): primary sort_order ASC,
+      // tie-break created_at ASC. New items append to the bottom (see
+      // addScratchpadItem), and backfill in migration 0011 numbers by created_at
+      // ASC — so all three agree on oldest-first.
+      for (const date in builtScratchpad) {
+        builtScratchpad[date].sort((a, b) => {
+          if (a.sortOrder !== b.sortOrder) {
+            return a.sortOrder - b.sortOrder
+          }
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        })
       }
 
       if (initial && typeof window !== 'undefined') {
         const MIGRATED_KEY = 'waddle-scratchpad-migrated-v1'
         const alreadyMigrated = window.localStorage.getItem(MIGRATED_KEY) === '1'
         if (!alreadyMigrated) {
-          // created_at is server-defaulted (Insert type forbids it), so
-          // legacy items will get a fresh timestamp at migration time
-          // rather than their original ones. The items themselves
-          // survive — only the relative ordering within a day changes.
-          const legacyRows: { id: string; user_id: string; date: string; type: 'text' | 'image' | 'link'; content: string; title: string | null }[] = []
+          const legacyRows: any[] = []
           const legacyKeys: string[] = []
           for (let i = 0; i < window.localStorage.length; i++) {
             const key = window.localStorage.key(i)
@@ -432,17 +447,18 @@ export function useWaddleData(): UseWaddleData {
             // Skip dates that already have cloud rows so we don't double-insert.
             if (builtScratchpad[date]?.length) continue
             try {
-              const parsed = JSON.parse(window.localStorage.getItem(key) ?? '[]') as ScratchpadItem[]
-              for (const it of parsed) {
+              const parsed = JSON.parse(window.localStorage.getItem(key) ?? '[]') as any[]
+              parsed.forEach((it, idx) => {
                 legacyRows.push({
-                  id: it.id,
+                  id: it.id || crypto.randomUUID(),
                   user_id: user.id,
                   date,
                   type: it.type,
                   content: it.content,
                   title: it.title ?? null,
+                  sort_order: idx * 10,
                 })
-              }
+              })
               legacyKeys.push(key)
             } catch {
               /* ignore corrupt localStorage entry */
@@ -462,6 +478,7 @@ export function useWaddleData(): UseWaddleData {
                   type: r.type,
                   content: r.content,
                   title: r.title ?? undefined,
+                  sortOrder: r.sort_order,
                   createdAt: nowIso,
                 }
                 ;(builtScratchpad[r.date] ??= []).push(item)
@@ -2293,30 +2310,34 @@ export function useWaddleData(): UseWaddleData {
 
   const addScratchpadItem = useCallback(async (date: string, item: ScratchpadItem) => {
     const userId = requireUserId()
-    setScratchpadByDate((prev) => ({
-      ...prev,
-      [date]: [item, ...(prev[date] ?? [])],
-    }))
+    // Assign sort_order from the authoritative current state (not the caller's
+    // possibly-stale snapshot) so two quick adds can't collide — append to the
+    // bottom with a gap of 10.
+    let placed = item
+    setScratchpadByDate((prev) => {
+      const existing = prev[date] ?? []
+      const nextOrder = existing.length ? Math.max(...existing.map((i) => i.sortOrder)) + 10 : 0
+      placed = { ...item, sortOrder: nextOrder }
+      return { ...prev, [date]: [...existing, placed] }
+    })
     pendingWritesRef.current += 1
     try {
-      // created_at is server-defaulted (Insert type omits it); the
-      // optimistic state above keeps the client-generated timestamp so
-      // the new item slots into the list at the right spot until the
-      // next refetch reconciles with the server-stamped row.
       const { error } = await supabase.from('scratchpad_items').insert({
-        id: item.id,
+        id: placed.id,
         user_id: userId,
         date,
-        type: item.type,
-        content: item.content,
-        title: item.title ?? null,
+        type: placed.type,
+        content: placed.content,
+        title: placed.title ?? null,
+        is_checked: placed.isChecked ?? false,
+        sort_order: placed.sortOrder,
+        parent_id: placed.parentId ?? null,
+        metadata: (placed.metadata as any) ?? null,
       })
       if (error) {
-        // Roll back the optimistic insert so the UI matches reality
-        // instead of showing a phantom item that vanishes on refetch.
         setScratchpadByDate((prev) => ({
           ...prev,
-          [date]: (prev[date] ?? []).filter((i) => i.id !== item.id),
+          [date]: (prev[date] ?? []).filter((i) => i.id !== placed.id),
         }))
         handleDbError('儲存白板')(error)
       }
@@ -2349,10 +2370,105 @@ export function useWaddleData(): UseWaddleData {
         if (removedFromDate && removedItem) {
           setScratchpadByDate((prev) => ({
             ...prev,
-            [removedFromDate!]: [removedItem!, ...(prev[removedFromDate!] ?? [])],
+            [removedFromDate!]: [...(prev[removedFromDate!] ?? []), removedItem!].sort((a, b) => a.sortOrder - b.sortOrder),
           }))
         }
         handleDbError('刪除白板項目')(error)
+      }
+    } finally {
+      pendingWritesRef.current -= 1
+    }
+  }, [supabase])
+
+  const updateScratchpadItem = useCallback(
+    async (id: string, patch: Partial<ScratchpadItem>) => {
+      let editedDate: string | null = null
+      let previous: ScratchpadItem | null = null
+      setScratchpadByDate((prev) => {
+        const next: Record<string, ScratchpadItem[]> = {}
+        for (const [date, items] of Object.entries(prev)) {
+          const found = items.find((i) => i.id === id)
+          if (found) {
+            editedDate = date
+            previous = { ...found }
+            next[date] = items.map((i) =>
+              i.id === id
+                ? {
+                    ...i,
+                    ...patch,
+                  }
+                : i,
+            )
+          } else {
+            next[date] = items
+          }
+        }
+        return next
+      })
+      if (!editedDate || !previous) return
+      pendingWritesRef.current += 1
+      try {
+        const dbPatch: any = {}
+        if (patch.content !== undefined) dbPatch.content = patch.content
+        if (patch.title !== undefined) dbPatch.title = patch.title
+        if (patch.type !== undefined) dbPatch.type = patch.type
+        if (patch.isChecked !== undefined) dbPatch.is_checked = patch.isChecked
+        if (patch.sortOrder !== undefined) dbPatch.sort_order = patch.sortOrder
+        if (patch.parentId !== undefined) dbPatch.parent_id = patch.parentId
+        if (patch.metadata !== undefined) dbPatch.metadata = patch.metadata
+
+        const { error } = await supabase
+          .from('scratchpad_items')
+          .update(dbPatch)
+          .eq('id', id)
+        if (error) {
+          setScratchpadByDate((prev) => ({
+            ...prev,
+            [editedDate!]: (prev[editedDate!] ?? []).map((i) =>
+              i.id === id ? previous! : i,
+            ),
+          }))
+          handleDbError('編輯白板項目')(error)
+        }
+      } finally {
+        pendingWritesRef.current -= 1
+      }
+    },
+    [supabase],
+  )
+
+  const reorderScratchpadItems = useCallback(async (date: string, items: ScratchpadItem[]) => {
+    const userId = requireUserId()
+    // Capture the pre-reorder list from authoritative state (guarded against an
+    // absent key) so an error rollback can't write `undefined` into the bucket.
+    let previousItems: ScratchpadItem[] = []
+    setScratchpadByDate((prev) => {
+      previousItems = prev[date] ?? []
+      return { ...prev, [date]: items }
+    })
+
+    pendingWritesRef.current += 1
+    try {
+      // Persist the whole reordered set in ONE upsert. A single statement avoids
+      // the partial-failure window of N parallel UPDATEs (some rows commit, others
+      // don't → DB half-reordered). Full rows are required because upsert's INSERT
+      // path must satisfy the NOT NULL columns.
+      const rows = items.map((item) => ({
+        id: item.id,
+        user_id: userId,
+        date,
+        type: item.type,
+        content: item.content,
+        title: item.title ?? null,
+        is_checked: item.isChecked ?? false,
+        sort_order: item.sortOrder,
+        parent_id: item.parentId ?? null,
+        metadata: (item.metadata as any) ?? null,
+      }))
+      const { error } = await supabase.from('scratchpad_items').upsert(rows)
+      if (error) {
+        setScratchpadByDate((prev) => ({ ...prev, [date]: previousItems }))
+        handleDbError('重新排序白板')(error)
       }
     } finally {
       pendingWritesRef.current -= 1
@@ -2522,7 +2638,9 @@ export function useWaddleData(): UseWaddleData {
     setQuickLinks,
     scratchpadByDate,
     addScratchpadItem,
+    updateScratchpadItem,
     deleteScratchpadItem,
+    reorderScratchpadItems,
     clearScratchpadDate,
   }
 }

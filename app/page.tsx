@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { MainLayout } from '@/components/layout/main-layout'
@@ -56,7 +56,9 @@ function WaddlePage() {
     setQuickLinks,
     scratchpadByDate,
     addScratchpadItem,
+    updateScratchpadItem,
     deleteScratchpadItem,
+    reorderScratchpadItems,
     clearScratchpadDate,
   } = useWaddleData()
 
@@ -132,11 +134,48 @@ function WaddlePage() {
     setSelectedTimeBlock(block)
   }, [])
 
+  // When a scratchpad note is promoted, we stage a draft task in the modal but
+  // DON'T delete the source note yet — only after the task is actually saved
+  // (see handleSaveTask). Cancelling the modal leaves the note intact.
+  const promotedScratchpadIdRef = useRef<string | null>(null)
+
+  const handlePromoteToTask = useCallback((title: string, description: string | undefined, sourceId: string) => {
+    const firstWs = workspaces.find(w => !w.isArchived) || workspaces[0]
+    const firstCat = firstWs?.categories.find(c => !c.isArchived) || firstWs?.categories[0]
+    if (!firstCat) return
+
+    promotedScratchpadIdRef.current = sourceId
+    setTaskMode('create')
+    setSelectedTask({
+      id: crypto.randomUUID(),
+      categoryId: firstCat.id,
+      workspaceId: firstWs.id,
+      workspaceName: firstWs.name,
+      workspaceColor: firstWs.color,
+      categoryName: firstCat.name,
+      title,
+      description,
+      taskType: 'one_time',
+      urgency: 5,
+      isCompleted: false,
+      sortOrder: 0,
+      calendarColor: firstWs.color,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+  }, [workspaces])
+
   // Save handler shared by edit + create modes.
   const handleSaveTask = useCallback(async (updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => {
     if (!selectedTask) return
 
     if (taskMode === 'create') {
+      // Snapshot the promote source NOW, before any await. The modal fires
+      // onSave un-awaited then calls onClose synchronously, and onClose nulls
+      // the ref — so reading the ref after `await createTask` would always see
+      // null. Capturing here makes the delete robust to that ordering.
+      const promotedId = promotedScratchpadIdRef.current
+      promotedScratchpadIdRef.current = null
       const targetCategoryId = newCategoryId || selectedTask.categoryId
       const targetWorkspace = workspaces.find((w) =>
         w.categories.some((c) => c.id === targetCategoryId)
@@ -157,12 +196,16 @@ function WaddlePage() {
         updatedAt: now,
       }
       await createTask(newTask)
+      // Task persisted — now it's safe to remove the source scratchpad note
+      // (if this create came from a "promote to task"). On a thrown createTask
+      // we skip the delete, so the note survives.
+      if (promotedId) deleteScratchpadItem(promotedId)
       return
     }
 
     // edit mode
     await updateTask(selectedTask.id, updates, newCategoryId, recurrenceChoice, targetDate)
-  }, [selectedTask, taskMode, workspaces, createTask, updateTask])
+  }, [selectedTask, taskMode, workspaces, createTask, updateTask, deleteScratchpadItem])
 
   // Open the TaskDetailModal in create mode with a draft task pre-filled
   // from the calendar slot the user clicked.
@@ -382,8 +425,11 @@ function WaddlePage() {
         onSetQuickLinks={setQuickLinks}
         scratchpadByDate={scratchpadByDate}
         onAddScratchpadItem={addScratchpadItem}
+        onUpdateScratchpadItem={updateScratchpadItem}
         onDeleteScratchpadItem={deleteScratchpadItem}
+        onReorderScratchpadItems={reorderScratchpadItems}
         onClearScratchpadDate={clearScratchpadDate}
+        onPromoteToTask={handlePromoteToTask}
       />
 
       {liveSelectedTask && (
@@ -394,6 +440,8 @@ function WaddlePage() {
           workspaces={workspaces}
           isOpen={!!liveSelectedTask}
           onClose={() => {
+            // Cancelling a promote: drop the pending link, keep the note.
+            promotedScratchpadIdRef.current = null
             setSelectedTask(null)
             setSelectedOccurrenceDate(undefined)
           }}

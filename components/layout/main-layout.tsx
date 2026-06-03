@@ -52,8 +52,11 @@ interface MainLayoutProps {
   // Scratchpad — DB-backed; per-date map plus narrow mutations.
   scratchpadByDate?: Record<string, ScratchpadItem[]>
   onAddScratchpadItem?: (date: string, item: ScratchpadItem) => void
+  onUpdateScratchpadItem?: (id: string, patch: Partial<ScratchpadItem>) => void
   onDeleteScratchpadItem?: (id: string) => void
+  onReorderScratchpadItems?: (date: string, items: ScratchpadItem[]) => void
   onClearScratchpadDate?: (date: string) => void
+  onPromoteToTask?: (title: string, description: string | undefined, sourceId: string) => void
 }
 
 const MIN_PANEL_WIDTH = 280
@@ -91,8 +94,11 @@ export function MainLayout({
   onSetQuickLinks,
   scratchpadByDate,
   onAddScratchpadItem,
+  onUpdateScratchpadItem,
   onDeleteScratchpadItem,
+  onReorderScratchpadItems,
   onClearScratchpadDate,
+  onPromoteToTask,
 }: MainLayoutProps) {
   const isMobile = useIsMobile()
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
@@ -279,8 +285,11 @@ export function MainLayout({
           hideTrigger
           scratchpadByDate={scratchpadByDate ?? {}}
           onAddItem={onAddScratchpadItem ?? (() => {})}
+          onUpdateItem={onUpdateScratchpadItem ?? (() => {})}
           onDeleteItem={onDeleteScratchpadItem ?? (() => {})}
+          onReorderItems={onReorderScratchpadItems ?? (() => {})}
           onClearDate={onClearScratchpadDate ?? (() => {})}
+          onPromoteToTask={onPromoteToTask}
         />
 
         {/* Quick-links overlay — same pull-sheet pattern as scratchpad
@@ -528,8 +537,11 @@ export function MainLayout({
       <FocusScratchpad
         scratchpadByDate={scratchpadByDate ?? {}}
         onAddItem={onAddScratchpadItem ?? (() => {})}
+        onUpdateItem={onUpdateScratchpadItem ?? (() => {})}
         onDeleteItem={onDeleteScratchpadItem ?? (() => {})}
+        onReorderItems={onReorderScratchpadItems ?? (() => {})}
         onClearDate={onClearScratchpadDate ?? (() => {})}
+        onPromoteToTask={onPromoteToTask}
       />
 
       <div className="flex flex-1 min-h-0 relative">
