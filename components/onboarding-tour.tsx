@@ -67,7 +67,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="calendar-panel"]',
     title: '日曆：上方待排程 / 下方時間軸',
-    body: '每一天上方那條是「待排程」（有日期沒時間）；下方時間軸是「已排時間」的任務。',
+    body: '每一天上方那條是「待排程」（有日期沒時間）；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let\'s Play｜夏令營），一眼看出屬於哪個分類；不想要可在設定關掉。',
     placement: 'left',
     padding: 0,
   },
@@ -172,7 +172,7 @@ const MOBILE_STEPS: TourStep[] = [
   {
     target: '[data-tour="calendar-panel"]',
     title: '日曆：上方待排程 / 下方時間軸',
-    body: '上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。每週循環的任務拖到別的時間時，Huddle 會問「只改這一天 / 之後也改 / 全部改」，像 Google 日曆一樣自由。',
+    body: '上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let\'s Play｜夏令營）讓你一眼分辨，不想要可在設定關掉。每週循環的任務拖到別的時間時，Huddle 會問「只改這一天 / 之後也改 / 全部改」，像 Google 日曆一樣自由。',
     placement: 'top',
     padding: 0,
   },

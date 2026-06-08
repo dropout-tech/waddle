@@ -86,7 +86,7 @@ function buildTaskInsert(task: Task, userId: string) {
 // (keep_completed_today_in_list), and 0009 (quick_links). Same latch
 // shape so saveSettings matches createTask/updateTask instead of paying
 // the failed-write cost on every save.
-const SETTINGS_EXT_COL_RE = /day_view_days|week_view_days|keep_completed_today_in_list|quick_links/
+const SETTINGS_EXT_COL_RE = /day_view_days|week_view_days|keep_completed_today_in_list|quick_links|show_category_prefix/
 let settingsExtColsKnownMissing = false
 const isMissingSettingsExtColumnError = (err: unknown) => isMissingColumnError(err, SETTINGS_EXT_COL_RE)
 
@@ -101,6 +101,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   dayViewDays: 1,
   weekViewDays: 7,
   keepCompletedTodayInList: true,
+  showCategoryPrefix: true,
   quickLinks: [],
   weatherCity: 'Taipei',
   weatherUnit: 'celsius',
@@ -386,6 +387,21 @@ export function useWaddleData(): UseWaddleData {
               const parsed = JSON.parse(raw)
               if (Array.isArray(parsed)) {
                 builtSettings.quickLinks = parsed as UserSettings['quickLinks']
+              }
+            }
+          } catch {
+            /* ignore corrupt localStorage */
+          }
+        }
+
+        const dbCatPrefix = settingsRow?.show_category_prefix
+        if (dbCatPrefix === undefined) {
+          try {
+            const raw = window.localStorage.getItem('waddle-category-prefix-v1')
+            if (raw) {
+              const parsed = JSON.parse(raw) as { showCategoryPrefix?: boolean }
+              if (typeof parsed.showCategoryPrefix === 'boolean') {
+                builtSettings.showCategoryPrefix = parsed.showCategoryPrefix
               }
             }
           } catch {
@@ -2140,6 +2156,10 @@ export function useWaddleData(): UseWaddleData {
           'waddle-quick-links-v1',
           JSON.stringify(newSettings.quickLinks),
         )
+        window.localStorage.setItem(
+          'waddle-category-prefix-v1',
+          JSON.stringify({ showCategoryPrefix: newSettings.showCategoryPrefix }),
+        )
       } catch {
         /* localStorage unavailable; ignore */
       }
@@ -2157,6 +2177,7 @@ export function useWaddleData(): UseWaddleData {
           week_view_days: newSettings.weekViewDays,
           keep_completed_today_in_list: newSettings.keepCompletedTodayInList,
           quick_links: newSettings.quickLinks as unknown as Json,
+          show_category_prefix: newSettings.showCategoryPrefix,
         }
     let { error } = await supabase.from('user_settings').upsert(fullSettingsRow)
     if (error && isMissingSettingsExtColumnError(error)) {

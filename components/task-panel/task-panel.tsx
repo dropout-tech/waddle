@@ -79,7 +79,13 @@ export function TaskPanel({
   className,
 }: TaskPanelProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [density, setDensity] = useState<Density>('comfortable')
+  const [density, setDensity] = useState<Density>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('waddle-density-v1')
+      if (saved === 'compact' || saved === 'comfortable') return saved
+    }
+    return 'comfortable'
+  })
   const [viewMode, setViewMode] = useState<ViewMode>('category')
   const [metaOrder, setMetaOrder] = useState<MetaField[]>(() => {
     if (typeof window !== 'undefined') {
@@ -328,7 +334,10 @@ export function TaskPanel({
               onFiltersChange={setFilters}
               workspaces={workspaces.map((w) => ({ id: w.id, name: w.name, color: w.color }))}
               density={density}
-              onDensityChange={setDensity}
+              onDensityChange={(d) => {
+                setDensity(d)
+                localStorage.setItem('waddle-density-v1', d)
+              }}
               metaOrder={metaOrder}
               onMetaOrderChange={(order) => {
                 setMetaOrder(order)

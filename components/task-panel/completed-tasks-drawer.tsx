@@ -35,15 +35,13 @@ function dateKey(iso: string): string {
   return toDateString(new Date(iso))
 }
 
-/** Friendly group label given a date and a reference "today". */
-function groupLabel(d: string, today: string, yesterday: string, sevenDaysAgo: string, fourteenDaysAgo: string): string {
-  if (d === today) return '今天'
-  if (d === yesterday) return '昨天'
-  if (d >= sevenDaysAgo) return '本週稍早'
-  if (d >= fourteenDaysAgo) return '上週'
-  // Older — bucket by month for readability.
+/** Month bucket label. Current year drops the year prefix ("6 月"); older
+ *  years keep it ("2025 年 6 月") so cross-year history stays unambiguous. */
+function groupLabel(d: string, currentYear: number): string {
   const [y, m] = d.split('-')
-  return `${parseInt(y, 10)} 年 ${parseInt(m, 10)} 月`
+  const year = parseInt(y, 10)
+  const month = parseInt(m, 10)
+  return year === currentYear ? `${month} 月` : `${year} 年 ${month} 月`
 }
 
 /** "幾天前 / 幾小時前 / 幾分鐘前" — humanized duration label. */
@@ -161,19 +159,11 @@ export function CompletedTasksDrawer({
     }
   }, [completed])
 
-  // Group rows by friendly label. Order matters — render in the same order
-  // we generate the labels in (today, yesterday, this week, last week, …).
+  // Group rows by month. `completed` is sorted newest-first, so buckets are
+  // created in most-recent-month-first order (the "未知時間" bucket lands last
+  // because those rows sort to the bottom).
   const groups = useMemo(() => {
-    const today = toDateString(new Date())
-    const yest = new Date()
-    yest.setDate(yest.getDate() - 1)
-    const yesterday = toDateString(yest)
-    const seven = new Date()
-    seven.setDate(seven.getDate() - 7)
-    const sevenStr = toDateString(seven)
-    const fourteen = new Date()
-    fourteen.setDate(fourteen.getDate() - 14)
-    const fourteenStr = toDateString(fourteen)
+    const currentYear = new Date().getFullYear()
 
     const buckets: Array<{ label: string; tasks: CompletedFlat[] }> = []
     const indexByLabel = new Map<string, number>()
@@ -182,7 +172,7 @@ export function CompletedTasksDrawer({
       // still discoverable; the bucket renders last because the natural
       // sort is "most recent first".
       const label = t.completedAt
-        ? groupLabel(dateKey(t.completedAt), today, yesterday, sevenStr, fourteenStr)
+        ? groupLabel(dateKey(t.completedAt), currentYear)
         : '未知時間'
       let idx = indexByLabel.get(label)
       if (idx === undefined) {
@@ -258,7 +248,7 @@ export function CompletedTasksDrawer({
                     sticky behavior. */}
                 <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 py-1">
                   {g.label}
-                  <span className="ml-2 text-muted-foreground/60 normal-case font-normal">{g.tasks.length}</span>
+                  <span className="text-muted-foreground/60 normal-case font-normal">・已完成 {g.tasks.length}</span>
                 </h3>
                 <ul className="space-y-1.5">
                   {g.tasks.map((t) => (

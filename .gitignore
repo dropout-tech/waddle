@@ -25,5 +25,8 @@ out/
 # Playwright MCP scratch
 .playwright-mcp/
 
+# Codex tool scratch
+.codex/
+
 # TypeScript build cache
 tsconfig.tsbuildinfo

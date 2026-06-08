@@ -5,6 +5,8 @@ import { Clock, Inbox, Check, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import { formatEstimatedTime } from '@/lib/task-utils'
+import { taskDisplayTitle } from '@/lib/task-display'
+import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 
 interface PendingZoneProps {
   tasks: Task[]
@@ -17,6 +19,7 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
   const [isAdding, setIsAdding] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const showCategoryPrefix = useShowCategoryPrefix()
 
   const handleSubmit = () => {
     if (newTaskTitle.trim()) {
@@ -108,7 +111,7 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
           <div
             key={task.id}
             draggable
-            aria-label={`待排程任務：${task.title}`}
+            aria-label={`待排程任務：${taskDisplayTitle(task, showCategoryPrefix)}`}
             className={cn(
               'group flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-all cursor-grab active:cursor-grabbing',
               'bg-card border border-border hover:border-primary/30 hover:shadow-sm',
@@ -146,7 +149,7 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
                 task.isCompleted && 'line-through text-muted-foreground'
               )}
             >
-              {task.title}
+              {taskDisplayTitle(task, showCategoryPrefix)}
             </button>
 
             {task.estimatedMinutes && (

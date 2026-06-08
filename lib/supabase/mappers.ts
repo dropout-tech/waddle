@@ -247,6 +247,9 @@ export function rowToSettings(
     // from localStorage if it exists.
     keepCompletedTodayInList:
       row.keep_completed_today_in_list ?? fallbackSettings.keepCompletedTodayInList,
+    // Migration 0013 — same graceful-fallback pattern; defaults to true.
+    showCategoryPrefix:
+      row.show_category_prefix ?? fallbackSettings.showCategoryPrefix,
     // Migration 0009 — JSONB array. Default to fallback (typically `[]`)
     // when the column is absent so older deployments degrade cleanly.
     quickLinks: Array.isArray(row.quick_links)

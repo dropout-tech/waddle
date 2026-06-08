@@ -23,6 +23,8 @@ import { TaskBlock, type TaskDragStart } from './task-block'
 import { SlotIcon } from './slot-icon'
 import { X, ChevronLeft } from 'lucide-react'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from '../modals/recurrence-choice-modal'
+import { taskDisplayTitle } from '@/lib/task-display'
+import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 
 interface DayScrollViewProps {
   selectedDate: Date
@@ -90,6 +92,7 @@ export function DayScrollView({
   dayViewDays = 1,
 }: DayScrollViewProps) {
   const isMobile = useIsMobile()
+  const showCategoryPrefix = useShowCategoryPrefix()
   // On mobile, each day fills (viewport - time column) so the user sees one
   // full day per swipe and scroll-snap lands on day boundaries. Desktop
   // measures the actual scroll container and divides by dayViewDays so the
@@ -1099,7 +1102,7 @@ export function DayScrollView({
                           >
                             <span className="flex items-center gap-1.5 min-w-0">
                               {task.isCompleted && <span className="flex-shrink-0">✓</span>}
-                              <span className="truncate">{task.title}</span>
+                              <span className="truncate">{taskDisplayTitle(task, showCategoryPrefix)}</span>
                             </span>
                           </div>
                         )
@@ -1115,7 +1118,7 @@ export function DayScrollView({
                           }}
                         >
                           <span className="flex items-center gap-1.5 min-w-0">
-                            <span className="truncate">{draggedTaskPreview.title}</span>
+                            <span className="truncate">{taskDisplayTitle(draggedTaskPreview, showCategoryPrefix)}</span>
                           </span>
                         </div>
                       )}
@@ -1391,7 +1394,10 @@ export function DayScrollView({
                     }}
                   >
                     <div className="text-xs font-semibold text-white truncate">
-                      {tasks.find(t => t.id === activeTaskDrag.taskId)?.title}
+                      {(() => {
+                        const dt = tasks.find(t => t.id === activeTaskDrag.taskId)
+                        return dt ? taskDisplayTitle(dt, showCategoryPrefix) : ''
+                      })()}
                     </div>
                     <div className="text-[10px] text-white/80 font-mono mt-0.5">
                       {minutesToTime(activeTaskDrag.currentStart)}-{minutesToTime(activeTaskDrag.currentEnd)}
@@ -1412,7 +1418,7 @@ export function DayScrollView({
                     }}
                   >
                     <div className="text-xs font-semibold text-white truncate">
-                      {pendingTaskDrag.task.title}
+                      {taskDisplayTitle(pendingTaskDrag.task, showCategoryPrefix)}
                     </div>
                     <div className="text-[10px] text-white/80 font-mono mt-0.5">
                       {minutesToTime(pendingTaskDrag.currentMinutes)}-{minutesToTime(pendingTaskDrag.currentMinutes + pendingTaskDrag.duration)}
