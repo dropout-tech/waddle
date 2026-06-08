@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { Check, Plus } from 'lucide-react'
 import { toDateString, taskOccursOnDate } from '@/lib/calendar-utils'
+import { taskDisplayTitle } from '@/lib/task-display'
+import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 
 interface MonthViewProps {
   selectedDate: Date
@@ -33,6 +35,7 @@ export function MonthView({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isScrolling = useRef(false)
   const monthRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const showCategoryPrefix = useShowCategoryPrefix()
 
   // Generate months to render
   const months = useMemo(() => {
@@ -303,7 +306,7 @@ export function MonthView({
                               style={{ backgroundColor: getUrgencyColor(task.urgency) }}
                             />
                             <span className="truncate font-medium text-foreground/80 flex-1">
-                              {task.title}
+                              {taskDisplayTitle(task, showCategoryPrefix)}
                             </span>
                           </div>
                         ))}

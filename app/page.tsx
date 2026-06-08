@@ -21,6 +21,7 @@ import { WaterReminderModal } from '@/components/modals/water-reminder-modal'
 import { toDateString } from '@/lib/calendar-utils'
 import { findTaskById } from '@/lib/task-utils'
 import { AuthGuard } from '@/components/auth/auth-guard'
+import { CategoryPrefixProvider } from '@/components/category-prefix-context'
 import type { Task, SlotType, TimeBlock } from '@/lib/types'
 
 function WaddlePage() {
@@ -394,6 +395,7 @@ function WaddlePage() {
 
   return (
     <ErrorBoundary>
+      <CategoryPrefixProvider value={settings.showCategoryPrefix ?? true}>
       <MainLayout
         workspaces={workspaces}
         timeBlocks={timeBlocks}
@@ -431,6 +433,7 @@ function WaddlePage() {
         onClearScratchpadDate={clearScratchpadDate}
         onPromoteToTask={handlePromoteToTask}
       />
+      </CategoryPrefixProvider>
 
       {liveSelectedTask && (
         <TaskDetailModal

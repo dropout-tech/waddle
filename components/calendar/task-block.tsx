@@ -10,6 +10,8 @@ import {
 } from '@/lib/task-utils'
 import { Check, GripVertical, RefreshCw, Layers, Clock, Users, Video, Link2, Settings2 } from 'lucide-react'
 import { detectMeetingProvider } from '@/lib/meeting-utils'
+import { taskDisplayTitle } from '@/lib/task-display'
+import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 
 // Touch input requires a long-press before any drag activates so the user
 // can scroll the calendar past tasks without accidentally moving them.
@@ -74,6 +76,8 @@ function TaskBlockImpl({
   dragOverride = null,
   isDragging = false,
 }: TaskBlockProps) {
+  const showCategoryPrefix = useShowCategoryPrefix()
+  const displayTitle = taskDisplayTitle(task, showCategoryPrefix)
   const occurrenceDate = date ?? task.scheduledDate
   if (!task.scheduledStartTime || !task.scheduledEndTime) return null
 
@@ -295,7 +299,7 @@ function TaskBlockImpl({
   const meetingStripeColor = colorIsLight
     ? 'rgba(0,0,0,0.12)'
     : 'rgba(255,255,255,0.12)'
-  const ariaLabel = `${task.isMeeting ? '會議 — ' : ''}${task.title}，${formatTime(task.scheduledStartTime!)} 到 ${formatTime(task.scheduledEndTime!)}${task.isCompleted ? '，已完成' : ''}`
+  const ariaLabel = `${task.isMeeting ? '會議 — ' : ''}${displayTitle}，${formatTime(task.scheduledStartTime!)} 到 ${formatTime(task.scheduledEndTime!)}${task.isCompleted ? '，已完成' : ''}`
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -373,7 +377,7 @@ function TaskBlockImpl({
         onPointerDown={handleBodyPointerDown}
         onPointerUp={handleBodyPointerUp}
         style={{ touchAction: 'none' }}
-        title={`${task.title} · ${formatTime(task.scheduledStartTime!)}–${formatTime(task.scheduledEndTime!)}`}
+        title={`${displayTitle} · ${formatTime(task.scheduledStartTime!)}–${formatTime(task.scheduledEndTime!)}`}
       >
         {/* Top Row: Checkbox + Title */}
         <div className={cn('flex min-w-0', totalColumns > 1 ? 'items-start gap-1' : 'items-start gap-1.5')}>
@@ -431,7 +435,7 @@ function TaskBlockImpl({
             )}
             style={totalColumns > 3 ? { writingMode: 'vertical-rl', textOrientation: 'mixed' } : undefined}
           >
-            {task.title}
+            {displayTitle}
           </span>
         </div>
 

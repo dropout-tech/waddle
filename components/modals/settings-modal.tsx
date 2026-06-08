@@ -707,6 +707,24 @@ export function SettingsModal({
               />
             </label>
 
+            {/* Auto category prefix on calendar task titles */}
+            <label className="flex items-center justify-between cursor-pointer">
+              <div className="flex-1 pr-4">
+                <div className="text-sm text-foreground">行事曆自動加上分類</div>
+                <div className="text-xs text-muted-foreground">
+                  行事曆上的任務標題前自動加上「分類｜」，一眼看出是哪個分類（例：Let&apos;s Play｜夏令營）。不會更動你存的標題。
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={localSettings.showCategoryPrefix ?? true}
+                onChange={(e) =>
+                  setLocalSettings(prev => ({ ...prev, showCategoryPrefix: e.target.checked }))
+                }
+                className="w-4 h-4 rounded border-border accent-primary"
+              />
+            </label>
+
             {/* Default task duration */}
             <div className="flex items-center justify-between">
               <div>

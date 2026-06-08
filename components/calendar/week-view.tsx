@@ -22,6 +22,8 @@ import { TaskBlock, type TaskDragStart } from './task-block'
 import { SlotIcon } from './slot-icon'
 import { X, ChevronLeft } from 'lucide-react'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from '../modals/recurrence-choice-modal'
+import { taskDisplayTitle } from '@/lib/task-display'
+import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 
 interface WeekViewProps {
   selectedDate: Date
@@ -86,6 +88,7 @@ export function WeekView({
   hourHeight = 60,
   weekViewDays = 7,
 }: WeekViewProps) {
+  const showCategoryPrefix = useShowCategoryPrefix()
   // Effective day-column width — scales inversely with weekViewDays so a
   // 5-day work-week shows wider columns (more breathing room) and a 7-day
   // full week stays at the legacy compact 120px baseline.
@@ -880,7 +883,7 @@ export function WeekView({
                           >
                             <span className="flex items-center gap-1 min-w-0">
                               {task.isCompleted && <span className="flex-shrink-0">✓</span>}
-                              <span className="truncate">{task.title}</span>
+                              <span className="truncate">{taskDisplayTitle(task, showCategoryPrefix)}</span>
                             </span>
                           </div>
                         )
@@ -896,7 +899,7 @@ export function WeekView({
                           }}
                         >
                           <span className="flex items-center gap-1 min-w-0">
-                            <span className="truncate">{draggedTaskPreview.title}</span>
+                            <span className="truncate">{taskDisplayTitle(draggedTaskPreview, showCategoryPrefix)}</span>
                           </span>
                         </div>
                       )}
@@ -1064,7 +1067,10 @@ export function WeekView({
                     }}
                   >
                     <div className="text-xs font-semibold text-white truncate">
-                      {tasks.find(t => t.id === activeTaskDrag.taskId)?.title}
+                      {(() => {
+                        const dt = tasks.find(t => t.id === activeTaskDrag.taskId)
+                        return dt ? taskDisplayTitle(dt, showCategoryPrefix) : ''
+                      })()}
                     </div>
                     <div className="text-[10px] text-white/80 font-mono mt-0.5">
                       {minutesToTime(activeTaskDrag.currentStart)}-{minutesToTime(activeTaskDrag.currentEnd)}
@@ -1085,7 +1091,7 @@ export function WeekView({
                     }}
                   >
                     <div className="text-xs font-semibold text-white truncate">
-                      {pendingTaskDrag.task.title}
+                      {taskDisplayTitle(pendingTaskDrag.task, showCategoryPrefix)}
                     </div>
                     <div className="text-[10px] text-white/80 font-mono mt-0.5">
                       {minutesToTime(pendingTaskDrag.currentMinutes)}-{minutesToTime(pendingTaskDrag.currentMinutes + pendingTaskDrag.duration)}

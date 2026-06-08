@@ -202,6 +202,15 @@ export interface UserSettings {
    * in the "已完成" drawer keyed by completedAt.
    */
   keepCompletedTodayInList: boolean
+  /**
+   * When true (default), task titles in the calendar are shown prefixed with
+   * their category name, e.g. "Let's Play｜夏令營". The stored title stays
+   * clean — this is a display-only decoration so renaming a category updates
+   * every event at once and titles never accumulate prefixes. The top-level
+   * workspace (company) name is intentionally omitted; the left task panel
+   * already groups by category so the prefix is redundant there.
+   */
+  showCategoryPrefix: boolean
   weatherCity: string
   weatherUnit: 'celsius' | 'fahrenheit'
   // Time block defaults
