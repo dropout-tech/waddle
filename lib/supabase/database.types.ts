@@ -121,6 +121,18 @@ type ScratchpadItemsRow = {
   created_at: string
 }
 
+type NotebookNotesRow = {
+  id: string
+  user_id: string
+  title: string
+  icon: string | null
+  content: Json | null
+  sort_order: number
+  is_archived: boolean
+  created_at: string
+  updated_at: string
+}
+
 type TimeBlocksRow = {
   id: string
   user_id: string
@@ -278,6 +290,17 @@ type ScratchpadItemsInsert = {
   metadata?: Json | null
 }
 
+type NotebookNotesInsert = {
+  id?: string
+  user_id: string
+  title?: string
+  icon?: string | null
+  content?: Json | null
+  sort_order?: number
+  is_archived?: boolean
+  updated_at?: string
+}
+
 type TimeBlocksInsert = {
   id?: string
   user_id: string
@@ -349,6 +372,7 @@ export type Database = {
       journal_entries: Tbl<JournalEntriesRow, JournalEntriesInsert>
       journal_photos: Tbl<JournalPhotosRow, JournalPhotosInsert>
       scratchpad_items: Tbl<ScratchpadItemsRow, ScratchpadItemsInsert>
+      notebook_notes: Tbl<NotebookNotesRow, NotebookNotesInsert>
       time_blocks: Tbl<TimeBlocksRow, TimeBlocksInsert>
       slot_types: Tbl<SlotTypesRow, SlotTypesInsert>
       user_settings: Tbl<UserSettingsRow, UserSettingsInsert>
