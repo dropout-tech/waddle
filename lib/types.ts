@@ -21,6 +21,37 @@ export interface ScratchpadDay {
   items: ScratchpadItem[]
 }
 
+// Notebook (記事本) — Notion-style rich-text documents, separate from the daily
+// scratchpad. Each note's body lives in `content` as a Tiptap/ProseMirror JSON
+// document, so the editor owns all formatting (bold/italic/headings/lists/
+// todo/toggle/quote) with no per-block schema.
+export interface NotebookNote {
+  id: string
+  title: string
+  icon?: string // optional leading emoji
+  content: TiptapDoc | null // Tiptap/ProseMirror document JSON; null = empty note
+  sortOrder: number
+  isArchived: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+// Minimal structural shape of a Tiptap/ProseMirror document. The editor is the
+// source of truth for the full node/mark vocabulary; this just gives us a typed
+// handle instead of `any` at the data boundary.
+export interface TiptapDoc {
+  type: 'doc'
+  content?: TiptapNode[]
+}
+
+export interface TiptapNode {
+  type: string
+  attrs?: Record<string, unknown>
+  content?: TiptapNode[]
+  marks?: { type: string; attrs?: Record<string, unknown> }[]
+  text?: string
+}
+
 export interface Workspace {
   id: string
   name: string

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, Mail, User, Loader2 } from 'lucide-react'
+import { LogOut, Mail, User, Loader2, BookOpen } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
@@ -141,6 +141,24 @@ export function UserMenu({ className }: UserMenuProps = {}) {
               </div>
             </div>
           </div>
+
+          <button
+            data-tour="notebook-entry"
+            onClick={() => {
+              setOpen(false)
+              router.push('/notebook')
+            }}
+            className={cn(
+              'w-full flex items-center gap-2 px-4 py-2.5 text-sm',
+              'hover:bg-muted/60 transition-colors text-foreground'
+            )}
+            role="menuitem"
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>記事本</span>
+          </button>
+
+          <div className="border-t border-border" />
 
           <button
             onClick={handleSignOut}
