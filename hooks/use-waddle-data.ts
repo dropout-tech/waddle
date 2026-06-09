@@ -1125,8 +1125,8 @@ export function useWaddleData(): UseWaddleData {
         pendingWritesRef.current += 1
         try {
           await supabase.from('tasks').update({ exdates: nextExdates }).eq('id', taskId)
-          const userId = (await supabase.auth.getUser()).data.user?.id
-          await supabase.from('tasks').insert(buildTaskInsert(newTask, userId!))
+          const userId = requireUserId()
+          await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -1171,9 +1171,9 @@ export function useWaddleData(): UseWaddleData {
 
       pendingWritesRef.current += 1
       try {
-        const userId = (await supabase.auth.getUser()).data.user?.id
+        const userId = requireUserId()
         await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
-        await supabase.from('tasks').insert(buildTaskInsert(newTask, userId!))
+        await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
       } finally {
         pendingWritesRef.current -= 1
       }
@@ -1688,10 +1688,10 @@ export function useWaddleData(): UseWaddleData {
             .eq('id', taskId)
           if (updateError) handleDbError('更新重複任務例外')(updateError)
 
-          const userId = (await supabase.auth.getUser()).data.user?.id
+          const userId = requireUserId()
           const { error: insertError } = await supabase
             .from('tasks')
-            .insert(buildTaskInsert(newTask, userId!))
+            .insert(buildTaskInsert(newTask, userId))
           if (insertError) handleDbError('建立任務例外')(insertError)
         } finally {
           pendingWritesRef.current -= 1
@@ -1744,9 +1744,9 @@ export function useWaddleData(): UseWaddleData {
 
       pendingWritesRef.current += 1
       try {
-        const userId = (await supabase.auth.getUser()).data.user?.id
+        const userId = requireUserId()
         await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
-        await supabase.from('tasks').insert(buildTaskInsert(newTask, userId!))
+        await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
       } finally {
         pendingWritesRef.current -= 1
       }
@@ -1906,8 +1906,8 @@ export function useWaddleData(): UseWaddleData {
         pendingWritesRef.current += 1
         try {
           await supabase.from('tasks').update({ exdates: nextExdates }).eq('id', taskId)
-          const userId = (await supabase.auth.getUser()).data.user?.id
-          await supabase.from('tasks').insert(buildTaskInsert(newTask, userId!))
+          const userId = requireUserId()
+          await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -1953,9 +1953,9 @@ export function useWaddleData(): UseWaddleData {
 
       pendingWritesRef.current += 1
       try {
-        const userId = (await supabase.auth.getUser()).data.user?.id
+        const userId = requireUserId()
         await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
-        await supabase.from('tasks').insert(buildTaskInsert(newTask, userId!))
+        await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
       } finally {
         pendingWritesRef.current -= 1
       }
