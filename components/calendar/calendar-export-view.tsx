@@ -2,7 +2,10 @@
 
 import { forwardRef, useMemo } from 'react'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
-import { toDateString } from '@/lib/calendar-utils'
+import { toDateString, taskOccursOnDate } from '@/lib/calendar-utils'
+import { isLightColor } from '@/lib/utils'
+import { taskDisplayTitle } from '@/lib/task-display'
+import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import type { Workspace, Task, TimeBlock } from '@/lib/types'
 
 export interface CalendarExportViewOptions {
@@ -94,6 +97,9 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
   function CalendarExportView({ workspaces, timeBlocks, startDate, endDate, startHour, endHour, options }, ref) {
     const days = useMemo(() => enumerateDays(startDate, endDate), [startDate, endDate])
     const isDark = options.theme === 'dark'
+    // Same category-prefix decoration the live calendar uses, so an exported
+    // event reads "分類｜任務" exactly like it does on screen.
+    const showCategoryPrefix = useShowCategoryPrefix()
 
     // Flatten all scheduled items (tasks + time blocks) into a single list
     // keyed by date so each day column can grab its slice in O(1).
@@ -105,21 +111,39 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
         for (const cat of ws.categories) {
           if (cat.isArchived) continue
           for (const t of cat.tasks) {
-            if (!t.scheduledDate || !t.scheduledStartTime || !t.scheduledEndTime) continue
-            const item: ScheduledItem = {
-              id: t.id,
-              date: t.scheduledDate,
-              startMin: timeToMinutes(t.scheduledStartTime),
-              endMin: timeToMinutes(t.scheduledEndTime),
-              color: t.calendarColor || ws.color,
-              title: t.title || '（未命名）',
-              notes: t.notes,
-              isBlock: false,
-              isMeeting: t.isMeeting === true,
+            if (!t.scheduledStartTime || !t.scheduledEndTime) continue
+            // Expand recurrence: a weekly/daily task stores one base record
+            // and its other occurrences are virtual, computed at render time.
+            // Walk each day in range and ask the same predicate the live
+            // calendar uses (handles interval / daysOfWeek / exdates / endDate)
+            // so recurring tasks land on every matching day, not just the base.
+            const title = taskDisplayTitle(
+              { title: t.title || '（未命名）', categoryName: cat.name },
+              showCategoryPrefix,
+            )
+            const startMin = timeToMinutes(t.scheduledStartTime)
+            const endMin = timeToMinutes(t.scheduledEndTime)
+            const color = t.calendarColor || ws.color
+            for (const d of days) {
+              if (!taskOccursOnDate(t, d)) continue
+              const dateStr = toDateString(d)
+              const item: ScheduledItem = {
+                // Unique per day — the same recurring task renders on several
+                // days, so the bare task id would collide as a React key.
+                id: `${t.id}-${dateStr}`,
+                date: dateStr,
+                startMin,
+                endMin,
+                color,
+                title,
+                notes: t.notes,
+                isBlock: false,
+                isMeeting: t.isMeeting === true,
+              }
+              const arr = byDate.get(dateStr) ?? []
+              arr.push(item)
+              byDate.set(dateStr, arr)
             }
-            const arr = byDate.get(t.scheduledDate) ?? []
-            arr.push(item)
-            byDate.set(t.scheduledDate, arr)
           }
         }
       }
@@ -149,7 +173,7 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
       }
 
       return byDate
-    }, [workspaces, timeBlocks, days])
+    }, [workspaces, timeBlocks, days, showCategoryPrefix])
 
     const hourSpan = Math.max(1, endHour - startHour)
     const gridHeight = hourSpan * HOUR_PX
@@ -325,10 +349,7 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
                     item={it}
                     startHour={startHour}
                     endHour={endHour}
-                    columnWidth={dayColWidth}
                     options={options}
-                    surfaceColor={surfaceColor}
-                    textPrimary={textPrimary}
                     isDark={isDark}
                   />
                 ))}
@@ -363,19 +384,13 @@ function ItemBlock({
   item,
   startHour,
   endHour,
-  columnWidth,
   options,
-  surfaceColor,
-  textPrimary,
   isDark,
 }: {
   item: ScheduledItem
   startHour: number
   endHour: number
-  columnWidth: number
   options: CalendarExportViewOptions
-  surfaceColor: string
-  textPrimary: string
   isDark: boolean
 }) {
   const startBoundMin = startHour * 60
@@ -389,9 +404,55 @@ function ItemBlock({
   const height = Math.max(18, (visibleEnd - visibleStart) / minPerPx)
   const isShort = height < 32
 
-  // Soft tint background based on workspace color; full-strength left
-  // border keeps the color attribution legible even at thumbnail size.
-  const tintAlpha = isDark ? '33' : '22' // ~13% / ~13% — gentle wash
+  // Mirror the live calendar's color language so the export reads the same:
+  //  • Tasks  → solid workspace color + contrasting text (task-block.tsx).
+  //  • Blocks → soft diagonal stripes over the surface (time-block-item.tsx).
+  const colorIsLight = isLightColor(item.color)
+
+  // ── Time blocks: translucent striped slab, muted text ──────────────────
+  if (item.isBlock) {
+    const blockText = isDark ? '#d6d2c6' : '#6b6155'
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          top,
+          left: 4,
+          right: 4,
+          height: height - 2,
+          borderRadius: 8,
+          background: `repeating-linear-gradient(135deg, ${item.color}40, ${item.color}40 8px, ${item.color}22 8px, ${item.color}22 16px)`,
+          border: `1px solid ${item.color}55`,
+          overflow: 'hidden',
+          padding: isShort ? '2px 6px' : '4px 8px',
+          boxSizing: 'border-box',
+        }}
+      >
+        {options.showTitles && (
+          <div
+            style={{
+              fontSize: isShort ? 10 : 11,
+              fontWeight: 600,
+              color: blockText,
+              lineHeight: 1.25,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {item.title}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Tasks: solid color block, white-or-dark text by luminance ──────────
+  const textColor = colorIsLight ? '#2a2a2a' : '#ffffff'
+  const subColor = colorIsLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.78)'
+  // Meeting stripes / inset ring flip tone on pale colors to stay visible,
+  // matching task-block.tsx's luminance logic.
+  const stripeColor = colorIsLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.14)'
   return (
     <div
       style={{
@@ -401,48 +462,34 @@ function ItemBlock({
         right: 4,
         height: height - 2,
         borderRadius: 8,
-        backgroundColor: surfaceColor,
-        // Meeting blocks: thicker outer border to make them pop without
-        // changing the workspace color. Same hue, just bolder.
-        border: item.isMeeting
-          ? `2px solid ${item.color}${isDark ? 'bb' : '88'}`
-          : `1px solid ${item.color}${isDark ? '88' : '55'}`,
-        borderLeft: `${item.isMeeting ? 4 : 3}px solid ${item.color}`,
-        boxShadow: isDark ? 'none' : `0 1px 2px rgba(0,0,0,0.04)`,
+        backgroundColor: item.color,
+        // Meeting tasks: inset ring for the "double border" feel, tone
+        // chosen by luminance so it reads on both dark and pale colors.
+        boxShadow: item.isMeeting
+          ? `inset 0 0 0 2px ${colorIsLight ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.45)'}${isDark ? '' : ', 0 1px 2px rgba(0,0,0,0.10)'}`
+          : isDark
+          ? 'none'
+          : '0 1px 2px rgba(0,0,0,0.10)',
         overflow: 'hidden',
         padding: isShort ? '2px 6px' : '4px 8px',
         boxSizing: 'border-box',
       }}
     >
-      {/* Tinted background wash to make the workspace color readable
-          even on tiny blocks. Layered as an absolute overlay so it doesn't
-          push other content. */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundColor: item.color + tintAlpha,
-          pointerEvents: 'none',
-        }}
-      />
-
-      {/* Meeting-only: diagonal hatch pattern overlay so "this is a
-          meeting" reads at a glance even when the image is shared
-          downsized. Sits above the tint but below content. */}
+      {/* Meeting-only: low-contrast diagonal hatch over the solid color, the
+          same texture cue the live calendar uses. */}
       {item.isMeeting && (
         <div
           style={{
             position: 'absolute',
             inset: 0,
             pointerEvents: 'none',
-            backgroundImage: `repeating-linear-gradient(45deg, ${item.color}${isDark ? '33' : '22'} 0 4px, transparent 4px 10px)`,
+            backgroundImage: `repeating-linear-gradient(45deg, ${stripeColor} 0 6px, transparent 6px 14px)`,
           }}
         />
       )}
 
-      {/* Meeting-only: small icon badge in the top-right corner. Always
-          on, even when titles are hidden via privacy mode, because the
-          "this is a meeting" signal is more useful than not. */}
+      {/* Meeting-only: small icon badge, top-right. Always on, even in
+          privacy mode — the "this is a meeting" signal is worth keeping. */}
       {item.isMeeting && (
         <div
           style={{
@@ -452,22 +499,18 @@ function ItemBlock({
             width: 14,
             height: 14,
             borderRadius: 7,
-            backgroundColor: item.color,
+            backgroundColor: colorIsLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#ffffff',
-            fontSize: 9,
-            fontWeight: 700,
             lineHeight: 1,
             zIndex: 1,
           }}
         >
-          {/* Tiny inline Users-icon approximation. Using SVG instead of a
-              lucide-react component because html-to-image's font-loading
-              path doesn't always pick up icon fonts cleanly; a hand-drawn
-              SVG renders identically every time. */}
-          <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* Hand-drawn SVG instead of a lucide component — html-to-image's
+              font path doesn't always pick up icon fonts; an inline SVG
+              renders identically every time. */}
+          <svg viewBox="0 0 24 24" width="9" height="9" fill="none" stroke={textColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
             <circle cx="9" cy="7" r="4" />
             <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
@@ -482,7 +525,7 @@ function ItemBlock({
               style={{
                 fontSize: isShort ? 10 : 11,
                 fontWeight: 600,
-                color: textPrimary,
+                color: textColor,
                 lineHeight: 1.25,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -490,14 +533,12 @@ function ItemBlock({
               }}
             >
               {item.title}
-              {item.isBlock ? '' : ''}
             </div>
             {!isShort && (
               <div
                 style={{
                   fontSize: 9,
-                  color: textPrimary,
-                  opacity: 0.65,
+                  color: subColor,
                   marginTop: 1,
                   fontVariantNumeric: 'tabular-nums',
                 }}
@@ -512,8 +553,7 @@ function ItemBlock({
               <div
                 style={{
                   fontSize: 9,
-                  color: textPrimary,
-                  opacity: 0.6,
+                  color: subColor,
                   marginTop: 2,
                   lineHeight: 1.2,
                   display: '-webkit-box',
@@ -527,16 +567,9 @@ function ItemBlock({
             )}
           </>
         ) : (
-          // Privacy mode: no title, just a tiny dot to indicate "something
-          // is booked here". Color tint already conveys workspace.
-          <div
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              backgroundColor: item.color,
-            }}
-          />
+          // Privacy mode: solid color slab with no title — the color alone
+          // conveys which workspace owns the slot, same as the calendar.
+          <div style={{ width: '100%', height: '100%' }} />
         )}
       </div>
     </div>
