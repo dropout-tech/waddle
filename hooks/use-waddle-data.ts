@@ -40,6 +40,11 @@ import type {
 /** PGRST204 = "column not found in schema cache". 42703 = "undefined column". */
 const MISSING_COL_CODES = new Set(['PGRST204', '42703'])
 
+/** 23505 = unique_violation. Task ids are client-generated UUIDs, so a
+ * duplicate-key error on insert always means "this exact row was already
+ * inserted" — the write is idempotent and safe to treat as success. */
+const isDuplicateKeyError = (err: unknown) => hasCode(err) && err.code === '23505'
+
 function hasCode(err: unknown): err is { code?: string; message?: string } {
   return !!err && typeof err === 'object'
 }
@@ -928,6 +933,9 @@ export function useWaddleData(): UseWaddleData {
         const retry = await supabase.from('tasks').insert(buildPayload(true))
         error = retry.error
       }
+      // Idempotent: the row (client UUID) is already in the DB and our
+      // optimistic state — swallow the duplicate instead of alarming the user.
+      if (error && isDuplicateKeyError(error)) return
       if (error) handleDbError('建立任務')(error)
     } finally {
       pendingWritesRef.current -= 1

@@ -376,6 +376,11 @@ function WaddlePage() {
       updatedAt: now,
     }
     await createTask(newTask)
+    // The task is already persisted — open the modal in EDIT mode so the
+    // follow-up Save goes through updateTask, not a second createTask with
+    // the same id (which would hit a tasks_pkey 23505 duplicate). taskMode is
+    // sticky, so without this it could still be 'create' from a prior action.
+    setTaskMode('edit')
     setSelectedTask(newTask)
   }, [workspaces, createTask])
 
