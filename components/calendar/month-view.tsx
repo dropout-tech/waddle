@@ -342,7 +342,7 @@ export function MonthView({
                 <button
                   type="button"
                   onClick={() => onCreateTask?.(agendaDateString)}
-                  className="h-11 px-5 rounded-full bg-secondary text-sm font-medium text-secondary-foreground active:brightness-95 transition-all"
+                  className="h-11 px-5 rounded-full bg-secondary border border-border text-sm font-medium text-secondary-foreground active:brightness-95 transition-all"
                 >
                   新增一件事
                 </button>
