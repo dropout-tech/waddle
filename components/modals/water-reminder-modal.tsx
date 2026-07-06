@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { Drawer as Vaul } from 'vaul'
 
 interface WaterReminderModalProps {
   isOpen: boolean
@@ -24,6 +26,7 @@ interface WaterReminderModalProps {
  */
 export function WaterReminderModal({ isOpen, onDrink, onSnooze }: WaterReminderModalProps) {
   const [mounted, setMounted] = useState(false)
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     if (isOpen) {
@@ -33,7 +36,63 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze }: WaterReminderM
     setMounted(false)
   }, [isOpen])
 
-  if (!isOpen) return null
+  if (!isOpen && !isMobile) return null
+
+  const mascotAndCopy = (
+    <div className="px-6 pt-7 pb-2 flex flex-col items-center text-center">
+      <WaddleWithWater className="w-32 h-32" />
+
+      <h2
+        id="water-reminder-title"
+        className="mt-3 text-[1.35rem] font-semibold text-foreground tracking-wide"
+        style={{ fontFamily: "'Caveat', 'Patrick Hand', 'Noto Sans TC', cursive" }}
+      >
+        該喝水囉～
+      </h2>
+
+      <p className="mt-2 text-sm text-muted-foreground leading-relaxed max-w-[18rem]">
+        搖搖擺擺地工作了一陣子，<br />
+        記得補一口水，再慢慢繼續。
+      </p>
+    </div>
+  )
+
+  if (isMobile) {
+    return (
+      <Vaul.Root open={isOpen} onOpenChange={(o) => { if (!o) onSnooze() }}>
+        <Vaul.Portal>
+          <Vaul.Overlay className="fixed inset-0 z-[60] bg-black/45 backdrop-blur-sm" />
+          <Vaul.Content
+            className="fixed inset-x-0 bottom-0 z-[60] flex flex-col rounded-t-2xl bg-card outline-none overflow-hidden"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
+            <Vaul.Title className="sr-only">該喝水囉</Vaul.Title>
+            {/* Drag handle */}
+            <div className="mx-auto mt-2 mb-1 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
+
+            {mascotAndCopy}
+
+            <div className="flex flex-col gap-2 px-5 pt-4 pb-4">
+              <Button
+                onClick={onDrink}
+                className="w-full h-12 rounded-xl gap-1.5 text-base"
+              >
+                <span aria-hidden>💧</span>
+                好，去喝水
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={onSnooze}
+                className="w-full h-12 rounded-xl text-base"
+              >
+                再過一下
+              </Button>
+            </div>
+          </Vaul.Content>
+        </Vaul.Portal>
+      </Vaul.Root>
+    )
+  }
 
   return (
     <div
@@ -57,22 +116,7 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze }: WaterReminderM
           mounted ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-[0.97]',
         )}
       >
-        <div className="px-6 pt-7 pb-2 flex flex-col items-center text-center">
-          <WaddleWithWater className="w-32 h-32" />
-
-          <h2
-            id="water-reminder-title"
-            className="mt-3 text-[1.35rem] font-semibold text-foreground tracking-wide"
-            style={{ fontFamily: "'Caveat', 'Patrick Hand', 'Noto Sans TC', cursive" }}
-          >
-            該喝水囉～
-          </h2>
-
-          <p className="mt-2 text-sm text-muted-foreground leading-relaxed max-w-[18rem]">
-            搖搖擺擺地工作了一陣子，<br />
-            記得補一口水，再慢慢繼續。
-          </p>
-        </div>
+        {mascotAndCopy}
 
         <div className="px-5 pb-5 pt-4 flex gap-2">
           <Button

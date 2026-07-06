@@ -234,6 +234,13 @@ export function CalendarPanel({
           onToggleComplete={onToggleComplete}
           onDateSelect={(date) => {
             onDateChange(date)
+            // Desktop: clicking a day drills into it. Mobile: tapping a day
+            // only moves the agenda selection below the grid — jumping views
+            // on every tap would make the dot grid unusable for browsing.
+            if (!isMobile) onViewModeChange('day')
+          }}
+          onOpenDayView={(date) => {
+            onDateChange(date)
             onViewModeChange('day')
           }}
           onCreateTask={(dateString) => {

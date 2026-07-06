@@ -349,9 +349,16 @@ function TaskBlockImpl({
         />
       )}
       {/* Resize handle — TOP. Larger touch target on mobile (the indicator
-          stays small; the hit area expands invisibly). */}
+          stays small; the hit area expands invisibly). Edge element sitting
+          at the very top of a block that can be as short as ~20-30px, so a
+          full 44px target isn't feasible without eating into the body's
+          drag/tap area below it — the visible strip grows to 24px (h-6) and
+          an invisible ::before extends 8px further *upward*, outside the
+          block into the empty gap above it, for a 32px effective reach.
+          Disabled on desktop (md:before:content-none) where hover reveals
+          the thin 8px (h-2) handle instead. */}
       <div
-        className="absolute top-0 left-0 right-0 h-4 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+        className="absolute top-0 left-0 right-0 h-6 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity before:content-[''] before:absolute before:inset-x-0 before:-top-2 before:h-8 md:before:content-none"
         onPointerDown={handleResizeTopPointerDown}
         style={{ touchAction: 'none' }}
       >
@@ -497,9 +504,11 @@ function TaskBlockImpl({
         <GripVertical className="w-3 h-3 text-white" />
       </div>
 
-      {/* Resize handle — BOTTOM. Same mobile sizing as TOP. */}
+      {/* Resize handle — BOTTOM. Same mobile sizing as TOP, mirrored: the
+          invisible ::before extends 8px downward into the gap below the
+          block instead of upward. */}
       <div
-        className="absolute bottom-0 left-0 right-0 h-4 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+        className="absolute bottom-0 left-0 right-0 h-6 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity before:content-[''] before:absolute before:inset-x-0 before:-bottom-2 before:h-8 md:before:content-none"
         onPointerDown={handleResizeBottomPointerDown}
         style={{ touchAction: 'none' }}
       >

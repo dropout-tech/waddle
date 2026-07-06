@@ -224,14 +224,17 @@ function TaskRowImpl({
           }}
         >
           {/* Checkbox — visual circle stays small; the actual <button>
-              gets p-2 -m-2 so the tap target is ~30 px even though the
-              visible dot is 14 px. Layout doesn't shift because the
-              negative margin cancels the padding. */}
+              gets padding so the tap target reaches 44px on mobile even
+              though the visible dot is 14 px. Layout doesn't shift because
+              the negative margin cancels the padding. Mobile uses p-[15px]
+              (44px effective); desktop reverts to the original p-2 (~30px,
+              fine for mouse precision and avoids overlapping the row's own
+              hover/drag affordances). */}
           <div className="relative flex-shrink-0">
             <button
               onClick={handleCheck}
               className={cn(
-                'flex-shrink-0 p-2 -m-2 rounded-full flex items-center justify-center transition-transform active:scale-95',
+                'flex-shrink-0 p-[15px] -m-[15px] md:p-2 md:-m-2 rounded-full flex items-center justify-center transition-transform active:scale-95',
                 burst && 'animate-[task-pop_500ms_ease-out]'
               )}
               aria-checked={task.isCompleted}
@@ -353,12 +356,13 @@ function TaskRowImpl({
 
         {/* Checkbox with celebration burst — same touch-target trick as
             the compact variant: invisible padding extends the tap zone
-            without enlarging the rendered circle. */}
+            without enlarging the rendered circle. p-[15px] on mobile hits
+            the 44px floor; md: reverts to the original p-2 for desktop. */}
         <div className="relative flex-shrink-0 mt-0.5">
           <button
             onClick={handleCheck}
             className={cn(
-              'p-2 -m-2 rounded-full flex items-center justify-center transition-transform active:scale-95',
+              'p-[15px] -m-[15px] md:p-2 md:-m-2 rounded-full flex items-center justify-center transition-transform active:scale-95',
               burst && 'animate-[task-pop_500ms_ease-out]'
             )}
             aria-checked={task.isCompleted}

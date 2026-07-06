@@ -104,7 +104,11 @@ export function JournalModal({
             </Button>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-secondary transition-colors ml-2"
+              // Visible box stays 32px (p-1.5 + w-5 icon); an invisible
+              // ::before extends the tap target to 44px on mobile (same
+              // pattern as the shadcn Button `icon` size), disabled on
+              // desktop where mouse precision doesn't need it.
+              className="relative p-1.5 rounded-lg hover:bg-secondary transition-colors ml-2 before:content-[''] before:absolute before:inset-0 before:-m-1.5 md:before:hidden"
             >
               <X className="w-5 h-5 text-muted-foreground" />
             </button>

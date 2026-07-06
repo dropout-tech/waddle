@@ -56,7 +56,7 @@ export function EditorToolbar({ editor, onPromote }: EditorToolbarProps) {
   }
 
   return (
-    <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-border bg-card/80 px-2 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-card/60">
+    <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-border bg-card/80 px-2 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-card/60 max-md:flex-nowrap max-md:overflow-x-auto max-md:gap-1">
       <Btn label="標題 1" active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
         <Heading1 className="h-4 w-4" />
       </Btn>
@@ -157,7 +157,7 @@ function Btn({
         if (!disabled) onClick()
       }}
       className={cn(
-        'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+        'flex h-8 w-8 items-center justify-center rounded-lg transition-colors max-md:h-10 max-md:w-10 max-md:flex-shrink-0',
         'text-muted-foreground hover:bg-secondary hover:text-foreground',
         active && 'bg-primary/10 text-primary hover:bg-primary/15',
         disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted-foreground',

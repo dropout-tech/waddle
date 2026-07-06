@@ -1,12 +1,13 @@
 'use client'
 
-import { useMemo, useRef, useCallback, useEffect } from 'react'
+import { useMemo, useRef, useCallback, useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
-import { Check, Plus } from 'lucide-react'
+import { Check, Plus, ChevronRight } from 'lucide-react'
 import { toDateString, taskOccursOnDate } from '@/lib/calendar-utils'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 interface MonthViewProps {
   selectedDate: Date
@@ -15,6 +16,9 @@ interface MonthViewProps {
   onTaskSelect: (task: Task, occurrenceDate?: string) => void
   onToggleComplete?: (taskId: string) => void
   onDateSelect?: (date: Date) => void
+  /** Mobile agenda's explicit "open day view" action. On mobile, tapping a
+   * day only selects it (agenda below updates); this is the intentional jump. */
+  onOpenDayView?: (date: Date) => void
   onCreateTask?: (date: string) => void
   onNavigate?: (direction: 'prev' | 'next') => void
 }
@@ -29,6 +33,7 @@ export function MonthView({
   onTaskSelect,
   onToggleComplete,
   onDateSelect,
+  onOpenDayView,
   onCreateTask,
   onNavigate,
 }: MonthViewProps) {
@@ -36,6 +41,15 @@ export function MonthView({
   const isScrolling = useRef(false)
   const monthRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const showCategoryPrefix = useShowCategoryPrefix()
+  const isMobile = useIsMobile()
+
+  // Mobile agenda: the day whose tasks are listed under the compact grid.
+  // Follows selectedDate (header navigation, "today" button) but can be
+  // changed locally by tapping a day cell without leaving month view.
+  const [agendaDay, setAgendaDay] = useState<Date>(selectedDate)
+  useEffect(() => {
+    setAgendaDay(selectedDate)
+  }, [selectedDate])
 
   // Generate months to render
   const months = useMemo(() => {
@@ -174,6 +188,256 @@ export function MonthView({
     if (urgency >= 6) return 'oklch(0.65 0.18 45)'
     if (urgency >= 4) return 'oklch(0.70 0.14 70)'
     return 'oklch(0.65 0.12 145)'
+  }
+
+  // ── Mobile: compact dot grid + agenda list ────────────────────────────────
+  // At 390px wide, 7 columns leave ~52px per cell — task chips are unreadable
+  // and their touch targets overlap. Instead of shrinking the desktop layout,
+  // the phone gets the iOS-calendar pattern: date + colored dots per cell,
+  // with the selected day's schedule listed below (mobile-ux skill §1/§6).
+  if (isMobile) {
+    const agendaDateString = toDateString(agendaDay)
+    const agendaTasks = getTasksForDay(agendaDay, agendaDateString)
+    const agendaPending = agendaTasks
+      .filter((t) => !t.isCompleted)
+      .sort((a, b) => {
+        if (a.scheduledStartTime && b.scheduledStartTime) {
+          return a.scheduledStartTime.localeCompare(b.scheduledStartTime)
+        }
+        // Timed items first, then by urgency.
+        if (a.scheduledStartTime) return -1
+        if (b.scheduledStartTime) return 1
+        return b.urgency - a.urgency
+      })
+    const agendaCompleted = agendaTasks.filter((t) => t.isCompleted)
+    const agendaBlocks = [...(blocksByDate[agendaDateString] || [])].sort((a, b) =>
+      a.startTime.localeCompare(b.startTime)
+    )
+    const agendaIsToday = agendaDateString === toDateString(new Date())
+    const agendaEmpty =
+      agendaPending.length === 0 && agendaCompleted.length === 0 && agendaBlocks.length === 0
+
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden select-none bg-panel-secondary">
+        {/* Horizontally snapping month pager (compact grid only) */}
+        <div
+          ref={scrollContainerRef}
+          className="flex-shrink-0 flex overflow-x-auto snap-x snap-mandatory"
+          onScroll={handleScroll}
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {months.map((monthDate) => {
+            const calendarDays = getCalendarDays(monthDate)
+            const monthKey = `${monthDate.getFullYear()}-${monthDate.getMonth()}`
+
+            return (
+              <div
+                key={monthKey}
+                ref={(el) => {
+                  if (el) monthRefs.current.set(monthKey, el)
+                }}
+                className="flex-shrink-0 w-full snap-center flex flex-col px-3 pt-1 pb-2"
+              >
+                {/* Weekday Headers */}
+                <div className="grid grid-cols-7 mb-1">
+                  {WEEKDAYS.map((day, index) => (
+                    <div
+                      key={day}
+                      className={cn(
+                        'text-center text-[11px] font-medium py-1.5',
+                        index === 0 || index === 6 ? 'text-foreground/65' : 'text-muted-foreground'
+                      )}
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Compact day grid: date + task dots, ≥44px touch cells */}
+                <div className="grid grid-cols-7 gap-0.5">
+                  {calendarDays.map((day, index) => {
+                    const dayTasks = getTasksForDay(day.date, day.dateString)
+                    const dayPending = dayTasks.filter((t) => !t.isCompleted)
+                    const hasCompletedOnly = dayPending.length === 0 && dayTasks.length > 0
+                    const isAgendaDay = day.dateString === agendaDateString
+
+                    return (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => {
+                          setAgendaDay(day.date)
+                          onDateSelect?.(day.date)
+                        }}
+                        className={cn(
+                          'relative flex flex-col items-center justify-center gap-1 rounded-lg min-h-[46px] transition-colors',
+                          !day.isCurrentMonth && 'opacity-40',
+                          isAgendaDay ? 'bg-accent/60' : 'active:bg-secondary/60'
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'text-[13px] font-semibold w-6 h-6 rounded-full flex items-center justify-center leading-none',
+                            day.isToday && 'bg-primary text-primary-foreground',
+                            !day.isToday && !day.isCurrentMonth && 'text-muted-foreground'
+                          )}
+                        >
+                          {day.date.getDate()}
+                        </span>
+                        {/* Dot row keeps a fixed height so all cells align */}
+                        <span className="flex items-center gap-[3px] h-1.5">
+                          {dayPending.slice(0, 3).map((task) => (
+                            <span
+                              key={task.id}
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: task.calendarColor || task.workspaceColor }}
+                            />
+                          ))}
+                          {hasCompletedOnly && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/35" />
+                          )}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Selected-day agenda */}
+        <div className="flex-1 flex flex-col min-h-0 border-t border-border/70 bg-panel">
+          <div className="flex items-center justify-between pl-4 pr-2 py-1.5 border-b border-border/50">
+            <span className="text-sm font-semibold">
+              {agendaDay.getMonth() + 1}月{agendaDay.getDate()}日 週{WEEKDAYS[agendaDay.getDay()]}
+              {agendaIsToday && (
+                <span className="ml-2 text-xs font-medium text-primary">今天</span>
+              )}
+            </span>
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={() => onCreateTask?.(agendaDateString)}
+                aria-label="新增任務"
+                className="w-11 h-11 flex items-center justify-center rounded-lg text-primary active:bg-secondary/60 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenDayView?.(agendaDay)}
+                className="h-11 pl-2 pr-1 flex items-center justify-center gap-0.5 rounded-lg text-xs text-muted-foreground active:bg-secondary/60 transition-colors"
+              >
+                日視圖
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-2 py-2">
+            {agendaEmpty ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-10">
+                <span className="text-sm text-muted-foreground">這天還沒有安排</span>
+                <button
+                  type="button"
+                  onClick={() => onCreateTask?.(agendaDateString)}
+                  className="h-11 px-5 rounded-full bg-secondary text-sm font-medium text-secondary-foreground active:brightness-95 transition-all"
+                >
+                  新增一件事
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-0.5 pb-2">
+                {agendaBlocks.map((block) => (
+                  <div key={block.id} className="flex items-center gap-3 px-2 min-h-[44px] py-1">
+                    <span
+                      className="w-1 self-stretch rounded-full flex-shrink-0"
+                      style={{ backgroundColor: block.color }}
+                    />
+                    <span className="text-xs font-mono text-muted-foreground w-[84px] flex-shrink-0">
+                      {block.startTime}–{block.endTime}
+                    </span>
+                    <span className="text-sm text-foreground/80 truncate">{block.label}</span>
+                  </div>
+                ))}
+
+                {agendaPending.map((task) => (
+                  <div
+                    key={task.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onTaskSelect(task, agendaDateString)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') onTaskSelect(task, agendaDateString)
+                    }}
+                    className="flex items-center gap-1 pr-2 min-h-[52px] rounded-xl active:bg-secondary/50 transition-colors cursor-pointer"
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleComplete(e, task.id)}
+                      aria-label="完成任務"
+                      className="w-11 h-11 flex-shrink-0 flex items-center justify-center"
+                    >
+                      <span
+                        className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                        style={{ borderColor: task.calendarColor || task.workspaceColor }}
+                      />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[15px] leading-snug text-foreground truncate">
+                        {taskDisplayTitle(task, showCategoryPrefix)}
+                      </div>
+                      {task.scheduledStartTime && task.scheduledEndTime && (
+                        <div className="text-xs font-mono text-muted-foreground mt-0.5">
+                          {task.scheduledStartTime}–{task.scheduledEndTime}
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: getUrgencyColor(task.urgency) }}
+                    />
+                  </div>
+                ))}
+
+                {agendaCompleted.map((task) => (
+                  <div
+                    key={task.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onTaskSelect(task, agendaDateString)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') onTaskSelect(task, agendaDateString)
+                    }}
+                    className="flex items-center gap-1 pr-2 min-h-[52px] rounded-xl active:bg-secondary/50 transition-colors cursor-pointer opacity-60"
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleComplete(e, task.id)}
+                      aria-label="取消完成"
+                      className="w-11 h-11 flex-shrink-0 flex items-center justify-center"
+                    >
+                      <span
+                        className="w-5 h-5 rounded-full flex items-center justify-center"
+                        style={{ backgroundColor: task.calendarColor || task.workspaceColor }}
+                      >
+                        <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                      </span>
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[15px] leading-snug text-muted-foreground line-through truncate">
+                        {taskDisplayTitle(task, showCategoryPrefix)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

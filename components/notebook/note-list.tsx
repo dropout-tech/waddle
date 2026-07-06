@@ -117,14 +117,22 @@ function NoteRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'group relative mb-0.5 flex items-center gap-1 rounded-lg pl-1 pr-1.5 transition-colors',
+        'group relative mb-0.5 flex items-center gap-2 rounded-lg pl-1 pr-1.5 transition-colors',
         active ? 'bg-primary/10' : 'hover:bg-secondary',
         isDragging && 'opacity-50',
       )}
     >
       <button
         type="button"
-        className="flex cursor-grab touch-none items-center text-muted-foreground/30 opacity-0 transition-opacity group-hover:opacity-100"
+        className={cn(
+          'flex w-11 shrink-0 cursor-grab touch-none items-center justify-center self-stretch rounded-md text-muted-foreground/30 transition-opacity',
+          // Hover devices: hidden until the row is hovered. Touch devices
+          // have no hover — keep it always visible there. w-11 self-stretch
+          // gives a >=44x44 hit box (row height already clears 44px) since
+          // a mouse-only 16px icon would otherwise be nearly untappable.
+          'opacity-0 group-hover:opacity-100',
+          '[@media(hover:none)]:opacity-60',
+        )}
         aria-label="拖曳排序"
         {...attributes}
         {...listeners}
@@ -145,18 +153,18 @@ function NoteRow({
       </button>
 
       {confirming ? (
-        <span className="flex shrink-0 items-center gap-1">
+        <span className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={onDelete}
-            className="rounded px-1.5 py-0.5 text-[10px] font-medium text-destructive hover:bg-destructive/10"
+            className="flex min-h-11 items-center rounded px-2.5 text-[10px] font-medium text-destructive hover:bg-destructive/10"
           >
             刪除
           </button>
           <button
             type="button"
             onClick={() => setConfirming(false)}
-            className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-secondary"
+            className="flex min-h-11 items-center rounded px-2.5 text-[10px] text-muted-foreground hover:bg-secondary"
           >
             取消
           </button>
@@ -167,7 +175,12 @@ function NoteRow({
           onClick={() => setConfirming(true)}
           title="刪除記事"
           aria-label="刪除記事"
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground/50 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+          className={cn(
+            'flex w-11 shrink-0 items-center justify-center self-stretch rounded text-muted-foreground/50 transition-opacity',
+            // Same touch-visibility treatment as the drag handle above.
+            'opacity-0 hover:text-destructive group-hover:opacity-100',
+            '[@media(hover:none)]:opacity-60',
+          )}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>

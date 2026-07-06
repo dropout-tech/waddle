@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { Drawer as Vaul } from 'vaul'
 import { CalendarDays, CalendarRange, Repeat } from 'lucide-react'
 
 export type RecurrenceChoice = 'only_this' | 'this_and_following' | 'all'
@@ -54,12 +56,100 @@ export function RecurrenceChoiceModal({
   actionLabel = '套用',
 }: RecurrenceChoiceModalProps) {
   const [choice, setChoice] = useState<RecurrenceChoice>(defaultChoice)
+  const isMobile = useIsMobile()
 
-  if (!isOpen) return null
+  if (!isOpen && !isMobile) return null
 
   const handleConfirm = () => {
     onConfirm(choice)
     onClose()
+  }
+
+  const optionList = (
+    <div className="px-3 pb-3 space-y-1.5">
+      {OPTIONS.map(({ value, label, hint, Icon }) => {
+        const active = choice === value
+        return (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setChoice(value)}
+            className={cn(
+              'w-full flex items-start gap-3 text-left px-3 py-3 rounded-xl border transition-all',
+              active
+                ? 'border-primary bg-primary/5'
+                : 'border-transparent hover:bg-secondary/50',
+            )}
+          >
+            <span
+              className={cn(
+                'mt-0.5 flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors',
+                active ? 'border-primary' : 'border-muted-foreground/40',
+              )}
+              aria-hidden
+            >
+              {active && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+            </span>
+            <Icon
+              className={cn(
+                'flex-shrink-0 w-4 h-4 mt-0.5',
+                active ? 'text-primary' : 'text-muted-foreground',
+              )}
+              aria-hidden
+            />
+            <span className="flex flex-col min-w-0">
+              <span className="text-sm font-medium text-foreground leading-snug">
+                {label}
+              </span>
+              <span className="text-xs text-muted-foreground leading-snug mt-0.5">
+                {hint}
+              </span>
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  if (isMobile) {
+    return (
+      <Vaul.Root open={isOpen} onOpenChange={(o) => { if (!o) onClose() }}>
+        <Vaul.Portal>
+          <Vaul.Overlay className="fixed inset-0 z-[60] bg-foreground/25 backdrop-blur-sm" />
+          <Vaul.Content
+            className="fixed inset-x-0 bottom-0 z-[60] flex max-h-[85dvh] flex-col rounded-t-2xl bg-card outline-none overflow-hidden"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
+            <Vaul.Title className="sr-only">{title}</Vaul.Title>
+            {/* Drag handle */}
+            <div className="mx-auto mt-2 mb-1 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
+
+            <header className="px-5 pt-3 pb-2">
+              <h2 className="text-base font-semibold text-foreground">{title}</h2>
+            </header>
+
+            {optionList}
+
+            <footer className="flex flex-col gap-2 px-4 pt-2 pb-4">
+              <button
+                type="button"
+                onClick={handleConfirm}
+                className="w-full h-12 rounded-xl text-sm font-semibold bg-primary text-primary-foreground active:brightness-95 transition-all"
+              >
+                {actionLabel}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full h-12 rounded-xl text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
+              >
+                取消
+              </button>
+            </footer>
+          </Vaul.Content>
+        </Vaul.Portal>
+      </Vaul.Root>
+    )
   }
 
   return (
@@ -78,49 +168,7 @@ export function RecurrenceChoiceModal({
           <h2 className="text-base font-semibold text-foreground">{title}</h2>
         </header>
 
-        <div className="px-3 pb-3 space-y-1.5">
-          {OPTIONS.map(({ value, label, hint, Icon }) => {
-            const active = choice === value
-            return (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setChoice(value)}
-                className={cn(
-                  'w-full flex items-start gap-3 text-left px-3 py-3 rounded-xl border transition-all',
-                  active
-                    ? 'border-primary bg-primary/5'
-                    : 'border-transparent hover:bg-secondary/50',
-                )}
-              >
-                <span
-                  className={cn(
-                    'mt-0.5 flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors',
-                    active ? 'border-primary' : 'border-muted-foreground/40',
-                  )}
-                  aria-hidden
-                >
-                  {active && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
-                </span>
-                <Icon
-                  className={cn(
-                    'flex-shrink-0 w-4 h-4 mt-0.5',
-                    active ? 'text-primary' : 'text-muted-foreground',
-                  )}
-                  aria-hidden
-                />
-                <span className="flex flex-col min-w-0">
-                  <span className="text-sm font-medium text-foreground leading-snug">
-                    {label}
-                  </span>
-                  <span className="text-xs text-muted-foreground leading-snug mt-0.5">
-                    {hint}
-                  </span>
-                </span>
-              </button>
-            )
-          })}
-        </div>
+        {optionList}
 
         <footer className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border bg-panel-secondary">
           <button

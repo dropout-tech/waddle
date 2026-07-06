@@ -17,6 +17,7 @@ import {
   taskOccursOnDate,
 } from '@/lib/calendar-utils'
 import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { CurrentTimeLine } from './current-time-line'
 import { TaskBlock, type TaskDragStart } from './task-block'
 import { SlotIcon } from './slot-icon'
@@ -89,11 +90,18 @@ export function WeekView({
   weekViewDays = 7,
 }: WeekViewProps) {
   const showCategoryPrefix = useShowCategoryPrefix()
+  const isMobile = useIsMobile()
+  // Mobile: measured width of the horizontal scroll container. Columns are
+  // sized so exactly three days fill the viewport — swipes land on aligned
+  // whole columns instead of arbitrary offsets.
+  const [mobileViewportWidth, setMobileViewportWidth] = useState(0)
   // Effective day-column width — scales inversely with weekViewDays so a
   // 5-day work-week shows wider columns (more breathing room) and a 7-day
   // full week stays at the legacy compact 120px baseline.
   const safeWeekDays = Math.max(5, Math.min(7, weekViewDays))
-  const DAY_WIDTH = Math.round(BASE_DAY_WIDTH * (7 / safeWeekDays))
+  const DAY_WIDTH = isMobile && mobileViewportWidth > 0
+    ? Math.floor((mobileViewportWidth - TIME_COL_WIDTH) / 3)
+    : Math.round(BASE_DAY_WIDTH * (7 / safeWeekDays))
   const EXTEND_THRESHOLD = DAY_WIDTH * 3
 
   // New-slot drag state
@@ -213,7 +221,24 @@ export function WeekView({
     setExtraAfter(0)
   }, [selectedDate])
 
-  // Recenter scroll on selectedDate change
+  // Mobile: keep the measured container width in sync (rotation, panel resize)
+  // so the 3-days-per-viewport column math stays exact.
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileViewportWidth(0)
+      return
+    }
+    const container = scrollContainerRef.current
+    if (!container) return
+    const measure = () => setMobileViewportWidth(container.clientWidth)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [isMobile])
+
+  // Recenter scroll on selectedDate change (and when DAY_WIDTH changes —
+  // mobile measurement landing or rotation shifts every column boundary).
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
@@ -226,7 +251,7 @@ export function WeekView({
 
     const t = window.setTimeout(() => { isScrolling.current = false }, 150)
     return () => window.clearTimeout(t)
-  }, [selectedDate])
+  }, [selectedDate, DAY_WIDTH])
 
   // After prepending days, shift scrollLeft so visual position is preserved
   useLayoutEffect(() => {
@@ -259,7 +284,7 @@ export function WeekView({
     } else if (scrollWidth - scrollLeft - clientWidth < EXTEND_THRESHOLD) {
       setExtraAfter(prev => prev + EXTEND_BATCH)
     }
-  }, [])
+  }, [DAY_WIDTH, EXTEND_THRESHOLD])
 
   const hours = useMemo(() => {
     const h = []

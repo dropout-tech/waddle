@@ -136,16 +136,21 @@ export function CalendarHeader({
         )}
       >
         {/* Left: Date Navigation */}
-        <div className={cn('flex items-center flex-1 min-w-0', isMobile ? 'gap-1' : 'gap-2')}>
+        <div className={cn('flex items-center flex-1 min-w-0 gap-2')}>
           {/* Prev / Next chevrons — restored 2026-05-07 because horizontal
               scroll is awkward on Windows trackpads / mice without a touch
               gesture. Click steps by the current view's natural unit
-              (day / week / month). */}
+              (day / week / month).
+              Mobile: visual icon stays 32px box, but the tap target grows
+              to 44px via an invisible ::before overlay (same trick as the
+              shadcn Button `icon` size) so it doesn't shove neighboring
+              elements around — disabled on md: so desktop mouse precision
+              is untouched. */}
           <button
             type="button"
             onClick={() => stepDate(-1)}
             aria-label={viewMode === 'day' ? '前一天' : viewMode === 'week' ? '前一週' : '前一個月'}
-            className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="relative flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:content-[''] before:absolute before:inset-0 before:-m-1.5 md:before:hidden"
           >
             <ChevronLeft className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -153,7 +158,7 @@ export function CalendarHeader({
             type="button"
             onClick={() => stepDate(1)}
             aria-label={viewMode === 'day' ? '後一天' : viewMode === 'week' ? '後一週' : '後一個月'}
-            className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="relative flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:content-[''] before:absolute before:inset-0 before:-m-1.5 md:before:hidden"
           >
             <ChevronRight className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -205,7 +210,9 @@ export function CalendarHeader({
                 aria-expanded={viewPickerOpen}
                 aria-label={`目前是${viewModeLabel}檢視，點擊更換`}
                 className={cn(
-                  'flex items-center gap-1 px-2.5 h-8 rounded-lg border border-border text-xs font-medium transition-colors',
+                  // Mobile-only button (desktop renders the segmented control
+                  // above instead) — h-11 keeps the tap target at the 44px floor.
+                  'flex items-center gap-1 px-2.5 h-11 rounded-lg border border-border text-xs font-medium transition-colors',
                   'hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   viewPickerOpen && 'bg-secondary'
                 )}
@@ -277,7 +284,7 @@ export function CalendarHeader({
                 onClick={() => setOverflowOpen(v => !v)}
                 aria-label="更多"
                 aria-expanded={overflowOpen}
-                className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex items-center justify-center w-11 h-11 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
               </button>

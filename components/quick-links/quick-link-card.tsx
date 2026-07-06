@@ -114,6 +114,11 @@ export function QuickLinkCard({ link, onEdit }: QuickLinkCardProps) {
           aria-label={`編輯 ${link.title}`}
           className={cn(
             'absolute top-1.5 right-1.5 flex items-center justify-center w-6 h-6 rounded-full',
+            // Touch devices get a >=44x44 hit box (visual disc stays w-6
+            // h-6 so it doesn't dominate the small card) — pointer is
+            // coarse there so there's no risk of stealing precise mouse
+            // clicks meant for the card underneath.
+            '[@media(hover:none)]:w-11 [@media(hover:none)]:h-11',
             'bg-card/95 backdrop-blur-sm border border-border shadow-sm text-muted-foreground',
             // Hover-revealed on desktop, semi-visible on touch where
             // hover is unreliable.
@@ -123,7 +128,7 @@ export function QuickLinkCard({ link, onEdit }: QuickLinkCardProps) {
             '[@media(hover:none)]:opacity-80',
           )}
         >
-          <Pencil className="w-3 h-3" />
+          <Pencil className="w-3 h-3 [@media(hover:none)]:w-3.5 [@media(hover:none)]:h-3.5" />
         </button>
       )}
     </div>
