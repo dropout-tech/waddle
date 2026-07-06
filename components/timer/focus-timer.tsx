@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  Play, Pause, Square, RotateCcw, Timer, Clock,
-  ChevronDown, ChevronUp, Settings2, Check, X,
+  Play, Pause, Timer, Clock,
+  ChevronDown, ChevronUp, Settings2,
   Coffee, Brain, Dumbbell, BookOpen, Volume2, VolumeX,
   Maximize2, Minimize2,
 } from 'lucide-react'
@@ -58,6 +58,10 @@ interface TimerPrefs {
   musicVolume: number
   // Stackable ambient overlays, each with its own enable + volume.
   ambient: Record<BgmAmbientId, AmbientPref>
+  // Where a desktop session opens: true = fill the viewport with the immersive
+  // focus screen ("放大"), false = corner mini pill. Mobile always opens
+  // immersive regardless. Remembered so the user's last choice sticks.
+  openInImmersive: boolean
 }
 
 const TIMER_PREFS_KEY = 'waddle-timer-prefs-v1'
@@ -75,6 +79,7 @@ const DEFAULT_PREFS: TimerPrefs = {
   music: null,
   musicVolume: 0.5,
   ambient: DEFAULT_AMBIENT,
+  openInImmersive: false,
 }
 const BREAK_COLOR = '#9bbfac' // sage — calmer than the focus oranges
 
@@ -103,6 +108,7 @@ function loadPrefs(): TimerPrefs {
       music: VALID_MUSIC_IDS.includes(parsed.music) ? parsed.music : null,
       musicVolume: typeof parsed.musicVolume === 'number' ? Math.max(0, Math.min(1, parsed.musicVolume)) : DEFAULT_PREFS.musicVolume,
       ambient: mergedAmbient,
+      openInImmersive: typeof parsed.openInImmersive === 'boolean' ? parsed.openInImmersive : DEFAULT_PREFS.openInImmersive,
     }
   } catch {
     return DEFAULT_PREFS
@@ -143,29 +149,6 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   // running a timer still auto-plays as before.
   const [bgmManualPlaying, setBgmManualPlaying] = useState(false)
 
-  // Browser native fullscreen on the whole app — entered from the setup
-  // card header so the user can hide chrome BEFORE starting a session.
-  // The immersive overlay (which kicks in when the timer starts) then
-  // lives inside an already-chromeless viewport. Mirroring the API event
-  // means Esc still works to leave and our icon stays in sync.
-  const [isAppFullscreen, setIsAppFullscreen] = useState(false)
-  const [appFullscreenSupported, setAppFullscreenSupported] = useState(false)
-  useEffect(() => {
-    if (typeof document === 'undefined') return
-    setAppFullscreenSupported(!!document.fullscreenEnabled)
-    const onChange = () => setIsAppFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', onChange)
-    return () => document.removeEventListener('fullscreenchange', onChange)
-  }, [])
-  const toggleAppFullscreen = () => {
-    if (typeof document === 'undefined') return
-    if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => {})
-    } else {
-      void document.documentElement.requestFullscreen().catch(() => {})
-    }
-  }
-  
   // Timer state
   const [timeLeft, setTimeLeft] = useState(25 * 60) // seconds for pomodoro
   const [elapsed, setElapsed] = useState(0) // seconds for stopwatch
@@ -315,12 +298,11 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
       setElapsed(0)
     }
 
-    // Pick the starting view. If the user enabled native browser fullscreen
-    // on the setup card they explicitly opted into a chromeless surface, so
-    // jump straight to immersive. Mobile also defaults to immersive — a
-    // corner pill on a phone leaves too little surface for the calendar to
-    // be useful anyway, and the immersive mode is genuinely better there.
-    setView(isAppFullscreen || isMobile ? 'immersive' : 'mini')
+    // Pick the starting view. "放大" (openInImmersive) means fill the viewport
+    // with the immersive focus screen; otherwise open as the corner mini pill.
+    // Mobile always goes immersive — a corner pill on a phone leaves too little
+    // surface for the calendar to be useful, and immersive is better there.
+    setView(prefs.openInImmersive || isMobile ? 'immersive' : 'mini')
 
     setState('running')
   }
@@ -606,7 +588,7 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
               "bg-card",
               mobileExpanded
                 ? "border-t border-border rounded-t-3xl shadow-2xl max-h-[88dvh] overflow-y-auto overscroll-contain pb-[max(env(safe-area-inset-bottom),0.5rem)]"
-                : "overflow-hidden border border-border rounded-2xl shadow-xl"
+                : "overflow-hidden border border-border rounded-3xl shadow-xl"
             )}
           >
             {/* Mobile sheet grab handle */}
@@ -615,47 +597,56 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                 <span className="block w-10 h-1 rounded-full bg-muted-foreground/30" />
               </div>
             )}
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
-              <div className="flex items-center gap-2">
-                <div className={cn(
-                  "w-2 h-2 rounded-full",
-                  state === 'running' ? "bg-success" :
-                  state === 'paused' ? "bg-urgency-medium" : "bg-muted-foreground"
-                )} />
-                <span className="text-sm font-medium">
-                  {state === 'idle'
-                    ? '專注計時'
-                    : session?.phase === 'break'
-                      ? state === 'running' ? '休息中' : '休息暫停'
-                      : state === 'running' ? '計時中' : '已暫停'}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                {appFullscreenSupported && (
-                  <button
-                    onClick={toggleAppFullscreen}
-                    aria-label={isAppFullscreen ? '退出全螢幕' : '進入全螢幕'}
-                    title={isAppFullscreen ? '退出全螢幕（或按 Esc）' : '進入全螢幕：藏掉瀏覽器工具列，開始計時後沉浸效果更完整'}
-                    className={cn(
-                      "p-1.5 rounded-lg transition-colors",
-                      isAppFullscreen ? "bg-primary/10 text-primary" : "hover:bg-secondary text-muted-foreground"
-                    )}
+            {/* Header — title + where-to-open toggle. The setup card is only
+                shown while idle, so the status copy is always 「專注」. */}
+            <div className="flex items-center justify-between px-5 pt-4 pb-1">
+              <span className="text-[15px] font-semibold tracking-tight text-foreground">專注</span>
+              <div className="flex items-center gap-1.5">
+                {/* 角落 ⟷ 全屏 — where this session opens. "放大" now means 全屏
+                    (fill the viewport with the immersive focus screen), not a
+                    browser-chrome fullscreen. Mobile always opens immersive, so
+                    the toggle is desktop-only. */}
+                {!isMobile && (
+                  <div
+                    role="group"
+                    aria-label="開啟方式"
+                    className="flex items-center gap-0.5 p-0.5 rounded-full bg-secondary/60"
                   >
-                    {isAppFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrefs((p) => ({ ...p, openInImmersive: false }))}
+                      aria-pressed={!prefs.openInImmersive}
+                      title="在角落以小視窗開始（日曆保持可見）"
+                      className={cn(
+                        "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                        !prefs.openInImmersive
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      <Minimize2 className="w-3.5 h-3.5" />
+                      角落
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrefs((p) => ({ ...p, openInImmersive: true }))}
+                      aria-pressed={prefs.openInImmersive}
+                      title="放大：開始時填滿整個畫面，進入沉浸專注"
+                      className={cn(
+                        "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                        prefs.openInImmersive
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      <Maximize2 className="w-3.5 h-3.5" />
+                      全屏
+                    </button>
+                  </div>
                 )}
                 <button
-                  onClick={() => setShowSettings(!showSettings)}
-                  className={cn(
-                    "p-1.5 rounded-lg transition-colors",
-                    showSettings ? "bg-primary/10 text-primary" : "hover:bg-secondary text-muted-foreground"
-                  )}
-                >
-                  <Settings2 className="w-4 h-4" />
-                </button>
-                <button
                   onClick={() => setIsExpanded(false)}
+                  aria-label="收合"
                   className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground"
                 >
                   <ChevronDown className="w-4 h-4" />
@@ -663,118 +654,169 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
               </div>
             </div>
 
-            {/* Settings Panel */}
-            {showSettings && state === 'idle' && (
-              <div className="px-4 py-3 border-b border-border bg-muted/20 space-y-3">
-                {/* Mode Toggle */}
-                <div className="flex gap-1 p-1 bg-secondary/50 rounded-lg">
+            {/* Tier 1 — essentials, always visible. Pick how long and what
+                you're focusing on; flow/sound/music live behind the 「更多」
+                summary row below the start button. */}
+            {state === 'idle' && (
+              <div className="px-5 pt-3 pb-1 space-y-4">
+                {/* Mode toggle */}
+                <div className="flex gap-1 p-1 bg-secondary/50 rounded-xl">
                   <button
                     onClick={() => setMode('pomodoro')}
                     className={cn(
-                      "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors",
-                      mode === 'pomodoro' ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"
+                      "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[13px] font-medium transition-colors",
+                      mode === 'pomodoro' ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    <Timer className="w-3.5 h-3.5" />
+                    <Timer className="w-4 h-4" />
                     番茄鐘
                   </button>
                   <button
                     onClick={() => setMode('stopwatch')}
                     className={cn(
-                      "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors",
-                      mode === 'stopwatch' ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"
+                      "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[13px] font-medium transition-colors",
+                      mode === 'stopwatch' ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    <Clock className="w-3.5 h-3.5" />
+                    <Clock className="w-4 h-4" />
                     正計時
                   </button>
                 </div>
 
-                {/* Pomodoro Presets */}
+                {/* Duration presets — big number-hero chips. Selected uses a
+                    soft tint of the preset color + a colored ring, never a loud
+                    full-saturation fill. */}
                 {mode === 'pomodoro' && (
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-1.5">
-                      {POMODORO_PRESETS.map((preset, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => {
-                            setSelectedPreset(idx)
-                            setUseCustom(false)
-                          }}
-                          className={cn(
-                            "px-2.5 py-1 rounded-lg text-xs font-medium transition-all",
-                            !useCustom && selectedPreset === idx
-                              ? "text-white"
-                              : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
-                          )}
-                          style={!useCustom && selectedPreset === idx ? { backgroundColor: preset.color } : {}}
-                        >
-                          {preset.minutes}分
-                        </button>
-                      ))}
-                    </div>
-                    
-                    {/* Custom Duration */}
-                    <div className="flex items-center gap-2">
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-3 gap-2">
+                      {POMODORO_PRESETS.map((preset, idx) => {
+                        const active = !useCustom && selectedPreset === idx
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => { setSelectedPreset(idx); setUseCustom(false) }}
+                            className={cn(
+                              "flex flex-col items-center justify-center gap-0.5 rounded-2xl border py-2.5 transition-all",
+                              active ? "shadow-sm" : "border-border/60 bg-secondary/30 hover:bg-secondary/60",
+                            )}
+                            style={active ? {
+                              backgroundColor: `color-mix(in oklch, ${preset.color} 16%, var(--card))`,
+                              borderColor: `color-mix(in oklch, ${preset.color} 55%, var(--border))`,
+                            } : undefined}
+                          >
+                            <span
+                              className="text-lg font-semibold tabular-nums leading-none"
+                              style={active ? { color: `color-mix(in oklch, ${preset.color} 72%, var(--foreground))` } : undefined}
+                            >
+                              {preset.minutes}
+                            </span>
+                            <span className={cn("text-[11px] leading-none", active ? "text-foreground/70" : "text-muted-foreground")}>
+                              {preset.label}
+                            </span>
+                          </button>
+                        )
+                      })}
+                      {/* 自訂 — same footprint as a preset chip */}
                       <button
                         onClick={() => setUseCustom(true)}
                         className={cn(
-                          "px-2.5 py-1 rounded-lg text-xs font-medium transition-colors",
-                          useCustom ? "bg-primary/10 text-primary" : "bg-secondary/50 text-muted-foreground"
+                          "flex flex-col items-center justify-center gap-0.5 rounded-2xl border py-2.5 transition-all",
+                          useCustom ? "shadow-sm bg-primary/10 border-primary/40" : "border-border/60 bg-secondary/30 hover:bg-secondary/60",
                         )}
                       >
-                        自訂
+                        <Settings2 className={cn("w-4 h-4", useCustom ? "text-primary" : "text-muted-foreground")} />
+                        <span className={cn("text-[11px] leading-none", useCustom ? "text-primary" : "text-muted-foreground")}>
+                          自訂
+                        </span>
                       </button>
-                      {useCustom && (
-                        <div className="flex items-center gap-1.5">
-                          <Input
-                            type="number"
-                            min={1}
-                            max={120}
-                            value={customMinutes}
-                            onChange={(e) => setCustomMinutes(parseInt(e.target.value) || 25)}
-                            className="w-16 h-7 text-xs text-center"
-                          />
-                          <span className="text-xs text-muted-foreground">分鐘</span>
-                        </div>
-                      )}
                     </div>
+                    {useCustom && (
+                      <div className="flex items-center justify-center gap-2 pt-0.5">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={120}
+                          value={customMinutes}
+                          onChange={(e) => setCustomMinutes(parseInt(e.target.value) || 25)}
+                          className="w-20 h-9 text-sm text-center"
+                        />
+                        <span className="text-sm text-muted-foreground">分鐘</span>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Focus Type (for stopwatch) */}
+                {/* Focus type (for stopwatch) — soft-tint selection */}
                 {mode === 'stopwatch' && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {FOCUS_TYPES.map((type) => (
-                      <button
-                        key={type.key}
-                        onClick={() => setFocusType(type)}
-                        className={cn(
-                          "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all",
-                          focusType.key === type.key
-                            ? "text-white"
-                            : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
-                        )}
-                        style={focusType.key === type.key ? { backgroundColor: type.color } : {}}
-                      >
-                        <type.icon className="w-3.5 h-3.5" />
-                        {type.label}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-2 gap-2">
+                    {FOCUS_TYPES.map((type) => {
+                      const active = focusType.key === type.key
+                      return (
+                        <button
+                          key={type.key}
+                          onClick={() => setFocusType(type)}
+                          className={cn(
+                            "flex items-center gap-2 px-3 py-2.5 rounded-2xl border text-[13px] font-medium transition-all",
+                            active ? "shadow-sm" : "border-border/60 bg-secondary/30 text-muted-foreground hover:bg-secondary/60",
+                          )}
+                          style={active ? {
+                            backgroundColor: `color-mix(in oklch, ${type.color} 16%, var(--card))`,
+                            borderColor: `color-mix(in oklch, ${type.color} 55%, var(--border))`,
+                            color: `color-mix(in oklch, ${type.color} 72%, var(--foreground))`,
+                          } : undefined}
+                        >
+                          <type.icon className="w-4 h-4" />
+                          {type.label}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
 
-                {/* Custom Label */}
+                {/* Intention — what are you focusing on? */}
                 <Input
-                  placeholder="自訂標籤（選填）"
+                  placeholder="在專注什麼？（選填）"
                   value={customLabel}
                   onChange={(e) => setCustomLabel(e.target.value)}
-                  className="h-8 text-xs"
+                  className="h-10 text-sm rounded-xl"
                 />
+              </div>
+            )}
 
+            {/* 更多 — one quiet summary row that opens the advanced panel
+                (break / sound / music). Replaces the old gear icon. */}
+            {state === 'idle' && (() => {
+              const allMissing = BGM_MUSIC.every((m) => unavailableSrcs.has(m.src))
+                && BGM_AMBIENT.every((a) => unavailableSrcs.has(a.src))
+              const { summary: bgmSummary } = summarizeBgm(prefs.music, prefs.ambient, { allMissing })
+              const detail = [
+                TIMER_SOUND_LABELS[prefs.sound],
+                bgmSummary,
+                mode === 'pomodoro' ? `休息 ${prefs.breakMinutes} 分` : null,
+              ].filter(Boolean).join(' · ')
+              return (
+                <div className="px-5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowSettings((v) => !v)}
+                    aria-expanded={showSettings}
+                    className="w-full flex items-center gap-2 py-2.5 px-1 -mx-1 rounded-lg hover:bg-secondary/40 transition-colors text-left"
+                  >
+                    <Settings2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-xs font-medium text-muted-foreground shrink-0">更多</span>
+                    <span className="text-[11px] text-foreground/55 truncate flex-1 min-w-0">{detail}</span>
+                    <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform shrink-0", showSettings && "rotate-180")} />
+                  </button>
+                </div>
+              )
+            })()}
+
+            {/* Advanced panel — break / sound / music. Behind the 更多 row. */}
+            {showSettings && state === 'idle' && (
+              <div className="px-5 pb-2 space-y-4 border-t border-border/50 pt-3">
                 {/* Pomodoro flow settings — break length, auto-start, sound */}
                 {mode === 'pomodoro' && (
-                  <div className="space-y-2 pt-2 border-t border-border/60">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <label className="text-[11px] text-muted-foreground" htmlFor="timer-break-mins">
                         休息時長（分）
@@ -1071,122 +1113,30 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
               </div>
             )}
 
-            {/* Timer Display */}
-            <div className="px-4 py-6 flex flex-col items-center">
-              {/* Progress Ring (for pomodoro) */}
-              {mode === 'pomodoro' && state !== 'idle' && (
-                <div className="relative mb-2">
-                  <svg className="w-32 h-32 -rotate-90">
-                    <circle
-                      cx="64"
-                      cy="64"
-                      r="56"
-                      className="fill-none stroke-secondary"
-                      strokeWidth="8"
-                    />
-                    <circle
-                      cx="64"
-                      cy="64"
-                      r="56"
-                      className="fill-none transition-all duration-1000"
-                      stroke={session?.color || '#e07b5a'}
-                      strokeWidth="8"
-                      strokeLinecap="round"
-                      strokeDasharray={`${2 * Math.PI * 56}`}
-                      strokeDashoffset={`${2 * Math.PI * 56 * (1 - progress / 100)}`}
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-3xl font-mono font-bold tabular-nums">
-                      {formatTime(displayTime)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Simple Display (for stopwatch or idle pomodoro) */}
-              {(mode === 'stopwatch' || state === 'idle') && (
-                <div className="text-center mb-4">
-                  <span className="text-4xl font-mono font-bold tabular-nums">
-                    {formatTime(displayTime)}
-                  </span>
-                  {session && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {session.label}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Session Info */}
-              {state !== 'idle' && session && (
-                <p className="text-xs text-muted-foreground mb-3">
-                  開始於 {formatTimeHHMM(session.startedAt)}
-                </p>
-              )}
-
-              {/* Controls */}
-              <div className="flex items-center gap-2">
-                {state === 'idle' ? (
-                  <Button
-                    onClick={startTimer}
-                    className="gap-2"
-                    style={{ backgroundColor: mode === 'pomodoro' 
-                      ? (useCustom ? focusType.color : POMODORO_PRESETS[selectedPreset].color)
-                      : focusType.color 
-                    }}
-                  >
-                    <Play className="w-4 h-4" />
-                    開始專注
-                  </Button>
-                ) : (
-                  <>
-                    {state === 'running' ? (
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        onClick={pauseTimer}
-                      >
-                        <Pause className="w-4 h-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        size="icon"
-                        onClick={resumeTimer}
-                        style={{ backgroundColor: session?.color }}
-                      >
-                        <Play className="w-4 h-4" />
-                      </Button>
-                    )}
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      onClick={() => stopTimer(false)}
-                      title="停止並儲存"
-                    >
-                      <Square className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={resetTimer}
-                      title="重置"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </Button>
-                  </>
-                )}
+            {/* Duration preview + start. The setup card only renders while
+                idle, so this is always the pre-session state: a quiet preview
+                of the chosen length, then the primary 開始專注 action. */}
+            <div className="px-5 pt-2 pb-5">
+              <div className="text-center mb-3">
+                <span className="font-mono font-semibold tabular-nums text-foreground/40 text-3xl tracking-tight">
+                  {formatTime(displayTime)}
+                </span>
               </div>
+              <Button
+                onClick={startTimer}
+                className="w-full h-12 gap-2 rounded-2xl text-[15px] font-semibold text-white shadow-sm transition-opacity hover:opacity-95"
+                style={{ backgroundColor: mode === 'pomodoro'
+                  ? (useCustom ? focusType.color : POMODORO_PRESETS[selectedPreset].color)
+                  : focusType.color
+                }}
+              >
+                <Play className="w-4 h-4" />
+                開始專注
+              </Button>
+              <p className="text-[11px] text-muted-foreground/70 text-center mt-2.5">
+                結束後會自動記錄到今天的日曆
+              </p>
             </div>
-
-            {/* Footer Hint */}
-            {state !== 'idle' && (
-              <div className="px-4 py-2 border-t border-border bg-muted/20">
-                <p className="text-[10px] text-muted-foreground text-center">
-                  結束後會自動記錄到今天的日曆
-                </p>
-              </div>
-            )}
           </div>
         ) : (
           /* Collapsed Button */

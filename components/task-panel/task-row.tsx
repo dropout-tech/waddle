@@ -212,8 +212,8 @@ function TaskRowImpl({
           onPointerDown={handleMouseDown}
           onClick={handleRowClick}
           className={cn(
-            'flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-all duration-150 rounded-md select-none',
-            'hover:brightness-[0.96]',
+            'flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-all duration-150 ease-out rounded-md select-none',
+            'hover:brightness-[0.97] hover:translate-x-0.5 hover:shadow-sm hover:shadow-black/[0.06] active:translate-x-0',
             isDragging && 'opacity-50',
             externalDragActive && 'opacity-40',
             task.isCompleted && 'opacity-50'
@@ -331,8 +331,8 @@ function TaskRowImpl({
       <div
         data-tour="task-row"
         className={cn(
-          'group relative flex items-start gap-3 px-3.5 py-3 rounded-xl transition-all duration-200 cursor-pointer select-none',
-          'border hover:brightness-[0.97]',
+          'group relative flex items-start gap-3 px-3.5 py-3 rounded-xl transition-all duration-200 ease-out cursor-pointer select-none',
+          'border hover:brightness-[0.98] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/[0.07] active:translate-y-0 active:scale-[0.995]',
           isDragging && 'opacity-50 scale-[0.98]',
           externalDragActive && 'opacity-40',
           task.isCompleted && 'opacity-55'
@@ -366,7 +366,7 @@ function TaskRowImpl({
             role="checkbox"
           >
             <span
-              className="block w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-all"
+              className="block w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center transition-all group-hover:scale-110"
               style={{
                 backgroundColor: task.isCompleted ? colors.accentColor : 'transparent',
                 borderColor: task.isCompleted ? colors.accentColor : `color-mix(in oklch, ${colors.accentColor} 50%, transparent)`,

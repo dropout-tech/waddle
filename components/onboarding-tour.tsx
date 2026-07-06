@@ -95,6 +95,13 @@ const DESKTOP_STEPS: TourStep[] = [
     padding: 6,
   },
   {
+    target: '[data-tour="notebook-entry"]',
+    title: '記事本',
+    body: 'Notion 式的長文筆記空間（粗體 / 標題 / 待辦 / toggle / 子彈列表），跟每天的白板分開存。就在「日記」旁邊，想寫長一點的東西點這裡。',
+    placement: 'bottom',
+    padding: 6,
+  },
+  {
     target: '[data-tour="scratchpad"]',
     title: '專注白板',
     body: '工作中冒出靈感？拉開白板丟文字、貼圖、連結，事後還能隨手編輯。每天分開存。',
@@ -126,7 +133,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="user-menu"]',
     title: '右上角：使用者選單',
-    body: '點開有「**記事本**」——Notion 式的長文筆記空間（粗體 / 標題 / 待辦 / toggle / 子彈列表），跟每天的白板分開存。登出也在這。設定、日記、報告等功能散落在介面上，慢慢探索。',
+    body: '點開有你的帳號資訊與登出。設定、日記、報告等功能散落在介面上，慢慢探索。',
     placement: 'bottom',
     padding: 4,
   },
@@ -178,7 +185,7 @@ const MOBILE_STEPS: TourStep[] = [
   },
   {
     title: '✨ 底部四分頁',
-    body: '任務 / 白板 / 日曆 / 連結。中間「白板」隨時記點子；最右邊「連結」放你常開的網址（Notion、Gmail 等等），點一下開新分頁。想寫長一點的筆記？右上角頭像選單裡有「**記事本**」（Notion 式排版）。',
+    body: '任務 / 白板 / 日曆 / 連結。中間「白板」隨時記點子；最右邊「連結」放你常開的網址（Notion、Gmail 等等），點一下開新分頁。想寫長一點的筆記？日曆頁右上角「⋯」選單裡有「**記事本**」（Notion 式排版）。',
   },
   {
     target: '[data-tour="focus-timer"]',

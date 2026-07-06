@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Pause, Play, X, Check, ChevronUp, ChevronDown, Music2, Maximize2, Minimize2, Minimize } from 'lucide-react'
+import { Pause, Play, X, ChevronUp, ChevronDown, Music2, Maximize2, Minimize2, Minimize } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   BGM_MUSIC, BGM_AMBIENT, summarizeBgm,
@@ -202,13 +202,29 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
       : null,
     [startedAt, targetSeconds],
   )
-  // Warm-shift the ring color in the final minute so the user gets a soft
-  // visual cue without a startling color change. Using oklch directly so
-  // the shift is consistent across all session colors (terracotta, sage, etc).
+
+  // The warmth journey — the signature move. As a focus session progresses,
+  // the whole screen drifts from the calm session color toward a warm amber,
+  // so time passing is something you *feel*, not just read. Only for pomodoro
+  // work: a stopwatch has no endpoint to warm toward, and a break should stay
+  // calm. WARM_ANCHOR stays inside the warm OKLCH band (hue ~48), so the drift
+  // never crosses into cold blue, honoring DESIGN.md's palette.
+  const WARM_ANCHOR = 'oklch(0.72 0.16 48)'
+  const warmth = !isBreak && targetSeconds > 0 && state !== 'idle'
+    ? Math.max(0, Math.min(1, progress / 100))
+    : 0
+  // The last minute gets an extra nudge so short timers still feel the arrival.
   const isFinalMinute = remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 60
   const ringStrokeActive = isFinalMinute
-    ? `color-mix(in oklch, ${color} 60%, oklch(0.7 0.18 30))`
-    : color
+    ? `color-mix(in oklch, ${color} 42%, oklch(0.7 0.18 38))`
+    : warmth > 0
+      ? `color-mix(in oklch, ${color} ${Math.round(100 - warmth * 45)}%, ${WARM_ANCHOR})`
+      : color
+  // Background base drifts warmer + slightly more saturated as warmth rises.
+  const sessionTone = `color-mix(in oklch, ${color} ${16 + warmth * 12}%, var(--background))`
+  const bgColor = warmth > 0
+    ? `color-mix(in oklch, ${sessionTone} ${Math.round(100 - warmth * 26)}%, ${WARM_ANCHOR})`
+    : sessionTone
 
   const ringRadius = 130
   const ringCirc = 2 * Math.PI * ringRadius
@@ -243,7 +259,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
         'transition-colors duration-700 ease-out',
       )}
       style={{
-        backgroundColor: `color-mix(in oklch, ${color} 16%, var(--background))`,
+        backgroundColor: bgColor,
       }}
       onPointerDown={resetDim}
       onTouchMove={resetDim}
@@ -268,6 +284,21 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
         @keyframes waddle-completion-in {
           from { opacity: 0; transform: scale(0.92); }
           to { opacity: 1; transform: scale(1); }
+        }
+        /* Completion: the penguin does a small celebratory waddle (a gentle
+           rock, not a bounce) and a warm halo blooms outward once. */
+        @keyframes waddle-celebrate-penguin {
+          0%   { transform: rotate(0deg) translateY(8px); }
+          16%  { transform: rotate(0deg) translateY(0); }
+          38%  { transform: rotate(-5deg); }
+          60%  { transform: rotate(5deg); }
+          80%  { transform: rotate(-3.5deg); }
+          100% { transform: rotate(0deg); }
+        }
+        @keyframes waddle-celebrate-bloom {
+          0%   { transform: scale(0.6); opacity: 0; }
+          40%  { opacity: 0.85; }
+          100% { transform: scale(1.18); opacity: 0; }
         }
         @keyframes waddle-chip-in {
           from { opacity: 0; transform: translateY(-6px); }
@@ -307,17 +338,21 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
           .waddle-ring-pulse { animation: none !important; }
           .waddle-particle { animation: none !important; opacity: 0 !important; }
           .waddle-breath-scale-target { animation: none !important; transform: scale(1) !important; }
+          .waddle-celebrate-penguin { animation: none !important; }
+          .waddle-celebrate-bloom { animation: none !important; opacity: 0 !important; }
         }
       `}</style>
 
-      {/* Breathing radial gradient. */}
+      {/* Breathing aurora. Larger + slower than a plain glow, and its core
+          picks up the warmth journey so the bloom warms alongside the ring. */}
       <div
         aria-hidden="true"
         className="waddle-breathe-bg pointer-events-none absolute inset-0"
         style={{
-          background: `radial-gradient(circle at 50% 42%, color-mix(in oklch, ${color} 22%, transparent) 0%, color-mix(in oklch, ${color} 8%, transparent) 38%, transparent 72%)`,
+          background: `radial-gradient(circle at 50% 40%, color-mix(in oklch, ${ringStrokeActive} ${26 + warmth * 16}%, transparent) 0%, color-mix(in oklch, ${color} 10%, transparent) 46%, transparent 80%)`,
           animation: state === 'running' ? 'waddle-breathe 8s ease-in-out infinite' : 'none',
           opacity: state === 'running' ? undefined : 0.55,
+          transition: 'background 900ms ease-out',
         }}
       />
 
@@ -490,7 +525,15 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
               strokeLinecap="round"
               strokeDasharray={ringCirc}
               strokeDashoffset={ringCirc * (1 - Math.min(progress, 100) / 100)}
-              style={{ transition: 'stroke-dashoffset 1000ms linear, stroke 700ms ease-out' }}
+              style={{
+                transition: 'stroke-dashoffset 1000ms linear, stroke 700ms ease-out, filter 900ms ease-out',
+                // Soft outer bloom on the progress arc that intensifies as the
+                // session warms. Paused freezes the glow off so the ring reads
+                // as "held". filter-only, so it never triggers layout.
+                filter: state === 'running'
+                  ? `drop-shadow(0 0 ${Math.round(5 + warmth * 11)}px color-mix(in oklch, ${ringStrokeActive} ${Math.round(45 + warmth * 25)}%, transparent))`
+                  : undefined,
+              }}
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -498,11 +541,17 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
             <span
               className="font-mono font-medium tabular-nums"
               style={{
-                fontSize: timeText.length > 5 ? '4rem' : '5rem',
+                fontSize: timeText.length > 5 ? '4.25rem' : '5.75rem',
                 lineHeight: 1,
                 letterSpacing: '-0.05em',
-                color: state === 'paused' ? 'var(--muted-foreground)' : 'var(--foreground)',
-                transition: 'color 400ms ease-out',
+                color: state === 'paused'
+                  ? 'var(--muted-foreground)'
+                  // Digits hold foreground for contrast, warming only a touch
+                  // in the final stretch so the arrival feels earned.
+                  : warmth > 0.85
+                    ? `color-mix(in oklch, var(--foreground) ${Math.round(100 - (warmth - 0.85) * 200)}%, ${WARM_ANCHOR})`
+                    : 'var(--foreground)',
+                transition: 'color 700ms ease-out',
               }}
             >
               {timeText}
@@ -590,11 +639,43 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
             animation: 'waddle-completion-in 500ms cubic-bezier(0.22, 1, 0.36, 1)',
           }}
         >
-          <div
-            className="h-24 w-24 rounded-full grid place-items-center mb-6 shadow-xl"
-            style={{ backgroundColor: color }}
-          >
-            <Check className="w-12 h-12 text-white" strokeWidth={2.5} />
+          {/* A warm halo blooms outward once, behind a penguin that does a
+              small celebratory waddle. On-brand reward, no confetti. */}
+          <div className="relative mb-7 grid place-items-center">
+            <span
+              aria-hidden
+              className="waddle-celebrate-bloom pointer-events-none absolute rounded-full"
+              style={{
+                width: 240, height: 240,
+                background: `radial-gradient(circle, color-mix(in oklch, ${WARM_ANCHOR} 48%, transparent) 0%, transparent 66%)`,
+                animation: 'waddle-celebrate-bloom 1.6s ease-out both',
+              }}
+            />
+            <div
+              className="waddle-celebrate-penguin relative"
+              style={{ animation: 'waddle-celebrate-penguin 1.9s cubic-bezier(0.22, 1, 0.36, 1) both', transformOrigin: '50% 90%' }}
+            >
+              <svg viewBox="-30 -45 60 86" className="w-24 h-auto">
+                {/* Body */}
+                <path
+                  d="M 0 -30 C -3 -42, -18 -42, -22 -30 C -28 -20, -28 0, -22 18 C -18 26, -10 30, 0 30 C 10 30, 18 26, 22 18 C 28 0, 28 -20, 22 -30 C 18 -42, 3 -42, 0 -30 Z"
+                  fill={`color-mix(in oklch, ${color} 68%, var(--foreground))`}
+                />
+                {/* Belly */}
+                <path
+                  d="M -10 -8 C -12 0, -12 14, -8 22 C -4 26, 4 26, 8 22 C 12 14, 12 0, 10 -8 C 6 -12, -6 -12, -10 -8 Z"
+                  fill="var(--card)"
+                />
+                {/* Eyes */}
+                <circle cx="-6" cy="-15" r="1.7" fill="var(--foreground)" />
+                <circle cx="6" cy="-15" r="1.7" fill="var(--foreground)" />
+                {/* Beak */}
+                <path d="M -3 -10 L 3 -10 L 0 -6 Z" fill="oklch(0.78 0.16 60)" />
+                {/* Feet */}
+                <ellipse cx="-7" cy="32" rx="4.5" ry="2" fill="oklch(0.78 0.16 60)" />
+                <ellipse cx="7" cy="32" rx="4.5" ry="2" fill="oklch(0.78 0.16 60)" />
+              </svg>
+            </div>
           </div>
           <h2 className="text-2xl font-semibold text-foreground tracking-tight">辛苦了</h2>
           <p className="text-sm text-muted-foreground mt-2">慢慢搖擺，喝口水吧</p>

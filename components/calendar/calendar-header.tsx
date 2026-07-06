@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, BarChart3, Settings, Sparkles, MoreHorizontal, Download } from 'lucide-react'
+import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, NotebookPen, BarChart3, Settings, Sparkles, MoreHorizontal, Download } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { UndoRedoButtons } from '@/components/undo-redo-buttons'
 import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -59,6 +60,7 @@ export function CalendarHeader({
   leftPanelOpen = true,
 }: CalendarHeaderProps) {
   const isMobile = useIsMobile()
+  const router = useRouter()
   const [overflowOpen, setOverflowOpen] = useState(false)
   const overflowRef = useRef<HTMLDivElement>(null)
   // Independent view-mode picker on mobile: tap a single button to pick 日 / 週 / 月.
@@ -267,8 +269,8 @@ export function CalendarHeader({
           {/* Inline UserMenu on mobile (replaces the floating one) */}
           {isMobile && <UserMenu className="relative" />}
 
-          {/* Mobile-only overflow menu: 日記 / 報告 / 設定 */}
-          {isMobile && (onOpenJournal || onOpenReport || onOpenSettings || onOpenExport) && (
+          {/* Mobile-only overflow menu: 記事本 / 日記 / 報告 / 匯出 / 設定 */}
+          {isMobile && (
             <div className="relative" ref={overflowRef}>
               <button
                 type="button"
@@ -281,6 +283,14 @@ export function CalendarHeader({
               </button>
               {overflowOpen && (
                 <div className="absolute right-0 top-full mt-1 w-44 max-w-[calc(100vw-1.5rem)] bg-card border border-border rounded-xl shadow-lg overflow-hidden z-[60]" role="menu">
+                  <button
+                    data-tour="notebook-entry"
+                    onClick={() => { setOverflowOpen(false); router.push('/notebook') }}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                  >
+                    <NotebookPen className="w-4 h-4" />
+                    <span>記事本</span>
+                  </button>
                   {onOpenJournal && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenJournal() }}
@@ -374,6 +384,15 @@ export function CalendarHeader({
         {/* Right: Undo/Redo / Journal / Report / Settings */}
         <div className="flex items-center gap-1">
           <UndoRedoButtons className="mr-1" />
+          <button
+            type="button"
+            data-tour="notebook-entry"
+            onClick={() => router.push('/notebook')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <NotebookPen className="w-3.5 h-3.5" aria-hidden="true" />
+            記事本
+          </button>
           {onOpenJournal && (
             <button
               type="button"

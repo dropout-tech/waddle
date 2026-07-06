@@ -214,6 +214,14 @@ export function useWaddleData(): UseWaddleData {
   // unsaved-yet state. Decrement happens in `finally` so a failed write
   // still releases the lock.
   const pendingWritesRef = useRef(0)
+  // Monotonic counter bumped on every local mutation (alongside
+  // pendingWritesRef++). Unlike pendingWritesRef — which drops back to 0 the
+  // instant a write resolves — this only ever grows, so a refetch can detect a
+  // mutation that *started and finished* while its DB read was in flight. That
+  // refetch's snapshot predates the mutation; committing it would bounce e.g. a
+  // freshly-checked task back to unchecked. loadData captures this at entry and
+  // bails before setWorkspaces if it changed. See the guard in loadData.
+  const mutationSeqRef = useRef(0)
 
   // Mirrors `workspaces` so mutation callbacks can read the current task
   // tree without listing `workspaces` in their dependency arrays — which
@@ -227,7 +235,14 @@ export function useWaddleData(): UseWaddleData {
   const loadData = useCallback(
     async ({ initial = false }: { initial?: boolean } = {}) => {
       const myVersion = ++loadVersionRef.current
-      const isStale = () => myVersion !== loadVersionRef.current
+      // Snapshot the mutation counter at entry. If a local write fires while
+      // this load's DB reads are in flight, the rows we fetched predate it —
+      // committing them would clobber the optimistic update (e.g. a just-checked
+      // task snapping back to unchecked). We bail before setWorkspaces below.
+      const mutationsAtStart = mutationSeqRef.current
+      const isStale = () =>
+        myVersion !== loadVersionRef.current ||
+        (!initial && mutationSeqRef.current !== mutationsAtStart)
 
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
@@ -603,7 +618,7 @@ export function useWaddleData(): UseWaddleData {
       },
     ])
 
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { error: e1 } = await supabase.from('workspaces').insert({
         id: wsId, user_id: userId, name, color, icon, sort_order: workspaces.length,
@@ -650,7 +665,7 @@ export function useWaddleData(): UseWaddleData {
     if (updates.color !== undefined) dbUpdates.color = updates.color
     if (updates.icon !== undefined) dbUpdates.icon = updates.icon
 
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { error } = await supabase.from('workspaces').update(dbUpdates).eq('id', workspaceId)
       if (error) return handleDbError('更新工作區')(error)
@@ -676,7 +691,7 @@ export function useWaddleData(): UseWaddleData {
     setWorkspaces((prev) =>
       prev.map((w) => (w.id === workspaceId ? { ...w, isArchived: true } : w))
     )
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { error } = await supabase
         .from('workspaces')
@@ -690,7 +705,7 @@ export function useWaddleData(): UseWaddleData {
 
   const deleteWorkspace = useCallback(async (workspaceId: string) => {
     setWorkspaces((prev) => prev.filter((w) => w.id !== workspaceId))
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { error } = await supabase.from('workspaces').delete().eq('id', workspaceId)
       if (error) handleDbError('刪除工作區')(error)
@@ -725,7 +740,7 @@ export function useWaddleData(): UseWaddleData {
       })
     )
 
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { error } = await supabase.from('categories').insert({
         id, user_id: userId, workspace_id: workspaceId, name, sort_order: sortOrder,
@@ -743,7 +758,7 @@ export function useWaddleData(): UseWaddleData {
         categories: w.categories.filter((c) => c.id !== categoryId),
       }))
     )
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       // Tasks in this category cascade-delete via the FK in the schema.
       const { error } = await supabase.from('categories').delete().eq('id', categoryId)
@@ -782,7 +797,7 @@ export function useWaddleData(): UseWaddleData {
       })
     )
 
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const updates = orderedCategoryIds.map((id, idx) =>
         supabase.from('categories').update({ sort_order: idx }).eq('id', id)
@@ -821,7 +836,7 @@ export function useWaddleData(): UseWaddleData {
       }))
     )
 
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { error } = await supabase
         .from('categories')
@@ -871,7 +886,7 @@ export function useWaddleData(): UseWaddleData {
 
     if (!workspaceId) return // category not found
 
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { error } = await supabase.from('tasks').insert({
         id, user_id: userId, workspace_id: workspaceId, category_id: categoryId,
@@ -919,7 +934,7 @@ export function useWaddleData(): UseWaddleData {
       }
       return base
     }
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       let { error } = await supabase
         .from('tasks')
@@ -1023,7 +1038,7 @@ export function useWaddleData(): UseWaddleData {
 
       const dbUpdates = taskToRow(updates)
 
-      pendingWritesRef.current += 1
+      pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
         if (isMove && newCategoryId) {
           dbUpdates.category_id = newCategoryId
@@ -1087,7 +1102,7 @@ export function useWaddleData(): UseWaddleData {
             tasks: c.tasks.map((t) => t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t)
           }))
         })))
-        pendingWritesRef.current += 1
+        pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
           const dbUpdates = taskToRow(updates)
           const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', taskId)
@@ -1130,7 +1145,7 @@ export function useWaddleData(): UseWaddleData {
           })
         })))
 
-        pendingWritesRef.current += 1
+        pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
           await supabase.from('tasks').update({ exdates: nextExdates }).eq('id', taskId)
           const userId = requireUserId()
@@ -1177,7 +1192,7 @@ export function useWaddleData(): UseWaddleData {
         })
       })))
 
-      pendingWritesRef.current += 1
+      pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
         const userId = requireUserId()
         await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
@@ -1234,7 +1249,7 @@ export function useWaddleData(): UseWaddleData {
     // toggle. Without this guard, a refetch that lands between the local
     // setWorkspaces above and the DB write below replays the pre-toggle row
     // and the checkbox visibly bounces back to its old state.
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       // Use .select() so PostgREST returns the affected rows. If RLS silently
       // blocks the update (auth.uid() mismatch / expired JWT) PostgREST returns
@@ -1340,7 +1355,7 @@ export function useWaddleData(): UseWaddleData {
           })),
         }))
       )
-      pendingWritesRef.current += 1
+      pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
         const { error } = await supabase.from('tasks').delete().eq('id', taskId)
         if (error) handleDbError('刪除任務')(error)
@@ -1412,7 +1427,7 @@ export function useWaddleData(): UseWaddleData {
             })),
           }))
         )
-        pendingWritesRef.current += 1
+        pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
           const { error } = await supabase.from('tasks').delete().eq('id', taskId)
           if (error) handleDbError('刪除任務')(error)
@@ -1434,7 +1449,7 @@ export function useWaddleData(): UseWaddleData {
             })),
           }))
         )
-        pendingWritesRef.current += 1
+        pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
           const { error } = await supabase
             .from('tasks')
@@ -1462,7 +1477,7 @@ export function useWaddleData(): UseWaddleData {
             })),
           }))
         )
-        pendingWritesRef.current += 1
+        pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
           const { error } = await supabase.from('tasks').delete().eq('id', taskId)
           if (error) handleDbError('刪除任務')(error)
@@ -1491,7 +1506,7 @@ export function useWaddleData(): UseWaddleData {
         }))
       )
 
-      pendingWritesRef.current += 1
+      pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
         const { error } = await supabase
           .from('tasks')
@@ -1557,7 +1572,7 @@ export function useWaddleData(): UseWaddleData {
       }
       if (date) update.scheduled_date = date
 
-      pendingWritesRef.current += 1
+      pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
         // .select() so PostgREST returns the rows the UPDATE touched. If RLS
         // or a stale session silently filters the row out, error stays null
@@ -1635,7 +1650,7 @@ export function useWaddleData(): UseWaddleData {
             })),
           }))
         )
-        pendingWritesRef.current += 1
+        pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
           const { error } = await supabase
             .from('tasks')
@@ -1688,7 +1703,7 @@ export function useWaddleData(): UseWaddleData {
           }))
         )
 
-        pendingWritesRef.current += 1
+        pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
           const { error: updateError } = await supabase
             .from('tasks')
@@ -1750,7 +1765,7 @@ export function useWaddleData(): UseWaddleData {
         }))
       )
 
-      pendingWritesRef.current += 1
+      pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
         const userId = requireUserId()
         await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
@@ -1811,7 +1826,7 @@ export function useWaddleData(): UseWaddleData {
         scheduled_date: date ?? null,
       }
 
-      pendingWritesRef.current += 1
+      pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
         const { data, error } = await supabase
           .from('tasks')
@@ -1864,7 +1879,7 @@ export function useWaddleData(): UseWaddleData {
             })),
           }))
         )
-        pendingWritesRef.current += 1
+        pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
           await supabase
             .from('tasks')
@@ -1911,7 +1926,7 @@ export function useWaddleData(): UseWaddleData {
             }),
           }))
         )
-        pendingWritesRef.current += 1
+        pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
           await supabase.from('tasks').update({ exdates: nextExdates }).eq('id', taskId)
           const userId = requireUserId()
@@ -1959,7 +1974,7 @@ export function useWaddleData(): UseWaddleData {
         }))
       )
 
-      pendingWritesRef.current += 1
+      pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
         const userId = requireUserId()
         await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
@@ -1983,7 +1998,7 @@ export function useWaddleData(): UseWaddleData {
 
     setTimeBlocks((prev) => [...prev, newBlock])
 
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const row = timeBlockToRow(newBlock)
       // .select() so PostgREST returns the inserted row; 0 rows here means
@@ -2028,7 +2043,7 @@ export function useWaddleData(): UseWaddleData {
       return prev.map((b) => (b.id === id ? { ...b, ...updates } : b))
     })
 
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { data, error } = await supabase
         .from('time_blocks')
@@ -2075,7 +2090,7 @@ export function useWaddleData(): UseWaddleData {
       return prev.filter((b) => b.id !== id)
     })
 
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { data, error } = await supabase
         .from('time_blocks')
@@ -2119,7 +2134,7 @@ export function useWaddleData(): UseWaddleData {
     const userId = requireUserId()
     setSettings(newSettings)
     setTimeBlocks(newTimeBlocks)
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
 
     // Settings rows we attempt with all fields. If the migration-0006
@@ -2310,7 +2325,7 @@ export function useWaddleData(): UseWaddleData {
       }
     }
 
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       // Upsert (not update) — the row is normally created by the
       // `handle_new_user` trigger, but defensively upserting means a
@@ -2349,7 +2364,7 @@ export function useWaddleData(): UseWaddleData {
       placed = { ...item, sortOrder: nextOrder }
       return { ...prev, [date]: [...existing, placed] }
     })
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { error } = await supabase.from('scratchpad_items').insert({
         id: placed.id,
@@ -2392,7 +2407,7 @@ export function useWaddleData(): UseWaddleData {
       }
       return next
     })
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { error } = await supabase.from('scratchpad_items').delete().eq('id', id)
       if (error) {
@@ -2435,7 +2450,7 @@ export function useWaddleData(): UseWaddleData {
         return next
       })
       if (!editedDate || !previous) return
-      pendingWritesRef.current += 1
+      pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
         const dbPatch: any = {}
         if (patch.content !== undefined) dbPatch.content = patch.content
@@ -2476,7 +2491,7 @@ export function useWaddleData(): UseWaddleData {
       return { ...prev, [date]: items }
     })
 
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       // Persist the whole reordered set in ONE upsert. A single statement avoids
       // the partial-failure window of N parallel UPDATEs (some rows commit, others
@@ -2513,7 +2528,7 @@ export function useWaddleData(): UseWaddleData {
       delete next[date]
       return next
     })
-    pendingWritesRef.current += 1
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { error } = await supabase
         .from('scratchpad_items')
