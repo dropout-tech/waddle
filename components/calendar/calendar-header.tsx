@@ -221,7 +221,7 @@ export function CalendarHeader({
                 <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', viewPickerOpen && 'rotate-180')} />
               </button>
               {viewPickerOpen && (
-                <div className="absolute left-0 top-full mt-1 w-32 max-w-[calc(100vw-1.5rem)] bg-card border border-border rounded-xl shadow-lg overflow-hidden z-[60]" role="menu">
+                <div className="absolute left-0 top-full mt-1 w-32 max-w-[calc(100vw-1.5rem)] bg-card border border-border rounded-xl shadow-lg overflow-hidden z-popover" role="menu">
                   {([
                     { id: 'day' as const, label: '日檢視', desc: '單天時間軸' },
                     { id: 'week' as const, label: '週檢視', desc: '七天概覽' },
@@ -289,7 +289,7 @@ export function CalendarHeader({
                 <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
               </button>
               {overflowOpen && (
-                <div className="absolute right-0 top-full mt-1 w-44 max-w-[calc(100vw-1.5rem)] bg-card border border-border rounded-xl shadow-lg overflow-hidden z-[60]" role="menu">
+                <div className="absolute right-0 top-full mt-1 w-44 max-w-[calc(100vw-1.5rem)] bg-card border border-border rounded-xl shadow-lg overflow-hidden z-popover" role="menu">
                   <button
                     data-tour="notebook-entry"
                     onClick={() => { setOverflowOpen(false); router.push('/notebook') }}

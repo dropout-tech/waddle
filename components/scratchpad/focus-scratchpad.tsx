@@ -314,12 +314,12 @@ export function FocusScratchpad({
       {/* Backdrop */}
       {isExpanded && (
         <div
-          className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[60]"
+          className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-popover"
           onClick={() => setIsExpanded(false)}
         />
       )}
 
-      <div className={cn('relative z-[70]', className)}>
+      <div className={cn('relative z-toast', className)}>
         {/* Pull Tab */}
         <div
           className={cn(
@@ -380,7 +380,7 @@ export function FocusScratchpad({
         >
         <div className={hideTrigger ? 'h-full overflow-y-auto' : ''}>
         {isDragging && (
-          <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary/50 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary/50 z-modal flex items-center justify-center">
             <div className="text-primary font-medium">放開以新增圖片</div>
           </div>
         )}
@@ -674,7 +674,7 @@ function SortableItem({
           {...attributes}
           {...listeners}
           className={cn(
-            'absolute top-2 left-2 z-10 p-1 rounded-lg bg-background/80 backdrop-blur-sm cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-primary transition-all',
+            'absolute top-2 left-2 z-panel p-1 rounded-lg bg-background/80 backdrop-blur-sm cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-primary transition-all',
             actionVis
           )}
         >
@@ -684,7 +684,7 @@ function SortableItem({
 
       {/* Action cluster (top-right) */}
       {isToday && !isEditing && (
-        <div className={cn('absolute top-2 right-2 z-10 flex items-center gap-1 transition-opacity', actionVis)}>
+        <div className={cn('absolute top-2 right-2 z-panel flex items-center gap-1 transition-opacity', actionVis)}>
           {item.type !== 'image' && (
             <button
               onClick={onEdit}

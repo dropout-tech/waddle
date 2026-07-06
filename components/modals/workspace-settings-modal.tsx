@@ -9,8 +9,8 @@ import {
   Folder, Mail, Phone, ShoppingBag, Plane, Car, Gamepad2, Headphones
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import type { Workspace } from '@/lib/types'
+import { ModalShell } from './modal-shell'
 
 const PRESET_COLORS = [
   '#c9847a', '#8fae8b', '#a8927f', '#7da2b8', '#c4a4b5', '#d4a76a',
@@ -83,10 +83,6 @@ export function WorkspaceSettingsModal({
     }
   }
 
-  useBodyScrollLock(isOpen)
-
-  if (!isOpen) return null
-
   const hasChanges =
     name !== workspace.name || color !== workspace.color || icon !== workspace.icon
 
@@ -129,15 +125,7 @@ export function WorkspaceSettingsModal({
   const totalTasks = workspace.categories.reduce((sum, cat) => sum + cat.tasks.length, 0)
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-
-      {/* Modal — full-screen sheet on mobile, centered card on desktop */}
-      <div className="relative bg-card w-full h-[100dvh] flex flex-col overflow-hidden md:h-auto md:max-h-[90dvh] md:max-w-sm md:mx-4 md:rounded-2xl md:shadow-2xl md:border md:border-border">
-
+    <ModalShell isOpen={isOpen} onClose={onClose} size="sm" ariaLabel="工作區設定">
         {/* Color accent top bar */}
         <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
 
@@ -378,7 +366,6 @@ export function WorkspaceSettingsModal({
           </div>
         </div>
 
-      </div>
-    </div>
+    </ModalShell>
   )
 }

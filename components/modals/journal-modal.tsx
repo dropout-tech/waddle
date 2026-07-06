@@ -12,11 +12,11 @@ import {
   Image as ImageIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import { formatDate } from '@/lib/task-utils'
 import { toDateString } from '@/lib/calendar-utils'
 import type { Task, JournalEntry } from '@/lib/types'
 import { Button } from '@/components/ui/button'
+import { ModalShell } from './modal-shell'
 
 interface JournalModalProps {
   isOpen: boolean
@@ -48,10 +48,6 @@ export function JournalModal({
   const [mood, setMood] = useState<JournalEntry['mood']>(entry?.mood)
   const [content, setContent] = useState(entry?.content || '')
 
-  useBodyScrollLock(isOpen)
-
-  if (!isOpen) return null
-
   const completedTasks = tasksForDate.filter((t) => t.isCompleted)
   const incompleteTasks = tasksForDate.filter((t) => !t.isCompleted)
 
@@ -77,15 +73,7 @@ export function JournalModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Modal — full-screen sheet on mobile, centered card on desktop */}
-      <div className="relative w-full h-[100dvh] flex flex-col bg-card overflow-hidden animate-in fade-in duration-200 md:h-auto md:max-h-[90vh] md:max-w-xl md:mx-4 md:rounded-2xl md:shadow-2xl md:border md:border-border md:zoom-in-95">
+    <ModalShell isOpen={isOpen} onClose={onClose} size="xl" ariaLabel={`${formatDate(date)} 日記`}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
@@ -221,7 +209,6 @@ export function JournalModal({
             儲存日記
           </Button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   )
 }

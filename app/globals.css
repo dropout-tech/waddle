@@ -207,6 +207,24 @@
 
   /* Register the brand easing so `ease-quart` and `transition-timing-function: var(--ease-quart)` both work. */
   --ease-quart: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Z-index scale — semantic layers, low to high. Tailwind v4 reads the
+     `--z-index-*` namespace to generate `z-*` utilities (e.g. `z-modal`
+     from `--z-index-modal`), same mechanism as `--radius-*` → `rounded-*`.
+     Scope note: only ModalShell (components/modals/modal-shell.tsx) has
+     been migrated to these tokens so far; the many pre-existing `z-[N]`
+     one-offs across the app (dropdowns, onboarding tour, drag ghost, etc.)
+     conceptually map onto this ladder but are a follow-up cleanup, not
+     touched here. */
+  --z-index-panel: 10;     /* in-place raised chrome: badges, underline indicators (old z-[1]/z-[5]) */
+  --z-index-sticky: 20;    /* sticky headers/toolbars pinned during scroll */
+  --z-index-dropdown: 30;  /* inline anchored dropdowns/menus, not modal-scoped */
+  --z-index-overlay: 40;   /* dimmed/blurred backdrop behind a modal or sheet */
+  --z-index-modal: 50;     /* the modal/sheet panel itself (old bare `z-50`, and the stray `z-[80]` on quick-link-edit-modal) */
+  --z-index-popover: 60;   /* popovers/menus/nested modals that must float above an open modal (category picker, recurrence choice, calendar/user menus) */
+  --z-index-toast: 70;     /* transient toast notifications; elevated modal-trigger chrome */
+  --z-index-tour: 80;      /* onboarding spotlight overlay + full-screen immersive takeovers, above all modals */
+  --z-index-max: 200;      /* drag-and-drop ghost/tooltip — must never be occluded by anything else */
 }
 
 @layer base {

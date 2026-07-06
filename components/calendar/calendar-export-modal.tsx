@@ -5,6 +5,7 @@ import { Download, Loader2, X, Copy, Check, Sun, Moon } from 'lucide-react'
 import { toPng } from 'html-to-image'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import { toDateString } from '@/lib/calendar-utils'
 import { isNative } from '@/lib/platform'
 import { saveOrShareBlob, copyImageToClipboard } from '@/lib/share'
@@ -81,15 +82,7 @@ export function CalendarExportModal({
     setEndStr(toDateString(e))
   }, [isOpen, selectedDate])
 
-  // Body scroll lock — same pattern as the other modals in this codebase.
-  useEffect(() => {
-    if (!isOpen) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [isOpen])
+  useBodyScrollLock(isOpen)
 
   const startDate = useMemo(() => {
     const [y, m, d] = startStr.split('-').map(Number)
@@ -211,7 +204,7 @@ export function CalendarExportModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-modal flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}

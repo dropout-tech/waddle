@@ -961,7 +961,7 @@ export function WeekView({
           style={{ width: `${TIME_COL_WIDTH + allDates.length * DAY_WIDTH}px` }}
         >
           {/* Time labels column - sticky left */}
-          <div className="w-14 flex-shrink-0 sticky left-0 z-20 bg-panel border-r border-border">
+          <div className="w-14 flex-shrink-0 sticky left-0 z-sticky bg-panel border-r border-border">
             {hours.map((hour) => (
               <div key={hour} className="relative" style={{ height: `${hourHeight}px` }}>
                 <span className="absolute -top-2 left-1 right-1 text-[10px] text-muted-foreground font-mono text-right">
@@ -1152,13 +1152,13 @@ export function WeekView({
 {pendingSlot && (
           <>
           <div
-            className="fixed inset-0 z-[100]"
+            className="fixed inset-0 z-overlay"
             onPointerDown={(e) => { e.stopPropagation(); setPendingSlot(null); setSelectedParent(null) }}
           />
           <div
             ref={popoverRef}
             className={cn(
-              'fixed z-[101] bg-card border border-border rounded-2xl shadow-2xl p-3 w-64 transition-opacity duration-100',
+              'fixed z-popover bg-card border border-border rounded-2xl shadow-2xl p-3 w-64 transition-opacity duration-100',
               popoverPos ? 'opacity-100' : 'opacity-0'
             )}
             style={{

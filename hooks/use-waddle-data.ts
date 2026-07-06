@@ -2330,7 +2330,7 @@ export function useWaddleData(): UseWaddleData {
       // Upsert (not update) — the row is normally created by the
       // `handle_new_user` trigger, but defensively upserting means a
       // missing row never silently swallows the user's links.
-      let { error } = await supabase
+      const { error } = await supabase
         .from('user_settings')
         .upsert(
           { user_id: userId, quick_links: next as unknown as Json },

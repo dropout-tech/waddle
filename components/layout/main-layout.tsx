@@ -481,7 +481,7 @@ export function MainLayout({
           const activeIndex = tabs.findIndex(t => t.active)
           return (
             <nav
-              className="relative flex-shrink-0 grid grid-cols-4 border-t border-border/70 bg-card/95 backdrop-blur z-30 pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_0_rgba(0,0,0,0.02)]"
+              className="relative flex-shrink-0 grid grid-cols-4 border-t border-border/70 bg-card/95 backdrop-blur z-sticky pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_0_rgba(0,0,0,0.02)]"
               role="tablist"
               aria-label="主要分頁"
             >

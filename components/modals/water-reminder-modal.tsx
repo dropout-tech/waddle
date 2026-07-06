@@ -61,9 +61,9 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze }: WaterReminderM
     return (
       <Vaul.Root open={isOpen} onOpenChange={(o) => { if (!o) onSnooze() }}>
         <Vaul.Portal>
-          <Vaul.Overlay className="fixed inset-0 z-[60] bg-black/45 backdrop-blur-sm" />
+          <Vaul.Overlay className="fixed inset-0 z-popover bg-black/45 backdrop-blur-sm" />
           <Vaul.Content
-            className="fixed inset-x-0 bottom-0 z-[60] flex flex-col rounded-t-2xl bg-card outline-none overflow-hidden"
+            className="fixed inset-x-0 bottom-0 z-popover flex flex-col rounded-t-2xl bg-card outline-none overflow-hidden"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
             <Vaul.Title className="sr-only">該喝水囉</Vaul.Title>
@@ -96,7 +96,7 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze }: WaterReminderM
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center px-4"
+      className="fixed inset-0 z-popover flex items-center justify-center px-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="water-reminder-title"

@@ -3,11 +3,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X, Calendar, Clock, Palette, Trash2, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
-import { useIsMobile } from '@/hooks/use-mobile'
 import { Input } from '@/components/ui/input'
-import { Drawer as Vaul } from 'vaul'
 import type { TimeBlock, SlotType } from '@/lib/types'
+import { ModalShell } from '@/components/modals/modal-shell'
 
 interface TimeBlockModalProps {
   block: TimeBlock | null
@@ -77,9 +75,6 @@ export function TimeBlockModal({
     setColor(block.color)
   }, [block?.id])
 
-  const isMobile = useIsMobile()
-  useBodyScrollLock(isOpen && !isMobile)
-
   // Top-level slot types only (skip parent groupings — flat list is enough).
   // Workspace-bound types are also excluded since those are tasks, not blocks.
   const availableTypes = useMemo(
@@ -92,7 +87,6 @@ export function TimeBlockModal({
   const duration = startMin !== null && endMin !== null ? endMin - startMin : null
 
   if (!block) return null
-  if (!isOpen && !isMobile) return null
 
   const handleSelectType = (slotKey: string) => {
     setType(slotKey)
@@ -361,34 +355,9 @@ export function TimeBlockModal({
     </>
   )
 
-  if (isMobile) {
-    return (
-      <Vaul.Root open={isOpen} onOpenChange={(o) => { if (!o) onClose() }}>
-        <Vaul.Portal>
-          <Vaul.Overlay className="fixed inset-0 z-50 bg-black/50" />
-          <Vaul.Content
-            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] flex-col rounded-t-2xl bg-card outline-none overflow-hidden"
-            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-          >
-            <Vaul.Title className="sr-only">編輯時間區塊</Vaul.Title>
-            {/* Drag handle */}
-            <div className="mx-auto mt-2 mb-1 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
-            {body}
-          </Vaul.Content>
-        </Vaul.Portal>
-      </Vaul.Root>
-    )
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative w-full h-auto max-h-[90vh] max-w-md mx-4 flex flex-col bg-card overflow-hidden rounded-2xl shadow-2xl border border-border animate-in fade-in zoom-in-95 duration-200">
-        {body}
-      </div>
-    </div>
+    <ModalShell isOpen={isOpen} onClose={onClose} size="md" ariaLabel="編輯時間區塊">
+      {body}
+    </ModalShell>
   )
 }

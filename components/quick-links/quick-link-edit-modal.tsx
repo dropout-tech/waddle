@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react'
 import { X, Save, Trash2, Link2, Type, Sparkles, Palette } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import { detectMeetingProvider } from '@/lib/meeting-utils'
 import { cn } from '@/lib/utils'
 import type { QuickLink } from '@/lib/types'
+import { ModalShell } from '@/components/modals/modal-shell'
 
 interface QuickLinkEditModalProps {
   isOpen: boolean
@@ -72,10 +72,6 @@ export function QuickLinkEditModal({
     setColor(initial?.color ?? null)
   }, [isOpen, initial])
 
-  useBodyScrollLock(isOpen)
-
-  if (!isOpen) return null
-
   // URL must be a valid http(s) or known video provider URL. Reuses the
   // meeting-utils detector so we get the same scheme-allow-list as the
   // meeting-reminder safety check (blocks javascript:/data:/file:).
@@ -106,15 +102,12 @@ export function QuickLinkEditModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-stretch md:items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden
-      />
-
-      <div className="relative w-full h-[100dvh] flex flex-col bg-card overflow-hidden animate-in fade-in duration-200 md:h-auto md:max-h-[90vh] md:max-w-md md:mx-4 md:rounded-2xl md:shadow-2xl md:border md:border-border md:zoom-in-95">
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      size="md"
+      ariaLabel={isEdit ? '編輯連結' : '新增連結'}
+    >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="text-base font-semibold text-foreground">
             {isEdit ? '編輯連結' : '新增連結'}
@@ -230,7 +223,6 @@ export function QuickLinkEditModal({
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   )
 }

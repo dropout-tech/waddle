@@ -277,7 +277,7 @@ const CONFETTI_COLORS = ['#e07b5a', '#8fae8b', '#c4a4b5', '#d4a76a', '#b58fae', 
 function Confetti({ x, y }: { x: number; y: number }) {
   return (
     <div
-      className="pointer-events-none fixed z-[110]"
+      className="pointer-events-none fixed z-max"
       style={{ left: x, top: y }}
       aria-hidden="true"
     >
@@ -483,7 +483,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
 
   return (
     <div
-      className="fixed inset-0 z-[100] pointer-events-none"
+      className="fixed inset-0 z-tour pointer-events-none"
       role="dialog"
       aria-modal="true"
       aria-label="新手導覽"

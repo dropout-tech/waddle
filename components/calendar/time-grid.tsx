@@ -277,11 +277,11 @@ export function TimeGrid({
         {pendingSlot && (
           <>
             <div
-              className="fixed inset-0 z-30"
+              className="fixed inset-0 z-overlay"
               onMouseDown={(e) => { e.stopPropagation(); setPendingSlot(null) }}
             />
             <div
-              className="absolute left-16 z-40 bg-card border border-border rounded-2xl shadow-2xl p-3 w-64"
+              className="absolute left-16 z-popover bg-card border border-border rounded-2xl shadow-2xl p-3 w-64"
               style={{ top: `${Math.min(pendingSlot.anchorY, (endHour - startHour) * 60 - 220)}px` }}
               onMouseDown={(e) => e.stopPropagation()}
             >

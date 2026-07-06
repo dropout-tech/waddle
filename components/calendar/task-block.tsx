@@ -324,8 +324,8 @@ function TaskBlockImpl({
         isDragging
           // "Lift" the block while dragging — slight scale + rotation makes
           // it feel like the user picked it up off the calendar.
-          ? 'shadow-2xl opacity-95 z-50 ring-2 ring-white/40 scale-[1.02] -rotate-1 transition-transform'
-          : 'hover:shadow-lg hover:z-10 transition-all',
+          ? 'shadow-2xl opacity-95 z-modal ring-2 ring-white/40 scale-[1.02] -rotate-1 transition-transform'
+          : 'hover:shadow-lg hover:z-panel transition-all',
         // Meeting-only: inset ring creates a "double border" feel against
         // the workspace-colored background. Tone is chosen at runtime
         // based on the background luminance.
@@ -358,7 +358,7 @@ function TaskBlockImpl({
           Disabled on desktop (md:before:content-none) where hover reveals
           the thin 8px (h-2) handle instead. */}
       <div
-        className="absolute top-0 left-0 right-0 h-6 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity before:content-[''] before:absolute before:inset-x-0 before:-top-2 before:h-8 md:before:content-none"
+        className="absolute top-0 left-0 right-0 h-6 md:h-2 z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity before:content-[''] before:absolute before:inset-x-0 before:-top-2 before:h-8 md:before:content-none"
         onPointerDown={handleResizeTopPointerDown}
         style={{ touchAction: 'none' }}
       >
@@ -482,7 +482,7 @@ function TaskBlockImpl({
       {meetingIcon && (
         <div
           className={cn(
-            'absolute top-1 right-1 z-[5] pointer-events-none flex items-center justify-center w-4 h-4 rounded-full backdrop-blur-sm',
+            'absolute top-1 right-1 z-panel pointer-events-none flex items-center justify-center w-4 h-4 rounded-full backdrop-blur-sm',
             colorIsLight ? 'bg-black/30' : 'bg-white/30',
           )}
           aria-hidden
@@ -508,7 +508,7 @@ function TaskBlockImpl({
           invisible ::before extends 8px downward into the gap below the
           block instead of upward. */}
       <div
-        className="absolute bottom-0 left-0 right-0 h-6 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity before:content-[''] before:absolute before:inset-x-0 before:-bottom-2 before:h-8 md:before:content-none"
+        className="absolute bottom-0 left-0 right-0 h-6 md:h-2 z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity before:content-[''] before:absolute before:inset-x-0 before:-bottom-2 before:h-8 md:before:content-none"
         onPointerDown={handleResizeBottomPointerDown}
         style={{ touchAction: 'none' }}
       >

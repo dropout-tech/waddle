@@ -15,7 +15,9 @@
     "cap:open": "cap open ios",
     "cap:run": "pnpm cap:sync && cap run ios",
     "start": "next start -p ${PORT:-3000}",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit",
+    "e2e": "node scripts/e2e/smoke.mjs"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
@@ -101,6 +103,7 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "playwright": "^1.61.1",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
     "tw-animate-css": "1.3.3",

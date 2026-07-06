@@ -347,7 +347,7 @@ export function PanelHeader({
 
       {/* Add Workspace Modal */}
       {isAdding && (
-        <div className="absolute inset-x-0 top-full mt-2 mx-4 p-4 bg-card border border-border rounded-xl shadow-lg z-50">
+        <div className="absolute inset-x-0 top-full mt-2 mx-4 p-4 bg-card border border-border rounded-xl shadow-lg z-modal">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-semibold text-foreground">新增工作區</span>
             <button

@@ -126,7 +126,7 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
         <div
           role="dialog"
           aria-label="今日會議"
-          className="absolute left-0 top-full mt-1.5 w-[320px] max-w-[calc(100vw-2rem)] bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+          className="absolute left-0 top-full mt-1.5 w-[320px] max-w-[calc(100vw-2rem)] bg-card border border-border rounded-xl shadow-xl z-modal overflow-hidden animate-in fade-in zoom-in-95 duration-150"
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">

@@ -1163,7 +1163,7 @@ export function DayScrollView({
           style={{ width: `${TIME_COL_WIDTH + allDates.length * DAY_WIDTH}px` }}
         >
           {/* Time labels column */}
-          <div className="w-14 flex-shrink-0 sticky left-0 z-20 bg-panel border-r border-border">
+          <div className="w-14 flex-shrink-0 sticky left-0 z-sticky bg-panel border-r border-border">
             {hours.map((hour) => (
                 <div key={hour} className="relative" style={{ height: `${hourHeight}px` }}>
                 <span className="absolute -top-2 left-1 right-1 text-[10px] text-muted-foreground font-mono text-right">
@@ -1271,7 +1271,7 @@ export function DayScrollView({
                       className={cn(
                         'absolute rounded text-xs font-medium overflow-hidden group select-none',
                         isDraggingThis
-                          ? 'shadow-2xl z-50 ring-2 ring-white/40 scale-[1.02] -rotate-1 transition-transform'
+                          ? 'shadow-2xl z-modal ring-2 ring-white/40 scale-[1.02] -rotate-1 transition-transform'
                           : 'hover:shadow-md transition-all'
                       )}
                       style={{
@@ -1289,7 +1289,7 @@ export function DayScrollView({
                     >
                       {/* Resize handle — TOP. Larger touch target on mobile. */}
                       <div
-                        className="absolute top-0 left-0 right-0 h-4 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        className="absolute top-0 left-0 right-0 h-4 md:h-2 z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         onPointerDown={(e) => handleTimeBlockDragStart(block, 'resize-top', dayIndex, e)}
                         style={{ touchAction: 'none' }}
                       >
@@ -1312,7 +1312,7 @@ export function DayScrollView({
 
                       {/* Resize handle — BOTTOM. */}
                       <div
-                        className="absolute bottom-0 left-0 right-0 h-4 md:h-2 z-10 cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        className="absolute bottom-0 left-0 right-0 h-4 md:h-2 z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         onPointerDown={(e) => handleTimeBlockDragStart(block, 'resize-bottom', dayIndex, e)}
                         style={{ touchAction: 'none' }}
                       >
@@ -1332,7 +1332,7 @@ export function DayScrollView({
                   const textColor = isLightColor(block.color) ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.95)'
                   return (
                     <div
-                      className="absolute left-1 right-1 rounded px-2 py-1 text-xs font-medium overflow-hidden shadow-2xl z-50 ring-2 ring-white/40 pointer-events-none"
+                      className="absolute left-1 right-1 rounded px-2 py-1 text-xs font-medium overflow-hidden shadow-2xl z-modal ring-2 ring-white/40 pointer-events-none"
                       style={{
                         top: `${activeBlockDrag.currentStart - MIN}px`,
                         height: `${Math.max(activeBlockDrag.currentEnd - activeBlockDrag.currentStart, 30)}px`,
@@ -1453,13 +1453,13 @@ export function DayScrollView({
 {pendingSlot && (
           <>
           <div
-            className="fixed inset-0 z-30"
+            className="fixed inset-0 z-overlay"
             onPointerDown={(e) => { e.stopPropagation(); setPendingSlot(null); setSelectedParent(null) }}
           />
           <div
             ref={popoverRef}
             className={cn(
-              'fixed z-40 bg-card border border-border rounded-2xl shadow-2xl p-3 w-64 transition-opacity duration-100',
+              'fixed z-popover bg-card border border-border rounded-2xl shadow-2xl p-3 w-64 transition-opacity duration-100',
               popoverPos ? 'opacity-100' : 'opacity-0'
             )}
             style={{

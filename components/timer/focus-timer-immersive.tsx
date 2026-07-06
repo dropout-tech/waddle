@@ -255,7 +255,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
     <div
       ref={containerRef}
       className={cn(
-        'fixed inset-0 z-[80] flex flex-col select-none overflow-hidden',
+        'fixed inset-0 z-tour flex flex-col select-none overflow-hidden',
         'transition-colors duration-700 ease-out',
       )}
       style={{
@@ -389,7 +389,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
 
       {/* HEADER */}
       <div
-        className="relative z-10 flex items-start justify-between px-5 pt-[max(env(safe-area-inset-top),1rem)] pb-3"
+        className="relative z-panel flex items-start justify-between px-5 pt-[max(env(safe-area-inset-top),1rem)] pb-3"
         style={{
           opacity: dimmed ? 0.25 : 1,
           transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)',
@@ -464,7 +464,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
 
       {/* CENTER */}
       <div
-        className="relative z-10 flex-1 flex flex-col items-center justify-center px-6"
+        className="relative z-panel flex-1 flex flex-col items-center justify-center px-6"
         style={{
           animation: 'waddle-immersive-in 380ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
@@ -582,7 +582,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
 
       {/* FOOTER */}
       <div
-        className="relative z-10 flex flex-col items-stretch px-5 pb-[max(env(safe-area-inset-bottom),1rem)] gap-3"
+        className="relative z-panel flex flex-col items-stretch px-5 pb-[max(env(safe-area-inset-bottom),1rem)] gap-3"
         style={{
           opacity: dimmed ? 0 : 1,
           transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)',

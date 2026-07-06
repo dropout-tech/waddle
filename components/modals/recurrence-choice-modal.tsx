@@ -115,9 +115,9 @@ export function RecurrenceChoiceModal({
     return (
       <Vaul.Root open={isOpen} onOpenChange={(o) => { if (!o) onClose() }}>
         <Vaul.Portal>
-          <Vaul.Overlay className="fixed inset-0 z-[60] bg-foreground/25 backdrop-blur-sm" />
+          <Vaul.Overlay className="fixed inset-0 z-popover bg-foreground/25 backdrop-blur-sm" />
           <Vaul.Content
-            className="fixed inset-x-0 bottom-0 z-[60] flex max-h-[85dvh] flex-col rounded-t-2xl bg-card outline-none overflow-hidden"
+            className="fixed inset-x-0 bottom-0 z-popover flex max-h-[85dvh] flex-col rounded-t-2xl bg-card outline-none overflow-hidden"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
             <Vaul.Title className="sr-only">{title}</Vaul.Title>
@@ -153,7 +153,7 @@ export function RecurrenceChoiceModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-popover flex items-center justify-center px-4">
       <div
         className="absolute inset-0 bg-foreground/25 backdrop-blur-sm"
         onClick={onClose}

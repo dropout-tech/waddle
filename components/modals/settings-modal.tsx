@@ -3,10 +3,10 @@
 import { useState, useMemo } from 'react'
 import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import type { UserSettings, TimeBlock, SlotType, Workspace, NotificationSettings } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ModalShell } from './modal-shell'
 import {
   getTaskCompleteSoundEnabled,
   setTaskCompleteSoundEnabled,
@@ -295,20 +295,8 @@ export function SettingsModal({
     return <span className={textSize}>{slotType.icon}</span>
   }
 
-  useBodyScrollLock(isOpen)
-
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Modal — full-screen sheet on mobile, centered card on desktop */}
-      <div className="relative w-full h-[100dvh] flex flex-col bg-card overflow-hidden animate-in fade-in duration-200 md:h-auto md:max-h-[90vh] md:max-w-lg md:mx-4 md:rounded-2xl md:shadow-2xl md:border md:border-border md:zoom-in-95">
+    <ModalShell isOpen={isOpen} onClose={onClose} size="lg" ariaLabel="設定">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">設定</h2>
@@ -1052,8 +1040,7 @@ export function SettingsModal({
             儲存
           </Button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 

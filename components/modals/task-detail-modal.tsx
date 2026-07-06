@@ -4,13 +4,13 @@ import { useState, useRef, useMemo } from 'react'
 import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat, List, CheckSquare, ListChecks, Link2, Users, MapPin, Video } from 'lucide-react'
 import { detectMeetingProvider, MEETING_PROVIDER_LABEL } from '@/lib/meeting-utils'
 import { cn } from '@/lib/utils'
-import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import type { Task, Workspace } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { renderNotesWithLinks } from '@/lib/notes-render'
 import { toDateString } from '@/lib/calendar-utils'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from './recurrence-choice-modal'
+import { ModalShell } from './modal-shell'
 
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -99,10 +99,6 @@ export function TaskDetailModal({
     .flatMap((w) => w.categories.map((c) => ({ ...c, workspace: w })))
     .find((c) => c.id === selectedCategoryId)
 
-  useBodyScrollLock(isOpen)
-
-  if (!isOpen) return null
-
   const toggleRecurrenceDay = (day: number) => {
     setRecurrenceDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
@@ -178,7 +174,7 @@ export function TaskDetailModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch md:items-center justify-center">
+    <>
       {recurrenceModal && (
         <RecurrenceChoiceModal
           isOpen={recurrenceModal.isOpen}
@@ -187,14 +183,12 @@ export function TaskDetailModal({
           title={recurrenceModal.type === 'save' ? '儲存重複任務' : '刪除重複任務'}
         />
       )}
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Modal — full-screen sheet on mobile, centered card on desktop */}
-      <div className="relative w-full h-[100dvh] flex flex-col bg-card overflow-hidden animate-in fade-in duration-200 md:h-auto md:max-h-[90vh] md:max-w-lg md:mx-4 md:rounded-2xl md:shadow-2xl md:border md:border-border md:zoom-in-95">
+      <ModalShell
+        isOpen={isOpen}
+        onClose={onClose}
+        size="lg"
+        ariaLabel={isCreate ? '新增任務' : '任務詳情'}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
@@ -234,7 +228,7 @@ export function TaskDetailModal({
                   so it never overflows on narrow phones (320 px screens
                   ran 64 px past the right edge before this). */}
               {showCategoryPicker && workspaces.length > 0 && (
-                <div className="fixed left-3 right-3 top-[calc(env(safe-area-inset-top,0px)+72px)] max-h-[60vh] md:absolute md:left-0 md:right-auto md:top-full md:mt-1 md:w-64 md:max-h-64 bg-card rounded-xl border border-border shadow-xl z-[60] py-2 overflow-y-auto">
+                <div className="fixed left-3 right-3 top-[calc(env(safe-area-inset-top,0px)+72px)] max-h-[60vh] md:absolute md:left-0 md:right-auto md:top-full md:mt-1 md:w-64 md:max-h-64 bg-card rounded-xl border border-border shadow-xl z-popover py-2 overflow-y-auto">
                   {workspaces.map((workspace) => (
                     <div key={workspace.id}>
                       <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
@@ -664,8 +658,8 @@ export function TaskDetailModal({
             {isCreate ? '建立任務' : '儲存'}
           </Button>
         </div>
-      </div>
-    </div>
+      </ModalShell>
+    </>
   )
 }
 

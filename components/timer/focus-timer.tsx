@@ -557,7 +557,7 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
       {/* Mobile sheet backdrop — clicking it collapses the panel. */}
       {mobileExpanded && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 z-overlay bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
           onClick={() => setIsExpanded(false)}
           aria-hidden="true"
         />

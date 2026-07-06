@@ -100,13 +100,13 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
           a foreground surface. */}
       {isExpanded && (
         <div
-          className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-[60]"
+          className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-popover"
           onClick={() => setExpanded(false)}
           aria-hidden
         />
       )}
 
-      <div className={cn('relative z-[70]', className)}>
+      <div className={cn('relative z-toast', className)}>
         {/* Pull tab — mirrors scratchpad's top tab, anchored to the
             bottom of the viewport. Hidden in controlled / hideTrigger
             mode (mobile). */}

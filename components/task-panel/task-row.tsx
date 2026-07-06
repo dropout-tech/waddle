@@ -189,7 +189,7 @@ function TaskRowImpl({
   const ghost = externalDragActive && typeof document !== 'undefined'
     ? createPortal(
         <div
-          className="fixed pointer-events-none z-[200] px-2.5 py-1.5 rounded-lg text-[11px] font-semibold shadow-2xl ring-2 ring-white/60 select-none max-w-[200px] truncate"
+          className="fixed pointer-events-none z-max px-2.5 py-1.5 rounded-lg text-[11px] font-semibold shadow-2xl ring-2 ring-white/60 select-none max-w-[200px] truncate"
           style={{
             left: ghostPos.x + 12,
             top: ghostPos.y + 12,

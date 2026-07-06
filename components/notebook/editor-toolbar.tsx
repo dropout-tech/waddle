@@ -66,7 +66,7 @@ export function EditorToolbar({ editor, onPromote }: EditorToolbarProps) {
   return (
     <div
       className={cn(
-        'z-40 flex items-center gap-0.5 border-border bg-card/85 px-2 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-card/65',
+        'z-sticky flex items-center gap-0.5 border-border bg-card/85 px-2 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-card/65',
         isMobile
           // Docked above the keyboard: fixed to the visual-viewport bottom,
           // raised by the keyboard's height (0 when closed → rests above the
