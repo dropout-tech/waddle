@@ -242,7 +242,10 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
 
   return (
     <div className="relative">
-      {/* Notification Bell Button */}
+      {/* Notification Bell Button — visual size stays 36x36 (p-2 + w-5 h-5
+          icon); on touch devices an invisible ::before extends the hit box
+          to 44x44 without changing what's painted, same trick as the
+          Waddle skill's small-icon-btn pattern. */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         aria-label={totalCount > 0 ? `通知 (${totalCount})` : '通知'}
@@ -250,7 +253,8 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
         aria-expanded={isOpen}
         className={cn(
           'relative p-2 rounded-lg transition-colors',
-          isOpen ? 'bg-secondary' : 'hover:bg-secondary/50'
+          isOpen ? 'bg-secondary' : 'hover:bg-secondary/50',
+          '[@media(hover:none)]:before:content-[""] [@media(hover:none)]:before:absolute [@media(hover:none)]:before:inset-[-4px]'
         )}
       >
         <Bell className="w-5 h-5 text-muted-foreground" />
@@ -369,7 +373,7 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
                                       style={{ backgroundColor: task.workspaceColor }}
                                     />
                                     <span className="text-xs truncate flex-1">{task.title}</span>
-                                    <ChevronRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <ChevronRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity [@media(hover:none)]:opacity-100" />
                                   </button>
                                 ))}
                                 {notification.tasks.length > 3 && (

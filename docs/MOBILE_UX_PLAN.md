@@ -40,21 +40,28 @@
 - **週視圖**：手機加 scroll-snap 逐日翻頁（對齊 day-scroll-view 既有模式）或明確導向日視圖。
 - 驗證 week-view 欄位拖曳與 task-row 拖曳在觸控的 touch-action 覆蓋完整性，缺的補上。
 
-### WP5【底欄 tab 手感】— sonnet（P1）
-- active 指示動畫（150-200ms、ease-out）、切 tab haptic（impact light）、
-  切換不重置日曆捲動位置（保留 state 或記憶 scrollTop）。
+### WP5【底欄 tab 手感】— ✅ 完成（2026-07-07）
+- active 滑動指示改 200ms + ease-quart（不彈跳）；切 tab 加 `hapticSelection()`
+  （Haptics.selectionChanged，比 impact 輕，iOS segmented-control 語意）。
+- ⚠️ **第 3 項「切 tab 保留日曆捲動位置」未做，需你決定**：成因是手機 tab 用條件
+  渲染 + `key` 強制 remount 觸發滑入動畫，捲動 state 全在 day-scroll-view 內部。要修得
+  動 calendar/ 檔案並改寫進場動畫（兩面板常駐掛載），屬中等架構改動、有風險。
+  建議另立工作包，且是否值得做取決於你實際用起來覺得「切回日曆被重置」有多惱人。
 
-### WP6【鍵盤貼附工具列】— P2（下一輪）
-- note-editor 工具列在鍵盤開啟時貼鍵盤上方（visualViewport / @capacitor/keyboard）。
+### WP6【鍵盤貼附工具列】— ✅ 完成（2026-07-07，web 已驗、原生待真機）
+- note-editor 工具列在手機改成 fixed 貼底、隨鍵盤上升（新 hook `useKeyboardInset`
+  用 visualViewport，跨 web/原生自校正）；桌面維持 sticky top 不變。
+- web 驗證通過（工具列 fixed 貼底、按鈕 40px、可打字、桌面無回歸）；**「浮在 iOS
+  軟鍵盤正上方」的精確行為 headless 測不到，需 Xcode 真機補驗一次**。
 
-### WP7【殘留 hover-only 普查】— P2（WP1 全域掃描結果，尚未修）
-以下檔案仍有 `opacity-0 group-hover` 模式，需逐一給觸控路徑（修法照 WP1 的
-`[@media(hover:none)]` 模式）：toast.tsx、focus-scratchpad.tsx、task-detail-modal.tsx、
-notification-center.tsx、day-scroll-view.tsx、time-block-item.tsx、task-block.tsx、
-task-row.tsx、category-section.tsx、full-screen-task-view.tsx。
-其中部分是「拖曳把手」類，手機已有長按替代，逐一判斷即可。
+### WP7【殘留 hover-only 普查】— ✅ 完成（2026-07-07）
+實修 4 檔（notification-center 鈴鐺熱區補 44、任務 chevron 觸控可見；category-section
+badge、full-screen-task-view 兩處 chevron、toast 關閉鈕觸控可見）。其餘 6 檔經查證是
+「拖曳把手 + 手機已有 280ms 長按替代」或「手機已 opacity-100 只桌面 hover 隱藏」，
+不需動（清單與行號在 git commit 訊息）。注：toast.tsx / ui/toaster.tsx 是死碼（正式用
+sonner），仍照修但無實際影響。
 
-### WP8【週視圖 CSS scroll-snap】— P2（待實機測試後決定）
+### WP8【週視圖 CSS scroll-snap】— P2（待實機測試後決定，維持不變）
 週視圖手機已改為「剛好 3 欄一屏」（2026-07-06）；是否再加 CSS snap-proximity
 需在 iOS 實機驗證與拖曳 autoscroll 的相容性後決定，不要盲加。
 

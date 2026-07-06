@@ -23,3 +23,22 @@ export function hapticTaskComplete(): void {
     }
   })()
 }
+
+/**
+ * A very light "tick" fired when the user selects a different option among a
+ * fixed set — e.g. switching the bottom tab bar. `selectionChanged` is the
+ * correct iOS semantic for this (segmented-control-style selection), and is
+ * noticeably subtler than `impact`, which is meant for physical collisions.
+ * Fire-and-forget: never throws and never blocks the UI. No-op on web.
+ */
+export function hapticSelection(): void {
+  if (!isNative()) return
+  void (async () => {
+    try {
+      const { Haptics } = await import('@capacitor/haptics')
+      await Haptics.selectionChanged()
+    } catch {
+      /* haptics unavailable (e.g. simulator / permission) — ignore */
+    }
+  })()
+}

@@ -140,7 +140,7 @@ export function CategorySection({
             </span>
           )}
           {completedCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded bg-success/10 text-success text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="px-1.5 py-0.5 rounded bg-success/10 text-success text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity [@media(hover:none)]:opacity-100">
               {completedCount}
             </span>
           )}

@@ -15,6 +15,7 @@ import { ErrorBoundary } from '@/components/error-boundary'
 import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
+import { hapticSelection } from '@/lib/haptics'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, ScratchpadItem } from '@/lib/types'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
 import { Link2 } from 'lucide-react'
@@ -436,6 +437,7 @@ export function MainLayout({
               Icon: ListChecks,
               active: mobileTab === 'tasks' && !mobileScratchpadOpen && !mobileLinksOpen,
               onClick: () => {
+                hapticSelection()
                 setMobileScratchpadOpen(false)
                 setMobileLinksOpen(false)
                 setMobileTab('tasks')
@@ -447,6 +449,7 @@ export function MainLayout({
               Icon: Sparkles,
               active: mobileScratchpadOpen,
               onClick: () => {
+                hapticSelection()
                 setMobileLinksOpen(false)
                 setMobileScratchpadOpen(v => !v)
               },
@@ -457,6 +460,7 @@ export function MainLayout({
               Icon: CalendarDays,
               active: mobileTab === 'calendar' && !mobileScratchpadOpen && !mobileLinksOpen,
               onClick: () => {
+                hapticSelection()
                 setMobileScratchpadOpen(false)
                 setMobileLinksOpen(false)
                 setMobileTab('calendar')
@@ -468,6 +472,7 @@ export function MainLayout({
               Icon: Link2,
               active: mobileLinksOpen,
               onClick: () => {
+                hapticSelection()
                 setMobileScratchpadOpen(false)
                 setMobileLinksOpen(v => !v)
               },
@@ -486,7 +491,7 @@ export function MainLayout({
               <span
                 aria-hidden="true"
                 className={cn(
-                  'absolute top-0 left-0 h-[3px] w-1/4 flex items-center justify-center transition-transform duration-300 ease-out pointer-events-none',
+                  'absolute top-0 left-0 h-[3px] w-1/4 flex items-center justify-center transition-[transform,opacity] duration-200 ease-quart pointer-events-none',
                   activeIndex < 0 && 'opacity-0',
                 )}
                 style={{ transform: `translateX(${Math.max(activeIndex, 0) * 100}%)` }}

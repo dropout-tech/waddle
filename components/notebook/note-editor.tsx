@@ -73,7 +73,9 @@ export function NoteEditor({ note, onTitleChange, onContentChange, onPromote }: 
     <div className="flex h-full flex-col">
       <EditorToolbar editor={editor} onPromote={onPromote} />
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-2xl px-6 py-8">
+        {/* Extra bottom padding on mobile so the last lines clear the
+            keyboard-docked toolbar (fixed, ~52px + home-indicator safe area). */}
+        <div className="mx-auto w-full max-w-2xl px-6 py-8 max-md:pb-[calc(env(safe-area-inset-bottom)+72px)]">
           <input
             value={title}
             onChange={(e) => handleTitleChange(e.target.value)}

@@ -1127,7 +1127,7 @@ export function FullScreenTaskView({
                             過期
                           </span>
                         )}
-                        <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity [@media(hover:none)]:opacity-100" />
                       </div>
                     </div>
                   )
@@ -1469,7 +1469,7 @@ function WorkspaceCard({
                 )}
               </div>
             </div>
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity [@media(hover:none)]:opacity-100 flex-shrink-0 mt-0.5" />
           </div>
         </div>
       )}

@@ -22,6 +22,8 @@ import {
   ListPlus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset'
 
 interface EditorToolbarProps {
   editor: Editor | null
@@ -42,6 +44,12 @@ function selectionOrLineText(editor: Editor): string {
 // Notion-style toolbar but constrained to the formats StarterKit + our extra
 // extensions provide.
 export function EditorToolbar({ editor, onPromote }: EditorToolbarProps) {
+  // Hooks must run before the early return. On mobile the bar detaches from the
+  // top of the editor and docks above the keyboard (iOS input-accessory style)
+  // so formatting stays reachable while typing at the bottom of a long note.
+  const isMobile = useIsMobile()
+  const keyboardInset = useKeyboardInset()
+
   if (!editor) return null
 
   const setLink = () => {
@@ -56,7 +64,30 @@ export function EditorToolbar({ editor, onPromote }: EditorToolbarProps) {
   }
 
   return (
-    <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-border bg-card/80 px-2 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-card/60 max-md:flex-nowrap max-md:overflow-x-auto max-md:gap-1">
+    <div
+      className={cn(
+        'z-40 flex items-center gap-0.5 border-border bg-card/85 px-2 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-card/65',
+        isMobile
+          // Docked above the keyboard: fixed to the visual-viewport bottom,
+          // raised by the keyboard's height (0 when closed → rests above the
+          // home indicator via safe-area padding). No bottom-transition so it
+          // tracks the keyboard exactly and never animates layout props.
+          // pr-5 + a right-edge fade mask signal "scrolls horizontally →" so the
+          // last icon doesn't read as clipped/broken (mask is visual-only; taps
+          // still land). scrollbar hidden — the fade is the affordance.
+          ? 'fixed inset-x-0 flex-nowrap gap-1 overflow-x-auto border-t pr-8 pb-[env(safe-area-inset-bottom)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          : 'sticky top-0 flex-wrap border-b',
+      )}
+      style={
+        isMobile
+          ? {
+              bottom: keyboardInset,
+              WebkitMaskImage: 'linear-gradient(to right, #000 calc(100% - 40px), transparent)',
+              maskImage: 'linear-gradient(to right, #000 calc(100% - 40px), transparent)',
+            }
+          : undefined
+      }
+    >
       <Btn label="標題 1" active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
         <Heading1 className="h-4 w-4" />
       </Btn>

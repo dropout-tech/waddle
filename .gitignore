@@ -31,3 +31,4 @@ out/
 # TypeScript build cache
 tsconfig.tsbuildinfo
 docs/reports/*-mobile-verify-shots/
+docs/reports/*-wp567-verify-shots/
