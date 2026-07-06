@@ -150,7 +150,7 @@ export function CalendarHeader({
             type="button"
             onClick={() => stepDate(-1)}
             aria-label={viewMode === 'day' ? '前一天' : viewMode === 'week' ? '前一週' : '前一個月'}
-            className="relative flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:content-[''] before:absolute before:inset-0 before:-m-1.5 md:before:hidden"
+            className="relative flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:content-[''] before:absolute before:inset-0 before:-m-1.5 md:before:hidden"
           >
             <ChevronLeft className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -158,7 +158,7 @@ export function CalendarHeader({
             type="button"
             onClick={() => stepDate(1)}
             aria-label={viewMode === 'day' ? '後一天' : viewMode === 'week' ? '後一週' : '後一個月'}
-            className="relative flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:content-[''] before:absolute before:inset-0 before:-m-1.5 md:before:hidden"
+            className="relative flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:content-[''] before:absolute before:inset-0 before:-m-1.5 md:before:hidden"
           >
             <ChevronRight className="w-4 h-4" aria-hidden="true" />
           </button>
