@@ -4,6 +4,7 @@ import { Noto_Sans_TC } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { NativeShell } from '@/components/native/native-shell'
+import { ThemeProvider } from '@/components/theme-provider'
 
 const geist = Geist({
   subsets: ['latin'],
@@ -84,8 +85,20 @@ export default function RootLayout({
       <body
         className={`${geist.variable} ${geistMono.variable} ${notoSansTC.variable} font-sans antialiased`}
       >
-        <NativeShell />
-        <AuthProvider>{children}</AuthProvider>
+        {/* Opt-in dark mode: defaults to light (the product's light-first
+            stance) and only switches when the user explicitly toggles it, so
+            no dark-OS surprise. `attribute="class"` writes `.dark` on <html>,
+            which the dark tokens in globals.css and NativeShell's status-bar
+            observer both key off. */}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <NativeShell />
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

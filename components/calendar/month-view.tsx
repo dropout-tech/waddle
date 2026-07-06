@@ -270,7 +270,11 @@ export function MonthView({
                           onDateSelect?.(day.date)
                         }}
                         className={cn(
-                          'relative flex flex-col items-center justify-center gap-1 rounded-lg min-h-[46px] transition-colors',
+                          // Compress the date grid on short viewports (e.g.
+                          // iPhone SE 667px tall) so the agenda list below gets
+                          // more room — the grid is navigation, the agenda is
+                          // the content.
+                          'relative flex flex-col items-center justify-center gap-1 rounded-lg min-h-[46px] [@media(max-height:700px)]:min-h-[38px] [@media(max-height:700px)]:gap-0.5 transition-colors',
                           !day.isCurrentMonth && 'opacity-40',
                           isAgendaDay ? 'bg-accent/60' : 'active:bg-secondary/60'
                         )}
@@ -335,7 +339,9 @@ export function MonthView({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-2 py-2">
+          {/* pb clears the floating focus-timer button (fixed bottom-6 right-6)
+              so the last agenda row can always scroll above it. */}
+          <div className="flex-1 overflow-y-auto px-2 pt-2 pb-24">
             {agendaEmpty ? (
               <div className="flex flex-col items-center justify-center gap-3 py-10">
                 <span className="text-sm text-muted-foreground">這天還沒有安排</span>
@@ -371,7 +377,7 @@ export function MonthView({
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') onTaskSelect(task, agendaDateString)
                     }}
-                    className="flex items-center gap-1 pr-2 min-h-[52px] rounded-xl active:bg-secondary/50 transition-colors cursor-pointer"
+                    className="flex items-center gap-1 pr-2 min-h-[52px] [@media(max-height:700px)]:min-h-[46px] rounded-xl active:bg-secondary/50 transition-colors cursor-pointer"
                   >
                     <button
                       type="button"

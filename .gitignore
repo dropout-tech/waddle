@@ -32,3 +32,4 @@ out/
 tsconfig.tsbuildinfo
 docs/reports/*-mobile-verify-shots/
 docs/reports/*-wp567-verify-shots/
+docs/reports/*-dark-mode-verify-shots/

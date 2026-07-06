@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, Mail, User, Loader2 } from 'lucide-react'
+import { useTheme } from 'next-themes'
+import { LogOut, Mail, User, Loader2, Moon, Sun } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
@@ -28,6 +29,12 @@ export function UserMenu({ className }: UserMenuProps = {}) {
   const [open, setOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const { resolvedTheme, setTheme } = useTheme()
+  // next-themes resolves the theme only on the client; gate the toggle's
+  // label/icon on mount so SSR and first render don't disagree.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  const isDark = mounted && resolvedTheme === 'dark'
 
   useEffect(() => {
     const supabase = createClient()
@@ -141,6 +148,21 @@ export function UserMenu({ className }: UserMenuProps = {}) {
               </div>
             </div>
           </div>
+
+          <div className="border-t border-border" />
+
+          <button
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            className={cn(
+              'w-full flex items-center gap-2 px-4 py-2.5 text-sm',
+              'hover:bg-muted/60 transition-colors text-foreground'
+            )}
+            role="menuitemcheckbox"
+            aria-checked={isDark}
+          >
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            <span>{isDark ? '切換淺色' : '切換深色'}</span>
+          </button>
 
           <div className="border-t border-border" />
 
