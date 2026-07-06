@@ -29,4 +29,4 @@ out/
 .codex/
 
 # TypeScript build cache
-tsconfig.tsbuildinfo
+tsconfig.tsbuildinfodocs/reports/*-mobile-verify-shots/
