@@ -4,6 +4,7 @@ import { forwardRef, useMemo } from 'react'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { toDateString, taskOccursOnDate } from '@/lib/calendar-utils'
 import { isLightColor } from '@/lib/utils'
+import { toDarkDisplayColor } from '@/lib/palette'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import type { Workspace, Task, TimeBlock } from '@/lib/types'
@@ -123,7 +124,8 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
             )
             const startMin = timeToMinutes(t.scheduledStartTime)
             const endMin = timeToMinutes(t.scheduledEndTime)
-            const color = t.calendarColor || ws.color
+            const rawColor = t.calendarColor || ws.color
+            const color = isDark ? toDarkDisplayColor(rawColor) ?? rawColor : rawColor
             for (const d of days) {
               if (!taskOccursOnDate(t, d)) continue
               const dateStr = toDateString(d)
@@ -162,7 +164,7 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
           date: b.date,
           startMin: timeToMinutes(b.startTime),
           endMin: timeToMinutes(b.endTime),
-          color: b.color,
+          color: isDark ? toDarkDisplayColor(b.color) ?? b.color : b.color,
           title: b.label,
           isBlock: true,
           isMeeting: false,
@@ -173,7 +175,7 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
       }
 
       return byDate
-    }, [workspaces, timeBlocks, days, showCategoryPrefix])
+    }, [workspaces, timeBlocks, days, showCategoryPrefix, isDark])
 
     const hourSpan = Math.max(1, endHour - startHour)
     const gridHeight = hourSpan * HOUR_PX

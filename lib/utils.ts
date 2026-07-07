@@ -62,7 +62,7 @@ export function unlockBodyScroll() {
  * approximation — fast, no perceptual library dependency.
  *
  * @example isLightColor('#ffe699')  // → true
- * @example isLightColor('#3b82f6')  // → false
+ * @example isLightColor('#259CCA')  // → false (brand low-chroma blue)
  */
 export function isLightColor(hex: string | undefined): boolean {
   if (!hex) return false

@@ -246,7 +246,7 @@ export function ReportModal({
                 </h4>
                 <div className="space-y-2">
                   {[
-                    { key: '7-10', label: '高 (7-10)', color: 'bg-destructive' },
+                    { key: '7-10', label: '高 (7-10)', color: 'bg-urgency-critical' },
                     { key: '4-6', label: '中 (4-6)', color: 'bg-warning' },
                     { key: '1-3', label: '低 (1-3)', color: 'bg-success' },
                   ].map(({ key, label, color }) => {

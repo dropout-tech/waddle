@@ -11,13 +11,11 @@ import { renderNotesWithLinks } from '@/lib/notes-render'
 import { toDateString } from '@/lib/calendar-utils'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from './recurrence-choice-modal'
 import { ModalShell } from './modal-shell'
+import { PICKER_COLOR_HEXES } from '@/lib/palette'
 
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
-const PRESET_COLORS = [
-  '#FF6B6B', '#4A90D9', '#66BB6A', '#FFB74D', '#9575CD',
-  '#4DD0E1', '#F06292', '#AED581', '#FFD54F', '#90A4AE',
-]
+const PRESET_COLORS = PICKER_COLOR_HEXES
 
 interface TaskDetailModalProps {
   task: Task

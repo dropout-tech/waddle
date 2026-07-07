@@ -15,6 +15,8 @@ import type { TaskDragStart } from './task-block'
 import { TimeBlockItem } from './time-block-item'
 import { CurrentTimeLine } from './current-time-line'
 import { CheckSquare, Coffee, Clock, Crosshair, User, X } from 'lucide-react'
+import { useDisplayColor } from '@/hooks/use-display-color'
+import { WORKSPACE_COLORS } from '@/lib/palette'
 
 interface TimeGridProps {
   scheduledTasks: Task[]
@@ -31,7 +33,7 @@ interface TimeGridProps {
 }
 
 const SLOT_TYPES = [
-  { key: 'task',     label: '任務', icon: CheckSquare, color: '#6B7FD4', description: '建立一般任務' },
+  { key: 'task',     label: '任務', icon: CheckSquare, color: WORKSPACE_COLORS.dustyLavender.hex, description: '建立一般任務' },
   { key: 'break',    label: '午休', icon: Coffee,      color: '#F6A854', description: '休息時間' },
   { key: 'buffer',   label: '緩衝', icon: Clock,       color: '#9BBFAC', description: '彈性緩衝時間' },
   { key: 'focus',    label: '專注', icon: Crosshair,   color: '#D46B8A', description: '專注工作時段' },
@@ -61,6 +63,7 @@ export function TimeGrid({
 }: TimeGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const gridRef      = useRef<HTMLDivElement>(null)
+  const displayColor = useDisplayColor()
 
   // ── New-slot drag (background) ──────────────────────────────────────────
   const [isSlotDragging, setIsSlotDragging] = useState(false)
@@ -295,7 +298,9 @@ export function TimeGrid({
               </div>
               <p className="text-[10px] text-muted-foreground mb-2">選擇時間區塊的類型</p>
               <div className="flex flex-col gap-1">
-                {SLOT_TYPES.map(({ key, label, icon: Icon, color, description }) => (
+                {SLOT_TYPES.map(({ key, label, icon: Icon, color: rawColor, description }) => {
+                  const color = displayColor(rawColor)
+                  return (
                   <button
                     key={key}
                     onClick={() => handleSelectType(key)}
@@ -309,7 +314,8 @@ export function TimeGrid({
                       <div className="text-[10px] text-muted-foreground">{description}</div>
                     </div>
                   </button>
-                ))}
+                  )
+                })}
               </div>
             </div>
           </>

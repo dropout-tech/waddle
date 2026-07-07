@@ -64,8 +64,16 @@ export function filterTasks(
  * Urgency (1–10) only affects background opacity and the label text shown in the badge.
  * Overdue state overrides to a red warning color.
  * Completed state desaturates everything.
+ *
+ * @param displayColorOverride Pass the theme-adjusted display color (see
+ * hooks/use-display-color.ts) when calling from a component that renders in
+ * both light and dark mode. `task.workspaceColor` is always the persisted
+ * *light-mode* hex; without this override, every color-mix derived here
+ * (rowBg/accentColor/badgeBg/badgeText/dot) would carry that light-mode
+ * saturation straight onto the dark card and read as neon. Defaults to the
+ * raw workspace color so non-UI callers (tests, etc.) keep working.
  */
-export function getUrgencyColor(task: Task): {
+export function getUrgencyColor(task: Task, displayColorOverride?: string): {
   /** Full row background colour */
   rowBg: string
   /** Left accent border colour — matches workspace color */
@@ -82,7 +90,7 @@ export function getUrgencyColor(task: Task): {
   isOverdue: boolean
 } {
   const today = toDateString(new Date())
-  const base = task.workspaceColor // always the workspace hex color
+  const base = displayColorOverride ?? task.workspaceColor // theme-adjusted display color, or the raw workspace hex
 
   // Background opacity increases with urgency (0.04 at low, 0.12 at critical)
   const urgency = task.urgency

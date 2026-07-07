@@ -25,6 +25,8 @@ import { X, ChevronLeft } from 'lucide-react'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from '../modals/recurrence-choice-modal'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
+import { useDisplayColor } from '@/hooks/use-display-color'
+import { WORKSPACE_COLORS } from '@/lib/palette'
 
 interface DayScrollViewProps {
   selectedDate: Date
@@ -93,6 +95,7 @@ export function DayScrollView({
 }: DayScrollViewProps) {
   const isMobile = useIsMobile()
   const showCategoryPrefix = useShowCategoryPrefix()
+  const displayColor = useDisplayColor()
   // On mobile, each day fills (viewport - time column) so the user sees one
   // full day per swipe and scroll-snap lands on day boundaries. Desktop
   // measures the actual scroll container and divides by dayViewDays so the
@@ -1095,7 +1098,7 @@ export function DayScrollView({
                               )
                             )}
                             style={{
-                              backgroundColor: task.calendarColor || task.workspaceColor,
+                              backgroundColor: displayColor(task.calendarColor || task.workspaceColor),
                               color: '#fff',
                               touchAction: 'none',
                             }}
@@ -1113,7 +1116,7 @@ export function DayScrollView({
                         <div
                           className="w-full flex-shrink-0 px-2 py-1 rounded text-[11px] font-medium truncate ring-2 ring-white/70 shadow-md select-none pointer-events-none"
                           style={{
-                            backgroundColor: draggedTaskPreview.calendarColor || draggedTaskPreview.workspaceColor,
+                            backgroundColor: displayColor(draggedTaskPreview.calendarColor || draggedTaskPreview.workspaceColor),
                             color: '#fff',
                           }}
                         >
@@ -1259,7 +1262,8 @@ export function DayScrollView({
                   // reads as "state" rather than another solid task. Text
                   // color flips by luminance — black/dark blocks need white
                   // text; cream/pale blocks need dark text.
-                  const textColor = isLightColor(block.color) ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.95)'
+                  const color = displayColor(block.color)!
+                  const textColor = isLightColor(color) ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.95)'
                   return (
                     <div
                       key={block.id}
@@ -1279,8 +1283,8 @@ export function DayScrollView({
                         height,
                         left: `calc(${leftPct}% + 2px)`,
                         width: `calc(${widthPct}% - 4px)`,
-                        backgroundColor: block.color + '99',
-                        borderLeft: `3px solid ${block.color}`,
+                        backgroundColor: color + '99',
+                        borderLeft: `3px solid ${color}`,
                         color: textColor,
                         cursor: isDraggingThis ? 'grabbing' : 'grab',
                         zIndex: isDraggingThis ? 50 : 1,
@@ -1293,7 +1297,7 @@ export function DayScrollView({
                         onPointerDown={(e) => handleTimeBlockDragStart(block, 'resize-top', dayIndex, e)}
                         style={{ touchAction: 'none' }}
                       >
-                        <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: block.color, opacity: 0.6 }} />
+                        <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: color, opacity: 0.6 }} />
                       </div>
 
                       {/* Body — drag to move, tap to open edit modal */}
@@ -1316,7 +1320,7 @@ export function DayScrollView({
                         onPointerDown={(e) => handleTimeBlockDragStart(block, 'resize-bottom', dayIndex, e)}
                         style={{ touchAction: 'none' }}
                       >
-                        <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: block.color, opacity: 0.6 }} />
+                        <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: color, opacity: 0.6 }} />
                       </div>
                     </div>
                   )
@@ -1329,15 +1333,16 @@ export function DayScrollView({
                 {activeBlockDrag && activeBlockDrag.dayIndex === dayIndex && !dayBlocks.find(b => b.id === activeBlockDrag.blockId) && (() => {
                   const block = timeBlocks.find(b => b.id === activeBlockDrag.blockId)
                   if (!block) return null
-                  const textColor = isLightColor(block.color) ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.95)'
+                  const color = displayColor(block.color)!
+                  const textColor = isLightColor(color) ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.95)'
                   return (
                     <div
                       className="absolute left-1 right-1 rounded px-2 py-1 text-xs font-medium overflow-hidden shadow-2xl z-modal ring-2 ring-white/40 pointer-events-none"
                       style={{
                         top: `${activeBlockDrag.currentStart - MIN}px`,
                         height: `${Math.max(activeBlockDrag.currentEnd - activeBlockDrag.currentStart, 30)}px`,
-                        backgroundColor: block.color + '99',
-                        borderLeft: `3px solid ${block.color}`,
+                        backgroundColor: color + '99',
+                        borderLeft: `3px solid ${color}`,
                         color: textColor,
                       }}
                     >
@@ -1390,7 +1395,7 @@ export function DayScrollView({
                     style={{
                       top: `${activeTaskDrag.currentStart - MIN}px`,
                       height: `${activeTaskDrag.currentEnd - activeTaskDrag.currentStart}px`,
-                      backgroundColor: tasks.find(t => t.id === activeTaskDrag.taskId)?.calendarColor || '#6B7FD4',
+                      backgroundColor: displayColor(tasks.find(t => t.id === activeTaskDrag.taskId)?.calendarColor || WORKSPACE_COLORS.dustyLavender.hex),
                     }}
                   >
                     <div className="text-xs font-semibold text-white truncate">
@@ -1414,7 +1419,7 @@ export function DayScrollView({
                     style={{
                       top: `${pendingTaskDrag.currentMinutes - MIN}px`,
                       height: `${Math.max(pendingTaskDrag.duration, 30)}px`,
-                      backgroundColor: pendingTaskDrag.task.calendarColor || pendingTaskDrag.task.workspaceColor || '#6B7FD4',
+                      backgroundColor: displayColor(pendingTaskDrag.task.calendarColor || pendingTaskDrag.task.workspaceColor || WORKSPACE_COLORS.dustyLavender.hex),
                     }}
                   >
                     <div className="text-xs font-semibold text-white truncate">
@@ -1499,7 +1504,7 @@ export function DayScrollView({
                     onClick={() => handleSelectType(slotType)}
                     className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
                   >
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${slotType.color}25` }}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${displayColor(slotType.color)}25` }}>
                       <SlotIcon slotType={slotType} />
                     </div>
                     <div className="flex-1 min-w-0">

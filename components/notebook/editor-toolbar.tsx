@@ -200,5 +200,11 @@ function Btn({
 }
 
 function Divider() {
-  return <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+  // `bg-border` alone measured ~1.4:1 against the toolbar background in dark
+  // mode (border is deliberately a soft, low-contrast line per DESIGN.md) —
+  // fine for a card edge, but this divider's job is to separate button
+  // groups, so it needs to actually be perceivable. muted-foreground/25 (the
+  // same token the icons use, just heavily thinned) keeps the "soft line"
+  // feel while giving it enough presence to read in both themes.
+  return <span className="mx-1 h-5 w-px bg-muted-foreground/45" aria-hidden />
 }

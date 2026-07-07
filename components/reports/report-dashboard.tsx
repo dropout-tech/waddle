@@ -23,6 +23,7 @@ import {
   ChevronUp,
   Users,
 } from 'lucide-react'
+import { useDisplayColor } from '@/hooks/use-display-color'
 
 interface ReportDashboardProps {
   workspaces: Workspace[]
@@ -33,6 +34,7 @@ type TabType = 'overview' | 'productivity' | 'habits' | 'insights'
 type DateRangeType = 'week' | 'month' | 'quarter' | 'year'
 
 export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
+  const displayColor = useDisplayColor()
   const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [dateRange, setDateRange] = useState<DateRangeType>('week')
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['overview']))
@@ -461,13 +463,15 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
           <div className="p-5 rounded-xl bg-card border border-border">
             <h3 className="font-medium mb-4">工作區表現</h3>
             <div className="space-y-4">
-              {workspaceStats.map(ws => (
+              {workspaceStats.map(ws => {
+                const wsColor = displayColor(ws.color)
+                return (
                 <div key={ws.id} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div
                         className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: ws.color }}
+                        style={{ backgroundColor: wsColor }}
                         aria-hidden="true"
                       />
                       <span className="font-medium text-sm">{ws.name}</span>
@@ -485,16 +489,17 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
                     </div>
                   </div>
                   <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className="h-full rounded-full transition-all duration-500"
-                      style={{ 
+                      style={{
                         width: `${ws.rate}%`,
-                        backgroundColor: ws.color 
+                        backgroundColor: wsColor
                       }}
                     />
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
@@ -1051,16 +1056,17 @@ function CollapsibleSection({
 }
 
 function TaskRow({ task }: { task: Task }) {
-  const daysOverdue = task.dueDate 
+  const displayColor = useDisplayColor()
+  const daysOverdue = task.dueDate
     ? Math.floor((Date.now() - new Date(task.dueDate).getTime()) / 86400000)
     : 0
 
   return (
     <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
       <div className="flex items-center gap-3">
-        <div 
+        <div
           className="w-2 h-2 rounded-full flex-shrink-0"
-          style={{ backgroundColor: task.workspaceColor || '#666' }}
+          style={{ backgroundColor: displayColor(task.workspaceColor) || '#666' }}
         />
         <span className="text-sm truncate">{task.title}</span>
       </div>

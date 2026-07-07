@@ -30,6 +30,7 @@ import {
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
+import { useDisplayColor } from '@/hooks/use-display-color'
 
 type TaskSortKey = 'category' | 'dueDate' | 'urgency' | 'created'
 
@@ -87,6 +88,7 @@ export function FullScreenTaskView({
   onClose,
   onAddTask
 }: FullScreenTaskViewProps) {
+  const displayColor = useDisplayColor()
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'workspaces'>('overview')
   const [taskFilter, setTaskFilter] = useState<'all' | 'today' | 'upcoming' | 'overdue' | 'unscheduled'>('all')
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null)
@@ -490,17 +492,19 @@ export function FullScreenTaskView({
                   工作區進度
                 </h2>
                 <div className="space-y-3">
-                  {workspaceStats.map(ws => (
-                    <div 
+                  {workspaceStats.map(ws => {
+                    const wsColor = displayColor(ws.color)
+                    return (
+                    <div
                       key={ws.id}
                       className="p-4 rounded-xl bg-card border border-border hover:shadow-md transition-all cursor-pointer"
                       onClick={() => { setActiveTab('workspaces'); setSelectedWorkspace(ws.id) }}
                     >
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <div 
-                            className="w-4 h-4 rounded-full" 
-                            style={{ backgroundColor: ws.color }}
+                          <div
+                            className="w-4 h-4 rounded-full"
+                            style={{ backgroundColor: wsColor }}
                           />
                           <span className="font-medium">{ws.name}</span>
                         </div>
@@ -524,14 +528,15 @@ export function FullScreenTaskView({
                       <div className="h-2 bg-secondary rounded-full overflow-hidden">
                         <div 
                           className="h-full rounded-full transition-all"
-                          style={{ 
+                          style={{
                             width: `${ws.stats.completionRate}%`,
-                            backgroundColor: ws.color 
+                            backgroundColor: wsColor
                           }}
                         />
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 
@@ -561,9 +566,9 @@ export function FullScreenTaskView({
                               過期 {getDaysOverdue(task.dueDate!)} 天
                             </div>
                           </div>
-                          <div 
+                          <div
                             className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: task.workspaceColor }}
+                            style={{ backgroundColor: displayColor(task.workspaceColor) }}
                           />
                         </div>
                       ))}
@@ -605,9 +610,9 @@ export function FullScreenTaskView({
                               </div>
                             )}
                           </div>
-                          <div 
+                          <div
                             className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: task.workspaceColor }}
+                            style={{ backgroundColor: displayColor(task.workspaceColor) }}
                           />
                         </div>
                       ))}
@@ -846,7 +851,7 @@ export function FullScreenTaskView({
                         className="w-full flex items-center gap-3 p-4 bg-card hover:bg-secondary/50 transition-colors"
                       >
                         <ChevronDown className={cn("w-4 h-4 transition-transform", !isExpanded && "-rotate-90")} />
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: workspace.color }} />
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: displayColor(workspace.color) }} />
                         <span className="font-semibold">{workspace.name}</span>
                         <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-secondary">
                           {wsTasks.length}
@@ -901,7 +906,7 @@ export function FullScreenTaskView({
                                           density === 'comfortable' && "px-4 py-3",
                                           density === 'relaxed' && "px-4 py-4"
                                         )}
-                                        style={{ borderLeftColor: workspace.color, borderLeftWidth: '3px' }}
+                                        style={{ borderLeftColor: displayColor(workspace.color), borderLeftWidth: '3px' }}
                                         onClick={() => onTaskClick?.(task)}
                                       >
                                         <button
@@ -1037,13 +1042,13 @@ export function FullScreenTaskView({
                           <span
                             className="flex-shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
                             style={{
-                              backgroundColor: `${task.workspaceColor}20`,
-                              color: task.workspaceColor,
+                              backgroundColor: `${displayColor(task.workspaceColor)}20`,
+                              color: displayColor(task.workspaceColor),
                             }}
                           >
                             <span
                               className="w-1.5 h-1.5 rounded-full"
-                              style={{ backgroundColor: task.workspaceColor }}
+                              style={{ backgroundColor: displayColor(task.workspaceColor) }}
                             />
                             {task.workspaceName}
                           </span>
@@ -1347,6 +1352,8 @@ function WorkspaceCard({
   onToggleComplete,
   onDrillIn,
 }: WorkspaceCardProps) {
+  const displayColor = useDisplayColor()
+  const wsColor = displayColor(ws.color)
   const { stats, mostUrgent, categoryProgress } = ws
 
   // Sort categories by completion rate desc to surface progress; cap to 4
@@ -1372,7 +1379,7 @@ function WorkspaceCard({
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden flex flex-col transition-shadow hover:shadow-md">
       {/* Card Header */}
-      <div className="px-5 pt-4 pb-3" style={{ backgroundColor: `${ws.color}10` }}>
+      <div className="px-5 pt-4 pb-3" style={{ backgroundColor: `${wsColor}10` }}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="text-2xl flex-shrink-0" aria-hidden="true">
@@ -1403,7 +1410,7 @@ function WorkspaceCard({
               strokeWidth="6"
               strokeLinecap="round"
               strokeDasharray={`${dash} ${c}`}
-              style={{ stroke: ws.color }}
+              style={{ stroke: wsColor }}
               className="transition-[stroke-dasharray] duration-500"
             />
           </svg>
@@ -1490,7 +1497,7 @@ function WorkspaceCard({
                 <div className="w-16 h-1 rounded-full bg-muted overflow-hidden flex-shrink-0">
                   <div
                     className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${c.percent}%`, backgroundColor: ws.color }}
+                    style={{ width: `${c.percent}%`, backgroundColor: wsColor }}
                   />
                 </div>
                 <span className="w-10 text-right tabular-nums text-muted-foreground text-[11px]">

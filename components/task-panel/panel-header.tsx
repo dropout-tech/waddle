@@ -9,6 +9,7 @@ import { WorkspaceSettingsModal } from '@/components/modals/workspace-settings-m
 import { WorkspaceIcon, PRESET_ICONS, PRESET_ICON_NAMES } from '@/lib/workspace-icons'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { UserMenu } from '@/components/user-menu'
+import { useDisplayColor } from '@/hooks/use-display-color'
 
 interface PanelHeaderProps {
   workspaces: Workspace[]
@@ -40,6 +41,7 @@ export function PanelHeader({
   onToggleExpand,
 }: PanelHeaderProps) {
   const isMobile = useIsMobile()
+  const displayColor = useDisplayColor()
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
   const [settingsWorkspaceId, setSettingsWorkspaceId] = useState<string | null>(null)
   const settingsWorkspace = workspaces.find((w) => w.id === settingsWorkspaceId) ?? null
@@ -280,6 +282,7 @@ export function PanelHeader({
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((workspace) => {
                 const count = getWorkspaceCount(workspace)
+                const wsColor = displayColor(workspace.color)
                 return (
                   <button
                     key={workspace.id}
@@ -288,18 +291,18 @@ export function PanelHeader({
                       'group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex-shrink-0',
                       'border bg-card hover:bg-muted/50'
                     )}
-                    style={{ borderColor: `${workspace.color}40`, color: workspace.color }}
+                    style={{ borderColor: `${wsColor}40`, color: wsColor }}
                   >
-                    <WorkspaceIcon 
-                      icon={workspace.icon} 
+                    <WorkspaceIcon
+                      icon={workspace.icon}
                       fallback={workspace.name}
-                      color={workspace.color} 
-                      size="xs" 
+                      color={wsColor}
+                      size="xs"
                     />
                     <span className="font-semibold">{workspace.name}</span>
                     <span
                       className="px-1.5 py-0.5 rounded text-[10px] font-bold"
-                      style={{ backgroundColor: `${workspace.color}18` }}
+                      style={{ backgroundColor: `${wsColor}18` }}
                     >
                       {count}
                     </span>

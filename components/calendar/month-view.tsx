@@ -8,6 +8,7 @@ import { toDateString, taskOccursOnDate } from '@/lib/calendar-utils'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useDisplayColor } from '@/hooks/use-display-color'
 
 interface MonthViewProps {
   selectedDate: Date
@@ -42,6 +43,7 @@ export function MonthView({
   const monthRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const showCategoryPrefix = useShowCategoryPrefix()
   const isMobile = useIsMobile()
+  const displayColor = useDisplayColor()
 
   // Mobile agenda: the day whose tasks are listed under the compact grid.
   // Follows selectedDate (header navigation, "today" button) but can be
@@ -294,7 +296,7 @@ export function MonthView({
                             <span
                               key={task.id}
                               className="w-1.5 h-1.5 rounded-full"
-                              style={{ backgroundColor: task.calendarColor || task.workspaceColor }}
+                              style={{ backgroundColor: displayColor(task.calendarColor || task.workspaceColor) }}
                             />
                           ))}
                           {hasCompletedOnly && (
@@ -359,7 +361,7 @@ export function MonthView({
                   <div key={block.id} className="flex items-center gap-3 px-2 min-h-[44px] py-1">
                     <span
                       className="w-1 self-stretch rounded-full flex-shrink-0"
-                      style={{ backgroundColor: block.color }}
+                      style={{ backgroundColor: displayColor(block.color) }}
                     />
                     <span className="text-xs font-mono text-muted-foreground w-[84px] flex-shrink-0">
                       {block.startTime}–{block.endTime}
@@ -387,7 +389,7 @@ export function MonthView({
                     >
                       <span
                         className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                        style={{ borderColor: task.calendarColor || task.workspaceColor }}
+                        style={{ borderColor: displayColor(task.calendarColor || task.workspaceColor) }}
                       />
                     </button>
                     <div className="flex-1 min-w-0">
@@ -426,7 +428,7 @@ export function MonthView({
                     >
                       <span
                         className="w-5 h-5 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: task.calendarColor || task.workspaceColor }}
+                        style={{ backgroundColor: displayColor(task.calendarColor || task.workspaceColor) }}
                       >
                         <Check className="w-3 h-3 text-white" strokeWidth={3} />
                       </span>
@@ -541,7 +543,7 @@ export function MonthView({
                             <div
                               key={block.id}
                               className="h-1 flex-1 rounded-full"
-                              style={{ backgroundColor: block.color }}
+                              style={{ backgroundColor: displayColor(block.color) }}
                             />
                           ))}
                         </div>
@@ -549,7 +551,9 @@ export function MonthView({
 
                       {/* Task List */}
                       <div className="flex-1 px-1 pb-1 space-y-0.5 overflow-y-auto">
-                        {pendingTasks.slice(0, 3).map((task) => (
+                        {pendingTasks.slice(0, 3).map((task) => {
+                          const color = displayColor(task.calendarColor || task.workspaceColor)
+                          return (
                           <div
                             key={task.id}
                             onClick={(e) => {
@@ -558,17 +562,17 @@ export function MonthView({
                             }}
                             className="flex items-center gap-1 px-1 py-0.5 rounded text-[9px] cursor-pointer hover:brightness-95 transition-all"
                             style={{
-                              backgroundColor: `${task.calendarColor || task.workspaceColor}15`,
-                              borderLeft: `2px solid ${task.calendarColor || task.workspaceColor}`,
+                              backgroundColor: `${color}15`,
+                              borderLeft: `2px solid ${color}`,
                             }}
                           >
                             <button
                               onClick={(e) => handleToggleComplete(e, task.id)}
                               className="flex-shrink-0 w-2.5 h-2.5 rounded-full border flex items-center justify-center"
-                              style={{ borderColor: task.calendarColor || task.workspaceColor }}
+                              style={{ borderColor: color }}
                             >
                               {task.isCompleted && (
-                                <Check className="w-1.5 h-1.5" style={{ color: task.calendarColor || task.workspaceColor }} strokeWidth={3} />
+                                <Check className="w-1.5 h-1.5" style={{ color }} strokeWidth={3} />
                               )}
                             </button>
                             <div
@@ -579,7 +583,8 @@ export function MonthView({
                               {taskDisplayTitle(task, showCategoryPrefix)}
                             </span>
                           </div>
-                        ))}
+                          )
+                        })}
 
                         {completedTasks.length > 0 && pendingTasks.length < 3 && (
                           <div className="text-[8px] text-muted-foreground/60 px-1 flex items-center gap-0.5">
@@ -595,13 +600,16 @@ export function MonthView({
                         )}
                       </div>
 
-                      {pendingTasks.length > 0 && (
+                      {day.isCurrentMonth && pendingTasks.length > 0 && (
                         <div
                           className="absolute top-0.5 right-0.5 min-w-[14px] h-3.5 px-1 rounded-full text-[8px] font-bold flex items-center justify-center text-white"
                           style={{
-                            backgroundColor: pendingTasks.some(t => t.urgency >= 7) 
-                              ? 'oklch(0.55 0.22 25)' 
-                              : 'oklch(0.65 0.15 230)',
+                            // Neutral by default; only lean on the urgency
+                            // ramp (never a plain blue) when the day actually
+                            // has something pressing in it.
+                            backgroundColor: pendingTasks.some(t => t.urgency >= 7)
+                              ? 'var(--urgency-critical)'
+                              : 'var(--foreground)',
                           }}
                         >
                           {pendingTasks.length}

@@ -25,6 +25,8 @@ import { X, ChevronLeft } from 'lucide-react'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from '../modals/recurrence-choice-modal'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
+import { useDisplayColor } from '@/hooks/use-display-color'
+import { WORKSPACE_COLORS } from '@/lib/palette'
 
 interface WeekViewProps {
   selectedDate: Date
@@ -90,6 +92,7 @@ export function WeekView({
   weekViewDays = 7,
 }: WeekViewProps) {
   const showCategoryPrefix = useShowCategoryPrefix()
+  const displayColor = useDisplayColor()
   const isMobile = useIsMobile()
   // Mobile: measured width of the horizontal scroll container. Columns are
   // sized so exactly three days fill the viewport — swipes land on aligned
@@ -902,7 +905,7 @@ export function WeekView({
                               )
                             )}
                             style={{
-                              backgroundColor: task.calendarColor || task.workspaceColor,
+                              backgroundColor: displayColor(task.calendarColor || task.workspaceColor),
                               color: '#fff',
                             }}
                           >
@@ -919,7 +922,7 @@ export function WeekView({
                         <div
                           className="w-full flex-shrink-0 px-1.5 py-[3px] rounded text-[10px] font-medium truncate ring-2 ring-white/70 shadow-md select-none pointer-events-none"
                           style={{
-                            backgroundColor: draggedTaskPreview.calendarColor || draggedTaskPreview.workspaceColor,
+                            backgroundColor: displayColor(draggedTaskPreview.calendarColor || draggedTaskPreview.workspaceColor),
                             color: '#fff',
                           }}
                         >
@@ -1020,7 +1023,8 @@ export function WeekView({
                   const leftPct = colIdx * widthPct
                   // See day-scroll-view for rationale: tint strong enough to
                   // read on cream bg, text color flips by luminance.
-                  const textColor = isLightColor(block.color) ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.95)'
+                  const color = displayColor(block.color)!
+                  const textColor = isLightColor(color) ? 'rgba(0,0,0,0.78)' : 'rgba(255,255,255,0.95)'
                   return (
                     <div
                       key={block.id}
@@ -1035,8 +1039,8 @@ export function WeekView({
                         height: getDurationHeight(block.startTime, block.endTime),
                         left: `calc(${leftPct}% + 2px)`,
                         width: `calc(${widthPct}% - 4px)`,
-                        backgroundColor: block.color + '99',
-                        borderLeft: `3px solid ${block.color}`,
+                        backgroundColor: color + '99',
+                        borderLeft: `3px solid ${color}`,
                         color: textColor,
                       }}
                     >
@@ -1088,7 +1092,7 @@ export function WeekView({
                     style={{
                       top: `${activeTaskDrag.currentStart - MIN}px`,
                       height: `${activeTaskDrag.currentEnd - activeTaskDrag.currentStart}px`,
-                      backgroundColor: tasks.find(t => t.id === activeTaskDrag.taskId)?.calendarColor || '#6B7FD4',
+                      backgroundColor: displayColor(tasks.find(t => t.id === activeTaskDrag.taskId)?.calendarColor || WORKSPACE_COLORS.dustyLavender.hex),
                     }}
                   >
                     <div className="text-xs font-semibold text-white truncate">
@@ -1112,7 +1116,7 @@ export function WeekView({
                     style={{
                       top: `${pendingTaskDrag.currentMinutes - MIN}px`,
                       height: `${Math.max(pendingTaskDrag.duration, 30)}px`,
-                      backgroundColor: pendingTaskDrag.task.calendarColor || pendingTaskDrag.task.workspaceColor || '#6B7FD4',
+                      backgroundColor: displayColor(pendingTaskDrag.task.calendarColor || pendingTaskDrag.task.workspaceColor || WORKSPACE_COLORS.dustyLavender.hex),
                     }}
                   >
                     <div className="text-xs font-semibold text-white truncate">
@@ -1198,7 +1202,7 @@ export function WeekView({
                         onClick={() => handleSelectType(slotType)}
                         className="flex items-center gap-2 px-2 py-2 rounded-xl hover:bg-muted transition-colors text-left"
                       >
-                        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${slotType.color}25` }}>
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${displayColor(slotType.color)}25` }}>
                           <SlotIcon slotType={slotType} />
                         </div>
                         <div className="flex-1 min-w-0">

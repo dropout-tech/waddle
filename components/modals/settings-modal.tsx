@@ -20,6 +20,7 @@ import {
 } from '@/lib/meeting-reminder'
 import { requestReminderPermission, syncMeetingReminders } from '@/lib/notifications'
 import { DeleteAccountButton } from '@/components/auth/delete-account-button'
+import { PICKER_COLOR_HEXES, WORKSPACE_COLORS } from '@/lib/palette'
 import {
   WATER_REMINDER_INTERVALS,
   type WaterReminderInterval,
@@ -58,10 +59,7 @@ interface SettingsModalProps {
   onSave: (settings: UserSettings, timeBlocks: TimeBlock[]) => void
 }
 
-const PRESET_COLORS = [
-  '#FF6B6B', '#4A90D9', '#66BB6A', '#FFB74D', '#9575CD',
-  '#4DD0E1', '#F06292', '#AED581', '#FFD54F', '#90A4AE',
-]
+const PRESET_COLORS = PICKER_COLOR_HEXES
 
 // Default notification settings
 const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
@@ -138,7 +136,7 @@ export function SettingsModal({
     description: '',
     icon: 'Clock',
     iconType: 'lucide',
-    color: '#6B7FD4',
+    color: WORKSPACE_COLORS.dustyLavender.hex,
     parentId: 'timeblock',
     workspaceId: undefined,
   })
@@ -221,14 +219,14 @@ export function SettingsModal({
       description: newSlotType.description || '',
       icon: newSlotType.icon || 'Clock',
       iconType: newSlotType.iconType || 'lucide',
-      color: newSlotType.color || '#6B7FD4',
+      color: newSlotType.color || WORKSPACE_COLORS.dustyLavender.hex,
       parentId: newSlotType.parentId,
       sortOrder: maxSort + 1,
       isBuiltIn: false,
       workspaceId: newSlotType.workspaceId,
     }
     persistSlotTypes([...localSettings.slotTypes, newType])
-    setNewSlotType({ label: '', description: '', icon: 'Clock', iconType: 'lucide', color: '#6B7FD4', parentId: 'timeblock', workspaceId: undefined })
+    setNewSlotType({ label: '', description: '', icon: 'Clock', iconType: 'lucide', color: WORKSPACE_COLORS.dustyLavender.hex, parentId: 'timeblock', workspaceId: undefined })
     setCustomIconInput('')
     setIsAddingNew(false)
   }
@@ -850,7 +848,7 @@ export function SettingsModal({
                       ))}
                       <input
                         type="color"
-                        value={newSlotType.color || '#6B7FD4'}
+                        value={newSlotType.color || WORKSPACE_COLORS.dustyLavender.hex}
                         onChange={(e) => setNewSlotType(prev => ({ ...prev, color: e.target.value }))}
                         className="w-6 h-6 rounded-full cursor-pointer"
                       />

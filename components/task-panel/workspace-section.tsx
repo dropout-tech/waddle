@@ -7,6 +7,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import type { Workspace, Task } from '@/lib/types'
 import { CategorySection } from './category-section'
 import type { Density, MetaField } from './task-panel'
+import { useDisplayColor } from '@/hooks/use-display-color'
 
 interface WorkspaceSectionProps {
   workspace: Workspace
@@ -43,6 +44,8 @@ export function WorkspaceSection({
   onTaskDragActivate,
 }: WorkspaceSectionProps) {
   const isMobile = useIsMobile()
+  const displayColor = useDisplayColor()
+  const wsColor = displayColor(workspace.color)
   const [isAddingCategory, setIsAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
   // Drag-reorder state for category headers (desktop only). `draggingId` is the
@@ -132,18 +135,18 @@ export function WorkspaceSection({
       <div className="flex items-center gap-3 px-1 mb-3">
         <div
           className="w-1 h-6 rounded-sm"
-          style={{ backgroundColor: workspace.color }}
+          style={{ backgroundColor: wsColor }}
         />
         <div className="flex-1 flex items-center gap-2">
           <h3 className="text-sm font-bold text-foreground">
             {workspace.icon && <span className="mr-1">{workspace.icon}</span>}
             {workspace.name}
           </h3>
-          <span 
+          <span
             className="text-[10px] font-medium px-1.5 py-0.5 rounded"
-            style={{ 
-              backgroundColor: `${workspace.color}15`,
-              color: workspace.color 
+            style={{
+              backgroundColor: `${wsColor}15`,
+              color: wsColor
             }}
           >
             {pendingCount}

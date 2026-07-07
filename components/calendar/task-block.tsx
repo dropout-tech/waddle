@@ -12,6 +12,7 @@ import { Check, GripVertical, RefreshCw, Layers, Clock, Users, Video, Link2, Set
 import { detectMeetingProvider } from '@/lib/meeting-utils'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
+import { useDisplayColor } from '@/hooks/use-display-color'
 
 // Touch input requires a long-press before any drag activates so the user
 // can scroll the calendar past tasks without accidentally moving them.
@@ -77,6 +78,7 @@ function TaskBlockImpl({
   isDragging = false,
 }: TaskBlockProps) {
   const showCategoryPrefix = useShowCategoryPrefix()
+  const displayColor = useDisplayColor()
   const displayTitle = taskDisplayTitle(task, showCategoryPrefix)
   const occurrenceDate = date ?? task.scheduledDate
   if (!task.scheduledStartTime || !task.scheduledEndTime) return null
@@ -255,7 +257,7 @@ function TaskBlockImpl({
   const handleResizeBottomPointerDown = (e: React.PointerEvent) =>
     handleResizePointerDown(e, 'resize-bottom')
 
-  const color = task.calendarColor || task.workspaceColor
+  const color = displayColor(task.calendarColor || task.workspaceColor)
 
   // Compact mode: positioned within column, uses percentage-based width
   // Non-compact: uses time label offset calculation

@@ -15,6 +15,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useDisplayColor } from '@/hooks/use-display-color'
 
 interface TaskRowProps {
   task: Task
@@ -54,7 +55,9 @@ function TaskRowImpl({
   isDragging,
   showWorkspaceTag = false,
 }: TaskRowProps) {
-  const colors = getUrgencyColor(task)
+  const displayColor = useDisplayColor()
+  const workspaceDisplayColor = displayColor(task.workspaceColor)
+  const colors = getUrgencyColor(task, workspaceDisplayColor)
   // Empty-title tasks (e.g. created via drag with no save) should still be
   // visible and tappable. Show a placeholder so the row never collapses.
   const displayTitle = task.title?.trim() || '未命名任務'
@@ -193,7 +196,7 @@ function TaskRowImpl({
           style={{
             left: ghostPos.x + 12,
             top: ghostPos.y + 12,
-            backgroundColor: task.calendarColor || task.workspaceColor,
+            backgroundColor: displayColor(task.calendarColor || task.workspaceColor),
             color: '#fff',
           }}
         >
@@ -283,7 +286,7 @@ function TaskRowImpl({
           {showWorkspaceTag && (
             <span
               className="flex-shrink-0 text-[9px] font-semibold px-1 py-0.5 rounded"
-              style={{ backgroundColor: `${task.workspaceColor}20`, color: task.workspaceColor }}
+              style={{ backgroundColor: `${workspaceDisplayColor}20`, color: workspaceDisplayColor }}
             >
               {task.workspaceName}
             </span>
@@ -409,7 +412,7 @@ function TaskRowImpl({
             {showWorkspaceTag && (
               <span
                 className="flex-shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded"
-                style={{ backgroundColor: `${task.workspaceColor}20`, color: task.workspaceColor }}
+                style={{ backgroundColor: `${workspaceDisplayColor}20`, color: workspaceDisplayColor }}
               >
                 {task.workspaceName}
               </span>

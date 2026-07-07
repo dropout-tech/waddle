@@ -16,6 +16,7 @@ import { toDateString, parseDateString } from '@/lib/calendar-utils'
 import { playTaskCompleteSound } from '@/lib/task-sound'
 import { hapticTaskComplete } from '@/lib/haptics'
 import { pushUndoableAction } from '@/lib/undo-stack'
+import { WORKSPACE_COLORS } from '@/lib/palette'
 import type {
   Workspace,
   Category,
@@ -2570,12 +2571,12 @@ export function useWaddleData(): UseWaddleData {
     const TEMPLATES: { name: string; color: string; icon: string; categories: string[] }[] =
       choice === 'template'
         ? [
-            { name: '工作', color: '#3b82f6', icon: '💼', categories: ['本週', '進行中', '完成'] },
-            { name: '個人', color: '#10b981', icon: '🏠', categories: ['生活', '健康'] },
-            { name: '學習', color: '#a855f7', icon: '📚', categories: ['課程', '閱讀'] },
+            { name: '工作', color: WORKSPACE_COLORS.lowChromaBlue.hex, icon: '💼', categories: ['本週', '進行中', '完成'] },
+            { name: '個人', color: WORKSPACE_COLORS.sage.hex, icon: '🏠', categories: ['生活', '健康'] },
+            { name: '學習', color: WORKSPACE_COLORS.dustyLavender.hex, icon: '📚', categories: ['課程', '閱讀'] },
           ]
         : [
-            { name: '我的工作區', color: '#6366f1', icon: '📌', categories: ['一般'] },
+            { name: '我的工作區', color: WORKSPACE_COLORS.terracotta.hex, icon: '📌', categories: ['一般'] },
           ]
 
     // Build everything in memory first so the optimistic UI matches what we
