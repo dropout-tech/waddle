@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pause, Play, X, ChevronUp, ChevronDown, Music2, Minimize } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { WaddleMascot } from '@/components/branding/waddle-mascot'
+import { useDisplayColor } from '@/hooks/use-display-color'
 import {
   BGM_MUSIC, BGM_AMBIENT, summarizeBgm,
   ALL_MUSIC_ID, ALL_MUSIC_LABEL, ALL_MUSIC_EMOJI,
@@ -61,6 +63,12 @@ export interface ImmersiveProps {
 const EXIT_HOLD_MS = 900
 const DIM_DELAY_MS = 5000
 
+// Break accent — sage, from DESIGN.md's secondary / urgency-low domain. The
+// 78/22 mix with --secondary-foreground pins its lightness to the same band
+// as --primary (≈0.68 light / ≈0.72 dark), so work and break carry equal
+// visual weight in both themes without hand-tuning a dark variant.
+const BREAK_ACCENT = 'color-mix(in oklch, var(--urgency-low) 78%, var(--secondary-foreground))'
+
 // Completion copy — one gentle voice for all three endings. No urgency, no
 // guilt; the celebration itself (penguin + halo) is reserved for finished
 // work sessions so it keeps meaning.
@@ -89,6 +97,8 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
   // Ambient "now" clock (B8). Updates on the minute boundary so the display
   // changes in sync with the OS clock rather than drifting by N seconds.
   const [nowText, setNowText] = useState(() => formatClockHHMM(new Date()))
+  // Maps the stored light-mode session color to its dark-safe display value.
+  const display = useDisplayColor()
 
   const dimTimerRef = useRef<NodeJS.Timeout | null>(null)
   const exitHoldRef = useRef<{ raf: number; cleared: boolean } | null>(null)
@@ -175,36 +185,28 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
     [startedAt, targetSeconds],
   )
 
-  // The warmth journey — the signature move. As a focus session progresses,
-  // the whole screen drifts from the calm session color toward a warm amber,
-  // so time passing is something you *feel*, not just read. Only for pomodoro
-  // work: a stopwatch has no endpoint to warm toward, and a break should stay
-  // calm. WARM_ANCHOR stays inside the warm OKLCH band (hue ~48), so the drift
-  // never crosses into cold blue, honoring DESIGN.md's palette.
-  const WARM_ANCHOR = 'oklch(0.72 0.16 48)'
+  // Direction A「暖紙陶瓷」— the scene is warm cream paper for both phases.
+  // The session/workspace color no longer floods the background; it lives
+  // only in the mode chip's dot (through the useDisplayColor pipeline so
+  // dark mode never goes neon). Everything else keys off a per-phase accent:
+  // terracotta (--primary) at work, sage at break — same composition, one
+  // world, two temperatures.
+  const accent = isBreak ? BREAK_ACCENT : 'var(--primary)'
+  const chipDotColor = display(color) ?? color
+  // A whisper of the old warmth journey survives in the central bloom only:
+  // it deepens slightly as a work session progresses. Felt, not read.
   const warmth = !isBreak && targetSeconds > 0 && state !== 'idle'
     ? Math.max(0, Math.min(1, progress / 100))
     : 0
-  // The last minute gets an extra nudge so short timers still feel the arrival.
-  const isFinalMinute = remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 60
   // Ring pulse is reserved for the final 10 seconds only — a quiet heartbeat
   // at the arrival, not a nervous tic for the last 5% of every session.
   const inFinalTen = remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 10
   // Completion → idle fades the whole surface out; completion → break keeps
   // the surface (the break continues underneath) and fades only the overlay.
   const rootExiting = !!completion?.exiting && completion.next === 'idle'
-  const ringStrokeActive = isFinalMinute
-    ? `color-mix(in oklch, ${color} 42%, oklch(0.7 0.18 38))`
-    : warmth > 0
-      ? `color-mix(in oklch, ${color} ${Math.round(100 - warmth * 45)}%, ${WARM_ANCHOR})`
-      : color
-  // Background base drifts warmer + slightly more saturated as warmth rises.
-  const sessionTone = `color-mix(in oklch, ${color} ${16 + warmth * 12}%, var(--background))`
-  const bgColor = warmth > 0
-    ? `color-mix(in oklch, ${sessionTone} ${Math.round(100 - warmth * 26)}%, ${WARM_ANCHOR})`
-    : sessionTone
 
-  const ringRadius = 130
+  const ringRadius = 152
+  const ringCenter = 170
   const ringCirc = 2 * Math.PI * ringRadius
 
   // 5-minute tick marks. Skip the 12-o'clock position so the dot doesn't
@@ -220,8 +222,8 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
       // -PI/2 because the parent SVG is `-rotate-90` so the start is "up"
       const angle = fraction * Math.PI * 2 - Math.PI / 2
       out.push({
-        cx: 150 + ringRadius * Math.cos(angle + Math.PI / 2), // +PI/2 to map back into the rotated SVG coords
-        cy: 150 + ringRadius * Math.sin(angle + Math.PI / 2),
+        cx: ringCenter + ringRadius * Math.cos(angle + Math.PI / 2), // +PI/2 to map back into the rotated SVG coords
+        cy: ringCenter + ringRadius * Math.sin(angle + Math.PI / 2),
       })
     }
     return out
@@ -233,10 +235,9 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
     <div
       className="fixed inset-0 z-tour flex flex-col select-none overflow-hidden"
       style={{
-        // No background-color transition: DESIGN.md limits animation to
-        // transform/opacity/filter. Phase color changes happen under the
-        // completion overlay, so nothing snaps in view anyway.
-        backgroundColor: bgColor,
+        // Warm cream paper (or warm charcoal in dark) — a flat token surface.
+        // The phase tint happens in the bloom layer below, never here.
+        backgroundColor: 'var(--background)',
         opacity: rootExiting ? 0 : 1,
         transition: 'opacity 400ms var(--ease-quart)',
       }}
@@ -283,15 +284,6 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
           from { opacity: 0; transform: translateY(-6px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        /* Floating particles drift from below the viewport up past the top
-           edge over a long lazy cycle. Composed with a horizontal sway
-           animation on the same element via animation-name pairing. */
-        @keyframes waddle-particle-rise {
-          0% { transform: translate3d(0, 30vh, 0); opacity: 0; }
-          12% { opacity: var(--waddle-particle-opacity, 0.32); }
-          88% { opacity: var(--waddle-particle-opacity, 0.32); }
-          100% { transform: translate3d(0, -130vh, 0); opacity: 0; }
-        }
         /* Box-breath-ish pacer for break phase. 4-7-8 cycle = 19s. */
         @keyframes waddle-breath-scale {
           0%   { transform: scale(1); }
@@ -315,59 +307,34 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
         @media (prefers-reduced-motion: reduce) {
           .waddle-breathe-bg { animation: none !important; opacity: 0.75 !important; }
           .waddle-ring-pulse { animation: none !important; }
-          .waddle-particle { animation: none !important; opacity: 0 !important; }
           .waddle-breath-scale-target { animation: none !important; transform: scale(1) !important; }
           .waddle-celebrate-penguin { animation: none !important; }
           .waddle-celebrate-bloom { animation: none !important; opacity: 0 !important; }
         }
       `}</style>
 
-      {/* Breathing aurora. Larger + slower than a plain glow, and its core
-          picks up the warmth journey so the bloom warms alongside the ring. */}
+      {/* Central bloom — the glaze warmth of Direction A. An extremely faint
+          accent wash breathing at the paper's center; recomputes with warmth
+          each tick (steps far too small to see), so no background transition
+          is needed — animating background would violate the
+          transform/opacity/filter rule anyway. */}
       <div
         aria-hidden="true"
         className="waddle-breathe-bg pointer-events-none absolute inset-0"
         style={{
-          // The gradient recomputes with warmth each tick (steps are far too
-          // small to see), so no background transition is needed — and
-          // animating background violates the transform/opacity/filter rule.
-          background: `radial-gradient(circle at 50% 40%, color-mix(in oklch, ${ringStrokeActive} ${26 + warmth * 16}%, transparent) 0%, color-mix(in oklch, ${color} 10%, transparent) 46%, transparent 80%)`,
+          background: `radial-gradient(1100px 760px at 50% 36%, color-mix(in oklch, ${accent} ${Math.round(6 + warmth * 3)}%, transparent), transparent 72%)`,
           animation: state === 'running' ? 'waddle-breathe 8s ease-in-out infinite' : 'none',
           opacity: state === 'running' ? undefined : 0.55,
         }}
       />
 
-      {/* B2: drifting particles — demoted to two barely-there motes. The
-          breathing aurora and the progress ring are the protagonists of this
-          screen; six particles competed with them for attention.
-          translate3d only — never width/height animations (per DESIGN.md). */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        {[
-          { left: '16%', delay: -12, duration: 56, size: 5, opacity: 0.12 },
-          { left: '78%', delay: -34, duration: 64, size: 6, opacity: 0.1  },
-        ].map((p, i) => (
-          <span
-            key={i}
-            className="waddle-particle absolute rounded-full"
-            style={{
-              left: p.left,
-              bottom: 0,
-              width: p.size, height: p.size,
-              background: `color-mix(in oklch, ${color} 65%, var(--background))`,
-              animation: `waddle-particle-rise ${p.duration}s linear ${p.delay}s infinite`,
-              ['--waddle-particle-opacity' as string]: p.opacity,
-              opacity: 0,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* B1: horizon + sitting Waddle silhouette behind the foreground. */}
-      <HorizonWithWaddle color={color} />
+      {/* Snow mound + small Waddle at the lower right — the diagonal
+          counterweight to the centered ring. */}
+      <SnowMoundWaddle />
 
       {/* HEADER */}
       <div
-        className="relative z-panel flex items-start justify-between px-5 pt-[max(env(safe-area-inset-top),1rem)] pb-3"
+        className="relative z-panel flex items-start justify-between px-5 sm:px-8 pt-[max(env(safe-area-inset-top),1rem)] sm:pt-6 pb-3"
         style={{
           opacity: dimmed ? 0.25 : 1,
           transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)',
@@ -375,27 +342,27 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
       >
         <div className="flex flex-col">
           <span
-            className="text-[11px] font-medium tracking-[0.18em] uppercase"
-            style={{ color: `color-mix(in oklch, ${color} 70%, var(--foreground))` }}
+            className="text-[11px] font-medium tracking-[0.22em]"
+            style={{ color: `color-mix(in oklch, ${accent} 62%, var(--foreground))` }}
           >
-            {isBreak ? 'Break' : 'Focus'}
+            {isBreak ? '休息中' : '專注中'}
           </span>
-          <span className="font-mono text-base font-medium text-foreground/65 tabular-nums tracking-tight mt-1">
-            {nowText}
+          <span className="font-mono text-[13px] text-muted-foreground tabular-nums mt-1.5">
+            現在 {nowText}
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {!isBreak && pomodoroCount > 0 && (
-            <PomodoroDots count={pomodoroCount} color={color} />
+            <PomodoroDots count={pomodoroCount} color={accent} />
           )}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <button
               type="button"
               onClick={onMinimize}
               aria-label="縮小到角落"
               title="縮小到角落（不停止計時）"
-              className="h-10 w-10 rounded-full grid place-items-center text-foreground/60 hover:text-foreground hover:bg-foreground/5 transition-colors"
+              className="h-11 w-11 rounded-full grid place-items-center text-foreground/55 hover:text-foreground hover:bg-foreground/5 transition-colors"
             >
               <Minimize className="w-4 h-4" />
             </button>
@@ -407,19 +374,19 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
               onPointerLeave={cancelExitHold}
               aria-label="長按結束（0.9 秒）"
               title="長按結束並儲存到日曆"
-              className="relative h-10 w-10 rounded-full grid place-items-center text-foreground/60 hover:text-foreground hover:bg-foreground/5 transition-colors touch-none"
+              className="relative h-11 w-11 rounded-full grid place-items-center text-foreground/55 hover:text-foreground hover:bg-foreground/5 transition-colors touch-none"
             >
               <X className="w-5 h-5" />
               {exitHoldProgress > 0 && (
-                <svg className="absolute inset-0 -rotate-90 pointer-events-none" viewBox="0 0 40 40">
+                <svg className="absolute inset-0 -rotate-90 pointer-events-none" viewBox="0 0 44 44">
                   <circle
-                    cx="20" cy="20" r="18"
+                    cx="22" cy="22" r="19"
                     fill="none"
-                    stroke={color}
+                    stroke={accent}
                     strokeWidth="2"
                     strokeLinecap="round"
-                    strokeDasharray={2 * Math.PI * 18}
-                    strokeDashoffset={2 * Math.PI * 18 * (1 - exitHoldProgress)}
+                    strokeDasharray={2 * Math.PI * 19}
+                    strokeDashoffset={2 * Math.PI * 19 * (1 - exitHoldProgress)}
                     style={{ transition: 'stroke-dashoffset 60ms linear' }}
                   />
                 </svg>
@@ -436,21 +403,22 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
           animation: 'waddle-immersive-in 380ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
-        {/* B5: intention chip */}
+        {/* Intention chip — the only place the session/workspace color
+            survives, as the small dot (dark-adapted via useDisplayColor). */}
         {label && (
           <div
-            className="mb-7 px-3.5 py-1.5 rounded-full border bg-card/55"
+            className="mb-8 sm:mb-10 px-4 py-[7px] rounded-full border bg-card/70"
             style={{
-              borderColor: `color-mix(in oklch, ${color} 38%, var(--border))`,
+              borderColor: `color-mix(in oklch, ${accent} 30%, var(--border))`,
               opacity: dimmed ? 0.35 : 1,
               transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)',
               animation: 'waddle-chip-in 520ms cubic-bezier(0.22, 1, 0.36, 1)',
             }}
           >
-            <span className="text-xs text-foreground/80 flex items-center gap-2">
+            <span className="text-[13px] text-foreground/85 flex items-center gap-2">
               <span
                 className="w-1.5 h-1.5 rounded-full shrink-0"
-                style={{ backgroundColor: color }}
+                style={{ backgroundColor: chipDotColor }}
                 aria-hidden
               />
               {label}
@@ -460,65 +428,59 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
 
         <div className="relative">
           <svg
-            className="-rotate-90 waddle-ring-pulse"
-            width="300"
-            height="300"
-            viewBox="0 0 300 300"
+            className="-rotate-90 waddle-ring-pulse w-[min(340px,78vw,44vh)] h-auto"
+            viewBox="0 0 340 340"
             style={{
               animation: state === 'running' && inFinalTen ? 'waddle-ring-pulse 2.2s ease-in-out infinite' : undefined,
             }}
           >
+            {/* Track — visible but reticent warm gray, one step off the paper */}
             <circle
-              cx="150" cy="150" r={ringRadius}
+              cx={ringCenter} cy={ringCenter} r={ringRadius}
               fill="none"
-              stroke={`color-mix(in oklch, ${color} 18%, var(--card))`}
-              strokeWidth="6"
+              stroke={`color-mix(in oklch, ${accent} 19%, var(--card))`}
+              strokeWidth="9"
             />
-            {/* B4: 5-min tick dots overlaid on the track */}
+            {/* 5-min tick dots overlaid on the track */}
             {ticks.map((t, i) => (
               <circle
                 key={i}
-                cx={t.cx} cy={t.cy} r="2.25"
-                fill={`color-mix(in oklch, ${color} 40%, var(--card))`}
+                cx={t.cx} cy={t.cy} r="2.5"
+                fill={`color-mix(in oklch, ${accent} 32%, var(--background))`}
               />
             ))}
+            {/* Progress arc — the single saturated protagonist of the screen */}
             <circle
-              cx="150" cy="150" r={ringRadius}
+              cx={ringCenter} cy={ringCenter} r={ringRadius}
               fill="none"
               stroke={state === 'paused'
-                ? `color-mix(in oklch, ${color} 50%, var(--muted))`
-                : ringStrokeActive}
-              strokeWidth="6"
+                ? `color-mix(in oklch, ${accent} 50%, var(--muted))`
+                : accent}
+              strokeWidth="9"
               strokeLinecap="round"
               strokeDasharray={ringCirc}
               strokeDashoffset={ringCirc * (1 - Math.min(progress, 100) / 100)}
               style={{
-                transition: 'stroke-dashoffset 1000ms linear, stroke 700ms ease-out, filter 900ms ease-out',
-                // Soft outer bloom on the progress arc that intensifies as the
-                // session warms. Paused freezes the glow off so the ring reads
-                // as "held". filter-only, so it never triggers layout.
+                transition: 'stroke-dashoffset 1000ms linear, stroke 400ms ease-out',
+                // A faint constant glow while running; paused turns it off so
+                // the ring reads as "held". filter-only — never layout.
                 filter: state === 'running'
-                  ? `drop-shadow(0 0 ${Math.round(5 + warmth * 11)}px color-mix(in oklch, ${ringStrokeActive} ${Math.round(45 + warmth * 25)}%, transparent))`
+                  ? `drop-shadow(0 0 5px color-mix(in oklch, ${accent} 30%, transparent))`
                   : undefined,
               }}
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            {/* B3: typography — Geist Mono medium, tight tracking, larger size */}
+            {/* Typography — Geist Mono, regular weight: a quiet clock face,
+                not a shouting billboard. ~84px desktop, scales with vw. */}
             <span
-              className="font-mono font-medium tabular-nums"
+              className="font-mono font-normal tabular-nums"
               style={{
-                fontSize: timeText.length > 5 ? '4.25rem' : '5.75rem',
+                fontSize: timeText.length > 5 ? 'clamp(2.6rem, 13vw, 3.6rem)' : 'clamp(3.75rem, 19vw, 5.25rem)',
                 lineHeight: 1,
-                letterSpacing: '-0.05em',
-                color: state === 'paused'
-                  ? 'var(--muted-foreground)'
-                  // Digits hold foreground for contrast, warming only a touch
-                  // in the final stretch so the arrival feels earned.
-                  : warmth > 0.85
-                    ? `color-mix(in oklch, var(--foreground) ${Math.round(100 - (warmth - 0.85) * 200)}%, ${WARM_ANCHOR})`
-                    : 'var(--foreground)',
-                transition: 'color 700ms ease-out',
+                letterSpacing: '-0.045em',
+                color: state === 'paused' ? 'var(--muted-foreground)' : 'var(--foreground)',
+                transition: 'color 400ms ease-out',
               }}
             >
               {timeText}
@@ -534,7 +496,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
           className="mt-8 flex flex-col items-center gap-3"
           style={{ opacity: dimmed ? 0 : 1, transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)' }}
         >
-          <p className="text-[11px] text-muted-foreground tabular-nums tracking-wide flex items-center gap-2">
+          <p className="text-[12.5px] text-muted-foreground tabular-nums tracking-[0.02em] flex items-center gap-2.5">
             <span>開始於 {startedAtText}</span>
             {endTimeText && (
               <>
@@ -543,7 +505,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
               </>
             )}
           </p>
-          {isBreak && state === 'running' && <BreathPacer color={color} />}
+          {isBreak && state === 'running' && <BreathPacer color={accent} />}
         </div>
       </div>
 
@@ -556,29 +518,16 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
           pointerEvents: dimmed ? 'none' : 'auto',
         }}
       >
-        <BgmBar
-          music={music}
-          musicVolume={musicVolume}
-          ambient={ambient}
-          playing={bgmPlaying}
-          color={color}
-          expanded={showBgmBar}
-          unavailableSrcs={unavailableSrcs}
-          onToggleExpand={() => setShowBgmBar(v => !v)}
-          onTogglePlay={onToggleBgm}
-          onSelectMusic={onSelectMusic}
-          onMusicVolumeChange={onMusicVolumeChange}
-          onToggleAmbient={onToggleAmbient}
-          onAmbientVolumeChange={onAmbientVolumeChange}
-        />
-        <div className="flex justify-center pt-1">
+        {/* Mockup hierarchy: the ceramic pause button first, the BGM pill
+            tucked quietly at the very bottom edge below it. */}
+        <div className="flex justify-center">
           {state === 'paused' && (
             <button
               type="button"
               onClick={onResume}
               aria-label="繼續"
-              className="h-16 w-16 rounded-full grid place-items-center text-white shadow-lg active:scale-95 transition-transform"
-              style={{ backgroundColor: color }}
+              className="h-16 w-16 rounded-full grid place-items-center active:scale-95 transition-transform"
+              style={{ backgroundColor: accent, color: 'var(--primary-foreground)', boxShadow: 'var(--shadow-ceramic)' }}
             >
               <Play className="w-6 h-6 translate-x-[2px]" />
             </button>
@@ -588,12 +537,28 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
               type="button"
               onClick={onPause}
               aria-label="暫停"
-              className="h-16 w-16 rounded-full grid place-items-center bg-card border border-border text-foreground/70 active:scale-95 transition-transform"
+              className="h-16 w-16 rounded-full grid place-items-center bg-card border border-border text-foreground/70 hover:text-foreground active:scale-95 transition-[transform,color]"
+              style={{ boxShadow: 'var(--shadow-ceramic)' }}
             >
               <Pause className="w-6 h-6" />
             </button>
           )}
         </div>
+        <BgmBar
+          music={music}
+          musicVolume={musicVolume}
+          ambient={ambient}
+          playing={bgmPlaying}
+          color={accent}
+          expanded={showBgmBar}
+          unavailableSrcs={unavailableSrcs}
+          onToggleExpand={() => setShowBgmBar(v => !v)}
+          onTogglePlay={onToggleBgm}
+          onSelectMusic={onSelectMusic}
+          onMusicVolumeChange={onMusicVolumeChange}
+          onToggleAmbient={onToggleAmbient}
+          onAmbientVolumeChange={onAmbientVolumeChange}
+        />
       </div>
 
       {completion && (
@@ -606,9 +571,9 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
           className="absolute inset-0 z-20 flex flex-col items-center justify-center outline-none"
           style={{
             // Solid tinted overlay, no backdrop-blur (DESIGN.md bans the
-            // glassmorphism defaults). All alpha via color-mix so the
-            // gradient works for non-hex color inputs too.
-            background: `radial-gradient(circle at 50% 42%, color-mix(in oklch, ${color} 36%, var(--background)) 0%, color-mix(in oklch, ${color} 16%, var(--background)) 50%, color-mix(in oklch, ${color} 8%, var(--background)) 100%)`,
+            // glassmorphism defaults). Same warm-paper world as the timer:
+            // a deeper accent bloom at center settling into the paper edge.
+            background: `radial-gradient(circle at 50% 42%, color-mix(in oklch, ${accent} 15%, var(--background)) 0%, color-mix(in oklch, ${accent} 7%, var(--background)) 55%, var(--background) 100%)`,
             animation: 'waddle-completion-in 500ms var(--ease-quart)',
             // completion → break: only the overlay fades, revealing the break
             // screen already running underneath. completion → idle: the root
@@ -629,7 +594,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
                 className="waddle-celebrate-bloom pointer-events-none absolute rounded-full"
                 style={{
                   width: 240, height: 240,
-                  background: `radial-gradient(circle, color-mix(in oklch, ${WARM_ANCHOR} 48%, transparent) 0%, transparent 66%)`,
+                  background: `radial-gradient(circle, color-mix(in oklch, ${accent} 45%, transparent) 0%, transparent 66%)`,
                   animation: 'waddle-celebrate-bloom 1.6s ease-out both',
                 }}
               />
@@ -643,26 +608,9 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
                 transformOrigin: '50% 90%',
               }}
             >
-              <svg viewBox="-30 -45 60 86" className="w-24 h-auto">
-                {/* Body */}
-                <path
-                  d="M 0 -30 C -3 -42, -18 -42, -22 -30 C -28 -20, -28 0, -22 18 C -18 26, -10 30, 0 30 C 10 30, 18 26, 22 18 C 28 0, 28 -20, 22 -30 C 18 -42, 3 -42, 0 -30 Z"
-                  fill={`color-mix(in oklch, ${color} 68%, var(--foreground))`}
-                />
-                {/* Belly */}
-                <path
-                  d="M -10 -8 C -12 0, -12 14, -8 22 C -4 26, 4 26, 8 22 C 12 14, 12 0, 10 -8 C 6 -12, -6 -12, -10 -8 Z"
-                  fill="var(--card)"
-                />
-                {/* Eyes */}
-                <circle cx="-6" cy="-15" r="1.7" fill="var(--foreground)" />
-                <circle cx="6" cy="-15" r="1.7" fill="var(--foreground)" />
-                {/* Beak */}
-                <path d="M -3 -10 L 3 -10 L 0 -6 Z" fill="oklch(0.78 0.16 60)" />
-                {/* Feet */}
-                <ellipse cx="-7" cy="32" rx="4.5" ry="2" fill="oklch(0.78 0.16 60)" />
-                <ellipse cx="7" cy="32" rx="4.5" ry="2" fill="oklch(0.78 0.16 60)" />
-              </svg>
+              {/* The one true brand penguin — same hand-drawn Waddle that
+                  stands on the snow mound behind the timer. */}
+              <WaddleMascot className="w-24 h-auto" />
             </div>
           </div>
           <h2 className="text-2xl font-semibold text-foreground tracking-tight">
@@ -688,92 +636,49 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
 // ---------------------------------------------------------------------------
 
 /**
- * B1 — Distant horizon ridge + foreground iceberg with a tiny Waddle silhouette
- * sitting on it, watching the timer. Static (no animation) so it doesn't
- * compete with the ring for attention. All fills derive from the session
- * color via `color-mix` so the scene picks up the focus/break palette.
+ * Snow mound rising from the lower-right corner with a small Waddle standing
+ * on it — the diagonal counterweight to the centered ring (mockup-a). One
+ * step brighter than the paper (var(--card)), a soft contour line so the
+ * ground "is there", and a foot shadow so the penguin stands rather than
+ * floats. Static; phase-neutral by design — the mound belongs to the paper
+ * world, not to the session color.
  */
-function HorizonWithWaddle({ color }: { color: string }) {
-  // Two layers: (1) the horizon ridges drawn as a full-bleed SVG band that
-  // fades to transparent at the very bottom so it doesn't meet the footer
-  // as a hard horizontal strip, (2) the Waddle silhouette as a separate
-  // absolutely-positioned element so its position is in viewport coords and
-  // never gets cropped by the SVG `slice` cover-fit on narrow screens.
+function SnowMoundWaddle() {
   return (
-    <>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-0"
-        style={{ height: '38vh', minHeight: 260 }}
-      >
-        <svg
-          viewBox="0 0 1200 400"
-          preserveAspectRatio="xMidYEnd slice"
-          className="absolute inset-0 w-full h-full"
-        >
-          <defs>
-            <linearGradient id="waddle-ridge-fade" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"  stopColor={`color-mix(in oklch, ${color} 16%, var(--background))`} stopOpacity="0.85" />
-              <stop offset="65%" stopColor={`color-mix(in oklch, ${color} 12%, var(--background))`} stopOpacity="0.5" />
-              <stop offset="100%" stopColor={`color-mix(in oklch, ${color} 8%, var(--background))`} stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="waddle-iceberg-fade" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"  stopColor={`color-mix(in oklch, ${color} 24%, var(--background))`} stopOpacity="0.92" />
-              <stop offset="70%" stopColor={`color-mix(in oklch, ${color} 18%, var(--background))`} stopOpacity="0.45" />
-              <stop offset="100%" stopColor={`color-mix(in oklch, ${color} 10%, var(--background))`} stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          {/* Distant back ridge */}
-          <path
-            d="M 0 240 Q 200 200, 380 220 T 720 210 T 1040 225 T 1200 220 L 1200 400 L 0 400 Z"
-            fill="url(#waddle-ridge-fade)"
-          />
-          {/* Front iceberg with a soft swell on the right side where Waddle
-              visually sits. */}
-          <path
-            d="M 0 320 Q 120 295, 280 300 Q 420 308, 540 298 Q 660 306, 800 282 Q 900 268, 980 275 Q 1090 288, 1200 296 L 1200 400 L 0 400 Z"
-            fill="url(#waddle-iceberg-fade)"
-          />
-        </svg>
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute right-0 bottom-0 z-0 w-[min(560px,88vw)]"
+    >
+      <svg viewBox="0 0 560 190" className="block w-full h-auto">
+        <defs>
+          <linearGradient id="waddle-mound-fade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--card)" stopOpacity="1" />
+            <stop offset="100%" stopColor="var(--card)" stopOpacity="0.65" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M 560 40 Q 430 22 330 72 Q 230 122 100 152 Q 40 166 0 190 L 560 190 Z"
+          fill="url(#waddle-mound-fade)"
+        />
+        {/* Contour line along the crest */}
+        <path
+          d="M 560 40 Q 430 22 330 72 Q 230 122 100 152 Q 40 166 0 190"
+          fill="none"
+          stroke="var(--border)"
+          strokeOpacity="0.55"
+          strokeWidth="1.5"
+        />
+      </svg>
+      {/* Waddle + foot shadow, positioned relative to the mound so they ride
+          its responsive scaling and never drift off the crest. */}
+      <div className="absolute" style={{ right: '22%', bottom: '46%' }}>
+        <div
+          className="absolute left-1/2 -translate-x-1/2 -bottom-[3px] h-2.5 w-[130%] rounded-full"
+          style={{ background: 'radial-gradient(closest-side, oklch(0.45 0.03 55 / 0.16), transparent)' }}
+        />
+        <WaddleMascot className="relative w-[clamp(44px,6vw,58px)] h-auto" />
       </div>
-      {/* Waddle penguin — viewport-positioned so it's never cropped by the
-          SVG cover-fit. Sits in the right portion of the screen, clear of
-          the centered play button and above the footer. Sizes shrink with
-          viewport width so the silhouette doesn't dominate small screens. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute z-0"
-        style={{
-          // Far enough above the footer that BgmBar + play button don't
-          // crop the body. Tuned to the footer's combined height (~ pill +
-          // play button + paddings ≈ 130–150px).
-          bottom: 'clamp(140px, 19vh, 220px)',
-          right: 'clamp(32px, 8vw, 140px)',
-        }}
-      >
-        <svg
-          viewBox="-30 -45 60 80"
-          className="w-[clamp(56px,7vw,84px)] h-auto"
-          style={{ opacity: 0.78 }}
-        >
-          {/* Body */}
-          <path
-            d="M 0 -30 C -3 -42, -18 -42, -22 -30 C -28 -20, -28 0, -22 18 C -18 26, -10 30, 0 30 C 10 30, 18 26, 22 18 C 28 0, 28 -20, 22 -30 C 18 -42, 3 -42, 0 -30 Z"
-            fill="color-mix(in oklch, var(--foreground) 50%, transparent)"
-          />
-          {/* Belly */}
-          <path
-            d="M -10 -8 C -12 0, -12 14, -8 22 C -4 26, 4 26, 8 22 C 12 14, 12 0, 10 -8 C 6 -12, -6 -12, -10 -8 Z"
-            fill="color-mix(in oklch, var(--background) 80%, transparent)"
-          />
-          {/* Tiny beak */}
-          <ellipse cx="0" cy="-18" rx="1.6" ry="2.2" fill="color-mix(in oklch, var(--foreground) 72%, transparent)" />
-          {/* Feet barely visible at base */}
-          <ellipse cx="-7" cy="32" rx="4" ry="1.6" fill="color-mix(in oklch, var(--foreground) 50%, transparent)" />
-          <ellipse cx="7"  cy="32" rx="4" ry="1.6" fill="color-mix(in oklch, var(--foreground) 50%, transparent)" />
-        </svg>
-      </div>
-    </>
+    </div>
   )
 }
 
@@ -886,9 +791,10 @@ function BgmBar({
           // Expanded: full card so the chips/sliders have a real surface.
           ? 'rounded-2xl bg-card border border-border/60'
           // Collapsed: slim pill, semi-transparent, centered with a max
-          // width so the scene behind (iceberg + Waddle) shows through and
-          // the bottom edge doesn't create a hard horizontal strip.
-          : 'rounded-full bg-card/60 border border-border/35 mx-auto max-w-sm backdrop-blur-[4px]',
+          // width so the scene behind (snow mound + Waddle) shows through
+          // and the bottom edge doesn't create a hard horizontal strip.
+          // No backdrop-blur — the paper world stays matte (DESIGN.md).
+          : 'rounded-full bg-card/65 border border-border/50 mx-auto max-w-sm',
       )}
     >
       <div className={cn('flex items-center gap-2', expanded ? 'px-3 py-2' : 'pl-2 pr-3 py-1.5')}>
