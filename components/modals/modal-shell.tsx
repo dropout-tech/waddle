@@ -15,9 +15,21 @@ let openStack: symbol[] = []
 
 export type ModalShellSize = 'sm' | 'md' | 'lg' | 'xl'
 
+/**
+ * `center` — mobile full-screen sheet / desktop centered card (default).
+ * `drawer` — mobile identical to `center` (same classes, same 200ms
+ * fade+zoom); desktop slides in from the right edge as a full-height
+ * ~520px panel, so the calendar stays visible while editing (DESIGN.md:
+ * central modals are for necessary decisions only — editing prefers a
+ * right drawer).
+ */
+export type ModalShellVariant = 'center' | 'drawer'
+
 /** Desktop max-width buckets, matching the widths the six hand-rolled
  *  modal shells used before consolidation (sm ≈ workspace-settings,
- *  md ≈ quick-link-edit, lg ≈ task-detail/settings, xl ≈ journal). */
+ *  md ≈ quick-link-edit, lg ≈ task-detail/settings, xl ≈ journal).
+ *  Only used by the `center` variant — the drawer has a fixed desktop
+ *  width instead. */
 const SIZE_CLASS: Record<ModalShellSize, string> = {
   sm: 'md:max-w-sm',
   md: 'md:max-w-md',
@@ -25,7 +37,14 @@ const SIZE_CLASS: Record<ModalShellSize, string> = {
   xl: 'md:max-w-xl',
 }
 
-const EXIT_DURATION_MS = 200
+/** Must cover the longest `duration-*` in each variant's exit classes.
+ *  The drawer's mobile exit animation is still 200ms; tw-animate-css
+ *  defaults to `animation-fill-mode: forwards`, so the panel holds its
+ *  faded-out end state for the extra 100ms before unmount — no flash. */
+const EXIT_DURATION_MS: Record<ModalShellVariant, number> = {
+  center: 200,
+  drawer: 300,
+}
 
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -35,18 +54,21 @@ interface ModalShellProps {
   isOpen: boolean
   onClose: () => void
   children: ReactNode
-  /** Desktop max-width bucket. Defaults to `lg`. */
+  /** Desktop max-width bucket (`center` variant only). Defaults to `lg`. */
   size?: ModalShellSize
+  /** Desktop shape: centered card (default) or right-edge drawer. */
+  variant?: ModalShellVariant
   /** Extra classes merged onto the panel — e.g. a bespoke `md:max-w-[...]`. */
   className?: string
   ariaLabel?: string
 }
 
 /**
- * Shared shell for central modals: portals to `document.body`, locks body
- * scroll, closes on backdrop click or Esc (topmost instance only), returns
- * focus to whatever triggered it, and renders the mobile-full-screen /
- * desktop-centered-card shape + overlay + motion per DESIGN.md.
+ * Shared shell for modals and drawers: portals to `document.body`, locks
+ * body scroll, closes on backdrop click or Esc (topmost instance only),
+ * returns focus to whatever triggered it, and renders the mobile
+ * full-screen sheet / desktop centered-card-or-right-drawer shape +
+ * overlay + motion per DESIGN.md.
  *
  * Callers that keep the component mounted and just toggle `isOpen` get a
  * real exit animation (the panel stays rendered for `EXIT_DURATION_MS` after
@@ -63,6 +85,7 @@ export function ModalShell({
   onClose,
   children,
   size = 'lg',
+  variant = 'center',
   className,
   ariaLabel,
 }: ModalShellProps) {
@@ -89,7 +112,7 @@ export function ModalShell({
     const t = setTimeout(() => {
       setShouldRender(false)
       setClosing(false)
-    }, prefersReducedMotion() ? 0 : EXIT_DURATION_MS)
+    }, prefersReducedMotion() ? 0 : EXIT_DURATION_MS[variant])
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on isOpen changes
   }, [isOpen])
@@ -133,7 +156,14 @@ export function ModalShell({
   if (!canPortal || !shouldRender) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-modal flex items-stretch justify-center md:items-center">
+    <div
+      className={cn(
+        'fixed inset-0 z-modal flex items-stretch justify-center',
+        // Drawer hugs the right edge at full height on desktop; center
+        // variant keeps the centered-card position.
+        variant === 'drawer' ? 'md:justify-end' : 'md:items-center'
+      )}
+    >
       {/* Backdrop — DESIGN.md: blur 6-8px + darken to oklch(0/0.25), no bg-black/60 wash. */}
       <div
         className={cn(
@@ -145,19 +175,40 @@ export function ModalShell({
         aria-hidden
       />
 
-      {/* Panel — full-screen sheet on mobile, centered card on desktop. */}
+      {/* Panel — full-screen sheet on mobile; on desktop either a centered
+          card (`center`) or a full-height right drawer (`drawer`). The
+          mobile class set is identical across variants on purpose. */}
       <div
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}
         className={cn(
           'relative z-modal flex h-[100dvh] w-full flex-col overflow-hidden bg-card',
-          'md:h-auto md:max-h-[90dvh] md:mx-4 md:rounded-2xl md:border md:border-border md:shadow-2xl',
-          'motion-safe:duration-200 motion-safe:ease-quart',
-          closing
-            ? 'motion-safe:animate-out motion-safe:fade-out motion-safe:zoom-out-95 pointer-events-none'
-            : 'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95',
-          SIZE_CLASS[size],
+          'motion-safe:ease-quart',
+          variant === 'center' && [
+            'md:h-auto md:max-h-[90dvh] md:mx-4 md:rounded-2xl md:border md:border-border md:shadow-2xl',
+            'motion-safe:duration-200',
+            closing
+              ? 'motion-safe:animate-out motion-safe:fade-out motion-safe:zoom-out-95 pointer-events-none'
+              : 'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95',
+            SIZE_CLASS[size],
+          ],
+          variant === 'drawer' && [
+            'md:w-[520px] md:rounded-l-2xl md:border-l md:border-border md:shadow-2xl',
+            // 200ms fade+zoom on mobile (unchanged from center); desktop
+            // overrides to a 300ms pure slide from the right — the *-100
+            // utilities reset the mobile fade/zoom vars at md and up.
+            'motion-safe:duration-200 md:motion-safe:duration-300',
+            closing
+              ? cn(
+                  'motion-safe:animate-out motion-safe:fade-out motion-safe:zoom-out-95 pointer-events-none',
+                  'md:motion-safe:fade-out-100 md:motion-safe:zoom-out-100 md:motion-safe:slide-out-to-right'
+                )
+              : cn(
+                  'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95',
+                  'md:motion-safe:fade-in-100 md:motion-safe:zoom-in-100 md:motion-safe:slide-in-from-right'
+                ),
+          ],
           className
         )}
       >

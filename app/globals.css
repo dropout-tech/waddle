@@ -208,6 +208,15 @@
   /* Register the brand easing so `ease-quart` and `transition-timing-function: var(--ease-quart)` both work. */
   --ease-quart: cubic-bezier(0.22, 1, 0.36, 1);
 
+  /* Ceramic elevation (`shadow-ceramic`) — for a standalone card sitting on
+     the page background (auth card). Two soft warm-charcoal layers (hue 55,
+     matching the foreground ink) instead of one heavy neutral shadow, per
+     DESIGN.md「沒有重 shadow」. In dark mode elevation comes from the
+     lighter card surface; this shadow just quietly grounds the edge. */
+  --shadow-ceramic:
+    0 1px 2px oklch(0.28 0.025 55 / 0.05),
+    0 12px 32px -12px oklch(0.28 0.025 55 / 0.14);
+
   /* Z-index scale — semantic layers, low to high. Tailwind v4 reads the
      `--z-index-*` namespace to generate `z-*` utilities (e.g. `z-modal`
      from `--z-index-modal`), same mechanism as `--radius-*` → `rounded-*`.

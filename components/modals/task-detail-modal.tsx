@@ -182,10 +182,15 @@ export function TaskDetailModal({
           title={recurrenceModal.type === 'save' ? '儲存重複任務' : '刪除重複任務'}
         />
       )}
+      {/* Drawer, not centered modal: editing isn't a decision, and sliding
+          in from the right keeps the calendar visible alongside the form
+          (DESIGN.md anti-pattern: 中央 modal 用於非必要決策). The nested
+          RecurrenceChoiceModal above stays centered — that one IS a
+          decision. Mobile keeps the full-screen sheet. */}
       <ModalShell
         isOpen={isOpen}
         onClose={onClose}
-        size="lg"
+        variant="drawer"
         ariaLabel={isCreate ? '新增任務' : '任務詳情'}
       >
         {/* Header */}
@@ -288,8 +293,9 @@ export function TaskDetailModal({
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-5 space-y-5 flex-1 min-h-0 md:flex-initial md:min-h-[unset] md:max-h-[60vh] overflow-y-auto">
+        {/* Content — fills the full drawer height on desktop (the old
+            centered modal capped this at 60vh); footer stays pinned below. */}
+        <div className="p-5 space-y-5 flex-1 min-h-0 overflow-y-auto">
           {/* Title */}
           <div>
             <Input

@@ -40,7 +40,7 @@ export default function LoginPage() {
 
 function LoginSkeleton() {
   return (
-    <div className="bg-card border border-border rounded-2xl shadow-sm p-8">
+    <div className="bg-card border border-border rounded-2xl shadow-ceramic p-8">
       <div className="h-8 w-32 bg-muted rounded animate-pulse mb-2" />
       <div className="h-4 w-48 bg-muted rounded animate-pulse" />
     </div>
@@ -105,7 +105,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="bg-card border border-border rounded-2xl shadow-sm p-8">
+    <div className="bg-card border border-border rounded-2xl shadow-ceramic p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">歡迎回來</h1>
         <p className="text-sm text-muted-foreground mt-1">登入以繼續使用 Huddle</p>
