@@ -94,16 +94,19 @@ export function WeekView({
   const showCategoryPrefix = useShowCategoryPrefix()
   const displayColor = useDisplayColor()
   const isMobile = useIsMobile()
-  // Mobile: measured width of the horizontal scroll container. Columns are
-  // sized so exactly three days fill the viewport — swipes land on aligned
-  // whole columns instead of arbitrary offsets.
-  const [mobileViewportWidth, setMobileViewportWidth] = useState(0)
-  // Effective day-column width — scales inversely with weekViewDays so a
-  // 5-day work-week shows wider columns (more breathing room) and a 7-day
-  // full week stays at the legacy compact 120px baseline.
+  // Measured width of the horizontal scroll container, on every screen
+  // size (not just mobile). Columns are sized so exactly N days fill the
+  // viewport — on mobile that's a fixed 3 (swipes land on aligned whole
+  // columns), on desktop it's `weekViewDays` (7, or 5 for the work-week
+  // setting). Without this, desktop fell back to a fixed 120px baseline
+  // that rarely matched the panel's actual width, so a partial extra
+  // column peeked in on the right edge (and duplicated a weekday label —
+  // see week-view desktop bug W3.1).
+  const [viewportWidth, setViewportWidth] = useState(0)
   const safeWeekDays = Math.max(5, Math.min(7, weekViewDays))
-  const DAY_WIDTH = isMobile && mobileViewportWidth > 0
-    ? Math.floor((mobileViewportWidth - TIME_COL_WIDTH) / 3)
+  const columnsPerScreen = isMobile ? 3 : safeWeekDays
+  const DAY_WIDTH = viewportWidth > 0
+    ? Math.floor((viewportWidth - TIME_COL_WIDTH) / columnsPerScreen)
     : Math.round(BASE_DAY_WIDTH * (7 / safeWeekDays))
   const EXTEND_THRESHOLD = DAY_WIDTH * 3
 
@@ -224,21 +227,18 @@ export function WeekView({
     setExtraAfter(0)
   }, [selectedDate])
 
-  // Mobile: keep the measured container width in sync (rotation, panel resize)
-  // so the 3-days-per-viewport column math stays exact.
+  // Keep the measured container width in sync (window resize, sidebar
+  // toggle, rotation) so the columns-per-viewport math stays exact on
+  // every screen size, not just mobile.
   useEffect(() => {
-    if (!isMobile) {
-      setMobileViewportWidth(0)
-      return
-    }
     const container = scrollContainerRef.current
     if (!container) return
-    const measure = () => setMobileViewportWidth(container.clientWidth)
+    const measure = () => setViewportWidth(container.clientWidth)
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(container)
     return () => observer.disconnect()
-  }, [isMobile])
+  }, [])
 
   // Recenter scroll on selectedDate change (and when DAY_WIDTH changes —
   // mobile measurement landing or rotation shifts every column boundary).

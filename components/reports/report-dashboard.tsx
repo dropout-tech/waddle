@@ -1,51 +1,44 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Calendar, 
-  Clock, 
-  Target, 
-  AlertTriangle,
-  CheckCircle2,
-  ListTodo,
-  BarChart3,
-  PieChart,
-  Activity,
-  Flame,
-  Award,
-  ArrowRight,
-  ChevronDown,
-  ChevronUp,
-  Users,
-} from 'lucide-react'
+import { Check } from 'lucide-react'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { WaddleMascot } from '@/components/branding/waddle-mascot'
 
 interface ReportDashboardProps {
   workspaces: Workspace[]
   onClose: () => void
 }
 
-type TabType = 'overview' | 'productivity' | 'habits' | 'insights'
 type DateRangeType = 'week' | 'month' | 'quarter' | 'year'
+type DecoratedTask = Task & { workspaceName: string; workspaceColor: string }
 
-export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
+/**
+ * 溫柔覆盤 — a single-scroll retrospective, not a KPI dashboard.
+ *
+ * IA (deliberately kept flat so the future weekly/monthly review and the
+ * conversational "ask Waddle about my month" agent can each grow out of a
+ * section without restructuring):
+ *   ① 節奏   — narrative summary + small daily bars
+ *   ② 時間   — where scheduled time went (hours-of-day strip + workspaces)
+ *   ③ 完成   — scrollable, day-grouped list of finished tasks
+ *   ④ 觀察   — one rule-generated gentle observation from Waddle
+ */
+export function ReportDashboard({ workspaces }: ReportDashboardProps) {
   const displayColor = useDisplayColor()
-  const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [dateRange, setDateRange] = useState<DateRangeType>('week')
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['overview']))
+  // Stable "now" for the lifetime of this view — the dashboard remounts on
+  // every open, so this stays fresh while keeping the memos below stable.
+  const [now] = useState(() => new Date())
 
-  const now = new Date()
-  
-  // Calculate date range boundaries
   const rangeConfig = useMemo(() => {
-    const start = new Date()
-    const prevStart = new Date()
-    
+    const start = new Date(now)
+    const prevStart = new Date(now)
+
     switch (dateRange) {
       case 'week':
         start.setDate(now.getDate() - 7)
@@ -66,18 +59,14 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
     }
   }, [dateRange, now])
 
-  // Gather all tasks with workspace info
+  // All tasks across live workspaces, decorated with workspace identity.
   const allTasks = useMemo(() => {
-    const tasks: (Task & { workspaceName: string; workspaceColor: string })[] = []
+    const tasks: DecoratedTask[] = []
     workspaces.forEach(ws => {
       if (!ws.isArchived) {
         ws.categories?.forEach(cat => {
           cat.tasks?.forEach(task => {
-            tasks.push({
-              ...task,
-              workspaceName: ws.name,
-              workspaceColor: ws.color
-            })
+            tasks.push({ ...task, workspaceName: ws.name, workspaceColor: ws.color })
           })
         })
       }
@@ -85,267 +74,258 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
     return tasks
   }, [workspaces])
 
-  // Filter tasks by date range
-  const currentPeriodTasks = useMemo(() => 
-    allTasks.filter(t => new Date(t.createdAt) >= rangeConfig.start),
+  // ---- Completions (the heart of a retrospective: what actually got done) ----
+
+  const completedInPeriod = useMemo(
+    () =>
+      allTasks.filter(
+        t => t.isCompleted && t.completedAt && new Date(t.completedAt) >= rangeConfig.start
+      ),
     [allTasks, rangeConfig.start]
   )
 
-  const previousPeriodTasks = useMemo(() => 
-    allTasks.filter(t => {
-      const created = new Date(t.createdAt)
-      return created >= rangeConfig.prevStart && created < rangeConfig.start
-    }),
+  const prevCompletedCount = useMemo(
+    () =>
+      allTasks.filter(t => {
+        if (!t.isCompleted || !t.completedAt) return false
+        const d = new Date(t.completedAt)
+        return d >= rangeConfig.prevStart && d < rangeConfig.start
+      }).length,
     [allTasks, rangeConfig.start, rangeConfig.prevStart]
   )
 
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const completed = currentPeriodTasks.filter(t => t.isCompleted)
-    const prevCompleted = previousPeriodTasks.filter(t => t.isCompleted)
-    
-    const completionRate = currentPeriodTasks.length > 0 
-      ? Math.round((completed.length / currentPeriodTasks.length) * 100) 
-      : 0
-    const prevCompletionRate = previousPeriodTasks.length > 0
-      ? Math.round((prevCompleted.length / previousPeriodTasks.length) * 100)
-      : 0
+  const createdInPeriod = useMemo(
+    () => allTasks.filter(t => new Date(t.createdAt) >= rangeConfig.start),
+    [allTasks, rangeConfig.start]
+  )
 
-    const overdue = allTasks.filter(t => 
-      !t.isCompleted && t.dueDate && new Date(t.dueDate) < now
-    )
+  // ---- Scheduled time (meetings vs. focus, hours of day, workspaces) ----
 
-    const highPriority = allTasks.filter(t =>
-      !t.isCompleted && t.urgency >= 8
-    )
+  const timeStats = useMemo(() => {
+    const startStr = toDateString(rangeConfig.start)
+    const prevStartStr = toDateString(rangeConfig.prevStart)
+    const todayStr = toDateString(now)
 
-    const scheduled = currentPeriodTasks.filter(t => t.scheduledDate)
-    const withDueDate = currentPeriodTasks.filter(t => t.dueDate)
-
-    // Meetings stats: total count + share of scheduled time spent on
-    // meetings vs other scheduled work. "Scheduled minutes" = sum of
-    // (endTime − startTime) over all tasks in the period that have a
-    // schedule attached, regardless of completion.
-    const meetingsInPeriod = currentPeriodTasks.filter(t => t.isMeeting && t.scheduledStartTime && t.scheduledEndTime)
-    const scheduledWithTime = currentPeriodTasks.filter(t => t.scheduledStartTime && t.scheduledEndTime)
-    const minutesBetween = (a: string, b: string) => {
-      const [ah, am] = a.split(':').map(Number)
-      const [bh, bm] = b.split(':').map(Number)
-      return Math.max(0, (bh * 60 + bm) - (ah * 60 + am))
+    const minutesOf = (t: DecoratedTask) => {
+      if (!t.scheduledStartTime || !t.scheduledEndTime) return 0
+      const [ah, am] = t.scheduledStartTime.split(':').map(Number)
+      const [bh, bm] = t.scheduledEndTime.split(':').map(Number)
+      return Math.max(0, bh * 60 + bm - (ah * 60 + am))
     }
-    const meetingMinutes = meetingsInPeriod.reduce(
-      (sum, t) => sum + minutesBetween(t.scheduledStartTime!, t.scheduledEndTime!),
-      0,
+
+    const inWindow = allTasks.filter(
+      t => t.scheduledDate && t.scheduledDate >= startStr && t.scheduledDate <= todayStr
     )
-    const scheduledMinutes = scheduledWithTime.reduce(
-      (sum, t) => sum + minutesBetween(t.scheduledStartTime!, t.scheduledEndTime!),
-      0,
+    const inPrev = allTasks.filter(
+      t => t.scheduledDate && t.scheduledDate >= prevStartStr && t.scheduledDate < startStr
     )
-    const meetingTimeShare = scheduledMinutes > 0
-      ? Math.round((meetingMinutes / scheduledMinutes) * 100)
-      : 0
+
+    const scheduledMinutes = inWindow.reduce((s, t) => s + minutesOf(t), 0)
+    const meetingMinutes = inWindow.filter(t => t.isMeeting).reduce((s, t) => s + minutesOf(t), 0)
+    const focusMinutes = scheduledMinutes - meetingMinutes
+    const meetingCount = inWindow.filter(t => t.isMeeting && minutesOf(t) > 0).length
+
+    const prevScheduled = inPrev.reduce((s, t) => s + minutesOf(t), 0)
+    const prevMeeting = inPrev.filter(t => t.isMeeting).reduce((s, t) => s + minutesOf(t), 0)
+    const prevFocusMinutes = prevScheduled - prevMeeting
+
+    const hourCounts: number[] = new Array(24).fill(0)
+    inWindow.forEach(t => {
+      if (t.scheduledStartTime) hourCounts[parseInt(t.scheduledStartTime.split(':')[0], 10)]++
+    })
+
+    const wsMap = new Map<string, { name: string; color: string; minutes: number; count: number }>()
+    inWindow.forEach(t => {
+      const entry = wsMap.get(t.workspaceName) ?? {
+        name: t.workspaceName,
+        color: t.workspaceColor,
+        minutes: 0,
+        count: 0,
+      }
+      entry.minutes += minutesOf(t)
+      entry.count += 1
+      wsMap.set(t.workspaceName, entry)
+    })
+    const totalWsMinutes = [...wsMap.values()].reduce((s, w) => s + w.minutes, 0)
+    const totalWsCount = [...wsMap.values()].reduce((s, w) => s + w.count, 0)
+    const useMinutes = totalWsMinutes > 0
+    const workspaceShare = [...wsMap.values()]
+      .filter(w => (useMinutes ? w.minutes > 0 : w.count > 0))
+      .sort((a, b) => (useMinutes ? b.minutes - a.minutes : b.count - a.count))
+      .slice(0, 5)
+      .map(w => ({
+        ...w,
+        share: useMinutes
+          ? (w.minutes / totalWsMinutes) * 100
+          : (w.count / Math.max(totalWsCount, 1)) * 100,
+        detail: useMinutes ? formatHours(w.minutes) : `${w.count} 件`,
+      }))
 
     return {
-      total: currentPeriodTasks.length,
-      completed: completed.length,
-      completionRate,
-      prevTotal: previousPeriodTasks.length,
-      prevCompleted: prevCompleted.length,
-      prevCompletionRate,
-      overdue: overdue.length,
-      highPriority: highPriority.length,
-      scheduled: scheduled.length,
-      withDueDate: withDueDate.length,
-      pending: currentPeriodTasks.filter(t => !t.isCompleted).length,
-      meetings: meetingsInPeriod.length,
-      meetingMinutes,
       scheduledMinutes,
-      meetingTimeShare,
+      meetingMinutes,
+      focusMinutes,
+      meetingCount,
+      prevFocusMinutes,
+      hourCounts,
+      workspaceShare,
     }
-  }, [currentPeriodTasks, previousPeriodTasks, allTasks, now])
+  }, [allTasks, rangeConfig, now])
 
-  // Daily completion data for chart
+  // ---- Daily completion bars (7 days for week view, 14 otherwise) ----
+
   const dailyData = useMemo(() => {
-    const days: { date: string; completed: number; created: number; label: string }[] = []
-    const dayCount = Math.min(rangeConfig.days, 14)
-    
+    const dayCount = dateRange === 'week' ? 7 : 14
+    const weekdayChars = ['日', '一', '二', '三', '四', '五', '六']
+    const days: { label: string; full: string; completed: number; isToday: boolean }[] = []
+
     for (let i = dayCount - 1; i >= 0; i--) {
-      const date = new Date()
+      const date = new Date(now)
       date.setDate(date.getDate() - i)
       const dateStr = toDateString(date)
-      
-      const completed = allTasks.filter(t => 
-        t.isCompleted && t.completedAt?.split('T')[0] === dateStr
+      const completed = allTasks.filter(
+        t => t.isCompleted && t.completedAt?.split('T')[0] === dateStr
       ).length
-      
-      const created = allTasks.filter(t => 
-        t.createdAt.split('T')[0] === dateStr
-      ).length
-
       days.push({
-        date: dateStr,
+        label:
+          dayCount === 7
+            ? weekdayChars[date.getDay()]
+            : `${date.getMonth() + 1}/${date.getDate()}`,
+        full: `${date.getMonth() + 1}月${date.getDate()}日`,
         completed,
-        created,
-        label: `${date.getMonth() + 1}/${date.getDate()}`
+        isToday: i === 0,
       })
     }
     return days
-  }, [allTasks, rangeConfig.days])
+  }, [allTasks, dateRange, now])
 
-  // Workspace breakdown
-  const workspaceStats = useMemo(() => 
-    workspaces
-      .filter(ws => !ws.isArchived)
-      .map(ws => {
-        const tasks = ws.categories?.flatMap(c => c.tasks || []) || []
-        const completed = tasks.filter(t => t.isCompleted)
-        const inPeriod = tasks.filter(t => new Date(t.createdAt) >= rangeConfig.start)
-        const completedInPeriod = inPeriod.filter(t => t.isCompleted)
-        
-        return {
-          id: ws.id,
-          name: ws.name,
-          icon: ws.icon,
-          color: ws.color,
-          total: tasks.length,
-          completed: completed.length,
-          periodTotal: inPeriod.length,
-          periodCompleted: completedInPeriod.length,
-          rate: tasks.length > 0 ? Math.round((completed.length / tasks.length) * 100) : 0
+  // ---- Day-grouped completed list ----
+
+  const completedGroups = useMemo(() => {
+    const sorted = [...completedInPeriod].sort((a, b) =>
+      (b.completedAt ?? '').localeCompare(a.completedAt ?? '')
+    )
+    const todayStr = toDateString(now)
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = toDateString(yesterday)
+
+    const groups: { key: string; label: string; items: DecoratedTask[] }[] = []
+    for (const task of sorted) {
+      const key = task.completedAt!.split('T')[0]
+      let group = groups[groups.length - 1]
+      if (!group || group.key !== key) {
+        const [, m, d] = key.split('-').map(Number)
+        group = {
+          key,
+          label: key === todayStr ? '今天' : key === yesterdayStr ? '昨天' : `${m}月${d}日`,
+          items: [],
         }
-      })
-      .sort((a, b) => b.periodCompleted - a.periodCompleted),
-    [workspaces, rangeConfig.start]
+        groups.push(group)
+      }
+      group.items.push(task)
+    }
+    return groups
+  }, [completedInPeriod, now])
+
+  // ---- Narrative & observation (rule-based, tone: a friend, not a system) ----
+
+  // "Most completions happened in the morning" clause — only claimed when
+  // there is enough signal (≥3 timed completions, majority in one bucket).
+  const timeOfDayClause = useMemo(() => {
+    const withTime = completedInPeriod.filter(t => t.scheduledStartTime)
+    if (withTime.length < 3) return null
+    const buckets = { 早上: 0, 下午: 0, 晚上: 0 }
+    withTime.forEach(t => {
+      const h = parseInt(t.scheduledStartTime!.split(':')[0], 10)
+      if (h >= 5 && h < 12) buckets['早上']++
+      else if (h >= 12 && h < 18) buckets['下午']++
+      else buckets['晚上']++
+    })
+    const [name, count] = Object.entries(buckets).sort((a, b) => b[1] - a[1])[0]
+    return count / withTime.length >= 0.5 ? name : null
+  }, [completedInPeriod])
+
+  const peakHour = useMemo(() => {
+    const counts = new Map<number, number>()
+    completedInPeriod.forEach(t => {
+      if (!t.scheduledStartTime) return
+      const h = parseInt(t.scheduledStartTime.split(':')[0], 10)
+      counts.set(h, (counts.get(h) ?? 0) + 1)
+    })
+    let best: { hour: number; count: number } | null = null
+    for (const [hour, count] of counts) {
+      if (!best || count > best.count) best = { hour, count }
+    }
+    return best
+  }, [completedInPeriod])
+
+  const overdueCount = useMemo(
+    () => allTasks.filter(t => !t.isCompleted && t.dueDate && new Date(t.dueDate) < now).length,
+    [allTasks, now]
   )
 
-  // Hour distribution (when tasks are scheduled)
-  const hourDistribution = useMemo(() => {
-    const hours: number[] = new Array(24).fill(0)
-    allTasks.forEach(t => {
-      if (t.scheduledStartTime) {
-        const hour = parseInt(t.scheduledStartTime.split(':')[0])
-        hours[hour]++
-      }
-    })
-    return hours
-  }, [allTasks])
+  const meetingShare =
+    timeStats.scheduledMinutes > 0
+      ? Math.round((timeStats.meetingMinutes / timeStats.scheduledMinutes) * 100)
+      : 0
 
-  // Peak productivity hours
-  const peakHours = useMemo(() => {
-    const hourCompletions: { hour: number; count: number }[] = []
-    for (let i = 0; i < 24; i++) {
-      const count = allTasks.filter(t => {
-        if (!t.isCompleted || !t.scheduledStartTime) return false
-        return parseInt(t.scheduledStartTime.split(':')[0]) === i
-      }).length
-      hourCompletions.push({ hour: i, count })
+  const observation = useMemo(() => {
+    const { label, prevLabel } = rangeConfig
+    if (meetingShare > 50 && timeStats.meetingCount >= 2) {
+      return `${label}有超過一半的排程時間在會議裡。也許可以幫自己留一段不被打擾的專注時光。`
     }
-    return hourCompletions.sort((a, b) => b.count - a.count).slice(0, 3)
-  }, [allTasks])
-
-  // Streak calculation
-  const streak = useMemo(() => {
-    let currentStreak = 0
-    let maxStreak = 0
-    let tempStreak = 0
-    
-    for (let i = 0; i < 30; i++) {
-      const date = new Date()
-      date.setDate(date.getDate() - i)
-      const dateStr = toDateString(date)
-      
-      const hasCompletedTask = allTasks.some(t => 
-        t.isCompleted && t.completedAt?.split('T')[0] === dateStr
-      )
-      
-      if (hasCompletedTask) {
-        tempStreak++
-        if (i === 0 || currentStreak > 0) {
-          currentStreak = tempStreak
-        }
-        maxStreak = Math.max(maxStreak, tempStreak)
-      } else {
-        if (i === 0) currentStreak = 0
-        tempStreak = 0
-      }
+    if (peakHour && peakHour.count >= 2) {
+      const h = peakHour.hour
+      const phase = h < 12 ? '早上' : h < 18 ? '下午' : '晚上'
+      const display = h > 12 ? h - 12 : h
+      return `${phase} ${display} 點左右的你最有進展，把重要的事留給那段時間，也許會更輕鬆。`
     }
-    
-    return { current: currentStreak, max: maxStreak }
-  }, [allTasks])
-
-  // Priority breakdown — urgency 8-10 high, 5-7 medium, 1-4 low
-  const priorityStats = useMemo(() => {
-    const pending = allTasks.filter(t => !t.isCompleted)
-    return {
-      high: pending.filter(t => t.urgency >= 8).length,
-      medium: pending.filter(t => t.urgency >= 5 && t.urgency < 8).length,
-      low: pending.filter(t => t.urgency >= 1 && t.urgency < 5).length,
-      none: pending.filter(t => !t.urgency).length,
+    if (overdueCount >= 3) {
+      return `有 ${overdueCount} 件事悄悄過了原本的日期。不用急，挑一件最想完成的開始就好。`
     }
-  }, [allTasks])
-
-  // Overdue tasks by severity
-  const overdueAnalysis = useMemo(() => {
-    const overdue = allTasks.filter(t => 
-      !t.isCompleted && t.dueDate && new Date(t.dueDate) < now
-    )
-    
-    return {
-      critical: overdue.filter(t => {
-        const days = Math.floor((now.getTime() - new Date(t.dueDate!).getTime()) / 86400000)
-        return days > 7
-      }),
-      warning: overdue.filter(t => {
-        const days = Math.floor((now.getTime() - new Date(t.dueDate!).getTime()) / 86400000)
-        return days > 3 && days <= 7
-      }),
-      minor: overdue.filter(t => {
-        const days = Math.floor((now.getTime() - new Date(t.dueDate!).getTime()) / 86400000)
-        return days <= 3
-      })
+    if (completedInPeriod.length > prevCompletedCount && prevCompletedCount > 0) {
+      return `${label}比${prevLabel}更有節奏了，保持這個舒服的步調就好。`
     }
-  }, [allTasks, now])
-
-  const toggleSection = (section: string) => {
-    const newSet = new Set(expandedSections)
-    if (newSet.has(section)) {
-      newSet.delete(section)
-    } else {
-      newSet.add(section)
+    if (completedInPeriod.length > 0) {
+      return `不論快慢，${label}走過的每一步都算數。`
     }
-    setExpandedSections(newSet)
-  }
+    return `${label}還沒有完成的紀錄。沒關係，慢慢來，Waddle 會在這裡陪你。`
+  }, [
+    rangeConfig,
+    meetingShare,
+    timeStats.meetingCount,
+    peakHour,
+    overdueCount,
+    completedInPeriod.length,
+    prevCompletedCount,
+  ])
 
-  // Calculate trend
-  const getTrend = (current: number, previous: number) => {
-    if (previous === 0) return current > 0 ? 100 : 0
-    return Math.round(((current - previous) / previous) * 100)
-  }
+  const hasActivity =
+    completedInPeriod.length > 0 || createdInPeriod.length > 0 || timeStats.scheduledMinutes > 0
 
-  const completionTrend = getTrend(stats.completionRate, stats.prevCompletionRate)
-  const tasksTrend = getTrend(stats.total, stats.prevTotal)
+  const completedDiff = completedInPeriod.length - prevCompletedCount
+  const focusDiff = timeStats.focusMinutes - timeStats.prevFocusMinutes
 
   return (
-    <div className="space-y-6">
-      {/* Header with Date Range */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-8">
+      {/* Header + range switch */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold">生產力報告</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            追蹤你的任務完成情況和工作習慣
-          </p>
+          <h2 className="text-xl font-semibold">回顧</h2>
+          <p className="text-sm text-muted-foreground mt-1">慢慢回頭看，走過的都算數</p>
         </div>
-        
         <div className="flex items-center gap-2">
           {(['week', 'month', 'quarter', 'year'] as const).map(range => (
             <button
               key={range}
               onClick={() => setDateRange(range)}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                // 44px min touch target on mobile; compact for pointer devices.
+                'px-3.5 min-h-11 sm:min-h-0 sm:px-3 sm:py-1.5 rounded-lg text-sm font-medium transition-colors',
                 dateRange === range
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary/50 text-muted-foreground hover:text-foreground hover:bg-secondary'
               )}
             >
               {range === 'week' ? '週' : range === 'month' ? '月' : range === 'quarter' ? '季' : '年'}
@@ -354,803 +334,316 @@ export function ReportDashboard({ workspaces, onClose }: ReportDashboardProps) {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex items-center gap-1 p-1 bg-secondary/30 rounded-xl">
-        {[
-          { id: 'overview', label: '總覽', icon: BarChart3 },
-          { id: 'productivity', label: '生產力', icon: Activity },
-          { id: 'habits', label: '習慣', icon: Flame },
-          { id: 'insights', label: '洞察', icon: Target }
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as TabType)}
+      {!hasActivity ? (
+        <Reveal index={0}>
+          <div className="flex flex-col items-center text-center py-16">
+            <WaddleMascot className="w-20 h-20" phase="auto" />
+            <p className="mt-5 text-base font-medium">{rangeConfig.label}還沒有留下紀錄</p>
+            <p className="mt-1.5 text-sm text-muted-foreground max-w-prose">
+              等你記下第一件事，Waddle 就開始幫你回顧
+            </p>
+          </div>
+        </Reveal>
+      ) : (
+        <>
+          {/* ① 節奏 — narrative + small daily bars */}
+          <Reveal index={0}>
+            <section aria-label={`${rangeConfig.label}的節奏`}>
+              <h3 className="text-base font-semibold mb-4">{rangeConfig.label}的節奏</h3>
+              <p className="text-base leading-relaxed max-w-prose">
+                {completedInPeriod.length > 0 ? (
+                  <>
+                    {rangeConfig.label}你完成了<Num>{completedInPeriod.length}</Num>件事
+                    {timeOfDayClause && <>，大多在{timeOfDayClause}</>}。
+                    {prevCompletedCount > 0 && completedDiff > 0 && (
+                      <>比{rangeConfig.prevLabel}多完成了<Num>{completedDiff}</Num>件。</>
+                    )}
+                    {prevCompletedCount > 0 && completedDiff === 0 && (
+                      <>和{rangeConfig.prevLabel}的步調差不多。</>
+                    )}
+                    {prevCompletedCount > 0 && completedDiff < 0 && (
+                      <>比{rangeConfig.prevLabel}少一些——節奏本來就有起伏，沒關係。</>
+                    )}
+                    {timeStats.focusMinutes > 0 && (
+                      <>
+                        留給自己的專注時間約<Num>{hoursText(timeStats.focusMinutes)}</Num>小時
+                        {timeStats.prevFocusMinutes > 0 && focusDiff > 0 && (
+                          <>，比{rangeConfig.prevLabel}多了一點</>
+                        )}
+                        {timeStats.prevFocusMinutes > 0 && focusDiff < 0 && (
+                          <>，比{rangeConfig.prevLabel}短一些</>
+                        )}
+                        。
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {rangeConfig.label}你記下了<Num>{createdInPeriod.length}</Num>件事，
+                    還沒有完成的紀錄——正在進行，也是一種前進。
+                  </>
+                )}
+              </p>
+
+              <p className="text-xs text-muted-foreground mt-6 mb-2">
+                每日完成 · 最近 {dailyData.length} 天
+              </p>
+              <DailyBars data={dailyData} />
+            </section>
+          </Reveal>
+
+          {/* ② 時間都花在哪 */}
+          <Reveal index={1}>
+            <section aria-label="時間都花在哪" className="border-t border-border/70 pt-7">
+              <h3 className="text-base font-semibold mb-1">時間都花在哪</h3>
+              {timeStats.scheduledMinutes > 0 ? (
+                <>
+                  <p className="text-sm text-muted-foreground mb-5">
+                    {timeStats.meetingMinutes > 0 ? (
+                      <>
+                        會議 <MutedNum>{hoursText(timeStats.meetingMinutes)}</MutedNum> 小時 · 專注{' '}
+                        <MutedNum>{hoursText(timeStats.focusMinutes)}</MutedNum> 小時
+                      </>
+                    ) : (
+                      <>
+                        專注 <MutedNum>{hoursText(timeStats.focusMinutes)}</MutedNum> 小時 ·
+                        沒有會議打擾
+                      </>
+                    )}
+                  </p>
+
+                  <HourStrip counts={timeStats.hourCounts} />
+
+                  {timeStats.workspaceShare.length > 0 && (
+                    <div className="mt-7 space-y-4">
+                      {timeStats.workspaceShare.map(ws => {
+                        const wsColor = displayColor(ws.color)
+                        return (
+                          <div key={ws.name} className="space-y-1.5">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className="w-2 h-2 rounded-full shrink-0"
+                                  style={{ backgroundColor: wsColor }}
+                                  aria-hidden="true"
+                                />
+                                <span className="text-sm truncate">{ws.name}</span>
+                              </div>
+                              <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
+                                {ws.detail}
+                              </span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${ws.share}%`,
+                                  backgroundColor: wsColor,
+                                  transition: 'width 500ms cubic-bezier(0.25, 1, 0.5, 1)',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-3">
+                  {rangeConfig.label}還沒有排上時間軸的事。想試著把一件事放進日曆看看嗎？
+                </p>
+              )}
+            </section>
+          </Reveal>
+
+          {/* ③ 完成的事 */}
+          <Reveal index={2}>
+            <section aria-label="完成的事" className="border-t border-border/70 pt-7">
+              <h3 className="text-base font-semibold mb-4">
+                完成的事
+                {completedInPeriod.length > 0 && (
+                  <span className="ml-2 text-sm font-mono font-normal text-muted-foreground">
+                    {completedInPeriod.length}
+                  </span>
+                )}
+              </h3>
+              {completedGroups.length > 0 ? (
+                <div className="max-h-80 overflow-y-auto pr-1 space-y-5">
+                  {completedGroups.map(group => (
+                    <div key={group.key}>
+                      <p className="text-xs text-muted-foreground mb-2">{group.label}</p>
+                      <ul className="space-y-1">
+                        {group.items.map(task => (
+                          <li key={task.id} className="flex items-center gap-2.5 py-1">
+                            <span className="w-5 h-5 rounded-full bg-success/15 text-success flex items-center justify-center shrink-0">
+                              <Check className="w-3 h-3" strokeWidth={3} aria-hidden="true" />
+                            </span>
+                            <span className="text-sm truncate flex-1">{task.title}</span>
+                            <span
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{ backgroundColor: displayColor(task.workspaceColor) }}
+                              aria-hidden="true"
+                            />
+                            {task.completedAt && (
+                              <span className="text-[11px] font-mono text-muted-foreground w-11 text-right tabular-nums">
+                                {timeOf(task.completedAt)}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {rangeConfig.label}還沒有完成的紀錄。沒關係，正在進行也是一種前進。
+                </p>
+              )}
+            </section>
+          </Reveal>
+
+          {/* ④ Waddle 的觀察 */}
+          <Reveal index={3}>
+            <section aria-label="Waddle 的觀察" className="border-t border-border/70 pt-7">
+              <h3 className="text-base font-semibold mb-4">Waddle 的觀察</h3>
+              <div className="flex items-center gap-4 rounded-xl bg-accent/30 p-4 sm:p-5">
+                <WaddleMascot className="w-11 h-11 shrink-0" phase="auto" />
+                <p className="text-sm leading-relaxed text-accent-foreground max-w-prose">
+                  {observation}
+                </p>
+              </div>
+            </section>
+          </Reveal>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ---------- Presentational helpers ----------
+
+/** Staggered entrance: fade + 8px rise, ease-out-quart, honors reduced motion. */
+function Reveal({ index, children }: { index: number; children: ReactNode }) {
+  return (
+    <div
+      className="animate-in fade-in slide-in-from-bottom-2 motion-reduce:animate-none"
+      style={{
+        animationDelay: `${index * 80}ms`,
+        animationDuration: '300ms',
+        animationTimingFunction: 'cubic-bezier(0.25, 1, 0.5, 1)',
+        animationFillMode: 'backwards',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+/** Inline narrative number — mono, terracotta, one step above body text. */
+function Num({ children }: { children: ReactNode }) {
+  return (
+    <span className="font-mono text-lg font-medium text-primary tabular-nums mx-1">
+      {children}
+    </span>
+  )
+}
+
+function MutedNum({ children }: { children: ReactNode }) {
+  return <span className="font-mono text-foreground/80 tabular-nums">{children}</span>
+}
+
+/** Small daily completion bars, terracotta on warm neutral baseline. */
+function DailyBars({
+  data,
+}: {
+  data: { label: string; full: string; completed: number; isToday: boolean }[]
+}) {
+  const max = Math.max(...data.map(d => d.completed), 1)
+  return (
+    <div
+      className="flex items-end gap-1.5"
+      role="img"
+      aria-label={`每日完成數量：${data.map(d => `${d.full} ${d.completed} 件`).join('、')}`}
+    >
+      {data.map((day, i) => (
+        <div key={i} className="flex-1 min-w-0 flex flex-col items-center gap-1.5">
+          <div className="w-full h-16 flex items-end justify-center">
+            <div
+              className="w-full max-w-7 rounded-t"
+              style={
+                day.completed > 0
+                  ? {
+                      height: `${Math.max((day.completed / max) * 100, 8)}%`,
+                      backgroundColor: 'var(--chart-1)',
+                      opacity: 0.45 + 0.55 * (day.completed / max),
+                    }
+                  : { height: '3px', backgroundColor: 'var(--border)' }
+              }
+              title={`${day.full}：完成 ${day.completed} 件`}
+            />
+          </div>
+          <span
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all",
-              activeTab === tab.id
-                ? "bg-card shadow-sm text-foreground"
-                : "text-muted-foreground hover:text-foreground"
+              'text-[10px] font-mono',
+              day.isToday ? 'text-foreground' : 'text-muted-foreground'
             )}
           >
-            <tab.icon className="w-4 h-4" />
-            <span className="hidden sm:inline">{tab.label}</span>
-          </button>
+            {day.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** 24-hour strip of scheduled activity — height + warmth encode intensity. */
+function HourStrip({ counts }: { counts: number[] }) {
+  const max = Math.max(...counts, 1)
+  return (
+    <div role="img" aria-label="一天之中排程活動的分佈">
+      <div className="flex items-end gap-[3px] h-12">
+        {counts.map((count, hour) => (
+          <div
+            key={hour}
+            className="flex-1 rounded-t-sm"
+            style={
+              count > 0
+                ? {
+                    height: `${Math.max((count / max) * 100, 12)}%`,
+                    backgroundColor: 'var(--chart-1)',
+                    opacity: 0.35 + 0.65 * (count / max),
+                  }
+                : { height: '2px', backgroundColor: 'var(--border)' }
+            }
+            title={`${hour}:00 · ${count} 件`}
+          />
         ))}
       </div>
-
-      {/* Overview Tab */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          {/* Key Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <MetricCard
-              title="任務完成"
-              value={stats.completed}
-              subtitle={`共 ${stats.total} 個任務`}
-              trend={tasksTrend}
-              trendLabel={`較${rangeConfig.prevLabel}`}
-              icon={CheckCircle2}
-              color="green"
-            />
-            <MetricCard
-              title="完成率"
-              value={`${stats.completionRate}%`}
-              subtitle={`目標: 80%`}
-              trend={completionTrend}
-              trendLabel={`較${rangeConfig.prevLabel}`}
-              icon={Target}
-              color="blue"
-            />
-            <MetricCard
-              title="過期任務"
-              value={stats.overdue}
-              subtitle="可以挑個時間做"
-              icon={AlertTriangle}
-              color={stats.overdue > 0 ? "red" : "green"}
-            />
-            <MetricCard
-              title="連續天數"
-              value={streak.current}
-              subtitle={`最高紀錄: ${streak.max} 天`}
-              icon={Flame}
-              color="orange"
-            />
-          </div>
-
-          {/* Completion Chart */}
-          <div className="p-5 rounded-xl bg-card border border-border">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium">每日完成趨勢</h3>
-              <div className="flex items-center gap-4 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-success" />
-                  <span className="text-muted-foreground">已完成</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-info" />
-                  <span className="text-muted-foreground">新建立</span>
-                </div>
-              </div>
-            </div>
-            <div className="h-40 flex items-end gap-1">
-              {dailyData.map((day, i) => {
-                const maxVal = Math.max(...dailyData.map(d => Math.max(d.completed, d.created)), 1)
-                const completedHeight = (day.completed / maxVal) * 100
-                const createdHeight = (day.created / maxVal) * 100
-                
-                return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                    <div className="w-full flex items-end justify-center gap-0.5 h-32">
-                      <div 
-                        className="w-2 bg-success rounded-t transition-all"
-                        style={{ height: `${completedHeight}%`, minHeight: day.completed > 0 ? '4px' : '0' }}
-                        title={`完成: ${day.completed}`}
-                      />
-                      <div 
-                        className="w-2 bg-info rounded-t transition-all"
-                        style={{ height: `${createdHeight}%`, minHeight: day.created > 0 ? '4px' : '0' }}
-                        title={`建立: ${day.created}`}
-                      />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground">{day.label}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Workspace Breakdown */}
-          <div className="p-5 rounded-xl bg-card border border-border">
-            <h3 className="font-medium mb-4">工作區表現</h3>
-            <div className="space-y-4">
-              {workspaceStats.map(ws => {
-                const wsColor = displayColor(ws.color)
-                return (
-                <div key={ws.id} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: wsColor }}
-                        aria-hidden="true"
-                      />
-                      <span className="font-medium text-sm">{ws.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm">
-                      <span className="text-muted-foreground">
-                        {ws.periodCompleted}/{ws.periodTotal} {rangeConfig.label}
-                      </span>
-                      <span className={cn(
-                        "font-medium",
-                        ws.rate >= 80 ? "text-success" : ws.rate >= 50 ? "text-urgency-medium" : "text-urgency-critical"
-                      )}>
-                        {ws.rate}%
-                      </span>
-                    </div>
-                  </div>
-                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${ws.rate}%`,
-                        backgroundColor: wsColor
-                      }}
-                    />
-                  </div>
-                </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Productivity Tab */}
-      {activeTab === 'productivity' && (
-        <div className="space-y-6">
-          {/* Time Distribution */}
-          <div className="p-5 rounded-xl bg-card border border-border">
-            <h3 className="font-medium mb-4">任務時間分佈</h3>
-            <div className="grid grid-cols-6 gap-1">
-              {hourDistribution.map((count, hour) => {
-                const maxCount = Math.max(...hourDistribution, 1)
-                const intensity = count / maxCount
-                
-                return (
-                  <div 
-                    key={hour}
-                    className="aspect-square rounded-md flex items-center justify-center text-[10px] transition-colors"
-                    style={{
-                      backgroundColor: `rgba(59, 130, 246, ${intensity * 0.8 + 0.1})`,
-                      color: intensity > 0.5 ? 'white' : 'inherit'
-                    }}
-                    title={`${hour}:00 - ${count} 個任務`}
-                  >
-                    {hour}
-                  </div>
-                )
-              })}
-            </div>
-            <div className="flex items-center justify-between mt-4 text-xs text-muted-foreground">
-              <span>較少任務</span>
-              <div className="flex items-center gap-1">
-                {[0.1, 0.3, 0.5, 0.7, 0.9].map(opacity => (
-                  <div 
-                    key={opacity}
-                    className="w-4 h-4 rounded"
-                    style={{ backgroundColor: `rgba(59, 130, 246, ${opacity})` }}
-                  />
-                ))}
-              </div>
-              <span>較多任務</span>
-            </div>
-          </div>
-
-          {/* Peak Hours */}
-          <div className="p-5 rounded-xl bg-card border border-border">
-            <h3 className="font-medium mb-4">最高效率時段</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {peakHours.map((peak, i) => (
-                <div 
-                  key={peak.hour}
-                  className={cn(
-                    "p-4 rounded-xl border",
-                    i === 0 ? "bg-urgency-medium/10 border-urgency-medium/40" : "bg-secondary/30 border-border"
-                  )}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    {i === 0 && <Award className="w-5 h-5 text-urgency-medium" />}
-                    <span className="text-2xl font-bold">
-                      {peak.hour.toString().padStart(2, '0')}:00
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {peak.count} 個任務在此時段完成
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Priority Distribution */}
-          <div className="p-5 rounded-xl bg-card border border-border">
-            <h3 className="font-medium mb-4">待處理任務優先級</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="p-4 rounded-xl bg-urgency-critical/10 border border-urgency-critical/30">
-                <div className="text-2xl font-bold text-urgency-critical">{priorityStats.high}</div>
-                <div className="text-sm text-muted-foreground mt-1">高優先</div>
-              </div>
-              <div className="p-4 rounded-xl bg-urgency-medium/10 border border-urgency-medium/30">
-                <div className="text-2xl font-bold text-urgency-medium">{priorityStats.medium}</div>
-                <div className="text-sm text-muted-foreground mt-1">中優先</div>
-              </div>
-              <div className="p-4 rounded-xl bg-info/10 border border-info/30">
-                <div className="text-2xl font-bold text-info">{priorityStats.low}</div>
-                <div className="text-sm text-muted-foreground mt-1">低優先</div>
-              </div>
-              <div className="p-4 rounded-xl bg-secondary/50 border border-border">
-                <div className="text-2xl font-bold">{priorityStats.none}</div>
-                <div className="text-sm text-muted-foreground mt-1">未設定</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Meeting Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-5 rounded-xl bg-card border border-border">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Users className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <div className="font-medium">會議佔比</div>
-                  <div className="text-sm text-muted-foreground">會議時數 ÷ 已排程時數</div>
-                </div>
-              </div>
-              <div className="text-3xl font-bold">{stats.meetingTimeShare}%</div>
-              <div className="text-sm text-muted-foreground mt-1">
-                {Math.round(stats.meetingMinutes / 60 * 10) / 10} 小時會議
-                {' · '}
-                共 {stats.meetings} 場
-              </div>
-              <div className="h-2 bg-secondary rounded-full mt-3 overflow-hidden">
-                <div
-                  className="h-full bg-primary rounded-full transition-all"
-                  style={{ width: `${Math.min(100, stats.meetingTimeShare)}%` }}
-                />
-              </div>
-              {stats.meetingTimeShare > 50 && (
-                <div className="mt-2 text-xs text-muted-foreground italic">
-                  超過一半排程時間都在開會，記得也留點專注的空檔給自己
-                </div>
-              )}
-            </div>
-            <div className="p-5 rounded-xl bg-card border border-border">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-success/10">
-                  <Activity className="w-5 h-5 text-success" />
-                </div>
-                <div>
-                  <div className="font-medium">深度工作時間</div>
-                  <div className="text-sm text-muted-foreground">非會議的已排程時數</div>
-                </div>
-              </div>
-              <div className="text-3xl font-bold">
-                {Math.round((stats.scheduledMinutes - stats.meetingMinutes) / 60 * 10) / 10}
-                <span className="text-base text-muted-foreground font-normal ml-1">小時</span>
-              </div>
-              <div className="text-sm text-muted-foreground mt-1">
-                {stats.scheduledMinutes > 0
-                  ? `${100 - stats.meetingTimeShare}% 的排程時間`
-                  : '尚無排程資料'}
-              </div>
-              <div className="h-2 bg-secondary rounded-full mt-3 overflow-hidden">
-                <div
-                  className="h-full bg-success rounded-full transition-all"
-                  style={{ width: `${Math.min(100, 100 - stats.meetingTimeShare)}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Task Planning Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-5 rounded-xl bg-card border border-border">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-info/10">
-                  <Calendar className="w-5 h-5 text-info" />
-                </div>
-                <div>
-                  <div className="font-medium">排程率</div>
-                  <div className="text-sm text-muted-foreground">有設定排程的任務比例</div>
-                </div>
-              </div>
-              <div className="text-3xl font-bold">
-                {stats.total > 0 ? Math.round((stats.scheduled / stats.total) * 100) : 0}%
-              </div>
-              <div className="h-2 bg-secondary rounded-full mt-3 overflow-hidden">
-                <div 
-                  className="h-full bg-info rounded-full transition-all"
-                  style={{ width: `${stats.total > 0 ? (stats.scheduled / stats.total) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-            <div className="p-5 rounded-xl bg-card border border-border">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-chart-4/10">
-                  <Clock className="w-5 h-5 text-chart-4" />
-                </div>
-                <div>
-                  <div className="font-medium">截止日設定率</div>
-                  <div className="text-sm text-muted-foreground">有設定截止日的任務比例</div>
-                </div>
-              </div>
-              <div className="text-3xl font-bold">
-                {stats.total > 0 ? Math.round((stats.withDueDate / stats.total) * 100) : 0}%
-              </div>
-              <div className="h-2 bg-secondary rounded-full mt-3 overflow-hidden">
-                <div 
-                  className="h-full bg-chart-4 rounded-full transition-all"
-                  style={{ width: `${stats.total > 0 ? (stats.withDueDate / stats.total) * 100 : 0}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Habits Tab */}
-      {activeTab === 'habits' && (
-        <div className="space-y-6">
-          {/* Streak Card */}
-          <div className="p-6 rounded-xl bg-urgency-high/15 border border-urgency-high/30">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-full bg-urgency-high/20">
-                <Flame className="w-8 h-8 text-urgency-high" />
-              </div>
-              <div>
-                <div className="text-4xl font-bold">{streak.current} 天</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  目前連續完成天數 {streak.current > 0 && '(保持這個節奏)'}
-                </div>
-              </div>
-            </div>
-            {streak.max > streak.current && (
-              <div className="mt-4 p-3 rounded-lg bg-background/50">
-                <div className="flex items-center gap-2 text-sm">
-                  <Award className="w-4 h-4 text-urgency-medium" />
-                  <span>最高紀錄: {streak.max} 天連續完成</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Weekly Activity Heatmap */}
-          <div className="p-5 rounded-xl bg-card border border-border">
-            <h3 className="font-medium mb-4">過去 4 週活動</h3>
-            <div className="space-y-2">
-              {['日', '一', '二', '三', '四', '五', '六'].map((day, dayIndex) => (
-                <div key={day} className="flex items-center gap-2">
-                  <span className="w-6 text-xs text-muted-foreground">{day}</span>
-                  <div className="flex gap-1 flex-1">
-                    {Array.from({ length: 4 }).map((_, weekIndex) => {
-                      const date = new Date()
-                      const currentDay = date.getDay()
-                      const daysBack = (currentDay - dayIndex + 7) % 7 + weekIndex * 7
-                      date.setDate(date.getDate() - daysBack)
-                      const dateStr = toDateString(date)
-                      
-                      const completed = allTasks.filter(t => 
-                        t.isCompleted && t.completedAt?.split('T')[0] === dateStr
-                      ).length
-                      
-                      const intensity = Math.min(completed / 5, 1)
-                      
-                      return (
-                        <div
-                          key={weekIndex}
-                          className="flex-1 h-8 rounded-md transition-colors"
-                          style={{
-                            backgroundColor: completed > 0 
-                              ? `rgba(34, 197, 94, ${intensity * 0.8 + 0.2})`
-                              : 'var(--secondary)'
-                          }}
-                          title={`${dateStr}: ${completed} 個任務完成`}
-                        />
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-end gap-2 mt-4 text-xs text-muted-foreground">
-              <span>較少</span>
-              <div className="flex gap-1">
-                {[0, 0.25, 0.5, 0.75, 1].map(intensity => (
-                  <div 
-                    key={intensity}
-                    className="w-4 h-4 rounded"
-                    style={{ 
-                      backgroundColor: intensity > 0 
-                        ? `rgba(34, 197, 94, ${intensity * 0.8 + 0.2})`
-                        : 'var(--secondary)'
-                    }}
-                  />
-                ))}
-              </div>
-              <span>較多</span>
-            </div>
-          </div>
-
-          {/* Consistency Score */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-5 rounded-xl bg-card border border-border">
-              <h3 className="font-medium mb-3">一致性分數</h3>
-              <div className="relative pt-4">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-4xl font-bold">
-                    {Math.round((streak.current / 7) * 100)}
-                  </span>
-                </div>
-                <svg className="w-32 h-32 mx-auto" viewBox="0 0 100 100">
-                  <circle
-                    cx="50" cy="50" r="40"
-                    fill="none"
-                    stroke="var(--secondary)"
-                    strokeWidth="8"
-                  />
-                  <circle
-                    cx="50" cy="50" r="40"
-                    fill="none"
-                    stroke="var(--primary)"
-                    strokeWidth="8"
-                    strokeDasharray={`${(streak.current / 7) * 251.2} 251.2`}
-                    strokeLinecap="round"
-                    transform="rotate(-90 50 50)"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm text-muted-foreground text-center mt-2">
-                基於過去 7 天的活動
-              </p>
-            </div>
-            <div className="p-5 rounded-xl bg-card border border-border">
-              <h3 className="font-medium mb-3">習慣建議</h3>
-              <div className="space-y-3">
-                {streak.current === 0 && (
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-urgency-medium/10">
-                    <AlertTriangle className="w-5 h-5 text-urgency-medium flex-shrink-0 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium">開始新的連續紀錄</p>
-                      <p className="text-muted-foreground mt-1">今天完成至少一個任務來開始你的連續天數</p>
-                    </div>
-                  </div>
-                )}
-                {streak.current >= 3 && streak.current < 7 && (
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-info/10">
-                    <TrendingUp className="w-5 h-5 text-info flex-shrink-0 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium">保持勢頭</p>
-                      <p className="text-muted-foreground mt-1">再 {7 - streak.current} 天就能達到一週連續！</p>
-                    </div>
-                  </div>
-                )}
-                {streak.current >= 7 && (
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-success/10">
-                    <Award className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium">太棒了！</p>
-                      <p className="text-muted-foreground mt-1">你已經連續 {streak.current} 天保持生產力</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Insights Tab */}
-      {activeTab === 'insights' && (
-        <div className="space-y-6">
-          {/* Overdue Analysis */}
-          <CollapsibleSection
-            title="過期任務分析"
-            icon={AlertTriangle}
-            isOpen={expandedSections.has('overdue')}
-            onToggle={() => toggleSection('overdue')}
-            badge={stats.overdue > 0 ? stats.overdue : undefined}
-            badgeColor="red"
-          >
-            <div className="space-y-4">
-              {overdueAnalysis.critical.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-urgency-critical">很久沒看了 ({">"}7 天)</h4>
-                  {overdueAnalysis.critical.slice(0, 5).map(task => (
-                    <TaskRow key={task.id} task={task} />
-                  ))}
-                </div>
-              )}
-              {overdueAnalysis.warning.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-urgency-medium">放著有點久了 (3-7 天)</h4>
-                  {overdueAnalysis.warning.slice(0, 5).map(task => (
-                    <TaskRow key={task.id} task={task} />
-                  ))}
-                </div>
-              )}
-              {overdueAnalysis.minor.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-urgency-high">稍微晚了一點 ({"<"}3 天)</h4>
-                  {overdueAnalysis.minor.slice(0, 5).map(task => (
-                    <TaskRow key={task.id} task={task} />
-                  ))}
-                </div>
-              )}
-              {stats.overdue === 0 && (
-                <div className="flex items-center gap-3 p-4 rounded-lg bg-success/10">
-                  <CheckCircle2 className="w-5 h-5 text-success" />
-                  <span className="text-sm">太棒了！目前沒有過期的任務</span>
-                </div>
-              )}
-            </div>
-          </CollapsibleSection>
-
-          {/* Smart Suggestions */}
-          <div className="p-5 rounded-xl bg-card border border-border">
-            <h3 className="font-medium mb-4">智慧建議</h3>
-            <div className="space-y-3">
-              {stats.completionRate < 50 && (
-                <SuggestionCard
-                  type="warning"
-                  title="提升完成率"
-                  description="目前完成率低於 50%。建議將大任務拆分成更小的可執行項目，或重新評估任務的必要性。"
-                  action="查看待辦任務"
-                />
-              )}
-              {stats.overdue > 5 && (
-                <SuggestionCard
-                  type="error"
-                  title="清理過期任務"
-                  description={`有 ${stats.overdue} 個過期任務。建議重新評估優先級，歸檔不需要的任務，或重新設定截止日。`}
-                  action="查看過期任務"
-                />
-              )}
-              {priorityStats.high > 5 && (
-                <SuggestionCard
-                  type="warning"
-                  title="過多高優先任務"
-                  description="當所有任務都是高優先時，實際上沒有任務是高優先的。建議重新評估優先級分配。"
-                  action="檢視優先級"
-                />
-              )}
-              {stats.scheduled < stats.total * 0.3 && (
-                <SuggestionCard
-                  type="info"
-                  title="增加任務排程"
-                  description="只有不到 30% 的任務有排程。為任務設定具體時間可以提高完成率。"
-                  action="安排任務"
-                />
-              )}
-              {stats.completionRate >= 80 && (
-                <SuggestionCard
-                  type="success"
-                  title="表現優秀"
-                  description="你的完成率超過 80%，狀態很好。可以試著放一些更有挑戰的事情進來。"
-                />
-              )}
-              {streak.current >= 7 && (
-                <SuggestionCard
-                  type="success"
-                  title="連續達標"
-                  description={`你已經連續 ${streak.current} 天完成任務！這是建立持久習慣的關鍵。`}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <QuickStat label="平均每日完成" value={Math.round(stats.completed / rangeConfig.days * 10) / 10} unit="個" />
-            <QuickStat label="待處理任務" value={stats.pending} unit="個" />
-            <QuickStat label="高優先待辦" value={priorityStats.high} unit="個" warning={priorityStats.high > 3} />
-            <QuickStat label="已排程任務" value={stats.scheduled} unit="個" />
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Helper Components
-function MetricCard({ 
-  title, 
-  value, 
-  subtitle, 
-  trend, 
-  trendLabel,
-  icon: Icon, 
-  color 
-}: {
-  title: string
-  value: string | number
-  subtitle: string
-  trend?: number
-  trendLabel?: string
-  icon: React.ElementType
-  color: 'green' | 'blue' | 'red' | 'orange' | 'purple'
-}) {
-  const colorClasses = {
-    green: 'bg-success/10 border-success/30 text-success',
-    blue: 'bg-info/10 border-info/30 text-info',
-    red: 'bg-urgency-critical/10 border-urgency-critical/30 text-urgency-critical',
-    orange: 'bg-urgency-high/10 border-urgency-high/30 text-urgency-high',
-    purple: 'bg-chart-4/10 border-chart-4/30 text-chart-4'
-  }
-
-  return (
-    <div className={cn("p-4 rounded-xl border", colorClasses[color])}>
-      <div className="flex items-center justify-between mb-2">
-        <Icon className="w-5 h-5" />
-        {trend !== undefined && (
-          <div className={cn(
-            "flex items-center gap-1 text-xs font-medium",
-            trend >= 0 ? "text-success" : "text-urgency-critical"
-          )}>
-            {trend >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            <span>{Math.abs(trend)}%</span>
-          </div>
-        )}
-      </div>
-      <div className="text-2xl font-bold">{value}</div>
-      <div className="text-xs text-muted-foreground mt-1">{subtitle}</div>
-      {trendLabel && trend !== undefined && (
-        <div className="text-[10px] text-muted-foreground mt-0.5">{trendLabel}</div>
-      )}
-    </div>
-  )
-}
-
-function CollapsibleSection({
-  title,
-  icon: Icon,
-  isOpen,
-  onToggle,
-  badge,
-  badgeColor,
-  children
-}: {
-  title: string
-  icon: React.ElementType
-  isOpen: boolean
-  onToggle: () => void
-  badge?: number
-  badgeColor?: 'red' | 'yellow' | 'green'
-  children: React.ReactNode
-}) {
-  return (
-    <div className="rounded-xl bg-card border border-border overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 hover:bg-secondary/30 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <Icon className="w-5 h-5 text-muted-foreground" />
-          <span className="font-medium">{title}</span>
-          {badge !== undefined && (
-            <span className={cn(
-              "px-2 py-0.5 rounded-full text-xs font-medium",
-              badgeColor === 'red' ? "bg-urgency-critical/20 text-urgency-critical" :
-              badgeColor === 'yellow' ? "bg-urgency-medium/20 text-urgency-medium" :
-              "bg-success/20 text-success"
-            )}>
-              {badge}
-            </span>
-          )}
-        </div>
-        {isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-      </button>
-      {isOpen && <div className="px-4 pb-4">{children}</div>}
-    </div>
-  )
-}
-
-function TaskRow({ task }: { task: Task }) {
-  const displayColor = useDisplayColor()
-  const daysOverdue = task.dueDate
-    ? Math.floor((Date.now() - new Date(task.dueDate).getTime()) / 86400000)
-    : 0
-
-  return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
-      <div className="flex items-center gap-3">
-        <div
-          className="w-2 h-2 rounded-full flex-shrink-0"
-          style={{ backgroundColor: displayColor(task.workspaceColor) || '#666' }}
-        />
-        <span className="text-sm truncate">{task.title}</span>
-      </div>
-      <span className="text-xs text-urgency-critical font-medium whitespace-nowrap ml-2">
-        {daysOverdue} 天
-      </span>
-    </div>
-  )
-}
-
-function SuggestionCard({
-  type,
-  title,
-  description,
-  action
-}: {
-  type: 'info' | 'warning' | 'error' | 'success'
-  title: string
-  description: string
-  action?: string
-}) {
-  const styles = {
-    info: 'bg-info/10 border-info/30',
-    warning: 'bg-urgency-medium/10 border-urgency-medium/30',
-    error: 'bg-urgency-critical/10 border-urgency-critical/30',
-    success: 'bg-success/10 border-success/30'
-  }
-
-  const iconColors = {
-    info: 'text-info',
-    warning: 'text-urgency-medium',
-    error: 'text-urgency-critical',
-    success: 'text-success'
-  }
-
-  const icons = {
-    info: Target,
-    warning: AlertTriangle,
-    error: AlertTriangle,
-    success: CheckCircle2
-  }
-
-  const Icon = icons[type]
-
-  return (
-    <div className={cn("p-4 rounded-xl border", styles[type])}>
-      <div className="flex items-start gap-3">
-        <Icon className={cn("w-5 h-5 flex-shrink-0 mt-0.5", iconColors[type])} />
-        <div className="flex-1">
-          <h4 className="font-medium text-sm">{title}</h4>
-          <p className="text-sm text-muted-foreground mt-1">{description}</p>
-          {action && (
-            <button className="flex items-center gap-1 text-sm text-primary mt-2 hover:underline">
-              {action}
-              <ArrowRight className="w-3 h-3" />
-            </button>
-          )}
-        </div>
+      <div className="flex justify-between mt-1.5 text-[10px] font-mono text-muted-foreground">
+        <span>0:00</span>
+        <span>6:00</span>
+        <span>12:00</span>
+        <span>18:00</span>
+        <span>24:00</span>
       </div>
     </div>
   )
 }
 
-function QuickStat({ 
-  label, 
-  value, 
-  unit, 
-  warning 
-}: { 
-  label: string
-  value: number
-  unit: string
-  warning?: boolean 
-}) {
-  return (
-    <div className={cn(
-      "p-4 rounded-xl border",
-      warning ? "bg-urgency-medium/10 border-yellow-500/20" : "bg-card border-border"
-    )}>
-      <div className="text-2xl font-bold">
-        {value}
-        <span className="text-sm font-normal text-muted-foreground ml-1">{unit}</span>
-      </div>
-      <div className="text-xs text-muted-foreground mt-1">{label}</div>
-    </div>
-  )
+// ---------- Pure helpers ----------
+
+function hoursText(minutes: number): string {
+  return String(Math.round((minutes / 60) * 10) / 10)
+}
+
+function formatHours(minutes: number): string {
+  if (minutes < 60) return `${minutes} 分鐘`
+  return `${hoursText(minutes)} 小時`
+}
+
+function timeOf(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
 }

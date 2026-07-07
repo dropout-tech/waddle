@@ -429,20 +429,28 @@ function TaskBlockImpl({
             )}
           </div>
 
-          {/* Title: wraps to multiple lines when narrow.
-              1 col → 2 lines max, normal size.
+          {/* Title: wraps to multiple lines when narrow, EXCEPT short blocks.
+              Short blocks (≤45px) don't have the vertical room for a second
+              (clamped) line or for vertical-rl glyphs to flow before the
+              overflow-hidden shell clips them — both looked like truncated
+              garbage at ~28px tall. So isShort always gets a single
+              horizontal truncated line; full title/time is still available
+              via the title="" tooltip on the body below.
+              Non-short: 1 col → 2 lines max, normal size.
               2-3 cols → up to 3 lines, slightly smaller.
               4+ cols → vertical text (column too narrow for legible wrap). */}
           <span
             className={cn(
-              'font-semibold text-white leading-tight break-words flex-1 min-w-0',
-              totalColumns > 3
-                ? 'text-[10px]'
+              'font-semibold text-white leading-tight flex-1 min-w-0',
+              isShort
+                ? 'text-[10px] truncate'
+                : totalColumns > 3
+                ? 'text-[10px] break-words'
                 : totalColumns > 1
-                ? 'text-[11px] line-clamp-3'
-                : 'text-xs line-clamp-2'
+                ? 'text-[11px] line-clamp-3 break-words'
+                : 'text-xs line-clamp-2 break-words'
             )}
-            style={totalColumns > 3 ? { writingMode: 'vertical-rl', textOrientation: 'mixed' } : undefined}
+            style={!isShort && totalColumns > 3 ? { writingMode: 'vertical-rl', textOrientation: 'mixed' } : undefined}
           >
             {displayTitle}
           </span>

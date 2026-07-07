@@ -7,13 +7,15 @@ import { TaskPanel } from '@/components/task-panel/task-panel'
 import { FullScreenTaskView } from '@/components/task-panel/full-screen-task-view'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
 import { CalendarExportModal } from '@/components/calendar/calendar-export-modal'
-import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ListChecks, CalendarDays, Sparkles } from 'lucide-react'
+import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ListChecks, CalendarDays, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
 import { FocusScratchpad } from '@/components/scratchpad/focus-scratchpad'
 import { FocusTimer } from '@/components/timer/focus-timer'
+import { CommandPalette } from '@/components/command-palette'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useWideScreen } from '@/hooks/use-wide-screen'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { hapticSelection } from '@/lib/haptics'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, ScratchpadItem } from '@/lib/types'
@@ -63,6 +65,12 @@ interface MainLayoutProps {
 const MIN_PANEL_WIDTH = 280
 const MAX_PANEL_WIDTH = 600
 const DEFAULT_PANEL_WIDTH = 400
+
+// Third column (review pane) — only mounted at ≥1680px, see use-wide-screen.
+const REVIEW_PANE_WIDTH = 400
+const REVIEW_PANE_COLLAPSED_WIDTH = 40
+// Same per-device localStorage pattern as waddle-quick-links-open-v1.
+const REVIEW_PANE_KEY = 'waddle-review-pane-open-v1'
 
 export function MainLayout({
   workspaces,
@@ -203,7 +211,27 @@ export function MainLayout({
   // Sidebar visibility states
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true)
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true)
-  
+
+  // ≥1680px third column: always-on review pane (溫柔覆盤). Collapsed state
+  // is a per-device preference; default is open. isWide is false during
+  // hydration (see getServerSnapshot), so SSR markup never contains the pane.
+  const isWide = useWideScreen()
+  const [isReviewPaneOpen, setIsReviewPaneOpen] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return window.localStorage.getItem(REVIEW_PANE_KEY) !== '0'
+  })
+  useEffect(() => {
+    try { window.localStorage.setItem(REVIEW_PANE_KEY, isReviewPaneOpen ? '1' : '0') } catch {}
+  }, [isReviewPaneOpen])
+  // Gentle attention pulse on the pane when the header 報告 button is pressed
+  // while the pane is already visible (replaces the old full-page takeover).
+  const [reviewFlash, setReviewFlash] = useState(false)
+  const reviewFlashTimer = useRef<number | null>(null)
+  const reviewScrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => () => {
+    if (reviewFlashTimer.current) window.clearTimeout(reviewFlashTimer.current)
+  }, [])
+
   // Focus mode for journal/report (full screen view)
   const [focusMode, setFocusMode] = useState<'none' | 'journal' | 'report'>('none')
   
@@ -221,6 +249,50 @@ export function MainLayout({
   // Visible day count per view mode (1-3 for day, 5-7 for week)
   const dayViewDays = settings?.dayViewDays ?? 1
   const weekViewDays = settings?.weekViewDays ?? 7
+
+  // Global D/W/M/T (view switch + jump-to-today) — window-level so it works
+  // from a cold start, not just after the calendar panel itself has focus
+  // (that was the previous bug: the handler lived on calendar-panel.tsx's
+  // tabIndex=0 div and only fired once the user had already clicked in).
+  // Skips while typing in a field, or while any modal/overlay is open
+  // (ModalShell-based dialogs and Radix Dialog content both render
+  // role="dialog", which covers task/settings/time-block modals and the
+  // command palette in one check).
+  useEffect(() => {
+    if (isMobile) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      ) {
+        return
+      }
+      if (document.querySelector('[role="dialog"]')) return
+
+      switch (e.key.toLowerCase()) {
+        case 't':
+          e.preventDefault()
+          setSelectedDate(new Date())
+          break
+        case 'd':
+          e.preventDefault()
+          setViewMode('day')
+          break
+        case 'w':
+          e.preventDefault()
+          setViewMode('week')
+          break
+        case 'm':
+          e.preventDefault()
+          setViewMode('month')
+          break
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isMobile])
 
   const handleResize = useCallback((delta: number) => {
     setPanelWidth((prev) => {
@@ -268,6 +340,39 @@ export function MainLayout({
   const handleOpenReportFocus = useCallback(() => {
     setFocusMode('report')
   }, [])
+
+  // Desktop 報告 entry: on wide screens the review pane is already (or can
+  // be) on screen, so instead of replacing the calendar we expand the pane
+  // if collapsed, scroll it to top, and pulse a soft accent wash over it.
+  // Below 1680px this falls through to the existing full-page behavior.
+  const handleOpenReportDesktop = useCallback(() => {
+    if (!isWide) {
+      setFocusMode('report')
+      return
+    }
+    setIsReviewPaneOpen(true)
+    requestAnimationFrame(() => {
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      reviewScrollRef.current?.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
+    })
+    setReviewFlash(true)
+    if (reviewFlashTimer.current) window.clearTimeout(reviewFlashTimer.current)
+    reviewFlashTimer.current = window.setTimeout(() => setReviewFlash(false), 900)
+  }, [isWide])
+
+  // If the window grows past 1680px while the full-page report is open,
+  // fold it back into the pane — showing both would duplicate the content.
+  // Render-time state adjustment (the React-docs pattern for deriving
+  // state from a changed input) instead of an effect, so there is no
+  // extra committed frame showing both surfaces.
+  const [prevIsWide, setPrevIsWide] = useState(isWide)
+  if (isWide !== prevIsWide) {
+    setPrevIsWide(isWide)
+    if (isWide && focusMode === 'report') {
+      setFocusMode('none')
+      setIsReviewPaneOpen(true)
+    }
+  }
 
   // ─── MOBILE LAYOUT ─────────────────────────────────────────────
   // Single-panel layout: header (inside each panel) + active panel +
@@ -549,6 +654,18 @@ export function MainLayout({
         onPromoteToTask={onPromoteToTask}
       />
 
+      {/* ⌘K / Ctrl+K command palette — desktop only, self-mounts its own
+          keyboard listener. See components/command-palette.tsx. */}
+      <CommandPalette
+        tasks={allTasks}
+        onSelectTask={onSelectTask}
+        onOpenSettings={onOpenSettings}
+        onCreateTask={() => onCreateCalendarTask?.(toDateString(new Date()))}
+        onJumpToday={() => setSelectedDate(new Date())}
+        onSetViewMode={setViewMode}
+        onReturnToCalendar={() => setFocusMode('none')}
+      />
+
       <div className="flex flex-1 min-h-0 relative">
       {/* Left Panel Toggle Button (when panel is closed) */}
       {!isLeftPanelOpen && (
@@ -692,7 +809,7 @@ export function MainLayout({
                   onDeleteTimeBlock={onDeleteTimeBlock}
                   onTimeBlockSelect={onTimeBlockSelect}
                   onOpenJournal={handleOpenJournalFocus}
-                  onOpenReport={handleOpenReportFocus}
+                  onOpenReport={handleOpenReportDesktop}
                   onOpenSettings={onOpenSettings}
                   onOpenExport={() => setExportModalOpen(true)}
                   leftPanelOpen={isLeftPanelOpen}
@@ -700,6 +817,81 @@ export function MainLayout({
               </ErrorBoundary>
             )}
           </div>
+
+          {/* Third column — always-on review pane (≥1680px only). Warm
+              panel surface + hairline divider, no card chrome (DESIGN.md
+              container rules). Width transition mirrors the left task
+              panel's existing collapse language (300ms ease-quart); the
+              inner content keeps a fixed width so text never reflows
+              mid-animation, and only fades. */}
+          {isWide && (
+            <aside
+              aria-label="回顧欄"
+              className="relative h-full flex-shrink-0 border-l border-border bg-panel overflow-hidden transition-[width] duration-300 ease-quart motion-reduce:transition-none"
+              style={{
+                width: isReviewPaneOpen
+                  ? `${REVIEW_PANE_WIDTH}px`
+                  : `${REVIEW_PANE_COLLAPSED_WIDTH}px`,
+              }}
+            >
+              {/* Expanded content — fixed inner width, fades on collapse */}
+              <div
+                className={cn(
+                  'h-full flex flex-col transition-opacity duration-300 ease-quart motion-reduce:transition-none',
+                  isReviewPaneOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                )}
+                style={{ width: `${REVIEW_PANE_WIDTH}px` }}
+                aria-hidden={!isReviewPaneOpen}
+              >
+                <div ref={reviewScrollRef} className="flex-1 overflow-y-auto pl-8 pr-6 py-6">
+                  <ErrorBoundary>
+                    <ReportDashboard
+                      workspaces={workspaces}
+                      onClose={() => setIsReviewPaneOpen(false)}
+                    />
+                  </ErrorBoundary>
+                </div>
+              </div>
+
+              {/* Collapse handle — pull-tab riding the pane's left edge,
+                  continuing the resize-handle / pull-tab visual language. */}
+              {isReviewPaneOpen && (
+                <button
+                  onClick={() => setIsReviewPaneOpen(false)}
+                  aria-label="收合回顧欄"
+                  title="收合回顧欄"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-panel w-5 h-14 flex items-center justify-center rounded-r-lg border border-l-0 border-border bg-card text-muted-foreground/70 hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+              )}
+
+              {/* Collapsed strip — the whole 40px rail re-expands the pane */}
+              {!isReviewPaneOpen && (
+                <button
+                  onClick={() => setIsReviewPaneOpen(true)}
+                  aria-label="展開回顧欄"
+                  title="展開回顧欄"
+                  // pt-16 clears the floating UserMenu avatar (fixed top-3
+                  // right-3, ~52px tall) that rides over this rail.
+                  className="absolute inset-0 flex flex-col items-center gap-3 pt-16 pb-4 text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                >
+                  <BarChart3 className="w-4 h-4" aria-hidden="true" />
+                  <span className="text-xs tracking-widest [writing-mode:vertical-rl]">回顧</span>
+                  <ChevronLeft className="w-3.5 h-3.5 mt-auto" aria-hidden="true" />
+                </button>
+              )}
+
+              {/* 報告-button attention pulse — opacity-only accent wash */}
+              <div
+                aria-hidden="true"
+                className={cn(
+                  'absolute inset-0 pointer-events-none bg-accent/35 transition-opacity duration-500 ease-quart motion-reduce:transition-none',
+                  reviewFlash ? 'opacity-100' : 'opacity-0'
+                )}
+              />
+            </aside>
+          )}
         </>
       )}
       </div>

@@ -224,6 +224,17 @@ export function useWaddleData(): UseWaddleData {
   // bails before setWorkspaces if it changed. See the guard in loadData.
   const mutationSeqRef = useRef(0)
 
+  // Guards the "initial load" path against running twice. Next's
+  // reactStrictMode:true double-invokes mount effects once in dev — without
+  // this, both invocations independently read an empty `workspaces` table
+  // and both call seedUserData(), inserting two full sets of demo
+  // workspaces/categories/tasks (confirmed via duplicate created_at
+  // timestamps ~100-200ms apart on the mobiletest account). Checked and set
+  // synchronously as the very first statement of the initial branch, before
+  // any `await` — so the second (StrictMode-duplicate) invocation of this
+  // same hook instance sees it already claimed and bails immediately.
+  const initialLoadClaimedRef = useRef(false)
+
   // Mirrors `workspaces` so mutation callbacks can read the current task
   // tree without listing `workspaces` in their dependency arrays — which
   // would re-create the callbacks on every state change and bust the
@@ -235,6 +246,12 @@ export function useWaddleData(): UseWaddleData {
 
   const loadData = useCallback(
     async ({ initial = false }: { initial?: boolean } = {}) => {
+      // Synchronous claim — must run before any `await` in this function.
+      // See initialLoadClaimedRef above.
+      if (initial) {
+        if (initialLoadClaimedRef.current) return
+        initialLoadClaimedRef.current = true
+      }
       const myVersion = ++loadVersionRef.current
       // Snapshot the mutation counter at entry. If a local write fires while
       // this load's DB reads are in flight, the rows we fetched predate it —
