@@ -13,7 +13,7 @@ import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
  */
 let openStack: symbol[] = []
 
-export type ModalShellSize = 'sm' | 'md' | 'lg' | 'xl'
+export type ModalShellSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl'
 
 /**
  * `center` — mobile full-screen sheet / desktop centered card (default).
@@ -27,7 +27,9 @@ export type ModalShellVariant = 'center' | 'drawer'
 
 /** Desktop max-width buckets, matching the widths the six hand-rolled
  *  modal shells used before consolidation (sm ≈ workspace-settings,
- *  md ≈ quick-link-edit, lg ≈ task-detail/settings, xl ≈ journal).
+ *  md ≈ quick-link-edit, lg ≈ task-detail/settings, xl ≈ journal,
+ *  2xl ≈ calendar-export's two-pane layout — needs real estate for a
+ *  controls sidebar plus a scaled schedule preview).
  *  Only used by the `center` variant — the drawer has a fixed desktop
  *  width instead. */
 const SIZE_CLASS: Record<ModalShellSize, string> = {
@@ -35,6 +37,7 @@ const SIZE_CLASS: Record<ModalShellSize, string> = {
   md: 'md:max-w-md',
   lg: 'md:max-w-lg',
   xl: 'md:max-w-xl',
+  '2xl': 'md:max-w-6xl',
 }
 
 /** Must cover the longest `duration-*` in each variant's exit classes.
@@ -131,6 +134,10 @@ export function ModalShell({
     if (!shouldRender) return
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
+      // A nested layer (Radix AlertDialog/Dialog, or a hand-rolled dialog
+      // that opts in the same way) already handled this Escape and called
+      // preventDefault — don't also close this outer shell.
+      if (e.defaultPrevented) return
       if (openStack[openStack.length - 1] !== idRef.current) return
       onClose()
     }

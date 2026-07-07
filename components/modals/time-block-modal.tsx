@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X, Calendar, Clock, Palette, Trash2, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { Input } from '@/components/ui/input'
 import { DateField, TimeField } from '@/components/ui/date-time-field'
+import { Drawer as Vaul } from 'vaul'
 import type { TimeBlock, SlotType } from '@/lib/types'
 import { ModalShell } from '@/components/modals/modal-shell'
 
@@ -75,6 +77,8 @@ export function TimeBlockModal({
     setEndTime(block.endTime)
     setColor(block.color)
   }, [block?.id])
+
+  const isMobile = useIsMobile()
 
   // Top-level slot types only (skip parent groupings — flat list is enough).
   // Workspace-bound types are also excluded since those are tasks, not blocks.
@@ -353,6 +357,25 @@ export function TimeBlockModal({
         </div>
     </>
   )
+
+  if (isMobile) {
+    return (
+      <Vaul.Root open={isOpen} onOpenChange={(o) => { if (!o) onClose() }}>
+        <Vaul.Portal>
+          <Vaul.Overlay className="fixed inset-0 z-overlay bg-black/50" />
+          <Vaul.Content
+            className="fixed inset-x-0 bottom-0 z-modal flex max-h-[92dvh] flex-col rounded-t-2xl bg-card outline-none overflow-hidden"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
+            <Vaul.Title className="sr-only">編輯時間區塊</Vaul.Title>
+            {/* Drag handle */}
+            <div className="mx-auto mt-2 mb-1 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
+            {body}
+          </Vaul.Content>
+        </Vaul.Portal>
+      </Vaul.Root>
+    )
+  }
 
   return (
     <ModalShell isOpen={isOpen} onClose={onClose} size="md" ariaLabel="編輯時間區塊">

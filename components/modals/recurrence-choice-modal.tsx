@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { Drawer as Vaul } from 'vaul'
@@ -57,6 +57,25 @@ export function RecurrenceChoiceModal({
 }: RecurrenceChoiceModalProps) {
   const [choice, setChoice] = useState<RecurrenceChoice>(defaultChoice)
   const isMobile = useIsMobile()
+
+  // Hand-rolled dialog (not ModalShell) — with no Esc handling of its own,
+  // a stray Escape here fell through to whatever else was listening on
+  // `document` underneath (the task-edit drawer's ModalShell), closing it
+  // and losing in-progress edits. Registered with `capture: true` so this
+  // runs and marks the event before ModalShell's bubble-phase listener
+  // checks `e.defaultPrevented` — same mechanism Radix's own dismissable
+  // layer uses, so ordering is correct regardless of which mounted first.
+  useEffect(() => {
+    if (!isOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      e.stopPropagation()
+      onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown, { capture: true })
+    return () => document.removeEventListener('keydown', handleKeyDown, { capture: true })
+  }, [isOpen, onClose])
 
   if (!isOpen && !isMobile) return null
 

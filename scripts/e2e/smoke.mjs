@@ -10,13 +10,48 @@
 import { spawn } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { tmpdir } from 'node:os'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { chromium } from 'playwright'
 
 const PORT = 3100
 const BASE_URL = `http://localhost:${PORT}`
-const EMAIL = process.env.E2E_EMAIL || 'huddle.mobiletest.20260706@gmail.com'
-const PASSWORD = process.env.E2E_PASSWORD || 'MobileTest#2026'
+
+/** Minimal KEY=VALUE parser for `.env.e2e.local` — no new dependency for
+ *  something this small. Ignores blank lines and `#` comments; strips one
+ *  layer of matching quotes around the value. */
+function loadEnvFile(filePath) {
+  const out = {}
+  if (!existsSync(filePath)) return out
+  for (const rawLine of readFileSync(filePath, 'utf8').split('\n')) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const eq = line.indexOf('=')
+    if (eq === -1) continue
+    const key = line.slice(0, eq).trim()
+    let value = line.slice(eq + 1).trim()
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1)
+    }
+    out[key] = value
+  }
+  return out
+}
+
+const envFile = loadEnvFile(path.join(process.cwd(), '.env.e2e.local'))
+const EMAIL = process.env.E2E_EMAIL || envFile.E2E_EMAIL
+const PASSWORD = process.env.E2E_PASSWORD || envFile.E2E_PASSWORD
+
+if (!EMAIL || !PASSWORD) {
+  console.error('[e2e] Missing test credentials — no E2E_EMAIL/E2E_PASSWORD env vars')
+  console.error('[e2e] and no .env.e2e.local in the repo root.')
+  console.error('[e2e] Fix: create .env.e2e.local with:')
+  console.error('[e2e]   E2E_EMAIL=your-test-account@example.com')
+  console.error('[e2e]   E2E_PASSWORD=your-test-password')
+  console.error('[e2e] (gitignored via .env*.local) — see scripts/e2e/README.md.')
+  process.exit(1)
+}
+
 const SCREENSHOT_DIR = process.env.E2E_SCREENSHOT_DIR || path.join(tmpdir(), 'huddle-e2e-shots')
 
 // Known-noisy console.error lines that are pre-existing / environment-only
@@ -189,9 +224,8 @@ async function main() {
     await page.getByRole('button', { name: '設定' }).click()
     await page.getByRole('heading', { name: '設定' }).waitFor({ state: 'visible', timeout: 10000 })
     await check('settings-open') // assert while the modal is actually open
-    // Close via backdrop click (top-left corner, outside the centered card) —
-    // Esc-to-close is a known-broken path tracked separately, not asserted here.
-    await page.mouse.click(5, 5)
+    // Close via Esc — ModalShell handles this natively now (WR fix).
+    await page.keyboard.press('Escape')
     await page.getByRole('heading', { name: '設定' }).waitFor({ state: 'hidden', timeout: 10000 })
     await check('settings-closed')
   })

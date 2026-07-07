@@ -14,6 +14,7 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { ModalShell } from '@/components/modals/modal-shell'
+import { useDisplayColor } from '@/hooks/use-display-color'
 import {
   Command,
   CommandInput,
@@ -61,6 +62,7 @@ export function CommandPalette({
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const router = useRouter()
+  const displayColor = useDisplayColor()
 
   // ⌘K / Ctrl+K toggles the palette. Deliberately NOT gated on input focus —
   // unlike single-letter shortcuts, this chord isn't something people type by
@@ -169,7 +171,7 @@ export function CommandPalette({
                     <span
                       aria-hidden="true"
                       className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: task.workspaceColor }}
+                      style={{ backgroundColor: displayColor(task.workspaceColor) }}
                     />
                     <span className={cn('flex-1 truncate', task.isCompleted && 'line-through text-muted-foreground')}>
                       {task.title}

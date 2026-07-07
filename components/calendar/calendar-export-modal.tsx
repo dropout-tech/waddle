@@ -5,13 +5,13 @@ import { Download, Loader2, X, Copy, Check, Sun, Moon } from 'lucide-react'
 import { toPng } from 'html-to-image'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { useBodyScrollLock } from '@/hooks/use-body-scroll-lock'
 import { toDateString } from '@/lib/calendar-utils'
 import { isNative } from '@/lib/platform'
 import { saveOrShareBlob, copyImageToClipboard } from '@/lib/share'
 import type { Workspace, TimeBlock } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { DateField } from '@/components/ui/date-time-field'
+import { ModalShell } from '@/components/modals/modal-shell'
 import {
   CalendarExportView,
   type CalendarExportViewOptions,
@@ -81,8 +81,6 @@ export function CalendarExportModal({
     setStartStr(toDateString(s))
     setEndStr(toDateString(e))
   }, [isOpen, selectedDate])
-
-  useBodyScrollLock(isOpen)
 
   const startDate = useMemo(() => {
     const [y, m, d] = startStr.split('-').map(Number)
@@ -201,17 +199,8 @@ export function CalendarExportModal({
     }
   }
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 z-modal flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-200">
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden
-      />
-
-      <div className="relative w-full h-full md:h-[90vh] md:max-w-6xl bg-card md:rounded-2xl shadow-2xl border border-border overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+    <ModalShell isOpen={isOpen} onClose={onClose} size="2xl" ariaLabel="匯出行程圖檔">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div>
@@ -412,8 +401,7 @@ export function CalendarExportModal({
             </PreviewScaler>
           </div>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   )
 }
 

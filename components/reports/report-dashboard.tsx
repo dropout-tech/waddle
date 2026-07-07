@@ -439,7 +439,6 @@ export function ReportDashboard({ workspaces }: ReportDashboardProps) {
                                 style={{
                                   width: `${ws.share}%`,
                                   backgroundColor: wsColor,
-                                  transition: 'width 500ms cubic-bezier(0.25, 1, 0.5, 1)',
                                 }}
                               />
                             </div>
