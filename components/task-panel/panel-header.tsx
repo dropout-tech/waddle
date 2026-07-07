@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Sun, Plus, X, Settings2, PanelLeftClose, Maximize2, Minimize2, ChevronUp, ChevronDown } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import type { Workspace } from '@/lib/types'
@@ -10,6 +11,20 @@ import { WorkspaceIcon, PRESET_ICONS, PRESET_ICON_NAMES } from '@/lib/workspace-
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { UserMenu } from '@/components/user-menu'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { hapticSelection } from '@/lib/haptics'
+
+// Pet-the-mascot easter egg — small talk, not a feature. About a third of
+// pets get an extra line (kept quiet the rest of the time so it stays a
+// surprise rather than a canned response), throttled to one toast per
+// 1.5s so rapid clicking can't spam the toast stack.
+const PET_MESSAGES = [
+  '嘎。',
+  '今天也慢慢來就好。',
+  '謝謝你摸我。',
+  '記得喝口水。',
+]
+const PET_TOAST_CHANCE = 1 / 3
+const PET_TOAST_THROTTLE_MS = 1500
 
 interface PanelHeaderProps {
   workspaces: Workspace[]
@@ -50,6 +65,28 @@ export function PanelHeader({
   const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0])
   const [selectedIcon, setSelectedIcon] = useState(PRESET_ICON_NAMES[0])
   const today = new Date()
+
+  // Pet-the-mascot easter egg. petBobToken starts at 0 = idle (no
+  // animation class applied, so it never auto-plays on mount); each click
+  // bumps it to a new value, which both (a) turns the animation class on
+  // and (b) remounts the wrapping <span> via `key`, so the one-shot
+  // waddle-bob-once CSS animation restarts cleanly even if the previous
+  // 0.6s bob hasn't finished yet. lastPetToastAtRef throttles the
+  // occasional extra toast line — a ref (not state) because it's read/
+  // written inside the click handler and never needs to trigger a render.
+  const [petBobToken, setPetBobToken] = useState(0)
+  const lastPetToastAtRef = useRef(0)
+
+  const handlePetMascot = () => {
+    setPetBobToken((t) => t + 1)
+    hapticSelection()
+
+    if (Math.random() >= PET_TOAST_CHANCE) return
+    const now = Date.now()
+    if (now - lastPetToastAtRef.current < PET_TOAST_THROTTLE_MS) return
+    lastPetToastAtRef.current = now
+    toast(PET_MESSAGES[Math.floor(Math.random() * PET_MESSAGES.length)])
+  }
 
   // Header collapsed state - persisted to localStorage
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false)
@@ -175,7 +212,19 @@ export function PanelHeader({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2.5">
-                <WaddleMascot withBackground phase="auto" className="w-9 h-9 rounded-lg" />
+                <button
+                  type="button"
+                  onClick={handlePetMascot}
+                  aria-label="摸摸企鵝"
+                  className="cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span
+                    key={petBobToken}
+                    className={cn('block', petBobToken > 0 && 'animate-waddle-bob-once')}
+                  >
+                    <WaddleMascot withBackground phase="auto" className="w-9 h-9 rounded-lg" />
+                  </span>
+                </button>
                 <div>
                   <h1 className="text-lg font-bold text-foreground tracking-tight">
                     Huddle

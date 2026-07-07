@@ -488,6 +488,38 @@
   transform-origin: 50% 90%;
 }
 
+/* Daily-clear celebration — one-shot belly-slide from the left edge to
+   the right edge. See components/celebration/daily-clear-celebration.tsx.
+   Near-constant speed on purpose: with a steep ease-out the penguin
+   crosses the viewport in the first ~0.4s and the rest of the 2.2s plays
+   off-screen. A gentle symmetric curve keeps it visible the whole glide. */
+@keyframes daily-clear-skate {
+  0%   { transform: translateX(-20vw); opacity: 0; }
+  8%   { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateX(115vw); opacity: 0; }
+}
+
+/* Subtle rock layered on the glide (separate inner element so the two
+   transforms don't fight) — sells "sliding on ice" without spring/bounce. */
+@keyframes daily-clear-glide-bob {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50%      { transform: translateY(-4px) rotate(1.5deg); }
+}
+
+/* One-shot version of waddle-bob for click-to-pet interactions (see
+   panel-header.tsx's WaddleMascot) — same rock, but plays once instead of
+   looping, so repeat clicks can retrigger it cleanly. */
+@keyframes waddle-bob-once {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-4px) rotate(2deg); }
+}
+
+.animate-waddle-bob-once {
+  animation: waddle-bob-once 0.6s ease-in-out;
+  transform-origin: 50% 90%;
+}
+
 /* ------------------------------------------------------------
  * Motion baseline — Waddle's "慢慢搖擺" rhythm.
  *

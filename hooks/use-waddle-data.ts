@@ -16,6 +16,12 @@ import { toDateString, parseDateString } from '@/lib/calendar-utils'
 import { playTaskCompleteSound } from '@/lib/task-sound'
 import { hapticTaskComplete } from '@/lib/haptics'
 import { pushUndoableAction } from '@/lib/undo-stack'
+import {
+  DAILY_CLEAR_EVENT,
+  hasDailyClearFiredToday,
+  isDailyClearEligible,
+  markDailyClearFired,
+} from '@/lib/daily-clear'
 import { WORKSPACE_COLORS } from '@/lib/palette'
 import type {
   Workspace,
@@ -1229,13 +1235,21 @@ export function useWaddleData(): UseWaddleData {
     let completedAt: string | null = null
     // Title for the undo toast label — read once before the optimistic flip
     // so the undo action stays meaningful even if the task is later mutated.
+    // scheduledDate is captured the same way for the daily-clear eligibility
+    // check below (the toggle itself never changes scheduledDate).
     let taskTitle = '任務'
+    let taskEffectiveDate: string | undefined
     for (const w of workspacesRef.current) for (const c of w.categories) {
       const t = c.tasks.find((x) => x.id === taskId)
-      if (t) { taskTitle = t.title; break }
+      if (t) { taskTitle = t.title; taskEffectiveDate = t.scheduledDate || t.dueDate; break }
     }
-    setWorkspaces((prev) =>
-      prev.map((w) => ({
+    // Captured inside the setWorkspaces updater below so the daily-clear
+    // check runs against the *post*-toggle snapshot, not the stale
+    // pre-toggle one. The updater runs synchronously here (same assumption
+    // this function already makes for nextValue/completedAt above).
+    let nextSnapshot: Workspace[] = workspacesRef.current
+    setWorkspaces((prev) => {
+      const next = prev.map((w) => ({
         ...w,
         categories: w.categories.map((c) => ({
           ...c,
@@ -1253,7 +1267,9 @@ export function useWaddleData(): UseWaddleData {
           }),
         })),
       }))
-    )
+      nextSnapshot = next
+      return next
+    })
 
     // Play the cute completion chime right after the optimistic flip so it
     // feels instant. Only on the off→on transition; un-completing is silent.
@@ -1261,6 +1277,24 @@ export function useWaddleData(): UseWaddleData {
     if (nextValue) {
       playTaskCompleteSound()
       hapticTaskComplete()
+
+      // "今日全清" easter egg — see lib/daily-clear.ts for the eligibility
+      // rule. Checked/fired right here, same optimistic timing as the sound
+      // and haptic above: this function already trusts the optimistic flip
+      // before the DB write below confirms, so the celebration follows the
+      // same posture (a failed write still rolls back the checkbox via
+      // rollback() further down, but doesn't retract the celebration —
+      // consistent with how the sound/haptic behave today).
+      const todayStr = toDateString(new Date())
+      if (
+        !hasDailyClearFiredToday(todayStr) &&
+        isDailyClearEligible(taskEffectiveDate, nextSnapshot, todayStr)
+      ) {
+        markDailyClearFired(todayStr)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent(DAILY_CLEAR_EVENT))
+        }
+      }
     }
 
     // Block any cross-device/tab-focus refetch from clobbering the optimistic

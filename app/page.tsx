@@ -13,6 +13,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { OnboardingTour } from '@/components/onboarding-tour'
 import { SettingsModal } from '@/components/modals/settings-modal'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
+import { DailyClearCelebration } from '@/components/celebration/daily-clear-celebration'
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { useMeetingReminders } from '@/hooks/use-meeting-reminders'
 import { useWaterReminder } from '@/hooks/use-water-reminder'
@@ -486,6 +487,7 @@ function WaddlePage() {
         onChoose={applyOnboardingChoice}
       />
       <KeyboardShortcutsHint />
+      <DailyClearCelebration />
       <Toaster position="bottom-right" richColors closeButton />
       <WaterReminderModal
         isOpen={water.isOpen}
