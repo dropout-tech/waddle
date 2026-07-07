@@ -133,7 +133,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="user-menu"]',
     title: '右上角：使用者選單',
-    body: '點開有你的帳號資訊與登出。設定、日記、報告等功能散落在介面上，慢慢探索。',
+    body: '點開有你的帳號資訊、深淺色切換與登出。桌面上按 ⌘K 隨時召喚指令面板（搜任務、切視圖、開記事本）；按 ? 看完整快捷鍵。',
     placement: 'bottom',
     padding: 4,
   },

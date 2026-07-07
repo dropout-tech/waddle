@@ -12,6 +12,8 @@
 
 **Restrained + 多功能 accent**：以暖米中性色佔 75-85% 表面，搭配 4 個工作色（赤陶、鼠尾草、玫瑰粉、低彩度藍）以角色分配。每個 workspace 有自己的色票，但任何單一畫面中色彩出現次數受控（≤ 30% 表面有飽和色）。
 
+**可執行來源**：色票的程式碼真身在 `lib/palette.ts`（workspace 色、選擇器預設、urgency 五階、舊色遷移對照表）——新增顏色一律從這裡出，不要散寫 hex。資料驅動的顏色（workspace／任務／時段）在深色模式下經 `toDarkDisplayColor()`（OKLCH 降亮度、壓彩度）自動調校，渲染端統一走 `useDisplayColor()`。
+
 ### Core Palette
 
 | Role | Light Mode | Dark Mode | 用途 |
@@ -77,6 +79,7 @@
 - 沒有重 shadow。淺色模式用極淺 shadow + warm border 表現層次（`shadow-sm` 居多）。
 - Sheet / modal 用 backdrop blur 6-8px + 暗化 background 至 oklch(0/0.25)，避免重黑遮罩。
 - Dark mode 用「往上提一階明度」表達 elevation（card 比 background 亮 ~4%），而不是 shadow。
+- Auth 卡片等「陶瓷物件」用 `--shadow-ceramic`（雙層暖炭極淺陰影，globals.css）表現手感，不要疊到一般卡片上。
 
 ## Motion
 
@@ -95,6 +98,9 @@
 | Toast | sonner | 右下角，不要中央 |
 | Chart | recharts | 顏色限定使用 `--chart-1` 到 `--chart-5` |
 | Image Export | html-to-image | 行程 PNG，含 Waddle 浮水印 |
+| ModalShell | 自製（components/modals/modal-shell.tsx） | 共用殼：`center`（預設）與 `drawer`（桌面右緣 520px 全高）兩型；Esc／遮罩／焦點歸位／scroll-lock 內建，z-index 用 `--z-index-*` token |
+| Command Palette | cmdk + ModalShell | ⌘K 召喚；搜任務、切視圖、快速動作；桌面鍵盤入口 |
+| Date/Time Field | 自製（components/ui/date-time-field.tsx） | 桌面 popover 月曆＋15 分時間下拉、中文顯示格式；手機保留原生 input（iOS 滾輪較佳） |
 
 ## Iconography
 

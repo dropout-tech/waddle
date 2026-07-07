@@ -39,6 +39,8 @@ pnpm dev          # http://localhost:3000
 pnpm build
 pnpm start
 pnpm lint
+pnpm type-check   # tsc --noEmit
+pnpm e2e          # Playwright 煙霧測試（自起 dev server，見 scripts/e2e/README.md）
 ```
 
 ### 環境變數
