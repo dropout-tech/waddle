@@ -190,7 +190,7 @@ const MOBILE_STEPS: TourStep[] = [
   {
     target: '[data-tour="focus-timer"]',
     title: '專注計時器 ＋ 背景音',
-    body: '右下角浮動小球是番茄鐘。點開可全螢幕進入專注模式、配 Lo-fi / 雨聲 / 咖啡店白噪音，結束時 Huddle 輕輕提醒。',
+    body: '右下角浮動小球是番茄鐘。點開可放大成沉浸模式、配 Lo-fi / 雨聲 / 咖啡店白噪音，結束時 Huddle 輕輕提醒。',
     placement: 'top',
     padding: 6,
     hint: '👉 點開試試',
