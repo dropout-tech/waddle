@@ -5,6 +5,7 @@ import './globals.css'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { NativeShell } from '@/components/native/native-shell'
 import { ThemeProvider } from '@/components/theme-provider'
+import { FocusTimerProvider } from '@/components/timer/focus-timer-provider'
 
 const geist = Geist({
   subsets: ['latin'],
@@ -97,7 +98,13 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <NativeShell />
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            {/* Cross-route focus timer state — mounted above the router
+                outlet so a running session (and its BGM) survives
+                navigating to any route, not just while MainLayout happens
+                to be mounted. See focus-timer-provider.tsx. */}
+            <FocusTimerProvider>{children}</FocusTimerProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

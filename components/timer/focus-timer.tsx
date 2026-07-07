@@ -1,666 +1,75 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useEffect } from 'react'
 import {
-  Play, Pause, Timer, Clock,
-  ChevronDown, ChevronUp, Settings2,
-  Coffee, Brain, Dumbbell, BookOpen, Volume2, VolumeX,
-  Maximize2,
+  Play, Timer, Clock,
+  ChevronDown, Settings2,
+  Volume2, VolumeX,
+  Maximize2, Pause,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useIsMobile } from '@/hooks/use-mobile'
-import type { Task, Workspace } from '@/lib/types'
-import { toDateString } from '@/lib/calendar-utils'
+import type { Workspace } from '@/lib/types'
 import { playTimerSound, TIMER_SOUND_LABELS, type TimerSoundKind } from '@/lib/timer-sound'
 import {
   BGM_MUSIC, BGM_AMBIENT, getBgmEngine, summarizeBgm,
   ALL_MUSIC_ID, ALL_MUSIC_LABEL, ALL_MUSIC_EMOJI,
-  type AmbientPref, type BgmMusicId, type BgmAmbientId,
 } from '@/lib/timer-bgm'
 import { Music2 } from 'lucide-react'
-import { FocusTimerImmersive } from './focus-timer-immersive'
-import { FocusTimerMini } from './focus-timer-mini'
-import { loadPomodoroCount, recordPomodoroCompletion, type PomodoroDayCount } from '@/lib/pomodoro-count'
+import { formatTime } from '@/lib/timer-format'
+import { useFocusTimer, POMODORO_PRESETS, FOCUS_TYPES } from './focus-timer-provider'
 
 interface FocusTimerProps {
   workspaces: Workspace[]
   onCreateTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string) => void
 }
 
-type TimerMode = 'pomodoro' | 'stopwatch'
-type TimerState = 'idle' | 'running' | 'paused' | 'completed'
-type TimerPhase = 'work' | 'break'
-
-/** What just ended — drives the completion copy in the display layers. */
-type CompletionKind = 'work' | 'break' | 'manual'
-
-interface CompletionState {
-  kind: CompletionKind
-  /** Where the sequence lands: auto-break continues, everything else idles. */
-  next: 'break' | 'idle'
-  /** Whether the session gets the ✓ suffix when recorded to the calendar. */
-  completedFlag: boolean
-}
-
-// Gentle completion sequence (「溫柔收尾」). When a timer ends we no longer
-// unmount the session screen in the same tick — the view holds in a
-// 'completed' state so the chime, the ~1.5s BGM fade-out and the celebration
-// all land, then the surface fades out over COMPLETION_EXIT_MS
-// (opacity-only, ease-out-quart) before finalizing. Tapping anywhere skips.
-const COMPLETION_HOLD_MS = 2600
-const COMPLETION_HOLD_MANUAL_MS = 1400 // manual early end — shorter farewell
-const COMPLETION_EXIT_MS = 400
-const COMPLETION_BGM_FADE_S = 1.5
-
-interface TimerSession {
-  mode: TimerMode
-  /** Whether this session is a work block or a break block (for pomodoro). */
-  phase: TimerPhase
-  startedAt: Date
-  /** Total ms accumulated across previous pause→resume cycles. */
-  pausedMs: number
-  /** Wall-clock when the current pause started, or null if running. */
-  pausedAt: Date | null
-  /** For pomodoro: target duration in seconds (locked at start). */
-  targetSeconds: number
-  label: string
-  color: string
-  taskId?: string
-}
-
-interface TimerPrefs {
-  breakMinutes: number
-  autoStartBreak: boolean
-  sound: TimerSoundKind
-  // Background music during the session (null = off). At most one.
-  music: BgmMusicId | null
-  musicVolume: number
-  // Stackable ambient overlays, each with its own enable + volume.
-  ambient: Record<BgmAmbientId, AmbientPref>
-  // Where a desktop session opens: true = fill the viewport with the immersive
-  // focus screen ("放大"), false = corner mini pill. Mobile always opens
-  // immersive regardless. Remembered so the user's last choice sticks.
-  openInImmersive: boolean
-}
-
-const TIMER_PREFS_KEY = 'waddle-timer-prefs-v1'
-// Derive default ambient state from the BGM_AMBIENT manifest so adding a new
-// overlay needs only one edit (in lib/timer-bgm.ts).
-const DEFAULT_AMBIENT = Object.fromEntries(
-  BGM_AMBIENT.map((a) => [a.id, { enabled: false, volume: 0.5 }]),
-) as Record<BgmAmbientId, AmbientPref>
-const VALID_MUSIC_IDS: readonly BgmMusicId[] = [...BGM_MUSIC.map((m) => m.id), ALL_MUSIC_ID]
-const VALID_AMBIENT_IDS: readonly BgmAmbientId[] = BGM_AMBIENT.map((a) => a.id)
-const DEFAULT_PREFS: TimerPrefs = {
-  breakMinutes: 5,
-  autoStartBreak: true,
-  sound: 'chime',
-  music: null,
-  musicVolume: 0.5,
-  ambient: DEFAULT_AMBIENT,
-  openInImmersive: false,
-}
-const BREAK_COLOR = '#9bbfac' // sage — calmer than the focus oranges
-
-function loadPrefs(): TimerPrefs {
-  if (typeof window === 'undefined') return DEFAULT_PREFS
-  try {
-    const raw = window.localStorage.getItem(TIMER_PREFS_KEY)
-    if (!raw) return DEFAULT_PREFS
-    const parsed = JSON.parse(raw)
-    const mergedAmbient = { ...DEFAULT_AMBIENT }
-    if (parsed.ambient && typeof parsed.ambient === 'object') {
-      for (const id of VALID_AMBIENT_IDS) {
-        const a = parsed.ambient[id]
-        if (a && typeof a === 'object') {
-          mergedAmbient[id] = {
-            enabled: !!a.enabled,
-            volume: typeof a.volume === 'number' ? Math.max(0, Math.min(1, a.volume)) : 0.5,
-          }
-        }
-      }
-    }
-    return {
-      breakMinutes: typeof parsed.breakMinutes === 'number' ? parsed.breakMinutes : DEFAULT_PREFS.breakMinutes,
-      autoStartBreak: typeof parsed.autoStartBreak === 'boolean' ? parsed.autoStartBreak : DEFAULT_PREFS.autoStartBreak,
-      sound: ['chime', 'bell', 'beep', 'silent'].includes(parsed.sound) ? parsed.sound : DEFAULT_PREFS.sound,
-      music: VALID_MUSIC_IDS.includes(parsed.music) ? parsed.music : null,
-      musicVolume: typeof parsed.musicVolume === 'number' ? Math.max(0, Math.min(1, parsed.musicVolume)) : DEFAULT_PREFS.musicVolume,
-      ambient: mergedAmbient,
-      openInImmersive: typeof parsed.openInImmersive === 'boolean' ? parsed.openInImmersive : DEFAULT_PREFS.openInImmersive,
-    }
-  } catch {
-    return DEFAULT_PREFS
-  }
-}
-
-const POMODORO_PRESETS = [
-  { minutes: 25, label: '番茄鐘', color: '#e07b5a' },
-  { minutes: 15, label: '短專注', color: '#7da2b8' },
-  { minutes: 45, label: '長專注', color: '#8fae8b' },
-  { minutes: 5, label: '短休息', color: '#c4a4b5' },
-  { minutes: 10, label: '長休息', color: '#d4a76a' },
-]
-
-const FOCUS_TYPES = [
-  { key: 'focus', label: '專注工作', icon: Brain, color: '#e07b5a' },
-  { key: 'deep', label: '深度工作', icon: BookOpen, color: '#7da2b8' },
-  { key: 'exercise', label: '運動', icon: Dumbbell, color: '#8fae8b' },
-  { key: 'break', label: '休息', icon: Coffee, color: '#c4a4b5' },
-]
-
-export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
+/**
+ * Idle setup card ("開始專注" collapsed button + expanded settings panel).
+ * All state/engine logic lives in FocusTimerProvider (mounted globally in
+ * app/layout.tsx) so a running session survives navigation away from
+ * MainLayout. This component:
+ *   1. registers `onCreateTimeBlock` as the provider's calendar recorder
+ *      while it's mounted (MainLayout only — that's where the real
+ *      workspaces/categories mutation lives), and
+ *   2. renders nothing while a session is running/paused/completed — the
+ *      provider portals FocusTimerMini/Immersive onto document.body for
+ *      that, visible on every route, not just here.
+ */
+export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
   const isMobile = useIsMobile()
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [mode, setMode] = useState<TimerMode>('pomodoro')
-  const [state, setState] = useState<TimerState>('idle')
-  const [selectedPreset, setSelectedPreset] = useState(0)
-  const [customMinutes, setCustomMinutes] = useState(25)
-  const [useCustom, setUseCustom] = useState(false)
-  const [focusType, setFocusType] = useState(FOCUS_TYPES[0])
-  const [customLabel, setCustomLabel] = useState('')
-  const [showSettings, setShowSettings] = useState(false)
-  // Sound/music subsection collapse — default closed so the settings panel
-  // doesn't look like a wall of chips and sliders the first time it opens.
-  const [showBgmSettings, setShowBgmSettings] = useState(false)
-  // Standalone music playback — independent of timer state so the user can
-  // listen without starting a session. Combined with timer state below so
-  // running a timer still auto-plays as before.
-  const [bgmManualPlaying, setBgmManualPlaying] = useState(false)
+  const ft = useFocusTimer()
 
-  // Timer state
-  const [timeLeft, setTimeLeft] = useState(25 * 60) // seconds for pomodoro
-  const [elapsed, setElapsed] = useState(0) // seconds for stopwatch
-  const [session, setSession] = useState<TimerSession | null>(null)
-
-  // Completion sequence state — non-null while the gentle wind-down plays.
-  // `completionExiting` flips on for the final opacity fade before unmount.
-  const [completion, setCompletion] = useState<CompletionState | null>(null)
-  const [completionExiting, setCompletionExiting] = useState(false)
-  const completionTimersRef = useRef<number[]>([])
-
-  // When a session is active, `view` decides whether to render the corner
-  // mini pill or the fullscreen immersive overlay. Decoupled from `isExpanded`
-  // (which now only controls the idle setup card) so the user can freely
-  // shrink the timer back to the corner mid-session — the main reason being
-  // that a corner pill lets the calendar stay visible behind it.
-  const [view, setView] = useState<'mini' | 'immersive'>('mini')
-
-  // Today's completed-work-pomodoro count. Used by the immersive view to
-  // render a row of progress dots ("第 3 顆"). loadPomodoroCount is
-  // SSR-safe (returns zero on the server), so we can read it on mount.
-  const [pomodoroCount, setPomodoroCount] = useState<PomodoroDayCount | null>(null)
-  useEffect(() => { setPomodoroCount(loadPomodoroCount()) }, [])
-
-  // User preferences (break length, auto-break, sound choice). Loaded from
-  // localStorage on mount and persisted on every change so they survive
-  // refreshes and dev hot reloads.
-  const [prefs, setPrefs] = useState<TimerPrefs>(DEFAULT_PREFS)
-  useEffect(() => { setPrefs(loadPrefs()) }, [])
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    try { window.localStorage.setItem(TIMER_PREFS_KEY, JSON.stringify(prefs)) } catch {}
-  }, [prefs])
-
-  // Sync prefs → BGM engine. Engine handles crossfades + per-track volume.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const eng = getBgmEngine()
-    if (!eng) return
-    eng.setMusic(prefs.music)
-    eng.setMusicVolume(prefs.musicVolume)
-    for (const a of BGM_AMBIENT) {
-      const p = prefs.ambient[a.id]
-      eng.setAmbient(a.id, p.enabled, p.volume)
-    }
-  }, [prefs.music, prefs.musicVolume, prefs.ambient])
-
-  // Track which audio files have 404'd so the UI can disable those buttons
-  // and show a hint. The engine reports unavailability the first time a
-  // track tries to load and fails; we re-render to reflect that.
-  const [unavailableSrcs, setUnavailableSrcs] = useState<Set<string>>(() => new Set())
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const eng = getBgmEngine()
-    if (!eng) return
-    // Pull current state + subscribe. We rebuild the Set on each notify so
-    // React sees a new reference and re-renders.
-    const snapshot = () => {
-      const next = new Set<string>()
-      for (const m of BGM_MUSIC) if (!eng.isAvailable(m.src)) next.add(m.src)
-      for (const a of BGM_AMBIENT) if (!eng.isAvailable(a.src)) next.add(a.src)
-      setUnavailableSrcs(next)
-    }
-    // Eagerly instantiate every track so the `error` listener fires before
-    // the user clicks anything — otherwise missing files don't show as
-    // disabled until first selection.
-    eng.preload()
-    snapshot()
-    return eng.subscribe(snapshot)
-  }, [])
-
-  // Drive the engine play/pause from timer state. Running = on, anything
-  // else (idle / paused) = off so audio doesn't keep playing while paused.
-  // Re-runs of the prefs-sync effect above set the targets; this one flips
-  // the master playing switch.
-  // Audio is also killed on unmount so the timer module doesn't leak sound
-  // when the panel closes.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const eng = getBgmEngine()
-    if (!eng) return
-    // During the completion sequence: keep the music rolling when a break is
-    // about to continue the session; otherwise fade it out slowly (~1.5s) so
-    // the audio ends with the session instead of being clipped at 0.3s.
-    const keepPlaying = bgmManualPlaying || state === 'running'
-      || (state === 'completed' && completion?.next === 'break')
-    if (keepPlaying) eng.setPlaying(true)
-    else eng.setPlaying(false, state === 'completed' ? { fadeSeconds: COMPLETION_BGM_FADE_S } : undefined)
-  }, [state, bgmManualPlaying, completion])
-  // If the user clears all selections, drop the manual-playing flag so the
-  // play button doesn't appear "on" with nothing to play.
-  useEffect(() => {
-    const hasSelection = !!prefs.music || BGM_AMBIENT.some(a => prefs.ambient[a.id]?.enabled)
-    if (!hasSelection && bgmManualPlaying) setBgmManualPlaying(false)
-  }, [prefs.music, prefs.ambient, bgmManualPlaying])
-  useEffect(() => {
-    return () => {
-      const eng = typeof window !== 'undefined' ? getBgmEngine() : null
-      eng?.setPlaying(false)
-      // Don't leave completion timers firing setState after unmount.
-      for (const t of completionTimersRef.current) window.clearTimeout(t)
-      completionTimersRef.current = []
-    }
-  }, [])
-
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Get current timer duration based on mode
-  const getTargetSeconds = useCallback(() => {
-    if (useCustom) return customMinutes * 60
-    return POMODORO_PRESETS[selectedPreset].minutes * 60
-  }, [useCustom, customMinutes, selectedPreset])
-
-  // Format time display
-  const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600)
-    const mins = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-    }
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-  }
-
-  // Format time to HH:mm
-  const formatTimeHHMM = (date: Date) => {
-    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
-  }
-
-  // Format date to YYYY-MM-DD (local)
-  const formatDateISO = (date: Date) => toDateString(date)
-
-  // Start a fresh work session. `opts.immersive` forces the immersive view
-  // for this session (the setup card's 「放大開始」 action button) regardless
-  // of the remembered preference.
-  const startTimer = (opts?: { immersive?: boolean }) => {
-    // Sync-resume the AudioContext from this user gesture so BGM can
-    // actually play when state flips to 'running' (Web Audio autoplay
-    // policy gates resume() on a hot gesture token).
-    getBgmEngine()?.unlockAudio()
-    const now = new Date()
-    const label = customLabel || (mode === 'pomodoro'
-      ? (useCustom ? `${customMinutes}分鐘專注` : POMODORO_PRESETS[selectedPreset].label)
-      : focusType.label)
-    const color = mode === 'pomodoro'
-      ? (useCustom ? focusType.color : POMODORO_PRESETS[selectedPreset].color)
-      : focusType.color
-    const targetSeconds = getTargetSeconds()
-
-    setSession({
-      mode,
-      phase: 'work',
-      startedAt: now,
-      pausedMs: 0,
-      pausedAt: null,
-      targetSeconds,
-      label,
-      color,
-    })
-
-    if (mode === 'pomodoro') {
-      setTimeLeft(targetSeconds)
-    } else {
-      setElapsed(0)
-    }
-
-    // Pick the starting view. 「放大開始」 forces immersive for this session;
-    // otherwise the openInImmersive pref (「開始時直接進入沉浸畫面」) decides.
-    // Mobile always goes immersive — a corner pill on a phone leaves too little
-    // surface for the calendar to be useful, and immersive is better there.
-    setView(opts?.immersive || prefs.openInImmersive || isMobile ? 'immersive' : 'mini')
-
-    setState('running')
-  }
-
-  // Begin a break session of the configured length. Used both as the
-  // automatic continuation after a work pomodoro and as the manual button
-  // when auto-break is off.
-  const startBreak = useCallback(() => {
-    const breakSeconds = Math.max(1, Math.floor(prefs.breakMinutes)) * 60
-    setSession({
-      mode: 'pomodoro',
-      phase: 'break',
-      startedAt: new Date(),
-      pausedMs: 0,
-      pausedAt: null,
-      targetSeconds: breakSeconds,
-      label: `休息 ${prefs.breakMinutes} 分`,
-      color: BREAK_COLOR,
-    })
-    setTimeLeft(breakSeconds)
-    setState('running')
-  }, [prefs.breakMinutes])
-
-  // Pause timer — record the wall-clock so we can subtract paused duration
-  // from the running total. Without this, idle time during pause would still
-  // be counted toward elapsed.
-  const pauseTimer = () => {
-    setSession((s) => (s ? { ...s, pausedAt: new Date() } : s))
-    setState('paused')
-  }
-
-  // Resume timer — fold the just-finished pause into pausedMs and clear the
-  // pausedAt anchor so the next tick reads only running time.
-  const resumeTimer = () => {
-    getBgmEngine()?.unlockAudio()
-    setSession((s) => {
-      if (!s) return s
-      const addedPause = s.pausedAt ? Date.now() - s.pausedAt.getTime() : 0
-      return { ...s, pausedAt: null, pausedMs: s.pausedMs + addedPause }
-    })
-    setState('running')
-  }
-
-  // Persist a finished/aborted session as a time block on today's calendar.
-  // Pulled out of stopTimer so we can record a work pomodoro before
-  // transitioning into the auto-break without going through idle.
-  const recordSessionToCalendar = useCallback(
-    (s: TimerSession, completed: boolean) => {
-      if (!onCreateTimeBlock) return
-      const now = new Date()
-      const startTime = formatTimeHHMM(s.startedAt)
-      const endTime = formatTimeHHMM(now)
-      const date = formatDateISO(s.startedAt)
-      const durationMinutes = Math.floor((now.getTime() - s.startedAt.getTime()) / 60000)
-      if (durationMinutes < 1) return
-      // Break sessions are typed as 'break' so they color-code differently
-      // and don't get counted as focus time in any future analytics.
-      const blockType =
-        s.phase === 'break' ? 'break' : s.mode === 'pomodoro' ? 'pomodoro' : 'focus'
-      onCreateTimeBlock(
-        date,
-        startTime,
-        endTime,
-        blockType,
-        s.label + (completed ? ' ✓' : ''),
-        s.color,
-      )
-    },
-    [onCreateTimeBlock],
-  )
-
-  // Reset timer
-  const resetTimer = () => {
-    setState('idle')
-    setSession(null)
-    setTimeLeft(getTargetSeconds())
-    setElapsed(0)
-    setCustomLabel('')
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-    }
-  }
-
-  const clearCompletionTimers = () => {
-    for (const t of completionTimersRef.current) window.clearTimeout(t)
-    completionTimersRef.current = []
-  }
-
-  // Begin the gentle completion sequence. The session screen stays mounted
-  // in a 'completed' state (digits frozen, celebration, BGM fading), then
-  // fades out and finalizes. For the auto-break path the break session is
-  // swapped in *under* the still-visible celebration overlay so the break
-  // atmosphere is already there when the overlay clears — no idle flash.
-  const beginCompletion = (
-    s: TimerSession,
-    kind: CompletionKind,
-    next: 'break' | 'idle',
-    completedFlag: boolean,
-    holdMs: number,
-  ) => {
-    clearCompletionTimers()
-    setState('completed')
-    setCompletion({ kind, next, completedFlag })
-    setCompletionExiting(false)
-    const finish = next === 'break'
-      ? () => {
-          recordSessionToCalendar(s, true)
-          startBreak()
-          setCompletionExiting(true)
-          completionTimersRef.current = [window.setTimeout(() => {
-            setCompletion(null)
-            setCompletionExiting(false)
-          }, COMPLETION_EXIT_MS)]
-        }
-      : () => {
-          setCompletionExiting(true)
-          completionTimersRef.current = [window.setTimeout(() => {
-            recordSessionToCalendar(s, completedFlag)
-            setCompletion(null)
-            setCompletionExiting(false)
-            resetTimer()
-          }, COMPLETION_EXIT_MS)]
-        }
-    completionTimersRef.current = [window.setTimeout(finish, holdMs)]
-  }
-
-  // Tap anywhere during the sequence → jump straight to the end state.
-  // The farewell is offered, never enforced.
-  const skipCompletion = () => {
-    if (!completion) return
-    clearCompletionTimers()
-    if (completion.next === 'break') {
-      // If the break hasn't been started yet (still holding), start it now;
-      // if we're already in the overlay fade the break is running — just clear.
-      if (state === 'completed' && session) {
-        recordSessionToCalendar(session, true)
-        startBreak()
-      }
-      setCompletion(null)
-      setCompletionExiting(false)
-    } else {
-      if (session) recordSessionToCalendar(session, completion.completedFlag)
-      setCompletion(null)
-      setCompletionExiting(false)
-      resetTimer()
-    }
-  }
-
-  // Timer tick — wall-clock based.
-  //
-  // setInterval only triggers a recompute; the actual time comes from
-  // (Date.now() - startedAt) so it stays accurate even after the tab was
-  // backgrounded, the laptop slept, or the OS throttled timers.
-  //
-  // On completion: play the configured sound, then either auto-start a
-  // break (if work phase + autoStartBreak) or finalize via stopTimer.
-  useEffect(() => {
-    if (state !== 'running' || !session) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-      return
-    }
-    const tick = () => {
-      const runningMs = Date.now() - session.startedAt.getTime() - session.pausedMs
-      const runningSec = Math.max(0, Math.floor(runningMs / 1000))
-      if (session.mode === 'pomodoro') {
-        const remaining = session.targetSeconds - runningSec
-        if (remaining <= 0) {
-          // Stop ticking immediately so we don't double-fire while React
-          // batches the next state update / effect re-run.
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current)
-            intervalRef.current = null
-          }
-          playTimerSound(prefs.sound)
-          setTimeLeft(0)
-          // Bump today's pomodoro count when a *work* phase completes (not
-          // breaks). The immersive view's progress dots subscribe to this
-          // via the state setter below.
-          if (session.phase === 'work') {
-            setPomodoroCount(recordPomodoroCompletion())
-          }
-          // Hand off to the gentle completion sequence instead of tearing
-          // the screen down in the same tick the chime starts.
-          beginCompletion(
-            session,
-            session.phase,
-            session.phase === 'work' && prefs.autoStartBreak ? 'break' : 'idle',
-            true,
-            COMPLETION_HOLD_MS,
-          )
-          return
-        }
-        setTimeLeft(remaining)
-      } else {
-        setElapsed(runningSec)
-      }
-    }
-    tick() // immediate update so state reflects reality on resume / restart
-    intervalRef.current = setInterval(tick, 1000)
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-        intervalRef.current = null
-      }
-    }
+    if (!onCreateTimeBlock) return
+    return ft.registerRecorder(onCreateTimeBlock)
+    // Intentionally depend on ft.registerRecorder (stable useCallback
+    // identity), not the whole `ft` object — `ft` gets a new reference on
+    // every tick while a session is running, which would re-run this
+    // (harmless but pointless) unregister/register cycle every second.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, session, prefs.sound, prefs.autoStartBreak])
+  }, [ft.registerRecorder, onCreateTimeBlock])
 
-  // Update timeLeft when preset changes (only when idle)
-  useEffect(() => {
-    if (state === 'idle') {
-      setTimeLeft(getTargetSeconds())
-    }
-  }, [selectedPreset, customMinutes, useCustom, state, getTargetSeconds])
+  // Running/paused/completed sessions are rendered globally by the provider
+  // (portal onto document.body) — this component only ever shows the idle
+  // setup card. state is only ever non-'idle' here for a brief instant
+  // during the very first render after startTimer(), same as the original
+  // component's early-return guard.
+  if (ft.state !== 'idle') return null
 
-  // Calculate progress for pomodoro. Use the *session's* locked target when
-  // one exists — the UI preset can differ from the running session (most
-  // visibly during breaks, whose length comes from prefs.breakMinutes, not
-  // the selected preset; the ring used to start a break at ~80%).
-  const activeTargetSeconds = session?.targetSeconds ?? getTargetSeconds()
-  const progress = mode === 'pomodoro'
-    ? ((activeTargetSeconds - timeLeft) / Math.max(1, activeTargetSeconds)) * 100
-    : 0
-
-  const displayTime = mode === 'pomodoro' ? timeLeft : elapsed
+  const {
+    isExpanded, setIsExpanded, mode, setMode, selectedPreset, setSelectedPreset,
+    customMinutes, setCustomMinutes, useCustom, setUseCustom, focusType, setFocusType,
+    customLabel, setCustomLabel, showSettings, setShowSettings, showBgmSettings, setShowBgmSettings,
+    bgmManualPlaying, setBgmManualPlaying, prefs, setPrefs, unavailableSrcs, displayTime,
+    startTimer, state,
+  } = ft
 
   // Mobile expanded mode renders as a backdrop + bottom sheet (full-width,
   // slide-up from above the tab bar). Desktop keeps the corner card.
   const mobileExpanded = isMobile && isExpanded
-
-  // Once a session is running/paused, we hand off to one of two surfaces
-  // based on `view`:
-  //   • immersive — fullscreen overlay (legacy default, opt-in via the
-  //     setup-card fullscreen toggle, or mobile)
-  //   • mini      — corner pill so the calendar / day view stays visible
-  // The setup-card branch below is only reached while the timer is idle.
-  if (state !== 'idle' && session) {
-    const computedProgress = mode === 'pomodoro' ? progress : Math.min(100, (elapsed % 3600) / 36)
-    if (view === 'immersive') {
-      return (
-        <FocusTimerImmersive
-          visible
-          state={state}
-          phase={session.phase}
-          label={session.label}
-          color={session.color}
-          timeText={formatTime(displayTime)}
-          progress={computedProgress}
-          startedAtText={formatTimeHHMM(session.startedAt)}
-          targetSeconds={session.targetSeconds}
-          startedAt={session.startedAt}
-          remainingSeconds={mode === 'pomodoro' ? timeLeft : null}
-          pomodoroCount={pomodoroCount?.count ?? 0}
-          music={prefs.music}
-          musicVolume={prefs.musicVolume}
-          ambient={prefs.ambient}
-          completion={completion ? { kind: completion.kind, next: completion.next, exiting: completionExiting } : null}
-          bgmPlaying={(bgmManualPlaying || state === 'running' || (state === 'completed' && completion?.next === 'break'))}
-          unavailableSrcs={unavailableSrcs}
-          onPause={pauseTimer}
-          onResume={resumeTimer}
-          onExit={() => {
-            if (state === 'completed') { skipCompletion(); return }
-            beginCompletion(session, 'manual', 'idle', false, COMPLETION_HOLD_MANUAL_MS)
-            setIsExpanded(false)
-          }}
-          onSkipCompletion={skipCompletion}
-          onMinimize={() => setView('mini')}
-          onToggleBgm={() => {
-            getBgmEngine()?.unlockAudio()
-            setBgmManualPlaying(v => !v)
-          }}
-          onSelectMusic={(id) => {
-            getBgmEngine()?.unlockAudio()
-            setPrefs((p) => ({ ...p, music: id }))
-          }}
-          onMusicVolumeChange={(v) => setPrefs((p) => ({ ...p, musicVolume: v }))}
-          onToggleAmbient={(id) => {
-            getBgmEngine()?.unlockAudio()
-            setPrefs((prev) => ({
-              ...prev,
-              ambient: {
-                ...prev.ambient,
-                [id]: { ...prev.ambient[id], enabled: !prev.ambient[id].enabled },
-              },
-            }))
-          }}
-          onAmbientVolumeChange={(id, v) => setPrefs((prev) => ({
-            ...prev,
-            ambient: {
-              ...prev.ambient,
-              [id]: { ...prev.ambient[id], volume: v },
-            },
-          }))}
-        />
-      )
-    }
-    // Mini pill. Keeps the same session/state — only the visual surface
-    // differs from immersive.
-    return (
-      <FocusTimerMini
-        state={state}
-        phase={session.phase}
-        color={session.color}
-        timeText={formatTime(displayTime)}
-        progress={computedProgress}
-        label={session.label}
-        isMobile={isMobile}
-        completion={completion ? { kind: completion.kind, exiting: completionExiting } : null}
-        onPause={pauseTimer}
-        onResume={resumeTimer}
-        onExpand={() => setView('immersive')}
-        onStop={() => beginCompletion(session, 'manual', 'idle', false, COMPLETION_HOLD_MANUAL_MS)}
-        onSkipCompletion={skipCompletion}
-      />
-    )
-  }
 
   return (
     <>
@@ -996,7 +405,11 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                   // immersive bar (focus-timer-immersive.tsx) and this
                   // settings panel render the same canonical text.
                   const { summary, hasSelection } = summarizeBgm(prefs.music, prefs.ambient, { allMissing })
-                  const isPlaying = bgmManualPlaying || (state as TimerState) === 'running'
+                  // This card only ever renders while idle (see the early
+                  // return above), so state is never 'running' here — the
+                  // manual play toggle is the only thing driving playback
+                  // from this settings panel.
+                  const isPlaying = bgmManualPlaying
                   return (
                 <div className="pt-2 border-t border-border/60">
                   <div className="w-full flex items-center justify-between gap-2 py-1.5 px-1 -mx-1 rounded-md hover:bg-secondary/40 transition-colors">
@@ -1252,39 +665,21 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
             </div>
           </div>
         ) : (
-          /* Collapsed Button */
+          /* Collapsed Button. Only ever rendered while idle — a running/
+             paused/completed session is handled globally by the provider's
+             portal (see the early `if (ft.state !== 'idle') return null`
+             above), so the "running" appearance this button used to grow
+             (ring, live digits) can never actually show here; that branch
+             lived in the original component too, gated by the same
+             upstream idle check, just expressed as a runtime ternary. */
           <button
             data-tour="focus-timer"
             onClick={() => setIsExpanded(true)}
-            className={cn(
-              "flex items-center gap-2 px-4 py-3 rounded-2xl shadow-lg transition-all hover:scale-105",
-              "bg-card border border-border",
-              state === 'running' && "ring-2 ring-offset-2",
-            )}
-            style={state === 'running' ? {
-              ['--tw-ring-color' as string]: session?.color,
-              borderColor: session?.color,
-            } : undefined}
+            className="flex items-center gap-2 px-4 py-3 rounded-2xl shadow-lg transition-all hover:scale-105 bg-card border border-border"
           >
-            <div className={cn(
-              "w-2.5 h-2.5 rounded-full",
-              state === 'running' ? "animate-pulse" : "",
-              state === 'idle' && "bg-muted-foreground"
-            )} style={state !== 'idle' ? { backgroundColor: session?.color } : {}} />
-            
-            {state === 'idle' ? (
-              <>
-                <Timer className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">專注計時</span>
-              </>
-            ) : (
-              <>
-                <span className="text-sm font-mono font-bold tabular-nums">
-                  {formatTime(displayTime)}
-                </span>
-                <ChevronUp className="w-4 h-4 text-muted-foreground" />
-              </>
-            )}
+            <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground" />
+            <Timer className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium">專注計時</span>
           </button>
         )}
       </div>

@@ -15,6 +15,11 @@ export interface FocusTimerMiniProps {
   /** Session label (used as tooltip on the time text). */
   label: string
   isMobile?: boolean
+  /** Override the mobile bottom offset (px, above safe-area-inset-bottom).
+   *  Default (undefined) assumes the app's bottom tab bar (78px). Routes
+   *  without a tab bar — e.g. /notebook, which instead has a bottom-docked
+   *  editor toolbar — pass a smaller value so the pill clears it. */
+  mobileBottomOffsetPx?: number
   /** Non-null while the gentle completion sequence is playing. */
   completion?: { kind: 'work' | 'break' | 'manual'; exiting: boolean } | null
   onPause: () => void
@@ -32,8 +37,14 @@ const STOP_HOLD_MS = 600
 
 export function FocusTimerMini({
   state, phase, color, timeText, progress, label,
-  isMobile, completion, onPause, onResume, onExpand, onStop, onSkipCompletion,
+  isMobile, mobileBottomOffsetPx, completion, onPause, onResume, onExpand, onStop, onSkipCompletion,
 }: FocusTimerMiniProps) {
+  const mobileStyle = isMobile
+    ? {
+        bottom: `calc(${mobileBottomOffsetPx ?? 78}px + env(safe-area-inset-bottom))`,
+        right: '0.75rem',
+      }
+    : undefined
   const [stopProgress, setStopProgress] = useState(0)
   const holdRef = useRef<{ raf: number; cleared: boolean } | null>(null)
 
@@ -82,7 +93,7 @@ export function FocusTimerMini({
     return (
       <div
         className="fixed z-40 bottom-6 right-6"
-        style={isMobile ? { bottom: 'calc(78px + env(safe-area-inset-bottom))', right: '0.75rem' } : undefined}
+        style={mobileStyle}
         role="region"
         aria-label="計時完成"
       >
@@ -115,7 +126,7 @@ export function FocusTimerMini({
   return (
     <div
       className="fixed z-40 bottom-6 right-6"
-      style={isMobile ? { bottom: 'calc(78px + env(safe-area-inset-bottom))', right: '0.75rem' } : undefined}
+      style={mobileStyle}
       role="region"
       aria-label={phase === 'break' ? '休息計時迷你顯示' : '專注計時迷你顯示'}
     >
