@@ -11,7 +11,7 @@ import { isNative } from '@/lib/platform'
 import { saveOrShareBlob, copyImageToClipboard } from '@/lib/share'
 import type { Workspace, TimeBlock } from '@/lib/types'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { DateField } from '@/components/ui/date-time-field'
 import {
   CalendarExportView,
   type CalendarExportViewOptions,
@@ -263,20 +263,22 @@ export function CalendarExportModal({
               <div className="mt-3 space-y-2">
                 <div>
                   <label className="text-[11px] text-muted-foreground block mb-1">起始</label>
-                  <Input
-                    type="date"
+                  <DateField
                     value={startStr}
-                    onChange={(e) => onStartChange(e.target.value)}
+                    onChange={onStartChange}
                     className="h-9 text-xs"
+                    aria-label="起始日期"
+                    clearable={false}
                   />
                 </div>
                 <div>
                   <label className="text-[11px] text-muted-foreground block mb-1">結束</label>
-                  <Input
-                    type="date"
+                  <DateField
                     value={endStr}
-                    onChange={(e) => onEndChange(e.target.value)}
+                    onChange={onEndChange}
                     className="h-9 text-xs"
+                    aria-label="結束日期"
+                    clearable={false}
                   />
                 </div>
                 <div className={cn('text-[11px]', !isRangeValid ? 'text-destructive' : 'text-muted-foreground')}>

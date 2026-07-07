@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import type { UserSettings, TimeBlock, SlotType, Workspace, NotificationSettings } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TimeField } from '@/components/ui/date-time-field'
 import { ModalShell } from './modal-shell'
 import {
   getTaskCompleteSoundEnabled,
@@ -1399,11 +1400,11 @@ function NotificationsSettingsTab({
               {notifications.scheduling.dailyPlanningReminder && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">提醒時間</span>
-                  <Input
-                    type="time"
+                  <TimeField
                     value={notifications.scheduling.planningReminderTime}
-                    onChange={(e) => updateNestedField('scheduling', 'planningReminderTime', e.target.value)}
+                    onChange={(v) => updateNestedField('scheduling', 'planningReminderTime', v)}
                     className="h-8 w-28"
+                    aria-label="每日規劃提醒時間"
                   />
                 </div>
               )}
@@ -1435,18 +1436,18 @@ function NotificationsSettingsTab({
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-sm text-muted-foreground">時段</span>
                     <div className="flex items-center gap-2">
-                      <Input
-                        type="time"
+                      <TimeField
                         value={notifications.quietHours.startTime}
-                        onChange={(e) => updateNestedField('quietHours', 'startTime', e.target.value)}
+                        onChange={(v) => updateNestedField('quietHours', 'startTime', v)}
                         className="h-8 w-28"
+                        aria-label="勿擾開始時間"
                       />
                       <span className="text-xs text-muted-foreground">至</span>
-                      <Input
-                        type="time"
+                      <TimeField
                         value={notifications.quietHours.endTime}
-                        onChange={(e) => updateNestedField('quietHours', 'endTime', e.target.value)}
+                        onChange={(v) => updateNestedField('quietHours', 'endTime', v)}
                         className="h-8 w-28"
+                        aria-label="勿擾結束時間"
                       />
                     </div>
                   </div>

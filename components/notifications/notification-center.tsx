@@ -95,7 +95,7 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
           type: 'overdue',
           priority: 'high',
           title: `${criticalOverdue.length} 個任務已經放了一陣子`,
-          message: `最久的任務已過期 ${formatRelativeTime(daysOverdue)}。建議重新評估這些任務是否仍然需要執行，或考慮刪除/歸檔。`,
+          message: `最久的一件是${formatRelativeTime(daysOverdue)}的。有些也許已經不用做了——放心整理掉，留下真正想做的就好。`,
           tasks: criticalOverdue,
           actionLabel: '整理任務',
           createdAt: new Date(),
@@ -107,8 +107,8 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
           id: 'recent-overdue',
           type: 'overdue',
           priority: 'medium',
-          title: `${recentOverdue.length} 個任務剛過期`,
-          message: '這些任務在過去一週內到期，建議盡快安排時間處理。',
+          title: `${recentOverdue.length} 個任務剛過了預定日`,
+          message: '日子過了也沒關係，挑個合適的時段重新安排就好。',
           tasks: recentOverdue,
           actionLabel: '查看任務',
           createdAt: new Date(),
@@ -134,8 +134,8 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
           id: 'due-today',
           type: 'due_soon',
           priority: 'high',
-          title: `${todayTasks.length} 個任務今天到期`,
-          message: '記得在今天完成這些任務！',
+          title: `今天排了 ${todayTasks.length} 件事`,
+          message: '還有時間，可以慢慢做——一件一件來就好。',
           tasks: todayTasks,
           actionLabel: '查看任務',
           createdAt: new Date(),
@@ -147,8 +147,8 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
           id: 'due-soon',
           type: 'due_soon',
           priority: 'low',
-          title: `${upcomingTasks.length} 個任務即將到期`,
-          message: '這些任務將在 3 天內到期，提前規劃時間處理。',
+          title: `${upcomingTasks.length} 個任務這幾天到期`,
+          message: '接下來三天會陸續到期，先挑個順手的時段放上日曆，到時候就從容多了。',
           tasks: upcomingTasks,
           actionLabel: '查看任務',
           createdAt: new Date(),
@@ -169,8 +169,8 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
         id: 'stale-tasks',
         type: 'stale',
         priority: 'low',
-        title: `${staleTasks.length} 個任務需要整理`,
-        message: '這些任務已建立超過兩週但沒有設定截止日或排程。建議設定明確的時間，或考慮是否真的需要執行。',
+        title: `${staleTasks.length} 個任務靜靜躺了兩週`,
+        message: '還想做的話，挑個日子放上日曆；不想做了也沒關係，歸檔就好。',
         tasks: staleTasks,
         actionLabel: '整理任務',
         createdAt: new Date(),
@@ -187,8 +187,8 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
         id: 'too-many-urgent',
         type: 'insight',
         priority: 'medium',
-        title: '高優先任務過多',
-        message: `目前有 ${highUrgencyTasks.length} 個高優先任務。當所有任務都很緊急時，反而會降低執行效率。建議重新評估優先順序。`,
+        title: '急件好像有點多',
+        message: `有 ${highUrgencyTasks.length} 個任務都標了高優先。全部都急，反而不知道從哪開始——挑出真正的前幾名，其他的緩緩也可以。`,
         tasks: highUrgencyTasks,
         actionLabel: '調整優先順序',
         createdAt: new Date(),
@@ -425,7 +425,7 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
             {notifications.length > 0 && (
               <div className="px-4 py-3 border-t border-border bg-secondary/20">
                 <p className="text-[10px] text-muted-foreground text-center">
-                  專注於重要的事，定期整理任務清單
+                  慢慢搖擺，把事情做完
                 </p>
               </div>
             )}

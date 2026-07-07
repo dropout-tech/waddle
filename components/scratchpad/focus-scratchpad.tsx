@@ -100,6 +100,22 @@ export function FocusScratchpad({
 
   const isToday = selectedDate === todayKey
 
+  // Esc collapses the panel when expanded. If an item is mid-edit, its own
+  // textarea/input already handles Esc locally (cancelEdit) — we skip so
+  // that keypress cancels the edit first instead of yanking the whole panel
+  // shut in one step. A second Esc (once editingId clears) then collapses.
+  useEffect(() => {
+    if (!isExpanded) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (editingId !== null) return
+      setIsExpanded(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setIsExpanded closes over isControlled/onOpenChange, re-created each render; isExpanded/editingId are the only values that should re-trigger this
+  }, [isExpanded, editingId])
+
   const formatDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split('-').map(Number)
     const weekdays = ['日', '一', '二', '三', '四', '五', '六']

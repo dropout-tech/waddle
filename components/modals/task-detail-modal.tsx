@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import type { Task, Workspace } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DateField, TimeField } from '@/components/ui/date-time-field'
 import { renderNotesWithLinks } from '@/lib/notes-render'
 import { toDateString } from '@/lib/calendar-utils'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from './recurrence-choice-modal'
@@ -382,11 +383,11 @@ export function TaskDetailModal({
                 <Calendar className="w-3.5 h-3.5" />
                 截止日期
               </label>
-              <Input
-                type="date"
+              <DateField
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                onChange={setDueDate}
                 className="h-9"
+                aria-label="截止日期"
               />
             </div>
           </div>
@@ -520,11 +521,11 @@ export function TaskDetailModal({
                 {/* End Date */}
                 <div className="space-y-2">
                   <label className="text-xs text-muted-foreground">結束日期 (可選)</label>
-                  <Input
-                    type="date"
+                  <DateField
                     value={recurrenceEndDate}
-                    onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                    onChange={setRecurrenceEndDate}
                     className="h-8"
+                    aria-label="重複結束日期"
                   />
                 </div>
               </div>
@@ -876,10 +877,9 @@ function TimeBlockSection({
               </button>
             )
           })}
-          <Input
-            type="date"
+          <DateField
             value={scheduledDate}
-            onChange={(e) => onScheduledDateChange(e.target.value)}
+            onChange={onScheduledDateChange}
             className="h-8 flex-1 text-xs"
             aria-label="排程日期"
           />
@@ -909,11 +909,9 @@ function TimeBlockSection({
 
         {/* Start / End inputs — end has integrated ±15 stepper */}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <Input
-            type="time"
+          <TimeField
             value={startTime}
-            onChange={(e) => {
-              const v = e.target.value
+            onChange={(v) => {
               onStartTimeChange(v)
               const newStart = parseTime(v)
               if (newStart !== null && endMin !== null && duration && duration > 0) {
@@ -925,10 +923,9 @@ function TimeBlockSection({
           />
           <span className="text-muted-foreground text-sm" aria-hidden="true">→</span>
           <div className="relative">
-            <Input
-              type="time"
+            <TimeField
               value={endTime}
-              onChange={(e) => onEndTimeChange(e.target.value)}
+              onChange={onEndTimeChange}
               className="h-9 font-mono text-center pr-12"
               aria-label="結束時間"
             />

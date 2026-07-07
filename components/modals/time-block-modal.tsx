@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { X, Calendar, Clock, Palette, Trash2, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
+import { DateField, TimeField } from '@/components/ui/date-time-field'
 import type { TimeBlock, SlotType } from '@/lib/types'
 import { ModalShell } from '@/components/modals/modal-shell'
 
@@ -209,11 +210,12 @@ export function TimeBlockModal({
               <Calendar className="w-3.5 h-3.5" />
               日期
             </label>
-            <Input
-              type="date"
+            <DateField
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={setDate}
               className="h-10"
+              aria-label="日期"
+              clearable={false}
             />
           </div>
 
@@ -238,11 +240,9 @@ export function TimeBlockModal({
               )}
             </div>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-              <Input
-                type="time"
+              <TimeField
                 value={startTime}
-                onChange={(e) => {
-                  const v = e.target.value
+                onChange={(v) => {
                   setStartTime(v)
                   // Preserve duration when start changes mid-edit.
                   const ns = parseTime(v)
@@ -254,10 +254,9 @@ export function TimeBlockModal({
                 aria-label="開始時間"
               />
               <span className="text-muted-foreground text-sm" aria-hidden="true">→</span>
-              <Input
-                type="time"
+              <TimeField
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
+                onChange={setEndTime}
                 className="h-10 font-mono text-center"
                 aria-label="結束時間"
               />

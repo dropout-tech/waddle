@@ -1272,7 +1272,7 @@ function WorkspacesView({
           {summary.overdue > 0 && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-urgency-critical/10 text-urgency-critical text-xs font-medium">
               <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
-              {summary.overdue} 個過期需處理
+              {summary.overdue} 個已過預定日
             </span>
           )}
         </div>

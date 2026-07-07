@@ -128,6 +128,13 @@ export function CalendarPanel({
     enableMouseDrag: false,
   })
 
+  // D/W/M/T (view switch + jump-to-today) used to live only here, gated behind
+  // this panel's own focus (tabIndex=0) — so they silently did nothing until
+  // the user had already clicked into the calendar once. That's now handled
+  // window-level in MainLayout regardless of focus; this local handler keeps
+  // only the arrow-key day/week/month navigation, which is fine staying
+  // focus-scoped since it doesn't need to work from a cold start the way
+  // "jump to today" does.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     // Skip when user is typing in an input
     const target = e.target as HTMLElement
@@ -138,10 +145,6 @@ export function CalendarPanel({
 
     if (e.key === 'ArrowLeft') { e.preventDefault(); navigate('prev'); return }
     if (e.key === 'ArrowRight') { e.preventDefault(); navigate('next'); return }
-    if (e.key === 't' || e.key === 'T') { e.preventDefault(); handleTodayClick(); return }
-    if (e.key === 'd' || e.key === 'D') { e.preventDefault(); onViewModeChange('day'); return }
-    if (e.key === 'w' || e.key === 'W') { e.preventDefault(); onViewModeChange('week'); return }
-    if (e.key === 'm' || e.key === 'M') { e.preventDefault(); onViewModeChange('month'); return }
   }
 
   return (

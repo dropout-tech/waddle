@@ -215,14 +215,20 @@ function TaskRowImpl({
           onPointerDown={handleMouseDown}
           onClick={handleRowClick}
           className={cn(
-            'flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-all duration-150 ease-out rounded-md select-none',
-            'hover:brightness-[0.97] hover:translate-x-0.5 hover:shadow-sm hover:shadow-black/[0.06] active:translate-x-0',
+            'flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-all duration-150 ease-quart rounded-md select-none',
+            // Hover feedback beyond the drag handle: wash the row towards the
+            // accent (dusty rose) and nudge right. The base color lives in a
+            // CSS variable so hover can color-mix it — Tailwind classes can't
+            // override an inline background-color.
+            'bg-(--row-bg)',
+            'hover:bg-[color-mix(in_oklch,var(--row-bg)_82%,var(--color-accent))] hover:translate-x-0.5 hover:shadow-sm hover:shadow-black/[0.06] active:translate-x-0',
+            'focus-within:bg-[color-mix(in_oklch,var(--row-bg)_82%,var(--color-accent))]',
             isDragging && 'opacity-50',
             externalDragActive && 'opacity-40',
             task.isCompleted && 'opacity-50'
           )}
           style={{
-            backgroundColor: colors.rowBg || 'transparent',
+            ['--row-bg' as string]: colors.rowBg || 'transparent',
             borderLeft: `3px solid ${colors.accentColor}`,
           }}
         >
@@ -338,15 +344,24 @@ function TaskRowImpl({
       <div
         data-tour="task-row"
         className={cn(
-          'group relative flex items-start gap-3 px-3.5 py-3 rounded-xl transition-all duration-200 ease-out cursor-pointer select-none',
-          'border hover:brightness-[0.98] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/[0.07] active:translate-y-0 active:scale-[0.995]',
+          'group relative flex items-start gap-3 px-3.5 py-3 rounded-xl transition-all duration-150 ease-quart cursor-pointer select-none border',
+          // Hover feedback beyond the drag handle (W2.5): wash the card
+          // towards the accent (dusty rose), firm up the border, and keep the
+          // gentle lift. Base colors live in CSS variables because Tailwind
+          // hover classes can't override inline styles.
+          'bg-(--row-bg) border-[color-mix(in_oklch,var(--row-accent)_25%,transparent)]',
+          'hover:bg-[color-mix(in_oklch,var(--row-bg)_88%,var(--color-accent))] hover:border-[color-mix(in_oklch,var(--row-accent)_45%,transparent)]',
+          'hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/[0.07] active:translate-y-0 active:scale-[0.995]',
+          // Keyboard parity: focusing the checkbox inside lights the card the
+          // same way hover does.
+          'focus-within:bg-[color-mix(in_oklch,var(--row-bg)_88%,var(--color-accent))] focus-within:border-[color-mix(in_oklch,var(--row-accent)_45%,transparent)]',
           isDragging && 'opacity-50 scale-[0.98]',
           externalDragActive && 'opacity-40',
           task.isCompleted && 'opacity-55'
         )}
         style={{
-          backgroundColor: colors.rowBg,
-          borderColor: `color-mix(in oklch, ${colors.accentColor} 25%, transparent)`,
+          ['--row-bg' as string]: colors.rowBg,
+          ['--row-accent' as string]: colors.accentColor,
           borderLeftWidth: '3px',
           borderLeftColor: colors.accentColor,
         }}

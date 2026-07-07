@@ -12,13 +12,19 @@ interface ShortcutGroup {
 
 const GROUPS: ShortcutGroup[] = [
   {
+    title: '指令面板',
+    items: [
+      { keys: ['⌘', 'K'], label: '開啟指令面板（跳到今天／切換視圖／開記事本／新增任務／搜尋任務）' },
+    ],
+  },
+  {
     title: '日曆導航',
     items: [
       { keys: ['←', '→'], label: '上一日 / 下一日' },
-      { keys: ['T'], label: '回到今天' },
-      { keys: ['D'], label: '日檢視' },
-      { keys: ['W'], label: '週檢視' },
-      { keys: ['M'], label: '月檢視' },
+      { keys: ['T'], label: '回到今天（任何畫面皆可，不必先點日曆）' },
+      { keys: ['D'], label: '日檢視（任何畫面皆可）' },
+      { keys: ['W'], label: '週檢視（任何畫面皆可）' },
+      { keys: ['M'], label: '月檢視（任何畫面皆可）' },
     ],
   },
   {
