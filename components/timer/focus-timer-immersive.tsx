@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Pause, Play, X, ChevronUp, ChevronDown, Music2, Maximize2, Minimize2, Minimize } from 'lucide-react'
+import { Pause, Play, X, ChevronUp, ChevronDown, Music2, Minimize } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   BGM_MUSIC, BGM_AMBIENT, summarizeBgm,
@@ -9,9 +9,18 @@ import {
   type AmbientPref, type BgmMusicId, type BgmAmbientId,
 } from '@/lib/timer-bgm'
 
+/** Gentle wind-down state passed by the controller while a session ends. */
+export interface ImmersiveCompletion {
+  kind: 'work' | 'break' | 'manual'
+  /** 'break' keeps the session going underneath; 'idle' returns to setup. */
+  next: 'break' | 'idle'
+  /** True during the final 400ms opacity fade before finalizing. */
+  exiting: boolean
+}
+
 export interface ImmersiveProps {
   visible: boolean
-  state: 'idle' | 'running' | 'paused'
+  state: 'idle' | 'running' | 'paused' | 'completed'
   phase: 'work' | 'break'
   label: string
   color: string
@@ -31,9 +40,13 @@ export interface ImmersiveProps {
   ambient: Record<BgmAmbientId, AmbientPref>
   bgmPlaying: boolean
   unavailableSrcs: Set<string>
+  /** Non-null while the completion sequence is playing. */
+  completion: ImmersiveCompletion | null
   onPause: () => void
   onResume: () => void
   onExit: () => void
+  /** Tap-anywhere skip for the completion sequence. */
+  onSkipCompletion: () => void
   /** Shrink to corner mini pill without ending the session. */
   onMinimize: () => void
   onToggleBgm: () => void
@@ -48,6 +61,15 @@ export interface ImmersiveProps {
 const EXIT_HOLD_MS = 900
 const DIM_DELAY_MS = 5000
 
+// Completion copy — one gentle voice for all three endings. No urgency, no
+// guilt; the celebration itself (penguin + halo) is reserved for finished
+// work sessions so it keeps meaning.
+const COMPLETION_COPY: Record<ImmersiveCompletion['kind'], { title: string; sub: string }> = {
+  work:   { title: '這段專注完成了', sub: '辛苦了，慢慢喘口氣' },
+  break:  { title: '休息結束', sub: '準備好了，隨時開始下一段' },
+  manual: { title: '先到這裡也很好', sub: '想繼續時，隨時回來' },
+}
+
 function formatClockHHMM(d: Date): string {
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
 }
@@ -56,39 +78,20 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
   const {
     visible, state, phase, label, color, timeText, progress, startedAtText,
     targetSeconds, startedAt, remainingSeconds, pomodoroCount,
-    music, musicVolume, ambient, bgmPlaying, unavailableSrcs,
-    onPause, onResume, onExit, onMinimize, onToggleBgm,
+    music, musicVolume, ambient, bgmPlaying, unavailableSrcs, completion,
+    onPause, onResume, onExit, onSkipCompletion, onMinimize, onToggleBgm,
     onSelectMusic, onMusicVolumeChange, onToggleAmbient, onAmbientVolumeChange,
   } = props
 
   const [dimmed, setDimmed] = useState(false)
-  const [showCompletion, setShowCompletion] = useState(false)
   const [showBgmBar, setShowBgmBar] = useState(false)
   const [exitHoldProgress, setExitHoldProgress] = useState(0)
-  const [isNativeFullscreen, setIsNativeFullscreen] = useState(false)
-  const [fullscreenSupported, setFullscreenSupported] = useState(false)
   // Ambient "now" clock (B8). Updates on the minute boundary so the display
   // changes in sync with the OS clock rather than drifting by N seconds.
   const [nowText, setNowText] = useState(() => formatClockHHMM(new Date()))
 
-  const containerRef = useRef<HTMLDivElement | null>(null)
   const dimTimerRef = useRef<NodeJS.Timeout | null>(null)
   const exitHoldRef = useRef<{ raf: number; cleared: boolean } | null>(null)
-  const prevPhaseRef = useRef<'work' | 'break'>(phase)
-  const completionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Mirror the browser's fullscreen state so the toggle stays in sync even
-  // when the user hits Esc to leave native fullscreen. Pressing Esc only
-  // drops out of OS-level fullscreen — we DON'T exit the immersive overlay
-  // or stop the timer, so the experience degrades gracefully to the CSS
-  // overlay (chrome reappears, but timer continues).
-  useEffect(() => {
-    if (typeof document === 'undefined') return
-    setFullscreenSupported(!!document.fullscreenEnabled)
-    const onChange = () => setIsNativeFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', onChange)
-    return () => document.removeEventListener('fullscreenchange', onChange)
-  }, [])
 
   // Now-clock ticking. Align to the next minute boundary so updates land
   // exactly when the OS clock does, then once per minute.
@@ -107,26 +110,6 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
     }
   }, [visible])
 
-  const toggleNativeFullscreen = () => {
-    if (typeof document === 'undefined') return
-    if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => { /* Esc may have already exited */ })
-    } else if (containerRef.current?.requestFullscreen) {
-      void containerRef.current.requestFullscreen().catch(() => { /* permission/timing */ })
-    }
-  }
-
-  // Drop OS-level fullscreen when the immersive view unmounts (long-press
-  // exit / session end / minimize). Without this, leaving immersive would
-  // strand the browser in fullscreen with no way to undo it.
-  useEffect(() => {
-    return () => {
-      if (typeof document !== 'undefined' && document.fullscreenElement) {
-        void document.exitFullscreen().catch(() => {})
-      }
-    }
-  }, [])
-
   const resetDim = () => {
     setDimmed(false)
     if (dimTimerRef.current) clearTimeout(dimTimerRef.current)
@@ -141,17 +124,6 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
     return () => { if (dimTimerRef.current) clearTimeout(dimTimerRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, state])
-
-  useEffect(() => {
-    if (!visible) return
-    if (prevPhaseRef.current === 'work' && phase === 'break') {
-      setShowCompletion(true)
-      if (completionTimeoutRef.current) clearTimeout(completionTimeoutRef.current)
-      completionTimeoutRef.current = setTimeout(() => setShowCompletion(false), 2400)
-    }
-    prevPhaseRef.current = phase
-    return () => { if (completionTimeoutRef.current) clearTimeout(completionTimeoutRef.current) }
-  }, [phase, visible])
 
   const startExitHold = () => {
     if (exitHoldRef.current) return
@@ -215,6 +187,12 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
     : 0
   // The last minute gets an extra nudge so short timers still feel the arrival.
   const isFinalMinute = remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 60
+  // Ring pulse is reserved for the final 10 seconds only — a quiet heartbeat
+  // at the arrival, not a nervous tic for the last 5% of every session.
+  const inFinalTen = remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 10
+  // Completion → idle fades the whole surface out; completion → break keeps
+  // the surface (the break continues underneath) and fades only the overlay.
+  const rootExiting = !!completion?.exiting && completion.next === 'idle'
   const ringStrokeActive = isFinalMinute
     ? `color-mix(in oklch, ${color} 42%, oklch(0.7 0.18 38))`
     : warmth > 0
@@ -253,13 +231,14 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
 
   return (
     <div
-      ref={containerRef}
-      className={cn(
-        'fixed inset-0 z-tour flex flex-col select-none overflow-hidden',
-        'transition-colors duration-700 ease-out',
-      )}
+      className="fixed inset-0 z-tour flex flex-col select-none overflow-hidden"
       style={{
+        // No background-color transition: DESIGN.md limits animation to
+        // transform/opacity/filter. Phase color changes happen under the
+        // completion overlay, so nothing snaps in view anyway.
         backgroundColor: bgColor,
+        opacity: rootExiting ? 0 : 1,
+        transition: 'opacity 400ms var(--ease-quart)',
       }}
       onPointerDown={resetDim}
       onTouchMove={resetDim}
@@ -274,7 +253,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
         }
         @keyframes waddle-ring-pulse {
           0% { transform: scale(1); }
-          40% { transform: scale(1.06); }
+          40% { transform: scale(1.02); }
           100% { transform: scale(1); }
         }
         @keyframes waddle-immersive-in {
@@ -349,24 +328,23 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
         aria-hidden="true"
         className="waddle-breathe-bg pointer-events-none absolute inset-0"
         style={{
+          // The gradient recomputes with warmth each tick (steps are far too
+          // small to see), so no background transition is needed — and
+          // animating background violates the transform/opacity/filter rule.
           background: `radial-gradient(circle at 50% 40%, color-mix(in oklch, ${ringStrokeActive} ${26 + warmth * 16}%, transparent) 0%, color-mix(in oklch, ${color} 10%, transparent) 46%, transparent 80%)`,
           animation: state === 'running' ? 'waddle-breathe 8s ease-in-out infinite' : 'none',
           opacity: state === 'running' ? undefined : 0.55,
-          transition: 'background 900ms ease-out',
         }}
       />
 
-      {/* B2: drifting particles. Six positions, varied size/delay/duration so
-          the motion never feels grid-aligned. translate3d only — never
-          width/height animations (per DESIGN.md). */}
+      {/* B2: drifting particles — demoted to two barely-there motes. The
+          breathing aurora and the progress ring are the protagonists of this
+          screen; six particles competed with them for attention.
+          translate3d only — never width/height animations (per DESIGN.md). */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
         {[
-          { left: '8%',  delay: 0,    duration: 42, size: 6, opacity: 0.28 },
-          { left: '22%', delay: -12,  duration: 55, size: 4, opacity: 0.22 },
-          { left: '38%', delay: -28,  duration: 38, size: 7, opacity: 0.32 },
-          { left: '54%', delay: -6,   duration: 48, size: 5, opacity: 0.24 },
-          { left: '72%', delay: -22,  duration: 60, size: 8, opacity: 0.3  },
-          { left: '88%', delay: -18,  duration: 44, size: 4, opacity: 0.2  },
+          { left: '16%', delay: -12, duration: 56, size: 5, opacity: 0.12 },
+          { left: '78%', delay: -34, duration: 64, size: 6, opacity: 0.1  },
         ].map((p, i) => (
           <span
             key={i}
@@ -421,17 +399,6 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
             >
               <Minimize className="w-4 h-4" />
             </button>
-            {fullscreenSupported && (
-              <button
-                type="button"
-                onClick={toggleNativeFullscreen}
-                aria-label={isNativeFullscreen ? '退出全螢幕' : '進入瀏覽器全螢幕'}
-                title={isNativeFullscreen ? '退出全螢幕（或按 Esc）' : '進入瀏覽器全螢幕'}
-                className="h-10 w-10 rounded-full grid place-items-center text-foreground/60 hover:text-foreground hover:bg-foreground/5 transition-colors"
-              >
-                {isNativeFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-              </button>
-            )}
             <button
               type="button"
               onPointerDown={(e) => { e.preventDefault(); startExitHold() }}
@@ -493,12 +460,12 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
 
         <div className="relative">
           <svg
-            className={cn('-rotate-90', state === 'running' && progress > 95 && 'waddle-ring-pulse')}
+            className="-rotate-90 waddle-ring-pulse"
             width="300"
             height="300"
             viewBox="0 0 300 300"
             style={{
-              animation: state === 'running' && progress > 95 ? 'waddle-ring-pulse 1.4s ease-in-out infinite' : undefined,
+              animation: state === 'running' && inFinalTen ? 'waddle-ring-pulse 2.2s ease-in-out infinite' : undefined,
             }}
           >
             <circle
@@ -605,7 +572,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
           onAmbientVolumeChange={onAmbientVolumeChange}
         />
         <div className="flex justify-center pt-1">
-          {state === 'paused' ? (
+          {state === 'paused' && (
             <button
               type="button"
               onClick={onResume}
@@ -615,7 +582,8 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
             >
               <Play className="w-6 h-6 translate-x-[2px]" />
             </button>
-          ) : (
+          )}
+          {state === 'running' && (
             <button
               type="button"
               onClick={onPause}
@@ -628,32 +596,52 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
         </div>
       </div>
 
-      {showCompletion && (
+      {completion && (
         <div
-          className="absolute inset-0 z-20 flex flex-col items-center justify-center"
+          role="button"
+          tabIndex={0}
+          onClick={onSkipCompletion}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSkipCompletion() }}
+          aria-label="收尾中，點一下繼續"
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center outline-none"
           style={{
             // Solid tinted overlay, no backdrop-blur (DESIGN.md bans the
             // glassmorphism defaults). All alpha via color-mix so the
             // gradient works for non-hex color inputs too.
             background: `radial-gradient(circle at 50% 42%, color-mix(in oklch, ${color} 36%, var(--background)) 0%, color-mix(in oklch, ${color} 16%, var(--background)) 50%, color-mix(in oklch, ${color} 8%, var(--background)) 100%)`,
-            animation: 'waddle-completion-in 500ms cubic-bezier(0.22, 1, 0.36, 1)',
+            animation: 'waddle-completion-in 500ms var(--ease-quart)',
+            // completion → break: only the overlay fades, revealing the break
+            // screen already running underneath. completion → idle: the root
+            // fades instead, and this overlay rides along with it.
+            opacity: completion.exiting && completion.next === 'break' ? 0 : 1,
+            transition: 'opacity 400ms var(--ease-quart)',
+            pointerEvents: completion.exiting ? 'none' : 'auto',
           }}
         >
           {/* A warm halo blooms outward once, behind a penguin that does a
-              small celebratory waddle. On-brand reward, no confetti. */}
+              small celebratory waddle. On-brand reward, no confetti. The
+              full celebration is reserved for completed work sessions —
+              break endings and manual stops get the calm, still penguin. */}
           <div className="relative mb-7 grid place-items-center">
-            <span
-              aria-hidden
-              className="waddle-celebrate-bloom pointer-events-none absolute rounded-full"
-              style={{
-                width: 240, height: 240,
-                background: `radial-gradient(circle, color-mix(in oklch, ${WARM_ANCHOR} 48%, transparent) 0%, transparent 66%)`,
-                animation: 'waddle-celebrate-bloom 1.6s ease-out both',
-              }}
-            />
+            {completion.kind === 'work' && (
+              <span
+                aria-hidden
+                className="waddle-celebrate-bloom pointer-events-none absolute rounded-full"
+                style={{
+                  width: 240, height: 240,
+                  background: `radial-gradient(circle, color-mix(in oklch, ${WARM_ANCHOR} 48%, transparent) 0%, transparent 66%)`,
+                  animation: 'waddle-celebrate-bloom 1.6s ease-out both',
+                }}
+              />
+            )}
             <div
               className="waddle-celebrate-penguin relative"
-              style={{ animation: 'waddle-celebrate-penguin 1.9s cubic-bezier(0.22, 1, 0.36, 1) both', transformOrigin: '50% 90%' }}
+              style={{
+                animation: completion.kind === 'work'
+                  ? 'waddle-celebrate-penguin 1.9s var(--ease-quart) both'
+                  : undefined,
+                transformOrigin: '50% 90%',
+              }}
             >
               <svg viewBox="-30 -45 60 86" className="w-24 h-auto">
                 {/* Body */}
@@ -677,8 +665,18 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
               </svg>
             </div>
           </div>
-          <h2 className="text-2xl font-semibold text-foreground tracking-tight">辛苦了</h2>
-          <p className="text-sm text-muted-foreground mt-2">慢慢搖擺，喝口水吧</p>
+          <h2 className="text-2xl font-semibold text-foreground tracking-tight">
+            {COMPLETION_COPY[completion.kind].title}
+          </h2>
+          <p className="text-sm text-muted-foreground mt-2">
+            {COMPLETION_COPY[completion.kind].sub}
+          </p>
+          <p
+            className="text-[11px] text-muted-foreground/55 mt-10"
+            style={{ animation: 'waddle-chip-in 700ms var(--ease-quart) 600ms both' }}
+          >
+            點一下畫面繼續
+          </p>
         </div>
       )}
     </div>

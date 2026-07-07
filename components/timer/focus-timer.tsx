@@ -5,7 +5,7 @@ import {
   Play, Pause, Timer, Clock,
   ChevronDown, ChevronUp, Settings2,
   Coffee, Brain, Dumbbell, BookOpen, Volume2, VolumeX,
-  Maximize2, Minimize2,
+  Maximize2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -30,8 +30,29 @@ interface FocusTimerProps {
 }
 
 type TimerMode = 'pomodoro' | 'stopwatch'
-type TimerState = 'idle' | 'running' | 'paused'
+type TimerState = 'idle' | 'running' | 'paused' | 'completed'
 type TimerPhase = 'work' | 'break'
+
+/** What just ended — drives the completion copy in the display layers. */
+type CompletionKind = 'work' | 'break' | 'manual'
+
+interface CompletionState {
+  kind: CompletionKind
+  /** Where the sequence lands: auto-break continues, everything else idles. */
+  next: 'break' | 'idle'
+  /** Whether the session gets the ✓ suffix when recorded to the calendar. */
+  completedFlag: boolean
+}
+
+// Gentle completion sequence (「溫柔收尾」). When a timer ends we no longer
+// unmount the session screen in the same tick — the view holds in a
+// 'completed' state so the chime, the ~1.5s BGM fade-out and the celebration
+// all land, then the surface fades out over COMPLETION_EXIT_MS
+// (opacity-only, ease-out-quart) before finalizing. Tapping anywhere skips.
+const COMPLETION_HOLD_MS = 2600
+const COMPLETION_HOLD_MANUAL_MS = 1400 // manual early end — shorter farewell
+const COMPLETION_EXIT_MS = 400
+const COMPLETION_BGM_FADE_S = 1.5
 
 interface TimerSession {
   mode: TimerMode
@@ -154,6 +175,12 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   const [elapsed, setElapsed] = useState(0) // seconds for stopwatch
   const [session, setSession] = useState<TimerSession | null>(null)
 
+  // Completion sequence state — non-null while the gentle wind-down plays.
+  // `completionExiting` flips on for the final opacity fade before unmount.
+  const [completion, setCompletion] = useState<CompletionState | null>(null)
+  const [completionExiting, setCompletionExiting] = useState(false)
+  const completionTimersRef = useRef<number[]>([])
+
   // When a session is active, `view` decides whether to render the corner
   // mini pill or the fullscreen immersive overlay. Decoupled from `isExpanded`
   // (which now only controls the idle setup card) so the user can freely
@@ -224,8 +251,14 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
     if (typeof window === 'undefined') return
     const eng = getBgmEngine()
     if (!eng) return
-    eng.setPlaying(bgmManualPlaying || state === 'running')
-  }, [state, bgmManualPlaying])
+    // During the completion sequence: keep the music rolling when a break is
+    // about to continue the session; otherwise fade it out slowly (~1.5s) so
+    // the audio ends with the session instead of being clipped at 0.3s.
+    const keepPlaying = bgmManualPlaying || state === 'running'
+      || (state === 'completed' && completion?.next === 'break')
+    if (keepPlaying) eng.setPlaying(true)
+    else eng.setPlaying(false, state === 'completed' ? { fadeSeconds: COMPLETION_BGM_FADE_S } : undefined)
+  }, [state, bgmManualPlaying, completion])
   // If the user clears all selections, drop the manual-playing flag so the
   // play button doesn't appear "on" with nothing to play.
   useEffect(() => {
@@ -236,6 +269,9 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
     return () => {
       const eng = typeof window !== 'undefined' ? getBgmEngine() : null
       eng?.setPlaying(false)
+      // Don't leave completion timers firing setState after unmount.
+      for (const t of completionTimersRef.current) window.clearTimeout(t)
+      completionTimersRef.current = []
     }
   }, [])
 
@@ -266,8 +302,10 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
   // Format date to YYYY-MM-DD (local)
   const formatDateISO = (date: Date) => toDateString(date)
 
-  // Start a fresh work session.
-  const startTimer = () => {
+  // Start a fresh work session. `opts.immersive` forces the immersive view
+  // for this session (the setup card's 「放大開始」 action button) regardless
+  // of the remembered preference.
+  const startTimer = (opts?: { immersive?: boolean }) => {
     // Sync-resume the AudioContext from this user gesture so BGM can
     // actually play when state flips to 'running' (Web Audio autoplay
     // policy gates resume() on a hot gesture token).
@@ -298,11 +336,11 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
       setElapsed(0)
     }
 
-    // Pick the starting view. "放大" (openInImmersive) means fill the viewport
-    // with the immersive focus screen; otherwise open as the corner mini pill.
+    // Pick the starting view. 「放大開始」 forces immersive for this session;
+    // otherwise the openInImmersive pref (「開始時直接進入沉浸畫面」) decides.
     // Mobile always goes immersive — a corner pill on a phone leaves too little
     // surface for the calendar to be useful, and immersive is better there.
-    setView(prefs.openInImmersive || isMobile ? 'immersive' : 'mini')
+    setView(opts?.immersive || prefs.openInImmersive || isMobile ? 'immersive' : 'mini')
 
     setState('running')
   }
@@ -374,12 +412,6 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
     [onCreateTimeBlock],
   )
 
-  // Stop and save timer
-  const stopTimer = (completed: boolean = false) => {
-    if (session) recordSessionToCalendar(session, completed)
-    resetTimer()
-  }
-
   // Reset timer
   const resetTimer = () => {
     setState('idle')
@@ -389,6 +421,71 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
     setCustomLabel('')
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
+    }
+  }
+
+  const clearCompletionTimers = () => {
+    for (const t of completionTimersRef.current) window.clearTimeout(t)
+    completionTimersRef.current = []
+  }
+
+  // Begin the gentle completion sequence. The session screen stays mounted
+  // in a 'completed' state (digits frozen, celebration, BGM fading), then
+  // fades out and finalizes. For the auto-break path the break session is
+  // swapped in *under* the still-visible celebration overlay so the break
+  // atmosphere is already there when the overlay clears — no idle flash.
+  const beginCompletion = (
+    s: TimerSession,
+    kind: CompletionKind,
+    next: 'break' | 'idle',
+    completedFlag: boolean,
+    holdMs: number,
+  ) => {
+    clearCompletionTimers()
+    setState('completed')
+    setCompletion({ kind, next, completedFlag })
+    setCompletionExiting(false)
+    const finish = next === 'break'
+      ? () => {
+          recordSessionToCalendar(s, true)
+          startBreak()
+          setCompletionExiting(true)
+          completionTimersRef.current = [window.setTimeout(() => {
+            setCompletion(null)
+            setCompletionExiting(false)
+          }, COMPLETION_EXIT_MS)]
+        }
+      : () => {
+          setCompletionExiting(true)
+          completionTimersRef.current = [window.setTimeout(() => {
+            recordSessionToCalendar(s, completedFlag)
+            setCompletion(null)
+            setCompletionExiting(false)
+            resetTimer()
+          }, COMPLETION_EXIT_MS)]
+        }
+    completionTimersRef.current = [window.setTimeout(finish, holdMs)]
+  }
+
+  // Tap anywhere during the sequence → jump straight to the end state.
+  // The farewell is offered, never enforced.
+  const skipCompletion = () => {
+    if (!completion) return
+    clearCompletionTimers()
+    if (completion.next === 'break') {
+      // If the break hasn't been started yet (still holding), start it now;
+      // if we're already in the overlay fade the break is running — just clear.
+      if (state === 'completed' && session) {
+        recordSessionToCalendar(session, true)
+        startBreak()
+      }
+      setCompletion(null)
+      setCompletionExiting(false)
+    } else {
+      if (session) recordSessionToCalendar(session, completion.completedFlag)
+      setCompletion(null)
+      setCompletionExiting(false)
+      resetTimer()
     }
   }
 
@@ -428,14 +525,15 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
           if (session.phase === 'work') {
             setPomodoroCount(recordPomodoroCompletion())
           }
-          if (session.phase === 'work' && prefs.autoStartBreak) {
-            // Record the work block, then transition to a break session
-            // without dropping into idle.
-            recordSessionToCalendar(session, true)
-            startBreak()
-          } else {
-            stopTimer(true)
-          }
+          // Hand off to the gentle completion sequence instead of tearing
+          // the screen down in the same tick the chime starts.
+          beginCompletion(
+            session,
+            session.phase,
+            session.phase === 'work' && prefs.autoStartBreak ? 'break' : 'idle',
+            true,
+            COMPLETION_HOLD_MS,
+          )
           return
         }
         setTimeLeft(remaining)
@@ -461,9 +559,13 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
     }
   }, [selectedPreset, customMinutes, useCustom, state, getTargetSeconds])
 
-  // Calculate progress for pomodoro
-  const progress = mode === 'pomodoro' 
-    ? ((getTargetSeconds() - timeLeft) / getTargetSeconds()) * 100
+  // Calculate progress for pomodoro. Use the *session's* locked target when
+  // one exists — the UI preset can differ from the running session (most
+  // visibly during breaks, whose length comes from prefs.breakMinutes, not
+  // the selected preset; the ring used to start a break at ~80%).
+  const activeTargetSeconds = session?.targetSeconds ?? getTargetSeconds()
+  const progress = mode === 'pomodoro'
+    ? ((activeTargetSeconds - timeLeft) / Math.max(1, activeTargetSeconds)) * 100
     : 0
 
   const displayTime = mode === 'pomodoro' ? timeLeft : elapsed
@@ -498,11 +600,17 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
           music={prefs.music}
           musicVolume={prefs.musicVolume}
           ambient={prefs.ambient}
-          bgmPlaying={(bgmManualPlaying || state === 'running')}
+          completion={completion ? { kind: completion.kind, next: completion.next, exiting: completionExiting } : null}
+          bgmPlaying={(bgmManualPlaying || state === 'running' || (state === 'completed' && completion?.next === 'break'))}
           unavailableSrcs={unavailableSrcs}
           onPause={pauseTimer}
           onResume={resumeTimer}
-          onExit={() => { stopTimer(false); setIsExpanded(false) }}
+          onExit={() => {
+            if (state === 'completed') { skipCompletion(); return }
+            beginCompletion(session, 'manual', 'idle', false, COMPLETION_HOLD_MANUAL_MS)
+            setIsExpanded(false)
+          }}
+          onSkipCompletion={skipCompletion}
           onMinimize={() => setView('mini')}
           onToggleBgm={() => {
             getBgmEngine()?.unlockAudio()
@@ -544,10 +652,12 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
         progress={computedProgress}
         label={session.label}
         isMobile={isMobile}
+        completion={completion ? { kind: completion.kind, exiting: completionExiting } : null}
         onPause={pauseTimer}
         onResume={resumeTimer}
         onExpand={() => setView('immersive')}
-        onStop={() => { stopTimer(false) }}
+        onStop={() => beginCompletion(session, 'manual', 'idle', false, COMPLETION_HOLD_MANUAL_MS)}
+        onSkipCompletion={skipCompletion}
       />
     )
   }
@@ -597,61 +707,21 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                 <span className="block w-10 h-1 rounded-full bg-muted-foreground/30" />
               </div>
             )}
-            {/* Header — title + where-to-open toggle. The setup card is only
-                shown while idle, so the status copy is always 「專注」. */}
+            {/* Header — just the title + collapse. The old 角落⟷全屏 pref
+                toggle lived here and looked like an action button (same
+                Maximize2 icon as real zoom actions) while only flipping a
+                preference — a trap. Immediate zoom is now the 「放大開始」
+                action next to the start button; the remembered preference
+                moved into the 更多 panel where settings belong. */}
             <div className="flex items-center justify-between px-5 pt-4 pb-1">
               <span className="text-[15px] font-semibold tracking-tight text-foreground">專注</span>
-              <div className="flex items-center gap-1.5">
-                {/* 角落 ⟷ 全屏 — where this session opens. "放大" now means 全屏
-                    (fill the viewport with the immersive focus screen), not a
-                    browser-chrome fullscreen. Mobile always opens immersive, so
-                    the toggle is desktop-only. */}
-                {!isMobile && (
-                  <div
-                    role="group"
-                    aria-label="開啟方式"
-                    className="flex items-center gap-0.5 p-0.5 rounded-full bg-secondary/60"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setPrefs((p) => ({ ...p, openInImmersive: false }))}
-                      aria-pressed={!prefs.openInImmersive}
-                      title="在角落以小視窗開始（日曆保持可見）"
-                      className={cn(
-                        "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                        !prefs.openInImmersive
-                          ? "bg-card text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      <Minimize2 className="w-3.5 h-3.5" />
-                      角落
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPrefs((p) => ({ ...p, openInImmersive: true }))}
-                      aria-pressed={prefs.openInImmersive}
-                      title="放大：開始時填滿整個畫面，進入沉浸專注"
-                      className={cn(
-                        "flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                        prefs.openInImmersive
-                          ? "bg-card text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      <Maximize2 className="w-3.5 h-3.5" />
-                      全屏
-                    </button>
-                  </div>
-                )}
-                <button
-                  onClick={() => setIsExpanded(false)}
-                  aria-label="收合"
-                  className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground"
-                >
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-              </div>
+              <button
+                onClick={() => setIsExpanded(false)}
+                aria-label="收合"
+                className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Tier 1 — essentials, always visible. Pick how long and what
@@ -814,6 +884,33 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
             {/* Advanced panel — break / sound / music. Behind the 更多 row. */}
             {showSettings && state === 'idle' && (
               <div className="px-5 pb-2 space-y-4 border-t border-border/50 pt-3">
+                {/* Where sessions open by default. This is the remembered
+                    preference (「開始時自動放大」); the header-adjacent
+                    「放大開始」 button is the immediate one-off action. */}
+                {!isMobile && (
+                  <button
+                    type="button"
+                    onClick={() => setPrefs((p) => ({ ...p, openInImmersive: !p.openInImmersive }))}
+                    aria-pressed={prefs.openInImmersive}
+                    className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-secondary/50 text-left"
+                  >
+                    <span className="text-[11px] text-muted-foreground">開始時直接進入沉浸畫面</span>
+                    <span
+                      className={cn(
+                        'relative w-8 h-4 rounded-full transition-colors flex-shrink-0',
+                        prefs.openInImmersive ? 'bg-primary' : 'bg-muted',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform',
+                          prefs.openInImmersive ? 'translate-x-4' : 'translate-x-0.5',
+                        )}
+                      />
+                    </span>
+                  </button>
+                )}
+
                 {/* Pomodoro flow settings — break length, auto-start, sound */}
                 {mode === 'pomodoro' && (
                   <div className="space-y-2">
@@ -1122,17 +1219,33 @@ export function FocusTimer({ workspaces, onCreateTimeBlock }: FocusTimerProps) {
                   {formatTime(displayTime)}
                 </span>
               </div>
-              <Button
-                onClick={startTimer}
-                className="w-full h-12 gap-2 rounded-2xl text-[15px] font-semibold text-white shadow-sm transition-opacity hover:opacity-95"
-                style={{ backgroundColor: mode === 'pomodoro'
-                  ? (useCustom ? focusType.color : POMODORO_PRESETS[selectedPreset].color)
-                  : focusType.color
-                }}
-              >
-                <Play className="w-4 h-4" />
-                開始專注
-              </Button>
+              <div className="flex items-stretch gap-2">
+                <Button
+                  onClick={() => startTimer()}
+                  className="flex-1 h-12 gap-2 rounded-2xl text-[15px] font-semibold text-white shadow-sm transition-[transform,filter] duration-150 ease-quart hover:brightness-[1.06] active:scale-[0.985] motion-reduce:transform-none"
+                  style={{ backgroundColor: mode === 'pomodoro'
+                    ? (useCustom ? focusType.color : POMODORO_PRESETS[selectedPreset].color)
+                    : focusType.color
+                  }}
+                >
+                  <Play className="w-4 h-4" />
+                  開始專注
+                </Button>
+                {/* 放大開始 — the *action* the old header toggle pretended to
+                    be: starts this session immediately in the immersive
+                    focus screen (in-page overlay, never browser fullscreen). */}
+                {!isMobile && (
+                  <button
+                    type="button"
+                    onClick={() => startTimer({ immersive: true })}
+                    aria-label="放大開始：以沉浸畫面開始專注"
+                    title="放大開始：立即以沉浸畫面開始專注"
+                    className="h-12 w-12 shrink-0 rounded-2xl border border-border/70 bg-secondary/30 text-muted-foreground grid place-items-center transition-[transform,background-color,color] duration-150 ease-quart hover:bg-secondary/70 hover:text-foreground active:scale-[0.96] motion-reduce:transform-none"
+                  >
+                    <Maximize2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
               <p className="text-[11px] text-muted-foreground/70 text-center mt-2.5">
                 結束後會自動記錄到今天的日曆
               </p>

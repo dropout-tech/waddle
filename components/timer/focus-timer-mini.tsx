@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Pause, Play, Maximize2, X } from 'lucide-react'
+import { Check, Pause, Play, Maximize2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface FocusTimerMiniProps {
-  state: 'running' | 'paused'
+  state: 'running' | 'paused' | 'completed'
   phase: 'work' | 'break'
   color: string
   /** Pre-formatted timer text like "24:13" or "1:02:05". */
@@ -15,11 +15,15 @@ export interface FocusTimerMiniProps {
   /** Session label (used as tooltip on the time text). */
   label: string
   isMobile?: boolean
+  /** Non-null while the gentle completion sequence is playing. */
+  completion?: { kind: 'work' | 'break' | 'manual'; exiting: boolean } | null
   onPause: () => void
   onResume: () => void
   onExpand: () => void
   /** Long-hold stop, mirrors the immersive exit pattern. */
   onStop: () => void
+  /** Tap the pill during the completion sequence → skip to the end state. */
+  onSkipCompletion?: () => void
 }
 
 // Slightly shorter than the immersive exit hold — the corner pill is a quick
@@ -28,7 +32,7 @@ const STOP_HOLD_MS = 600
 
 export function FocusTimerMini({
   state, phase, color, timeText, progress, label,
-  isMobile, onPause, onResume, onExpand, onStop,
+  isMobile, completion, onPause, onResume, onExpand, onStop, onSkipCompletion,
 }: FocusTimerMiniProps) {
   const [stopProgress, setStopProgress] = useState(0)
   const holdRef = useRef<{ raf: number; cleared: boolean } | null>(null)
@@ -67,6 +71,46 @@ export function FocusTimerMini({
   const R = 9
   const C = 2 * Math.PI * R
   const isPaused = state === 'paused'
+
+  // Gentle completion state — same wind-down the immersive screen gets, in
+  // pill form: a small check, one soft line, tap to skip, fade out.
+  if (completion) {
+    const doneLabel =
+      completion.kind === 'work' ? '這段專注完成了'
+      : completion.kind === 'break' ? '休息結束'
+      : '先到這裡也很好'
+    return (
+      <div
+        className="fixed z-40 bottom-6 right-6"
+        style={isMobile ? { bottom: 'calc(78px + env(safe-area-inset-bottom))', right: '0.75rem' } : undefined}
+        role="region"
+        aria-label="計時完成"
+      >
+        <button
+          type="button"
+          onClick={onSkipCompletion}
+          aria-label={`${doneLabel}，點一下繼續`}
+          className="flex items-center gap-2 pl-2 pr-3.5 py-2 rounded-full shadow-lg bg-card border animate-in fade-in slide-in-from-bottom-2"
+          style={{
+            borderColor: `color-mix(in oklch, ${color} 38%, var(--border))`,
+            boxShadow: `0 6px 24px -8px color-mix(in oklch, ${color} 35%, transparent), 0 2px 6px -2px color-mix(in oklch, ${color} 20%, transparent)`,
+            opacity: completion.exiting ? 0 : 1,
+            transition: 'opacity 400ms var(--ease-quart)',
+            pointerEvents: completion.exiting ? 'none' : 'auto',
+          }}
+        >
+          <span
+            className="h-5 w-5 rounded-full grid place-items-center text-white shrink-0"
+            style={{ backgroundColor: color }}
+            aria-hidden
+          >
+            <Check className="w-3 h-3" />
+          </span>
+          <span className="text-[13px] font-medium text-foreground">{doneLabel}</span>
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -110,6 +154,7 @@ export function FocusTimerMini({
               paused so the pill feels visually frozen. */}
           {!isPaused && (
             <span
+              data-waddle-mini-pulse
               className="absolute w-1 h-1 rounded-full"
               style={{
                 backgroundColor: color,

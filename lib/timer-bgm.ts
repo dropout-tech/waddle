@@ -364,8 +364,11 @@ class BgmEngine {
     }
   }
 
-  /** Stop whatever's playing on the music channel with a short fade. */
-  private stopActiveMusic() {
+  /** Stop whatever's playing on the music channel with a fade.
+   *  `fadeSeconds` defaults to the quick utility fade; the timer's gentle
+   *  completion sequence passes a longer one (~1.5s) so the music ends with
+   *  the session instead of being clipped. */
+  private stopActiveMusic(fadeSeconds: number = FADE_S) {
     const a = this.active
     if (!a) return
     this.active = null
@@ -381,13 +384,13 @@ class BgmEngine {
     const g = a.gain.gain
     g.cancelScheduledValues(now)
     g.setValueAtTime(g.value, now)
-    g.linearRampToValueAtTime(0, now + FADE_S)
-    try { a.source.stop(now + FADE_S + 0.05) } catch {}
+    g.linearRampToValueAtTime(0, now + fadeSeconds)
+    try { a.source.stop(now + fadeSeconds + 0.05) } catch {}
     // Disconnect once the fade finishes (free GC reachability).
     window.setTimeout(() => {
       try { a.source.disconnect() } catch {}
       try { a.gain.disconnect() } catch {}
-    }, (FADE_S + 0.1) * 1000)
+    }, (fadeSeconds + 0.1) * 1000)
   }
 
   /** Enable or disable an ambient overlay. */
@@ -435,8 +438,10 @@ class BgmEngine {
     this.fadeHandles.set(el, requestAnimationFrame(tick))
   }
 
-  /** Start/stop everything (call when timer starts/stops). */
-  setPlaying(on: boolean) {
+  /** Start/stop everything (call when timer starts/stops).
+   *  `opts.fadeSeconds` lengthens the stop fade-out (music + ambient) — the
+   *  timer's completion sequence uses ~1.5s so the audio lands softly. */
+  setPlaying(on: boolean, opts?: { fadeSeconds?: number }) {
     if (on === this.playing) return
     this.playing = on
     if (on) {
@@ -452,11 +457,12 @@ class BgmEngine {
         }
       }
     } else {
-      this.stopActiveMusic()
+      const fadeS = opts?.fadeSeconds ?? FADE_S
+      this.stopActiveMusic(fadeS)
       for (const t of this.ambient.values()) {
         if (!t.el.paused) {
-          this.fadeAmbient(t.el, 0)
-          window.setTimeout(() => t.el.pause(), FADE_S * 1000 + 50)
+          this.fadeAmbient(t.el, 0, fadeS * 1000)
+          window.setTimeout(() => t.el.pause(), fadeS * 1000 + 50)
         }
       }
     }
