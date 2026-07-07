@@ -52,7 +52,7 @@ Code review（五路 agent＋逐條信心評分）後修復：
 
 # Unsolved Issues
 
-- [pending-user] `supabase/migrations/0014` — 舊資料換品牌色的 DB 遷移已審查完畢但被 guard hook 硬擋（正式 DB 寫入）；放行方式：使用者終端機跑 `supabase db push`，或明示授權。
+- ~~[pending-user] migration 0014~~ → **已於 2026-07-08 由使用者明示放行後執行**：暫時開防線→`supabase db push` 套用成功→防線立即還原並用測試 payload 重測（deny 正常）→唯讀腳本驗證測試帳號 3 workspaces/11 tasks/1 time_block 零舊色殘留（workspace 色已為 #AE96DA/#259CCA/#59B47D）。
 - [deferred] j/k 任務列表鍵盤導航 — 需先建立「可見任務扁平順序」單一來源（跨 category-section/unified-task-list 的結構工程）。
 - [deferred] 播種冪等的 DB 層唯一約束 — 現有 ref 鎖不擋跨分頁並發首登；需 schema 變更，另立遷移。
 - [taste] 任務抽屜遮罩透明度 — 可調淡讓「邊編輯邊看日曆」更清楚；等使用者體感回饋。
