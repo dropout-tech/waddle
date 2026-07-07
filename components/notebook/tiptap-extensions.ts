@@ -4,6 +4,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-details'
 import type { Extensions } from '@tiptap/react'
+import { SlashCommand } from './slash-command'
 
 // Shared editor vocabulary for the notebook. StarterKit (v3) already bundles
 // bold / italic / underline / strike / code / headings / bullet+ordered lists /
@@ -23,6 +24,7 @@ export function notebookExtensions(placeholder: string): Extensions {
     Details.configure({ persist: true, HTMLAttributes: { class: 'nb-details' } }),
     DetailsSummary,
     DetailsContent,
+    SlashCommand,
     Placeholder.configure({
       placeholder: ({ node }) => {
         if (node.type.name === 'heading') return '標題'

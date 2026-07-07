@@ -32,17 +32,24 @@ interface EditorToolbarProps {
 }
 
 // Pull a sensible task title from the editor: the selected text if there's a
-// selection, otherwise the text of the block the caret sits in.
-function selectionOrLineText(editor: Editor): string {
+// selection, otherwise the text of the block the caret sits in. Exported so
+// the desktop "升級為任務" entry (now in the notebook page header, since the
+// fixed toolbar no longer renders on desktop) can reuse the same logic.
+export function selectionOrLineText(editor: Editor): string {
   const { from, to } = editor.state.selection
   if (from !== to) return editor.state.doc.textBetween(from, to, ' ').trim()
   return editor.state.selection.$from.parent.textContent.trim()
 }
 
 // Fixed formatting bar above the editor. Each button reflects the active mark/
-// node at the caret (so users can see current state) and toggles it. Mirrors a
-// Notion-style toolbar but constrained to the formats StarterKit + our extra
-// extensions provide.
+// node at the caret (so users can see current state) and toggles it.
+//
+// Mobile-only: desktop dropped the fixed toolbar in favour of the "/" block
+// menu + selection bubble menu (Notion's pure-editor layout, no chrome above
+// the document). On mobile there's no floating selection menu (it would
+// fight the OS's own text-selection UI) and no hover affordance for "/", so
+// this bar stays as the primary formatting entry point, docked above the
+// keyboard.
 export function EditorToolbar({ editor, onPromote }: EditorToolbarProps) {
   // Hooks must run before the early return. On mobile the bar detaches from the
   // top of the editor and docks above the keyboard (iOS input-accessory style)
@@ -51,6 +58,7 @@ export function EditorToolbar({ editor, onPromote }: EditorToolbarProps) {
   const keyboardInset = useKeyboardInset()
 
   if (!editor) return null
+  if (!isMobile) return null
 
   const setLink = () => {
     const prev = editor.getAttributes('link').href as string | undefined

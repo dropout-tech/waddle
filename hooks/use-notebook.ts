@@ -40,6 +40,11 @@ export function useNotebook() {
   // doesn't reset another note's pending save.
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
+  // In-flight INSERTs keyed by note id. Any UPDATE/DELETE for a just-created
+  // note must await this first — otherwise it can reach the server before the
+  // INSERT commits, match 0 rows, and silently drop the user's first edits.
+  const pendingCreates = useRef<Record<string, Promise<void>>>({})
+
   // ── Initial load ─────────────────────────────────────────
   useEffect(() => {
     let mounted = true
@@ -65,7 +70,18 @@ export function useNotebook() {
         setLoading(false)
         return
       }
-      setNotes((data ?? []).map(rowToNote))
+      setNotes((prev) => {
+        // Merge instead of clobber: a note created or edited while this
+        // initial fetch was in flight only exists (or is newer) in `prev`.
+        // Replacing wholesale unmounts the editor mid-typing (create → type
+        // → late response wipes the note → focus drops to <body>).
+        const server = (data ?? []).map(rowToNote)
+        if (prev.length === 0) return server
+        const local = new Map(prev.map((n) => [n.id, n]))
+        const serverIds = new Set(server.map((n) => n.id))
+        const localOnly = prev.filter((n) => !serverIds.has(n.id))
+        return [...localOnly, ...server.map((n) => local.get(n.id) ?? n)]
+      })
       setLoading(false)
     })()
 
@@ -77,7 +93,7 @@ export function useNotebook() {
   }, [supabase])
 
   // ── Create ───────────────────────────────────────────────
-  const createNote = useCallback(async (): Promise<NotebookNote | null> => {
+  const createNote = useCallback((): NotebookNote | null => {
     const userId = userIdRef.current
     if (!userId) return null
 
@@ -97,20 +113,24 @@ export function useNotebook() {
 
     setNotes((prev) => [optimistic, ...prev.map((n) => ({ ...n, sortOrder: n.sortOrder + 10 }))])
 
-    const { error } = await supabase.from('notebook_notes').insert({
-      id,
-      user_id: userId,
-      title: '',
-      content: null,
-      sort_order: 0,
-      updated_at: now,
-    })
-
-    if (error) {
-      console.error('[notebook] create failed', error)
-      setNotes((prev) => prev.filter((n) => n.id !== id))
-      return null
-    }
+    // Return synchronously so the caller can focus the new note NOW —
+    // awaiting the INSERT here left the previous note active for a whole
+    // round-trip, and the user's first keystrokes landed in the wrong note.
+    pendingCreates.current[id] = (async () => {
+      const { error } = await supabase.from('notebook_notes').insert({
+        id,
+        user_id: userId,
+        title: '',
+        content: null,
+        sort_order: 0,
+        updated_at: now,
+      })
+      if (error) {
+        console.error('[notebook] create failed', error)
+        setNotes((prev) => prev.filter((n) => n.id !== id))
+      }
+      delete pendingCreates.current[id]
+    })()
     return optimistic
   }, [supabase])
 
@@ -127,6 +147,7 @@ export function useNotebook() {
         }),
       )
 
+      await pendingCreates.current[id]
       const { error } = await supabase
         .from('notebook_notes')
         .update({
@@ -159,6 +180,7 @@ export function useNotebook() {
 
       clearTimeout(saveTimers.current[id])
       saveTimers.current[id] = setTimeout(async () => {
+        await pendingCreates.current[id]
         const { error } = await supabase
           .from('notebook_notes')
           .update({ content: content as unknown as never, updated_at: new Date().toISOString() })
@@ -180,6 +202,7 @@ export function useNotebook() {
       })
       clearTimeout(saveTimers.current[id])
 
+      await pendingCreates.current[id]
       const { error } = await supabase.from('notebook_notes').delete().eq('id', id)
       if (error) {
         console.error('[notebook] delete failed', error)

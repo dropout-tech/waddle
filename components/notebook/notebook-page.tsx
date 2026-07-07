@@ -1,21 +1,30 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowLeft, ChevronLeft, Check, Loader2, CloudOff, PanelLeft } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, Check, Loader2, CloudOff, PanelLeft, ListPlus } from 'lucide-react'
 import { useNotebook } from '@/hooks/use-notebook'
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
 import type { Task } from '@/lib/types'
 import { NoteList } from './note-list'
-import { NoteEditor } from './note-editor'
+import { NoteEditor, type NoteEditorHandle } from './note-editor'
 import { cn } from '@/lib/utils'
 
 export function NotebookPage() {
   const router = useRouter()
-  const { notes, loading, saveStatus, createNote, renameNote, saveNoteContent, deleteNote, reorderNotes } =
-    useNotebook()
+  const {
+    notes,
+    loading,
+    saveStatus,
+    createNote,
+    renameNote,
+    setNoteIcon,
+    saveNoteContent,
+    deleteNote,
+    reorderNotes,
+  } = useNotebook()
 
   // Reuse the board's task layer so "升級為任務" creates a real task with the
   // same modal + createTask path used everywhere else. Unlike the scratchpad,
@@ -84,6 +93,9 @@ export function NotebookPage() {
   const [activeId, setActiveId] = useState<string | null>(null)
   // Mobile is single-pane: 'list' shows the sidebar, 'editor' shows the note.
   const [mobilePane, setMobilePane] = useState<'list' | 'editor'>('list')
+  // Desktop's "升級為任務" header button lives outside NoteEditor (no direct
+  // editor access), so it reaches in through this imperative handle.
+  const noteEditorRef = useRef<NoteEditorHandle>(null)
 
   // Auto-select the first note once loaded (desktop convenience).
   useEffect(() => {
@@ -137,7 +149,19 @@ export function NotebookPage() {
           </button>
         )}
         <span className="ml-1 hidden text-sm font-semibold text-foreground md:inline">記事本</span>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-1">
+          {activeNote && (
+            <button
+              type="button"
+              onClick={() => noteEditorRef.current?.promote()}
+              title="升級為任務"
+              aria-label="升級為任務"
+              className="hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:flex"
+            >
+              <ListPlus className="h-3.5 w-3.5" />
+              升級為任務
+            </button>
+          )}
           <SaveIndicator status={saveStatus} hasNote={!!activeNote} />
         </div>
       </header>
@@ -177,9 +201,11 @@ export function NotebookPage() {
           {activeNote ? (
             <NoteEditor
               key={activeNote.id}
+              ref={noteEditorRef}
               note={activeNote}
               onTitleChange={(title) => renameNote(activeNote.id, title)}
               onContentChange={(content) => saveNoteContent(activeNote.id, content)}
+              onIconChange={(icon) => setNoteIcon(activeNote.id, icon)}
               onPromote={handlePromote}
             />
           ) : (
