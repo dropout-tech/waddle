@@ -30,10 +30,21 @@ export interface NotebookNote {
   title: string
   icon?: string // optional leading emoji
   content: TiptapDoc | null // Tiptap/ProseMirror document JSON; null = empty note
+  categoryId: string | null // notebook_categories FK; null = 未分類
   sortOrder: number
   isArchived: boolean
   createdAt: string
   updatedAt: string
+}
+
+// A notebook-only folder (independent of task workspaces/categories).
+export interface NotebookCategory {
+  id: string
+  name: string
+  color: string
+  icon?: string // optional leading emoji
+  sortOrder: number
+  isArchived: boolean
 }
 
 // Minimal structural shape of a Tiptap/ProseMirror document. The editor is the

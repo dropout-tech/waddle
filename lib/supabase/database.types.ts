@@ -127,6 +127,19 @@ type NotebookNotesRow = {
   title: string
   icon: string | null
   content: Json | null
+  category_id: string | null
+  sort_order: number
+  is_archived: boolean
+  created_at: string
+  updated_at: string
+}
+
+type NotebookCategoriesRow = {
+  id: string
+  user_id: string
+  name: string
+  color: string
+  icon: string | null
   sort_order: number
   is_archived: boolean
   created_at: string
@@ -298,6 +311,18 @@ type NotebookNotesInsert = {
   title?: string
   icon?: string | null
   content?: Json | null
+  category_id?: string | null
+  sort_order?: number
+  is_archived?: boolean
+  updated_at?: string
+}
+
+type NotebookCategoriesInsert = {
+  id?: string
+  user_id: string
+  name?: string
+  color?: string
+  icon?: string | null
   sort_order?: number
   is_archived?: boolean
   updated_at?: string
@@ -376,6 +401,7 @@ export type Database = {
       journal_photos: Tbl<JournalPhotosRow, JournalPhotosInsert>
       scratchpad_items: Tbl<ScratchpadItemsRow, ScratchpadItemsInsert>
       notebook_notes: Tbl<NotebookNotesRow, NotebookNotesInsert>
+      notebook_categories: Tbl<NotebookCategoriesRow, NotebookCategoriesInsert>
       time_blocks: Tbl<TimeBlocksRow, TimeBlocksInsert>
       slot_types: Tbl<SlotTypesRow, SlotTypesInsert>
       user_settings: Tbl<UserSettingsRow, UserSettingsInsert>

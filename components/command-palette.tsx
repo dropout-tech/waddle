@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   CalendarClock,
   Calendar as CalendarIcon,
@@ -15,6 +14,7 @@ import {
 } from 'lucide-react'
 import { ModalShell } from '@/components/modals/modal-shell'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { useNotebookOverlay } from '@/components/notebook/notebook-overlay-provider'
 import {
   Command,
   CommandInput,
@@ -61,7 +61,7 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const router = useRouter()
+  const { open: openNotebook } = useNotebookOverlay()
   const displayColor = useDisplayColor()
 
   // ⌘K / Ctrl+K toggles the palette. Deliberately NOT gated on input focus —
@@ -139,7 +139,7 @@ export function CommandPalette({
                 <CalendarDays />
                 <span>切換為月檢視</span>
               </CommandItem>
-              <CommandItem value="開記事本" onSelect={() => runAction(() => router.push('/notebook'))}>
+              <CommandItem value="開記事本" onSelect={() => runAction(openNotebook)}>
                 <NotebookPen />
                 <span>開記事本</span>
               </CommandItem>
