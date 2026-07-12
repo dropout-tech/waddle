@@ -21,7 +21,9 @@ const eslintConfig = [
     },
   },
   {
-    ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts'],
+    // ios/ and out/ hold the generated Capacitor static bundle; docs/reports
+    // holds one-off verification scripts/artifacts — none are product code.
+    ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts', 'ios/**', 'out/**', 'docs/reports/**'],
   },
 ]
 
