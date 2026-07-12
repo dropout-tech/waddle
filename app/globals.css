@@ -249,6 +249,21 @@
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* Kill the legacy double-tap-to-zoom wait on interactive elements so taps
+     fire immediately in the iOS WebView (and mobile Safari). Pan/pinch on
+     scrollable content is unaffected. */
+  button,
+  [role='button'],
+  [role='tab'],
+  [role='menuitem'],
+  a,
+  input,
+  label,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
 }
 
 /* Custom Scrollbar - Minimal Japanese style */

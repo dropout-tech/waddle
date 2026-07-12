@@ -1,5 +1,6 @@
 'use client'
 
+import { handleExternalAnchorClick } from '@/lib/external-link'
 import { Fragment } from 'react'
 
 /**
@@ -79,7 +80,10 @@ export function renderNotesWithLinks(notes: string) {
               href={tok.href}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleExternalAnchorClick(e, tok.href!)
+              }}
               className="text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary break-all"
             >
               {tok.text}

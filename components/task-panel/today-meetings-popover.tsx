@@ -1,5 +1,6 @@
 'use client'
 
+import { handleExternalAnchorClick } from '@/lib/external-link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Users, MapPin, Video, Clock, X, Calendar } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -236,7 +237,10 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
                           href={m.meetingUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleExternalAnchorClick(e, m.meetingUrl!)
+                          }}
                           className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                           title={`開啟 ${MEETING_PROVIDER_LABEL[provider]}`}
                         >
