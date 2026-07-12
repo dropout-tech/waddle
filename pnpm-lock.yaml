@@ -4,13 +4,18 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@capacitor-community/apple-sign-in':
+    hash: 28573c99dd9ec8f13261292e64a7a530c461da6db7b052e3050fd05a1b9ed66d
+    path: patches/@capacitor-community__apple-sign-in.patch
+
 importers:
 
   .:
     dependencies:
       '@capacitor-community/apple-sign-in':
         specifier: ^7.1.0
-        version: 7.1.0(@capacitor/core@8.3.4)
+        version: 7.1.0(patch_hash=28573c99dd9ec8f13261292e64a7a530c461da6db7b052e3050fd05a1b9ed66d)(@capacitor/core@8.3.4)
       '@capacitor/app':
         specifier: ^8.1.0
         version: 8.1.0(@capacitor/core@8.3.4)
@@ -3994,7 +3999,7 @@ snapshots:
       '@babel/helper-validator-identifier': 7.28.5
     optional: true
 
-  '@capacitor-community/apple-sign-in@7.1.0(@capacitor/core@8.3.4)':
+  '@capacitor-community/apple-sign-in@7.1.0(patch_hash=28573c99dd9ec8f13261292e64a7a530c461da6db7b052e3050fd05a1b9ed66d)(@capacitor/core@8.3.4)':
     dependencies:
       '@capacitor/core': 8.3.4
       '@types/scriptjs': 0.0.2

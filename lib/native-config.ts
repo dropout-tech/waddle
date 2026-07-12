@@ -7,11 +7,11 @@
 //   - the Supabase Auth → URL Configuration redirect allow-list
 //   - the Apple Developer / Google OAuth console
 //
-// APP_ID is a placeholder until a real reverse-DNS domain is chosen. To switch:
+// APP_ID is the personal-project ID chosen by the owner (com.lazylazy.huddle, set 2026-07-12); NOT tied to any company domain. To switch:
 // change it here, in capacitor.config.ts, in Xcode, and in the consoles.
 // ─────────────────────────────────────────────────────────
 
-export const APP_ID = 'com.huddle.app'
+export const APP_ID = 'com.lazylazy.huddle'
 
 /** Custom URL scheme registered in Info.plist for deep links. */
 export const APP_URL_SCHEME = 'huddle'
