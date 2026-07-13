@@ -136,11 +136,38 @@ class BgmEngine {
    *  a no-op. Fire-and-forget — we never await it because awaiting would
    *  itself burn the gesture credit. */
   unlockAudio() {
+    this.blessAmbient()
     const ctx = this.ensureCtx()
     if (!ctx) return
     if (ctx.state === 'suspended') {
       // Intentionally not awaited — caller is in a sync click path.
       ctx.resume().catch(() => {})
+    }
+  }
+
+  /** Ambient overlays ride HTMLAudioElement, and stricter engines (Safari,
+   *  iOS WKWebView) require each element's FIRST play() to happen inside a
+   *  real user gesture — a play() fired later from a React effect gets a
+   *  NotAllowedError, which setAmbient/setPlaying silently swallow, so
+   *  enabling 雨聲/火焰 there produced no sound at all. unlockAudio() runs
+   *  synchronously in every audio-related click, so we piggyback: play each
+   *  element once at its current volume (0 unless it's already meant to be
+   *  audible) and immediately pause it back unless it should keep playing.
+   *  Chrome doesn't need this (sticky activation) but it's harmless there.
+   *  On rejection the flag resets so the next gesture retries. */
+  private ambientBlessed = false
+  private blessAmbient() {
+    if (this.ambientBlessed) return
+    this.ambientBlessed = true
+    for (const a of BGM_AMBIENT) {
+      if (this.unavailable.has(a.src)) continue
+      const t = this.getOrCreateAmbient(a.id, a.src)
+      const p = t.el.play()
+      if (p && typeof p.then === 'function') {
+        p.then(() => {
+          if (!(this.playing && t.targetVol > 0)) t.el.pause()
+        }).catch(() => { this.ambientBlessed = false })
+      }
     }
   }
 

@@ -259,6 +259,12 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
   const [showSettings, setShowSettings] = useState(false)
   const [showBgmSettings, setShowBgmSettings] = useState(false)
   const [bgmManualPlaying, setBgmManualPlaying] = useState(false)
+  // Session-scoped BGM override driven by the immersive bar's play/pause
+  // button: null = follow the timer (audible while running), 'off' = user
+  // muted this session, 'on' = user forced audio on (e.g. wants music while
+  // paused). Cleared on every session start and on every return to idle so
+  // no stale flag can keep music alive after a session ends.
+  const [bgmOverride, setBgmOverride] = useState<'on' | 'off' | null>(null)
 
   const [timeLeft, setTimeLeft] = useState(25 * 60)
   const [elapsed, setElapsed] = useState(0)
@@ -319,16 +325,30 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     return eng.subscribe(snapshot)
   }, [engaged])
 
-  // Drive the engine play/pause from timer state.
+  // Single source of truth for "should BGM be audible right now".
+  //  idle      → only the setup card's manual preview toggle
+  //  completed → keeps playing only through a completed→break handoff; a
+  //              completion that lands at idle ALWAYS winds down — this is
+  //              what stops the music on 結束/中斷, and no manual flag can
+  //              override it (the old `bgmManualPlaying || …` expression
+  //              could get latched on and keep music playing forever)
+  //  running   → audible unless the user muted; paused → silent unless the
+  //              user explicitly pressed play while paused
+  const bgmAudible =
+    state === 'idle' ? bgmManualPlaying
+    : bgmOverride === 'off' ? false
+    : state === 'completed' ? completion?.next === 'break'
+    : bgmOverride === 'on' ? true
+    : state === 'running'
+
+  // Drive the engine play/pause from the derived intent.
   useEffect(() => {
     if (typeof window === 'undefined') return
     const eng = getBgmEngine()
     if (!eng) return
-    const keepPlaying = bgmManualPlaying || state === 'running'
-      || (state === 'completed' && completion?.next === 'break')
-    if (keepPlaying) eng.setPlaying(true)
+    if (bgmAudible) eng.setPlaying(true)
     else eng.setPlaying(false, state === 'completed' ? { fadeSeconds: COMPLETION_BGM_FADE_S } : undefined)
-  }, [state, bgmManualPlaying, completion])
+  }, [bgmAudible, state])
   useEffect(() => {
     const hasSelection = !!prefs.music || BGM_AMBIENT.some(a => prefs.ambient[a.id]?.enabled)
     if (!hasSelection && bgmManualPlaying) setBgmManualPlaying(false)
@@ -352,8 +372,31 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
   // is not a runtime-enforced privacy boundary — harmless, read-only.
   useEffect(() => {
     if (typeof window === 'undefined') return
-    ;(window as unknown as { __waddleTimerDebug?: { isBgmPlaying: () => boolean } }).__waddleTimerDebug = {
+    ;(window as unknown as {
+      __waddleTimerDebug?: {
+        isBgmPlaying: () => boolean
+        ctxState: () => string
+        musicActive: () => boolean
+        ambientStates: () => Array<{ id: string; paused: boolean; volume: number; targetVol: number }>
+      }
+    }).__waddleTimerDebug = {
       isBgmPlaying: () => Boolean((getBgmEngine() as unknown as { playing?: boolean } | null)?.playing),
+      // `playing` is the *intent* flag; these two prove actual playback:
+      // a live AudioContext and a connected music source node.
+      ctxState: () => (getBgmEngine() as unknown as { ctx?: AudioContext | null } | null)?.ctx?.state ?? 'none',
+      musicActive: () => Boolean((getBgmEngine() as unknown as { active?: unknown } | null)?.active),
+      // Ambient <audio> elements never enter the DOM (created via new
+      // Audio()), so tests can't query them — surface their playback state
+      // here instead. Same read-only private-field access as above.
+      ambientStates: () => {
+        const eng = getBgmEngine() as unknown as {
+          ambient?: Map<string, { el: HTMLAudioElement; targetVol: number }>
+        } | null
+        if (!eng?.ambient) return []
+        return Array.from(eng.ambient.entries()).map(([id, t]) => ({
+          id, paused: t.el.paused, volume: t.el.volume, targetVol: t.targetVol,
+        }))
+      },
     }
   }, [])
 
@@ -366,6 +409,10 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
 
   const startTimer = useCallback((opts?: { immersive?: boolean }) => {
     getBgmEngine()?.unlockAudio()
+    // A new session owns the audio lifecycle: drop any idle-preview flag or
+    // previous session's mute so playback follows prefs + timer state again.
+    setBgmManualPlaying(false)
+    setBgmOverride(null)
     const now = new Date()
     const label = customLabel || (mode === 'pomodoro'
       ? (useCustom ? `${customMinutes}分鐘專注` : POMODORO_PRESETS[selectedPreset].label)
@@ -458,6 +505,11 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     setTimeLeft(getTargetSeconds())
     setElapsed(0)
     setCustomLabel('')
+    // Every land-at-idle path funnels through here — returning to idle must
+    // also return the audio to its silent baseline, whatever flags the
+    // session (or a pre-session preview) left behind.
+    setBgmManualPlaying(false)
+    setBgmOverride(null)
     if (intervalRef.current) clearInterval(intervalRef.current)
   }, [getTargetSeconds])
   // Update timeLeft when preset changes (only when idle) — same effect as
@@ -626,7 +678,7 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
           musicVolume={prefs.musicVolume}
           ambient={prefs.ambient}
           completion={completion ? { kind: completion.kind, next: completion.next, exiting: completionExiting } : null}
-          bgmPlaying={(bgmManualPlaying || state === 'running' || (state === 'completed' && completion?.next === 'break'))}
+          bgmPlaying={bgmAudible}
           unavailableSrcs={unavailableSrcs}
           onPause={pauseTimer}
           onResume={resumeTimer}
@@ -639,7 +691,10 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
           onMinimize={() => setView('mini')}
           onToggleBgm={() => {
             getBgmEngine()?.unlockAudio()
-            setBgmManualPlaying(v => !v)
+            // Real in-session mute/unmute (the old latch had no audible
+            // effect while running): audible now → mute for this session;
+            // silent (paused, or muted earlier) → force it on.
+            setBgmOverride(bgmAudible ? 'off' : 'on')
           }}
           onSelectMusic={(id) => {
             getBgmEngine()?.unlockAudio()
