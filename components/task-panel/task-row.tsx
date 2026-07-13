@@ -206,6 +206,15 @@ function TaskRowImpl({
       )
     : null
 
+  // M/D prefix shown before the scheduled time (both densities) — two tasks
+  // at "10:00" on different days would otherwise look identical in the panel.
+  // Year is dropped since the panel is for current work.
+  let scheduledDatePrefix = ''
+  if (task.scheduledDate) {
+    const [, m, d] = task.scheduledDate.split('-')
+    if (m && d) scheduledDatePrefix = `${parseInt(m, 10)}/${parseInt(d, 10)} `
+  }
+
   // ─── COMPACT: single tight line, left border only ────────────────────────
   if (density === 'compact') {
     return (
@@ -318,13 +327,13 @@ function TaskRowImpl({
             {displayTitle}
           </span>
 
-          {/* Time (if any) */}
+          {/* Time (if any) — prefixed with M/D when the task has a date */}
           {task.scheduledStartTime && (
             <span
               className="flex-shrink-0 font-mono text-[10px]"
               style={{ color: colors.accentColor }}
             >
-              {task.scheduledStartTime}
+              {scheduledDatePrefix}{task.scheduledStartTime}
             </span>
           )}
 
@@ -508,21 +517,11 @@ function TaskRowImpl({
                 )
               }
               if (field === 'time' && task.scheduledStartTime) {
-                // Show the scheduled date alongside the time so a user
-                // looking at the list can tell which day this lives on.
-                // Without it, two tasks scheduled at "10:00" on different
-                // days look identical from the panel. Formatted as M/D
-                // (drop the year) since the panel is for current work.
-                let datePrefix = ''
-                if (task.scheduledDate) {
-                  const [, m, d] = task.scheduledDate.split('-')
-                  if (m && d) datePrefix = `${parseInt(m, 10)}/${parseInt(d, 10)} `
-                }
                 return (
                   <span key="time" className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: colors.accentColor }}>
                     <Clock className="w-3 h-3" />
                     <span className="font-mono">
-                      {datePrefix}{task.scheduledStartTime}{task.scheduledEndTime && ` - ${task.scheduledEndTime}`}
+                      {scheduledDatePrefix}{task.scheduledStartTime}{task.scheduledEndTime && ` - ${task.scheduledEndTime}`}
                     </span>
                   </span>
                 )
