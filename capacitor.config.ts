@@ -10,12 +10,18 @@ const config: CapacitorConfig = {
   appId: 'com.lazylazy.huddle',
   appName: 'Huddle',
   webDir: 'out',
+  // WKWebView underlay — shows through before first paint; must match the
+  // brand cream or a cold start flashes white between splash and hydration.
+  backgroundColor: '#fdf8ec',
   ios: {
     contentInset: 'always',
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 600,
+      // Keep the splash up until native-shell.tsx calls SplashScreen.hide()
+      // after React mounts — auto-hiding at a fixed delay caused a white gap
+      // on cold start (observed on-device 2026-07-12).
+      launchAutoHide: false,
       backgroundColor: '#fdf8ec',
       showSpinner: false,
     },

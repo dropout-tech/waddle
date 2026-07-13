@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
+import { useBrowserFinished } from '@/lib/auth/use-browser-finished'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,6 +44,10 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [needsConfirmation, setNeedsConfirmation] = useState(false)
   const oauthBusy = loading || googleLoading || appleLoading
+
+  // Native: user closed the OAuth browser sheet without completing → unstick
+  // the spinner (it otherwise waits for a deep link that never comes).
+  useBrowserFinished(() => setGoogleLoading(false))
 
   async function handleEmailSignup(e: FormEvent) {
     e.preventDefault()

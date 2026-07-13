@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
+import { useBrowserFinished } from '@/lib/auth/use-browser-finished'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -62,6 +63,10 @@ function LoginForm() {
     searchParams.get('error') === 'auth_callback_failed' ? '登入失敗，請再試一次' : null
   )
   const oauthBusy = loading || googleLoading || appleLoading
+
+  // Native: user closed the OAuth browser sheet without completing → unstick
+  // the spinner (it otherwise waits for a deep link that never comes).
+  useBrowserFinished(() => setGoogleLoading(false))
 
   async function handleEmailLogin(e: FormEvent) {
     e.preventDefault()

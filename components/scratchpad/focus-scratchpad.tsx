@@ -1,5 +1,6 @@
 'use client'
 
+import { handleExternalAnchorClick } from '@/lib/external-link'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import {
   ChevronDown, ChevronUp, Image, Link2, Type,
@@ -818,6 +819,7 @@ function SortableItem({
               href={item.content}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={(e) => handleExternalAnchorClick(e, item.content)}
               className="block p-3 hover:bg-primary/5 transition-colors"
             >
               <div className="flex items-start gap-2">

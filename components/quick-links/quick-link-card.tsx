@@ -1,5 +1,6 @@
 'use client'
 
+import { openExternalUrl } from '@/lib/external-link'
 import { Pencil } from 'lucide-react'
 import { cn, isLightColor } from '@/lib/utils'
 import { detectMeetingProvider } from '@/lib/meeting-utils'
@@ -20,7 +21,7 @@ function openLink(url: string) {
     console.warn('[quick-link] refused to open non-http(s) URL', url)
     return
   }
-  window.open(url, '_blank', 'noopener,noreferrer')
+  void openExternalUrl(url)
 }
 
 export function QuickLinkCard({ link, onEdit }: QuickLinkCardProps) {
