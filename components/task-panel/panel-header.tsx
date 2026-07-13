@@ -110,7 +110,10 @@ export function PanelHeader({
     let count = 0
     for (const category of workspace.categories) {
       count += category.tasks.filter(
-        (t) => !t.isCompleted && t.showInTaskList !== false
+        (t) =>
+          !t.isCompleted &&
+          t.showInTaskList !== false &&
+          !(t.isMeeting && t.scheduledDate)
       ).length
     }
     return count

@@ -323,10 +323,13 @@ export function TaskDetailModal({
           {/* List visibility toggle — uncheck for recurring meetings the user
               wants on the calendar but not in the left task list. Only
               meaningful for scheduled tasks; unscheduled ones must show in
-              the list or they'd be invisible everywhere. */}
+              the list or they'd be invisible everywhere. Scheduled meetings
+              are forced calendar-only (the panels filter them out), so the
+              toggle locks off for them. */}
           {(() => {
-            const canToggle = !!scheduledDate
-            const effective = canToggle ? showInTaskList : true
+            const forcedOffByMeeting = isMeeting && !!scheduledDate
+            const canToggle = !!scheduledDate && !forcedOffByMeeting
+            const effective = forcedOffByMeeting ? false : canToggle ? showInTaskList : true
             return (
               <button
                 type="button"
@@ -343,9 +346,11 @@ export function TaskDetailModal({
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-foreground">加入左側任務欄</div>
                     <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                      {canToggle
-                        ? '關閉後此任務僅顯示在日曆上，例如例行會議'
-                        : '需先排程才能僅顯示在日曆'}
+                      {forcedOffByMeeting
+                        ? '會議僅顯示在日曆上，不會出現在左側任務欄'
+                        : canToggle
+                          ? '關閉後此任務僅顯示在日曆上，例如例行會議'
+                          : '需先排程才能僅顯示在日曆'}
                     </div>
                   </div>
                 </div>

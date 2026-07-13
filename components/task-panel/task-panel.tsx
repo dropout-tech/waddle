@@ -142,6 +142,12 @@ export function TaskPanel({
               if (task.showInTaskList === false) {
                 return false
               }
+              // Meetings live on the calendar, not the to-do list. Only when
+              // scheduled — an unscheduled meeting must stay in the list or
+              // it would be invisible everywhere.
+              if (task.isMeeting && task.scheduledDate) {
+                return false
+              }
               // Search filter
               if (filters.search && !task.title.toLowerCase().includes(filters.search.toLowerCase())) {
                 return false
