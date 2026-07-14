@@ -496,6 +496,7 @@ function WaddlePage() {
         isOpen={water.isOpen}
         onDrink={water.dismiss}
         onSnooze={water.snooze}
+        onDisable={water.disable}
       />
     </ErrorBoundary>
   )

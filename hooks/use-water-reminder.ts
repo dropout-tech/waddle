@@ -6,9 +6,9 @@ import {
   SNOOZE_MINUTES,
   getWaterNextDueAt,
   getWaterReminderEnabled,
-  getWaterReminderInterval,
   scheduleNextWaterReminder,
   setWaterNextDueAt,
+  setWaterReminderEnabled,
 } from '@/lib/water-reminder'
 
 /**
@@ -83,7 +83,15 @@ export function useWaterReminder() {
     setIsOpen(false)
   }, [])
 
-  return { isOpen, enabled, dismiss, snooze }
+  /** Turn the whole feature off from inside the popup (the popup's gear).
+   *  Settings can re-enable it later; its own toggle re-arms the schedule. */
+  const disable = useCallback(() => {
+    setWaterReminderEnabled(false)
+    setEnabledState(false)
+    setIsOpen(false)
+  }, [])
+
+  return { isOpen, enabled, dismiss, snooze, disable }
 }
 
 export { DEFAULT_WATER_INTERVAL }

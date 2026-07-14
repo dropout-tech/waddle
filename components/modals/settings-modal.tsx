@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserSettings, TimeBlock, SlotType, Workspace, NotificationSettings } from '@/lib/types'
@@ -131,6 +131,16 @@ export function SettingsModal({
   const [waterEnabled, setWaterEnabledState] = useState<boolean>(() => getWaterReminderEnabled())
   const [waterInterval, setWaterIntervalState] = useState<WaterReminderInterval>(() => getWaterReminderInterval())
   const [editingSlotType, setEditingSlotType] = useState<SlotType | null>(null)
+  // These per-device prefs can change while this (always-mounted) modal is
+  // closed — e.g. the water popup's own gear turns the reminder off. Re-read
+  // them on every open so the toggles reflect reality, not mount-time state.
+  useEffect(() => {
+    if (!isOpen) return
+    setTaskSoundEnabledState(getTaskCompleteSoundEnabled())
+    setReminderLeadState(getReminderLead())
+    setWaterEnabledState(getWaterReminderEnabled())
+    setWaterIntervalState(getWaterReminderInterval())
+  }, [isOpen])
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [newSlotType, setNewSlotType] = useState<Partial<SlotType>>({
     label: '',
