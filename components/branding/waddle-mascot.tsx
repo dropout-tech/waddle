@@ -52,7 +52,7 @@ export function WaddleMascot({
       xmlns="http://www.w3.org/2000/svg"
       role={decorative ? undefined : 'img'}
       aria-hidden={decorative || undefined}
-      aria-label={decorative ? undefined : 'Waddle 企鵝吉祥物'}
+      aria-label={decorative ? undefined : 'Huddle 企鵝吉祥物'}
       className={cn('block', className)}
     >
       <defs>
