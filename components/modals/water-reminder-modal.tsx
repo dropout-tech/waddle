@@ -1,10 +1,19 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Settings2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { Drawer as Vaul } from 'vaul'
+import {
+  WATER_REMINDER_INTERVALS,
+  DEFAULT_WATER_INTERVAL,
+  getWaterReminderInterval,
+  setWaterReminderInterval,
+  type WaterReminderInterval,
+} from '@/lib/water-reminder'
 
 interface WaterReminderModalProps {
   isOpen: boolean
@@ -12,20 +21,28 @@ interface WaterReminderModalProps {
   onDrink: () => void
   /** User wants a short snooze → re-prompt in a few minutes. */
   onSnooze: () => void
+  /** Gear panel's toggle: turn the whole reminder feature off. */
+  onDisable: () => void
 }
 
 /**
  * Gentle full-screen popup that nudges the user to drink water. Reuses
- * the Waddle visual language (charcoal + cream, soft rounded card,
- * hand-drawn penguin). No red, no warnings — Waddle just walked over
+ * the Huddle visual language (charcoal + cream, soft rounded card,
+ * hand-drawn penguin). No red, no warnings — Huddle just walked over
  * with a glass.
+ *
+ * The gear in the top-right opens an inline settings panel (on/off +
+ * interval) so users can turn the reminder off right where it bothers
+ * them, instead of hunting for it in the settings modal.
  *
  * The mascot here is an inline variant of WaddleMascot that includes a
  * water glass in one flipper; keeping it local avoids cluttering the
  * shared mascot component with one-off props.
  */
-export function WaterReminderModal({ isOpen, onDrink, onSnooze }: WaterReminderModalProps) {
+export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: WaterReminderModalProps) {
   const [mounted, setMounted] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [interval, setIntervalState] = useState<WaterReminderInterval>(DEFAULT_WATER_INTERVAL)
   const isMobile = useIsMobile()
 
   useEffect(() => {
@@ -36,7 +53,81 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze }: WaterReminderM
     setMounted(false)
   }, [isOpen])
 
+  // Fresh prefs + collapsed gear panel every time the popup appears.
+  useEffect(() => {
+    if (!isOpen) return
+    setIntervalState(getWaterReminderInterval())
+    setShowSettings(false)
+  }, [isOpen])
+
   if (!isOpen && !isMobile) return null
+
+  const handleDisable = () => {
+    onDisable()
+    toast('已關閉喝水提醒', {
+      description: '想恢復時：右上角「設定」→ 一般 → 喝水提醒',
+    })
+  }
+
+  const handleIntervalChange = (mins: WaterReminderInterval) => {
+    setIntervalState(mins)
+    // Persist only — the popup is already due, and every way of closing it
+    // (喝水/再過一下/滑掉) re-arms the schedule from the stored interval.
+    setWaterReminderInterval(mins)
+  }
+
+  const gearButton = (
+    <button
+      type="button"
+      onClick={() => setShowSettings((v) => !v)}
+      aria-label="提醒設定"
+      aria-expanded={showSettings}
+      title="提醒設定"
+      className={cn(
+        'absolute z-10 grid place-items-center rounded-full text-muted-foreground/70 hover:text-foreground hover:bg-secondary/70 transition-colors',
+        isMobile ? 'top-2.5 right-2.5 h-11 w-11' : 'top-3 right-3 h-9 w-9',
+      )}
+    >
+      <Settings2 className="w-[18px] h-[18px]" />
+    </button>
+  )
+
+  const settingsPanel = showSettings && (
+    <div className="mx-5 mb-1 rounded-2xl border border-border/60 bg-secondary/30 px-4 py-3 space-y-2.5 text-left">
+      <label className="flex items-center justify-between cursor-pointer">
+        <div className="flex-1 pr-4">
+          <div className="text-sm text-foreground">喝水提醒</div>
+          <div className="text-xs text-muted-foreground">關掉後不再跳出，設定 → 一般 可重新開啟</div>
+        </div>
+        <input
+          type="checkbox"
+          checked
+          onChange={handleDisable}
+          className="w-4 h-4 rounded border-border accent-primary"
+        />
+      </label>
+      <div className="space-y-1.5">
+        <div className="text-xs text-muted-foreground">提醒間隔</div>
+        <div className="flex flex-wrap gap-1.5">
+          {WATER_REMINDER_INTERVALS.map((mins) => (
+            <button
+              key={mins}
+              type="button"
+              onClick={() => handleIntervalChange(mins)}
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
+                interval === mins
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card border border-border text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {mins} 分鐘
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 
   const mascotAndCopy = (
     <div className="px-6 pt-7 pb-2 flex flex-col items-center text-center">
@@ -69,8 +160,10 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze }: WaterReminderM
             <Vaul.Title className="sr-only">該喝水囉</Vaul.Title>
             {/* Drag handle */}
             <div className="mx-auto mt-2 mb-1 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
+            {gearButton}
 
             {mascotAndCopy}
+            {settingsPanel}
 
             <div className="flex flex-col gap-2 px-5 pt-4 pb-4">
               <Button
@@ -116,7 +209,9 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze }: WaterReminderM
           mounted ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-3 scale-[0.97]',
         )}
       >
+        {gearButton}
         {mascotAndCopy}
+        {settingsPanel}
 
         <div className="px-5 pb-5 pt-4 flex gap-2">
           <Button
@@ -140,7 +235,7 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze }: WaterReminderM
 }
 
 /**
- * Waddle holding a cream-colored glass of water. Built on the same vector
+ * Huddle 的企鵝 holding a cream-colored glass of water. Built on the same vector
  * grammar as [components/branding/waddle-mascot.tsx] but with a small
  * flipper-arm + glass overlay. Kept local because nothing else in the app
  * needs this variant.
