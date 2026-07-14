@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Settings2 } from 'lucide-react'
+import { Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -88,7 +88,7 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
         isMobile ? 'top-2.5 right-2.5 h-11 w-11' : 'top-3 right-3 h-9 w-9',
       )}
     >
-      <Settings2 className="w-[18px] h-[18px]" />
+      <Settings className="w-[18px] h-[18px]" />
     </button>
   )
 
