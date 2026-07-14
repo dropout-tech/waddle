@@ -152,12 +152,46 @@ export function WorkspaceSection({
             {pendingCount}
           </span>
         </div>
+        {/* Always visible (not hover-revealed) — the whole point of moving it
+            up from the list bottom is that users couldn't find it there. */}
+        {onAddCategory && (
+          <button
+            type="button"
+            onClick={() => setIsAddingCategory(true)}
+            title="新增分類"
+            aria-label={`在「${workspace.name}」新增分類`}
+            className="h-6 w-6 grid place-items-center rounded-md text-muted-foreground/50 hover:text-primary hover:bg-muted/50 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Categories. Desktop uses a left border + indent for visual hierarchy.
           Mobile drops both — narrow viewports look better with full-width
           sections, and the indent shifted content noticeably right. */}
       <div className={cn('space-y-1', isMobile ? '' : 'pl-3 border-l border-border ml-1')}>
+        {/* Inline new-category input — right under the header whose ＋ opened
+            it, so the eye doesn't have to jump to the bottom of the list. */}
+        {isAddingCategory && (
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-primary/40 bg-primary/5">
+            <Plus className="w-3.5 h-3.5 text-primary" />
+            <input
+              type="text"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={() => {
+                if (!newCategoryName.trim()) {
+                  setIsAddingCategory(false)
+                }
+              }}
+              placeholder="分類名稱..."
+              className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
+              autoFocus
+            />
+          </div>
+        )}
         {sortedCategories.map((category) => {
           const isDragging = draggingId === category.id
           const dropIndicator =
@@ -187,35 +221,6 @@ export function WorkspaceSection({
             />
           )
         })}
-
-        {/* Add Category */}
-        {isAddingCategory ? (
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-primary/40 bg-primary/5 mt-2">
-            <Plus className="w-3.5 h-3.5 text-primary" />
-            <input
-              type="text"
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onBlur={() => {
-                if (!newCategoryName.trim()) {
-                  setIsAddingCategory(false)
-                }
-              }}
-              placeholder="分類名稱..."
-              className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
-              autoFocus
-            />
-          </div>
-        ) : (
-          <button
-            onClick={() => setIsAddingCategory(true)}
-            className="flex items-center gap-1.5 w-full px-2 py-1.5 rounded-lg text-muted-foreground/50 hover:text-primary hover:bg-muted/30 transition-colors mt-2"
-          >
-            <Plus className="w-3 h-3" />
-            <span className="text-[10px] font-medium">新增分類</span>
-          </button>
-        )}
       </div>
     </div>
   )
