@@ -230,6 +230,15 @@ export function useWaddleData(): UseWaddleData {
   // bails before setWorkspaces if it changed. See the guard in loadData.
   const mutationSeqRef = useRef(0)
 
+  // In-flight task INSERTs keyed by task id. Any mutation on a just-created
+  // task must await its INSERT first — otherwise the UPDATE/DELETE can reach
+  // the DB before the row exists, PostgREST matches 0 rows with no error,
+  // and the change is silently lost (reproduced wire-level: completing a
+  // task within seconds of creating it → PATCH 200 [] before POST 201, the
+  // checkbox rolls back with a misleading auth toast). Same guard as
+  // use-notebook's pendingCreates.
+  const pendingTaskCreatesRef = useRef<Record<string, Promise<void>>>({})
+
   // Guards the "initial load" path against running twice. Next's
   // reactStrictMode:true double-invokes mount effects once in dev — without
   // this, both invocations independently read an empty `workspaces` table
@@ -911,15 +920,24 @@ export function useWaddleData(): UseWaddleData {
     if (!workspaceId) return // category not found
 
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
-    try {
-      const { error } = await supabase.from('tasks').insert({
-        id, user_id: userId, workspace_id: workspaceId, category_id: categoryId,
-        title, urgency: 5, calendar_color: workspaceColor, sort_order: sortOrder,
-      })
-      if (error) handleDbError('新增任務')(error)
-    } finally {
-      pendingWritesRef.current -= 1
-    }
+    // Register the in-flight INSERT so a mutation on this task that fires
+    // before it lands (e.g. completing it right away) can await it instead
+    // of racing it to the DB. The promise never rejects (errors are handled
+    // inside), so awaiting it is always safe.
+    const insertPromise = (async () => {
+      try {
+        const { error } = await supabase.from('tasks').insert({
+          id, user_id: userId, workspace_id: workspaceId, category_id: categoryId,
+          title, urgency: 5, calendar_color: workspaceColor, sort_order: sortOrder,
+        })
+        if (error) handleDbError('新增任務')(error)
+      } finally {
+        pendingWritesRef.current -= 1
+        delete pendingTaskCreatesRef.current[id]
+      }
+    })()
+    pendingTaskCreatesRef.current[id] = insertPromise
+    await insertPromise
   }, [supabase])
 
   /**
@@ -959,26 +977,33 @@ export function useWaddleData(): UseWaddleData {
       return base
     }
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
-    try {
-      let { error } = await supabase
-        .from('tasks')
-        .insert(buildPayload(meetingColsKnownMissing))
-      // Pre-migration-0008 fallback: retry without meeting columns once we
-      // detect the column is unknown, then latch the flag for the rest of
-      // the session.
-      if (error && isMissingMeetingColumnError(error)) {
-        meetingColsKnownMissing = true
-        console.warn('[createTask] meeting columns missing — falling back. Run migration 0008.', error)
-        const retry = await supabase.from('tasks').insert(buildPayload(true))
-        error = retry.error
+    // Registered for the same reason as addTask — mutations on this task
+    // must not outrace its INSERT (see pendingTaskCreatesRef).
+    const insertPromise = (async () => {
+      try {
+        let { error } = await supabase
+          .from('tasks')
+          .insert(buildPayload(meetingColsKnownMissing))
+        // Pre-migration-0008 fallback: retry without meeting columns once we
+        // detect the column is unknown, then latch the flag for the rest of
+        // the session.
+        if (error && isMissingMeetingColumnError(error)) {
+          meetingColsKnownMissing = true
+          console.warn('[createTask] meeting columns missing — falling back. Run migration 0008.', error)
+          const retry = await supabase.from('tasks').insert(buildPayload(true))
+          error = retry.error
+        }
+        // Idempotent: the row (client UUID) is already in the DB and our
+        // optimistic state — swallow the duplicate instead of alarming the user.
+        if (error && isDuplicateKeyError(error)) return
+        if (error) handleDbError('建立任務')(error)
+      } finally {
+        pendingWritesRef.current -= 1
+        delete pendingTaskCreatesRef.current[task.id]
       }
-      // Idempotent: the row (client UUID) is already in the DB and our
-      // optimistic state — swallow the duplicate instead of alarming the user.
-      if (error && isDuplicateKeyError(error)) return
-      if (error) handleDbError('建立任務')(error)
-    } finally {
-      pendingWritesRef.current -= 1
-    }
+    })()
+    pendingTaskCreatesRef.current[task.id] = insertPromise
+    await insertPromise
   }, [supabase])
 
   const updateTask = useCallback(async (
@@ -989,6 +1014,8 @@ export function useWaddleData(): UseWaddleData {
     targetDate?: string,
     recordUndo: boolean = true
   ) => {
+    // Don't outrace this task's own INSERT (see pendingTaskCreatesRef).
+    await pendingTaskCreatesRef.current[taskId]
     // Find the task in local state via ref so the callback doesn't need
     // to depend on `workspaces` (which would re-create it on every keystroke).
     let existing: Task | null = null
@@ -1297,6 +1324,14 @@ export function useWaddleData(): UseWaddleData {
       }
     }
 
+    // A toggle can arrive while this task's INSERT is still in flight
+    // (create a task → immediately check it off). Wait the INSERT out —
+    // otherwise the UPDATE below reaches the DB first, matches 0 rows, and
+    // the completion is silently lost + rolled back with a misleading auth
+    // toast. The optimistic flip above already happened, so the UI stays
+    // instant; only the network write is deferred.
+    await pendingTaskCreatesRef.current[taskId]
+
     // Block any cross-device/tab-focus refetch from clobbering the optimistic
     // toggle. Without this guard, a refetch that lands between the local
     // setWorkspaces above and the DB write below replays the pre-toggle row
@@ -1360,6 +1395,8 @@ export function useWaddleData(): UseWaddleData {
   }, [supabase])
 
   const deleteTask = useCallback(async (taskId: string, targetDate?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, recordUndo: boolean = true) => {
+    // Don't outrace this task's own INSERT (see pendingTaskCreatesRef).
+    await pendingTaskCreatesRef.current[taskId]
     // Find the task in local state via ref so this callback is stable.
     let task: Task | null = null
     for (const w of workspacesRef.current) {
@@ -1584,6 +1621,11 @@ export function useWaddleData(): UseWaddleData {
     targetDate?: string,
     recordUndo: boolean = true
   ) => {
+    // Don't outrace this task's own INSERT (see pendingTaskCreatesRef) —
+    // "create a task inline → immediately drag it onto the calendar" would
+    // otherwise lose the schedule silently (this UPDATE has no row-count
+    // check at all).
+    await pendingTaskCreatesRef.current[taskId]
     // Find the task in local state via ref so this callback is stable.
     let task: Task | null = null
     for (const w of workspacesRef.current) {
@@ -1837,6 +1879,8 @@ export function useWaddleData(): UseWaddleData {
     // future call sites can opt out of redundant recording when needed.
     _recordUndo: boolean = true
   ) => {
+    // Don't outrace this task's own INSERT (see pendingTaskCreatesRef).
+    await pendingTaskCreatesRef.current[taskId]
     // Find the task via ref to stay decoupled from `workspaces`.
     let task: Task | null = null
     for (const w of workspacesRef.current) {
