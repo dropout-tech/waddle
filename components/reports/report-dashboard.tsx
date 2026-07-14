@@ -21,12 +21,12 @@ type DecoratedTask = Task & { workspaceName: string; workspaceColor: string }
  * 溫柔覆盤 — a single-scroll retrospective, not a KPI dashboard.
  *
  * IA (deliberately kept flat so the future weekly/monthly review and the
- * conversational "ask Waddle about my month" agent can each grow out of a
+ * conversational "ask Huddle about my month" agent can each grow out of a
  * section without restructuring):
  *   ① 節奏   — narrative summary + small daily bars
  *   ② 時間   — where scheduled time went (hours-of-day strip + workspaces)
  *   ③ 完成   — scrollable, day-grouped list of finished tasks
- *   ④ 觀察   — one rule-generated gentle observation from Waddle
+ *   ④ 觀察   — one rule-generated gentle observation from Huddle
  */
 export function ReportDashboard({ workspaces }: ReportDashboardProps) {
   const displayColor = useDisplayColor()
@@ -290,7 +290,7 @@ export function ReportDashboard({ workspaces }: ReportDashboardProps) {
     if (completedInPeriod.length > 0) {
       return `不論快慢，${label}走過的每一步都算數。`
     }
-    return `${label}還沒有完成的紀錄。沒關係，慢慢來，Waddle 會在這裡陪你。`
+    return `${label}還沒有完成的紀錄。沒關係，慢慢來，Huddle 會在這裡陪你。`
   }, [
     rangeConfig,
     meetingShare,
@@ -340,7 +340,7 @@ export function ReportDashboard({ workspaces }: ReportDashboardProps) {
             <WaddleMascot className="w-20 h-20" phase="auto" />
             <p className="mt-5 text-base font-medium">{rangeConfig.label}還沒有留下紀錄</p>
             <p className="mt-1.5 text-sm text-muted-foreground max-w-prose">
-              等你記下第一件事，Waddle 就開始幫你回顧
+              等你記下第一件事，Huddle 就開始幫你回顧
             </p>
           </div>
         </Reveal>
@@ -503,10 +503,10 @@ export function ReportDashboard({ workspaces }: ReportDashboardProps) {
             </section>
           </Reveal>
 
-          {/* ④ Waddle 的觀察 */}
+          {/* ④ Huddle 的觀察 */}
           <Reveal index={3}>
-            <section aria-label="Waddle 的觀察" className="border-t border-border/70 pt-7">
-              <h3 className="text-base font-semibold mb-4">Waddle 的觀察</h3>
+            <section aria-label="Huddle 的觀察" className="border-t border-border/70 pt-7">
+              <h3 className="text-base font-semibold mb-4">Huddle 的觀察</h3>
               <div className="flex items-center gap-4 rounded-xl bg-accent/30 p-4 sm:p-5">
                 <WaddleMascot className="w-11 h-11 shrink-0" phase="auto" />
                 <p className="text-sm leading-relaxed text-accent-foreground max-w-prose">
