@@ -173,39 +173,9 @@ export function CategorySection({
             />
           ))}
 
-          {/* Completed section — collapsible toggle */}
-          {completedTasks.length > 0 && (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowCompleted(v => !v)}
-                className="flex items-center gap-1.5 px-2 py-1 mt-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-                aria-expanded={showCompleted}
-              >
-                <ChevronDown
-                  className={cn(
-                    'w-3 h-3 transition-transform duration-150',
-                    !showCompleted && '-rotate-90'
-                  )}
-                />
-                <span>已完成 {completedTasks.length}</span>
-              </button>
-              {showCompleted && completedTasks.map((task) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  density={density}
-                  metaOrder={metaOrder}
-                  onToggleComplete={onToggleComplete}
-                  onSelect={onSelectTask}
-                  onSendToCalendar={onSendTaskToCalendar}
-                  onDragActivate={onTaskDragActivate}
-                />
-              ))}
-            </>
-          )}
-
-          {/* Add Task Input */}
+          {/* Add Task Input — kept above the completed section so the list
+              reads 未完成 → 新增 → 已完成 (per user feedback: the add row
+              hiding under 已完成 felt unintuitive). */}
           {isAdding ? (
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-primary/40 bg-primary/5">
               <Plus className="w-3.5 h-3.5 text-primary" />
@@ -235,6 +205,38 @@ export function CategorySection({
               <Plus className="w-3.5 h-3.5" />
               <span className="text-xs font-medium">新增任務</span>
             </button>
+          )}
+
+          {/* Completed section — collapsible toggle, always last */}
+          {completedTasks.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowCompleted(v => !v)}
+                className="flex items-center gap-1.5 px-2 py-1 mt-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                aria-expanded={showCompleted}
+              >
+                <ChevronDown
+                  className={cn(
+                    'w-3 h-3 transition-transform duration-150',
+                    !showCompleted && '-rotate-90'
+                  )}
+                />
+                <span>已完成 {completedTasks.length}</span>
+              </button>
+              {showCompleted && completedTasks.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  density={density}
+                  metaOrder={metaOrder}
+                  onToggleComplete={onToggleComplete}
+                  onSelect={onSelectTask}
+                  onSendToCalendar={onSendTaskToCalendar}
+                  onDragActivate={onTaskDragActivate}
+                />
+              ))}
+            </>
           )}
         </div>
       )}
