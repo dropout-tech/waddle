@@ -13,6 +13,7 @@ import { detectMeetingProvider } from '@/lib/meeting-utils'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { useI18n } from '@/lib/i18n/react'
 
 // Touch input requires a long-press before any drag activates so the user
 // can scroll the calendar past tasks without accidentally moving them.
@@ -77,6 +78,7 @@ function TaskBlockImpl({
   dragOverride = null,
   isDragging = false,
 }: TaskBlockProps) {
+  const { t } = useI18n()
   const showCategoryPrefix = useShowCategoryPrefix()
   const displayColor = useDisplayColor()
   const displayTitle = taskDisplayTitle(task, showCategoryPrefix)
@@ -301,7 +303,13 @@ function TaskBlockImpl({
   const meetingStripeColor = colorIsLight
     ? 'rgba(0,0,0,0.12)'
     : 'rgba(255,255,255,0.12)'
-  const ariaLabel = `${task.isMeeting ? '會議 — ' : ''}${displayTitle}，${formatTime(task.scheduledStartTime!)} 到 ${formatTime(task.scheduledEndTime!)}${task.isCompleted ? '，已完成' : ''}`
+  const ariaLabel = t('{meetingPrefix}{title}，{start} 到 {end}{completedSuffix}', {
+    meetingPrefix: task.isMeeting ? t('會議 — ') : '',
+    title: displayTitle,
+    start: formatTime(task.scheduledStartTime!),
+    end: formatTime(task.scheduledEndTime!),
+    completedSuffix: task.isCompleted ? t('，已完成') : '',
+  })
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -394,7 +402,7 @@ function TaskBlockImpl({
             <div
               role="checkbox"
               aria-checked={task.isCompleted}
-              aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
+              aria-label={task.isCompleted ? t('標記為未完成') : t('標記為完成')}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={handleCheckboxClick}
               className={cn(
@@ -473,7 +481,7 @@ function TaskBlockImpl({
                 {task.taskType === 'project' && <Layers className="w-2.5 h-2.5 text-white/50 flex-shrink-0" />}
                 {task.taskType === 'one_time' && <Clock className="w-2.5 h-2.5 text-white/50 flex-shrink-0" />}
                 <span className="text-[9px] text-white/55 truncate">
-                  {task.taskType === 'routine' ? '例行任務' : task.taskType === 'project' ? '專案' : '單次任務'}
+                  {task.taskType === 'routine' ? t('例行任務') : task.taskType === 'project' ? t('專案') : t('單次任務')}
                 </span>
               </div>
             )}

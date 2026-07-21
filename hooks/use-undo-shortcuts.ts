@@ -13,6 +13,7 @@
 import { useEffect } from 'react'
 import { toast } from 'sonner'
 import { performRedo, performUndo } from '@/lib/undo-stack'
+import { t } from '@/lib/i18n'
 
 export function useUndoShortcuts() {
   useEffect(() => {
@@ -35,13 +36,13 @@ export function useUndoShortcuts() {
       try {
         if (e.shiftKey) {
           const action = await performRedo()
-          if (action) toast.success(`已重做：${action.label}`)
+          if (action) toast.success(t('已重做：{label}', { label: action.label }))
         } else {
           const action = await performUndo()
-          if (action) toast.success(`已復原：${action.label}`)
+          if (action) toast.success(t('已復原：{label}', { label: action.label }))
         }
       } catch (err) {
-        toast.error(e.shiftKey ? '重做失敗' : '復原失敗')
+        toast.error(e.shiftKey ? t('重做失敗') : t('復原失敗'))
         console.error('[undo-shortcuts]', err)
       }
     }

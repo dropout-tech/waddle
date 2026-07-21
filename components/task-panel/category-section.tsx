@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import type { Category, Task } from '@/lib/types'
 import { TaskRow } from './task-row'
 import type { Density, MetaField } from './task-panel'
+import { useI18n } from '@/lib/i18n/react'
 
 interface CategorySectionProps {
   category: Category
@@ -50,6 +51,7 @@ export function CategorySection({
   onHeaderDrop,
   onHeaderDragEnd,
 }: CategorySectionProps) {
+  const { t } = useI18n()
   const [isAdding, setIsAdding] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   // Completed tasks default-collapsed so they don't pad out the active list.
@@ -71,8 +73,8 @@ export function CategorySection({
     if (!onDelete) return
     const taskCount = category.tasks.length
     const message = taskCount > 0
-      ? `刪除分類「${category.name}」？這會連同 ${taskCount} 個任務一起刪除，無法復原。`
-      : `刪除分類「${category.name}」？`
+      ? t('刪除分類「{name}」？這會連同 {count} 個任務一起刪除，無法復原。', { name: category.name, count: taskCount })
+      : t('刪除分類「{name}」？', { name: category.name })
     if (window.confirm(message)) {
       onDelete(category.id)
     }
@@ -118,8 +120,8 @@ export function CategorySection({
             onDragEnd={onHeaderDragEnd}
             onClick={(e) => e.stopPropagation()}
             className="-ml-1 flex items-center justify-center text-muted-foreground/40 hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
-            title="拖曳調整分類順序"
-            aria-label="拖曳調整分類順序"
+            title={t('拖曳調整分類順序')}
+            aria-label={t('拖曳調整分類順序')}
           >
             <GripVertical className="w-3.5 h-3.5" />
           </span>
@@ -148,8 +150,8 @@ export function CategorySection({
             <button
               onClick={handleDelete}
               className="p-0.5 rounded text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all"
-              title={`刪除分類「${category.name}」`}
-              aria-label={`刪除分類「${category.name}」`}
+              title={t('刪除分類「{name}」', { name: category.name })}
+              aria-label={t('刪除分類「{name}」', { name: category.name })}
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -189,7 +191,7 @@ export function CategorySection({
                     setIsAdding(false)
                   }
                 }}
-                placeholder="輸入任務名稱..."
+                placeholder={t('輸入任務名稱...')}
                 className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
                 autoFocus
                 enterKeyHint="done"
@@ -203,7 +205,7 @@ export function CategorySection({
               className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-muted-foreground/60 hover:text-primary hover:bg-muted/30 transition-colors border border-dashed border-border/50 hover:border-primary/30"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span className="text-xs font-medium">新增任務</span>
+              <span className="text-xs font-medium">{t('新增任務')}</span>
             </button>
           )}
 
@@ -222,7 +224,7 @@ export function CategorySection({
                     !showCompleted && '-rotate-90'
                   )}
                 />
-                <span>已完成 {completedTasks.length}</span>
+                <span>{t('已完成 {count}', { count: completedTasks.length })}</span>
               </button>
               {showCompleted && completedTasks.map((task) => (
                 <TaskRow

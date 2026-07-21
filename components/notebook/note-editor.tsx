@@ -8,6 +8,8 @@ import { EditorToolbar, selectionOrLineText } from './editor-toolbar'
 import { SelectionToolbar } from './selection-toolbar'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { NoteIconPicker } from './note-icon-picker'
+import { insertImage, type UploadImageFn } from './upload-image'
+import { useI18n } from '@/lib/i18n/react'
 
 const EMPTY_DOC: TiptapDoc = { type: 'doc', content: [{ type: 'paragraph' }] }
 const TITLE_DEBOUNCE_MS = 500
@@ -19,6 +21,9 @@ interface NoteEditorProps {
   onIconChange?: (icon: string | undefined) => void
   /** Promote the current selection/line to a real task (optional). */
   onPromote?: (title: string) => void
+  /** Uploads an image to Supabase Storage and resolves its public URL — wired
+   *  to slash-insert, the mobile toolbar button, and paste/drop below. */
+  uploadImage: UploadImageFn
 }
 
 export interface NoteEditorHandle {
@@ -28,10 +33,11 @@ export interface NoteEditorHandle {
 }
 
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor(
-  { note, onTitleChange, onContentChange, onIconChange, onPromote },
+  { note, onTitleChange, onContentChange, onIconChange, onPromote, uploadImage },
   ref,
 ) {
   const isMobile = useIsMobile()
+  const { t } = useI18n()
 
   // Guard so programmatic setContent (on note switch) doesn't echo back as a
   // user edit and trigger a redundant save.
@@ -39,12 +45,34 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const loadedIdRef = useRef<string | null>(null)
 
   const editor = useEditor({
-    extensions: notebookExtensions('輸入文字，或輸入「/」加入區塊…'),
+    extensions: notebookExtensions(uploadImage),
     content: note.content ?? EMPTY_DOC,
     // Tiptap SSR guard: render only on the client to avoid hydration mismatch.
     immediatelyRender: false,
     editorProps: {
       attributes: { class: 'nb-prose focus:outline-none' },
+      // Pasted/dropped images go straight to Supabase Storage (never base64
+      // into the content JSON). Non-image paste/drop falls through untouched
+      // by returning false, so text/HTML/internal-node drag stays default.
+      handlePaste: (view, event) => {
+        const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
+          f.type.startsWith('image/'),
+        )
+        if (files.length === 0) return false
+        event.preventDefault()
+        files.forEach((file) => void insertImage(view, uploadImage, file))
+        return true
+      },
+      handleDrop: (view, event) => {
+        const files = Array.from(event.dataTransfer?.files ?? []).filter((f) =>
+          f.type.startsWith('image/'),
+        )
+        if (files.length === 0) return false
+        event.preventDefault()
+        const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos
+        files.forEach((file) => void insertImage(view, uploadImage, file, undefined, pos))
+        return true
+      },
     },
     onUpdate: ({ editor }) => {
       if (applyingRef.current) return
@@ -100,7 +128,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   return (
     <div className="flex h-full flex-col">
-      <EditorToolbar editor={editor} onPromote={onPromote} />
+      <EditorToolbar editor={editor} onPromote={onPromote} uploadImage={uploadImage} />
       {!isMobile && <SelectionToolbar editor={editor} />}
       <div
         className="flex-1 overflow-y-auto"
@@ -128,7 +156,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                 editor?.commands.focus('start')
               }
             }}
-            placeholder="無標題"
+            placeholder={t('無標題')}
             className="mt-1 w-full bg-transparent text-3xl font-bold text-foreground placeholder:text-muted-foreground/50 focus:outline-none md:text-4xl"
           />
           <div className="mt-4">

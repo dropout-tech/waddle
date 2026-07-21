@@ -5,6 +5,7 @@ import { Coffee, Clock, User, Target, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { TimeBlock } from '@/lib/types'
 import { calculateBlockHeight, calculateBlockTop } from '@/lib/task-utils'
+import { useI18n } from '@/lib/i18n/react'
 
 interface TimeBlockItemProps {
   block: TimeBlock
@@ -53,6 +54,7 @@ function TimeBlockItemImpl({
   const [originalStart, setOriginalStart] = useState(0)
   const [originalEnd, setOriginalEnd] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const { t } = useI18n()
 
   const top = compact ? 0 : calculateBlockTop(block.startTime, calendarStartHour)
   const height = compact ? '100%' : calculateBlockHeight(block.startTime, block.endTime)
@@ -162,7 +164,7 @@ function TimeBlockItemImpl({
         {!compact && (
           <>
             <span className="text-xs font-medium text-muted-foreground">
-              {block.label || typeLabels[block.type]}
+              {block.label || t(typeLabels[block.type])}
             </span>
             <span className="text-[10px] text-muted-foreground/70 font-mono ml-auto mr-1">
               {block.startTime} - {block.endTime}

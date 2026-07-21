@@ -29,9 +29,10 @@ import {
   FolderInput,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-import { zhTW } from 'date-fns/locale'
+import { zhTW, enUS } from 'date-fns/locale'
 import type { NotebookNote, NotebookCategory } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n/react'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -78,6 +79,7 @@ export function NoteList({
   onRenameCategory,
   onDeleteCategory,
 }: NoteListProps) {
+  const { t } = useI18n()
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -124,13 +126,13 @@ export function NoteList({
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-3 py-3">
-        <h2 className="text-sm font-semibold text-foreground">記事本</h2>
+        <h2 className="text-sm font-semibold text-foreground">{t('記事本')}</h2>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => setAddingCategory(true)}
-            title="新增分類"
-            aria-label="新增分類"
+            title={t('新增分類')}
+            aria-label={t('新增分類')}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             <FolderPlus className="h-4 w-4" />
@@ -138,8 +140,8 @@ export function NoteList({
           <button
             type="button"
             onClick={() => onCreate()}
-            title="新增記事"
-            aria-label="新增記事"
+            title={t('新增記事')}
+            aria-label={t('新增記事')}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             <Plus className="h-4 w-4" />
@@ -150,13 +152,13 @@ export function NoteList({
       {isFullyEmpty && !addingCategory ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
           <FileText className="h-8 w-8 text-muted-foreground/40" />
-          <p className="text-xs text-muted-foreground">還沒有記事</p>
+          <p className="text-xs text-muted-foreground">{t('還沒有記事')}</p>
           <button
             type="button"
             onClick={() => onCreate()}
             className="mt-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            建立第一篇
+            {t('建立第一篇')}
           </button>
         </div>
       ) : (
@@ -178,7 +180,7 @@ export function NoteList({
                 onBlur={() => {
                   if (!newCategoryName.trim()) setAddingCategory(false)
                 }}
-                placeholder="分類名稱…"
+                placeholder={t('分類名稱…')}
                 className="min-w-0 flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
                 autoFocus
               />
@@ -255,6 +257,7 @@ function CategoryGroup({
   onSetNoteCategory: (noteId: string, categoryId: string | null) => void
   onReorderWithin: (oldIndex: number, newIndex: number) => void
 }) {
+  const { t } = useI18n()
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState(category.name)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -280,7 +283,7 @@ function CategoryGroup({
           type="button"
           onClick={onToggleCollapse}
           className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground"
-          aria-label={collapsed ? '展開分類' : '收合分類'}
+          aria-label={collapsed ? t('展開分類') : t('收合分類')}
         >
           <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-150', collapsed && '-rotate-90')} />
         </button>
@@ -313,9 +316,9 @@ function CategoryGroup({
             onDoubleClick={startRename}
             onClick={onToggleCollapse}
             className="min-w-0 flex-1 truncate text-left text-xs font-semibold text-foreground/80"
-            title="雙擊改名"
+            title={t('雙擊改名')}
           >
-            {category.name.trim() || '未命名分類'}
+            {category.name.trim() || t('未命名分類')}
           </button>
         )}
 
@@ -330,8 +333,8 @@ function CategoryGroup({
           <button
             type="button"
             onClick={onCreateNote}
-            title="在此新增記事"
-            aria-label="在此新增記事"
+            title={t('在此新增記事')}
+            aria-label={t('在此新增記事')}
             className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 hover:bg-secondary hover:text-foreground"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -339,8 +342,8 @@ function CategoryGroup({
           <button
             type="button"
             onClick={startRename}
-            title="改名"
-            aria-label="改名"
+            title={t('改名')}
+            aria-label={t('改名')}
             className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 hover:bg-secondary hover:text-foreground"
           >
             <Pencil className="h-3.5 w-3.5" />
@@ -352,22 +355,22 @@ function CategoryGroup({
                 onClick={onDeleteCategory}
                 className="rounded px-1.5 py-0.5 text-[10px] font-medium text-destructive hover:bg-destructive/10"
               >
-                刪除
+                {t('刪除')}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmingDelete(false)}
                 className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-secondary"
               >
-                取消
+                {t('取消')}
               </button>
             </span>
           ) : (
             <button
               type="button"
               onClick={() => setConfirmingDelete(true)}
-              title="刪除分類"
-              aria-label="刪除分類"
+              title={t('刪除分類')}
+              aria-label={t('刪除分類')}
               className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -378,7 +381,7 @@ function CategoryGroup({
 
       {!collapsed &&
         (notes.length === 0 ? (
-          <p className="px-3 py-1 text-[11px] text-muted-foreground/50">尚無記事</p>
+          <p className="px-3 py-1 text-[11px] text-muted-foreground/50">{t('尚無記事')}</p>
         ) : (
           <div className="pl-2">
             <NoteRowsSortable
@@ -417,6 +420,7 @@ function UncategorizedGroup({
   onSetNoteCategory: (noteId: string, categoryId: string | null) => void
   onReorderWithin: (oldIndex: number, newIndex: number) => void
 }) {
+  const { t } = useI18n()
   return (
     <div className={cn('mb-1', allCategories.length > 0 && 'mt-2 border-t border-border/60 pt-2')}>
       <button
@@ -426,13 +430,13 @@ function UncategorizedGroup({
         aria-expanded={!collapsed}
       >
         <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform duration-150', collapsed && '-rotate-90')} />
-        <span className="text-xs font-semibold text-muted-foreground">未分類</span>
+        <span className="text-xs font-semibold text-muted-foreground">{t('未分類')}</span>
         <span className="ml-auto text-[10px] font-medium text-muted-foreground">{notes.length}</span>
       </button>
 
       {!collapsed &&
         (notes.length === 0 ? (
-          <p className="px-3 py-1 text-[11px] text-muted-foreground/50">沒有未分類的記事</p>
+          <p className="px-3 py-1 text-[11px] text-muted-foreground/50">{t('沒有未分類的記事')}</p>
         ) : (
           <div className="pl-2">
             <NoteRowsSortable
@@ -519,11 +523,12 @@ function NoteRow({
   onDelete: () => void
   onMoveToCategory: (categoryId: string | null) => void
 }) {
+  const { t, lang } = useI18n()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: note.id })
   const [confirming, setConfirming] = useState(false)
 
   const style = { transform: CSS.Transform.toString(transform), transition }
-  const title = note.title.trim() || '無標題'
+  const title = note.title.trim() || t('無標題')
 
   return (
     <div
@@ -544,7 +549,7 @@ function NoteRow({
           'opacity-0 group-hover:opacity-100',
           '[@media(hover:none)]:opacity-60',
         )}
-        aria-label="拖曳排序"
+        aria-label={t('拖曳排序')}
         {...attributes}
         {...listeners}
       >
@@ -558,7 +563,10 @@ function NoteRow({
             {title}
           </span>
           <span className="truncate text-[10px] text-muted-foreground">
-            {formatDistanceToNow(new Date(note.updatedAt), { addSuffix: true, locale: zhTW })}
+            {formatDistanceToNow(new Date(note.updatedAt), {
+              addSuffix: true,
+              locale: lang === 'en' ? enUS : zhTW,
+            })}
           </span>
         </span>
       </button>
@@ -570,14 +578,14 @@ function NoteRow({
             onClick={onDelete}
             className="flex min-h-9 items-center rounded px-2 text-[10px] font-medium text-destructive hover:bg-destructive/10"
           >
-            刪除
+            {t('刪除')}
           </button>
           <button
             type="button"
             onClick={() => setConfirming(false)}
             className="flex min-h-9 items-center rounded px-2 text-[10px] text-muted-foreground hover:bg-secondary"
           >
-            取消
+            {t('取消')}
           </button>
         </span>
       ) : (
@@ -591,21 +599,21 @@ function NoteRow({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                title="移到分類"
-                aria-label="移到分類"
+                title={t('移到分類')}
+                aria-label={t('移到分類')}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-muted-foreground/50 hover:text-foreground"
               >
                 <FolderInput className="h-3.5 w-3.5" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuLabel className="text-[10px] text-muted-foreground">移到分類</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-[10px] text-muted-foreground">{t('移到分類')}</DropdownMenuLabel>
               <DropdownMenuItem
                 disabled={note.categoryId === null}
                 onSelect={() => onMoveToCategory(null)}
                 className="text-xs"
               >
-                未分類
+                {t('未分類')}
               </DropdownMenuItem>
               {allCategories.length > 0 && <DropdownMenuSeparator />}
               {allCategories.map((c) => (
@@ -616,7 +624,7 @@ function NoteRow({
                   className="text-xs"
                 >
                   <span className="mr-1">{c.icon ?? '📁'}</span>
-                  {c.name.trim() || '未命名分類'}
+                  {c.name.trim() || t('未命名分類')}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -625,8 +633,8 @@ function NoteRow({
           <button
             type="button"
             onClick={() => setConfirming(true)}
-            title="刪除記事"
-            aria-label="刪除記事"
+            title={t('刪除記事')}
+            aria-label={t('刪除記事')}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-muted-foreground/50 transition-opacity hover:text-destructive"
           >
             <Trash2 className="h-3.5 w-3.5" />

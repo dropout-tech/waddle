@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { Workspace } from '@/lib/types'
 import { ModalShell } from './modal-shell'
+import { useI18n } from '@/lib/i18n/react'
 
 const PRESET_COLORS = [
   '#c9847a', '#8fae8b', '#a8927f', '#7da2b8', '#c4a4b5', '#d4a76a',
@@ -49,6 +50,7 @@ export function WorkspaceSettingsModal({
   onArchive,
   onDelete,
 }: WorkspaceSettingsModalProps) {
+  const { t } = useI18n()
   const [name, setName] = useState(workspace.name)
   const [color, setColor] = useState(workspace.color)
   const [icon, setIcon] = useState(workspace.icon)
@@ -62,7 +64,7 @@ export function WorkspaceSettingsModal({
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        alert('圖片大小不能超過 2MB')
+        alert(t('圖片大小不能超過 2MB'))
         return
       }
       const reader = new FileReader()
@@ -125,7 +127,7 @@ export function WorkspaceSettingsModal({
   const totalTasks = workspace.categories.reduce((sum, cat) => sum + cat.tasks.length, 0)
 
   return (
-    <ModalShell isOpen={isOpen} onClose={onClose} size="sm" ariaLabel="工作區設定">
+    <ModalShell isOpen={isOpen} onClose={onClose} size="sm" ariaLabel={t('工作區設定')}>
         {/* Color accent top bar */}
         <div className="h-1.5 w-full" style={{ backgroundColor: color }} />
 
@@ -139,14 +141,14 @@ export function WorkspaceSettingsModal({
               {icon ? renderIcon(icon, 'lg') : <span className="text-sm font-bold">{name.charAt(0)}</span>}
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">工作區設定</p>
+              <p className="text-xs text-muted-foreground">{t('工作區設定')}</p>
               <p className="text-sm font-semibold text-foreground leading-tight">{workspace.name}</p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
-            aria-label="關閉"
+            aria-label={t('關閉')}
           >
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -159,22 +161,22 @@ export function WorkspaceSettingsModal({
           <div className="flex gap-3">
             <div className="flex-1 rounded-xl border border-border bg-muted/30 px-3 py-2.5 text-center">
               <p className="text-lg font-bold text-foreground tabular-nums">{taskCount}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">待完成</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{t('待完成')}</p>
             </div>
             <div className="flex-1 rounded-xl border border-border bg-muted/30 px-3 py-2.5 text-center">
               <p className="text-lg font-bold text-foreground tabular-nums">{totalTasks}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">全部任務</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{t('全部任務')}</p>
             </div>
             <div className="flex-1 rounded-xl border border-border bg-muted/30 px-3 py-2.5 text-center">
               <p className="text-lg font-bold text-foreground tabular-nums">{workspace.categories.length}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">分類數</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{t('分類數')}</p>
             </div>
           </div>
 
           {/* Name */}
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
-              名稱
+              {t('名稱')}
             </label>
             <input
               type="text"
@@ -182,14 +184,14 @@ export function WorkspaceSettingsModal({
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
               className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
-              placeholder="工作區名稱..."
+              placeholder={t('工作區名稱...')}
             />
           </div>
 
           {/* Icon */}
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-2">
-              圖示
+              {t('圖示')}
             </label>
             
             {/* Custom Image Upload */}
@@ -208,8 +210,8 @@ export function WorkspaceSettingsModal({
                     <img src={customImage} alt="custom" className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">自訂圖片</p>
-                    <p className="text-xs text-muted-foreground">已上傳</p>
+                    <p className="text-sm font-medium text-foreground">{t('自訂圖片')}</p>
+                    <p className="text-xs text-muted-foreground">{t('已上傳')}</p>
                   </div>
                   <button
                     onClick={clearCustomImage}
@@ -227,17 +229,17 @@ export function WorkspaceSettingsModal({
                     <Upload className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
                   <div className="text-left">
-                    <p className="text-sm font-medium text-foreground">上傳自訂圖片</p>
-                    <p className="text-xs text-muted-foreground">支援 JPG、PNG，最大 2MB</p>
+                    <p className="text-sm font-medium text-foreground">{t('上傳自訂圖片')}</p>
+                    <p className="text-xs text-muted-foreground">{t('支援 JPG、PNG，最大 2MB')}</p>
                   </div>
                 </button>
               )}
             </div>
-            
+
             {/* Divider */}
             <div className="flex items-center gap-2 mb-3">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">或選擇圖示</span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('或選擇圖示')}</span>
               <div className="flex-1 h-px bg-border" />
             </div>
             
@@ -272,7 +274,7 @@ export function WorkspaceSettingsModal({
           {/* Color */}
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide block mb-1.5">
-              顏色
+              {t('顏色')}
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
               {PRESET_COLORS.map((c) => (
@@ -292,7 +294,7 @@ export function WorkspaceSettingsModal({
             </div>
             {/* Custom color picker */}
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-muted-foreground">自訂顏色</span>
+              <span className="text-xs text-muted-foreground">{t('自訂顏色')}</span>
               <div className="relative">
                 <input
                   type="color"
@@ -327,7 +329,7 @@ export function WorkspaceSettingsModal({
             )}
             style={hasChanges && name.trim() ? { backgroundColor: color } : {}}
           >
-            儲存變更
+            {t('儲存變更')}
           </button>
 
           {/* Danger zone */}
@@ -338,7 +340,7 @@ export function WorkspaceSettingsModal({
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-border text-xs font-medium text-muted-foreground hover:bg-muted/50 transition-colors"
               >
                 <Archive className="w-3.5 h-3.5" />
-                封存
+                {t('封存')}
               </button>
             )}
             {onDelete && (
@@ -360,7 +362,7 @@ export function WorkspaceSettingsModal({
                 )}
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                {confirmDelete ? '確認刪除' : '刪除'}
+                {confirmDelete ? t('確認刪除') : t('刪除')}
               </button>
             )}
           </div>

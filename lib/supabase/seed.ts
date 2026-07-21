@@ -10,6 +10,7 @@ import type { Database } from './database.types'
 import type { Workspace, TimeBlock } from '@/lib/types'
 import { mockWorkspaces, mockTimeBlocks } from '@/lib/mock-data'
 import { demoWorkspaces, demoTimeBlocks } from '@/lib/demo-data'
+import { t } from '@/lib/i18n'
 
 type SB = SupabaseClient<Database>
 
@@ -48,7 +49,7 @@ export async function seedUserData(
     return {
       id: newId,
       user_id: userId,
-      name: ws.name,
+      name: t(ws.name),
       color: ws.color,
       icon: ws.icon,
       sort_order: ws.sortOrder,
@@ -68,7 +69,7 @@ export async function seedUserData(
         id: newId,
         user_id: userId,
         workspace_id: workspaceIdMap.get(ws.id)!,
-        name: cat.name,
+        name: t(cat.name),
         sort_order: cat.sortOrder,
         is_collapsed: cat.isCollapsed,
         is_archived: cat.isArchived,
@@ -89,8 +90,8 @@ export async function seedUserData(
         user_id: userId,
         workspace_id: workspaceIdMap.get(ws.id)!,
         category_id: categoryIdMap.get(cat.id)!,
-        title: task.title,
-        description: task.description ?? null,
+        title: t(task.title),
+        description: task.description ? t(task.description) : null,
         task_type: task.taskType,
         urgency: task.urgency,
         estimated_minutes: task.estimatedMinutes ?? null,
@@ -128,7 +129,7 @@ export async function seedUserData(
     start_time: tb.startTime,
     end_time: tb.endTime,
     type: tb.type,
-    label: tb.label,
+    label: t(tb.label),
     color: tb.color,
     is_recurring: tb.isRecurring,
     recurrence_rule: tb.recurrenceRule ?? null,

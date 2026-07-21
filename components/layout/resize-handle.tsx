@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n/react'
 
 interface ResizeHandleProps {
   onResize: (delta: number) => void
@@ -13,6 +14,7 @@ interface ResizeHandleProps {
 export function ResizeHandle({ onResize, className, keyboardStep = 16 }: ResizeHandleProps) {
   const [isDragging, setIsDragging] = useState(false)
   const lastXRef = useRef(0)
+  const { t } = useI18n()
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -58,7 +60,7 @@ export function ResizeHandle({ onResize, className, keyboardStep = 16 }: ResizeH
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="調整面板寬度"
+      aria-label={t('調整面板寬度')}
       tabIndex={0}
       onMouseDown={handleMouseDown}
       onKeyDown={handleKeyDown}

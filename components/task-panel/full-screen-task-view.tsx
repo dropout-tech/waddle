@@ -31,6 +31,8 @@ import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { getLang } from '@/lib/i18n'
+import { useI18n } from '@/lib/i18n/react'
 
 type TaskSortKey = 'category' | 'dueDate' | 'urgency' | 'created'
 
@@ -88,6 +90,7 @@ export function FullScreenTaskView({
   onClose,
   onAddTask
 }: FullScreenTaskViewProps) {
+  const { t, lang } = useI18n()
   const displayColor = useDisplayColor()
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'workspaces'>('overview')
   const [taskFilter, setTaskFilter] = useState<'all' | 'today' | 'upcoming' | 'overdue' | 'unscheduled'>('all')
@@ -322,13 +325,13 @@ export function FullScreenTaskView({
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
     const isToday = dateStr === todayStr
-    if (isToday) return '今天'
-    
+    if (isToday) return t('今天')
+
     const tomorrow = new Date(now)
     tomorrow.setDate(tomorrow.getDate() + 1)
-    if (dateStr === toDateString(tomorrow)) return '明天'
-    
-    return date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })
+    if (dateStr === toDateString(tomorrow)) return t('明天')
+
+    return date.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', { month: 'short', day: 'numeric' })
   }
 
   const getDaysOverdue = (dueDate: string) => {
@@ -353,9 +356,9 @@ export function FullScreenTaskView({
       <div className="flex-shrink-0 px-6 py-4 border-b border-border bg-card">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-xl font-semibold text-foreground">任務管理</h1>
+            <h1 className="text-xl font-semibold text-foreground">{t('任務管理')}</h1>
             <p className="text-sm text-muted-foreground">
-              {stats.pending} 個待完成 · {stats.completed} 個已完成
+              {t('{pending} 個待完成 · {completed} 個已完成', { pending: stats.pending, completed: stats.completed })}
             </p>
           </div>
           <button
@@ -363,16 +366,16 @@ export function FullScreenTaskView({
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors text-sm font-medium"
           >
             <Minimize2 className="w-4 h-4" />
-            返回日曆
+            {t('返回日曆')}
           </button>
         </div>
 
         {/* Tab Navigation */}
         <div className="flex items-center gap-1">
           {[
-            { id: 'overview', label: '總覽', icon: LayoutGrid },
-            { id: 'tasks', label: '所有任務', icon: List },
-            { id: 'workspaces', label: '工作區', icon: Target },
+            { id: 'overview', label: t('總覽'), icon: LayoutGrid },
+            { id: 'tasks', label: t('所有任務'), icon: List },
+            { id: 'workspaces', label: t('工作區'), icon: Target },
           ].map(tab => (
             <button
               key={tab.id}
@@ -402,7 +405,7 @@ export function FullScreenTaskView({
                   <div className="p-2 rounded-lg bg-primary/10">
                     <Target className="w-4 h-4 text-primary" />
                   </div>
-                  <span className="text-sm text-muted-foreground">完成率</span>
+                  <span className="text-sm text-muted-foreground">{t('完成率')}</span>
                 </div>
                 <div className="text-2xl font-bold">{stats.completionRate}%</div>
                 <div className="mt-2 h-1.5 bg-secondary rounded-full overflow-hidden">
@@ -426,11 +429,11 @@ export function FullScreenTaskView({
                   <div className="p-2 rounded-lg bg-info/10">
                     <Calendar className="w-4 h-4 text-info" />
                   </div>
-                  <span className="text-sm text-muted-foreground">今日任務</span>
+                  <span className="text-sm text-muted-foreground">{t('今日任務')}</span>
                 </div>
                 <div className="text-2xl font-bold">{stats.today.length}</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  已完成 {stats.todayCompleted.length} 個
+                  {t('已完成 {count} 個', { count: stats.todayCompleted.length })}
                 </div>
               </div>
 
@@ -447,10 +450,10 @@ export function FullScreenTaskView({
                   <div className="p-2 rounded-lg bg-urgency-medium/10">
                     <Clock className="w-4 h-4 text-urgency-medium" />
                   </div>
-                  <span className="text-sm text-muted-foreground">即將到期</span>
+                  <span className="text-sm text-muted-foreground">{t('即將到期')}</span>
                 </div>
                 <div className="text-2xl font-bold">{stats.upcoming.length}</div>
-                <div className="text-xs text-muted-foreground mt-1">3 天內</div>
+                <div className="text-xs text-muted-foreground mt-1">{t('3 天內')}</div>
               </div>
 
               <div 
@@ -466,10 +469,10 @@ export function FullScreenTaskView({
                   <div className="p-2 rounded-lg bg-urgency-critical/10">
                     <AlertTriangle className="w-4 h-4 text-urgency-critical" />
                   </div>
-                  <span className="text-sm text-muted-foreground">已過期</span>
+                  <span className="text-sm text-muted-foreground">{t('已過期')}</span>
                 </div>
                 <div className="text-2xl font-bold text-urgency-critical">{stats.overdue.length}</div>
-                <div className="text-xs text-urgency-critical mt-1">可以先看看</div>
+                <div className="text-xs text-urgency-critical mt-1">{t('可以先看看')}</div>
               </div>
 
               <div className="p-4 rounded-xl bg-urgency-high/10 border border-urgency-high/30">
@@ -477,11 +480,11 @@ export function FullScreenTaskView({
                   <div className="p-2 rounded-lg bg-urgency-high/20">
                     <Flame className="w-4 h-4 text-urgency-high" />
                   </div>
-                  <span className="text-sm text-muted-foreground">連續天數</span>
+                  <span className="text-sm text-muted-foreground">{t('連續天數')}</span>
                 </div>
                 <div className="text-2xl font-bold text-urgency-high">{stats.streak}</div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {stats.streak > 0 ? '保持這個節奏' : '今天開始'}
+                  {stats.streak > 0 ? t('保持這個節奏') : t('今天開始')}
                 </div>
               </div>
             </div>
@@ -492,7 +495,7 @@ export function FullScreenTaskView({
               <div className="space-y-4">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
                   <LayoutGrid className="w-5 h-5" />
-                  工作區進度
+                  {t('工作區進度')}
                 </h2>
                 <div className="space-y-3">
                   {workspaceStats.map(ws => {
@@ -514,12 +517,12 @@ export function FullScreenTaskView({
                         <div className="flex items-center gap-4 text-sm">
                           {ws.stats.overdue > 0 && (
                             <span className="px-2 py-0.5 rounded-full bg-urgency-critical/10 text-urgency-critical text-xs font-medium">
-                              {ws.stats.overdue} 過期
+                              {t('{count} 過期', { count: ws.stats.overdue })}
                             </span>
                           )}
                           {ws.stats.today > 0 && (
                             <span className="px-2 py-0.5 rounded-full bg-info/10 text-info text-xs font-medium">
-                              {ws.stats.today} 今日
+                              {t('{count} 今日', { count: ws.stats.today })}
                             </span>
                           )}
                           <span className="text-muted-foreground">
@@ -550,7 +553,7 @@ export function FullScreenTaskView({
                   <div className="space-y-3">
                     <h2 className="text-lg font-semibold flex items-center gap-2 text-urgency-critical">
                       <AlertTriangle className="w-5 h-5" />
-                      可以先處理
+                      {t('可以先處理')}
                     </h2>
                     <div className="space-y-2">
                       {stats.overdue.slice(0, 5).map(task => (
@@ -566,7 +569,7 @@ export function FullScreenTaskView({
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium truncate">{task.title}</div>
                             <div className="text-xs text-urgency-critical">
-                              過期 {getDaysOverdue(task.dueDate!)} 天
+                              {t('過期 {days} 天', { days: getDaysOverdue(task.dueDate!) })}
                             </div>
                           </div>
                           <div
@@ -580,7 +583,7 @@ export function FullScreenTaskView({
                           className="w-full text-center text-sm text-urgency-critical py-2 hover:underline"
                           onClick={() => { setActiveTab('tasks'); setTaskFilter('overdue') }}
                         >
-                          查看全部 {stats.overdue.length} 個過期任務
+                          {t('查看全部 {count} 個過期任務', { count: stats.overdue.length })}
                         </button>
                       )}
                     </div>
@@ -592,7 +595,7 @@ export function FullScreenTaskView({
                   <div className="space-y-3">
                     <h2 className="text-lg font-semibold flex items-center gap-2">
                       <Target className="w-5 h-5 text-urgency-high" />
-                      高優先任務
+                      {t('高優先任務')}
                     </h2>
                     <div className="space-y-2">
                       {stats.highPriority.slice(0, 4).map(task => (
@@ -628,7 +631,7 @@ export function FullScreenTaskView({
                   <div className="space-y-3">
                     <h2 className="text-lg font-semibold flex items-center gap-2">
                       <Clock className="w-5 h-5 text-muted-foreground" />
-                      待安排時間
+                      {t('待安排時間')}
                       <span className="text-sm font-normal text-muted-foreground">
                         ({stats.unscheduled.length})
                       </span>
@@ -637,7 +640,7 @@ export function FullScreenTaskView({
                       className="w-full p-3 rounded-lg border border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors text-sm text-muted-foreground"
                       onClick={() => { setActiveTab('tasks'); setTaskFilter('unscheduled') }}
                     >
-                      查看並安排 {stats.unscheduled.length} 個未排程任務
+                      {t('查看並安排 {count} 個未排程任務', { count: stats.unscheduled.length })}
                     </button>
                   </div>
                 )}
@@ -654,7 +657,7 @@ export function FullScreenTaskView({
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="text"
-                  placeholder="搜尋任務..."
+                  placeholder={t('搜尋任務...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
@@ -663,11 +666,11 @@ export function FullScreenTaskView({
               
               <div className="flex items-center gap-2">
                 {[
-                  { id: 'all', label: '全部' },
-                  { id: 'today', label: '今日' },
-                  { id: 'upcoming', label: '即將到期' },
-                  { id: 'overdue', label: '已過期' },
-                  { id: 'unscheduled', label: '未排程' },
+                  { id: 'all', label: t('全部') },
+                  { id: 'today', label: t('今日') },
+                  { id: 'upcoming', label: t('即將到期') },
+                  { id: 'overdue', label: t('已過期') },
+                  { id: 'unscheduled', label: t('未排程') },
                 ].map(filter => (
                   <button
                     key={filter.id}
@@ -689,7 +692,7 @@ export function FullScreenTaskView({
                 onChange={(e) => setSelectedWorkspace(e.target.value || null)}
                 className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
               >
-                <option value="">所有工作區</option>
+                <option value="">{t('所有工作區')}</option>
                 {workspaces.filter(w => !w.isArchived).map(ws => (
                   <option key={ws.id} value={ws.id}>{ws.name}</option>
                 ))}
@@ -711,7 +714,7 @@ export function FullScreenTaskView({
                         : "text-muted-foreground hover:text-foreground hover:bg-card/60"
                     )}
                   >
-                    依分類
+                    {t('依分類')}
                   </button>
                   <button
                     onClick={() => setViewMode('flat')}
@@ -723,7 +726,7 @@ export function FullScreenTaskView({
                         : "text-muted-foreground hover:text-foreground hover:bg-card/60"
                     )}
                   >
-                    列表
+                    {t('列表')}
                   </button>
                 </div>
 
@@ -733,10 +736,10 @@ export function FullScreenTaskView({
                   onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                   className="px-2.5 py-1.5 rounded-lg border border-border bg-card text-xs"
                 >
-                  <option value="category">依分類</option>
-                  <option value="dueDate">依到期日</option>
-                  <option value="urgency">依優先度</option>
-                  <option value="created">依建立時間</option>
+                  <option value="category">{t('依分類')}</option>
+                  <option value="dueDate">{t('依到期日')}</option>
+                  <option value="urgency">{t('依優先度')}</option>
+                  <option value="created">{t('依建立時間')}</option>
                 </select>
 
                 {/* Expand/Collapse All - only show in grouped view */}
@@ -751,7 +754,7 @@ export function FullScreenTaskView({
                         setExpandedCategories(new Set(allCatIds))
                       }}
                       className="px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                      title="展開全部"
+                      title={t('展開全部')}
                     >
                       <ChevronsDownUp className="w-3.5 h-3.5 rotate-180" />
                     </button>
@@ -762,7 +765,7 @@ export function FullScreenTaskView({
                         setExpandedCategories(new Set())
                       }}
                       className="px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                      title="收合全部"
+                      title={t('收合全部')}
                     >
                       <ChevronsDownUp className="w-3.5 h-3.5" />
                     </button>
@@ -775,9 +778,9 @@ export function FullScreenTaskView({
                 <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
                 <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary">
                   {[
-                    { id: 'compact', label: '緊湊' },
-                    { id: 'comfortable', label: '舒適' },
-                    { id: 'relaxed', label: '寬鬆' },
+                    { id: 'compact', label: t('緊湊') },
+                    { id: 'comfortable', label: t('舒適') },
+                    { id: 'relaxed', label: t('寬鬆') },
                   ].map(d => (
                     <button
                       key={d.id}
@@ -805,7 +808,7 @@ export function FullScreenTaskView({
                     <CheckCircle2 className="w-8 h-8 text-muted-foreground" />
                   </div>
                   <div className="text-lg font-medium text-muted-foreground">
-                    {taskFilter === 'overdue' ? '太棒了！沒有過期任務' : '沒有符合條件的任務'}
+                    {taskFilter === 'overdue' ? t('太棒了！沒有過期任務') : t('沒有符合條件的任務')}
                   </div>
                 </div>
               ) : viewMode === 'grouped' ? (
@@ -936,7 +939,7 @@ export function FullScreenTaskView({
                                               task.urgency >= 5 && task.urgency < 8 && "bg-urgency-high/10 text-urgency-high",
                                               task.urgency < 5 && "bg-success/10 text-success"
                                             )}>
-                                              {task.urgency >= 8 ? '高' : task.urgency >= 5 ? '中' : '低'}
+                                              {task.urgency >= 8 ? t('高') : task.urgency >= 5 ? t('中') : t('低')}
                                             </span>
                                           )}
                                           {task.dueDate && (
@@ -968,7 +971,7 @@ export function FullScreenTaskView({
                                               setAddingTaskInCategory(null)
                                             }
                                           }}
-                                          placeholder="輸入任務名稱..."
+                                          placeholder={t('輸入任務名稱...')}
                                           className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                                           autoFocus
                                         />
@@ -982,7 +985,7 @@ export function FullScreenTaskView({
                                           }}
                                           className="px-3 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
                                         >
-                                          新增
+                                          {t('新增')}
                                         </button>
                                       </div>
                                     ) : (
@@ -991,7 +994,7 @@ export function FullScreenTaskView({
                                         className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
                                       >
                                         <Plus className="w-3.5 h-3.5" />
-                                        新增任務
+                                        {t('新增任務')}
                                       </button>
                                     )}
                                   </div>
@@ -1027,7 +1030,7 @@ export function FullScreenTaskView({
                     >
                       <button
                         onClick={(e) => { e.stopPropagation(); onToggleComplete?.(task.id) }}
-                        aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
+                        aria-label={task.isCompleted ? t('標記為未完成') : t('標記為完成')}
                         className={cn(
                           'rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0',
                           density === 'compact' ? 'w-4 h-4 mt-0' : 'w-5 h-5',
@@ -1081,7 +1084,7 @@ export function FullScreenTaskView({
                             {task.scheduledDate && (
                               <>
                                 <span aria-hidden="true">·</span>
-                                <span>排程 {formatDate(task.scheduledDate)}</span>
+                                <span>{t('排程 {date}', { date: formatDate(task.scheduledDate) })}</span>
                               </>
                             )}
                           </div>
@@ -1104,7 +1107,7 @@ export function FullScreenTaskView({
                       >
                         {density !== 'compact' && task.urgency >= 8 && (
                           <span className="px-2 py-0.5 rounded-full bg-urgency-high/10 text-urgency-high text-xs font-medium">
-                            高優先
+                            {t('高優先')}
                           </span>
                         )}
                         {density !== 'compact' && task.dueDate && (
@@ -1115,7 +1118,7 @@ export function FullScreenTaskView({
                             )}
                           >
                             {isOverdue
-                              ? `過期 ${getDaysOverdue(task.dueDate)} 天`
+                              ? t('過期 {days} 天', { days: getDaysOverdue(task.dueDate) })
                               : formatDate(task.dueDate)}
                           </span>
                         )}
@@ -1123,16 +1126,16 @@ export function FullScreenTaskView({
                         {density === 'compact' && task.urgency >= 8 && (
                           <span
                             className="w-1.5 h-1.5 rounded-full bg-urgency-high"
-                            aria-label="高優先"
-                            title="高優先"
+                            aria-label={t('高優先')}
+                            title={t('高優先')}
                           />
                         )}
                         {density === 'compact' && isOverdue && (
                           <span
                             className="text-[10px] font-medium text-urgency-critical whitespace-nowrap"
-                            aria-label="已過期"
+                            aria-label={t('已過期')}
                           >
-                            過期
+                            {t('過期')}
                           </span>
                         )}
                         <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity [@media(hover:none)]:opacity-100" />
@@ -1208,9 +1211,11 @@ interface WorkspaceStat {
 
 function formatHours(minutes: number): string {
   if (minutes <= 0) return '—'
-  if (minutes < 60) return `${minutes} 分`
+  const isEn = getLang() === 'en'
+  if (minutes < 60) return isEn ? `${minutes} min` : `${minutes} 分`
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
+  if (isEn) return m === 0 ? `${h} hr` : `${h}.${Math.round((m / 60) * 10)} hr`
   return m === 0 ? `${h} 小時` : `${h}.${Math.round((m / 60) * 10)} 小時`
 }
 
@@ -1234,6 +1239,7 @@ function WorkspacesView({
   onToggleComplete,
   onDrillIn,
 }: WorkspacesViewProps) {
+  const { t } = useI18n()
   // Aggregate cross-workspace summary
   const summary = useMemo(() => {
     return workspaceStats.reduce(
@@ -1256,7 +1262,7 @@ function WorkspacesView({
     return (
       <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
         <LayoutGrid className="w-10 h-10 mb-3 opacity-40" aria-hidden="true" />
-        <p className="text-sm">尚無工作區，先建立一個來開始排程任務。</p>
+        <p className="text-sm">{t('尚無工作區，先建立一個來開始排程任務。')}</p>
       </div>
     )
   }
@@ -1267,23 +1273,23 @@ function WorkspacesView({
       <div className="rounded-xl border border-border bg-gradient-to-br from-card to-secondary/30 p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">整體狀態</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t('整體狀態')}</h2>
             <p className="text-xs text-muted-foreground">
-              {workspaceStats.length} 個工作區 · {summary.pending} 個待處理任務
+              {t('{workspaces} 個工作區 · {pending} 個待處理任務', { workspaces: workspaceStats.length, pending: summary.pending })}
             </p>
           </div>
           {summary.overdue > 0 && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-urgency-critical/10 text-urgency-critical text-xs font-medium">
               <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
-              {summary.overdue} 個已過預定日
+              {t('{count} 個已過預定日', { count: summary.overdue })}
             </span>
           )}
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <SummaryStat icon={<Calendar className="w-3.5 h-3.5" aria-hidden="true" />} label="今日排程" value={summary.today} tone="primary" />
-          <SummaryStat icon={<Clock className="w-3.5 h-3.5" aria-hidden="true" />} label="七日內到期" value={summary.upcoming} tone="amber" />
-          <SummaryStat icon={<AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />} label="過期" value={summary.overdue} tone={summary.overdue > 0 ? 'red' : 'neutral'} />
-          <SummaryStat icon={<Hourglass className="w-3.5 h-3.5" aria-hidden="true" />} label="估計工時" value={formatHours(summary.estimatedMin)} tone="neutral" />
+          <SummaryStat icon={<Calendar className="w-3.5 h-3.5" aria-hidden="true" />} label={t('今日排程')} value={summary.today} tone="primary" />
+          <SummaryStat icon={<Clock className="w-3.5 h-3.5" aria-hidden="true" />} label={t('七日內到期')} value={summary.upcoming} tone="amber" />
+          <SummaryStat icon={<AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />} label={t('過期')} value={summary.overdue} tone={summary.overdue > 0 ? 'red' : 'neutral'} />
+          <SummaryStat icon={<Hourglass className="w-3.5 h-3.5" aria-hidden="true" />} label={t('估計工時')} value={formatHours(summary.estimatedMin)} tone="neutral" />
         </div>
       </div>
 
@@ -1355,6 +1361,7 @@ function WorkspaceCard({
   onToggleComplete,
   onDrillIn,
 }: WorkspaceCardProps) {
+  const { t } = useI18n()
   const displayColor = useDisplayColor()
   const wsColor = displayColor(ws.color)
   const { stats, mostUrgent, categoryProgress } = ws
@@ -1367,12 +1374,12 @@ function WorkspaceCard({
 
   const urgentMeta = mostUrgent
     ? mostUrgent.dueDate && new Date(mostUrgent.dueDate) < now
-      ? { tone: 'red' as const, label: `過期 ${getDaysOverdue(mostUrgent.dueDate)} 天` }
+      ? { tone: 'red' as const, label: t('過期 {days} 天', { days: getDaysOverdue(mostUrgent.dueDate) }) }
       : mostUrgent.scheduledStartTime
       ? { tone: 'primary' as const, label: `${mostUrgent.scheduledStartTime}` }
       : mostUrgent.dueDate
-      ? { tone: 'amber' as const, label: `截止 ${formatDate(mostUrgent.dueDate)}` }
-      : { tone: 'neutral' as const, label: '未排程' }
+      ? { tone: 'amber' as const, label: t('截止 {date}', { date: formatDate(mostUrgent.dueDate) }) }
+      : { tone: 'neutral' as const, label: t('未排程') }
     : null
 
   const r = 22
@@ -1391,7 +1398,7 @@ function WorkspaceCard({
             <div className="min-w-0">
               <h3 className="font-semibold text-foreground truncate">{ws.name}</h3>
               <p className="text-[11px] text-muted-foreground">
-                {stats.total} 個任務 · 估計 {formatHours(stats.estimatedMin)}
+                {t('{count} 個任務 · 估計 {hours}', { count: stats.total, hours: formatHours(stats.estimatedMin) })}
               </p>
             </div>
           </div>
@@ -1428,9 +1435,9 @@ function WorkspaceCard({
         </div>
         {/* KPI tiles (clickable, drill into filtered task list) */}
         <div className="flex-1 grid grid-cols-3 gap-1.5 min-w-0">
-          <KpiTile label="今日" value={stats.today} tone="primary" onClick={() => onDrillIn(ws.id, 'today')} />
-          <KpiTile label="過期" value={stats.overdue} tone={stats.overdue > 0 ? 'red' : 'neutral'} onClick={() => onDrillIn(ws.id, 'overdue')} />
-          <KpiTile label="待處理" value={stats.pending} tone="neutral" onClick={() => onDrillIn(ws.id, 'all')} />
+          <KpiTile label={t('今日')} value={stats.today} tone="primary" onClick={() => onDrillIn(ws.id, 'today')} />
+          <KpiTile label={t('過期')} value={stats.overdue} tone={stats.overdue > 0 ? 'red' : 'neutral'} onClick={() => onDrillIn(ws.id, 'overdue')} />
+          <KpiTile label={t('待處理')} value={stats.pending} tone="neutral" onClick={() => onDrillIn(ws.id, 'all')} />
         </div>
       </div>
 
@@ -1446,18 +1453,18 @@ function WorkspaceCard({
               onTaskClick?.(mostUrgent)
             }
           }}
-          aria-label={`開啟最緊急任務：${mostUrgent.title}`}
+          aria-label={t('開啟最緊急任務：{title}', { title: mostUrgent.title })}
           className="text-left px-5 py-3 border-b border-border/60 hover:bg-secondary/40 transition-colors group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset cursor-pointer"
         >
           <div className="flex items-center gap-1.5 mb-1.5">
             <Flame className="w-3 h-3 text-urgency-high" aria-hidden="true" />
-            <span className="text-[10px] font-semibold text-urgency-high uppercase tracking-wide">最緊急</span>
+            <span className="text-[10px] font-semibold text-urgency-high uppercase tracking-wide">{t('最緊急')}</span>
           </div>
           <div className="flex items-start gap-2">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onToggleComplete?.(mostUrgent.id) }}
-              aria-label="標記為完成"
+              aria-label={t('標記為完成')}
               className="flex-shrink-0 mt-0.5 w-4 h-4 rounded-full border-2 border-muted-foreground hover:border-primary hover:bg-primary/10 transition"
             />
             <div className="flex-1 min-w-0">
@@ -1488,9 +1495,9 @@ function WorkspaceCard({
       {topCategories.length > 0 && (
         <div className="px-5 py-3 space-y-2 flex-1">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">分類進度</span>
+            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{t('分類進度')}</span>
             {remainingCats > 0 && (
-              <span className="text-[10px] text-muted-foreground/70">+{remainingCats} 個</span>
+              <span className="text-[10px] text-muted-foreground/70">{t('+{count} 個', { count: remainingCats })}</span>
             )}
           </div>
           <div className="space-y-1.5">
@@ -1521,7 +1528,7 @@ function WorkspaceCard({
             className="w-full flex items-center gap-1.5 text-[11px] text-urgency-medium hover:text-urgency-high transition-colors"
           >
             <AlertTriangle className="w-3 h-3" aria-hidden="true" />
-            <span>{stats.stuck} 個任務超過 7 天未排程</span>
+            <span>{t('{count} 個任務超過 7 天未排程', { count: stats.stuck })}</span>
             <ArrowRight className="w-3 h-3 ml-auto" aria-hidden="true" />
           </button>
         </div>
@@ -1533,7 +1540,7 @@ function WorkspaceCard({
         onClick={() => onDrillIn(ws.id, 'all')}
         className="px-5 py-3 border-t border-border/60 flex items-center justify-between text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
       >
-        <span>檢視所有任務</span>
+        <span>{t('檢視所有任務')}</span>
         <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
       </button>
     </div>
@@ -1541,10 +1548,11 @@ function WorkspaceCard({
 }
 
 function HealthBadge({ health }: { health: 'healthy' | 'caution' | 'warning' }) {
+  const { t } = useI18n()
   const config = {
-    healthy: { Icon: ShieldCheck, label: '健康', cls: 'bg-success/10 text-success' },
-    caution: { Icon: Shield, label: '注意', cls: 'bg-urgency-medium/10 text-urgency-medium' },
-    warning: { Icon: ShieldAlert, label: '警示', cls: 'bg-urgency-critical/10 text-urgency-critical' },
+    healthy: { Icon: ShieldCheck, label: t('健康'), cls: 'bg-success/10 text-success' },
+    caution: { Icon: Shield, label: t('注意'), cls: 'bg-urgency-medium/10 text-urgency-medium' },
+    warning: { Icon: ShieldAlert, label: t('警示'), cls: 'bg-urgency-critical/10 text-urgency-critical' },
   } as const
   const { Icon, label, cls } = config[health]
   return (
@@ -1553,7 +1561,7 @@ function HealthBadge({ health }: { health: 'healthy' | 'caution' | 'warning' }) 
         'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0',
         cls
       )}
-      aria-label={`狀態：${label}`}
+      aria-label={t('狀態：{label}', { label })}
     >
       <Icon className="w-3 h-3" aria-hidden="true" />
       {label}

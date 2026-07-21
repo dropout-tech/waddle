@@ -14,8 +14,11 @@ import {
   Quote,
   Code2,
   Minus,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n/react'
+import { pickAndInsertImage, type UploadImageFn } from './upload-image'
 
 // Notion-style "/" block menu — item catalogue + the popup list itself.
 // The Tiptap Suggestion plugin (slash-command.ts) owns positioning/lifecycle;
@@ -122,12 +125,29 @@ export const SLASH_ITEMS: SlashItem[] = [
   },
 ]
 
-/** Empty query → show everything; otherwise match the 中文 label or an alias. */
-export function filterSlashItems(query: string): SlashItem[] {
+/** The "圖片" item is built per-call since it closes over `uploadImage` (the
+ *  Supabase Storage upload fn from useNotebook), which isn't available at
+ *  module load time. */
+function createImageItem(uploadImage: UploadImageFn): SlashItem {
+  return {
+    id: 'image',
+    label: '圖片',
+    aliases: ['image', 'img', 'photo'],
+    description: '插入一張圖片',
+    icon: ImageIcon,
+    run: (editor, range) => pickAndInsertImage(editor.view, uploadImage, { from: range.from, to: range.to }),
+  }
+}
+
+/** Empty query → show everything; otherwise match the 中文 label or an alias.
+ *  `uploadImage` is optional only for callers that genuinely can't offer
+ *  image upload (e.g. isolated unit tests) — the notebook always passes it. */
+export function filterSlashItems(query: string, uploadImage?: UploadImageFn): SlashItem[] {
+  const items = uploadImage ? [...SLASH_ITEMS, createImageItem(uploadImage)] : SLASH_ITEMS
   const trimmed = query.trim()
-  if (!trimmed) return SLASH_ITEMS
+  if (!trimmed) return items
   const q = trimmed.toLowerCase()
-  return SLASH_ITEMS.filter(
+  return items.filter(
     (item) => item.label.includes(trimmed) || item.aliases.some((alias) => alias.includes(q)),
   )
 }
@@ -145,6 +165,7 @@ export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function Sl
   { items, command },
   ref,
 ) {
+  const { t } = useI18n()
   const [selected, setSelected] = useState(0)
 
   // Keep the highlighted row in range whenever the filtered list changes.
@@ -175,7 +196,7 @@ export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function Sl
   return (
     <div
       role="listbox"
-      aria-label="插入區塊"
+      aria-label={t('插入區塊')}
       className="max-h-80 w-60 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-md"
     >
       {items.map((item, i) => {
@@ -202,9 +223,9 @@ export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function Sl
               <Icon className="h-4 w-4" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium leading-tight">{item.label}</span>
+              <span className="block truncate font-medium leading-tight">{t(item.label)}</span>
               <span className="block truncate text-xs text-muted-foreground leading-tight">
-                {item.description}
+                {t(item.description)}
               </span>
             </span>
           </button>

@@ -9,6 +9,8 @@ import { DateField, TimeField } from '@/components/ui/date-time-field'
 import { Drawer as Vaul } from 'vaul'
 import type { TimeBlock, SlotType } from '@/lib/types'
 import { ModalShell } from '@/components/modals/modal-shell'
+import { useI18n } from '@/lib/i18n/react'
+import { t } from '@/lib/i18n'
 
 interface TimeBlockModalProps {
   block: TimeBlock | null
@@ -35,10 +37,10 @@ function formatTimeFromMinutes(minutes: number): string {
 }
 
 function formatDuration(min: number): string {
-  if (min < 60) return `${min} 分`
+  if (min < 60) return t('{min} 分', { min })
   const h = Math.floor(min / 60)
   const m = min % 60
-  return m === 0 ? `${h} 小時` : `${h} 小時 ${m} 分`
+  return m === 0 ? t('{h} 小時', { h }) : t('{h} 小時 {m} 分', { h, m })
 }
 
 const PRESET_COLORS = [
@@ -60,6 +62,7 @@ export function TimeBlockModal({
   onSave,
   onDelete,
 }: TimeBlockModalProps) {
+  const { t } = useI18n()
   const [type, setType] = useState('')
   const [label, setLabel] = useState('')
   const [date, setDate] = useState('')
@@ -100,8 +103,12 @@ export function TimeBlockModal({
       // Adopt the type's color + label as defaults — but only if the user
       // hasn't customized them away. (If color matches the *previous* type's
       // color it was probably auto-set, so we replace it.)
+      // Label goes through t() here (not just at display) because this
+      // value lands in the editable field and, if saved as-is, in the DB —
+      // in English mode we want the English label written, not the raw
+      // Chinese source string.
       if (color === block.color) setColor(picked.color)
-      if (label === block.label) setLabel(picked.label)
+      if (label === block.label) setLabel(t(picked.label))
     }
   }
 
@@ -131,7 +138,7 @@ export function TimeBlockModal({
 
   const handleDelete = () => {
     if (!onDelete) return
-    if (window.confirm(`刪除「${block.label}」這個時間區塊？`)) {
+    if (window.confirm(t('刪除「{label}」這個時間區塊？', { label: block.label }))) {
       onDelete(block.id)
       onClose()
     }
@@ -144,14 +151,14 @@ export function TimeBlockModal({
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">編輯時間區塊</h2>
+          <h2 className="text-lg font-semibold text-foreground">{t('編輯時間區塊')}</h2>
           <div className="flex items-center gap-1">
             {onDelete && (
               <button
                 onClick={handleDelete}
                 className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                title="刪除"
-                aria-label="刪除"
+                title={t('刪除')}
+                aria-label={t('刪除')}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -159,7 +166,7 @@ export function TimeBlockModal({
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
-              aria-label="關閉"
+              aria-label={t('關閉')}
             >
               <X className="w-4 h-4" />
             </button>
@@ -170,14 +177,14 @@ export function TimeBlockModal({
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Type picker */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">類型</label>
+            <label className="text-xs font-medium text-muted-foreground">{t('類型')}</label>
             <div className="flex flex-wrap gap-2">
-              {availableTypes.map(t => {
-                const active = type === t.key
+              {availableTypes.map(st => {
+                const active = type === st.key
                 return (
                   <button
-                    key={t.id}
-                    onClick={() => handleSelectType(t.key)}
+                    key={st.id}
+                    onClick={() => handleSelectType(st.key)}
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border',
                       active
@@ -187,9 +194,9 @@ export function TimeBlockModal({
                   >
                     <span
                       className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: t.color }}
+                      style={{ backgroundColor: st.color }}
                     />
-                    <span>{t.label}</span>
+                    <span>{t(st.label)}</span>
                   </button>
                 )
               })}
@@ -198,11 +205,11 @@ export function TimeBlockModal({
 
           {/* Label */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">標籤</label>
+            <label className="text-xs font-medium text-muted-foreground">{t('標籤')}</label>
             <Input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder="輸入名稱..."
+              placeholder={t('輸入名稱...')}
               className="h-10"
               autoFocus={false}
             />
@@ -212,13 +219,13 @@ export function TimeBlockModal({
           <div className="space-y-1.5">
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <Calendar className="w-3.5 h-3.5" />
-              日期
+              {t('日期')}
             </label>
             <DateField
               value={date}
               onChange={setDate}
               className="h-10"
-              aria-label="日期"
+              aria-label={t('日期')}
               clearable={false}
             />
           </div>
@@ -228,7 +235,7 @@ export function TimeBlockModal({
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Clock className="w-3.5 h-3.5" />
-                時段
+                {t('時段')}
               </label>
               {duration !== null && (
                 <span
@@ -239,7 +246,7 @@ export function TimeBlockModal({
                       : 'bg-primary/10 text-primary'
                   )}
                 >
-                  {duration <= 0 ? '結束需晚於開始' : `時長 ${formatDuration(duration)}`}
+                  {duration <= 0 ? t('結束需晚於開始') : t('時長 {duration}', { duration: formatDuration(duration) })}
                 </span>
               )}
             </div>
@@ -255,20 +262,20 @@ export function TimeBlockModal({
                   }
                 }}
                 className="h-10 font-mono text-center"
-                aria-label="開始時間"
+                aria-label={t('開始時間')}
               />
               <span className="text-muted-foreground text-sm" aria-hidden="true">→</span>
               <TimeField
                 value={endTime}
                 onChange={setEndTime}
                 className="h-10 font-mono text-center"
-                aria-label="結束時間"
+                aria-label={t('結束時間')}
               />
             </div>
 
             {/* Quick presets */}
             <div className="flex items-center gap-1.5 flex-wrap pt-1">
-              <span className="text-[10px] text-muted-foreground mr-0.5">快速設定</span>
+              <span className="text-[10px] text-muted-foreground mr-0.5">{t('快速設定')}</span>
               {QUICK_DURATIONS.map(m => {
                 const active = duration === m
                 return (
@@ -311,7 +318,7 @@ export function TimeBlockModal({
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <Palette className="w-3.5 h-3.5" />
-              顏色
+              {t('顏色')}
             </label>
             <div className="flex flex-wrap items-center gap-2">
               {PRESET_COLORS.map(c => (
@@ -324,7 +331,7 @@ export function TimeBlockModal({
                     color === c && 'ring-2 ring-offset-2 ring-primary scale-110'
                   )}
                   style={{ backgroundColor: c }}
-                  aria-label={`選擇顏色 ${c}`}
+                  aria-label={t('選擇顏色 {color}', { color: c })}
                 />
               ))}
               <Input
@@ -332,7 +339,7 @@ export function TimeBlockModal({
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
                 className="w-10 h-7 p-0.5 rounded cursor-pointer"
-                aria-label="自訂顏色"
+                aria-label={t('自訂顏色')}
               />
             </div>
           </div>
@@ -344,7 +351,7 @@ export function TimeBlockModal({
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
           >
-            取消
+            {t('取消')}
           </button>
           <button
             onClick={handleSave}
@@ -352,7 +359,7 @@ export function TimeBlockModal({
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Save className="w-3.5 h-3.5" />
-            儲存
+            {t('儲存')}
           </button>
         </div>
     </>
@@ -367,7 +374,7 @@ export function TimeBlockModal({
             className="fixed inset-x-0 bottom-0 z-modal flex max-h-[92dvh] flex-col rounded-t-2xl bg-card outline-none overflow-hidden"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
-            <Vaul.Title className="sr-only">編輯時間區塊</Vaul.Title>
+            <Vaul.Title className="sr-only">{t('編輯時間區塊')}</Vaul.Title>
             {/* Drag handle */}
             <div className="mx-auto mt-2 mb-1 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
             {body}
@@ -378,7 +385,7 @@ export function TimeBlockModal({
   }
 
   return (
-    <ModalShell isOpen={isOpen} onClose={onClose} size="md" ariaLabel="編輯時間區塊">
+    <ModalShell isOpen={isOpen} onClose={onClose} size="md" ariaLabel={t('編輯時間區塊')}>
       {body}
     </ModalShell>
   )

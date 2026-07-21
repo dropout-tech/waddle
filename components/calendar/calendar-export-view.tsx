@@ -8,6 +8,9 @@ import { toDarkDisplayColor } from '@/lib/palette'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import type { Workspace, Task, TimeBlock } from '@/lib/types'
+import { useI18n } from '@/lib/i18n/react'
+import type { Lang } from '@/lib/i18n'
+import { format } from 'date-fns'
 
 export interface CalendarExportViewOptions {
   /** Show task titles. If false, blocks render as solid-color slabs only
@@ -57,15 +60,23 @@ function enumerateDays(start: Date, end: Date): Date[] {
   return out
 }
 
-/** "5/11(週一)" — compact label good for column heads. */
-function dayLabel(d: Date): string {
+/** "5/11(週一)" / "5/11 Mon" — compact label good for column heads. */
+function dayLabel(d: Date, lang: Lang): string {
+  if (lang === 'en') return format(d, 'M/d EEE')
   return `${d.getMonth() + 1}/${d.getDate()} 週${WEEKDAY_LABELS[d.getDay()]}`
 }
 
-/** "2026/5/11 — 2026/5/17" — header title. */
-function rangeLabel(start: Date, end: Date): string {
+/** "2026/5/11 — 2026/5/17" / "May 11 – 17, 2026" — header title. */
+function rangeLabel(start: Date, end: Date, lang: Lang): string {
   if (toDateString(start) === toDateString(end)) {
+    if (lang === 'en') return format(start, 'MMM d, yyyy')
     return `${start.getFullYear()}/${start.getMonth() + 1}/${start.getDate()}`
+  }
+  if (lang === 'en') {
+    const sameYear = start.getFullYear() === end.getFullYear()
+    return sameYear
+      ? `${format(start, 'MMM d')} – ${format(end, 'MMM d, yyyy')}`
+      : `${format(start, 'MMM d, yyyy')} – ${format(end, 'MMM d, yyyy')}`
   }
   return `${start.getFullYear()}/${start.getMonth() + 1}/${start.getDate()} — ${end.getFullYear()}/${end.getMonth() + 1}/${end.getDate()}`
 }
@@ -96,11 +107,16 @@ interface ScheduledItem {
  */
 export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewProps>(
   function CalendarExportView({ workspaces, timeBlocks, startDate, endDate, startHour, endHour, options }, ref) {
+    const { t, lang } = useI18n()
     const days = useMemo(() => enumerateDays(startDate, endDate), [startDate, endDate])
     const isDark = options.theme === 'dark'
     // Same category-prefix decoration the live calendar uses, so an exported
     // event reads "分類｜任務" exactly like it does on screen.
     const showCategoryPrefix = useShowCategoryPrefix()
+    // Computed outside the loop below — that loop's `for (const t of ...)`
+    // shadows this file's `t` (translate) with the task variable, so the
+    // translation must be resolved before entering it.
+    const untitledTaskLabel = t('（未命名）')
 
     // Flatten all scheduled items (tasks + time blocks) into a single list
     // keyed by date so each day column can grab its slice in O(1).
@@ -119,7 +135,7 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
             // calendar uses (handles interval / daysOfWeek / exdates / endDate)
             // so recurring tasks land on every matching day, not just the base.
             const title = taskDisplayTitle(
-              { title: t.title || '（未命名）', categoryName: cat.name },
+              { title: t.title || untitledTaskLabel, categoryName: cat.name },
               showCategoryPrefix,
             )
             const startMin = timeToMinutes(t.scheduledStartTime)
@@ -175,7 +191,7 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
       }
 
       return byDate
-    }, [workspaces, timeBlocks, days, showCategoryPrefix, isDark])
+    }, [workspaces, timeBlocks, days, showCategoryPrefix, isDark, untitledTaskLabel])
 
     const hourSpan = Math.max(1, endHour - startHour)
     const gridHeight = hourSpan * HOUR_PX
@@ -235,12 +251,12 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
                 MY SCHEDULE
               </div>
               <div style={{ fontSize: 22, fontWeight: 700, color: textPrimary, marginTop: 2 }}>
-                {rangeLabel(startDate, endDate)}
+                {rangeLabel(startDate, endDate, lang)}
               </div>
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 11, color: textMuted }}>共 {days.length} 天</div>
+            <div style={{ fontSize: 11, color: textMuted }}>{t('共 {count} 天', { count: days.length })}</div>
             <div style={{ fontSize: 11, color: textMuted }}>
               {String(startHour).padStart(2, '0')}:00 — {String(endHour).padStart(2, '0')}:00
             </div>
@@ -264,7 +280,7 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
                   borderLeft: i === 0 ? 'none' : `1px solid ${subtleBorder}`,
                 }}
               >
-                {dayLabel(d)}
+                {dayLabel(d, lang)}
               </div>
             )
           })}
@@ -372,9 +388,11 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
             color: textMuted,
           }}
         >
-          <span>以 Huddle 規劃 · huddle.app</span>
+          <span>{t('以 Huddle 規劃 · huddle.app')}</span>
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-            匯出於 {new Date().getFullYear()}/{new Date().getMonth() + 1}/{new Date().getDate()}
+            {lang === 'en'
+              ? `Exported ${format(new Date(), 'M/d/yyyy')}`
+              : `匯出於 ${new Date().getFullYear()}/${new Date().getMonth() + 1}/${new Date().getDate()}`}
           </span>
         </div>
       </div>
