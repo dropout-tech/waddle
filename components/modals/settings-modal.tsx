@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2, Globe2 } from 'lucide-react'
+import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2, Globe2, Link2, Copy, Share2, RefreshCw, Users, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { UserSettings, TimeBlock, SlotType, Workspace, NotificationSettings } from '@/lib/types'
 import { useI18n } from '@/lib/i18n/react'
@@ -10,6 +11,26 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TimeField } from '@/components/ui/date-time-field'
 import { ModalShell } from './modal-shell'
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog'
+import {
+  useCalendarSharing,
+  type PendingShareInvite,
+  type SharePeer,
+  type ShareGrant,
+  type GrantKind,
+  type GrantDetail,
+} from '@/hooks/use-calendar-sharing'
+import { createClient } from '@/lib/supabase/client'
 import {
   getTaskCompleteSoundEnabled,
   setTaskCompleteSoundEnabled,
@@ -124,7 +145,7 @@ export function SettingsModal({
   const { lang, setLang, t } = useI18n()
   const [localSettings, setLocalSettings] = useState<UserSettings>(settings)
   const [localTimeBlocks, setLocalTimeBlocks] = useState<TimeBlock[]>(timeBlocks)
-  const [activeTab, setActiveTab] = useState<'general' | 'slotTypes' | 'notifications'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'slotTypes' | 'notifications' | 'sharing'>('general')
   // Task-complete sound is a per-device pref stored in localStorage (same
   // pattern as timer sound), so it lives outside localSettings/UserSettings.
   const [taskSoundEnabled, setTaskSoundEnabledState] = useState<boolean>(() => getTaskCompleteSoundEnabled())
@@ -358,6 +379,17 @@ export function SettingsModal({
             )}
           >
             {t('時間區塊')}
+          </button>
+          <button
+            onClick={() => setActiveTab('sharing')}
+            className={cn(
+              'flex-1 px-4 py-2.5 text-sm font-medium transition-colors',
+              activeTab === 'sharing'
+                ? 'text-primary border-b-2 border-primary bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {t('共享')}
           </button>
         </div>
 
@@ -763,6 +795,7 @@ export function SettingsModal({
               />
             </label>
 
+
             {/* Default task duration */}
             <div className="flex items-center justify-between">
               <div>
@@ -1078,6 +1111,9 @@ export function SettingsModal({
               </div>
             </div>
           )}
+
+          {/* Sharing Tab */}
+          {activeTab === 'sharing' && <SharingSettingsTab />}
         </div>
 
         {/* Footer */}
@@ -1641,6 +1677,538 @@ function NotificationsSettingsTab({
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// Sharing Settings Tab Component — invite / accept / revoke / dissolve (P1)
+// plus the per-peer 開放範圍 grant editor (P2, see PeerGrantEditor below).
+function formatShareDate(iso: string, lang: Lang): string {
+  try {
+    return new Date(iso).toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', {
+      month: 'short',
+      day: 'numeric',
+    })
+  } catch {
+    return iso
+  }
+}
+
+function SharingSettingsTab() {
+  const { t, lang } = useI18n()
+  const { pendingInvites, peers, grants, myUserId, loading, createInvite, revokeInvite, dissolveShare, setGrant } =
+    useCalendarSharing()
+  // Which peer's 開放範圍 editor is expanded (one at a time keeps the tab short).
+  const [expandedShareId, setExpandedShareId] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+
+  const handleCreateInvite = async () => {
+    setGenerating(true)
+    const url = await createInvite()
+    setGenerating(false)
+    if (url) {
+      setInviteUrl(url)
+      setCopied(false)
+    }
+  }
+
+  const handleCopy = async () => {
+    if (!inviteUrl) return
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setCopied(true)
+      toast.success(t('已複製連結'))
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error(t('複製失敗，請手動選取連結'))
+    }
+  }
+
+  const handleShare = async () => {
+    if (!inviteUrl) return
+    try {
+      await navigator.share({ title: t('Huddle 行事曆共享邀請'), url: inviteUrl })
+    } catch {
+      // User cancelled the native share sheet — not an error.
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Generate invite link */}
+      <div className="space-y-3">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Link2 className="w-4 h-4" />
+          {t('產生邀請連結')}
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          {t('把連結傳給對方，雙方接受後即可互相查看彼此開放的行事曆')}
+        </p>
+
+        {!inviteUrl ? (
+          <Button onClick={handleCreateInvite} disabled={generating} className="gap-2">
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+            {t('產生邀請連結')}
+          </Button>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-secondary/50 border border-border">
+              <input
+                readOnly
+                value={inviteUrl}
+                onFocus={(e) => e.currentTarget.select()}
+                className="flex-1 min-w-0 bg-transparent text-xs text-foreground truncate outline-none"
+                aria-label={t('邀請連結')}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" onClick={handleCopy} className="h-9 gap-1.5">
+                <Copy className="w-3.5 h-3.5" />
+                {copied ? t('已複製') : t('複製')}
+              </Button>
+              {canNativeShare && (
+                <Button size="sm" variant="secondary" onClick={handleShare} className="h-9 gap-1.5">
+                  <Share2 className="w-3.5 h-3.5" />
+                  {t('分享')}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleCreateInvite}
+                disabled={generating}
+                className="h-9 gap-1.5"
+              >
+                {generating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                {t('重新產生')}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">{t('連結 7 天內有效，且僅能使用一次')}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-border" />
+
+      {/* Pending invites */}
+      <div className="space-y-3">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Clock className="w-4 h-4" />
+          {t('待接受的邀請')}
+        </h3>
+        {loading ? (
+          <p className="text-xs text-muted-foreground">{t('載入中…')}</p>
+        ) : pendingInvites.length === 0 ? (
+          <p className="text-xs text-muted-foreground">{t('目前沒有待接受的邀請')}</p>
+        ) : (
+          <div className="space-y-2">
+            {pendingInvites.map((invite: PendingShareInvite) => (
+              <div
+                key={invite.id}
+                className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-secondary/30 border border-border"
+              >
+                <span className="text-xs text-muted-foreground">
+                  {t('建立於 {date}', { date: formatShareDate(invite.createdAt, lang) })}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => revokeInvite(invite.id)}
+                  className="h-8 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  {t('撤銷')}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-border" />
+
+      {/* Linked peers */}
+      <div className="space-y-3">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Users className="w-4 h-4" />
+          {t('已連結的人')}
+        </h3>
+        {loading ? (
+          <p className="text-xs text-muted-foreground">{t('載入中…')}</p>
+        ) : peers.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {t('還沒有互相共享行事曆的對象，產生一個邀請連結開始吧')}
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {peers.map((peer: SharePeer) => {
+              const isExpanded = expandedShareId === peer.shareId
+              return (
+                <div key={peer.shareId} className="rounded-lg bg-secondary/30 border border-border">
+                  <div className="flex items-center justify-between gap-2 p-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {peer.avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- static export has no image optimizer
+                          <img src={peer.avatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-4 h-4 text-primary" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-foreground truncate">
+                          {peer.displayName || t('未命名使用者')}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {t('連結於 {date}', { date: formatShareDate(peer.createdAt, lang) })}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        aria-expanded={isExpanded}
+                        onClick={() =>
+                          setExpandedShareId((cur) => (cur === peer.shareId ? null : peer.shareId))
+                        }
+                        className="h-8 px-2 text-xs gap-0.5"
+                      >
+                        {t('開放範圍')}
+                        <ChevronRight
+                          className={cn('w-3.5 h-3.5 transition-transform', isExpanded && 'rotate-90')}
+                        />
+                      </Button>
+                      <DissolveShareButton
+                        peerName={peer.displayName}
+                        onConfirm={() => dissolveShare(peer.shareId)}
+                      />
+                    </div>
+                  </div>
+                  {isExpanded && myUserId && (
+                    <PeerGrantEditor
+                      shareId={peer.shareId}
+                      peerId={peer.peerId}
+                      peerName={peer.displayName || t('對方')}
+                      myUserId={myUserId}
+                      grants={grants}
+                      onSetGrant={setGrant}
+                    />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DissolveShareButton({
+  peerName,
+  onConfirm,
+}: {
+  peerName: string | null
+  onConfirm: () => void | Promise<void>
+}) {
+  const { t } = useI18n()
+  const [busy, setBusy] = useState(false)
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        {/* Shared Button (not a raw <button>) so size="sm" picks up its
+            mobile-only invisible hit-area expansion (see button.tsx's
+            `before:` pseudo-element) and clears the 44px touch target. */}
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-8 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
+        >
+          {t('解除共享')}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t('確定要解除共享嗎？')}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t('解除後，你和 {name} 都無法再查看對方開放的行事曆；之後想恢復需要重新邀請一次。', {
+              name: peerName || t('對方'),
+            })}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>{t('取消')}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={async (e) => {
+              e.preventDefault()
+              setBusy(true)
+              await onConfirm()
+              setBusy(false)
+            }}
+            disabled={busy}
+            className="bg-destructive text-white hover:bg-destructive/90"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : t('解除共享')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+// ─────────────────────────────────────────────────────────
+// Grant editor (P2) — per peer, two lists (workspaces / slot types), each
+// item a three-state choice: 不開放 / 只顯示忙碌 / 完整內容.
+//
+// Grantable items are read straight from the DB (RLS scopes both tables to
+// the signed-in user) rather than from props: the grants RLS WITH CHECK
+// only accepts refs that exist as MY rows, so listing DB rows guarantees
+// every option shown here is actually grantable. Note built-in slot types
+// (午休/緩衝/專注) are synthesized at runtime and NOT stored in slot_types,
+// so only custom types appear — matching what the RPC can actually share.
+// ─────────────────────────────────────────────────────────
+
+// Built-in time-block types (must mirror app/page.tsx baseTypes). They are
+// synthesized at runtime and not stored in slot_types — granting one seeds
+// its DB row first (see useCalendarSharing.setGrant), because migration
+// 0016 only accepts grant refs that exist as real slot_types rows. Labels
+// stay zh-canonical here (t() keys); display goes through t().
+const BUILT_IN_TIME_BLOCK_TYPES = [
+  { key: 'break', label: '午休', description: '休息時間', icon: 'Coffee', iconType: 'lucide' as const, color: '#F6A854' },
+  { key: 'buffer', label: '緩衝', description: '彈性緩衝時間', icon: 'Clock', iconType: 'lucide' as const, color: '#9BBFAC' },
+  { key: 'focus', label: '專注', description: '專注工作時段', icon: 'Crosshair', iconType: 'lucide' as const, color: '#D46B8A' },
+]
+
+function PeerGrantEditor({
+  shareId,
+  peerId,
+  peerName,
+  myUserId,
+  grants,
+  onSetGrant,
+}: {
+  shareId: string
+  peerId: string
+  peerName: string
+  myUserId: string
+  grants: ShareGrant[]
+  onSetGrant: (
+    shareId: string,
+    kind: GrantKind,
+    ref: string,
+    detail: GrantDetail | null,
+    seed?: { label: string; description: string; icon: string; iconType: 'lucide' | 'custom' | 'emoji'; color: string },
+  ) => Promise<boolean>
+}) {
+  const { t } = useI18n()
+  const supabase = createClient()
+  const [items, setItems] = useState<{
+    workspaces: { id: string; name: string; icon: string; color: string }[]
+    slotTypes: { key: string; label: string; color: string }[]
+  } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const [wsRes, stRes] = await Promise.all([
+        supabase
+          .from('workspaces')
+          .select('id, name, icon, color')
+          .eq('is_archived', false)
+          .order('sort_order'),
+        supabase.from('slot_types').select('key, label, color, workspace_id').order('sort_order'),
+      ])
+      if (cancelled) return
+      if (wsRes.error) console.error('[calendar-sharing] load workspaces failed', wsRes.error)
+      if (stRes.error) console.error('[calendar-sharing] load slot types failed', stRes.error)
+      setItems({
+        workspaces: wsRes.data ?? [],
+        // Workspace-bound types create tasks (covered by workspace grants);
+        // 'task'/'timeblock' are picker pseudo-entries, not block types.
+        slotTypes: (stRes.data ?? []).filter(
+          (s) => !s.workspace_id && s.key !== 'task' && s.key !== 'timeblock',
+        ),
+      })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [supabase])
+
+  const myGrants = grants.filter((g) => g.shareId === shareId && g.ownerId === myUserId)
+  const theirGrants = grants.filter((g) => g.shareId === shareId && g.ownerId === peerId)
+  const detailOf = (kind: GrantKind, ref: string): GrantDetail | null =>
+    myGrants.find((g) => g.kind === kind && g.ref === ref)?.detail ?? null
+
+  const theirWorkspaceCount = theirGrants.filter((g) => g.kind === 'workspace').length
+  const theirSlotTypeCount = theirGrants.filter((g) => g.kind === 'slot_type').length
+
+  return (
+    <div className="border-t border-border/70 px-2.5 pb-3 pt-2.5 space-y-4">
+      {/* 我開放給對方 */}
+      <div className="space-y-2">
+        <div className="text-xs font-semibold text-foreground">
+          {t('我開放給 {name} 的內容', { name: peerName })}
+        </div>
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          {t('「完整內容」會顯示事項標題；「只顯示忙碌」只給時段與類型、不含標題。預設全部不開放。')}
+        </p>
+
+        {!items ? (
+          <p className="text-xs text-muted-foreground">{t('載入中…')}</p>
+        ) : (
+          <>
+            {/* Workspaces（大分類） */}
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-medium text-muted-foreground">{t('大分類')}</div>
+              {items.workspaces.length === 0 ? (
+                <p className="text-[10px] text-muted-foreground">{t('沒有可開放的大分類')}</p>
+              ) : (
+                items.workspaces.map((ws) => (
+                  <GrantRow
+                    key={ws.id}
+                    icon={ws.icon}
+                    color={ws.color}
+                    label={ws.name}
+                    value={detailOf('workspace', ws.id)}
+                    onChange={(detail) => void onSetGrant(shareId, 'workspace', ws.id, detail)}
+                  />
+                ))
+              )}
+            </div>
+
+            {/* Slot types（時間區塊類型）— built-ins first (with seed data
+                so granting one can create its slot_types row on demand),
+                then the user's DB-backed custom types, deduped by key. */}
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-medium text-muted-foreground">{t('時間區塊類型')}</div>
+              {BUILT_IN_TIME_BLOCK_TYPES.map((bt) => (
+                <GrantRow
+                  key={bt.key}
+                  color={bt.color}
+                  label={t(bt.label)}
+                  value={detailOf('slot_type', bt.key)}
+                  onChange={(detail) =>
+                    void onSetGrant(shareId, 'slot_type', bt.key, detail, {
+                      label: bt.label,
+                      description: bt.description,
+                      icon: bt.icon,
+                      iconType: bt.iconType,
+                      color: bt.color,
+                    })
+                  }
+                />
+              ))}
+              {items.slotTypes
+                .filter((st) => !BUILT_IN_TIME_BLOCK_TYPES.some((bt) => bt.key === st.key))
+                .map((st) => (
+                  <GrantRow
+                    key={st.key}
+                    color={st.color}
+                    label={st.label}
+                    value={detailOf('slot_type', st.key)}
+                    onChange={(detail) => void onSetGrant(shareId, 'slot_type', st.key, detail)}
+                  />
+                ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* 對方開放給我 — read-only summary. Item names are the peer's private
+          data (their workspace names are unreadable to us by design), so we
+          only show counts. */}
+      <div className="space-y-1">
+        <div className="text-xs font-semibold text-foreground">
+          {t('{name} 開放給我的內容', { name: peerName })}
+        </div>
+        {theirWorkspaceCount === 0 && theirSlotTypeCount === 0 ? (
+          <p className="text-[10px] text-muted-foreground">{t('對方尚未開放任何內容')}</p>
+        ) : (
+          <p className="text-[10px] text-muted-foreground">
+            {t('對方已開放 {ws} 個大分類、{st} 個時間區塊類型（項目名稱由對方保密）', {
+              ws: theirWorkspaceCount,
+              st: theirSlotTypeCount,
+            })}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// One grantable item + its three-state control. Row wraps on narrow (390px)
+// screens so the segmented control never overflows horizontally.
+function GrantRow({
+  icon,
+  color,
+  label,
+  value,
+  onChange,
+}: {
+  icon?: string
+  color: string
+  label: string
+  value: GrantDetail | null
+  onChange: (detail: GrantDetail | null) => void
+}) {
+  const { t } = useI18n()
+  const options: { value: GrantDetail | null; label: string }[] = [
+    { value: null, label: t('不開放') },
+    { value: 'busy', label: t('只顯示忙碌') },
+    { value: 'full', label: t('完整內容') },
+  ]
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-0.5">
+      <div className="flex items-center gap-1.5 min-w-0 flex-1 basis-32">
+        <span
+          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+          style={{ backgroundColor: color }}
+          aria-hidden="true"
+        />
+        {icon && <span className="text-xs flex-shrink-0">{icon}</span>}
+        <span className="text-xs text-foreground truncate">{label}</span>
+      </div>
+      <div
+        role="radiogroup"
+        aria-label={label}
+        className="flex items-center border border-border rounded-lg overflow-hidden flex-shrink-0"
+      >
+        {options.map((opt) => {
+          const selected = value === opt.value
+          return (
+            <button
+              key={opt.label}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => {
+                if (!selected) onChange(opt.value)
+              }}
+              className={cn(
+                // 44px touch floor via invisible vertical expansion (visual
+                // stays h-9 so the row doesn't balloon).
+                "relative h-9 px-2.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset before:content-[''] before:absolute before:inset-0 before:-my-1 md:before:hidden",
+                selected
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+              )}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

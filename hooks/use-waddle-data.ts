@@ -2358,8 +2358,10 @@ export function useWaddleData(): UseWaddleData {
     // synthesized at runtime in app/page.tsx, so we don't write them.
     const customSlotTypes = newSettings.slotTypes.filter((s) => !s.isBuiltIn)
     if (customSlotTypes.length === 0) {
+      // Built-in rows may exist as calendar-sharing grant anchors (seeded on
+      // grant); wiping them would orphan those grants, so only clear customs.
       const { error: stError } = await supabase
-        .from('slot_types').delete().eq('user_id', userId)
+        .from('slot_types').delete().eq('user_id', userId).eq('is_built_in', false)
       if (stError) handleDbError('儲存時間區塊類型')(stError)
     } else {
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

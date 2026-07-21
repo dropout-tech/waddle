@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
@@ -17,6 +17,7 @@ import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useWideScreen } from '@/hooks/use-wide-screen'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
+import { useCalendarSharing, usePeerCalendarEvents } from '@/hooks/use-calendar-sharing'
 import { hapticSelection } from '@/lib/haptics'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, ScratchpadItem } from '@/lib/types'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
@@ -303,6 +304,32 @@ export function MainLayout({
     })
   }, [])
 
+  // ── Calendar sharing overlay ──────────────────────────────
+  // Peers + per-peer visibility toggles live here (this component owns
+  // selectedDate, which drives the fetch window). The settings modal has
+  // its own hook instance for grant editing; the two only need to agree
+  // via the DB + localStorage, refreshed on refocus — no realtime.
+  const {
+    peers: sharePeers,
+    visiblePeers,
+    togglePeerVisible,
+  } = useCalendarSharing(true)
+
+  // Viewer's slot-type key → label map, used to label the peer's busy
+  // time-blocks with a human word (built-in keys are shared across users).
+  const peerTypeLabels = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const s of slotTypes ?? []) map[s.key] = s.label
+    return map
+  }, [slotTypes])
+
+  const peerEvents = usePeerCalendarEvents({
+    peers: sharePeers,
+    visiblePeers,
+    selectedDate,
+    typeLabels: peerTypeLabels,
+  })
+
   // Get all tasks flattened
   const getAllTasks = useCallback(() => {
     const tasks: Task[] = []
@@ -525,6 +552,10 @@ export function MainLayout({
                 onOpenSettings={onOpenSettings}
                 onOpenExport={() => setExportModalOpen(true)}
                 leftPanelOpen={true}
+                peerEvents={peerEvents}
+                sharePeers={sharePeers}
+                visiblePeers={visiblePeers}
+                onTogglePeerVisible={togglePeerVisible}
               />
               </div>
             </ErrorBoundary>
@@ -818,6 +849,10 @@ export function MainLayout({
                   onOpenSettings={onOpenSettings}
                   onOpenExport={() => setExportModalOpen(true)}
                   leftPanelOpen={isLeftPanelOpen}
+                  peerEvents={peerEvents}
+                  sharePeers={sharePeers}
+                  visiblePeers={visiblePeers}
+                  onTogglePeerVisible={togglePeerVisible}
                 />
               </ErrorBoundary>
             )}
