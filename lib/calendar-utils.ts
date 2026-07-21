@@ -288,10 +288,19 @@ export function calculateTaskColumns(
  */
 export function calculateUnifiedColumns(
   tasks: Task[],
-  blocks: TimeBlock[]
+  blocks: TimeBlock[],
+  /**
+   * Shared-calendar peer events (Task-shaped shims from
+   * use-calendar-sharing). They join the same packing so a peer's event
+   * fans out into a sibling column instead of covering the user's own
+   * task. Their ids are already prefixed (`peer:`) so they can't collide
+   * with real task ids. Optional — existing callers are unaffected.
+   */
+  peerEvents: Task[] = []
 ): {
   tasks: Map<string, { column: number; totalColumns: number }>
   blocks: Map<string, { column: number; totalColumns: number }>
+  peers: Map<string, { column: number; totalColumns: number }>
 } {
   const BLOCK_PREFIX = '__block__'
   const blockShims = blocks.map(
@@ -302,10 +311,11 @@ export function calculateUnifiedColumns(
         scheduledEndTime: b.endTime,
       }) as unknown as Task
   )
-  const packed = calculateTaskColumns([...tasks, ...blockShims])
+  const packed = calculateTaskColumns([...tasks, ...blockShims, ...peerEvents])
 
   const taskCols = new Map<string, { column: number; totalColumns: number }>()
   const blockCols = new Map<string, { column: number; totalColumns: number }>()
+  const peerCols = new Map<string, { column: number; totalColumns: number }>()
   for (const t of tasks) {
     const v = packed.get(t.id)
     if (v) taskCols.set(t.id, v)
@@ -314,5 +324,9 @@ export function calculateUnifiedColumns(
     const v = packed.get(`${BLOCK_PREFIX}${b.id}`)
     if (v) blockCols.set(b.id, v)
   }
-  return { tasks: taskCols, blocks: blockCols }
+  for (const p of peerEvents) {
+    const v = packed.get(p.id)
+    if (v) peerCols.set(p.id, v)
+  }
+  return { tasks: taskCols, blocks: blockCols, peers: peerCols }
 }

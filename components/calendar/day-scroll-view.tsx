@@ -20,6 +20,8 @@ import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swip
 import { useIsMobile } from '@/hooks/use-mobile'
 import { CurrentTimeLine } from './current-time-line'
 import { TaskBlock, type TaskDragStart } from './task-block'
+import { PeerEventBlock } from './peer-event-block'
+import type { PeerEvent } from '@/hooks/use-calendar-sharing'
 import { SlotIcon } from './slot-icon'
 import { X, ChevronLeft } from 'lucide-react'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from '../modals/recurrence-choice-modal'
@@ -54,6 +56,9 @@ interface DayScrollViewProps {
   /** How many days should fit in the viewport at once (1-3). Desktop only;
    *  mobile always shows one day per viewport for snap-scroll behavior. */
   dayViewDays?: number
+  /** Shared-calendar overlay: peers' events (read-only, pre-filtered by
+   *  visibility toggles). Recurring masters expand via taskOccursOnDate. */
+  peerEvents?: PeerEvent[]
 }
 
 interface ActiveTaskDrag extends TaskDragStart {
@@ -99,6 +104,7 @@ export function DayScrollView({
   endHour = 24,
   hourHeight = 60,
   dayViewDays = 1,
+  peerEvents = [],
 }: DayScrollViewProps) {
   const isMobile = useIsMobile()
   const showCategoryPrefix = useShowCategoryPrefix()
@@ -407,6 +413,14 @@ export function DayScrollView({
     const dateStr = toDateString(date)
     return timeBlocks.filter(b => b.date === dateStr)
   }, [timeBlocks])
+
+  // Peer overlay events for a date — same recurring expansion as own tasks
+  // (PeerEvent is Task-shaped so taskOccursOnDate works unchanged).
+  const getPeerEventsForDate = useCallback((date: Date) => {
+    return peerEvents.filter(
+      (ev) => taskOccursOnDate(ev, date) && ev.scheduledStartTime && ev.scheduledEndTime
+    )
+  }, [peerEvents])
 
   // Get all-day tasks (including recurring expansions)
   const getAllDayTasksForDate = useCallback((date: Date) => {
@@ -1014,6 +1028,7 @@ export function DayScrollView({
                 const isToday = dateStr === todayString
                 const allDayTasks = getAllDayTasksForDate(date)
                 const weekdayIndex = date.getDay()
+                const holidayName = null
 
                 // The single task currently being dragged (if any). We render
                 // this as a "ghost" preview inside whichever pending zone the
@@ -1064,10 +1079,15 @@ export function DayScrollView({
                       </div>
                       <div className={cn(
                         'text-2xl font-bold',
-                        isToday ? 'text-primary' : 'text-foreground'
+                        isToday ? 'text-primary' : holidayName ? 'text-red-600 dark:text-red-400' : 'text-foreground'
                       )}>
                         {date.getDate()}
                       </div>
+                      {holidayName && (
+                        <div className="text-[10px] leading-tight text-red-600 dark:text-red-400 truncate">
+                          {translate(holidayName)}
+                        </div>
+                      )}
                     </div>
                     {/* Pending/All-day tasks — also acts as drop zone for
                          scheduled tasks dragged here to clear their time. */}
@@ -1195,12 +1215,14 @@ export function DayScrollView({
             const isToday = dateStr === todayString
             const dayTasks = getTasksForDate(date)
             const dayBlocks = getBlocksForDate(date)
+            const dayPeerEvents = getPeerEventsForDate(date)
             const dragSelection = getDragSelection(dayIndex)
-            // Pack tasks and TimeBlocks into shared columns so a block that
-            // overlaps a task's time range gets a sibling column instead of
-            // hiding underneath. Both layers consume {column, totalColumns}
-            // from the same grid.
-            const { tasks: taskCols, blocks: blockCols } = calculateUnifiedColumns(dayTasks, dayBlocks)
+            // Pack tasks, TimeBlocks and peer events into shared columns so
+            // a block that overlaps a task's time range gets a sibling
+            // column instead of hiding underneath. All layers consume
+            // {column, totalColumns} from the same grid.
+            const { tasks: taskCols, blocks: blockCols, peers: peerCols } =
+              calculateUnifiedColumns(dayTasks, dayBlocks, dayPeerEvents)
 
             return (
               <div
@@ -1458,6 +1480,22 @@ export function DayScrollView({
                     </span>
                   </div>
                 )}
+
+                {/* Peer shared events — read-only overlay, packed into the
+                    same columns as own tasks/blocks (no handlers attached). */}
+                {dayPeerEvents.map((ev) => {
+                  const col = peerCols.get(ev.id)
+                  return (
+                    <PeerEventBlock
+                      key={ev.id}
+                      event={ev}
+                      top={getTimePosition(ev.scheduledStartTime!)}
+                      height={getDurationHeight(ev.scheduledStartTime!, ev.scheduledEndTime!)}
+                      column={col?.column ?? 0}
+                      totalColumns={col?.totalColumns ?? 1}
+                    />
+                  )
+                })}
 
                 {/* Current time line for today — compact mode because the
                     time gutter is a separate sticky column. */}

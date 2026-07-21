@@ -135,4 +135,9 @@ export const dict: Record<string, string> = {
   '放開以放到待排程': 'Release to move to Unscheduled',
   '點擊新增任務': 'Tap to add a task',
   '返回': 'Back',
+
+  // ── calendar-header.tsx — shared-calendar peer chips ────────────────────
+  '共享行事曆顯示': 'Shared calendar visibility',
+  '點擊隱藏 {name} 的行事曆': "Hide {name}'s calendar",
+  '點擊顯示 {name} 的行事曆': "Show {name}'s calendar",
 }

@@ -7,6 +7,7 @@ import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
 import { useBrowserFinished } from '@/lib/auth/use-browser-finished'
+import { PENDING_SHARE_INVITE_KEY } from '@/hooks/use-calendar-sharing'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -86,6 +87,16 @@ function LoginForm() {
     if (err) {
       setError(translateError(err.message))
       setLoading(false)
+      return
+    }
+
+    // A share-invite link that bounced here to authenticate first hands off
+    // via sessionStorage (the URL fragment it arrived with doesn't survive
+    // this redirect) — send the user back to finish accepting instead of the
+    // normal post-login destination.
+    if (window.sessionStorage.getItem(PENDING_SHARE_INVITE_KEY)) {
+      router.push('/share/invite')
+      router.refresh()
       return
     }
 

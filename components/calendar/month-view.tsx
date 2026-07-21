@@ -4,7 +4,8 @@ import { useMemo, useRef, useCallback, useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { Check, Plus, ChevronRight } from 'lucide-react'
-import { toDateString, taskOccursOnDate } from '@/lib/calendar-utils'
+import { toDateString, taskOccursOnDate, timeToMinutes } from '@/lib/calendar-utils'
+import type { PeerEvent } from '@/hooks/use-calendar-sharing'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -24,6 +25,9 @@ interface MonthViewProps {
   onOpenDayView?: (date: Date) => void
   onCreateTask?: (date: string) => void
   onNavigate?: (direction: 'prev' | 'next') => void
+  /** Shared-calendar overlay: peers' events (read-only, pre-filtered by
+   *  visibility toggles). Recurring masters expand via taskOccursOnDate. */
+  peerEvents?: PeerEvent[]
 }
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
@@ -43,6 +47,7 @@ export function MonthView({
   onOpenDayView,
   onCreateTask,
   onNavigate,
+  peerEvents = [],
 }: MonthViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isScrolling = useRef(false)
@@ -187,6 +192,21 @@ export function MonthView({
     return map
   }, [timeBlocks])
 
+  // Peer overlay events for a day (read-only; PeerEvent is Task-shaped so
+  // recurring masters expand through taskOccursOnDate). Sorted by start time.
+  const getPeerEventsForDay = useCallback(
+    (date: Date): PeerEvent[] => {
+      const matched = peerEvents.filter((ev) => taskOccursOnDate(ev, date))
+      return [...matched].sort((a, b) => {
+        if (a.scheduledStartTime && b.scheduledStartTime) {
+          return timeToMinutes(a.scheduledStartTime) - timeToMinutes(b.scheduledStartTime)
+        }
+        return 0
+      })
+    },
+    [peerEvents]
+  )
+
   const handleToggleComplete = (e: React.MouseEvent, taskId: string) => {
     e.stopPropagation()
     onToggleComplete?.(taskId)
@@ -222,9 +242,13 @@ export function MonthView({
     const agendaBlocks = [...(blocksByDate[agendaDateString] || [])].sort((a, b) =>
       a.startTime.localeCompare(b.startTime)
     )
+    const agendaPeerEvents = getPeerEventsForDay(agendaDay)
     const agendaIsToday = agendaDateString === toDateString(new Date())
     const agendaEmpty =
-      agendaPending.length === 0 && agendaCompleted.length === 0 && agendaBlocks.length === 0
+      agendaPending.length === 0 &&
+      agendaCompleted.length === 0 &&
+      agendaBlocks.length === 0 &&
+      agendaPeerEvents.length === 0
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden select-none bg-panel-secondary">
@@ -269,6 +293,7 @@ export function MonthView({
                     const dayPending = dayTasks.filter((t) => !t.isCompleted)
                     const hasCompletedOnly = dayPending.length === 0 && dayTasks.length > 0
                     const isAgendaDay = day.dateString === agendaDateString
+                    const holidayName = null
 
                     return (
                       <button
@@ -292,7 +317,8 @@ export function MonthView({
                           className={cn(
                             'text-[13px] font-semibold w-6 h-6 rounded-full flex items-center justify-center leading-none',
                             day.isToday && 'bg-primary text-primary-foreground',
-                            !day.isToday && !day.isCurrentMonth && 'text-muted-foreground'
+                            !day.isToday && !day.isCurrentMonth && 'text-muted-foreground',
+                            !day.isToday && holidayName && 'text-red-600 dark:text-red-400'
                           )}
                         >
                           {day.date.getDate()}
@@ -376,6 +402,30 @@ export function MonthView({
                       {block.startTime}–{block.endTime}
                     </span>
                     <span className="text-sm text-foreground/80 truncate">{block.label}</span>
+                  </div>
+                ))}
+
+                {/* Peer shared events — read-only rows (no tap handlers).
+                    Dashed accent + desaturation match the timeline styling. */}
+                {agendaPeerEvents.map((ev) => (
+                  <div
+                    key={ev.id}
+                    data-peer-event={ev.detail}
+                    className="flex items-center gap-3 px-2 min-h-[44px] py-1 saturate-[.55] opacity-80"
+                  >
+                    <span
+                      className="w-1 self-stretch rounded-sm flex-shrink-0 border border-dashed"
+                      style={{ borderColor: displayColor(ev.calendarColor) }}
+                    />
+                    <span className="text-xs font-mono text-muted-foreground w-[84px] flex-shrink-0">
+                      {ev.scheduledStartTime && ev.scheduledEndTime
+                        ? `${ev.scheduledStartTime}–${ev.scheduledEndTime}`
+                        : ''}
+                    </span>
+                    <span className="text-sm text-foreground/70 truncate flex-1">{ev.title}</span>
+                    <span className="text-[10px] text-muted-foreground truncate max-w-[72px] flex-shrink-0">
+                      {ev.peerName}
+                    </span>
                   </div>
                 ))}
 
@@ -509,8 +559,10 @@ export function MonthView({
                 {calendarDays.map((day, index) => {
                   const dayTasks = getTasksForDay(day.date, day.dateString)
                   const dayBlocks = blocksByDate[day.dateString] || []
+                  const dayPeerEvents = getPeerEventsForDay(day.date)
                   const pendingTasks = dayTasks.filter((t) => !t.isCompleted)
                   const completedTasks = dayTasks.filter((t) => t.isCompleted)
+                  const holidayName = null
 
                   return (
                     <div
@@ -524,22 +576,30 @@ export function MonthView({
                       onClick={() => onDateSelect?.(day.date)}
                     >
                       {/* Date Header */}
-                      <div className="flex items-center justify-between px-1.5 py-1 border-b border-border/50">
-                        <span
-                          className={cn(
-                            'text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center',
-                            day.isToday && 'bg-primary text-primary-foreground',
-                            !day.isCurrentMonth && 'text-muted-foreground'
+                      <div className="flex items-center justify-between px-1.5 py-1 border-b border-border/50 gap-1 min-w-0">
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span
+                            className={cn(
+                              'text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0',
+                              day.isToday && 'bg-primary text-primary-foreground',
+                              !day.isToday && !day.isCurrentMonth && 'text-muted-foreground',
+                              !day.isToday && holidayName && 'text-red-600 dark:text-red-400'
+                            )}
+                          >
+                            {day.date.getDate()}
+                          </span>
+                          {holidayName && (
+                            <span className="text-[9px] leading-none text-red-600 dark:text-red-400 truncate">
+                              {t(holidayName)}
+                            </span>
                           )}
-                        >
-                          {day.date.getDate()}
-                        </span>
+                        </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
                             onCreateTask?.(day.dateString)
                           }}
-                          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-4 h-4 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-all"
+                          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-4 h-4 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-all flex-shrink-0"
                         >
                           <Plus className="w-2.5 h-2.5 text-primary" />
                         </button>
@@ -605,6 +665,31 @@ export function MonthView({
                         {pendingTasks.length > 3 && (
                           <div className="text-[8px] text-primary font-medium px-1">
                             +{pendingTasks.length - 3}
+                          </div>
+                        )}
+
+                        {/* Peer shared events — read-only chips (no click
+                            handlers), dashed + desaturated like the timeline. */}
+                        {dayPeerEvents.slice(0, 2).map((ev) => {
+                          const peerColor = displayColor(ev.calendarColor)
+                          return (
+                            <div
+                              key={ev.id}
+                              data-peer-event={ev.detail}
+                              title={ev.peerName}
+                              className="flex items-center gap-1 px-1 py-0.5 rounded text-[9px] border border-dashed saturate-[.55] opacity-80 select-none"
+                              style={{
+                                borderColor: peerColor,
+                                backgroundColor: `${peerColor}12`,
+                              }}
+                            >
+                              <span className="truncate text-foreground/70">{ev.title}</span>
+                            </div>
+                          )
+                        })}
+                        {dayPeerEvents.length > 2 && (
+                          <div className="text-[8px] text-muted-foreground/70 px-1">
+                            +{dayPeerEvents.length - 2}
                           </div>
                         )}
                       </div>

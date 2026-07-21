@@ -10,6 +10,8 @@ import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { UserMenu } from '@/components/user-menu'
 import { useNotebookOverlay } from '@/components/notebook/notebook-overlay-provider'
+import { isPeerVisible, type SharePeer } from '@/hooks/use-calendar-sharing'
+import { User as UserIcon } from 'lucide-react'
 import type { Workspace, Task } from '@/lib/types'
 import { useI18n } from '@/lib/i18n/react'
 import { format } from 'date-fns'
@@ -39,6 +41,11 @@ interface CalendarHeaderProps {
   /** When false, the top nav row is shifted right to leave room for the
    * floating "open task panel" button at the top-left of the calendar area. */
   leftPanelOpen?: boolean
+  // Calendar sharing — connected peers + per-peer overlay visibility toggle.
+  // When there are no peers, nothing sharing-related renders at all.
+  sharePeers?: SharePeer[]
+  visiblePeers?: Record<string, boolean>
+  onTogglePeerVisible?: (peerId: string) => void
 }
 
 const ZOOM_LABELS = ['緊湊', '標準', '寬鬆', '詳細']
@@ -60,6 +67,9 @@ export function CalendarHeader({
   onOpenSettings,
   onOpenExport,
   leftPanelOpen = true,
+  sharePeers = [],
+  visiblePeers = {},
+  onTogglePeerVisible,
 }: CalendarHeaderProps) {
   const isMobile = useIsMobile()
   const { t, lang } = useI18n()
@@ -360,6 +370,50 @@ export function CalendarHeader({
           )}
         </div>
       </div>
+
+      {/* Peer chips — one per connected calendar-share peer; tap toggles
+          that peer's overlay on/off. Renders nothing when there are no
+          peers. h-9 visual + invisible ::before expansion clears the 44px
+          touch floor on mobile without inflating the row. */}
+      {sharePeers.length > 0 && onTogglePeerVisible && (
+        <div
+          className="flex items-center gap-1.5 px-3 pb-1.5 pt-0.5 overflow-x-auto scrollbar-hide"
+          role="group"
+          aria-label={t('共享行事曆顯示')}
+        >
+          {sharePeers.map((peer) => {
+            const visible = isPeerVisible(visiblePeers, peer.peerId)
+            const name = peer.displayName || t('未命名使用者')
+            return (
+              <button
+                key={peer.peerId}
+                type="button"
+                onClick={() => onTogglePeerVisible(peer.peerId)}
+                aria-pressed={visible}
+                title={visible ? t('點擊隱藏 {name} 的行事曆', { name }) : t('點擊顯示 {name} 的行事曆', { name })}
+                className={cn(
+                  'relative flex items-center gap-1.5 h-9 pl-1.5 pr-2.5 rounded-full border text-xs font-medium flex-shrink-0 transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  "before:content-[''] before:absolute before:inset-0 before:-my-1.5 md:before:hidden",
+                  visible
+                    ? 'border-primary/40 bg-primary/10 text-foreground'
+                    : 'border-border bg-transparent text-muted-foreground opacity-60'
+                )}
+              >
+                <span className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {peer.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- static export has no image optimizer
+                    <img src={peer.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <UserIcon className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+                  )}
+                </span>
+                <span className="truncate max-w-[96px]">{name}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Secondary Row — desktop only. Mobile uses pinch zoom + the
           overflow menu above for journal / report / settings. */}

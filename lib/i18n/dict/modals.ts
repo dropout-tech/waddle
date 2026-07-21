@@ -253,4 +253,67 @@ export const dict: Record<string, string> = {
 
   // ── date-time-field.tsx ─────────────────────────────────────────────────
   '選擇日期': 'Select date',
+
+  // ── settings-modal.tsx — Sharing tab (P1 invite flow) ───────────────────
+  '共享': 'Sharing',
+  '產生邀請連結': 'Create invite link',
+  '把連結傳給對方，雙方接受後即可互相查看彼此開放的行事曆':
+    'Send the link to the other person — once both accept, you can each see what the other has chosen to share',
+  '邀請連結': 'Invite link',
+  '複製': 'Copy',
+  '分享': 'Share',
+  '重新產生': 'Regenerate',
+  '連結 7 天內有效，且僅能使用一次': 'The link is valid for 7 days and can only be used once',
+  '待接受的邀請': 'Pending invites',
+  '目前沒有待接受的邀請': 'No pending invites',
+  '建立於 {date}': 'Created {date}',
+  '撤銷': 'Revoke',
+  '已連結的人': 'Connected people',
+  '還沒有互相共享行事曆的對象，產生一個邀請連結開始吧':
+    'No calendar-sharing partners yet — create an invite link to get started',
+  '未命名使用者': 'Unnamed user',
+  '連結於 {date}': 'Connected {date}',
+  '解除共享': 'Stop sharing',
+  '確定要解除共享嗎？': 'Stop sharing calendars?',
+  '解除後，你和 {name} 都無法再查看對方開放的行事曆；之後想恢復需要重新邀請一次。':
+    "After this, neither you nor {name} can see each other's shared calendar. To reconnect, you'll need to send a new invite.",
+  '已解除共享': 'Sharing removed',
+  '已複製連結': 'Link copied',
+  '複製失敗，請手動選取連結': "Couldn't copy — please select the link manually",
+  'Huddle 行事曆共享邀請': 'Huddle calendar sharing invite',
+  '產生邀請連結失敗，請稍後再試': "Couldn't create the invite link — please try again later",
+  '撤銷邀請失敗，請稍後再試': "Couldn't revoke the invite — please try again later",
+  '解除共享失敗，請稍後再試': "Couldn't stop sharing — please try again later",
+
+  // ── settings-modal.tsx — Sharing tab (P2 grant editor) ──────────────────
+  '開放範圍': 'Sharing scope',
+  '我開放給 {name} 的內容': 'What I share with {name}',
+  '「完整內容」會顯示事項標題；「只顯示忙碌」只給時段與類型、不含標題。預設全部不開放。':
+    '"Full details" shows event titles; "Busy only" shares just the time slot and type, without titles. Nothing is shared by default.',
+  '大分類': 'Workspaces',
+  '沒有可開放的大分類': 'No workspaces available to share',
+  '時間區塊類型': 'Time-block types',
+  '{name} 開放給我的內容': 'What {name} shares with me',
+  '對方尚未開放任何內容': "They haven't shared anything yet",
+  '對方已開放 {ws} 個大分類、{st} 個時間區塊類型（項目名稱由對方保密）':
+    'They share {ws} workspace(s) and {st} time-block type(s) — item names stay private on their side',
+  '不開放': 'Off',
+  '只顯示忙碌': 'Busy only',
+  '完整內容': 'Full details',
+  '更新開放範圍失敗，請稍後再試': "Couldn't update the sharing scope — please try again later",
+  '忙碌': 'Busy',
+  '對方': 'Partner',
+
+  // ── app/share/invite/page.tsx ───────────────────────────────────────────
+  '{name} 邀請你互相共享行事曆': '{name} invited you to share calendars with each other',
+  '接受後，你們可以各自選擇開放哪些行程給對方查看':
+    'After accepting, you each choose which events to open up to the other',
+  '接受邀請': 'Accept invite',
+  '正在確認邀請…': 'Confirming the invite…',
+  '略過': 'Skip',
+  '已成功建立共享關係': 'Sharing connection created',
+  '邀請連結無效或已過期': 'This invite link is invalid or has expired',
+  '請向對方確認連結，或請他重新產生一份邀請':
+    'Double-check the link with them, or ask them to create a new invite',
+  '回到 Huddle': 'Back to Huddle',
 }
