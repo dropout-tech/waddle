@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Check, Pause, Play, Maximize2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n/react'
 
 export interface FocusTimerMiniProps {
   state: 'running' | 'paused' | 'completed'
@@ -39,6 +40,7 @@ export function FocusTimerMini({
   state, phase, color, timeText, progress, label,
   isMobile, mobileBottomOffsetPx, completion, onPause, onResume, onExpand, onStop, onSkipCompletion,
 }: FocusTimerMiniProps) {
+  const { t } = useI18n()
   const mobileStyle = isMobile
     ? {
         bottom: `calc(${mobileBottomOffsetPx ?? 78}px + env(safe-area-inset-bottom))`,
@@ -87,20 +89,20 @@ export function FocusTimerMini({
   // pill form: a small check, one soft line, tap to skip, fade out.
   if (completion) {
     const doneLabel =
-      completion.kind === 'work' ? '這段專注完成了'
-      : completion.kind === 'break' ? '休息結束'
-      : '先到這裡也很好'
+      completion.kind === 'work' ? t('這段專注完成了')
+      : completion.kind === 'break' ? t('休息結束')
+      : t('先到這裡也很好')
     return (
       <div
         className="fixed z-40 bottom-6 right-6"
         style={mobileStyle}
         role="region"
-        aria-label="計時完成"
+        aria-label={t('計時完成')}
       >
         <button
           type="button"
           onClick={onSkipCompletion}
-          aria-label={`${doneLabel}，點一下繼續`}
+          aria-label={t('{label}，點一下繼續', { label: doneLabel })}
           className="flex items-center gap-2 pl-2 pr-3.5 py-2 rounded-full shadow-lg bg-card border animate-in fade-in slide-in-from-bottom-2"
           style={{
             borderColor: `color-mix(in oklch, ${color} 38%, var(--border))`,
@@ -128,7 +130,7 @@ export function FocusTimerMini({
       className="fixed z-40 bottom-6 right-6"
       style={mobileStyle}
       role="region"
-      aria-label={phase === 'break' ? '休息計時迷你顯示' : '專注計時迷你顯示'}
+      aria-label={phase === 'break' ? t('休息計時迷你顯示') : t('專注計時迷你顯示')}
     >
       <div
         className={cn(
@@ -191,8 +193,8 @@ export function FocusTimerMini({
         <button
           type="button"
           onClick={onExpand}
-          aria-label="展開為全畫面"
-          title="展開為全畫面"
+          aria-label={t('展開為全畫面')}
+          title={t('展開為全畫面')}
           className="h-7 w-7 rounded-full grid place-items-center text-foreground/55 hover:text-foreground hover:bg-secondary/70 transition-colors"
         >
           <Maximize2 className="w-3.5 h-3.5" />
@@ -203,7 +205,7 @@ export function FocusTimerMini({
           <button
             type="button"
             onClick={onResume}
-            aria-label="繼續"
+            aria-label={t('繼續')}
             className="h-7 w-7 rounded-full grid place-items-center text-white transition-transform active:scale-95"
             style={{ backgroundColor: color }}
           >
@@ -213,7 +215,7 @@ export function FocusTimerMini({
           <button
             type="button"
             onClick={onPause}
-            aria-label="暫停"
+            aria-label={t('暫停')}
             className="h-7 w-7 rounded-full grid place-items-center bg-secondary/70 text-foreground/75 hover:bg-secondary transition-colors"
           >
             <Pause className="w-3.5 h-3.5" />
@@ -227,8 +229,8 @@ export function FocusTimerMini({
           onPointerUp={cancelStopHold}
           onPointerCancel={cancelStopHold}
           onPointerLeave={cancelStopHold}
-          aria-label="長按結束（0.6 秒）"
-          title="長按結束並儲存到日曆"
+          aria-label={t('長按結束（0.6 秒）')}
+          title={t('長按結束並儲存到日曆')}
           className="relative h-7 w-7 rounded-full grid place-items-center text-foreground/45 hover:text-foreground hover:bg-secondary/70 transition-colors touch-none"
         >
           <X className="w-3.5 h-3.5" />

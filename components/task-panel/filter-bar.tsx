@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Search, Filter, X, ChevronDown, AlignJustify, Minus, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Density, MetaField } from './task-panel'
+import { useI18n } from '@/lib/i18n/react'
 
 export interface FilterState {
   search: string
@@ -34,6 +35,7 @@ interface FilterBarProps {
 }
 
 export function FilterBar({ filters, onFiltersChange, workspaces, density, onDensityChange, metaOrder, onMetaOrderChange }: FilterBarProps) {
+  const { t } = useI18n()
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [draggingField, setDraggingField] = useState<MetaField | null>(null)
   const [dragOverField, setDragOverField] = useState<MetaField | null>(null)
@@ -77,7 +79,7 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
           type="text"
           value={filters.search}
           onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
-          placeholder="搜尋任務..."
+          placeholder={t('搜尋任務...')}
           className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
         />
         {filters.search && (
@@ -102,7 +104,7 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
           )}
         >
           <Filter className="w-3 h-3" />
-          <span>篩選</span>
+          <span>{t('篩選')}</span>
           {hasActiveFilters && (
             <span className="ml-1 px-1 py-0.5 rounded bg-primary text-primary-foreground text-[10px]">
               {filters.urgency.length + filters.workspaceIds.length + (filters.showCompleted ? 0 : 1)}
@@ -119,7 +121,7 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
               onClick={clearFilters}
               className="mr-2 text-[10px] text-muted-foreground hover:text-destructive transition-colors"
             >
-              清除
+              {t('清除')}
             </button>
           )}
           {/* Density Toggle */}
@@ -128,7 +130,7 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
               <button
                 key={opt.value}
                 onClick={() => onDensityChange(opt.value)}
-                title={opt.label}
+                title={t(opt.label)}
                 className={cn(
                   'flex items-center justify-center w-6 h-6 rounded-md transition-all',
                   density === opt.value
@@ -149,7 +151,7 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
           {/* Urgency Filter */}
           <div>
             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-              急迫度 (1-10)
+              {t('急迫度 (1-10)')}
             </span>
             <div className="flex gap-1 mt-1.5 flex-wrap">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((level) => (
@@ -178,7 +180,7 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
           {/* Workspace Filter */}
           <div>
             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-              工作區
+              {t('工作區')}
             </span>
             <div className="flex gap-1.5 mt-1.5 flex-wrap">
               {workspaces.map((ws) => (
@@ -206,7 +208,7 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
           {/* Show Completed Toggle */}
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-              顯示已完成
+              {t('顯示已完成')}
             </span>
             <button
               onClick={() => onFiltersChange({ ...filters, showCompleted: !filters.showCompleted })}
@@ -227,7 +229,7 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
           {/* Meta Info Order */}
           <div>
             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-              資訊顯示順序
+              {t('資訊顯示順序')}
             </span>
             <div className="flex items-center gap-1.5 mt-1.5">
               {metaOrder.map((field, index) => (
@@ -260,11 +262,11 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
                 >
                   <GripVertical className="w-2.5 h-2.5 opacity-50" />
                   <span className="text-[9px] text-muted-foreground/60 font-mono mr-0.5">{index + 1}</span>
-                  {META_FIELD_LABELS[field]}
+                  {t(META_FIELD_LABELS[field])}
                 </div>
               ))}
             </div>
-            <p className="text-[9px] text-muted-foreground/50 mt-1">拖曳調整顯示順序</p>
+            <p className="text-[9px] text-muted-foreground/50 mt-1">{t('拖曳調整顯示順序')}</p>
           </div>
         </div>
       )}

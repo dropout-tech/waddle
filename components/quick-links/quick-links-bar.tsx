@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import type { QuickLink } from '@/lib/types'
 import { QuickLinkCard } from './quick-link-card'
 import { QuickLinkEditModal } from './quick-link-edit-modal'
+import { useI18n } from '@/lib/i18n/react'
 
 interface QuickLinksBarProps {
   links: QuickLink[]
@@ -36,6 +37,7 @@ const OPEN_STATE_KEY = 'waddle.quickLinksOpen'
  * geometry differs.
  */
 export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger, className }: QuickLinksBarProps) {
+  const { t } = useI18n()
   const isControlled = isOpen !== undefined
   const [internalOpen, setInternalOpen] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false
@@ -128,7 +130,7 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
             )}
           >
             <Link2 className="w-3 h-3" />
-            <span>常用連結</span>
+            <span>{t('常用連結')}</span>
             {links.length > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
                 {links.length}
@@ -188,9 +190,9 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
                     <Link2 className="w-4 h-4 text-primary" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-semibold text-foreground">常用連結</h2>
+                    <h2 className="text-sm font-semibold text-foreground">{t('常用連結')}</h2>
                     <p className="text-[11px] text-muted-foreground">
-                      釘住網址，點一下開新分頁
+                      {t('釘住網址，點一下開新分頁')}
                     </p>
                   </div>
                 </div>
@@ -200,7 +202,7 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  新增
+                  {t('新增')}
                 </button>
               </div>
 
@@ -210,9 +212,9 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
                   <div className="w-12 h-12 rounded-full bg-muted/40 flex items-center justify-center mb-3">
                     <Link2 className="w-5 h-5 text-muted-foreground" />
                   </div>
-                  <p className="text-sm text-muted-foreground">還沒有連結</p>
+                  <p className="text-sm text-muted-foreground">{t('還沒有連結')}</p>
                   <p className="text-[11px] text-muted-foreground/70 mt-0.5">
-                    點右上「+ 新增」加第一個
+                    {t('點右上「+ 新增」加第一個')}
                   </p>
                 </div>
               ) : (

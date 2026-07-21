@@ -13,8 +13,18 @@ import { toDateString } from '@/lib/calendar-utils'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from './recurrence-choice-modal'
 import { ModalShell } from './modal-shell'
 import { PICKER_COLOR_HEXES } from '@/lib/palette'
+import { useI18n } from '@/lib/i18n/react'
+import { getLang, t } from '@/lib/i18n'
 
-const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
+// Weekday letters for the recurrence day-picker. Kept lang-aware directly
+// (not routed through t()) because a single Chinese character like '日'
+// would collide in the shared dictionary with unrelated one-character UI
+// labels elsewhere (e.g. the "Day" view-mode button in settings-modal).
+const WEEKDAY_LABELS_ZH = ['日', '一', '二', '三', '四', '五', '六']
+const WEEKDAY_LABELS_EN = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
+function weekdayLabels() {
+  return getLang() === 'en' ? WEEKDAY_LABELS_EN : WEEKDAY_LABELS_ZH
+}
 
 const PRESET_COLORS = PICKER_COLOR_HEXES
 
@@ -43,6 +53,7 @@ export function TaskDetailModal({
   onToggleComplete,
   onDelete,
 }: TaskDetailModalProps) {
+  const { t } = useI18n()
   const isCreate = mode === 'create'
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description || '')
@@ -179,7 +190,7 @@ export function TaskDetailModal({
           isOpen={recurrenceModal.isOpen}
           onClose={() => setRecurrenceModal(null)}
           onConfirm={handleRecurrenceConfirm}
-          title={recurrenceModal.type === 'save' ? '儲存重複任務' : '刪除重複任務'}
+          title={recurrenceModal.type === 'save' ? t('儲存重複任務') : t('刪除重複任務')}
         />
       )}
       {/* Drawer, not centered modal: editing isn't a decision, and sliding
@@ -191,7 +202,7 @@ export function TaskDetailModal({
         isOpen={isOpen}
         onClose={onClose}
         variant="drawer"
-        ariaLabel={isCreate ? '新增任務' : '任務詳情'}
+        ariaLabel={isCreate ? t('新增任務') : t('任務詳情')}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -206,7 +217,7 @@ export function TaskDetailModal({
                     ? 'border-primary bg-primary'
                     : 'border-muted-foreground/40 hover:border-primary'
                 )}
-                title={task.isCompleted ? '標記為未完成' : '標記為完成'}
+                title={task.isCompleted ? t('標記為未完成') : t('標記為完成')}
               >
                 {task.isCompleted && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
               </button>
@@ -279,7 +290,7 @@ export function TaskDetailModal({
                   }
                 }}
                 className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                title="刪除任務"
+                title={t('刪除任務')}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -302,7 +313,7 @@ export function TaskDetailModal({
               autoFocus={isCreate}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={isCreate ? '輸入任務標題…' : '任務名稱'}
+              placeholder={isCreate ? t('輸入任務標題…') : t('任務名稱')}
               className="text-lg font-semibold border-0 px-0 focus-visible:ring-0 bg-transparent"
             />
           </div>
@@ -344,13 +355,13 @@ export function TaskDetailModal({
                 <div className="flex items-start gap-3 min-w-0">
                   <ListChecks className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                   <div className="min-w-0">
-                    <div className="text-sm font-medium text-foreground">加入左側任務欄</div>
+                    <div className="text-sm font-medium text-foreground">{t('加入左側任務欄')}</div>
                     <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
                       {forcedOffByMeeting
-                        ? '會議僅顯示在日曆上，不會出現在左側任務欄'
+                        ? t('會議僅顯示在日曆上，不會出現在左側任務欄')
                         : canToggle
-                          ? '關閉後此任務僅顯示在日曆上，例如例行會議'
-                          : '需先排程才能僅顯示在日曆'}
+                          ? t('關閉後此任務僅顯示在日曆上，例如例行會議')
+                          : t('需先排程才能僅顯示在日曆')}
                     </div>
                   </div>
                 </div>
@@ -377,7 +388,7 @@ export function TaskDetailModal({
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Clock className="w-3.5 h-3.5" />
-                預估時間 (分鐘)
+                {t('預估時間 (分鐘)')}
               </label>
               <Input
                 type="number"
@@ -392,13 +403,13 @@ export function TaskDetailModal({
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Calendar className="w-3.5 h-3.5" />
-                截止日期
+                {t('截止日期')}
               </label>
               <DateField
                 value={dueDate}
                 onChange={setDueDate}
                 className="h-9"
-                aria-label="截止日期"
+                aria-label={t('截止日期')}
               />
             </div>
           </div>
@@ -407,7 +418,7 @@ export function TaskDetailModal({
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <Palette className="w-3.5 h-3.5" />
-              日曆顏色
+              {t('日曆顏色')}
             </label>
             <div className="flex items-center gap-2 flex-wrap">
               {PRESET_COLORS.map((color) => (
@@ -428,7 +439,7 @@ export function TaskDetailModal({
                 value={calendarColor}
                 onChange={(e) => setCalendarColor(e.target.value)}
                 className="w-7 h-7 rounded-full cursor-pointer"
-                title="自訂顏色"
+                title={t('自訂顏色')}
               />
             </div>
           </div>
@@ -438,7 +449,7 @@ export function TaskDetailModal({
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Repeat className="w-3.5 h-3.5" />
-                重複設定
+                {t('重複設定')}
               </label>
               <button
                 onClick={() => {
@@ -486,7 +497,7 @@ export function TaskDetailModal({
                           : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
                       )}
                     >
-                      {option.label}
+                      {t(option.label)}
                     </button>
                   ))}
                 </div>
@@ -494,7 +505,7 @@ export function TaskDetailModal({
                 {/* Interval (for custom) */}
                 {recurrenceType === 'custom' && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">每</span>
+                    <span className="text-xs text-muted-foreground">{t('每')}</span>
                     <Input
                       type="number"
                       min="1"
@@ -502,16 +513,16 @@ export function TaskDetailModal({
                       onChange={(e) => setRecurrenceInterval(e.target.value)}
                       className="w-16 h-8 text-center"
                     />
-                    <span className="text-xs text-muted-foreground">天重複一次</span>
+                    <span className="text-xs text-muted-foreground">{t('天重複一次')}</span>
                   </div>
                 )}
 
                 {/* Days of Week (for weekly) */}
                 {recurrenceType === 'weekly' && (
                   <div className="space-y-2">
-                    <span className="text-xs text-muted-foreground">選擇重複的星期</span>
+                    <span className="text-xs text-muted-foreground">{t('選擇重複的星期')}</span>
                     <div className="flex gap-1.5">
-                      {WEEKDAY_LABELS.map((label, index) => (
+                      {weekdayLabels().map((label, index) => (
                         <button
                           key={index}
                           onClick={() => toggleRecurrenceDay(index)}
@@ -531,12 +542,12 @@ export function TaskDetailModal({
 
                 {/* End Date */}
                 <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">結束日期 (可選)</label>
+                  <label className="text-xs text-muted-foreground">{t('結束日期 (可選)')}</label>
                   <DateField
                     value={recurrenceEndDate}
                     onChange={setRecurrenceEndDate}
                     className="h-8"
-                    aria-label="重複結束日期"
+                    aria-label={t('重複結束日期')}
                   />
                 </div>
               </div>
@@ -562,9 +573,9 @@ export function TaskDetailModal({
               <div className="flex items-center gap-2">
                 <Users className={cn('w-4 h-4', isMeeting ? 'text-primary' : 'text-muted-foreground')} />
                 <div className="text-left">
-                  <div className="text-sm font-medium text-foreground">標記為會議</div>
+                  <div className="text-sm font-medium text-foreground">{t('標記為會議')}</div>
                   <div className="text-[10px] text-muted-foreground">
-                    在日曆上顯示專屬樣式，可記錄參與者 / 地點 / 視訊連結
+                    {t('在日曆上顯示專屬樣式，可記錄參與者 / 地點 / 視訊連結')}
                   </div>
                 </div>
               </div>
@@ -589,12 +600,12 @@ export function TaskDetailModal({
                 <div className="space-y-1">
                   <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <Users className="w-3 h-3" />
-                    參與者
+                    {t('參與者')}
                   </label>
                   <Input
                     value={attendees}
                     onChange={(e) => setAttendees(e.target.value)}
-                    placeholder="例：Alice、Bob、團隊全員"
+                    placeholder={t('例：Alice、Bob、團隊全員')}
                     className="h-9"
                   />
                 </div>
@@ -603,12 +614,12 @@ export function TaskDetailModal({
                 <div className="space-y-1">
                   <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <MapPin className="w-3 h-3" />
-                    地點
+                    {t('地點')}
                   </label>
                   <Input
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    placeholder="例：會議室 A / 線上"
+                    placeholder={t('例：會議室 A / 線上')}
                     className="h-9"
                   />
                 </div>
@@ -617,7 +628,7 @@ export function TaskDetailModal({
                 <div className="space-y-1">
                   <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <Video className="w-3 h-3" />
-                    視訊連結
+                    {t('視訊連結')}
                   </label>
                   <Input
                     type="url"
@@ -631,7 +642,7 @@ export function TaskDetailModal({
                     if (!provider) return null
                     return (
                       <div className="text-[10px] text-muted-foreground">
-                        已偵測：{MEETING_PROVIDER_LABEL[provider]}
+                        {t('已偵測：{provider}', { provider: provider === 'generic' ? t(MEETING_PROVIDER_LABEL[provider]) : MEETING_PROVIDER_LABEL[provider] })}
                       </div>
                     )
                   })()}
@@ -644,12 +655,12 @@ export function TaskDetailModal({
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
               <FileText className="w-3.5 h-3.5" />
-              描述
+              {t('描述')}
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="添加任務描述..."
+              placeholder={t('添加任務描述...')}
               className="w-full min-h-[100px] px-3 py-2 rounded-lg border border-input bg-secondary/30 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
@@ -661,11 +672,11 @@ export function TaskDetailModal({
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border bg-secondary/20 pb-[max(env(safe-area-inset-bottom),1rem)] md:pb-4">
           <Button variant="secondary" onClick={onClose}>
-            取消
+            {t('取消')}
           </Button>
           <Button onClick={handleSave} className="gap-2">
             <Save className="w-4 h-4" />
-            {isCreate ? '建立任務' : '儲存'}
+            {isCreate ? t('建立任務') : t('儲存')}
           </Button>
         </div>
       </ModalShell>
@@ -699,16 +710,17 @@ interface UrgencySliderProps {
 }
 
 function UrgencySlider({ value, onChange }: UrgencySliderProps) {
+  const { t } = useI18n()
   const bucket = urgencyBucket(value)
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <AlertCircle className="w-3.5 h-3.5" />
-          急迫度
+          {t('急迫度')}
         </label>
         <div className="flex items-center gap-2">
-          <span className={cn('text-[10px] font-medium', bucket.text)}>{bucket.label}</span>
+          <span className={cn('text-[10px] font-medium', bucket.text)}>{t(bucket.label)}</span>
           <span
             className={cn(
               'inline-flex items-center justify-center min-w-7 h-7 px-2 rounded-full text-sm font-semibold shadow-sm',
@@ -733,7 +745,7 @@ function UrgencySlider({ value, onChange }: UrgencySliderProps) {
               key={level}
               type="button"
               onClick={() => onChange(level)}
-              aria-label={`設為急迫度 ${level}`}
+              aria-label={t('設為急迫度 {level}', { level })}
               aria-pressed={value === level}
               className={cn(
                 'group relative flex-1 h-6 rounded-md transition-all',
@@ -754,9 +766,9 @@ function UrgencySlider({ value, onChange }: UrgencySliderProps) {
 
       {/* Bucket labels */}
       <div className="flex items-center justify-between text-[10px] text-muted-foreground/80 px-0.5">
-        <span>低</span>
-        <span>中</span>
-        <span>高</span>
+        <span>{t('低')}</span>
+        <span>{t('中')}</span>
+        <span>{t('高')}</span>
       </div>
     </div>
   )
@@ -783,11 +795,11 @@ function formatTimeFromMinutes(total: number): string {
 }
 
 function formatDuration(min: number): string {
-  if (min <= 0) return '0 分'
-  if (min < 60) return `${min} 分`
+  if (min <= 0) return t('0 分')
+  if (min < 60) return t('{min} 分', { min })
   const h = Math.floor(min / 60)
   const m = min % 60
-  return m === 0 ? `${h} 小時` : `${h} 小時 ${m} 分`
+  return m === 0 ? t('{h} 小時', { h }) : t('{h} 小時 {m} 分', { h, m })
 }
 
 interface TimeBlockSectionProps {
@@ -807,6 +819,7 @@ function TimeBlockSection({
   onStartTimeChange,
   onEndTimeChange,
 }: TimeBlockSectionProps) {
+  const { t } = useI18n()
   const startMin = parseTime(startTime)
   const endMin = parseTime(endTime)
   const duration = useMemo(() => {
@@ -850,17 +863,17 @@ function TimeBlockSection({
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-xs font-semibold text-foreground">
           <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-          排程
+          {t('排程')}
         </label>
         {hasSchedule && (
           <button
             type="button"
             onClick={handleClearAll}
             className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            title="清空日期與時段，任務移回左側待排程"
+            title={t('清空日期與時段，任務移回左側待排程')}
           >
             <X className="w-3 h-3" />
-            取消排程
+            {t('取消排程')}
           </button>
         )}
       </div>
@@ -884,7 +897,7 @@ function TimeBlockSection({
                     : 'bg-card text-foreground border border-border hover:bg-secondary'
                 )}
               >
-                {d.label}
+                {t(d.label)}
               </button>
             )
           })}
@@ -892,7 +905,7 @@ function TimeBlockSection({
             value={scheduledDate}
             onChange={onScheduledDateChange}
             className="h-8 flex-1 text-xs"
-            aria-label="排程日期"
+            aria-label={t('排程日期')}
           />
         </div>
       </div>
@@ -902,7 +915,7 @@ function TimeBlockSection({
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
             <Clock className="w-3.5 h-3.5" />
-            時段
+            {t('時段')}
           </label>
           {duration !== null && (
             <span
@@ -913,7 +926,7 @@ function TimeBlockSection({
                   : 'bg-primary/10 text-primary'
               )}
             >
-              {duration <= 0 ? '結束需晚於開始' : formatDuration(duration)}
+              {duration <= 0 ? t('結束需晚於開始') : formatDuration(duration)}
             </span>
           )}
         </div>
@@ -930,7 +943,7 @@ function TimeBlockSection({
               }
             }}
             className="h-9 font-mono text-center"
-            aria-label="開始時間"
+            aria-label={t('開始時間')}
           />
           <span className="text-muted-foreground text-sm" aria-hidden="true">→</span>
           <div className="relative">
@@ -938,7 +951,7 @@ function TimeBlockSection({
               value={endTime}
               onChange={onEndTimeChange}
               className="h-9 font-mono text-center pr-12"
-              aria-label="結束時間"
+              aria-label={t('結束時間')}
             />
             {/* End-time stepper — placed where the right edge of the input
                 would otherwise sit, so adjustments feel attached to the
@@ -947,7 +960,7 @@ function TimeBlockSection({
               <button
                 type="button"
                 onClick={() => adjustEnd(-15)}
-                aria-label="結束時間 -15 分鐘"
+                aria-label={t('結束時間 -15 分鐘')}
                 className="w-5 h-5 flex items-center justify-center rounded text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 −
@@ -955,7 +968,7 @@ function TimeBlockSection({
               <button
                 type="button"
                 onClick={() => adjustEnd(15)}
-                aria-label="結束時間 +15 分鐘"
+                aria-label={t('結束時間 +15 分鐘')}
                 className="w-5 h-5 flex items-center justify-center rounded text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 +
@@ -1005,6 +1018,7 @@ interface NotesEditorProps {
 }
 
 function NotesEditor({ value, onChange }: NotesEditorProps) {
+  const { t } = useI18n()
   const ref = useRef<HTMLTextAreaElement>(null)
 
   const insertLink = () => {
@@ -1015,10 +1029,10 @@ function NotesEditor({ value, onChange }: NotesEditorProps) {
     const end = ta.selectionEnd ?? v.length
     const selected = v.slice(start, end)
 
-    const url = window.prompt('輸入網址（例如 https://example.com）', selected.startsWith('http') ? selected : 'https://')
+    const url = window.prompt(t('輸入網址（例如 https://example.com）'), selected.startsWith('http') ? selected : 'https://')
     if (!url) return
 
-    const text = selected || window.prompt('連結要顯示的文字（留空則顯示網址）', '') || url
+    const text = selected || window.prompt(t('連結要顯示的文字（留空則顯示網址）'), '') || url
     // Markdown-style link — kept verbatim in storage; rendered as <a> in
     // display contexts (TaskRow notes preview/tooltip, task-detail rendered
     // preview if added later).
@@ -1063,14 +1077,14 @@ function NotesEditor({ value, onChange }: NotesEditorProps) {
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
           <FileText className="w-3.5 h-3.5" />
-          備註
+          {t('備註')}
         </label>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => insertLinePrefix('• ')}
-            title="加項目符號"
-            aria-label="加項目符號"
+            title={t('加項目符號')}
+            aria-label={t('加項目符號')}
             className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <List className="w-3.5 h-3.5" aria-hidden="true" />
@@ -1078,8 +1092,8 @@ function NotesEditor({ value, onChange }: NotesEditorProps) {
           <button
             type="button"
             onClick={() => insertLinePrefix('☐ ')}
-            title="加待辦項目"
-            aria-label="加待辦項目"
+            title={t('加待辦項目')}
+            aria-label={t('加待辦項目')}
             className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <CheckSquare className="w-3.5 h-3.5" aria-hidden="true" />
@@ -1087,8 +1101,8 @@ function NotesEditor({ value, onChange }: NotesEditorProps) {
           <button
             type="button"
             onClick={insertLink}
-            title="插入超連結"
-            aria-label="插入超連結"
+            title={t('插入超連結')}
+            aria-label={t('插入超連結')}
             className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
@@ -1137,14 +1151,14 @@ function NotesEditor({ value, onChange }: NotesEditorProps) {
             else if (after.startsWith('☑ ')) onChange(before + '☐ ' + after.slice(2))
           }
         }}
-        placeholder={'寫下細節 · 子彈或待辦清單\n例如：\n• 確認流程\n☐ 寄信給客戶\n☐ 整理會議紀錄'}
+        placeholder={t('寫下細節 · 子彈或待辦清單\n例如：\n• 確認流程\n☐ 寄信給客戶\n☐ 整理會議紀錄')}
         className="w-full min-h-[120px] px-3 py-2 rounded-lg border border-input bg-secondary/30 text-sm text-foreground placeholder:text-muted-foreground/60 resize-y focus:outline-none focus:ring-2 focus:ring-ring font-mono leading-relaxed"
       />
       {/* Live preview — only shown when notes contain a link, so the user
           can click to verify the URL without leaving the modal. */}
       {/\[[^\]]+\]\([^)]+\)|https?:\/\//.test(value) && (
         <div className="px-3 py-2 rounded-lg border border-dashed border-border bg-card text-xs leading-relaxed whitespace-pre-wrap break-words">
-          <div className="text-[10px] text-muted-foreground mb-1">預覽</div>
+          <div className="text-[10px] text-muted-foreground mb-1">{t('預覽')}</div>
           {renderNotesWithLinks(value)}
         </div>
       )}

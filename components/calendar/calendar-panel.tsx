@@ -12,6 +12,7 @@ import { TimeGrid } from './time-grid'
 import { DayScrollView } from './day-scroll-view'
 import { WeekView } from './week-view'
 import { MonthView } from './month-view'
+import { useI18n } from '@/lib/i18n/react'
 
 interface CalendarPanelProps {
   selectedDate: Date
@@ -93,6 +94,7 @@ export function CalendarPanel({
   className,
 }: CalendarPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const { t } = useI18n()
 
   const handleTodayClick = () => {
     onDateChange(new Date())
@@ -151,7 +153,7 @@ export function CalendarPanel({
     <div
       ref={panelRef}
       role="region"
-      aria-label="日曆"
+      aria-label={t('日曆')}
       data-tour="calendar-panel"
       className={cn('flex flex-col h-full bg-panel focus:outline-none', className)}
       onKeyDown={handleKeyDown}

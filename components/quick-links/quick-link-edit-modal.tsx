@@ -8,6 +8,7 @@ import { detectMeetingProvider } from '@/lib/meeting-utils'
 import { cn } from '@/lib/utils'
 import type { QuickLink } from '@/lib/types'
 import { ModalShell } from '@/components/modals/modal-shell'
+import { useI18n } from '@/lib/i18n/react'
 
 interface QuickLinkEditModalProps {
   isOpen: boolean
@@ -55,6 +56,7 @@ export function QuickLinkEditModal({
   onSave,
   onDelete,
 }: QuickLinkEditModalProps) {
+  const { t } = useI18n()
   const isEdit = !!initial
   const [title, setTitle] = useState(initial?.title ?? '')
   const [url, setUrl] = useState(initial?.url ?? '')
@@ -96,7 +98,7 @@ export function QuickLinkEditModal({
 
   const handleDelete = () => {
     if (!initial || !onDelete) return
-    if (!confirm(`刪除「${initial.title}」？`)) return
+    if (!confirm(t('刪除「{title}」？', { title: initial.title }))) return
     onDelete(initial.id)
     onClose()
   }
@@ -106,16 +108,16 @@ export function QuickLinkEditModal({
       isOpen={isOpen}
       onClose={onClose}
       size="md"
-      ariaLabel={isEdit ? '編輯連結' : '新增連結'}
+      ariaLabel={isEdit ? t('編輯連結') : t('新增連結')}
     >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="text-base font-semibold text-foreground">
-            {isEdit ? '編輯連結' : '新增連結'}
+            {isEdit ? t('編輯連結') : t('新增連結')}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            aria-label="關閉"
+            aria-label={t('關閉')}
             className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
           >
             <X className="w-4 h-4" />
@@ -127,12 +129,12 @@ export function QuickLinkEditModal({
           <div className="space-y-1.5">
             <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Type className="w-3 h-3" />
-              名稱
+              {t('名稱')}
             </label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="例：Notion / GitHub / Gmail"
+              placeholder={t('例：Notion / GitHub / Gmail')}
               autoFocus
             />
           </div>
@@ -141,7 +143,7 @@ export function QuickLinkEditModal({
           <div className="space-y-1.5">
             <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Link2 className="w-3 h-3" />
-              網址
+              {t('網址')}
             </label>
             <Input
               type="url"
@@ -152,7 +154,7 @@ export function QuickLinkEditModal({
             />
             {url.trim().length > 0 && !urlLooksValid && (
               <div className="text-[11px] text-destructive">
-                需要 http:// 或 https:// 開頭的網址
+                {t('需要 http:// 或 https:// 開頭的網址')}
               </div>
             )}
           </div>
@@ -161,12 +163,12 @@ export function QuickLinkEditModal({
           <div className="space-y-1.5">
             <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Sparkles className="w-3 h-3" />
-              圖示（emoji 或文字，留空自動取名稱第一個字）
+              {t('圖示（emoji 或文字，留空自動取名稱第一個字）')}
             </label>
             <Input
               value={icon}
               onChange={(e) => setIcon(e.target.value)}
-              placeholder="📝 / GH / 🐧 / 任意文字皆可"
+              placeholder={t('📝 / GH / 🐧 / 任意文字皆可')}
             />
           </div>
 
@@ -174,7 +176,7 @@ export function QuickLinkEditModal({
           <div className="space-y-1.5">
             <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               <Palette className="w-3 h-3" />
-              色彩
+              {t('色彩')}
             </label>
             <div className="grid grid-cols-10 gap-1.5">
               {COLOR_OPTIONS.map((c, i) => (
@@ -182,7 +184,7 @@ export function QuickLinkEditModal({
                   key={i}
                   type="button"
                   onClick={() => setColor(c)}
-                  aria-label={c ?? '預設'}
+                  aria-label={c ?? t('預設')}
                   aria-pressed={color === c}
                   className={cn(
                     'aspect-square w-full rounded-full transition-all',
@@ -210,16 +212,16 @@ export function QuickLinkEditModal({
           {isEdit && onDelete ? (
             <Button variant="ghost" onClick={handleDelete} className="text-destructive">
               <Trash2 className="w-4 h-4" />
-              刪除
+              {t('刪除')}
             </Button>
           ) : (
             <div />
           )}
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={onClose}>取消</Button>
+            <Button variant="outline" onClick={onClose}>{t('取消')}</Button>
             <Button onClick={handleSave} disabled={!canSave} className="gap-2">
               <Save className="w-4 h-4" />
-              儲存
+              {t('儲存')}
             </Button>
           </div>
         </div>

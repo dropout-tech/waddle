@@ -5,6 +5,7 @@ import { Pencil } from 'lucide-react'
 import { cn, isLightColor } from '@/lib/utils'
 import { detectMeetingProvider } from '@/lib/meeting-utils'
 import type { QuickLink } from '@/lib/types'
+import { useI18n } from '@/lib/i18n/react'
 
 interface QuickLinkCardProps {
   link: QuickLink
@@ -25,6 +26,7 @@ function openLink(url: string) {
 }
 
 export function QuickLinkCard({ link, onEdit }: QuickLinkCardProps) {
+  const { t } = useI18n()
   // Fallback icon: first **grapheme** (full character) of the title so
   // CJK glyphs render cleanly instead of half a codepoint. `Array.from`
   // splits by code unit, good enough for the languages Waddle ships in.
@@ -112,7 +114,7 @@ export function QuickLinkCard({ link, onEdit }: QuickLinkCardProps) {
             e.stopPropagation()
             onEdit(link)
           }}
-          aria-label={`編輯 ${link.title}`}
+          aria-label={t('編輯 {title}', { title: link.title })}
           className={cn(
             'absolute top-1.5 right-1.5 flex items-center justify-center w-6 h-6 rounded-full',
             // Touch devices get a >=44x44 hit box (visual disc stays w-6

@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n/react'
+import { t } from '@/lib/i18n'
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -34,6 +36,12 @@ function AppleIcon({ className }: { className?: string }) {
 export default function SignupPage() {
   const router = useRouter()
   const supabase = createClient()
+  // Subscribes this component to language changes; translations below use the
+  // plain `t` import (same underlying function) so the helper translateError
+  // outside this component can share it without a naming clash.
+  // Hook-bound t shadows the module-level import inside the component so
+  // render output follows the hydration-safe language (SSR = zh first paint).
+  const { t } = useI18n()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -54,7 +62,7 @@ export default function SignupPage() {
     setError(null)
 
     if (password.length < 6) {
-      setError('密碼至少需要 6 個字元')
+      setError(t('密碼至少需要 6 個字元'))
       return
     }
 
@@ -115,17 +123,17 @@ export default function SignupPage() {
           <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
             <CheckCircle2 className="w-6 h-6" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">檢查你的信箱</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t('檢查你的信箱')}</h1>
           <p className="text-sm text-muted-foreground mt-2">
-            我們已寄出驗證連結到 <span className="font-medium text-foreground">{email}</span>
+            {t('我們已寄出驗證連結到')} <span className="font-medium text-foreground">{email}</span>
             <br />
-            點擊連結後即可登入。
+            {t('點擊連結後即可登入。')}
           </p>
           <Link
             href="/login"
             className="mt-6 text-sm text-foreground font-medium hover:underline"
           >
-            返回登入
+            {t('返回登入')}
           </Link>
         </div>
       </div>
@@ -135,8 +143,8 @@ export default function SignupPage() {
   return (
     <div className="bg-card border border-border rounded-2xl shadow-ceramic p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">建立帳號</h1>
-        <p className="text-sm text-muted-foreground mt-1">幾秒鐘就能開始使用 Huddle</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('建立帳號')}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{t('幾秒鐘就能開始使用 Huddle')}</p>
       </div>
 
       <div className="space-y-2.5">
@@ -152,7 +160,7 @@ export default function SignupPage() {
           ) : (
             <GoogleIcon className="w-4 h-4" />
           )}
-          <span className="ml-2">使用 Google 註冊</span>
+          <span className="ml-2">{t('使用 Google 註冊')}</span>
         </Button>
 
         <Button
@@ -167,7 +175,7 @@ export default function SignupPage() {
           ) : (
             <AppleIcon className="w-4 h-4" />
           )}
-          <span className="ml-2">使用 Apple 註冊</span>
+          <span className="ml-2">{t('使用 Apple 註冊')}</span>
         </Button>
       </div>
 
@@ -176,7 +184,7 @@ export default function SignupPage() {
           <div className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 text-muted-foreground">或使用 Email</span>
+          <span className="bg-card px-2 text-muted-foreground">{t('或使用 Email')}</span>
         </div>
       </div>
 
@@ -197,7 +205,7 @@ export default function SignupPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">密碼</Label>
+          <Label htmlFor="password">{t('密碼')}</Label>
           <div className="relative">
             <Input
               id="password"
@@ -209,18 +217,18 @@ export default function SignupPage() {
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
               className="h-11 pr-10"
-              placeholder="至少 6 個字元"
+              placeholder={t('至少 6 個字元')}
             />
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={showPassword ? '隱藏密碼' : '顯示密碼'}
+              aria-label={showPassword ? t('隱藏密碼') : t('顯示密碼')}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
-          <p className="text-xs text-muted-foreground">至少 6 個字元</p>
+          <p className="text-xs text-muted-foreground">{t('至少 6 個字元')}</p>
         </div>
 
         {error && (
@@ -234,14 +242,14 @@ export default function SignupPage() {
         )}
 
         <Button type="submit" className="w-full h-11" disabled={oauthBusy}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : '建立帳號'}
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t('建立帳號')}
         </Button>
       </form>
 
       <p className="text-center text-sm text-muted-foreground mt-6">
-        已經有帳號了？{' '}
+        {t('已經有帳號了？')}{' '}
         <Link href="/login" className="text-foreground font-medium hover:underline">
-          登入
+          {t('登入')}
         </Link>
       </p>
     </div>
@@ -250,9 +258,9 @@ export default function SignupPage() {
 
 function translateError(message: string): string {
   const map: Record<string, string> = {
-    'User already registered': '此 Email 已註冊，請直接登入',
-    'Password should be at least 6 characters': '密碼至少需要 6 個字元',
-    'Unable to validate email address: invalid format': 'Email 格式不正確',
+    'User already registered': t('此 Email 已註冊，請直接登入'),
+    'Password should be at least 6 characters': t('密碼至少需要 6 個字元'),
+    'Unable to validate email address: invalid format': t('Email 格式不正確'),
   }
   return map[message] ?? message
 }

@@ -12,6 +12,7 @@ import {
 import { detectMeetingProvider } from '@/lib/meeting-utils'
 import { isNative } from '@/lib/platform'
 import { syncMeetingReminders } from '@/lib/notifications'
+import { t } from '@/lib/i18n'
 
 /**
  * Watches all meetings in the workspace tree and fires a browser
@@ -76,10 +77,10 @@ export function useMeetingReminders(workspaces: Workspace[]) {
         const trim = (s: string, max: number) =>
           s.replace(/\s+/g, ' ').trim().slice(0, max)
         const bodyLines: string[] = []
-        bodyLines.push(`${m.scheduledStartTime} 開始（${minutesUntil} 分鐘後）`)
-        if (m.location) bodyLines.push(`地點：${trim(m.location, 80)}`)
-        if (m.attendees) bodyLines.push(`參與者：${trim(m.attendees, 120)}`)
-        const safeTitle = trim(m.title, 80) || '會議'
+        bodyLines.push(t('{time} 開始（{lead} 分鐘後）', { time: m.scheduledStartTime, lead: minutesUntil }))
+        if (m.location) bodyLines.push(t('地點：{location}', { location: trim(m.location, 80) }))
+        if (m.attendees) bodyLines.push(t('參與者：{attendees}', { attendees: trim(m.attendees, 120) }))
+        const safeTitle = trim(m.title, 80) || t('會議')
 
         // Only treat the URL as "openable" if it parses as a known video
         // provider (or matches the http(s) catch-all). Anything else —
@@ -92,7 +93,7 @@ export function useMeetingReminders(workspaces: Workspace[]) {
         const openable = !!m.meetingUrl && provider !== null
 
         try {
-          const n = new Notification(`會議提醒 · ${safeTitle}`, {
+          const n = new Notification(t('會議提醒 · {title}', { title: safeTitle }), {
             body: bodyLines.join('\n'),
             // Tag dedupes within the OS notification center — re-firing
             // the same id swaps the visible notification instead of

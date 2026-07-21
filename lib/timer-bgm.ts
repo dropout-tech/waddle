@@ -25,6 +25,8 @@
 // Missing files (404) resolve quietly and mark the track unavailable —
 // the UI surfaces that as a disabled state.
 
+import { t, getLang } from '@/lib/i18n'
+
 export type RealMusicId = 'relax' | 'energetic' | 'nature'
 /** Music selection. 'all' = cycle the whole playlist. */
 export type BgmMusicId = RealMusicId | 'all'
@@ -530,14 +532,16 @@ export function summarizeBgm(
   const hasSelection = !!music || activeAmbients.length > 0
   let summary: string
   if (opts.allMissing) {
-    summary = opts.allMissingLabel ?? '尚未加入音檔'
+    summary = opts.allMissingLabel ?? t('尚未加入音檔')
   } else if (!hasSelection) {
-    summary = opts.offLabel ?? '關閉'
+    // '關閉' here means "Off" (BGM state); the shared dict key translates the
+    // majority meaning "Close", so this site bypasses the dict.
+    summary = opts.offLabel ?? (getLang() === 'en' ? 'Off' : '關閉')
   } else {
     const parts: string[] = []
-    if (isShuffle) parts.push(ALL_MUSIC_LABEL)
-    else if (musicMeta) parts.push(musicMeta.label)
-    if (activeAmbients.length > 0) parts.push(activeAmbients.map((a) => a.label).join('·'))
+    if (isShuffle) parts.push(t(ALL_MUSIC_LABEL))
+    else if (musicMeta) parts.push(t(musicMeta.label))
+    if (activeAmbients.length > 0) parts.push(activeAmbients.map((a) => t(a.label)).join('·'))
     summary = parts.join(' + ')
   }
   return { summary, hasSelection, activeAmbients, musicMeta, isShuffle }

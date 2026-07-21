@@ -17,6 +17,7 @@ import { CurrentTimeLine } from './current-time-line'
 import { CheckSquare, Coffee, Clock, Crosshair, User, X } from 'lucide-react'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { WORKSPACE_COLORS } from '@/lib/palette'
+import { useI18n } from '@/lib/i18n/react'
 
 interface TimeGridProps {
   scheduledTasks: Task[]
@@ -64,6 +65,7 @@ export function TimeGrid({
   const containerRef = useRef<HTMLDivElement>(null)
   const gridRef      = useRef<HTMLDivElement>(null)
   const displayColor = useDisplayColor()
+  const { t } = useI18n()
 
   // ── New-slot drag (background) ──────────────────────────────────────────
   const [isSlotDragging, setIsSlotDragging] = useState(false)
@@ -211,7 +213,9 @@ export function TimeGrid({
       onCreateTask?.(startTime, endTime)
     } else {
       const meta = SLOT_TYPES.find(s => s.key === key)!
-      onCreateTimeBlock?.(startTime, endTime, key as TimeBlock['type'], meta.label, meta.color)
+      // meta.label is stored as the TimeBlock's persisted label — translate
+      // at creation time so it's saved in the user's current UI language.
+      onCreateTimeBlock?.(startTime, endTime, key as TimeBlock['type'], t(meta.label), meta.color)
     }
     setPendingSlot(null)
   }
@@ -296,7 +300,7 @@ export function TimeGrid({
                   <X className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
               </div>
-              <p className="text-[10px] text-muted-foreground mb-2">選擇時間區塊的類型</p>
+              <p className="text-[10px] text-muted-foreground mb-2">{t('選擇時間區塊的類型')}</p>
               <div className="flex flex-col gap-1">
                 {SLOT_TYPES.map(({ key, label, icon: Icon, color: rawColor, description }) => {
                   const color = displayColor(rawColor)
@@ -310,8 +314,8 @@ export function TimeGrid({
                       <Icon className="w-4 h-4" style={{ color }} />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-foreground">{label}</div>
-                      <div className="text-[10px] text-muted-foreground">{description}</div>
+                      <div className="text-sm font-medium text-foreground">{t(label)}</div>
+                      <div className="text-[10px] text-muted-foreground">{t(description)}</div>
                     </div>
                   </button>
                   )

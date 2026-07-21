@@ -7,6 +7,7 @@ import type { Task } from '@/lib/types'
 import { formatEstimatedTime } from '@/lib/task-utils'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
+import { useI18n } from '@/lib/i18n/react'
 
 interface PendingZoneProps {
   tasks: Task[]
@@ -20,6 +21,7 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const showCategoryPrefix = useShowCategoryPrefix()
+  const { t } = useI18n()
 
   const handleSubmit = () => {
     if (newTaskTitle.trim()) {
@@ -40,14 +42,14 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
 
   if (tasks.length === 0 && !isAdding) {
     return (
-      <div className="px-5 py-4 border-b border-border bg-muted/30" role="region" aria-label="待排程任務">
+      <div className="px-5 py-4 border-b border-border bg-muted/30" role="region" aria-label={t('待排程任務')}>
         <button
           type="button"
           onClick={() => { setIsAdding(true); setTimeout(() => inputRef.current?.focus(), 0) }}
           className="w-full flex items-center justify-center gap-2 text-muted-foreground/50 hover:text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
         >
           <Plus className="w-4 h-4" aria-hidden="true" />
-          <span className="text-xs">點擊新增待排程任務</span>
+          <span className="text-xs">{t('點擊新增待排程任務')}</span>
         </button>
       </div>
     )
@@ -57,16 +59,16 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
     <div
       className="px-5 py-4 border-b border-border bg-muted/20"
       role="region"
-      aria-label="待排程任務"
+      aria-label={t('待排程任務')}
     >
       {/* Label */}
       <div className="flex items-center gap-2 mb-3">
         <Clock className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
         <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
-          待排程
+          {t('待排程')}
         </span>
         <span className="text-[10px] text-muted-foreground/60">
-          · 拖曳到下方時間軸
+          {t('· 拖曳到下方時間軸')}
         </span>
       </div>
 
@@ -82,7 +84,7 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
               onChange={(e) => setNewTaskTitle(e.target.value)}
               onKeyDown={handleKeyDown}
               onBlur={() => { if (!newTaskTitle.trim()) setIsAdding(false) }}
-              placeholder="任務名稱..."
+              placeholder={t('任務名稱...')}
               className="w-32 bg-transparent text-xs outline-none placeholder:text-muted-foreground/50"
               autoFocus
               enterKeyHint="done"
@@ -103,7 +105,7 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-all"
           >
             <Plus className="w-3 h-3" />
-            <span>新增</span>
+            <span>{t('新增')}</span>
           </button>
         )}
 
@@ -111,7 +113,7 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
           <div
             key={task.id}
             draggable
-            aria-label={`待排程任務：${taskDisplayTitle(task, showCategoryPrefix)}`}
+            aria-label={t('待排程任務：{title}', { title: taskDisplayTitle(task, showCategoryPrefix) })}
             className={cn(
               'group flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-all cursor-grab active:cursor-grabbing',
               'bg-card border border-border hover:border-primary/30 hover:shadow-sm',
@@ -122,7 +124,7 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
             {/* Checkbox */}
             <button
               onClick={() => onToggleComplete?.(task.id)}
-              aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
+              aria-label={task.isCompleted ? t('標記為未完成') : t('標記為完成')}
               className={cn(
                 'flex-shrink-0 w-3.5 h-3.5 rounded-full border-[1.5px] flex items-center justify-center transition-all',
                 task.isCompleted 

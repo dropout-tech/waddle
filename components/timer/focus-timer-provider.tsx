@@ -27,6 +27,7 @@ import {
   Brain, BookOpen, Dumbbell, Coffee,
 } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useI18n } from '@/lib/i18n/react'
 import { playTimerSound, type TimerSoundKind } from '@/lib/timer-sound'
 import {
   BGM_MUSIC, BGM_AMBIENT, getBgmEngine,
@@ -247,6 +248,7 @@ const NOTEBOOK_MOBILE_MINI_BOTTOM_PX = 64
 export function FocusTimerProvider({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
   const pathname = usePathname()
+  const { t } = useI18n()
 
   const [isExpanded, setIsExpanded] = useState(false)
   const [mode, setMode] = useState<TimerMode>('pomodoro')
@@ -415,8 +417,8 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     setBgmOverride(null)
     const now = new Date()
     const label = customLabel || (mode === 'pomodoro'
-      ? (useCustom ? `${customMinutes}分鐘專注` : POMODORO_PRESETS[selectedPreset].label)
-      : focusType.label)
+      ? (useCustom ? t('{minutes}分鐘專注', { minutes: customMinutes }) : t(POMODORO_PRESETS[selectedPreset].label))
+      : t(focusType.label))
     const color = mode === 'pomodoro'
       ? (useCustom ? focusType.color : POMODORO_PRESETS[selectedPreset].color)
       : focusType.color
@@ -430,17 +432,17 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     else setElapsed(0)
     setView(opts?.immersive || prefs.openInImmersive || isMobile ? 'immersive' : 'mini')
     setState('running')
-  }, [customLabel, mode, useCustom, customMinutes, selectedPreset, focusType, prefs.openInImmersive, isMobile, getTargetSeconds])
+  }, [customLabel, mode, useCustom, customMinutes, selectedPreset, focusType, prefs.openInImmersive, isMobile, getTargetSeconds, t])
 
   const startBreak = useCallback(() => {
     const breakSeconds = Math.max(1, Math.floor(prefs.breakMinutes)) * 60
     setSession({
       mode: 'pomodoro', phase: 'break', startedAt: new Date(), pausedMs: 0, pausedAt: null,
-      targetSeconds: breakSeconds, label: `休息 ${prefs.breakMinutes} 分`, color: BREAK_COLOR,
+      targetSeconds: breakSeconds, label: t('休息 {min} 分', { min: prefs.breakMinutes }), color: BREAK_COLOR,
     })
     setTimeLeft(breakSeconds)
     setState('running')
-  }, [prefs.breakMinutes])
+  }, [prefs.breakMinutes, t])
 
   const pauseTimer = useCallback(() => {
     setSession((s) => (s ? { ...s, pausedAt: new Date() } : s))

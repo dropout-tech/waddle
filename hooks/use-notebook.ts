@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { NotebookNote, NotebookCategory, TiptapDoc } from '@/lib/types'
 import type { Database } from '@/lib/supabase/database.types'
+import { t } from '@/lib/i18n'
 
 type NotebookNotesRow = Database['public']['Tables']['notebook_notes']['Row']
 type NotebookCategoriesRow = Database['public']['Tables']['notebook_categories']['Row']
@@ -441,7 +442,7 @@ export function useNotebook() {
   const uploadImage = useCallback(
     async (file: File): Promise<string> => {
       const userId = userIdRef.current
-      if (!userId) throw new Error('尚未登入')
+      if (!userId) throw new Error(t('尚未登入'))
       const ext = (file.name.split('.').pop() || 'png').toLowerCase()
       const path = `${userId}/${crypto.randomUUID()}.${ext}`
       const { error } = await supabase.storage

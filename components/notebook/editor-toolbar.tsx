@@ -20,15 +20,19 @@ import {
   Undo2,
   Redo2,
   ListPlus,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset'
+import { useI18n } from '@/lib/i18n/react'
+import { pickAndInsertImage, type UploadImageFn } from './upload-image'
 
 interface EditorToolbarProps {
   editor: Editor | null
   /** Promote the current selection (or current line) to a real task. */
   onPromote?: (title: string) => void
+  uploadImage: UploadImageFn
 }
 
 // Pull a sensible task title from the editor: the selected text if there's a
@@ -50,19 +54,20 @@ export function selectionOrLineText(editor: Editor): string {
 // fight the OS's own text-selection UI) and no hover affordance for "/", so
 // this bar stays as the primary formatting entry point, docked above the
 // keyboard.
-export function EditorToolbar({ editor, onPromote }: EditorToolbarProps) {
+export function EditorToolbar({ editor, onPromote, uploadImage }: EditorToolbarProps) {
   // Hooks must run before the early return. On mobile the bar detaches from the
   // top of the editor and docks above the keyboard (iOS input-accessory style)
   // so formatting stays reachable while typing at the bottom of a long note.
   const isMobile = useIsMobile()
   const keyboardInset = useKeyboardInset()
+  const { t } = useI18n()
 
   if (!editor) return null
   if (!isMobile) return null
 
   const setLink = () => {
     const prev = editor.getAttributes('link').href as string | undefined
-    const url = window.prompt('連結網址', prev ?? 'https://')
+    const url = window.prompt(t('連結網址'), prev ?? 'https://')
     if (url === null) return // cancelled
     if (url === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run()
@@ -96,71 +101,74 @@ export function EditorToolbar({ editor, onPromote }: EditorToolbarProps) {
           : undefined
       }
     >
-      <Btn label="標題 1" active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
+      <Btn label={t('標題 1')} active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
         <Heading1 className="h-4 w-4" />
       </Btn>
-      <Btn label="標題 2" active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
+      <Btn label={t('標題 2')} active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
         <Heading2 className="h-4 w-4" />
       </Btn>
-      <Btn label="標題 3" active={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
+      <Btn label={t('標題 3')} active={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
         <Heading3 className="h-4 w-4" />
       </Btn>
 
       <Divider />
 
-      <Btn label="粗體" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
+      <Btn label={t('粗體')} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
         <Bold className="h-4 w-4" />
       </Btn>
-      <Btn label="斜體" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
+      <Btn label={t('斜體')} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
         <Italic className="h-4 w-4" />
       </Btn>
-      <Btn label="底線" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+      <Btn label={t('底線')} active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
         <UnderlineIcon className="h-4 w-4" />
       </Btn>
-      <Btn label="刪除線" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
+      <Btn label={t('刪除線')} active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
         <Strikethrough className="h-4 w-4" />
       </Btn>
-      <Btn label="行內程式碼" active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
+      <Btn label={t('行內程式碼')} active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
         <Code className="h-4 w-4" />
       </Btn>
-      <Btn label="連結" active={editor.isActive('link')} onClick={setLink}>
+      <Btn label={t('連結')} active={editor.isActive('link')} onClick={setLink}>
         <Link2 className="h-4 w-4" />
       </Btn>
 
       <Divider />
 
-      <Btn label="項目符號" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+      <Btn label={t('項目符號')} active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
         <List className="h-4 w-4" />
       </Btn>
-      <Btn label="編號清單" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+      <Btn label={t('編號清單')} active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
         <ListOrdered className="h-4 w-4" />
       </Btn>
-      <Btn label="待辦清單" active={editor.isActive('taskList')} onClick={() => editor.chain().focus().toggleTaskList().run()}>
+      <Btn label={t('待辦清單')} active={editor.isActive('taskList')} onClick={() => editor.chain().focus().toggleTaskList().run()}>
         <ListChecks className="h-4 w-4" />
       </Btn>
-      <Btn label="收合區塊（toggle）" active={editor.isActive('details')} onClick={() => editor.chain().focus().setDetails().run()}>
+      <Btn label={t('收合區塊（toggle）')} active={editor.isActive('details')} onClick={() => editor.chain().focus().setDetails().run()}>
         <ChevronRight className="h-4 w-4" />
       </Btn>
-      <Btn label="引言" active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
+      <Btn label={t('引言')} active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
         <Quote className="h-4 w-4" />
       </Btn>
-      <Btn label="分隔線" active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+      <Btn label={t('分隔線')} active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()}>
         <Minus className="h-4 w-4" />
+      </Btn>
+      <Btn label={t('插入圖片')} active={false} onClick={() => pickAndInsertImage(editor.view, uploadImage)}>
+        <ImageIcon className="h-4 w-4" />
       </Btn>
 
       <Divider />
 
-      <Btn label="復原" active={false} disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
+      <Btn label={t('復原')} active={false} disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
         <Undo2 className="h-4 w-4" />
       </Btn>
-      <Btn label="重做" active={false} disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()}>
+      <Btn label={t('重做')} active={false} disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()}>
         <Redo2 className="h-4 w-4" />
       </Btn>
 
       {onPromote && (
         <>
           <Divider />
-          <Btn label="升級為任務" active={false} onClick={() => onPromote(selectionOrLineText(editor))}>
+          <Btn label={t('升級為任務')} active={false} onClick={() => onPromote(selectionOrLineText(editor))}>
             <ListPlus className="h-4 w-4" />
           </Btn>
         </>

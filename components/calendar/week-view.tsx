@@ -27,6 +27,7 @@ import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { WORKSPACE_COLORS } from '@/lib/palette'
+import { useI18n } from '@/lib/i18n/react'
 
 interface WeekViewProps {
   selectedDate: Date
@@ -61,6 +62,11 @@ interface ActiveTaskDrag extends TaskDragStart {
   dayIndex: number
 }
 
+// Bare weekday chars collide with other single-char meanings elsewhere in
+// the shared t() dictionary (see calendar-header.tsx) — resolve English
+// weekday abbreviations directly by index instead of routing through t().
+const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
 const BASE_DAY_WIDTH = 120 // baseline column width when weekViewDays === 7
 // Initial 21-day window centered on selectedDate; extends in both directions
 // on demand as user scrolls toward an edge.
@@ -94,6 +100,7 @@ export function WeekView({
   const showCategoryPrefix = useShowCategoryPrefix()
   const displayColor = useDisplayColor()
   const isMobile = useIsMobile()
+  const { t: translate, lang } = useI18n()
   // Measured width of the horizontal scroll container, on every screen
   // size (not just mobile). Columns are sized so exactly N days fill the
   // viewport — on mobile that's a fixed 3 (swipes land on aligned whole
@@ -459,7 +466,7 @@ export function WeekView({
         // surface an explicit undo. Without this, mis-aimed drags silently
         // un-time tasks and they appear to vanish from the timeline.
         const pendingDate = overPending.getAttribute('data-pending-zone-date') ?? undefined
-        const taskTitle = tasks.find((t) => t.id === finalState.taskId)?.title || '任務'
+        const taskTitle = tasks.find((t) => t.id === finalState.taskId)?.title || translate('任務')
         const originalDate = tasks.find((t) => t.id === finalState.taskId)?.scheduledDate
         const originalStart = minutesToTime(finalState.originalStart)
         const originalEnd = minutesToTime(finalState.originalEnd)
@@ -482,11 +489,14 @@ export function WeekView({
         }
 
         toast(
-          `「${taskTitle}」已移到 ${pendingDate ?? '待排程'}（時間移除）`,
+          translate('「{title}」已移到 {date}（時間移除）', {
+            title: taskTitle,
+            date: pendingDate ?? translate('待排程'),
+          }),
           {
             duration: 8000,
             action: {
-              label: '復原',
+              label: translate('復原'),
               onClick: () => {
                 if (originalDate) {
                   onRescheduleTask?.(finalState.taskId, originalDate, originalStart, originalEnd)
@@ -533,7 +543,7 @@ export function WeekView({
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
-  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask, tasks])
+  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask, tasks, DAY_WIDTH, translate])
 
   // Pending task drag — same window-level pattern. Drag preview only activates
   // after the cursor moves past the threshold, so a plain click on a pending
@@ -800,7 +810,7 @@ export function WeekView({
           isOpen={recurrenceModal.isOpen}
           onClose={() => setRecurrenceModal(null)}
           onConfirm={handleRecurrenceConfirm}
-          title={recurrenceModal.type === 'reschedule' ? '重新排程重複任務' : '取消排程重複任務'}
+          title={recurrenceModal.type === 'reschedule' ? translate('重新排程重複任務') : translate('取消排程重複任務')}
         />
       )}
       {/* Resizable Header Row */}
@@ -856,7 +866,7 @@ export function WeekView({
                       isToday && 'bg-primary/10'
                     )}>
                       <div className="text-[10px] text-muted-foreground font-medium">
-                        週{WEEKDAY_NAMES[weekdayIndex]}
+                        {lang === 'en' ? WEEKDAYS_EN[weekdayIndex] : `週${WEEKDAY_NAMES[weekdayIndex]}`}
                       </div>
                       <div className={cn(
                         'text-lg font-bold',
@@ -887,7 +897,7 @@ export function WeekView({
                         // timeline below.
                         onCreateTask?.(dateStr)
                       }}
-                      title={(activeTaskDrag || pendingTaskDrag) ? '放開以放到待排程' : '點擊新增任務'}
+                      title={(activeTaskDrag || pendingTaskDrag) ? translate('放開以放到待排程') : translate('點擊新增任務')}
                     >
                       {allDayTasks.map((task) => {
                         const isThisTaskBeingDragged = pendingTaskDrag?.task.id === task.id
@@ -1179,19 +1189,19 @@ export function WeekView({
                       className="flex items-center gap-1 text-xs font-semibold text-foreground hover:text-primary transition-colors"
                     >
                       <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
-                      返回
+                      {translate('返回')}
                     </button>
                   ) : (
                     <span className="text-xs font-semibold text-foreground">
                       {pendingSlot.startTime} - {pendingSlot.endTime}
                     </span>
                   )}
-                  <button onClick={() => { setPendingSlot(null); setSelectedParent(null) }} aria-label="關閉" className="p-1 rounded-lg hover:bg-muted transition-colors">
+                  <button onClick={() => { setPendingSlot(null); setSelectedParent(null) }} aria-label={translate('關閉')} className="p-1 rounded-lg hover:bg-muted transition-colors">
                     <X className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
                   </button>
                 </div>
                 <p className="text-[10px] text-muted-foreground mb-2">
-                  {selectedParent ? slotTypes.find(s => s.id === selectedParent)?.label : '選擇時間區塊的類型'}
+                  {selectedParent ? slotTypes.find(s => s.id === selectedParent)?.label : translate('選擇時間區塊的類型')}
                 </p>
                 <div className="flex flex-col gap-1">
                   {(selectedParent ? getChildSlotTypes(selectedParent) : topLevelSlotTypes).map((slotType) => {

@@ -4,6 +4,7 @@ import { Undo2, Redo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { performRedo, performUndo, useUndoStack } from '@/lib/undo-stack'
+import { useI18n } from '@/lib/i18n/react'
 
 /**
  * Toolbar pair: ↶ Undo + ↷ Redo.
@@ -18,13 +19,14 @@ import { performRedo, performUndo, useUndoStack } from '@/lib/undo-stack'
  */
 export function UndoRedoButtons({ className }: { className?: string }) {
   const { undoLen, redoLen, topUndoLabel, topRedoLabel } = useUndoStack()
+  const { t } = useI18n()
 
   const handleUndo = async () => {
     try {
       const action = await performUndo()
-      if (action) toast.success(`已復原：${action.label}`)
+      if (action) toast.success(t('已復原：{label}', { label: action.label }))
     } catch (e) {
-      toast.error('復原失敗')
+      toast.error(t('復原失敗'))
       console.error(e)
     }
   }
@@ -32,9 +34,9 @@ export function UndoRedoButtons({ className }: { className?: string }) {
   const handleRedo = async () => {
     try {
       const action = await performRedo()
-      if (action) toast.success(`已重做：${action.label}`)
+      if (action) toast.success(t('已重做：{label}', { label: action.label }))
     } catch (e) {
-      toast.error('重做失敗')
+      toast.error(t('重做失敗'))
       console.error(e)
     }
   }
@@ -45,8 +47,8 @@ export function UndoRedoButtons({ className }: { className?: string }) {
         type="button"
         disabled={undoLen === 0}
         onClick={handleUndo}
-        title={topUndoLabel ? `復原：${topUndoLabel} (⌘Z)` : '無動作可復原 (⌘Z)'}
-        aria-label="復原"
+        title={topUndoLabel ? t('復原：{label} (⌘Z)', { label: topUndoLabel }) : t('無動作可復原 (⌘Z)')}
+        aria-label={t('復原')}
         className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Undo2 className="w-3.5 h-3.5" aria-hidden="true" />
@@ -55,8 +57,8 @@ export function UndoRedoButtons({ className }: { className?: string }) {
         type="button"
         disabled={redoLen === 0}
         onClick={handleRedo}
-        title={topRedoLabel ? `重做：${topRedoLabel} (⇧⌘Z)` : '無動作可重做 (⇧⌘Z)'}
-        aria-label="重做"
+        title={topRedoLabel ? t('重做：{label} (⇧⌘Z)', { label: topRedoLabel }) : t('無動作可重做 (⇧⌘Z)')}
+        aria-label={t('重做')}
         className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <Redo2 className="w-3.5 h-3.5" aria-hidden="true" />

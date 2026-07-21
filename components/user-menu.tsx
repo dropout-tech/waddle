@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes'
 import { LogOut, Mail, User, Loader2, Moon, Sun } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n/react'
 
 interface SessionInfo {
   email: string
@@ -30,6 +31,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
   const [signingOut, setSigningOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const { resolvedTheme, setTheme } = useTheme()
+  const { t } = useI18n()
   // next-themes resolves the theme only on the client; gate the toggle's
   // label/icon on mount so SSR and first render don't disagree.
   const [mounted, setMounted] = useState(false)
@@ -95,7 +97,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
           'hover:bg-muted/60 transition-colors',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
         )}
-        aria-label="使用者選單"
+        aria-label={t('使用者選單')}
         aria-expanded={open}
       >
         {session.avatarUrl ? (
@@ -161,7 +163,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
             aria-checked={isDark}
           >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            <span>{isDark ? '切換淺色' : '切換深色'}</span>
+            <span>{isDark ? t('切換淺色') : t('切換深色')}</span>
           </button>
 
           <div className="border-t border-border" />
@@ -180,7 +182,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
             ) : (
               <LogOut className="w-4 h-4" />
             )}
-            <span>登出</span>
+            <span>{t('登出')}</span>
           </button>
         </div>
       )}

@@ -33,6 +33,13 @@ import {
   parseDateString,
   WEEKDAY_NAMES,
 } from '@/lib/calendar-utils'
+import { useI18n } from '@/lib/i18n/react'
+import { getLang } from '@/lib/i18n'
+
+// English weekday abbreviations, used instead of the shared (Chinese-only)
+// WEEKDAY_NAMES when the UI language is English — kept local rather than
+// added to calendar-utils.ts since that file is owned elsewhere.
+const EN_WEEKDAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
 
 // Shared field chrome — mirrors components/ui/input.tsx so the swapped-in
 // triggers sit flush next to remaining shadcn Inputs in the same form.
@@ -43,15 +50,21 @@ const fieldClasses =
   'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] ' +
   'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50'
 
-/** 「7月12日（週六）」; adds the year when it isn't the current one. */
+/** 「7月12日（週六）」/ "Jul 12 (Sat)"; adds the year when it isn't the current one. */
 export function formatDateFieldLabel(value: string): string {
   const d = parseDateString(value)
   if (Number.isNaN(d.getTime())) return value
+  const isCurrentYear = d.getFullYear() === new Date().getFullYear()
+
+  if (getLang() === 'en') {
+    const month = d.toLocaleDateString('en-US', { month: 'short' })
+    const weekday = EN_WEEKDAY_NAMES[d.getDay()]
+    const ymd = isCurrentYear ? `${month} ${d.getDate()}` : `${month} ${d.getDate()}, ${d.getFullYear()}`
+    return `${ymd} (${weekday})`
+  }
+
   const md = `${d.getMonth() + 1}月${d.getDate()}日`
-  const ymd =
-    d.getFullYear() === new Date().getFullYear()
-      ? md
-      : `${d.getFullYear()}年${md}`
+  const ymd = isCurrentYear ? md : `${d.getFullYear()}年${md}`
   return `${ymd}（週${WEEKDAY_NAMES[d.getDay()]}）`
 }
 
@@ -71,11 +84,13 @@ export function DateField({
   value,
   onChange,
   className,
-  placeholder = '選擇日期',
+  placeholder,
   clearable = true,
   disabled,
   'aria-label': ariaLabel,
 }: DateFieldProps) {
+  const { t } = useI18n()
+  const resolvedPlaceholder = placeholder ?? t('選擇日期')
   const isMobile = useIsMobile()
   const [open, setOpen] = React.useState(false)
 
@@ -114,7 +129,7 @@ export function DateField({
             </span>
           ) : (
             <span className="truncate text-muted-foreground">
-              {placeholder}
+              {resolvedPlaceholder}
             </span>
           )}
         </button>
@@ -137,8 +152,11 @@ export function DateField({
           }}
           formatters={{
             formatCaption: (date) =>
-              `${date.getFullYear()} 年 ${date.getMonth() + 1} 月`,
-            formatWeekdayName: (date) => WEEKDAY_NAMES[date.getDay()],
+              getLang() === 'en'
+                ? date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                : `${date.getFullYear()} 年 ${date.getMonth() + 1} 月`,
+            formatWeekdayName: (date) =>
+              getLang() === 'en' ? EN_WEEKDAY_NAMES[date.getDay()] : WEEKDAY_NAMES[date.getDay()],
           }}
         />
         <div className="flex items-center justify-between gap-2 border-t border-border px-3 py-2">
@@ -150,7 +168,7 @@ export function DateField({
             }}
             className="rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors duration-150 ease-quart hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            今天
+            {t('今天')}
           </button>
           {clearable && value && (
             <button
@@ -161,7 +179,7 @@ export function DateField({
               }}
               className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors duration-150 ease-quart hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              清除
+              {t('清除')}
             </button>
           )}
         </div>

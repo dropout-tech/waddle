@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import { ModalShell } from '@/components/modals/modal-shell'
 import { NotebookWorkspace } from './notebook-workspace'
+import { useI18n } from '@/lib/i18n/react'
 
 interface NotebookOverlayContextValue {
   isOpen: boolean
@@ -35,6 +36,7 @@ export function useNotebookOverlay() {
  * call-sites in this app behave (see ModalShell's doc comment).
  */
 export function NotebookOverlayProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const [openCount, setOpenCount] = useState(0)
 
@@ -53,7 +55,7 @@ export function NotebookOverlayProvider({ children }: { children: ReactNode }) {
         isOpen={isOpen}
         onClose={close}
         variant="center"
-        ariaLabel="記事本"
+        ariaLabel={t('記事本')}
         className="md:h-[85vh] md:max-h-[85vh] md:max-w-[1100px]"
       >
         <NotebookWorkspace key={openCount} onExit={close} exitVariant="close" />

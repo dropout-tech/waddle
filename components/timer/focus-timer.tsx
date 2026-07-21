@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useI18n } from '@/lib/i18n/react'
 import type { Workspace } from '@/lib/types'
 import { playTimerSound, TIMER_SOUND_LABELS, type TimerSoundKind } from '@/lib/timer-sound'
 import {
@@ -41,6 +42,7 @@ interface FocusTimerProps {
 export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
   const isMobile = useIsMobile()
   const ft = useFocusTimer()
+  const { t } = useI18n()
 
   useEffect(() => {
     if (!onCreateTimeBlock) return
@@ -123,10 +125,10 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                 action next to the start button; the remembered preference
                 moved into the 更多 panel where settings belong. */}
             <div className="flex items-center justify-between px-5 pt-4 pb-1">
-              <span className="text-[15px] font-semibold tracking-tight text-foreground">專注</span>
+              <span className="text-[15px] font-semibold tracking-tight text-foreground">{t('專注')}</span>
               <button
                 onClick={() => setIsExpanded(false)}
-                aria-label="收合"
+                aria-label={t('收合')}
                 className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground"
               >
                 <ChevronDown className="w-4 h-4" />
@@ -148,7 +150,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                     )}
                   >
                     <Timer className="w-4 h-4" />
-                    番茄鐘
+                    {t('番茄鐘')}
                   </button>
                   <button
                     onClick={() => setMode('stopwatch')}
@@ -158,7 +160,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                     )}
                   >
                     <Clock className="w-4 h-4" />
-                    正計時
+                    {t('正計時')}
                   </button>
                 </div>
 
@@ -190,7 +192,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                               {preset.minutes}
                             </span>
                             <span className={cn("text-[11px] leading-none", active ? "text-foreground/70" : "text-muted-foreground")}>
-                              {preset.label}
+                              {t(preset.label)}
                             </span>
                           </button>
                         )
@@ -205,7 +207,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                       >
                         <Settings2 className={cn("w-4 h-4", useCustom ? "text-primary" : "text-muted-foreground")} />
                         <span className={cn("text-[11px] leading-none", useCustom ? "text-primary" : "text-muted-foreground")}>
-                          自訂
+                          {t('自訂')}
                         </span>
                       </button>
                     </div>
@@ -219,7 +221,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                           onChange={(e) => setCustomMinutes(parseInt(e.target.value) || 25)}
                           className="w-20 h-9 text-sm text-center"
                         />
-                        <span className="text-sm text-muted-foreground">分鐘</span>
+                        <span className="text-sm text-muted-foreground">{t('分鐘')}</span>
                       </div>
                     )}
                   </div>
@@ -245,7 +247,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                           } : undefined}
                         >
                           <type.icon className="w-4 h-4" />
-                          {type.label}
+                          {t(type.label)}
                         </button>
                       )
                     })}
@@ -254,7 +256,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
 
                 {/* Intention — what are you focusing on? */}
                 <Input
-                  placeholder="在專注什麼？（選填）"
+                  placeholder={t('在專注什麼？（選填）')}
                   value={customLabel}
                   onChange={(e) => setCustomLabel(e.target.value)}
                   className="h-10 text-sm rounded-xl"
@@ -269,9 +271,9 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                 && BGM_AMBIENT.every((a) => unavailableSrcs.has(a.src))
               const { summary: bgmSummary } = summarizeBgm(prefs.music, prefs.ambient, { allMissing })
               const detail = [
-                TIMER_SOUND_LABELS[prefs.sound],
+                t(TIMER_SOUND_LABELS[prefs.sound]),
                 bgmSummary,
-                mode === 'pomodoro' ? `休息 ${prefs.breakMinutes} 分` : null,
+                mode === 'pomodoro' ? t('休息 {min} 分', { min: prefs.breakMinutes }) : null,
               ].filter(Boolean).join(' · ')
               return (
                 <div className="px-5 pt-1">
@@ -282,7 +284,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                     className="w-full flex items-center gap-2 py-2.5 px-1 -mx-1 rounded-lg hover:bg-secondary/40 transition-colors text-left"
                   >
                     <Settings2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <span className="text-xs font-medium text-muted-foreground shrink-0">更多</span>
+                    <span className="text-xs font-medium text-muted-foreground shrink-0">{t('更多')}</span>
                     <span className="text-[11px] text-foreground/55 truncate flex-1 min-w-0">{detail}</span>
                     <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform shrink-0", showSettings && "rotate-180")} />
                   </button>
@@ -303,7 +305,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                     aria-pressed={prefs.openInImmersive}
                     className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-secondary/50 text-left"
                   >
-                    <span className="text-[11px] text-muted-foreground">開始時直接進入沉浸畫面</span>
+                    <span className="text-[11px] text-muted-foreground">{t('開始時直接進入沉浸畫面')}</span>
                     <span
                       className={cn(
                         'relative w-8 h-4 rounded-full transition-colors flex-shrink-0',
@@ -325,7 +327,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <label className="text-[11px] text-muted-foreground" htmlFor="timer-break-mins">
-                        休息時長（分）
+                        {t('休息時長（分）')}
                       </label>
                       <Input
                         id="timer-break-mins"
@@ -347,7 +349,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                       aria-pressed={prefs.autoStartBreak}
                       className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-secondary/50 text-left"
                     >
-                      <span className="text-[11px] text-muted-foreground">完成後自動進入休息</span>
+                      <span className="text-[11px] text-muted-foreground">{t('完成後自動進入休息')}</span>
                       <span
                         className={cn(
                           'relative w-8 h-4 rounded-full transition-colors flex-shrink-0',
@@ -366,7 +368,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                     <div className="flex items-center justify-between gap-2">
                       <label className="text-[11px] text-muted-foreground flex items-center gap-1.5">
                         {prefs.sound === 'silent' ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
-                        提示音
+                        {t('提示音')}
                       </label>
                       <div className="flex gap-1">
                         {(['chime', 'bell', 'beep', 'silent'] as TimerSoundKind[]).map((k) => (
@@ -385,7 +387,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                                 : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
                             )}
                           >
-                            {TIMER_SOUND_LABELS[k]}
+                            {t(TIMER_SOUND_LABELS[k])}
                           </button>
                         ))}
                       </div>
@@ -427,7 +429,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                       }}
                       disabled={!hasSelection || allMissing}
                       aria-pressed={isPlaying}
-                      title={!hasSelection ? '請先選擇音樂或環境音' : isPlaying ? '暫停' : '播放'}
+                      title={!hasSelection ? t('請先選擇音樂或環境音') : isPlaying ? t('暫停') : t('播放')}
                       className={cn(
                         'w-6 h-6 shrink-0 rounded-full flex items-center justify-center transition-colors',
                         !hasSelection || allMissing
@@ -447,7 +449,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                     >
                       <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                         <Music2 className="w-3 h-3" />
-                        背景音 / 環境音
+                        {t('背景音 / 環境音')}
                       </span>
                       <span className="flex items-center gap-1.5">
                         <span className={cn(
@@ -465,7 +467,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                     <div className="space-y-1.5">
                       <label className="text-[11px] text-muted-foreground flex items-center gap-1.5">
                         <Music2 className="w-3 h-3" />
-                        背景音樂
+                        {t('背景音樂')}
                       </label>
                       <div className="flex gap-1 flex-wrap">
                         <button
@@ -481,7 +483,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                               : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
                           )}
                         >
-                          無
+                          {t('無')}
                         </button>
                         {BGM_MUSIC.map((m) => {
                           const missing = unavailableSrcs.has(m.src)
@@ -494,7 +496,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                                 setPrefs((p) => ({ ...p, music: m.id }))
                               }}
                               disabled={missing}
-                              title={missing ? '音檔尚未加入（見 public/audio/README.md）' : undefined}
+                              title={missing ? t('音檔尚未加入（見 public/audio/README.md）') : undefined}
                               className={cn(
                                 'px-2 py-0.5 rounded text-[10px] font-medium transition-colors flex items-center gap-1',
                                 missing
@@ -504,7 +506,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                                     : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
                               )}
                             >
-                              <span>{m.emoji}</span>{m.label}
+                              <span>{m.emoji}</span>{t(m.label)}
                             </button>
                           )
                         })}
@@ -522,7 +524,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                                 setPrefs((p) => ({ ...p, music: ALL_MUSIC_ID }))
                               }}
                               disabled={everyMissing}
-                              title={everyMissing ? '尚未加入任何音檔（見 public/audio/README.md）' : '依序循環播放所有背景音樂'}
+                              title={everyMissing ? t('尚未加入任何音檔（見 public/audio/README.md）') : t('依序循環播放所有背景音樂')}
                               className={cn(
                                 'px-2 py-0.5 rounded text-[10px] font-medium transition-colors flex items-center gap-1',
                                 everyMissing
@@ -532,7 +534,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                                     : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
                               )}
                             >
-                              <span>{ALL_MUSIC_EMOJI}</span>{ALL_MUSIC_LABEL}
+                              <span>{ALL_MUSIC_EMOJI}</span>{t(ALL_MUSIC_LABEL)}
                             </button>
                           )
                         })()}
@@ -545,7 +547,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                           step={0.05}
                           value={prefs.musicVolume}
                           onChange={(e) => setPrefs((p) => ({ ...p, musicVolume: parseFloat(e.target.value) }))}
-                          aria-label="背景音樂音量"
+                          aria-label={t('背景音樂音量')}
                           className="w-full h-1 accent-primary"
                         />
                       )}
@@ -554,7 +556,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                     {/* Ambient overlays — multi-select, each with its own slider */}
                     <div className="space-y-1.5 pt-1">
                       <label className="text-[11px] text-muted-foreground">
-                        環境音（可疊加）
+                        {t('環境音（可疊加）')}
                       </label>
                       <div className="space-y-1">
                         {BGM_AMBIENT.map((a) => {
@@ -576,7 +578,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                                 }}
                                 aria-pressed={p.enabled}
                                 disabled={missing}
-                                title={missing ? '音檔尚未加入（見 public/audio/README.md）' : undefined}
+                                title={missing ? t('音檔尚未加入（見 public/audio/README.md）') : undefined}
                                 className={cn(
                                   'px-2 py-0.5 rounded text-[10px] font-medium transition-colors flex items-center gap-1 w-[68px] justify-start',
                                   missing
@@ -586,7 +588,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                                       : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
                                 )}
                               >
-                                <span>{a.emoji}</span>{a.label}
+                                <span>{a.emoji}</span>{t(a.label)}
                               </button>
                               <input
                                 type="range"
@@ -602,7 +604,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                                     [a.id]: { ...prev.ambient[a.id], volume: parseFloat(e.target.value) },
                                   },
                                 }))}
-                                aria-label={`${a.label}音量`}
+                                aria-label={t('{label}音量', { label: t(a.label) })}
                                 className="flex-1 h-1 accent-primary disabled:opacity-40"
                               />
                             </div>
@@ -612,7 +614,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                     </div>
                     {(unavailableSrcs.size > 0) && (
                       <p className="text-[10px] text-muted-foreground/70 italic pt-0.5">
-                        灰色項目尚未放入音檔 · 詳見 public/audio/README.md
+                        {t('灰色項目尚未放入音檔 · 詳見 public/audio/README.md')}
                       </p>
                     )}
                   </div>
@@ -642,7 +644,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                   }}
                 >
                   <Play className="w-4 h-4" />
-                  開始專注
+                  {t('開始專注')}
                 </Button>
                 {/* 放大開始 — the *action* the old header toggle pretended to
                     be: starts this session immediately in the immersive
@@ -651,8 +653,8 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                   <button
                     type="button"
                     onClick={() => startTimer({ immersive: true })}
-                    aria-label="放大開始：以沉浸畫面開始專注"
-                    title="放大開始：立即以沉浸畫面開始專注"
+                    aria-label={t('放大開始：以沉浸畫面開始專注')}
+                    title={t('放大開始：立即以沉浸畫面開始專注')}
                     className="h-12 w-12 shrink-0 rounded-2xl border border-border/70 bg-secondary/30 text-muted-foreground grid place-items-center transition-[transform,background-color,color] duration-150 ease-quart hover:bg-secondary/70 hover:text-foreground active:scale-[0.96] motion-reduce:transform-none"
                   >
                     <Maximize2 className="w-4 h-4" />
@@ -660,7 +662,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                 )}
               </div>
               <p className="text-[11px] text-muted-foreground/70 text-center mt-2.5">
-                結束後會自動記錄到今天的日曆
+                {t('結束後會自動記錄到今天的日曆')}
               </p>
             </div>
           </div>
@@ -679,7 +681,7 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
           >
             <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground" />
             <Timer className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">專注計時</span>
+            <span className="text-sm font-medium">{t('專注計時')}</span>
           </button>
         )}
       </div>

@@ -1,5 +1,6 @@
 import type { Task, ColorStatus, Workspace, Category } from './types'
 import { toDateString } from './calendar-utils'
+import { t, getLang } from '@/lib/i18n'
 
 // ─────────────────────────────────────────────────────────
 // Workspace-tree traversal helpers
@@ -102,11 +103,11 @@ export function getUrgencyColor(task: Task, displayColorOverride?: string): {
     : 0.04
 
   const urgencyLabel =
-    urgency >= 9 ? '極度緊急'
-    : urgency >= 7 ? '高度緊急'
-    : urgency >= 5 ? '中等'
-    : urgency >= 3 ? '一般'
-    : '輕鬆'
+    urgency >= 9 ? t('極度緊急')
+    : urgency >= 7 ? t('高度緊急')
+    : urgency >= 5 ? t('中等')
+    : urgency >= 3 ? t('一般')
+    : t('輕鬆')
 
   // --- Completed ---
   if (task.isCompleted) {
@@ -129,7 +130,7 @@ export function getUrgencyColor(task: Task, displayColorOverride?: string): {
       badgeBg: 'oklch(0.58 0.20 25 / 0.15)',
       badgeText: 'oklch(0.42 0.18 25)',
       dot: 'oklch(0.58 0.20 25)',
-      label: '已過期',
+      label: t('已過期'),
       isOverdue: true,
     }
   }
@@ -173,10 +174,14 @@ export function formatTime(time: string): string {
 
 // Format date for display
 export function formatDate(date: Date): string {
-  const days = ['日', '一', '二', '三', '四', '五', '六']
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
+  if (getLang() === 'en') {
+    const weekday = date.toLocaleDateString('en-US', { weekday: 'short' })
+    return `${year}/${month}/${day} (${weekday})`
+  }
+  const days = ['日', '一', '二', '三', '四', '五', '六']
   const weekday = days[date.getDay()]
   return `${year}/${month}/${day} 週${weekday}`
 }

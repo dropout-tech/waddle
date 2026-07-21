@@ -1,6 +1,7 @@
 import { Extension, ReactRenderer } from '@tiptap/react'
 import { Suggestion, exitSuggestion } from '@tiptap/suggestion'
 import { SlashMenu, filterSlashItems, type SlashItem, type SlashMenuHandle } from './slash-command-menu'
+import type { UploadImageFn } from './upload-image'
 
 // Notion's "/" block picker, wired through Tiptap's Suggestion utility.
 // Positioning is hand-rolled (fixed + clientRect-based, flips above the caret
@@ -11,17 +12,27 @@ const MENU_HEIGHT = 320
 const MENU_WIDTH = 240
 const GAP = 8
 
-export const SlashCommand = Extension.create({
+export interface SlashCommandOptions {
+  /** Passed through to the "圖片" item so it can upload + insert on pick. */
+  uploadImage?: UploadImageFn
+}
+
+export const SlashCommand = Extension.create<SlashCommandOptions>({
   name: 'slashCommand',
 
+  addOptions() {
+    return { uploadImage: undefined }
+  },
+
   addProseMirrorPlugins() {
+    const { uploadImage } = this.options
     return [
       Suggestion<SlashItem, SlashItem>({
         editor: this.editor,
         char: '/',
         startOfLine: false,
         allowSpaces: false,
-        items: ({ query }) => filterSlashItems(query),
+        items: ({ query }) => filterSlashItems(query, uploadImage),
         command: ({ editor, range, props }) => {
           props.run(editor, range)
         },

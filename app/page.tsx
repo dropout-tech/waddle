@@ -24,10 +24,12 @@ import { findTaskById } from '@/lib/task-utils'
 import { AuthGuard } from '@/components/auth/auth-guard'
 import { CategoryPrefixProvider } from '@/components/category-prefix-context'
 import { NotebookOverlayProvider } from '@/components/notebook/notebook-overlay-provider'
+import { useI18n } from '@/lib/i18n/react'
 import type { Task, SlotType, TimeBlock } from '@/lib/types'
 
 function WaddlePage() {
   const isMobile = useIsMobile()
+  const { t } = useI18n()
   const {
     workspaces,
     timeBlocks,
@@ -85,7 +87,7 @@ function WaddlePage() {
         id: `ws-${ws.id}`,
         key: `ws-${ws.id}`,
         label: ws.name,
-        description: `新增任務到「${ws.name}」`,
+        description: t('新增任務到「{name}」', { name: ws.name }),
         icon: ws.icon,
         iconType: 'emoji' as const,
         color: ws.color,
@@ -95,15 +97,17 @@ function WaddlePage() {
       }))
 
     const baseTypes: SlotType[] = [
-      { id: 'timeblock', key: 'timeblock', label: '時間區塊', description: '各類時間安排', icon: 'Layers', iconType: 'lucide', color: '#9CA3AF', sortOrder: workspaceTypes.length, isBuiltIn: true },
-      { id: 'break', key: 'break', label: '午休', description: '休息時間', icon: 'Coffee', iconType: 'lucide', color: '#F6A854', parentId: 'timeblock', sortOrder: 0, isBuiltIn: true },
-      { id: 'buffer', key: 'buffer', label: '緩衝', description: '彈性緩衝時間', icon: 'Clock', iconType: 'lucide', color: '#9BBFAC', parentId: 'timeblock', sortOrder: 1, isBuiltIn: true },
-      { id: 'focus', key: 'focus', label: '專注', description: '專注工作時段', icon: 'Crosshair', iconType: 'lucide', color: '#D46B8A', parentId: 'timeblock', sortOrder: 2, isBuiltIn: true },
+      { id: 'timeblock', key: 'timeblock', label: t('時間區塊'), description: t('各類時間安排'), icon: 'Layers', iconType: 'lucide', color: '#9CA3AF', sortOrder: workspaceTypes.length, isBuiltIn: true },
+      { id: 'break', key: 'break', label: t('午休'), description: t('休息時間'), icon: 'Coffee', iconType: 'lucide', color: '#F6A854', parentId: 'timeblock', sortOrder: 0, isBuiltIn: true },
+      { id: 'buffer', key: 'buffer', label: t('緩衝'), description: t('彈性緩衝時間'), icon: 'Clock', iconType: 'lucide', color: '#9BBFAC', parentId: 'timeblock', sortOrder: 1, isBuiltIn: true },
+      { id: 'focus', key: 'focus', label: t('專注'), description: t('專注工作時段'), icon: 'Crosshair', iconType: 'lucide', color: '#D46B8A', parentId: 'timeblock', sortOrder: 2, isBuiltIn: true },
     ]
 
     const customTypes = settings.slotTypes?.filter((s) => !s.isBuiltIn) || []
     return [...workspaceTypes, ...baseTypes, ...customTypes]
-  }, [workspaces, settings.slotTypes])
+    // `t` changes identity with the language, so these labels re-translate
+    // when the user switches language.
+  }, [workspaces, settings.slotTypes, t])
 
   // Modal state. taskMode distinguishes editing an existing task vs.
   // creating a new one through the same TaskDetailModal UI. In create mode,
@@ -365,7 +369,7 @@ function WaddlePage() {
       workspaceName: firstWorkspace.name,
       workspaceColor: firstWorkspace.color,
       categoryName: firstCategory.name,
-      title: '新任務',
+      title: t('新任務'),
       taskType: 'one_time',
       urgency: 5,
       calendarColor: firstWorkspace.color,
@@ -384,7 +388,7 @@ function WaddlePage() {
     // sticky, so without this it could still be 'create' from a prior action.
     setTaskMode('edit')
     setSelectedTask(newTask)
-  }, [workspaces, createTask])
+  }, [workspaces, createTask, t])
 
   if (isLoading) {
     return (
@@ -393,7 +397,7 @@ function WaddlePage() {
           <WaddleMascot className="w-20 h-20 animate-waddle-bob" />
           <div className="flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-sm">載入中...</span>
+            <span className="text-sm">{t('載入中...')}</span>
           </div>
         </div>
       </main>

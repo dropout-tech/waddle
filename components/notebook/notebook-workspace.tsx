@@ -10,6 +10,7 @@ import type { Task } from '@/lib/types'
 import { NoteList } from './note-list'
 import { NoteEditor, type NoteEditorHandle } from './note-editor'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n/react'
 
 interface NotebookWorkspaceProps {
   /** Called when the user wants to leave the notebook — either navigate back
@@ -32,6 +33,7 @@ interface NotebookWorkspaceProps {
  * `h-[100dvh]` on the full-page shell, or ModalShell's sized panel).
  */
 export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProps) {
+  const { t } = useI18n()
   const {
     notes,
     categories,
@@ -47,6 +49,7 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
     createCategory,
     renameCategory,
     deleteCategory,
+    uploadImage,
   } = useNotebook()
 
   // Reuse the board's task layer so "升級為任務" creates a real task with the
@@ -59,13 +62,13 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
     (rawTitle: string) => {
       const title = rawTitle.trim()
       if (!title) {
-        toast.error('沒有可升級的文字 — 先選取一段，或把游標放在某一行')
+        toast.error(t('沒有可升級的文字 — 先選取一段，或把游標放在某一行'))
         return
       }
       const firstWs = workspaces.find((w) => !w.isArchived) || workspaces[0]
       const firstCat = firstWs?.categories.find((c) => !c.isArchived) || firstWs?.categories[0]
       if (!firstWs || !firstCat) {
-        toast.error('請先在主面板建立工作區與分類')
+        toast.error(t('請先在主面板建立工作區與分類'))
         return
       }
       setDraftTask({
@@ -85,7 +88,7 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
         updatedAt: new Date().toISOString(),
       })
     },
-    [workspaces],
+    [workspaces, t],
   )
 
   const handleSaveTask = useCallback(
@@ -108,9 +111,9 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
         createdAt: now,
         updatedAt: now,
       })
-      toast.success('已建立任務')
+      toast.success(t('已建立任務'))
     },
-    [draftTask, workspaces, createTask],
+    [draftTask, workspaces, createTask, t],
   )
 
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -154,8 +157,8 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
         <button
           type="button"
           onClick={onExit}
-          title={exitVariant === 'back' ? '返回面板' : '關閉'}
-          aria-label={exitVariant === 'back' ? '返回面板' : '關閉'}
+          title={exitVariant === 'back' ? t('返回面板') : t('關閉')}
+          aria-label={exitVariant === 'back' ? t('返回面板') : t('關閉')}
           className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
         >
           {exitVariant === 'back' ? <ArrowLeft className="h-4 w-4" /> : <X className="h-4 w-4" />}
@@ -168,21 +171,21 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:hidden"
           >
             <ChevronLeft className="h-4 w-4" />
-            記事
+            {t('記事')}
           </button>
         )}
-        <span className="ml-1 hidden text-sm font-semibold text-foreground md:inline">記事本</span>
+        <span className="ml-1 hidden text-sm font-semibold text-foreground md:inline">{t('記事本')}</span>
         <div className="ml-auto flex items-center gap-1">
           {activeNote && (
             <button
               type="button"
               onClick={() => noteEditorRef.current?.promote()}
-              title="升級為任務"
-              aria-label="升級為任務"
+              title={t('升級為任務')}
+              aria-label={t('升級為任務')}
               className="hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:flex"
             >
               <ListPlus className="h-3.5 w-3.5" />
-              升級為任務
+              {t('升級為任務')}
             </button>
           )}
           <SaveIndicator status={saveStatus} hasNote={!!activeNote} />
@@ -235,12 +238,13 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
               onContentChange={(content) => saveNoteContent(activeNote.id, content)}
               onIconChange={(icon) => setNoteIcon(activeNote.id, icon)}
               onPromote={handlePromote}
+              uploadImage={uploadImage}
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <PanelLeft className="h-10 w-10 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">
-                {loading ? '載入中…' : '選一篇記事，或建立新的一篇'}
+                {loading ? t('載入中…') : t('選一篇記事，或建立新的一篇')}
               </p>
               {!loading && (
                 <button
@@ -248,7 +252,7 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
                   onClick={() => handleCreate()}
                   className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
-                  新增記事
+                  {t('新增記事')}
                 </button>
               )}
             </div>
@@ -271,26 +275,27 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
 }
 
 function SaveIndicator({ status, hasNote }: { status: string; hasNote: boolean }) {
+  const { t } = useI18n()
   if (!hasNote) return null
   if (status === 'saving')
     return (
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Loader2 className="h-3 w-3 animate-spin" />
-        儲存中
+        {t('儲存中')}
       </span>
     )
   if (status === 'error')
     return (
       <span className="flex items-center gap-1.5 text-xs text-destructive">
         <CloudOff className="h-3 w-3" />
-        儲存失敗
+        {t('儲存失敗')}
       </span>
     )
   if (status === 'saved')
     return (
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Check className="h-3 w-3" />
-        已儲存
+        {t('已儲存')}
       </span>
     )
   return null

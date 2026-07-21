@@ -13,6 +13,7 @@ import {
   type MeetingTaskRef,
   type ReminderLead,
 } from '@/lib/meeting-reminder'
+import { t } from '@/lib/i18n'
 
 // iOS allows at most 64 pending local notifications; stay comfortably under.
 const MAX_SCHEDULED = 60
@@ -104,12 +105,12 @@ export async function syncMeetingReminders(
   await LocalNotifications.schedule({
     notifications: upcoming.map(({ m, fireAt }) => {
       const reminderId = `${m.id}@${m.scheduledDate}T${m.scheduledStartTime}`
-      const bodyLines = [`${m.scheduledStartTime} 開始（${lead} 分鐘後）`]
-      if (m.location) bodyLines.push(`地點：${trim(m.location, 80)}`)
-      if (m.attendees) bodyLines.push(`參與者：${trim(m.attendees, 120)}`)
+      const bodyLines = [t('{time} 開始（{lead} 分鐘後）', { time: m.scheduledStartTime, lead })]
+      if (m.location) bodyLines.push(t('地點：{location}', { location: trim(m.location, 80) }))
+      if (m.attendees) bodyLines.push(t('參與者：{attendees}', { attendees: trim(m.attendees, 120) }))
       return {
         id: hashId(reminderId),
-        title: `會議提醒 · ${trim(m.title, 80) || '會議'}`,
+        title: t('會議提醒 · {title}', { title: trim(m.title, 80) || t('會議') }),
         body: bodyLines.join('\n'),
         schedule: { at: new Date(fireAt) },
         extra: { kind: 'meeting', meetingUrl: m.meetingUrl ?? null },

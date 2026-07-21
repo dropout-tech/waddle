@@ -104,7 +104,9 @@ async function main() {
   await waitForServerReady()
 
   const browser = await chromium.launch()
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+  // Pin the UI language: the app auto-detects from the browser locale since
+  // the i18n rollout, and this smoke test asserts the zh-TW labels.
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'zh-TW' })
 
   const consoleErrors = []
   const pageErrors = []

@@ -9,6 +9,8 @@ import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { useI18n } from '@/lib/i18n/react'
+import { format } from 'date-fns'
 
 interface MonthViewProps {
   selectedDate: Date
@@ -25,6 +27,10 @@ interface MonthViewProps {
 }
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+// Bare weekday chars collide with other single-char meanings elsewhere in
+// the shared t() dictionary (see calendar-header.tsx) — resolve English
+// weekday abbreviations directly by index instead of routing through t().
+const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS_TO_RENDER = 3
 
 export function MonthView({
@@ -44,6 +50,7 @@ export function MonthView({
   const showCategoryPrefix = useShowCategoryPrefix()
   const isMobile = useIsMobile()
   const displayColor = useDisplayColor()
+  const { t, lang } = useI18n()
 
   // Mobile agenda: the day whose tasks are listed under the compact grid.
   // Follows selectedDate (header navigation, "today" button) but can be
@@ -250,7 +257,7 @@ export function MonthView({
                         index === 0 || index === 6 ? 'text-foreground/65' : 'text-muted-foreground'
                       )}
                     >
-                      {day}
+                      {lang === 'en' ? WEEKDAYS_EN[index] : day}
                     </div>
                   ))}
                 </div>
@@ -316,16 +323,18 @@ export function MonthView({
         <div className="flex-1 flex flex-col min-h-0 border-t border-border/70 bg-panel">
           <div className="flex items-center justify-between pl-4 pr-2 py-1.5 border-b border-border/50">
             <span className="text-sm font-semibold">
-              {agendaDay.getMonth() + 1}月{agendaDay.getDate()}日 週{WEEKDAYS[agendaDay.getDay()]}
+              {lang === 'en'
+                ? format(agendaDay, 'MMM d · EEE')
+                : `${agendaDay.getMonth() + 1}月${agendaDay.getDate()}日 週${WEEKDAYS[agendaDay.getDay()]}`}
               {agendaIsToday && (
-                <span className="ml-2 text-xs font-medium text-primary">今天</span>
+                <span className="ml-2 text-xs font-medium text-primary">{t('今天')}</span>
               )}
             </span>
             <div className="flex items-center">
               <button
                 type="button"
                 onClick={() => onCreateTask?.(agendaDateString)}
-                aria-label="新增任務"
+                aria-label={t('新增任務')}
                 className="w-11 h-11 flex items-center justify-center rounded-lg text-primary active:bg-secondary/60 transition-colors"
               >
                 <Plus className="w-5 h-5" />
@@ -335,7 +344,7 @@ export function MonthView({
                 onClick={() => onOpenDayView?.(agendaDay)}
                 className="h-11 pl-2 pr-1 flex items-center justify-center gap-0.5 rounded-lg text-xs text-muted-foreground active:bg-secondary/60 transition-colors"
               >
-                日視圖
+                {t('日視圖')}
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -346,13 +355,13 @@ export function MonthView({
           <div className="flex-1 overflow-y-auto px-2 pt-2 pb-24">
             {agendaEmpty ? (
               <div className="flex flex-col items-center justify-center gap-3 py-10">
-                <span className="text-sm text-muted-foreground">這天還沒有安排</span>
+                <span className="text-sm text-muted-foreground">{t('這天還沒有安排')}</span>
                 <button
                   type="button"
                   onClick={() => onCreateTask?.(agendaDateString)}
                   className="h-11 px-5 rounded-full bg-secondary border border-border text-sm font-medium text-secondary-foreground active:brightness-95 transition-all"
                 >
-                  新增一件事
+                  {t('新增一件事')}
                 </button>
               </div>
             ) : (
@@ -384,7 +393,7 @@ export function MonthView({
                     <button
                       type="button"
                       onClick={(e) => handleToggleComplete(e, task.id)}
-                      aria-label="完成任務"
+                      aria-label={t('完成任務')}
                       className="w-11 h-11 flex-shrink-0 flex items-center justify-center"
                     >
                       <span
@@ -423,7 +432,7 @@ export function MonthView({
                     <button
                       type="button"
                       onClick={(e) => handleToggleComplete(e, task.id)}
-                      aria-label="取消完成"
+                      aria-label={t('取消完成')}
                       className="w-11 h-11 flex-shrink-0 flex items-center justify-center"
                     >
                       <span
@@ -476,7 +485,7 @@ export function MonthView({
                   'text-lg font-bold',
                   isCurrentMonth ? 'text-primary' : 'text-muted-foreground'
                 )}>
-                  {monthDate.getFullYear()}年{monthDate.getMonth() + 1}月
+                  {lang === 'en' ? format(monthDate, 'MMMM yyyy') : `${monthDate.getFullYear()}年${monthDate.getMonth() + 1}月`}
                 </span>
               </div>
 
@@ -490,7 +499,7 @@ export function MonthView({
                       index === 0 || index === 6 ? 'text-foreground/65' : 'text-muted-foreground'
                     )}
                   >
-                    週{day}
+                    {lang === 'en' ? WEEKDAYS_EN[index] : `週${day}`}
                   </div>
                 ))}
               </div>

@@ -5,6 +5,7 @@ import { Pause, Play, X, ChevronUp, ChevronDown, Music2, Minimize } from 'lucide
 import { cn } from '@/lib/utils'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { useI18n } from '@/lib/i18n/react'
 import {
   BGM_MUSIC, BGM_AMBIENT, summarizeBgm,
   ALL_MUSIC_ID, ALL_MUSIC_LABEL, ALL_MUSIC_EMOJI,
@@ -90,6 +91,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
     onPause, onResume, onExit, onSkipCompletion, onMinimize, onToggleBgm,
     onSelectMusic, onMusicVolumeChange, onToggleAmbient, onAmbientVolumeChange,
   } = props
+  const { t } = useI18n()
 
   const [dimmed, setDimmed] = useState(false)
   const [showBgmBar, setShowBgmBar] = useState(false)
@@ -245,7 +247,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
       onTouchMove={resetDim}
       role="dialog"
       aria-modal="true"
-      aria-label={isBreak ? '休息計時中' : '專注計時中'}
+      aria-label={isBreak ? t('休息計時中') : t('專注計時中')}
     >
       <style>{`
         @keyframes waddle-breathe {
@@ -345,10 +347,10 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
             className="text-[11px] font-medium tracking-[0.22em]"
             style={{ color: `color-mix(in oklch, ${accent} 62%, var(--foreground))` }}
           >
-            {isBreak ? '休息中' : '專注中'}
+            {isBreak ? t('休息中') : t('專注中')}
           </span>
           <span className="font-mono text-[13px] text-muted-foreground tabular-nums mt-1.5">
-            現在 {nowText}
+            {t('現在 {time}', { time: nowText })}
           </span>
         </div>
 
@@ -360,8 +362,8 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
             <button
               type="button"
               onClick={onMinimize}
-              aria-label="縮小到角落"
-              title="縮小到角落（不停止計時）"
+              aria-label={t('縮小到角落')}
+              title={t('縮小到角落（不停止計時）')}
               className="h-11 w-11 rounded-full grid place-items-center text-foreground/55 hover:text-foreground hover:bg-foreground/5 transition-colors"
             >
               <Minimize className="w-4 h-4" />
@@ -372,8 +374,8 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
               onPointerUp={cancelExitHold}
               onPointerCancel={cancelExitHold}
               onPointerLeave={cancelExitHold}
-              aria-label="長按結束（0.9 秒）"
-              title="長按結束並儲存到日曆"
+              aria-label={t('長按結束（0.9 秒）')}
+              title={t('長按結束並儲存到日曆')}
               className="relative h-11 w-11 rounded-full grid place-items-center text-foreground/55 hover:text-foreground hover:bg-foreground/5 transition-colors touch-none"
             >
               <X className="w-5 h-5" />
@@ -486,7 +488,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
               {timeText}
             </span>
             {state === 'paused' && (
-              <span className="text-xs text-muted-foreground mt-2 tracking-wider">已暫停</span>
+              <span className="text-xs text-muted-foreground mt-2 tracking-wider">{t('已暫停')}</span>
             )}
           </div>
         </div>
@@ -497,11 +499,11 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
           style={{ opacity: dimmed ? 0 : 1, transition: 'opacity 600ms cubic-bezier(0.22, 1, 0.36, 1)' }}
         >
           <p className="text-[12.5px] text-muted-foreground tabular-nums tracking-[0.02em] flex items-center gap-2.5">
-            <span>開始於 {startedAtText}</span>
+            <span>{t('開始於 {time}', { time: startedAtText })}</span>
             {endTimeText && (
               <>
                 <span className="text-muted-foreground/40">·</span>
-                <span>預計 {endTimeText} 結束</span>
+                <span>{t('預計 {time} 結束', { time: endTimeText })}</span>
               </>
             )}
           </p>
@@ -525,7 +527,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
             <button
               type="button"
               onClick={onResume}
-              aria-label="繼續"
+              aria-label={t('繼續')}
               className="h-16 w-16 rounded-full grid place-items-center active:scale-95 transition-transform"
               style={{ backgroundColor: accent, color: 'var(--primary-foreground)', boxShadow: 'var(--shadow-ceramic)' }}
             >
@@ -536,7 +538,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
             <button
               type="button"
               onClick={onPause}
-              aria-label="暫停"
+              aria-label={t('暫停')}
               className="h-16 w-16 rounded-full grid place-items-center bg-card border border-border text-foreground/70 hover:text-foreground active:scale-95 transition-[transform,color]"
               style={{ boxShadow: 'var(--shadow-ceramic)' }}
             >
@@ -567,7 +569,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
           tabIndex={0}
           onClick={onSkipCompletion}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSkipCompletion() }}
-          aria-label="收尾中，點一下繼續"
+          aria-label={t('收尾中，點一下繼續')}
           className="absolute inset-0 z-20 flex flex-col items-center justify-center outline-none"
           style={{
             // Solid tinted overlay, no backdrop-blur (DESIGN.md bans the
@@ -614,16 +616,16 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
             </div>
           </div>
           <h2 className="text-2xl font-semibold text-foreground tracking-tight">
-            {COMPLETION_COPY[completion.kind].title}
+            {t(COMPLETION_COPY[completion.kind].title)}
           </h2>
           <p className="text-sm text-muted-foreground mt-2">
-            {COMPLETION_COPY[completion.kind].sub}
+            {t(COMPLETION_COPY[completion.kind].sub)}
           </p>
           <p
             className="text-[11px] text-muted-foreground/55 mt-10"
             style={{ animation: 'waddle-chip-in 700ms var(--ease-quart) 600ms both' }}
           >
-            點一下畫面繼續
+            {t('點一下畫面繼續')}
           </p>
         </div>
       )}
@@ -688,14 +690,15 @@ function SnowMoundWaddle() {
  * empty slots so day-one feels like "1/4 done" instead of a lone dot.
  */
 function PomodoroDots({ count, color }: { count: number; color: string }) {
+  const { t } = useI18n()
   const goal = Math.max(4, Math.min(8, count))
   const filled = Math.min(count, goal)
   return (
     <div
       className="hidden sm:flex items-center gap-1.5"
       role="status"
-      aria-label={`今日已完成 ${count} 顆番茄`}
-      title={`今日已完成 ${count} 顆番茄`}
+      aria-label={t('今日已完成 {count} 顆番茄', { count })}
+      title={t('今日已完成 {count} 顆番茄', { count })}
     >
       {Array.from({ length: goal }).map((_, i) => (
         <span
@@ -722,6 +725,7 @@ function PomodoroDots({ count, color }: { count: number; color: string }) {
  * to match the breathing phases. Whole cycle = 19 seconds.
  */
 function BreathPacer({ color }: { color: string }) {
+  const { t } = useI18n()
   return (
     <div className="flex flex-col items-center gap-2 mt-1">
       <div
@@ -733,9 +737,9 @@ function BreathPacer({ color }: { color: string }) {
         }}
       />
       <div className="relative h-4 w-24 text-center">
-        <span className="absolute inset-0 text-[11px] text-muted-foreground" style={{ animation: 'waddle-breath-inhale 19s ease-in-out infinite' }}>吸氣 · 4 秒</span>
-        <span className="absolute inset-0 text-[11px] text-muted-foreground" style={{ animation: 'waddle-breath-hold 19s ease-in-out infinite' }}>屏息 · 7 秒</span>
-        <span className="absolute inset-0 text-[11px] text-muted-foreground" style={{ animation: 'waddle-breath-exhale 19s ease-in-out infinite' }}>吐氣 · 8 秒</span>
+        <span className="absolute inset-0 text-[11px] text-muted-foreground" style={{ animation: 'waddle-breath-inhale 19s ease-in-out infinite' }}>{t('吸氣 · 4 秒')}</span>
+        <span className="absolute inset-0 text-[11px] text-muted-foreground" style={{ animation: 'waddle-breath-hold 19s ease-in-out infinite' }}>{t('屏息 · 7 秒')}</span>
+        <span className="absolute inset-0 text-[11px] text-muted-foreground" style={{ animation: 'waddle-breath-exhale 19s ease-in-out infinite' }}>{t('吐氣 · 8 秒')}</span>
       </div>
     </div>
   )
@@ -767,17 +771,18 @@ function BgmBar({
   onToggleExpand, onTogglePlay,
   onSelectMusic, onMusicVolumeChange, onToggleAmbient, onAmbientVolumeChange,
 }: BgmBarProps) {
+  const { t } = useI18n()
   // Source of truth for the "what's playing" string lives in lib/timer-bgm
   // so the desktop settings panel and this mobile bar can't drift. The
   // emoji formatting is a presentation choice we apply on top.
-  const { hasSelection, activeAmbients, musicMeta, isShuffle } = summarizeBgm(music, ambient, { offLabel: '靜音專注' })
+  const { hasSelection, activeAmbients, musicMeta, isShuffle } = summarizeBgm(music, ambient, { offLabel: t('靜音專注') })
   const musicChip = isShuffle
-    ? `${ALL_MUSIC_EMOJI} ${ALL_MUSIC_LABEL}`
+    ? `${ALL_MUSIC_EMOJI} ${t(ALL_MUSIC_LABEL)}`
     : musicMeta
-      ? `${musicMeta.emoji} ${musicMeta.label}`
+      ? `${musicMeta.emoji} ${t(musicMeta.label)}`
       : null
   const summary = !hasSelection
-    ? '靜音專注'
+    ? t('靜音專注')
     : [
         musicChip,
         activeAmbients.length > 0 ? activeAmbients.map((a) => a.emoji).join('') : null,
@@ -841,7 +846,7 @@ function BgmBar({
           <div className="space-y-1.5">
             <label className="text-[11px] text-muted-foreground flex items-center gap-1.5">
               <Music2 className="w-3 h-3" />
-              背景音樂
+              {t('背景音樂')}
             </label>
             <div className="flex gap-1 flex-wrap">
               <button
@@ -854,7 +859,7 @@ function BgmBar({
                     : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
                 )}
               >
-                無
+                {t('無')}
               </button>
               {BGM_MUSIC.map((m) => {
                 const missing = unavailableSrcs.has(m.src)
@@ -864,7 +869,7 @@ function BgmBar({
                     type="button"
                     onClick={() => onSelectMusic(m.id)}
                     disabled={missing}
-                    title={missing ? '音檔尚未加入（見 public/audio/README.md）' : undefined}
+                    title={missing ? t('音檔尚未加入（見 public/audio/README.md）') : undefined}
                     className={cn(
                       'px-2 py-0.5 rounded text-[10px] font-medium transition-colors flex items-center gap-1',
                       missing
@@ -874,7 +879,7 @@ function BgmBar({
                           : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
                     )}
                   >
-                    <span>{m.emoji}</span>{m.label}
+                    <span>{m.emoji}</span>{t(m.label)}
                   </button>
                 )
               })}
@@ -885,7 +890,7 @@ function BgmBar({
                     type="button"
                     onClick={() => onSelectMusic(ALL_MUSIC_ID)}
                     disabled={everyMissing}
-                    title={everyMissing ? '尚未加入任何音檔（見 public/audio/README.md）' : '依序循環播放所有背景音樂'}
+                    title={everyMissing ? t('尚未加入任何音檔（見 public/audio/README.md）') : t('依序循環播放所有背景音樂')}
                     className={cn(
                       'px-2 py-0.5 rounded text-[10px] font-medium transition-colors flex items-center gap-1',
                       everyMissing
@@ -895,7 +900,7 @@ function BgmBar({
                           : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
                     )}
                   >
-                    <span>{ALL_MUSIC_EMOJI}</span>{ALL_MUSIC_LABEL}
+                    <span>{ALL_MUSIC_EMOJI}</span>{t(ALL_MUSIC_LABEL)}
                   </button>
                 )
               })()}
@@ -908,7 +913,7 @@ function BgmBar({
                 step={0.05}
                 value={musicVolume}
                 onChange={(e) => onMusicVolumeChange(parseFloat(e.target.value))}
-                aria-label="背景音樂音量"
+                aria-label={t('背景音樂音量')}
                 className="w-full h-1 accent-primary"
               />
             )}
@@ -917,7 +922,7 @@ function BgmBar({
           {/* Ambient overlays — multi-select, independent volumes. */}
           <div className="space-y-1.5">
             <label className="text-[11px] text-muted-foreground">
-              環境音（可疊加）
+              {t('環境音（可疊加）')}
             </label>
             <div className="space-y-1">
               {BGM_AMBIENT.map((a) => {
@@ -930,7 +935,7 @@ function BgmBar({
                       onClick={() => onToggleAmbient(a.id)}
                       aria-pressed={p.enabled}
                       disabled={missing}
-                      title={missing ? '音檔尚未加入（見 public/audio/README.md）' : undefined}
+                      title={missing ? t('音檔尚未加入（見 public/audio/README.md）') : undefined}
                       className={cn(
                         'px-2 py-0.5 rounded text-[10px] font-medium transition-colors flex items-center gap-1 w-[68px] justify-start',
                         missing
@@ -940,7 +945,7 @@ function BgmBar({
                             : 'bg-secondary/60 text-muted-foreground hover:bg-secondary',
                       )}
                     >
-                      <span>{a.emoji}</span>{a.label}
+                      <span>{a.emoji}</span>{t(a.label)}
                     </button>
                     <input
                       type="range"
@@ -950,7 +955,7 @@ function BgmBar({
                       value={p.volume}
                       disabled={!p.enabled || missing}
                       onChange={(e) => onAmbientVolumeChange(a.id, parseFloat(e.target.value))}
-                      aria-label={`${a.label}音量`}
+                      aria-label={t('{label}音量', { label: t(a.label) })}
                       className="flex-1 h-1 accent-primary disabled:opacity-40"
                     />
                   </div>

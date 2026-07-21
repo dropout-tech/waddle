@@ -2,6 +2,7 @@
 
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { t } from '@/lib/i18n'
 
 interface Props {
   children: ReactNode
@@ -44,9 +45,9 @@ export class ErrorBoundary extends Component<Props, State> {
           <AlertTriangle className="w-6 h-6 text-destructive" aria-hidden="true" />
         </div>
         <div className="space-y-1">
-          <h2 className="text-base font-medium text-foreground">這個區塊發生錯誤</h2>
+          <h2 className="text-base font-medium text-foreground">{t('這個區塊發生錯誤')}</h2>
           <p className="text-sm text-muted-foreground max-w-sm">
-            {error.message || '請嘗試重新整理或回報此問題。'}
+            {error.message || t('請嘗試重新整理或回報此問題。')}
           </p>
         </div>
         <button
@@ -55,7 +56,7 @@ export class ErrorBoundary extends Component<Props, State> {
           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <RefreshCw className="w-4 h-4" aria-hidden="true" />
-          重試
+          {t('重試')}
         </button>
       </div>
     )

@@ -17,6 +17,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from '@/components/ui/alert-dialog'
+import { useI18n } from '@/lib/i18n/react'
 
 /**
  * In-app account deletion (App Store Guideline 5.1.1(v)). Calls the
@@ -27,6 +28,7 @@ import {
 export function DeleteAccountButton() {
   const router = useRouter()
   const [deleting, setDeleting] = useState(false)
+  const { t } = useI18n()
 
   async function handleDelete() {
     setDeleting(true)
@@ -38,7 +40,7 @@ export function DeleteAccountButton() {
       router.replace('/login')
     } catch (e) {
       console.error('[delete-account] failed', e)
-      toast.error('刪除帳號失敗，請稍後再試')
+      toast.error(t('刪除帳號失敗，請稍後再試'))
       setDeleting(false)
     }
   }
@@ -54,18 +56,18 @@ export function DeleteAccountButton() {
           )}
         >
           <Trash2 className="w-3.5 h-3.5" />
-          刪除帳號
+          {t('刪除帳號')}
         </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>確定要刪除帳號嗎？</AlertDialogTitle>
+          <AlertDialogTitle>{t('確定要刪除帳號嗎？')}</AlertDialogTitle>
           <AlertDialogDescription>
-            這會永久刪除你的帳號與所有資料（任務、行程、日記、設定），無法復原。
+            {t('這會永久刪除你的帳號與所有資料（任務、行程、日記、設定），無法復原。')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+          <AlertDialogCancel disabled={deleting}>{t('取消')}</AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault()
@@ -74,7 +76,7 @@ export function DeleteAccountButton() {
             disabled={deleting}
             className="bg-destructive text-white hover:bg-destructive/90"
           >
-            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : '永久刪除'}
+            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('永久刪除')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
