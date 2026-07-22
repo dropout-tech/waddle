@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>方向 C — 墨色極簡</title>
+<style>
+  :root {
+    --bg: oklch(0.962 0.006 78);
+    --fg: oklch(0.3 0.02 55);
+    --terra: oklch(0.6 0.14 35);
+    --muted: oklch(0.5 0.015 55);
+    --sans: 'Noto Sans TC', -apple-system, 'PingFang TC', 'Helvetica Neue', sans-serif;
+    /* 正式實作用 Geist Mono 可變字重（Thin）；靜態稿以 Helvetica Neue 100 模擬 hairline */
+    --hairline: 'Helvetica Neue', -apple-system, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1440px; height: 900px; overflow: hidden; }
+  body {
+    font-family: var(--sans); color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    background:
+      radial-gradient(1500px 1000px at 50% 32%,
+        oklch(0.968 0.007 82), oklch(0.953 0.006 72) 85%);
+  }
+
+  /* ---------- 巨大 hairline 數字：唯一主角 ---------- */
+  .digits-block {
+    position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .digits {
+    font-family: var(--hairline); font-weight: 100;
+    font-size: 252px; line-height: 1; letter-spacing: -0.015em;
+    font-variant-numeric: tabular-nums;
+    color: oklch(0.3 0.02 55);
+  }
+  .meta-line {
+    margin-top: 34px;
+    font-size: 11.5px; letter-spacing: 0.16em;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .meta-line .sep { opacity: 0.4; margin: 0 12px; }
+
+  /* ---------- 靜息態 HUD：全部退到將近看不見（hover 才浮現） ---------- */
+  .hud-mode {
+    position: absolute; top: 34px; left: 40px;
+    display: flex; align-items: center; gap: 9px;
+    font-size: 11px; letter-spacing: 0.24em; color: var(--muted);
+    opacity: 0.62;
+  }
+  .hud-mode .chip-dot { width: 5px; height: 5px; border-radius: 99px; background: var(--terra); }
+  .hud-right {
+    position: absolute; top: 26px; right: 30px; display: flex; gap: 4px; opacity: 0.32;
+  }
+  .ghost-btn {
+    width: 38px; height: 38px; border-radius: 99px;
+    display: grid; place-items: center; color: var(--fg);
+  }
+  .ghost-btn svg { width: 16px; height: 16px; }
+
+  .pause-btn {
+    position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%);
+    width: 48px; height: 48px; border-radius: 99px;
+    border: 1px solid oklch(0.3 0.02 55 / 0.22);
+    display: grid; place-items: center;
+    color: oklch(0.3 0.02 55 / 0.5);
+  }
+  .pause-btn svg { width: 16px; height: 16px; }
+
+  .bgm-hint {
+    position: absolute; right: 40px; bottom: 76px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; letter-spacing: 0.12em; color: var(--fg);
+    opacity: 0.34;
+  }
+  .bgm-hint svg { width: 13px; height: 13px; }
+
+  /* ---------- 進度：畫面底部一條 2px 水平線 ---------- */
+  .progress-track {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+    background: color-mix(in oklch, var(--fg) 15%, var(--bg));
+  }
+  .progress-fill {
+    position: absolute; left: 0; bottom: 0; height: 2px; width: 62%;
+    background: var(--terra);
+  }
+  .progress-tip {
+    position: absolute; left: calc(62% - 3px); bottom: -2px;
+    width: 6px; height: 6px; border-radius: 99px;
+    background: var(--terra);
+  }
+  /* 企鵝不在此畫面：墨色極簡的 Waddle 只在完成畫面登場 */
+</style>
+</head>
+<body>
+
+  <div class="hud-mode"><span class="chip-dot"></span>短專注 · 專注中</div>
+
+  <div class="hud-right">
+    <div class="ghost-btn" title="縮小到角落">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/>
+        <path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/>
+      </svg>
+    </div>
+    <div class="ghost-btn" title="長按結束">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+        <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="digits-block">
+    <div class="digits">14:45</div>
+    <div class="meta-line">
+      <span>開始於 14:12</span><span class="sep">—</span><span>預計 14:52 結束</span>
+    </div>
+  </div>
+
+  <div class="pause-btn" title="暫停">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <rect x="6.5" y="4.5" width="4" height="15" rx="1.4"/>
+      <rect x="13.5" y="4.5" width="4" height="15" rx="1.4"/>
+    </svg>
+  </div>
+
+  <div class="bgm-hint">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="8" cy="18" r="4"/><path d="M12 18V2l7 4"/>
+    </svg>
+    <span>海浪</span>
+  </div>
+
+  <div class="progress-track"></div>
+  <div class="progress-fill"></div>
+  <div class="progress-tip"></div>
+
+</body>
+</html>

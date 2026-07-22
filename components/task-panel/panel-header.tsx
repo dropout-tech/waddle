@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { Sun, Plus, X, Settings2, PanelLeftClose, Maximize2, Minimize2, ChevronUp, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -8,7 +9,6 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import type { Workspace } from '@/lib/types'
 import { WorkspaceSettingsModal } from '@/components/modals/workspace-settings-modal'
 import { WorkspaceIcon, PRESET_ICONS, PRESET_ICON_NAMES } from '@/lib/workspace-icons'
-import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { UserMenu } from '@/components/user-menu'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { hapticSelection } from '@/lib/haptics'
@@ -72,8 +72,8 @@ export function PanelHeader({
   // animation class applied, so it never auto-plays on mount); each click
   // bumps it to a new value, which both (a) turns the animation class on
   // and (b) remounts the wrapping <span> via `key`, so the one-shot
-  // waddle-bob-once CSS animation restarts cleanly even if the previous
-  // 0.6s bob hasn't finished yet. lastPetToastAtRef throttles the
+  // huddle-pet CSS animation restarts cleanly even if the previous motion
+  // hasn't finished yet. lastPetToastAtRef throttles the
   // occasional extra toast line — a ref (not state) because it's read/
   // written inside the click handler and never needs to trigger a render.
   const [petBobToken, setPetBobToken] = useState(0)
@@ -225,9 +225,19 @@ export function PanelHeader({
                 >
                   <span
                     key={petBobToken}
-                    className={cn('block', petBobToken > 0 && 'animate-waddle-bob-once')}
+                    className={cn('block', petBobToken > 0 && 'animate-huddle-pet')}
                   >
-                    <WaddleMascot withBackground phase="auto" className="w-9 h-9 rounded-lg" />
+                    <span className="block h-9 w-9 overflow-hidden rounded-lg bg-[#f4d977]">
+                      <Image
+                        src="/huddle-mascot.png"
+                        alt=""
+                        width={36}
+                        height={36}
+                        aria-hidden="true"
+                        className="h-full w-full object-contain"
+                        priority
+                      />
+                    </span>
                   </span>
                 </button>
                 <div>
