@@ -8,6 +8,12 @@ import { useDisplayColor } from '@/hooks/use-display-color'
 import { useI18n } from '@/lib/i18n/react'
 import { hapticSelection } from '@/lib/haptics'
 import {
+  DEFAULT_MASCOT_SRC,
+  MASCOT_SURPRISES,
+  getMascotSurprise,
+  type MascotSurprise,
+} from '@/lib/mascot-surprises'
+import {
   BGM_MUSIC, BGM_AMBIENT, summarizeBgm,
   ALL_MUSIC_ID, ALL_MUSIC_LABEL, ALL_MUSIC_EMOJI,
   type AmbientPref, type BgmMusicId, type BgmAmbientId,
@@ -116,6 +122,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
   const [exitHoldProgress, setExitHoldProgress] = useState(0)
   const [companionReaction, setCompanionReaction] = useState(0)
   const [companionMessage, setCompanionMessage] = useState<string | null>(null)
+  const [companionSurprise, setCompanionSurprise] = useState<MascotSurprise | null>(null)
   // Ambient "now" clock (B8). Updates on the minute boundary so the display
   // changes in sync with the OS clock rather than drifting by N seconds.
   const [nowText, setNowText] = useState(() => formatClockHHMM(new Date()))
@@ -194,11 +201,18 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
         ? BREAK_COMPANION_COPY
         : WORK_COMPANION_COPY
     const nextReaction = companionReaction + 1
+    const surprise = getMascotSurprise(nextReaction)
     setCompanionReaction(nextReaction)
-    setCompanionMessage(copy[(nextReaction - 1) % copy.length])
+    setCompanionSurprise(surprise)
+    setCompanionMessage(nextReaction % 2 === 0
+      ? surprise.message
+      : copy[(nextReaction - 1) % copy.length])
     hapticSelection()
     if (companionMessageTimerRef.current) clearTimeout(companionMessageTimerRef.current)
-    companionMessageTimerRef.current = setTimeout(() => setCompanionMessage(null), 2200)
+    companionMessageTimerRef.current = setTimeout(() => {
+      setCompanionMessage(null)
+      setCompanionSurprise(null)
+    }, 2200)
   }
 
   // Ensure an in-flight long-press RAF doesn't outlive the component.
@@ -400,6 +414,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
         dimmed={dimmed}
         message={companionMessage}
         reaction={companionReaction}
+        surprise={companionSurprise}
         accent={accent}
         onPet={petCompanion}
       />
@@ -681,12 +696,17 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
               }}
             >
               <Image
-                src="/huddle-mascot.png"
+                src={completion.kind === 'work'
+                  ? MASCOT_SURPRISES[pomodoroCount % MASCOT_SURPRISES.length].src
+                  : DEFAULT_MASCOT_SRC}
                 alt=""
                 width={96}
                 height={96}
                 aria-hidden="true"
                 className="h-24 w-24 object-contain"
+                style={completion.kind === 'work' && MASCOT_SURPRISES[pomodoroCount % MASCOT_SURPRISES.length].id === 'pixel'
+                  ? { imageRendering: 'pixelated' }
+                  : undefined}
                 draggable={false}
               />
             </div>
@@ -726,6 +746,7 @@ function SnowMoundHuddle({
   dimmed,
   message,
   reaction,
+  surprise,
   accent,
   onPet,
 }: {
@@ -733,6 +754,7 @@ function SnowMoundHuddle({
   dimmed: boolean
   message: string | null
   reaction: number
+  surprise: MascotSurprise | null
   accent: string
   onPet: () => void
 }) {
@@ -827,7 +849,7 @@ function SnowMoundHuddle({
                 : undefined}
             >
               <Image
-                src="/huddle-mascot.png"
+                src={surprise?.src ?? DEFAULT_MASCOT_SRC}
                 alt=""
                 width={64}
                 height={64}
@@ -835,6 +857,7 @@ function SnowMoundHuddle({
                 aria-hidden="true"
                 draggable={false}
                 className="relative h-auto w-[clamp(48px,6vw,62px)] object-contain"
+                style={surprise?.id === 'pixel' ? { imageRendering: 'pixelated' } : undefined}
               />
             </span>
           </span>
