@@ -796,7 +796,7 @@ export function MainLayout({
               /* Full-page Journal / Report - replaces calendar inline */
               <div className="flex flex-col h-full bg-background">
                 {/* Slim header bar */}
-                <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-card/50 flex-shrink-0">
+                <div className="flex items-center justify-between pl-6 pr-14 py-3 border-b border-border bg-card/50 flex-shrink-0">
                   <div className="flex items-center gap-2.5">
                     {focusMode === 'journal' ? (
                       <>

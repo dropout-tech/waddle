@@ -354,7 +354,9 @@ export function FullScreenTaskView({
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-border bg-card">
+      {/* Desktop UserMenu floats at top-right, so keep its 56px safety area
+          clear just like the regular task-panel header does. */}
+      <div className="flex-shrink-0 pl-6 pr-14 py-4 border-b border-border bg-card">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-xl font-semibold text-foreground">{t('任務管理')}</h1>
