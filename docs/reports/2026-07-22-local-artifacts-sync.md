@@ -12,5 +12,6 @@
 
 # Result
 
-- No tests were run in Quick mode. The local artifacts are ready to be committed before the remote fast-forward is applied.
+- Committed the local artifacts as `8af41d6`, merged the ten incoming commits without conflicts, and pushed the combined history to `origin/feat/ios-capacitor`.
+- No tests were run in Quick mode.
 - Product documentation does not need updating because these files do not change runtime behavior, APIs, or database schemas.
