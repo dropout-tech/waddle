@@ -54,6 +54,10 @@ import {
   setWaterReminderEnabled,
   setWaterReminderInterval,
 } from '@/lib/water-reminder'
+import {
+  getTaiwanHolidaysEnabled,
+  setTaiwanHolidaysEnabled,
+} from '@/lib/taiwan-holidays'
 
 // Map icon names to components
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -154,6 +158,7 @@ export function SettingsModal({
   // Water-break reminder prefs — per-device, same pattern as the others.
   const [waterEnabled, setWaterEnabledState] = useState<boolean>(() => getWaterReminderEnabled())
   const [waterInterval, setWaterIntervalState] = useState<WaterReminderInterval>(() => getWaterReminderInterval())
+  const [taiwanHolidaysEnabled, setTaiwanHolidaysEnabledState] = useState<boolean>(() => getTaiwanHolidaysEnabled())
   const [editingSlotType, setEditingSlotType] = useState<SlotType | null>(null)
   // These per-device prefs can change while this (always-mounted) modal is
   // closed — e.g. the water popup's own gear turns the reminder off. Re-read
@@ -164,6 +169,7 @@ export function SettingsModal({
     setReminderLeadState(getReminderLead())
     setWaterEnabledState(getWaterReminderEnabled())
     setWaterIntervalState(getWaterReminderInterval())
+    setTaiwanHolidaysEnabledState(getTaiwanHolidaysEnabled())
   }, [isOpen])
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [newSlotType, setNewSlotType] = useState<Partial<SlotType>>({
@@ -795,6 +801,26 @@ export function SettingsModal({
               />
             </label>
 
+            {/* Taiwan public holidays on the calendar — device-level, takes
+                effect immediately (same pattern as the water reminder). */}
+            <label className="flex items-center justify-between cursor-pointer">
+              <div className="flex-1 pr-4">
+                <div className="text-sm text-foreground">{t('顯示國定假日')}</div>
+                <div className="text-xs text-muted-foreground">
+                  {t('在行事曆標示中華民國國定假日')}
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={taiwanHolidaysEnabled}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  setTaiwanHolidaysEnabledState(next)
+                  setTaiwanHolidaysEnabled(next)
+                }}
+                className="w-4 h-4 rounded border-border accent-primary"
+              />
+            </label>
 
             {/* Default task duration */}
             <div className="flex items-center justify-between">

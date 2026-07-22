@@ -30,6 +30,7 @@ import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { WORKSPACE_COLORS } from '@/lib/palette'
 import { useI18n } from '@/lib/i18n/react'
+import { getTaiwanHoliday, useTaiwanHolidaysEnabled } from '@/lib/taiwan-holidays'
 
 interface WeekViewProps {
   selectedDate: Date
@@ -107,6 +108,7 @@ export function WeekView({
   const displayColor = useDisplayColor()
   const isMobile = useIsMobile()
   const { t: translate, lang } = useI18n()
+  const holidaysEnabled = useTaiwanHolidaysEnabled()
   // Measured width of the horizontal scroll container, on every screen
   // size (not just mobile). Columns are sized so exactly N days fill the
   // viewport — on mobile that's a fixed 3 (swipes land on aligned whole
@@ -849,7 +851,7 @@ export function WeekView({
                 const isToday = dateStr === todayString
                 const allDayTasks = getAllDayTasksForDate(date)
                 const weekdayIndex = date.getDay()
-                const holidayName = null
+                const holidayName = holidaysEnabled ? getTaiwanHoliday(dateStr) : null
 
                 // Live drag preview state — see day-scroll-view for the full
                 // explanation. Same logic mirrored here.

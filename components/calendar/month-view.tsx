@@ -11,6 +11,7 @@ import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { useI18n } from '@/lib/i18n/react'
+import { getTaiwanHoliday, useTaiwanHolidaysEnabled } from '@/lib/taiwan-holidays'
 import { format } from 'date-fns'
 
 interface MonthViewProps {
@@ -56,6 +57,7 @@ export function MonthView({
   const isMobile = useIsMobile()
   const displayColor = useDisplayColor()
   const { t, lang } = useI18n()
+  const holidaysEnabled = useTaiwanHolidaysEnabled()
 
   // Mobile agenda: the day whose tasks are listed under the compact grid.
   // Follows selectedDate (header navigation, "today" button) but can be
@@ -293,7 +295,7 @@ export function MonthView({
                     const dayPending = dayTasks.filter((t) => !t.isCompleted)
                     const hasCompletedOnly = dayPending.length === 0 && dayTasks.length > 0
                     const isAgendaDay = day.dateString === agendaDateString
-                    const holidayName = null
+                    const holidayName = holidaysEnabled ? getTaiwanHoliday(day.dateString) : null
 
                     return (
                       <button
@@ -562,7 +564,7 @@ export function MonthView({
                   const dayPeerEvents = getPeerEventsForDay(day.date)
                   const pendingTasks = dayTasks.filter((t) => !t.isCompleted)
                   const completedTasks = dayTasks.filter((t) => t.isCompleted)
-                  const holidayName = null
+                  const holidayName = holidaysEnabled ? getTaiwanHoliday(day.dateString) : null
 
                   return (
                     <div

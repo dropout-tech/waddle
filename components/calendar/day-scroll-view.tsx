@@ -30,6 +30,7 @@ import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { WORKSPACE_COLORS } from '@/lib/palette'
 import { useI18n } from '@/lib/i18n/react'
+import { getTaiwanHoliday, useTaiwanHolidaysEnabled } from '@/lib/taiwan-holidays'
 import { format } from 'date-fns'
 
 interface DayScrollViewProps {
@@ -110,6 +111,7 @@ export function DayScrollView({
   const showCategoryPrefix = useShowCategoryPrefix()
   const displayColor = useDisplayColor()
   const { t: translate, lang } = useI18n()
+  const holidaysEnabled = useTaiwanHolidaysEnabled()
   // On mobile, each day fills (viewport - time column) so the user sees one
   // full day per swipe and scroll-snap lands on day boundaries. Desktop
   // measures the actual scroll container and divides by dayViewDays so the
@@ -1028,7 +1030,7 @@ export function DayScrollView({
                 const isToday = dateStr === todayString
                 const allDayTasks = getAllDayTasksForDate(date)
                 const weekdayIndex = date.getDay()
-                const holidayName = null
+                const holidayName = holidaysEnabled ? getTaiwanHoliday(dateStr) : null
 
                 // The single task currently being dragged (if any). We render
                 // this as a "ghost" preview inside whichever pending zone the

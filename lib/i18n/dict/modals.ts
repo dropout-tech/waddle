@@ -54,6 +54,8 @@ export const dict: Record<string, string> = {
   '關掉的話，勾選完成後該任務馬上從列表消失（仍可在「已完成」中看到）': "If off, a task disappears from the list the moment it's checked off (still visible under \"Completed\")",
   '行事曆自動加上分類': 'Auto-prefix calendar titles with category',
   "行事曆上的任務標題前自動加上「分類｜」，一眼看出是哪個分類（例：Let's Play｜夏令營）。不會更動你存的標題。": 'Adds "Category | " to the front of task titles on the calendar so you can tell at a glance (e.g. "Let\'s Play | Summer Camp"). Your saved title is not changed.',
+  '顯示國定假日': 'Show public holidays',
+  '在行事曆標示中華民國國定假日': 'Marks Taiwan (ROC) public holidays on the calendar',
   '預設任務時長': 'Default task duration',
   '拖曳建立任務時的預設持續時間': 'Duration used when you create a task by dragging',
   '分鐘': 'min',
