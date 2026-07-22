@@ -101,6 +101,15 @@ export const dict: Record<string, string> = {
   '辛苦了，慢慢喘口氣': 'Well done — take a breather',
   '準備好了，隨時開始下一段': "Whenever you're ready for the next one",
   '想繼續時，隨時回來': "Come back anytime you're ready",
+  '摸摸專注企鵝': 'Pet your focus penguin',
+  '我在這裡陪你。': "I'm right here with you.",
+  '慢慢來，只看眼前這一小段。': 'Take it slowly. Just stay with this small stretch.',
+  '先做一件，就很好。': 'Doing one thing first is already enough.',
+  '休息也算進度。': 'Rest counts as progress too.',
+  '喝口水，肩膀放鬆。': 'Take a sip of water and relax your shoulders.',
+  '看遠一點，再慢慢回來。': 'Look into the distance, then ease back in.',
+  '不用急，準備好再繼續。': "No rush. Continue when you're ready.",
+  '企鵝先幫你守著時間。': 'The penguin will keep watch for now.',
 
   // Focus scratchpad
   '圖片大小不能超過 5MB': 'Image must be under 5MB',

@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Image from 'next/image'
 import { Pause, Play, X, ChevronUp, ChevronDown, Music2, Minimize } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { useI18n } from '@/lib/i18n/react'
+import { hapticSelection } from '@/lib/haptics'
 import {
   BGM_MUSIC, BGM_AMBIENT, summarizeBgm,
   ALL_MUSIC_ID, ALL_MUSIC_LABEL, ALL_MUSIC_EMOJI,
@@ -79,6 +80,23 @@ const COMPLETION_COPY: Record<ImmersiveCompletion['kind'], { title: string; sub:
   manual: { title: '先到這裡也很好', sub: '想繼續時，隨時回來' },
 }
 
+const WORK_COMPANION_COPY = [
+  '我在這裡陪你。',
+  '慢慢來，只看眼前這一小段。',
+  '先做一件，就很好。',
+]
+
+const BREAK_COMPANION_COPY = [
+  '休息也算進度。',
+  '喝口水，肩膀放鬆。',
+  '看遠一點，再慢慢回來。',
+]
+
+const PAUSED_COMPANION_COPY = [
+  '不用急，準備好再繼續。',
+  '企鵝先幫你守著時間。',
+]
+
 function formatClockHHMM(d: Date): string {
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
 }
@@ -96,6 +114,8 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
   const [dimmed, setDimmed] = useState(false)
   const [showBgmBar, setShowBgmBar] = useState(false)
   const [exitHoldProgress, setExitHoldProgress] = useState(0)
+  const [companionReaction, setCompanionReaction] = useState(0)
+  const [companionMessage, setCompanionMessage] = useState<string | null>(null)
   // Ambient "now" clock (B8). Updates on the minute boundary so the display
   // changes in sync with the OS clock rather than drifting by N seconds.
   const [nowText, setNowText] = useState(() => formatClockHHMM(new Date()))
@@ -104,6 +124,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
 
   const dimTimerRef = useRef<NodeJS.Timeout | null>(null)
   const exitHoldRef = useRef<{ raf: number; cleared: boolean } | null>(null)
+  const companionMessageTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Now-clock ticking. Align to the next minute boundary so updates land
   // exactly when the OS clock does, then once per minute.
@@ -166,6 +187,20 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
     setExitHoldProgress(0)
   }
 
+  const petCompanion = () => {
+    const copy = state === 'paused'
+      ? PAUSED_COMPANION_COPY
+      : phase === 'break'
+        ? BREAK_COMPANION_COPY
+        : WORK_COMPANION_COPY
+    const nextReaction = companionReaction + 1
+    setCompanionReaction(nextReaction)
+    setCompanionMessage(copy[(nextReaction - 1) % copy.length])
+    hapticSelection()
+    if (companionMessageTimerRef.current) clearTimeout(companionMessageTimerRef.current)
+    companionMessageTimerRef.current = setTimeout(() => setCompanionMessage(null), 2200)
+  }
+
   // Ensure an in-flight long-press RAF doesn't outlive the component.
   useEffect(() => {
     return () => {
@@ -174,6 +209,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
         cancelAnimationFrame(exitHoldRef.current.raf)
         exitHoldRef.current = null
       }
+      if (companionMessageTimerRef.current) clearTimeout(companionMessageTimerRef.current)
     }
   }, [])
 
@@ -224,8 +260,10 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
       // -PI/2 because the parent SVG is `-rotate-90` so the start is "up"
       const angle = fraction * Math.PI * 2 - Math.PI / 2
       out.push({
-        cx: ringCenter + ringRadius * Math.cos(angle + Math.PI / 2), // +PI/2 to map back into the rotated SVG coords
-        cy: ringCenter + ringRadius * Math.sin(angle + Math.PI / 2),
+        // Normalize trig output before SSR so tiny engine-level float-string
+        // differences cannot produce a hydration attribute mismatch.
+        cx: Number((ringCenter + ringRadius * Math.cos(angle + Math.PI / 2)).toFixed(4)), // +PI/2 to map back into the rotated SVG coords
+        cy: Number((ringCenter + ringRadius * Math.sin(angle + Math.PI / 2)).toFixed(4)),
       })
     }
     return out
@@ -286,6 +324,27 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
           from { opacity: 0; transform: translateY(-6px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes huddle-companion-float {
+          0%, 100% { transform: translateY(0) rotate(-0.5deg); }
+          50% { transform: translateY(-2px) rotate(0.7deg); }
+        }
+        @keyframes huddle-companion-pet {
+          0% { transform: translateY(0) rotate(0deg) scale(1); }
+          18% { transform: translateY(2px) rotate(0deg) scaleX(1.05) scaleY(0.93); }
+          42% { transform: translateY(-4px) rotate(-7deg) scaleX(0.98) scaleY(1.03); }
+          66% { transform: translateY(-2px) rotate(6deg) scale(1.01); }
+          84% { transform: translateY(0) rotate(-2deg) scale(1); }
+          100% { transform: translateY(0) rotate(0deg) scale(1); }
+        }
+        @keyframes huddle-companion-bubble {
+          from { opacity: 0; transform: translateY(5px) scale(0.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes huddle-companion-spark {
+          0% { opacity: 0; transform: translate(0, 4px) scale(0.6); }
+          28% { opacity: 0.9; }
+          100% { opacity: 0; transform: translate(var(--spark-x), var(--spark-y)) scale(0.35); }
+        }
         /* Box-breath-ish pacer for break phase. 4-7-8 cycle = 19s. */
         @keyframes waddle-breath-scale {
           0%   { transform: scale(1); }
@@ -312,6 +371,10 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
           .waddle-breath-scale-target { animation: none !important; transform: scale(1) !important; }
           .waddle-celebrate-penguin { animation: none !important; }
           .waddle-celebrate-bloom { animation: none !important; opacity: 0 !important; }
+          .huddle-companion-float,
+          .huddle-companion-pet,
+          .huddle-companion-bubble,
+          .huddle-companion-spark { animation: none !important; }
         }
       `}</style>
 
@@ -330,9 +393,16 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
         }}
       />
 
-      {/* Snow mound + small Waddle at the lower right — the diagonal
+      {/* Snow mound + small Huddle at the lower right — the diagonal
           counterweight to the centered ring. */}
-      <SnowMoundWaddle />
+      <SnowMoundHuddle
+        state={state}
+        dimmed={dimmed}
+        message={companionMessage}
+        reaction={companionReaction}
+        accent={accent}
+        onPet={petCompanion}
+      />
 
       {/* HEADER */}
       <div
@@ -610,9 +680,15 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
                 transformOrigin: '50% 90%',
               }}
             >
-              {/* The one true brand penguin — same hand-drawn Waddle that
-                  stands on the snow mound behind the timer. */}
-              <WaddleMascot className="w-24 h-auto" />
+              <Image
+                src="/huddle-mascot.png"
+                alt=""
+                width={96}
+                height={96}
+                aria-hidden="true"
+                className="h-24 w-24 object-contain"
+                draggable={false}
+              />
             </div>
           </div>
           <h2 className="text-2xl font-semibold text-foreground tracking-tight">
@@ -638,20 +714,34 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
 // ---------------------------------------------------------------------------
 
 /**
- * Snow mound rising from the lower-right corner with a small Waddle standing
+ * Snow mound rising from the lower-right corner with Huddle standing
  * on it — the diagonal counterweight to the centered ring (mockup-a). One
  * step brighter than the paper (var(--card)), a soft contour line so the
  * ground "is there", and a foot shadow so the penguin stands rather than
- * floats. Static; phase-neutral by design — the mound belongs to the paper
- * world, not to the session color.
+ * floats. The mound stays static and phase-neutral; Huddle is the only
+ * interactive layer and settles when the rest of the focus UI dims.
  */
-function SnowMoundWaddle() {
+function SnowMoundHuddle({
+  state,
+  dimmed,
+  message,
+  reaction,
+  accent,
+  onPet,
+}: {
+  state: ImmersiveProps['state']
+  dimmed: boolean
+  message: string | null
+  reaction: number
+  accent: string
+  onPet: () => void
+}) {
+  const { t } = useI18n()
   return (
     <div
-      aria-hidden="true"
-      className="pointer-events-none absolute right-0 bottom-0 z-0 w-[min(560px,88vw)]"
+      className="absolute right-0 bottom-0 w-[min(560px,88vw)]"
     >
-      <svg viewBox="0 0 560 190" className="block w-full h-auto">
+      <svg aria-hidden="true" viewBox="0 0 560 190" className="pointer-events-none block w-full h-auto">
         <defs>
           <linearGradient id="waddle-mound-fade" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--card)" stopOpacity="1" />
@@ -671,14 +761,84 @@ function SnowMoundWaddle() {
           strokeWidth="1.5"
         />
       </svg>
-      {/* Waddle + foot shadow, positioned relative to the mound so they ride
+      {/* Huddle + foot shadow, positioned relative to the mound so they ride
           its responsive scaling and never drift off the crest. */}
-      <div className="absolute" style={{ right: '22%', bottom: '46%' }}>
+      <div
+        className="absolute z-[11]"
+        style={{
+          right: '22%',
+          bottom: '46%',
+          opacity: dimmed ? 0.42 : 1,
+          transition: 'opacity 600ms var(--ease-quart)',
+        }}
+      >
+        {message && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="huddle-companion-bubble pointer-events-none absolute bottom-[calc(100%+10px)] right-0 w-max max-w-[min(220px,58vw)] rounded-2xl border border-border/70 bg-card px-3 py-2 text-[11px] leading-relaxed text-foreground/75 shadow-sm"
+            style={{ animation: 'huddle-companion-bubble 220ms var(--ease-quart)' }}
+          >
+            {t(message)}
+          </div>
+        )}
         <div
+          aria-hidden="true"
           className="absolute left-1/2 -translate-x-1/2 -bottom-[3px] h-2.5 w-[130%] rounded-full"
           style={{ background: 'radial-gradient(closest-side, oklch(0.45 0.03 55 / 0.16), transparent)' }}
         />
-        <WaddleMascot className="relative w-[clamp(44px,6vw,58px)] h-auto" />
+        <button
+          type="button"
+          onClick={onPet}
+          aria-label={t('摸摸專注企鵝')}
+          title={t('摸摸專注企鵝')}
+          className="relative block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          {reaction > 0 && (
+            <span key={`spark-${reaction}`} aria-hidden="true" className="pointer-events-none absolute inset-0 z-10">
+              {[
+                { x: '-16px', y: '-22px', left: '18%', delay: '0ms' },
+                { x: '2px', y: '-28px', left: '50%', delay: '70ms' },
+                { x: '17px', y: '-20px', left: '76%', delay: '120ms' },
+              ].map((spark, index) => (
+                <span
+                  key={index}
+                  className="huddle-companion-spark absolute top-1/3 h-1.5 w-1.5 rounded-full"
+                  style={{
+                    left: spark.left,
+                    backgroundColor: accent,
+                    animation: `huddle-companion-spark 620ms var(--ease-quart) ${spark.delay} both`,
+                    '--spark-x': spark.x,
+                    '--spark-y': spark.y,
+                  } as React.CSSProperties}
+                />
+              ))}
+            </span>
+          )}
+          <span
+            key={`pet-${reaction}`}
+            className={cn('relative block', reaction > 0 && 'huddle-companion-pet')}
+            style={reaction > 0 ? { animation: 'huddle-companion-pet 680ms var(--ease-quart)' } : undefined}
+          >
+            <span
+              className="block"
+              style={state === 'running' && !dimmed
+                ? { animation: 'huddle-companion-float 5.8s ease-in-out infinite', transformOrigin: '50% 90%' }
+                : undefined}
+            >
+              <Image
+                src="/huddle-mascot.png"
+                alt=""
+                width={64}
+                height={64}
+                loading="eager"
+                aria-hidden="true"
+                draggable={false}
+                className="relative h-auto w-[clamp(48px,6vw,62px)] object-contain"
+              />
+            </span>
+          </span>
+        </button>
       </div>
     </div>
   )
