@@ -28,6 +28,7 @@ export function forEachTask(
     for (const cat of ws.categories) {
       if (cat.isArchived) continue
       for (const t of cat.tasks) {
+        if (t.isArchived) continue
         cb(t, cat, ws)
       }
     }
@@ -56,6 +57,24 @@ export function filterTasks(
     if (predicate(task)) out.push({ task, category, workspace })
   })
   return out
+}
+
+/**
+ * The date that makes an active, one-off task eligible for the overdue
+ * cleanup flow. A missed calendar slot takes precedence over a due date,
+ * because the cleanup is primarily about removing stale time commitments
+ * from the calendar. Recurring masters and meetings stay in their dedicated
+ * calendar workflows so a bulk action can never rewrite a whole series.
+ */
+export function getTaskOverdueDate(task: Task, today = toDateString(new Date())): string | null {
+  if (task.isCompleted || task.isArchived || task.isRecurring || task.isMeeting) return null
+  if (task.scheduledDate && task.scheduledDate < today) return task.scheduledDate
+  if (task.dueDate && task.dueDate < today) return task.dueDate
+  return null
+}
+
+export function isTaskOverdue(task: Task, today = toDateString(new Date())): boolean {
+  return getTaskOverdueDate(task, today) !== null
 }
 
 /**

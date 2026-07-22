@@ -34,6 +34,7 @@ interface CalendarHeaderProps {
   onOpenJournal?: () => void
   onOpenReport?: () => void
   onOpenSettings?: () => void
+  onOpenOverdueReview?: () => void
   /** Open the "export schedule as PNG" modal. Lives in the calendar header
    *  next to journal / report / settings on desktop, in the overflow menu
    *  on mobile (where horizontal space is at a premium). */
@@ -65,6 +66,7 @@ export function CalendarHeader({
   onOpenJournal,
   onOpenReport,
   onOpenSettings,
+  onOpenOverdueReview,
   onOpenExport,
   leftPanelOpen = true,
   sharePeers = [],
@@ -301,6 +303,7 @@ export function CalendarHeader({
           <NotificationCenter
             workspaces={workspaces || []}
             onTaskClick={onTaskClick}
+            onReviewOverdue={onOpenOverdueReview}
           />
 
           {/* Inline UserMenu on mobile (replaces the floating one) */}

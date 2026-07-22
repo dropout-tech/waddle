@@ -117,6 +117,7 @@ export function FullScreenTaskView({
         ws.categories?.forEach(cat => {
           if (!cat.isArchived) {
             cat.tasks?.forEach(task => {
+              if (task.isArchived) return
               if (task.showInTaskList === false) return
               // Scheduled meetings are calendar-only (same rule as the left
               // panel); unscheduled ones stay visible here.
