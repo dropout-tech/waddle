@@ -104,8 +104,11 @@ try {
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(password)
   await page.locator('form button[type="submit"]').click()
-  await page.waitForURL(`${BASE_URL}/`, { timeout: 20000 })
-  await page.getByRole('button', { name: '月檢視' }).waitFor({ state: 'visible', timeout: 20000 })
+  await page.waitForURL(
+    (url) => url.origin === new URL(BASE_URL).origin && url.pathname === '/',
+    { waitUntil: 'domcontentloaded', timeout: 60000 },
+  )
+  await page.getByRole('button', { name: '月檢視' }).waitFor({ state: 'visible', timeout: 60000 })
 
   await page.locator('[data-tour="focus-timer"]').click()
   await page.getByRole('button', { name: '自訂', exact: true }).click()
