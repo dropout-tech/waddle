@@ -97,7 +97,7 @@
 | Form / Input | shadcn/ui | 圓角 + warm border |
 | Toast | sonner | 右下角，不要中央 |
 | Chart | recharts | 顏色限定使用 `--chart-1` 到 `--chart-5` |
-| Image Export | html-to-image | 行程 PNG，含 Waddle 浮水印 |
+| Image Export | html-to-image | 行程 PNG，含 Huddle 浮水印 |
 | ModalShell | 自製（components/modals/modal-shell.tsx） | 共用殼：`center`（預設）與 `drawer`（桌面右緣 520px 全高）兩型；Esc／遮罩／焦點歸位／scroll-lock 內建，z-index 用 `--z-index-*` token |
 | Command Palette | cmdk + ModalShell | ⌘K 召喚；搜任務、切視圖、快速動作；桌面鍵盤入口 |
 | Date/Time Field | 自製（components/ui/date-time-field.tsx） | 桌面 popover 月曆＋15 分時間下拉、中文顯示格式；手機保留原生 input（iOS 滾輪較佳） |
@@ -106,9 +106,9 @@
 
 - Lucide React 為基準（已含於 shadcn）。
 - 線條 1.5-2px，圓角 cap。
-- **企鵝吉祥物 Waddle** 是手繪 SVG 風格，出現在 onboarding、empty state、PNG 匯出浮水印；不要在功能性 icon 位置使用吉祥物。
+- **企鵝吉祥物 Huddle** 是手繪風格，出現在 onboarding、empty state、PNG 匯出浮水印；不要在功能性 icon 位置使用吉祥物。
 
-## Anti-patterns Specific to Waddle
+## Anti-patterns Specific to Huddle
 
 - ❌ 紅色驚嘆號 / 紅色「逾期」標籤 — 用赤陶飽和度遞增表達 urgency
 - ❌ "You're behind on X tasks" 的 UX 文案 — 用「還有 X 件可以慢慢做」之類

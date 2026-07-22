@@ -15,6 +15,7 @@ import { User as UserIcon } from 'lucide-react'
 import type { Workspace, Task } from '@/lib/types'
 import { useI18n } from '@/lib/i18n/react'
 import { format } from 'date-fns'
+import { HuddleFootprints } from '@/components/growth/huddle-footprints'
 
 interface CalendarHeaderProps {
   selectedDate: Date
@@ -33,6 +34,7 @@ interface CalendarHeaderProps {
   // Focus mode
   onOpenJournal?: () => void
   onOpenReport?: () => void
+  onOpenGrowth?: () => void
   onOpenSettings?: () => void
   onOpenOverdueReview?: () => void
   /** Open the "export schedule as PNG" modal. Lives in the calendar header
@@ -65,6 +67,7 @@ export function CalendarHeader({
   onTaskClick,
   onOpenJournal,
   onOpenReport,
+  onOpenGrowth,
   onOpenSettings,
   onOpenOverdueReview,
   onOpenExport,
@@ -349,6 +352,15 @@ export function CalendarHeader({
                       <span>{t('報告')}</span>
                     </button>
                   )}
+                  {onOpenGrowth && (
+                    <button
+                      onClick={() => { setOverflowOpen(false); onOpenGrowth() }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                    >
+                      <HuddleFootprints className="h-4 w-4 gap-0.5" />
+                      <span>{t('成長旅程')}</span>
+                    </button>
+                  )}
                   {onOpenExport && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenExport() }}
@@ -495,6 +507,16 @@ export function CalendarHeader({
             >
               <BarChart3 className="w-3.5 h-3.5" aria-hidden="true" />
               {t('報告')}
+            </button>
+          )}
+          {onOpenGrowth && (
+            <button
+              type="button"
+              onClick={onOpenGrowth}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <HuddleFootprints className="h-3.5 w-4 gap-0.5" />
+              {t('成長')}
             </button>
           )}
           {onOpenExport && (

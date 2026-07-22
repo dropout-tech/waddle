@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { ArrowRight, ArrowLeft, X, Sparkles, LayoutTemplate, FilePlus2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { WaddleMascot } from '@/components/branding/waddle-mascot'
+import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useI18n } from '@/lib/i18n/react'
 
@@ -568,7 +568,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
 
         {isCenter && (
           <div className="flex justify-center -mt-1 mb-2">
-            <WaddleMascot
+            <HuddleMascot
               withBackground
               className={cn(
                 'w-16 h-16 rounded-2xl shadow-sm',

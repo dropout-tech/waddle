@@ -1,7 +1,7 @@
 'use client'
 
 import { forwardRef, useMemo } from 'react'
-import { WaddleMascot } from '@/components/branding/waddle-mascot'
+import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { toDateString, taskOccursOnDate } from '@/lib/calendar-utils'
 import { isLightColor } from '@/lib/utils'
 import { toDarkDisplayColor } from '@/lib/palette'
@@ -244,7 +244,7 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
                 justifyContent: 'center',
               }}
             >
-              <WaddleMascot className="w-9 h-9" />
+              <HuddleMascot className="w-9 h-9" />
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, color: textMuted, letterSpacing: 1 }}>

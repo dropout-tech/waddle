@@ -7,7 +7,7 @@ import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
 import { Check } from 'lucide-react'
 import { useDisplayColor } from '@/hooks/use-display-color'
-import { WaddleMascot } from '@/components/branding/waddle-mascot'
+import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { useI18n } from '@/lib/i18n/react'
 import { t as translate } from '@/lib/i18n'
 
@@ -379,7 +379,7 @@ export function ReportDashboard({ workspaces }: ReportDashboardProps) {
       {!hasActivity ? (
         <Reveal index={0}>
           <div className="flex flex-col items-center text-center py-16">
-            <WaddleMascot className="w-20 h-20" phase="auto" />
+            <HuddleMascot className="w-20 h-20" phase="auto" />
             <p className="mt-5 text-base font-medium">
               {t('{label}還沒有留下紀錄', { label: labelText })}
             </p>
@@ -571,7 +571,7 @@ export function ReportDashboard({ workspaces }: ReportDashboardProps) {
             <section aria-label={t('Huddle 的觀察')} className="border-t border-border/70 pt-7">
               <h3 className="text-base font-semibold mb-4">{t('Huddle 的觀察')}</h3>
               <div className="flex items-center gap-4 rounded-xl bg-accent/30 p-4 sm:p-5">
-                <WaddleMascot className="w-11 h-11 shrink-0" phase="auto" />
+                <HuddleMascot className="w-11 h-11 shrink-0" phase="auto" />
                 <p className="text-sm leading-relaxed text-accent-foreground max-w-prose">
                   {observation}
                 </p>
