@@ -1,7 +1,7 @@
 // English dictionary fragment — keys are the Traditional Chinese source strings.
 export const dict: Record<string, string> = {
   // app/(auth)/layout.tsx
-  '慢慢搖擺，把事情做完': "Waddle along, get it done.",
+  '慢慢搖擺，把事情做完': "Take it slow, get it done.",
   '切換語言': 'Switch language',
 
   // app/(auth)/login/page.tsx

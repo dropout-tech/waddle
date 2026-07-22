@@ -5,16 +5,16 @@ import { cn } from '@/lib/utils'
 import { useDayPhase, type DayPhase } from '@/hooks/use-day-phase'
 import { useI18n } from '@/lib/i18n/react'
 
-type WaddlePhase = DayPhase | 'auto'
+type HuddlePhase = DayPhase | 'auto'
 
-interface WaddleMascotProps {
+interface HuddleMascotProps {
   className?: string
   /** Render the warm-yellow rounded background behind Huddle. */
   withBackground?: boolean
   /** Hides the mascot from screen readers when used decoratively next to text. */
   decorative?: boolean
   /** Keeps the quiet late-night zzz detail without changing the mascot artwork. */
-  phase?: WaddlePhase
+  phase?: HuddlePhase
 }
 
 /**
@@ -26,12 +26,12 @@ interface WaddleMascotProps {
  * prevents loading, auth, report, onboarding, invite, and export surfaces
  * from drifting back to an older hand-drawn variant.
  */
-export function WaddleMascot({
+export function HuddleMascot({
   className,
   withBackground = false,
   decorative = true,
   phase = 'work',
-}: WaddleMascotProps) {
+}: HuddleMascotProps) {
   const autoPhase = useDayPhase()
   const resolved: DayPhase = phase === 'auto' ? autoPhase : phase
   const { t } = useI18n()

@@ -12,7 +12,7 @@ import { UserMenu } from '@/components/user-menu'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { OnboardingTour } from '@/components/onboarding-tour'
 import { SettingsModal } from '@/components/modals/settings-modal'
-import { WaddleMascot } from '@/components/branding/waddle-mascot'
+import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { DailyClearCelebration } from '@/components/celebration/daily-clear-celebration'
 import { OverdueTaskReview } from '@/components/task-panel/overdue-task-review'
 import { useWaddleData } from '@/hooks/use-waddle-data'
@@ -28,7 +28,7 @@ import { NotebookOverlayProvider } from '@/components/notebook/notebook-overlay-
 import { useI18n } from '@/lib/i18n/react'
 import type { Task, SlotType, TimeBlock } from '@/lib/types'
 
-function WaddlePage() {
+function HuddlePage() {
   const isMobile = useIsMobile()
   const { t } = useI18n()
   const {
@@ -414,7 +414,7 @@ function WaddlePage() {
     return (
       <main className="h-screen w-full flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4 text-muted-foreground">
-          <WaddleMascot className="w-20 h-20 animate-waddle-bob" />
+          <HuddleMascot className="w-20 h-20 animate-waddle-bob" />
           <div className="flex items-center gap-2">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span className="text-sm">{t('載入中...')}</span>
@@ -538,13 +538,13 @@ function WaddlePage() {
   )
 }
 
-// AuthGuard ensures WaddlePage (and its useWaddleData fetch) only mounts for an
+// AuthGuard ensures HuddlePage (and its legacy data hook) only mounts for an
 // authenticated user; otherwise it redirects to /login. This replaces the
 // server middleware that previously gated this route.
 export default function Page() {
   return (
     <AuthGuard>
-      <WaddlePage />
+      <HuddlePage />
     </AuthGuard>
   )
 }

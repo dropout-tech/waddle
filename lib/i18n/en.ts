@@ -7,6 +7,7 @@ import { dict as modals } from './dict/modals'
 import { dict as misc } from './dict/misc'
 import { dict as reports } from './dict/reports'
 import { dict as dataLayer } from './dict/data-layer'
+import { dict as growth } from './dict/growth'
 
 // Merged English dictionary. Keys are the Traditional Chinese source strings
 // (see lib/i18n/index.ts). Split by feature area purely to keep files
@@ -22,4 +23,5 @@ export const en: Record<string, string> = {
   ...misc,
   ...reports,
   ...dataLayer,
+  ...growth,
 }

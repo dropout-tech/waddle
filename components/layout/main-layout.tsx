@@ -23,6 +23,8 @@ import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, Scr
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
 import { Link2 } from 'lucide-react'
 import { useI18n } from '@/lib/i18n/react'
+import { GrowthJourneyDashboard } from '@/components/growth/growth-journey-dashboard'
+import { HuddleFootprints } from '@/components/growth/huddle-footprints'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
@@ -238,7 +240,7 @@ export function MainLayout({
   }, [])
 
   // Focus mode for journal/report (full screen view)
-  const [focusMode, setFocusMode] = useState<'none' | 'journal' | 'report'>('none')
+  const [focusMode, setFocusMode] = useState<'none' | 'journal' | 'report' | 'growth'>('none')
   
   // Calendar zoom level - controls hour height and visible time range
   // Zoom levels: 1 = compact (40px/hour), 2 = normal (60px/hour), 3 = expanded (80px/hour), 4 = detailed (100px/hour)
@@ -374,6 +376,10 @@ export function MainLayout({
     setFocusMode('report')
   }, [])
 
+  const handleOpenGrowthFocus = useCallback(() => {
+    setFocusMode('growth')
+  }, [])
+
   // Desktop 報告 entry: on wide screens the review pane is already (or can
   // be) on screen, so instead of replacing the calendar we expand the pane
   // if collapsed, scroll it to top, and pulse a soft accent wash over it.
@@ -466,10 +472,15 @@ export function MainLayout({
                       <BookOpen className="w-4 h-4 text-primary" />
                       <span className="text-sm font-semibold">{t('日記')}</span>
                     </>
-                  ) : (
+                  ) : focusMode === 'report' ? (
                     <>
                       <BarChart3 className="w-4 h-4 text-primary" />
                       <span className="text-sm font-semibold">{t('報告')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <HuddleFootprints className="h-4 w-5 gap-0.5" />
+                      <span className="text-sm font-semibold">{t('成長旅程')}</span>
                     </>
                   )}
                 </div>
@@ -484,8 +495,13 @@ export function MainLayout({
               <div className="flex-1 overflow-auto p-4">
                 {focusMode === 'journal' ? (
                   <JournalFocusView workspaces={workspaces} onClose={() => setFocusMode('none')} />
-                ) : (
+                ) : focusMode === 'report' ? (
                   <ReportDashboard workspaces={workspaces} onClose={() => setFocusMode('none')} />
+                ) : (
+                  <GrowthJourneyDashboard
+                    workspaces={workspaces}
+                    scratchpadByDate={scratchpadByDate ?? {}}
+                  />
                 )}
               </div>
             </div>
@@ -554,6 +570,7 @@ export function MainLayout({
                 onTimeBlockSelect={onTimeBlockSelect}
                 onOpenJournal={handleOpenJournalFocus}
                 onOpenReport={handleOpenReportFocus}
+                onOpenGrowth={handleOpenGrowthFocus}
                 onOpenSettings={onOpenSettings}
                 onOpenOverdueReview={onOpenOverdueReview}
                 onOpenExport={() => setExportModalOpen(true)}
@@ -786,10 +803,15 @@ export function MainLayout({
                         <BookOpen className="w-4 h-4 text-primary" />
                         <span className="text-sm font-semibold">{t('日記')}</span>
                       </>
-                    ) : (
+                    ) : focusMode === 'report' ? (
                       <>
                         <BarChart3 className="w-4 h-4 text-primary" />
                         <span className="text-sm font-semibold">{t('報告')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <HuddleFootprints className="h-4 w-5 gap-0.5" />
+                        <span className="text-sm font-semibold">{t('成長旅程')}</span>
                       </>
                     )}
                   </div>
@@ -810,13 +832,18 @@ export function MainLayout({
                         onClose={() => setFocusMode('none')}
                       />
                     </div>
-                  ) : (
+                  ) : focusMode === 'report' ? (
                     <div className="max-w-5xl mx-auto">
                       <ReportDashboard
                         workspaces={workspaces}
                         onClose={() => setFocusMode('none')}
                       />
                     </div>
+                  ) : (
+                    <GrowthJourneyDashboard
+                      workspaces={workspaces}
+                      scratchpadByDate={scratchpadByDate ?? {}}
+                    />
                   )}
                 </div>
               </div>
@@ -853,6 +880,7 @@ export function MainLayout({
                   onTimeBlockSelect={onTimeBlockSelect}
                   onOpenJournal={handleOpenJournalFocus}
                   onOpenReport={handleOpenReportDesktop}
+                  onOpenGrowth={handleOpenGrowthFocus}
                   onOpenSettings={onOpenSettings}
                   onOpenOverdueReview={onOpenOverdueReview}
                   onOpenExport={() => setExportModalOpen(true)}
@@ -1107,4 +1135,3 @@ function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], on
     </div>
   )
 }
-

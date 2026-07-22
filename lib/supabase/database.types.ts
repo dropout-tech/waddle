@@ -266,6 +266,52 @@ type UserSettingsRow = {
   updated_at: string
 }
 
+type GrowthDaysRow = {
+  id: string
+  user_id: string
+  activity_date: string
+  planned_count: number
+  completed_count: number
+  focus_minutes: number
+  reflection_count: number
+  footprint_earned: boolean
+  created_at: string
+  updated_at: string
+}
+
+type GrowthAchievementsRow = {
+  user_id: string
+  achievement_key: string
+  unlocked_at: string
+  progress: number
+  metadata: Json
+}
+
+type GrowthJourneysRow = {
+  id: string
+  user_id: string
+  title: string
+  daily_step: string
+  duration_days: 7 | 14 | 30
+  start_date: string
+  status: 'active' | 'completed' | 'paused'
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+type GrowthJourneyDaysRow = {
+  id: string
+  journey_id: string
+  user_id: string
+  entry_date: string
+  is_complete: boolean
+  note: string | null
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 // ─────────────────────────────────────────────────────────
 // Insert types — what we send to INSERT. Most defaults filled by DB so we
 // allow them as optional. Required: only columns without DB defaults.
@@ -438,6 +484,49 @@ type UserSettingsInsert = {
   onboarding_completed?: boolean
 }
 
+type GrowthDaysInsert = {
+  id?: string
+  user_id: string
+  activity_date: string
+  planned_count?: number
+  completed_count?: number
+  focus_minutes?: number
+  reflection_count?: number
+  footprint_earned?: boolean
+  updated_at?: string
+}
+
+type GrowthAchievementsInsert = {
+  user_id: string
+  achievement_key: string
+  unlocked_at?: string
+  progress?: number
+  metadata?: Json
+}
+
+type GrowthJourneysInsert = {
+  id?: string
+  user_id: string
+  title: string
+  daily_step: string
+  duration_days: 7 | 14 | 30
+  start_date: string
+  status?: 'active' | 'completed' | 'paused'
+  completed_at?: string | null
+  updated_at?: string
+}
+
+type GrowthJourneyDaysInsert = {
+  id?: string
+  journey_id: string
+  user_id: string
+  entry_date: string
+  is_complete?: boolean
+  note?: string | null
+  completed_at?: string | null
+  updated_at?: string
+}
+
 // ─────────────────────────────────────────────────────────
 // Database type composition
 // ─────────────────────────────────────────────────────────
@@ -467,6 +556,10 @@ export type Database = {
       calendar_share_invites: Tbl<CalendarShareInvitesRow, CalendarShareInvitesInsert>
       calendar_shares: Tbl<CalendarSharesRow, CalendarSharesInsert>
       calendar_share_grants: Tbl<CalendarShareGrantsRow, CalendarShareGrantsInsert>
+      growth_days: Tbl<GrowthDaysRow, GrowthDaysInsert>
+      growth_achievements: Tbl<GrowthAchievementsRow, GrowthAchievementsInsert>
+      growth_journeys: Tbl<GrowthJourneysRow, GrowthJourneysInsert>
+      growth_journey_days: Tbl<GrowthJourneyDaysRow, GrowthJourneyDaysInsert>
     }
     Views: Record<string, never>
     // Migration 0016's five RPCs — the only path for cross-account reads.
