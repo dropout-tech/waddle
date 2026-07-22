@@ -230,15 +230,46 @@ export function overlaps(a: Task, b: Task): boolean {
   return aStart < bEnd && aEnd > bStart
 }
 
+const MIN_TASK_LAYOUT_DURATION_MINUTES = 30
+const MIN_OVERLAY_LAYOUT_DURATION_MINUTES = 15
+
 /**
- * Greedy column packing for overlapping tasks.
+ * Calendar task cards keep a 30-minute visual height so a 15-minute task is
+ * still readable and draggable. Column packing must use that same visual
+ * footprint; otherwise back-to-back short tasks are assigned to one column
+ * and the taller card from the earlier task covers the next one.
+ */
+function withMinimumLayoutDuration(task: Task, minimumMinutes: number): Task {
+  if (!task.scheduledStartTime || !task.scheduledEndTime || minimumMinutes <= 0) {
+    return task
+  }
+
+  const start = timeToMinutes(task.scheduledStartTime)
+  const end = timeToMinutes(task.scheduledEndTime)
+  if (end - start >= minimumMinutes) return task
+
+  return {
+    ...task,
+    scheduledEndTime: minutesToTime(start + minimumMinutes),
+  }
+}
+
+/**
+ * Greedy column packing for overlapping task cards.
+ *
+ * By default the overlap calculation follows TaskBlock's 30-minute minimum
+ * rendered height, not only the persisted duration. Callers that have already
+ * normalized mixed item types can pass a different minimum (including 0).
  * Returns column index + total columns for each task in its overlap group.
  */
 export function calculateTaskColumns(
-  tasks: Task[]
+  tasks: Task[],
+  minimumLayoutDurationMinutes: number = MIN_TASK_LAYOUT_DURATION_MINUTES,
 ): Map<string, { column: number; totalColumns: number }> {
   const result = new Map<string, { column: number; totalColumns: number }>()
-  const valid = tasks.filter((t) => t.scheduledStartTime && t.scheduledEndTime)
+  const valid = tasks
+    .filter((t) => t.scheduledStartTime && t.scheduledEndTime)
+    .map((task) => withMinimumLayoutDuration(task, minimumLayoutDurationMinutes))
   if (!valid.length) return result
 
   const sorted = [...valid].sort((a, b) => {
@@ -326,15 +357,27 @@ export function calculateUnifiedColumns(
   peers: Map<string, { column: number; totalColumns: number }>
 } {
   const BLOCK_PREFIX = '__block__'
+  // TaskBlock renders tasks at a minimum 30-minute height. Time blocks and
+  // peer overlays use a 15-minute minimum, so normalize each item to the
+  // footprint its component actually paints before sharing one column grid.
+  const taskShims = tasks.map((task) =>
+    withMinimumLayoutDuration(task, MIN_TASK_LAYOUT_DURATION_MINUTES)
+  )
   const blockShims = blocks.map(
     (b) =>
-      ({
-        id: `${BLOCK_PREFIX}${b.id}`,
-        scheduledStartTime: b.startTime,
-        scheduledEndTime: b.endTime,
-      }) as unknown as Task
+      withMinimumLayoutDuration(
+        ({
+          id: `${BLOCK_PREFIX}${b.id}`,
+          scheduledStartTime: b.startTime,
+          scheduledEndTime: b.endTime,
+        }) as unknown as Task,
+        MIN_OVERLAY_LAYOUT_DURATION_MINUTES,
+      )
   )
-  const packed = calculateTaskColumns([...tasks, ...blockShims, ...peerEvents])
+  const peerShims = peerEvents.map((event) =>
+    withMinimumLayoutDuration(event, MIN_OVERLAY_LAYOUT_DURATION_MINUTES)
+  )
+  const packed = calculateTaskColumns([...taskShims, ...blockShims, ...peerShims], 0)
 
   const taskCols = new Map<string, { column: number; totalColumns: number }>()
   const blockCols = new Map<string, { column: number; totalColumns: number }>()
