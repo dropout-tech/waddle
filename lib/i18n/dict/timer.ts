@@ -110,6 +110,9 @@ export const dict: Record<string, string> = {
   '看遠一點，再慢慢回來。': 'Look into the distance, then ease back in.',
   '不用急，準備好再繼續。': "No rush. Continue when you're ready.",
   '企鵝先幫你守著時間。': 'The penguin will keep watch for now.',
+  '摸扁了，變成企鵝麻糬了。': 'Squish — now I am a penguin mochi.',
+  '噹，我剛剛把自己摺好了。': 'Shh, I just folded myself back together.',
+  '叮，切換成像素模式。': 'Ding — pixel mode activated.',
 
   // Focus scratchpad
   '圖片大小不能超過 5MB': 'Image must be under 5MB',

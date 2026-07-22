@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -29,16 +30,15 @@ interface WaterReminderModalProps {
 /**
  * Gentle full-screen popup that nudges the user to drink water. Reuses
  * the Huddle visual language (charcoal + cream, soft rounded card,
- * hand-drawn penguin). No red, no warnings — Huddle just walked over
+ * approved Huddle mascot). No red, no warnings — Huddle just walked over
  * with a glass.
  *
  * The gear in the top-right opens an inline settings panel (on/off +
  * interval) so users can turn the reminder off right where it bothers
  * them, instead of hunting for it in the settings modal.
  *
- * The mascot here is an inline variant of WaddleMascot that includes a
- * water glass in one flipper; keeping it local avoids cluttering the
- * shared mascot component with one-off props.
+ * The water glass stays a local overlay so every appearance uses the same
+ * approved mascot artwork without adding one-off props to the shared mascot.
  */
 export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: WaterReminderModalProps) {
   const { t } = useI18n()
@@ -133,7 +133,7 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
 
   const mascotAndCopy = (
     <div className="px-6 pt-7 pb-2 flex flex-col items-center text-center">
-      <WaddleWithWater className="w-32 h-32" />
+      <HuddleWithWater className="w-32 h-32" />
 
       <h2
         id="water-reminder-title"
@@ -237,121 +237,51 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
 }
 
 /**
- * Huddle 的企鵝 holding a cream-colored glass of water. Built on the same vector
- * grammar as [components/branding/waddle-mascot.tsx] but with a small
- * flipper-arm + glass overlay. Kept local because nothing else in the app
- * needs this variant.
+ * The approved Huddle artwork with a small water-glass overlay. The mascot
+ * itself remains untouched, so the reminder cannot drift into a different
+ * character design.
  */
-function WaddleWithWater({ className }: { className?: string }) {
+function HuddleWithWater({ className }: { className?: string }) {
   const { t } = useI18n()
   return (
-    <svg
-      viewBox="0 0 120 120"
-      xmlns="http://www.w3.org/2000/svg"
+    <div
       role="img"
       aria-label={t('Huddle 拿著水杯')}
-      className={className}
+      className={cn('relative aspect-square', className)}
     >
-      {/* Soft yellow halo so the penguin reads as a focal token */}
-      <circle cx="60" cy="62" r="50" fill="#f4d977" opacity="0.55" />
-
-      {/* Body */}
-      <path
-        d="M40 26
-           C38.5 19 34.5 17 32 19
-           C30 21 30.5 24.5 35 29
-           C29 34 25 43 25 58
-           C25 81 38 98 60 98
-           C82 98 95 81 95 58
-           C95 43 91 34 85 29
-           C89.5 24.5 90 21 88 19
-           C85.5 17 81.5 19 80 26
-           C74 23 67 22 60 22
-           C53 22 46 23 40 26Z"
-        fill="#3a342e"
-        stroke="#1f1a14"
-        strokeWidth="2.5"
-        strokeLinejoin="round"
+      <span aria-hidden className="absolute inset-[6%] rounded-full bg-[#f4d977]/55" />
+      <Image
+        src="/huddle-mascot.png"
+        alt=""
+        width={512}
+        height={512}
+        loading="eager"
+        aria-hidden="true"
+        draggable={false}
+        className="absolute inset-[7%] h-[86%] w-[86%] object-contain"
       />
 
-      {/* Belly */}
-      <path
-        d="M47 58
-           C47 55 51 54 60 54
-           C69 54 73 55 73 58
-           C76 70 75 86 70 94
-           C66 97 62 98 60 98
-           C58 98 54 97 50 94
-           C45 86 44 70 47 58Z"
-        fill="#f5ead0"
-        stroke="#1f1a14"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-
-      {/* Eyes */}
-      <circle cx="48" cy="52" r="8.5" fill="#f5ead0" stroke="#1f1a14" strokeWidth="2" />
-      <circle cx="72" cy="52" r="8.5" fill="#f5ead0" stroke="#1f1a14" strokeWidth="2" />
-      <circle cx="49" cy="53" r="3.5" fill="#1a1612" />
-      <circle cx="73" cy="53" r="3.5" fill="#1a1612" />
-      {/* tiny shine */}
-      <circle cx="50.5" cy="51" r="1" fill="#fff" />
-      <circle cx="74.5" cy="51" r="1" fill="#fff" />
-
-      {/* Beak */}
-      <ellipse cx="60" cy="61" rx="2.4" ry="2.8" fill="#1f1a14" />
-
-      {/* Little blush */}
-      <ellipse cx="40" cy="64" rx="3.5" ry="2" fill="#e89a9a" opacity="0.55" />
-      <ellipse cx="80" cy="64" rx="3.5" ry="2" fill="#e89a9a" opacity="0.55" />
-
-      {/* Right flipper reaching toward the glass */}
-      <path
-        d="M82 68
-           C90 70 96 76 96 82
-           C96 87 92 90 88 89
-           C83 88 80 84 79 78Z"
-        fill="#3a342e"
-        stroke="#1f1a14"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-
-      {/* Water glass — cream tinted with charcoal outline */}
-      <g>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 48 58"
+        className="absolute bottom-[4%] right-[-1%] h-[45%] w-[38%] drop-shadow-sm"
+      >
         <path
-          d="M86 70
-             L102 70
-             L100 96
-             C100 99 98 100 94 100
-             C90 100 88 99 88 96 Z"
+          d="M8 18 L35 18 L32 49 C32 54 29 56 21.5 56 C14 56 11 54 11 49 Z"
           fill="#f5ead0"
           stroke="#1f1a14"
-          strokeWidth="2"
+          strokeWidth="2.4"
           strokeLinejoin="round"
         />
-        {/* Water inside */}
         <path
-          d="M87.6 78
-             L100.4 78
-             L99.2 95.6
-             C99.2 97.6 97.5 98.4 94 98.4
-             C90.5 98.4 88.8 97.6 88.8 95.6 Z"
+          d="M10 29 L33 29 L31.3 48.5 C31.3 52 28.8 53.5 21.5 53.5 C14.2 53.5 11.7 52 11.7 48.5 Z"
           fill="#9bc7d8"
-          opacity="0.85"
+          opacity="0.9"
         />
-        {/* Surface highlight */}
-        <ellipse cx="94" cy="78" rx="6.4" ry="1.2" fill="#fff" opacity="0.6" />
-      </g>
-
-      {/* Bubbles floating up */}
-      <circle cx="106" cy="58" r="2" fill="#9bc7d8" opacity="0.85" />
-      <circle cx="111" cy="50" r="1.4" fill="#9bc7d8" opacity="0.7" />
-      <circle cx="108" cy="44" r="1" fill="#9bc7d8" opacity="0.55" />
-
-      {/* Feet */}
-      <ellipse cx="52" cy="99" rx="5" ry="2.6" fill="#3a342e" stroke="#1f1a14" strokeWidth="1.6" />
-      <ellipse cx="68" cy="99" rx="5" ry="2.6" fill="#3a342e" stroke="#1f1a14" strokeWidth="1.6" />
-    </svg>
+        <ellipse cx="21.5" cy="29" rx="11.5" ry="1.8" fill="#fff" opacity="0.65" />
+        <circle cx="38" cy="11" r="3" fill="#9bc7d8" opacity="0.85" />
+        <circle cx="43" cy="3.5" r="2" fill="#9bc7d8" opacity="0.65" />
+      </svg>
+    </div>
   )
 }

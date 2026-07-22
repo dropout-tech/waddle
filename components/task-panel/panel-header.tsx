@@ -13,6 +13,11 @@ import { UserMenu } from '@/components/user-menu'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { hapticSelection } from '@/lib/haptics'
 import { useI18n } from '@/lib/i18n/react'
+import {
+  DEFAULT_MASCOT_SRC,
+  getMascotSurprise,
+  type MascotSurprise,
+} from '@/lib/mascot-surprises'
 
 // Pet-the-mascot easter egg — small talk, not a feature. About a third of
 // pets get an extra line (kept quiet the rest of the time so it stays a
@@ -26,6 +31,7 @@ const PET_MESSAGES = [
 ]
 const PET_TOAST_CHANCE = 1 / 3
 const PET_TOAST_THROTTLE_MS = 1500
+const PET_SURPRISE_MS = 1700
 
 interface PanelHeaderProps {
   workspaces: Workspace[]
@@ -77,18 +83,33 @@ export function PanelHeader({
   // occasional extra toast line — a ref (not state) because it's read/
   // written inside the click handler and never needs to trigger a render.
   const [petBobToken, setPetBobToken] = useState(0)
+  const [petSurprise, setPetSurprise] = useState<MascotSurprise | null>(null)
   const lastPetToastAtRef = useRef(0)
+  const petSurpriseCursorRef = useRef(0)
+  const petSurpriseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handlePetMascot = () => {
     setPetBobToken((t) => t + 1)
+    petSurpriseCursorRef.current += 1
+    const surprise = getMascotSurprise(petSurpriseCursorRef.current)
+    setPetSurprise(surprise)
     hapticSelection()
+
+    if (petSurpriseTimerRef.current) clearTimeout(petSurpriseTimerRef.current)
+    petSurpriseTimerRef.current = setTimeout(() => setPetSurprise(null), PET_SURPRISE_MS)
 
     if (Math.random() >= PET_TOAST_CHANCE) return
     const now = Date.now()
     if (now - lastPetToastAtRef.current < PET_TOAST_THROTTLE_MS) return
     lastPetToastAtRef.current = now
-    toast(t(PET_MESSAGES[Math.floor(Math.random() * PET_MESSAGES.length)]))
+    toast(t(Math.random() < 0.55
+      ? surprise.message
+      : PET_MESSAGES[Math.floor(Math.random() * PET_MESSAGES.length)]))
   }
+
+  useEffect(() => () => {
+    if (petSurpriseTimerRef.current) clearTimeout(petSurpriseTimerRef.current)
+  }, [])
 
   // Header collapsed state - persisted to localStorage
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false)
@@ -224,17 +245,18 @@ export function PanelHeader({
                   className="cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span
-                    key={petBobToken}
+                    key={`${petBobToken}-${petSurprise?.id ?? 'default'}`}
                     className={cn('block', petBobToken > 0 && 'animate-huddle-pet')}
                   >
                     <span className="block h-9 w-9 overflow-hidden rounded-lg bg-[#f4d977]">
                       <Image
-                        src="/huddle-mascot.png"
+                        src={petSurprise?.src ?? DEFAULT_MASCOT_SRC}
                         alt=""
                         width={36}
                         height={36}
                         aria-hidden="true"
                         className="h-full w-full object-contain"
+                        style={petSurprise?.id === 'pixel' ? { imageRendering: 'pixelated' } : undefined}
                         priority
                       />
                     </span>
