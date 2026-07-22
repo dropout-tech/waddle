@@ -522,16 +522,33 @@
   50%      { transform: translateY(-4px) rotate(1.5deg); }
 }
 
-/* One-shot version of waddle-bob for click-to-pet interactions (see
-   panel-header.tsx's WaddleMascot) — same rock, but plays once instead of
-   looping, so repeat clicks can retrigger it cleanly. */
-@keyframes waddle-bob-once {
-  0%, 100% { transform: translateY(0) rotate(-2deg); }
-  50%      { transform: translateY(-4px) rotate(2deg); }
+/* One-shot response for the clickable header mascot. The slight squash
+   acknowledges the touch first, then the penguin shifts its weight from
+   foot to foot before settling. Kept transform-only so it stays smooth on
+   mobile; the global reduced-motion rule below collapses it to instant. */
+@keyframes huddle-pet {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  18% {
+    transform: translateY(1.5px) rotate(0deg) scaleX(1.04) scaleY(0.94);
+  }
+  42% {
+    transform: translateY(-3px) rotate(-6deg) scaleX(0.98) scaleY(1.03);
+  }
+  68% {
+    transform: translateY(-1px) rotate(5deg) scale(1.01);
+  }
+  86% {
+    transform: translateY(0) rotate(-2deg) scale(1);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
 }
 
-.animate-waddle-bob-once {
-  animation: waddle-bob-once 0.6s ease-in-out;
+.animate-huddle-pet {
+  animation: huddle-pet 480ms var(--ease-quart);
   transform-origin: 50% 90%;
 }
 
