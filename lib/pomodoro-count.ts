@@ -5,7 +5,9 @@
 // user's midnight rather than UTC. Stored as { date, count } so we can detect
 // stale entries from a previous day and reset.
 
-const STORAGE_KEY = 'waddle-pomodoro-count-v1'
+const STORAGE_KEY = 'huddle-pomodoro-count-v1'
+const LEGACY_STORAGE_KEY = 'waddle-pomodoro-count-v1'
+export const HUDDLE_POMODORO_COUNT_EVENT = 'huddle:pomodoro-count'
 
 export interface PomodoroDayCount {
   date: string  // YYYY-MM-DD, local
@@ -24,11 +26,17 @@ export function loadPomodoroCount(): PomodoroDayCount {
   const today = todayKey()
   if (typeof window === 'undefined') return { date: today, count: 0 }
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY)
     if (!raw) return { date: today, count: 0 }
     const parsed = JSON.parse(raw) as Partial<PomodoroDayCount>
     if (parsed.date === today && typeof parsed.count === 'number') {
-      return { date: today, count: Math.max(0, Math.floor(parsed.count)) }
+      const value = { date: today, count: Math.max(0, Math.floor(parsed.count)) }
+      // One-way compatibility migration: preserve existing progress while all
+      // new writes use the Huddle key.
+      if (!window.localStorage.getItem(STORAGE_KEY)) {
+        try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value)) } catch {}
+      }
+      return value
     }
   } catch {
     /* fall through to zero */
@@ -42,6 +50,7 @@ export function recordPomodoroCompletion(): PomodoroDayCount {
   const next: PomodoroDayCount = { date: current.date, count: current.count + 1 }
   if (typeof window !== 'undefined') {
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)) } catch {}
+    window.dispatchEvent(new CustomEvent(HUDDLE_POMODORO_COUNT_EVENT, { detail: next }))
   }
   return next
 }

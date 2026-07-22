@@ -31,7 +31,7 @@ export const dict: Record<string, string> = {
   '分類名稱...': 'Category name...',
 
   // panel-header.tsx
-  '嘎。': 'Waddle.',
+  '嘎。': 'Huddle.',
   '今天也慢慢來就好。': "Take it slow today, that's fine.",
   '謝謝你摸我。': 'Thanks for the pat.',
   '記得喝口水。': 'Remember to drink some water.',

@@ -1,6 +1,6 @@
 'use client'
 
-import { WaddleMascot } from '@/components/branding/waddle-mascot'
+import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { RedirectIfAuthed } from '@/components/auth/redirect-if-authed'
 import { useI18n } from '@/lib/i18n/react'
 import { cn } from '@/lib/utils'
@@ -47,7 +47,7 @@ export default function AuthLayout({
       <div className="w-full max-w-md">
         {/* Brand — single-line lockup; the slogan lives at the page foot now. */}
         <div className="flex items-center justify-center gap-2.5 mb-8">
-          <WaddleMascot withBackground className="w-11 h-11 shadow-sm rounded-xl" />
+          <HuddleMascot withBackground className="w-11 h-11 shadow-sm rounded-xl" />
           <span className="text-xl font-semibold tracking-tight">Huddle</span>
         </div>
         {children}

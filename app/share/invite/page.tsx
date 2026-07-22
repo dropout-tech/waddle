@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Loader2, CalendarHeart } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/auth/auth-provider'
-import { WaddleMascot } from '@/components/branding/waddle-mascot'
+import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/lib/i18n/react'
 import {
@@ -109,7 +109,7 @@ export default function ShareInvitePage() {
     <main className="min-h-dvh w-full bg-gradient-to-br from-background via-background to-muted/40 flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2.5 mb-8">
-          <WaddleMascot withBackground className="w-11 h-11 shadow-sm rounded-xl" />
+          <HuddleMascot withBackground className="w-11 h-11 shadow-sm rounded-xl" />
           <span className="text-xl font-semibold tracking-tight">Huddle</span>
         </div>
 

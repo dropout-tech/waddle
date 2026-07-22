@@ -47,6 +47,7 @@ interface CalendarPanelProps {
   // Focus mode callbacks
   onOpenJournal?: () => void
   onOpenReport?: () => void
+  onOpenGrowth?: () => void
   onOpenSettings?: () => void
   onOpenOverdueReview?: () => void
   onOpenExport?: () => void
@@ -94,6 +95,7 @@ export function CalendarPanel({
   onTimeBlockSelect,
   onOpenJournal,
   onOpenReport,
+  onOpenGrowth,
   onOpenSettings,
   onOpenOverdueReview,
   onOpenExport,
@@ -187,6 +189,7 @@ export function CalendarPanel({
         onTaskClick={onTaskSelect}
         onOpenJournal={onOpenJournal}
         onOpenReport={onOpenReport}
+        onOpenGrowth={onOpenGrowth}
         onOpenSettings={onOpenSettings}
         onOpenOverdueReview={onOpenOverdueReview}
         onOpenExport={onOpenExport}
