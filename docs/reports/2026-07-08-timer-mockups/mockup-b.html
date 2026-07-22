@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>方向 B — 時光場景</title>
+<style>
+  :root {
+    --fg: oklch(0.3 0.03 52);
+    --card: oklch(0.995 0.003 85);
+    --terra: oklch(0.68 0.14 35);
+    --gold: oklch(0.85 0.09 70);
+    --sun: oklch(0.9 0.11 75);
+    --muted: oklch(0.44 0.03 55);
+    --sans: 'Noto Sans TC', -apple-system, 'PingFang TC', 'Helvetica Neue', sans-serif;
+    --mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1440px; height: 900px; overflow: hidden; }
+  body {
+    font-family: var(--sans); color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+    /* 工作階段＝暖午後天空。休息階段換成黃昏玫瑰（同結構、換 stop 色即可） */
+    background: linear-gradient(180deg,
+      oklch(0.895 0.05 72) 0%,
+      oklch(0.935 0.04 78) 34%,
+      oklch(0.962 0.028 70) 58%,
+      oklch(0.93 0.055 50) 78%,
+      oklch(0.955 0.03 60) 100%);
+  }
+  /* 太陽在天空的暈染，跟著進度點的位置 */
+  .sun-bloom {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(460px 380px at 61% 29%,
+      oklch(0.93 0.085 75 / 0.6), transparent 70%);
+  }
+
+  /* ---------- HUD（極簡） ---------- */
+  .mode-chip {
+    position: absolute; top: 26px; left: 50%; transform: translateX(-50%);
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 15px; border-radius: 99px;
+    background: color-mix(in oklch, var(--card) 55%, transparent);
+    border: 1px solid oklch(0.99 0.01 85 / 0.55);
+    font-size: 13px; color: color-mix(in oklch, var(--fg) 82%, transparent);
+  }
+  .mode-chip .chip-dot { width: 6px; height: 6px; border-radius: 99px; background: var(--terra); }
+  .hud-right {
+    position: absolute; top: 22px; right: 28px; display: flex; gap: 2px;
+  }
+  .ghost-btn {
+    width: 40px; height: 40px; border-radius: 99px;
+    display: grid; place-items: center;
+    color: oklch(0.35 0.03 55 / 0.5);
+  }
+  .ghost-btn svg { width: 17px; height: 17px; }
+
+  /* ---------- 天空中的計時 ---------- */
+  .sky-stage { position: absolute; inset: 0; pointer-events: none; }
+  .digits-block {
+    position: absolute; left: 50%; top: 438px; transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .digits {
+    font-family: var(--mono); font-weight: 350;
+    font-size: 118px; line-height: 1; letter-spacing: -0.045em;
+    font-variant-numeric: tabular-nums;
+    color: oklch(0.3 0.035 50);
+  }
+  .meta-line {
+    margin-top: 22px; font-size: 13px; color: var(--muted);
+    font-variant-numeric: tabular-nums; letter-spacing: 0.03em;
+  }
+  .meta-line .sep { opacity: 0.45; margin: 0 7px; }
+
+  /* ---------- 雪原 ---------- */
+  .snow { position: absolute; inset-inline: 0; bottom: 0; height: 300px; pointer-events: none; }
+  .penguin-wrap { position: absolute; left: 368px; bottom: 108px; pointer-events: none; }
+  .penguin { width: 118px; display: block; }
+  .penguin-shadow {
+    position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%);
+    width: 110px; height: 16px; border-radius: 99px;
+    background: radial-gradient(closest-side, oklch(0.45 0.03 55 / 0.16), transparent);
+  }
+  .footprint { position: absolute; border-radius: 99px; background: oklch(0.5 0.03 55); }
+
+  /* ---------- 控制 ---------- */
+  .pause-btn {
+    position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%);
+    width: 60px; height: 60px; border-radius: 99px;
+    background: color-mix(in oklch, var(--card) 88%, transparent);
+    border: 1px solid oklch(0.9 0.02 80 / 0.8);
+    display: grid; place-items: center;
+    color: color-mix(in oklch, var(--fg) 72%, transparent);
+    box-shadow: 0 1px 2px oklch(0.28 0.025 55 / 0.05), 0 8px 22px oklch(0.28 0.025 55 / 0.08);
+  }
+  .pause-btn svg { width: 21px; height: 21px; }
+  .bgm-pill {
+    position: absolute; right: 36px; bottom: 42px;
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 8px 15px 8px 12px; border-radius: 99px;
+    background: color-mix(in oklch, var(--card) 82%, transparent);
+    border: 1px solid oklch(0.9 0.018 80 / 0.7);
+    box-shadow: 0 1px 2px oklch(0.28 0.025 55 / 0.04);
+    font-size: 12px; color: color-mix(in oklch, var(--fg) 72%, transparent);
+  }
+  .bgm-pill svg { width: 14px; height: 14px; color: oklch(0.42 0.03 55 / 0.75); }
+</style>
+</head>
+<body>
+
+  <div class="sun-bloom"></div>
+
+  <!-- 太陽軌跡＝進度弧：太陽走到 62% 的位置 -->
+  <svg class="sky-stage" viewBox="0 0 1440 900" aria-hidden="true">
+    <defs>
+      <radialGradient id="sunGlow">
+        <stop offset="0%" stop-color="oklch(0.93 0.1 75)" stop-opacity="0.9"/>
+        <stop offset="100%" stop-color="oklch(0.93 0.1 75)" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <!-- 剩餘：點狀虛線軌道 -->
+    <path d="M 290 660 A 430 430 0 0 1 1150 660"
+          fill="none" stroke="oklch(0.995 0.012 85)" stroke-opacity="0.75"
+          stroke-width="2.5" stroke-linecap="round"
+          pathLength="100" stroke-dasharray="0.45 1.75"/>
+    <!-- 已走過：實線、暖金 -->
+    <path d="M 290 660 A 430 430 0 0 1 1150 660"
+          fill="none" stroke="oklch(0.82 0.1 68)" stroke-opacity="0.95"
+          stroke-width="3.5" stroke-linecap="round"
+          pathLength="100" stroke-dasharray="62 100"/>
+    <!-- 太陽（進度點） -->
+    <circle cx="878" cy="260" r="34" fill="url(#sunGlow)"/>
+    <circle cx="878" cy="260" r="11" fill="var(--sun)"/>
+    <circle cx="878" cy="260" r="11" fill="none" stroke="oklch(0.99 0.02 85 / 0.8)" stroke-width="1.5"/>
+    <!-- 軌道起終點的小標記 -->
+    <circle cx="290" cy="660" r="3.5" fill="oklch(0.82 0.1 68)"/>
+    <circle cx="1150" cy="660" r="3.5" fill="oklch(0.995 0.012 85)" fill-opacity="0.9"/>
+  </svg>
+
+  <!-- 計時數字懸浮在天空 -->
+  <div class="digits-block">
+    <div class="digits">14:45</div>
+    <div class="meta-line">
+      <span>開始於 14:12</span><span class="sep">·</span><span>預計 14:52 結束</span>
+    </div>
+  </div>
+
+  <!-- 雪原：三層暖白丘陵 -->
+  <svg class="snow" viewBox="0 0 1440 300" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M 0 92 Q 240 52 480 78 Q 740 104 960 68 Q 1200 34 1440 76 L 1440 300 L 0 300 Z"
+          fill="oklch(0.952 0.022 68)"/>
+    <path d="M 0 156 Q 300 112 620 140 Q 940 166 1180 138 Q 1330 122 1440 142 L 1440 300 L 0 300 Z"
+          fill="oklch(0.974 0.013 78)"/>
+    <path d="M 0 228 Q 360 192 720 214 Q 1080 234 1440 202 L 1440 300 L 0 300 Z"
+          fill="oklch(0.99 0.006 85)"/>
+  </svg>
+
+  <!-- Waddle：場景主角，站在雪丘上看著太陽走 -->
+  <div class="penguin-wrap">
+    <div class="penguin-shadow"></div>
+    <!-- 身後的小腳印，往左漸淡 -->
+    <div class="footprint" style="left:-38px;  bottom:2px;  width:9px; height:5px; opacity:.16; transform:rotate(-14deg)"></div>
+    <div class="footprint" style="left:-58px;  bottom:-3px; width:9px; height:5px; opacity:.13; transform:rotate(10deg)"></div>
+    <div class="footprint" style="left:-88px;  bottom:4px;  width:8px; height:5px; opacity:.1;  transform:rotate(-12deg)"></div>
+    <div class="footprint" style="left:-108px; bottom:-2px; width:8px; height:5px; opacity:.07; transform:rotate(8deg)"></div>
+    <svg class="penguin" viewBox="-30 -45 60 82" aria-hidden="true">
+      <path d="M 0 -30 C -3 -42, -18 -42, -22 -30 C -28 -20, -28 0, -22 18 C -18 26, -10 30, 0 30 C 10 30, 18 26, 22 18 C 28 0, 28 -20, 22 -30 C 18 -42, 3 -42, 0 -30 Z"
+            fill="oklch(0.33 0.03 55)"/>
+      <path d="M -10 -8 C -12 0, -12 14, -8 22 C -4 26, 4 26, 8 22 C 12 14, 12 0, 10 -8 C 6 -12, -6 -12, -10 -8 Z"
+            fill="oklch(0.99 0.005 85)"/>
+      <circle cx="-6" cy="-15" r="1.7" fill="oklch(0.98 0.005 85)"/>
+      <circle cx="6" cy="-15" r="1.7" fill="oklch(0.98 0.005 85)"/>
+      <circle cx="-5.6" cy="-15" r="0.9" fill="oklch(0.2 0.02 55)"/>
+      <circle cx="6.4" cy="-15" r="0.9" fill="oklch(0.2 0.02 55)"/>
+      <path d="M -3 -10 L 3 -10 L 0 -6 Z" fill="oklch(0.78 0.16 60)"/>
+      <ellipse cx="-7" cy="32" rx="4.5" ry="2" fill="oklch(0.78 0.16 60)"/>
+      <ellipse cx="7" cy="32" rx="4.5" ry="2" fill="oklch(0.78 0.16 60)"/>
+    </svg>
+  </div>
+
+  <div class="mode-chip"><span class="chip-dot"></span>短專注</div>
+
+  <div class="hud-right">
+    <div class="ghost-btn" title="縮小到角落">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/>
+        <path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/>
+      </svg>
+    </div>
+    <div class="ghost-btn" title="長按結束">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+        <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="pause-btn" title="暫停">
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <rect x="6.5" y="4.5" width="4" height="15" rx="1.4"/>
+      <rect x="13.5" y="4.5" width="4" height="15" rx="1.4"/>
+    </svg>
+  </div>
+
+  <div class="bgm-pill">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="8" cy="18" r="4"/><path d="M12 18V2l7 4"/>
+    </svg>
+    <span>海浪 · 白噪音</span>
+  </div>
+
+</body>
+</html>
