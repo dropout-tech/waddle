@@ -2,15 +2,13 @@
 //
 // Two channels with different implementations, chosen per usage pattern:
 //
-// • Music — Web Audio API. AudioBufferSourceNode.loop=true loops the
-//   pre-decoded PCM sample-accurately, the *canonical* way to do
-//   gapless looping on the web. The previous HTMLAudioElement
-//   approaches (native `loop=true`, and a hand-rolled dual-buffer
-//   handoff on `timeupdate`) both produced an audible click at the
-//   loop seam because MP3 frames have priming silence at start/end
-//   that gets re-decoded on every loop reset. Decoding once into a
-//   buffer and letting the audio thread loop the raw samples
-//   sidesteps the problem entirely.
+// • Music — low-latency HTMLAudioElement startup, then Web Audio API.
+//   Streaming starts as soon as the browser has the first frames; once the
+//   full file has decoded, playback hands off at the same offset to an
+//   AudioBufferSourceNode. That gives cold starts immediate feedback without
+//   giving up sample-accurate, gapless looping for the rest of the session.
+//   A generation token prevents a slow decode from starting after the timer
+//   has already stopped or switched tracks.
 //
 //   In 'all' (shuffle) mode the loop flag stays off and we schedule
 //   the *next* track to start with a short crossfade right before the
@@ -79,6 +77,11 @@ interface ActiveMusic {
   shuffleTimer: number | null
 }
 
+interface StreamingMusic {
+  id: RealMusicId
+  el: HTMLAudioElement
+}
+
 interface AmbientTrack {
   el: HTMLAudioElement
   targetVol: number
@@ -105,6 +108,17 @@ class BgmEngine {
 
   /** The currently-audible music node, if any. */
   private active: ActiveMusic | null = null
+  /** Low-latency streaming fallback used while the full file is being
+   *  decoded for gapless Web Audio playback. This lets the first frames play
+   *  as soon as the browser has buffered them instead of waiting for an
+   *  entire 5–10 MB MP3 to download and decode. */
+  private activeStream: StreamingMusic | null = null
+  private musicElements = new Map<RealMusicId, HTMLAudioElement>()
+
+  /** Invalidates async starts. loadBuffer() can take several seconds on a
+   *  cold cache; without this token, a start that finished after the timer
+   *  had already ended would create a brand-new source and play forever. */
+  private playbackGeneration = 0
 
   private ambient = new Map<BgmAmbientId, AmbientTrack>()
 
@@ -139,11 +153,57 @@ class BgmEngine {
    *  itself burn the gesture credit. */
   unlockAudio() {
     this.blessAmbient()
+    if (this.selection) this.blessMusic(this.selection)
     const ctx = this.ensureCtx()
     if (!ctx) return
     if (ctx.state === 'suspended') {
       // Intentionally not awaited — caller is in a sync click path.
       ctx.resume().catch(() => {})
+    }
+  }
+
+  /** Prime the selected music element inside the current user gesture and
+   *  start decoding in the background. Safe to call repeatedly. */
+  prepareMusic(id: BgmMusicId | null) {
+    const realId = id === 'all'
+      ? BGM_MUSIC.find((m) => !this.unavailable.has(m.src))?.id ?? null
+      : id
+    if (!realId) return
+    this.blessMusic(realId)
+    this.loadBuffer(realId).catch(() => {})
+  }
+
+  private getOrCreateMusicElement(id: RealMusicId): HTMLAudioElement | null {
+    const existing = this.musicElements.get(id)
+    if (existing) return existing
+    const meta = BGM_MUSIC.find((m) => m.id === id)
+    if (!meta || this.unavailable.has(meta.src)) return null
+    const el = new Audio(meta.src)
+    el.preload = 'auto'
+    el.volume = 0
+    el.addEventListener('error', () => {
+      this.unavailable.add(meta.src)
+      this.notify()
+    })
+    this.musicElements.set(id, el)
+    return el
+  }
+
+  /** HTML media playback also needs its first play() to occur during a user
+   *  gesture on Safari/iOS. Play once at zero volume, then pause unless a
+   *  real start claimed the same element while the promise was pending. */
+  private blessMusic(id: BgmMusicId) {
+    const realId = id === 'all'
+      ? BGM_MUSIC.find((m) => !this.unavailable.has(m.src))?.id
+      : id
+    if (!realId) return
+    const el = this.getOrCreateMusicElement(realId)
+    if (!el) return
+    const p = el.play()
+    if (p && typeof p.then === 'function') {
+      p.then(() => {
+        if (!(this.playing && this.activeStream?.el === el)) el.pause()
+      }).catch(() => {})
     }
   }
 
@@ -260,16 +320,16 @@ class BgmEngine {
     return p
   }
 
-  /** Pre-fetch all music bytes and pre-construct ambient <audio> elements
-   *  so the UI can render which files 404'd before the user clicks. Does
-   *  NOT create an AudioContext — that's deferred to the first click via
-   *  unlockAudio(). */
+  /** Pre-fetch the selected music and pre-construct ambient <audio> elements.
+   *  Avoids downloading every large music file at once. Does NOT create an
+   *  AudioContext — that's deferred to the first click via unlockAudio(). */
   preload() {
-    for (const m of BGM_MUSIC) {
-      if (!this.prefetched.has(m.id)) {
-        this.prefetchBytes(m.id).catch(() => {})
-      }
-    }
+    // Prioritize only the chosen track. Fetching all three large MP3s at
+    // once split bandwidth away from the one the user was about to hear.
+    const first = this.selection === 'all'
+      ? BGM_MUSIC.find((m) => !this.unavailable.has(m.src))?.id
+      : this.selection
+    if (first && !this.prefetched.has(first)) this.prefetchBytes(first).catch(() => {})
     for (const a of BGM_AMBIENT) this.getOrCreateAmbient(a.id, a.src)
   }
 
@@ -303,17 +363,20 @@ class BgmEngine {
 
   setMusic(id: BgmMusicId | null) {
     if (id === this.selection) return
+    this.playbackGeneration += 1
     this.stopActiveMusic()
+    this.stopStreamingMusic()
     this.selection = id
     this.playlist = this.buildPlaylist(id)
     this.playlistIndex = 0
     if (this.playing && this.playlist.length > 0) {
-      this.startPlaylistEntry().catch(() => {})
+      this.startPlaylistEntry(this.playbackGeneration).catch(() => {})
     }
   }
 
   setMusicVolume(v: number) {
     this.musicVol = Math.max(0, Math.min(1, v))
+    if (this.activeStream) this.fadeAmbient(this.activeStream.el, this.musicVol, 80)
     if (this.active && this.ctx) {
       const now = this.ctx.currentTime
       const g = this.active.gain.gain
@@ -331,15 +394,19 @@ class BgmEngine {
    *  AudioBufferSourceNode loops itself forever (gapless). In shuffle
    *  mode the source plays once and we schedule the next entry to
    *  start SHUFFLE_LEAD_S before this one ends. */
-  private async startPlaylistEntry() {
-    if (!this.playing || this.playlist.length === 0) return
+  private async startPlaylistEntry(generation: number) {
+    if (!this.playing || generation !== this.playbackGeneration || this.playlist.length === 0) return
     const id = this.playlist[this.playlistIndex]
+    this.startStreamingMusic(id, generation)
     const buf = await this.loadBuffer(id)
+    // The timer may have stopped, switched tracks, or begun a newer session
+    // while fetch/decode was pending. Never let stale async work create audio.
+    if (!this.playing || generation !== this.playbackGeneration) return
     if (!buf) {
       // Skip missing tracks in shuffle mode so the playlist keeps moving.
       if (this.playlist.length > 1) {
         this.playlistIndex = (this.playlistIndex + 1) % this.playlist.length
-        if (this.playing) this.startPlaylistEntry().catch(() => {})
+        if (this.playing) this.startPlaylistEntry(generation).catch(() => {})
       }
       return
     }
@@ -351,6 +418,7 @@ class BgmEngine {
     if (ctx.state === 'suspended') {
       try { await ctx.resume() } catch {}
     }
+    if (!this.playing || generation !== this.playbackGeneration) return
 
     const source = ctx.createBufferSource()
     source.buffer = buf
@@ -362,15 +430,22 @@ class BgmEngine {
     source.connect(gain).connect(ctx.destination)
 
     const startAt = ctx.currentTime
-    source.start(startAt)
+    const streamOffset = this.activeStream?.id === id && Number.isFinite(this.activeStream.el.currentTime)
+      ? this.activeStream.el.currentTime % Math.max(0.001, buf.duration)
+      : 0
+    source.start(startAt, streamOffset)
     // Fade in to the user's target volume.
     gain.gain.linearRampToValueAtTime(this.musicVol, startAt + FADE_S)
+
+    // The streaming element made startup immediate; hand off at the same
+    // playback position, then let the decoded source handle gapless loops.
+    this.stopStreamingMusic(FADE_S)
 
     const entry: ActiveMusic = { id, source, gain, shuffleTimer: null }
     this.active = entry
 
     if (isShuffle) {
-      const dur = buf.duration
+      const dur = Math.max(0.05, buf.duration - streamOffset)
       const fadeStartAt = startAt + Math.max(0, dur - SHUFFLE_LEAD_S)
       const endAt = startAt + dur
       // Fade out over the tail. setValueAtTime anchors the volume so
@@ -385,12 +460,54 @@ class BgmEngine {
         if (this.active !== entry) return
         this.playlistIndex = (this.playlistIndex + 1) % this.playlist.length
         // Old source will fade to 0 and stop naturally; just start the next.
-        this.startPlaylistEntry().catch(() => {})
+        this.startPlaylistEntry(generation).catch(() => {})
         // Disconnect the old source AFTER its scheduled end so we don't
         // cut the tail crossfade short.
         try { entry.source.stop(endAt + 0.05) } catch {}
       }, msUntilNext)
     }
+  }
+
+  private startStreamingMusic(id: RealMusicId, generation: number) {
+    const el = this.getOrCreateMusicElement(id)
+    if (!el) return
+    this.stopStreamingMusic(0)
+    el.loop = this.playlist.length === 1
+    el.volume = 0
+    try { el.currentTime = 0 } catch {}
+    this.activeStream = { id, el }
+    const p = el.play()
+    this.fadeAmbient(el, this.musicVol, 100)
+    if (p && typeof p.then === 'function') {
+      p.then(() => {
+        if (!this.playing || generation !== this.playbackGeneration || this.activeStream?.el !== el) {
+          el.pause()
+        }
+      }).catch(() => {})
+    }
+  }
+
+  private stopStreamingMusic(fadeSeconds: number = FADE_S) {
+    const stream = this.activeStream
+    if (!stream) return
+    this.activeStream = null
+    const stop = () => {
+      // The same cached element may have been claimed by a newer start while
+      // this older fade timer was waiting. Never pause the new owner.
+      if (this.activeStream?.el === stream.el) return
+      stream.el.pause()
+      try { stream.el.currentTime = 0 } catch {}
+    }
+    if (fadeSeconds <= 0) {
+      const pending = this.fadeHandles.get(stream.el)
+      if (pending !== undefined) cancelAnimationFrame(pending)
+      this.fadeHandles.delete(stream.el)
+      stream.el.volume = 0
+      stop()
+      return
+    }
+    this.fadeAmbient(stream.el, 0, fadeSeconds * 1000)
+    window.setTimeout(stop, fadeSeconds * 1000 + 50)
   }
 
   /** Stop whatever's playing on the music channel with a fade.
@@ -473,9 +590,11 @@ class BgmEngine {
   setPlaying(on: boolean, opts?: { fadeSeconds?: number }) {
     if (on === this.playing) return
     this.playing = on
+    this.playbackGeneration += 1
+    const generation = this.playbackGeneration
     if (on) {
       if (this.selection && this.playlist.length > 0) {
-        this.startPlaylistEntry().catch(() => {})
+        this.startPlaylistEntry(generation).catch(() => {})
       }
       for (const [id, t] of this.ambient) {
         if (t.targetVol > 0) {
@@ -488,6 +607,7 @@ class BgmEngine {
     } else {
       const fadeS = opts?.fadeSeconds ?? FADE_S
       this.stopActiveMusic(fadeS)
+      this.stopStreamingMusic(fadeS)
       for (const t of this.ambient.values()) {
         if (!t.el.paused) {
           this.fadeAmbient(t.el, 0, fadeS * 1000)

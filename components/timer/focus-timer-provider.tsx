@@ -386,7 +386,10 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
       // `playing` is the *intent* flag; these two prove actual playback:
       // a live AudioContext and a connected music source node.
       ctxState: () => (getBgmEngine() as unknown as { ctx?: AudioContext | null } | null)?.ctx?.state ?? 'none',
-      musicActive: () => Boolean((getBgmEngine() as unknown as { active?: unknown } | null)?.active),
+      musicActive: () => {
+        const eng = getBgmEngine() as unknown as { active?: unknown; activeStream?: unknown } | null
+        return Boolean(eng?.active || eng?.activeStream)
+      },
       // Ambient <audio> elements never enter the DOM (created via new
       // Audio()), so tests can't query them — surface their playback state
       // here instead. Same read-only private-field access as above.
@@ -410,7 +413,9 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
   }, [useCustom, customMinutes, selectedPreset])
 
   const startTimer = useCallback((opts?: { immersive?: boolean }) => {
-    getBgmEngine()?.unlockAudio()
+    const eng = getBgmEngine()
+    eng?.unlockAudio()
+    eng?.prepareMusic(prefs.music)
     // A new session owns the audio lifecycle: drop any idle-preview flag or
     // previous session's mute so playback follows prefs + timer state again.
     setBgmManualPlaying(false)
@@ -432,7 +437,7 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     else setElapsed(0)
     setView(opts?.immersive || prefs.openInImmersive || isMobile ? 'immersive' : 'mini')
     setState('running')
-  }, [customLabel, mode, useCustom, customMinutes, selectedPreset, focusType, prefs.openInImmersive, isMobile, getTargetSeconds, t])
+  }, [customLabel, mode, useCustom, customMinutes, selectedPreset, focusType, prefs.music, prefs.openInImmersive, isMobile, getTargetSeconds, t])
 
   const startBreak = useCallback(() => {
     const breakSeconds = Math.max(1, Math.floor(prefs.breakMinutes)) * 60
@@ -699,7 +704,9 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
             setBgmOverride(bgmAudible ? 'off' : 'on')
           }}
           onSelectMusic={(id) => {
-            getBgmEngine()?.unlockAudio()
+            const eng = getBgmEngine()
+            eng?.unlockAudio()
+            eng?.prepareMusic(id)
             setPrefs((p) => ({ ...p, music: id }))
           }}
           onMusicVolumeChange={(v) => setPrefs((p) => ({ ...p, musicVolume: v }))}

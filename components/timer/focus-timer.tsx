@@ -492,7 +492,9 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                               key={m.id}
                               type="button"
                               onClick={() => {
-                                getBgmEngine()?.unlockAudio()
+                                const eng = getBgmEngine()
+                                eng?.unlockAudio()
+                                eng?.prepareMusic(m.id)
                                 setPrefs((p) => ({ ...p, music: m.id }))
                               }}
                               disabled={missing}
@@ -520,7 +522,9 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
                             <button
                               type="button"
                               onClick={() => {
-                                getBgmEngine()?.unlockAudio()
+                                const eng = getBgmEngine()
+                                eng?.unlockAudio()
+                                eng?.prepareMusic(ALL_MUSIC_ID)
                                 setPrefs((p) => ({ ...p, music: ALL_MUSIC_ID }))
                               }}
                               disabled={everyMissing}
@@ -676,7 +680,12 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
              upstream idle check, just expressed as a runtime ternary. */
           <button
             data-tour="focus-timer"
-            onClick={() => setIsExpanded(true)}
+            onClick={() => {
+              const eng = getBgmEngine()
+              eng?.unlockAudio()
+              eng?.prepareMusic(prefs.music)
+              setIsExpanded(true)
+            }}
             className="flex items-center gap-2 px-4 py-3 rounded-2xl shadow-lg transition-all hover:scale-105 bg-card border border-border"
           >
             <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground" />
