@@ -1,7 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="240" height="64" viewBox="0 0 240 64" fill="none">
+  <defs>
+    <clipPath id="app-icon-clip" clipPathUnits="userSpaceOnUse">
+      <rect width="48" height="48" rx="11"/>
+    </clipPath>
+  </defs>
   <g transform="translate(8 8)">
-    <rect width="48" height="48" rx="11" fill="#f4d977"/>
-    <image href="huddle-mascot.png" xlink:href="huddle-mascot.png" x="3" y="3" width="42" height="42" preserveAspectRatio="xMidYMid meet"/>
+    <image href="app-icon.png" xlink:href="app-icon.png" width="48" height="48" preserveAspectRatio="xMidYMid slice" clip-path="url(#app-icon-clip)"/>
   </g>
   <text x="68" y="40" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="28" font-weight="700" fill="#1f1a14" letter-spacing="-0.5">Huddle</text>
 </svg>
