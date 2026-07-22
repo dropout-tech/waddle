@@ -2,6 +2,9 @@
 // Covers: hooks/use-waddle-data.ts, hooks/use-meeting-reminders.ts,
 // hooks/use-undo-shortcuts.ts, lib/notifications/index.ts, lib/task-utils.ts.
 export const dict: Record<string, string> = {
+  '批次完成任務': 'Complete tasks',
+  '有些任務沒有成功儲存，已恢復原狀': 'Some tasks could not be saved, so the previous state was restored.',
+  '完成 {count} 個任務': 'Complete {count} tasks',
   // ── use-waddle-data.ts: generic save-error wrapper ──
   '儲存失敗：{op}': 'Save failed: {op}',
   '初始化資料失敗，請重新整理': 'Failed to set up your data — please refresh.',

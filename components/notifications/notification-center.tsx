@@ -1,17 +1,18 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Bell, AlertTriangle, Clock, Calendar, CheckCircle2, Trash2, Archive, ChevronRight, X, Sparkles } from 'lucide-react'
+import { Bell, AlertTriangle, Clock, Calendar, CheckCircle2, Archive, ChevronRight, X, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task, Workspace } from '@/lib/types'
+import { getTaskOverdueDate, isTaskOverdue } from '@/lib/task-utils'
+import { toDateString } from '@/lib/calendar-utils'
 import { useI18n } from '@/lib/i18n/react'
 import { t } from '@/lib/i18n'
 
 interface NotificationCenterProps {
   workspaces: Workspace[]
   onTaskClick?: (task: Task) => void
-  onArchiveTask?: (taskId: string) => void
-  onDeleteTask?: (taskId: string) => void
+  onReviewOverdue?: () => void
 }
 
 interface Notification {
@@ -41,7 +42,7 @@ const formatRelativeTime = (days: number): string => {
   return t('{n} 年前', { n: Math.floor(days / 365) })
 }
 
-export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onDeleteTask }: NotificationCenterProps) {
+export function NotificationCenter({ workspaces, onTaskClick, onReviewOverdue }: NotificationCenterProps) {
   const { t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
@@ -54,7 +55,7 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
       if (!ws.isArchived) {
         ws.categories?.forEach(cat => {
           if (!cat.isArchived) {
-            tasks.push(...(cat.tasks?.filter(t => !t.isCompleted) || []))
+            tasks.push(...(cat.tasks?.filter(t => !t.isCompleted && !t.isArchived) || []))
           }
         })
       }
@@ -68,30 +69,29 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
     today.setHours(0, 0, 0, 0)
     const notifs: Notification[] = []
 
-    // 1. Overdue tasks (past due date)
-    const overdueTasks = allTasks.filter(task => {
-      if (!task.dueDate) return false
-      const dueDate = new Date(task.dueDate)
-      dueDate.setHours(0, 0, 0, 0)
-      return dueDate < today
-    })
+    const todayStr = toDateString(today)
+
+    // 1. Tasks whose calendar slot or due date has passed. Recurring masters
+    // and meetings are intentionally excluded by isTaskOverdue so the cleanup
+    // flow cannot rewrite an entire series.
+    const overdueTasks = allTasks.filter(task => isTaskOverdue(task, todayStr))
 
     if (overdueTasks.length > 0) {
       // Group by how long overdue
       const criticalOverdue = overdueTasks.filter(t => {
-        const days = daysDiff(today, new Date(t.dueDate!))
+        const days = daysDiff(today, new Date(`${getTaskOverdueDate(t, todayStr)}T00:00:00`))
         return days >= 7
       })
       const recentOverdue = overdueTasks.filter(t => {
-        const days = daysDiff(today, new Date(t.dueDate!))
+        const days = daysDiff(today, new Date(`${getTaskOverdueDate(t, todayStr)}T00:00:00`))
         return days < 7
       })
 
       if (criticalOverdue.length > 0) {
         const oldestTask = criticalOverdue.reduce((oldest, task) => {
-          return new Date(task.dueDate!) < new Date(oldest.dueDate!) ? task : oldest
+          return getTaskOverdueDate(task, todayStr)! < getTaskOverdueDate(oldest, todayStr)! ? task : oldest
         })
-        const daysOverdue = daysDiff(today, new Date(oldestTask.dueDate!))
+        const daysOverdue = daysDiff(today, new Date(`${getTaskOverdueDate(oldestTask, todayStr)}T00:00:00`))
 
         notifs.push({
           id: 'critical-overdue',
@@ -401,7 +401,9 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
                               <div className="mt-3 flex gap-2">
                                 <button
                                   onClick={() => {
-                                    if (notification.tasks?.[0]) {
+                                    if (notification.type === 'overdue' && onReviewOverdue) {
+                                      onReviewOverdue()
+                                    } else if (notification.tasks?.[0]) {
                                       onTaskClick?.(notification.tasks[0])
                                     }
                                     setIsOpen(false)
@@ -410,18 +412,6 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
                                 >
                                   {notification.actionLabel}
                                 </button>
-                                {notification.type === 'overdue' && notification.priority === 'high' && (
-                                  <button
-                                    onClick={() => {
-                                      notification.tasks?.forEach(t => onArchiveTask?.(t.id))
-                                      dismissNotification(notification.id)
-                                    }}
-                                    className="px-3 py-1.5 rounded-lg bg-secondary text-muted-foreground text-xs font-medium hover:bg-secondary/80 transition-colors flex items-center gap-1"
-                                  >
-                                    <Archive className="w-3 h-3" />
-                                    {t('全部歸檔')}
-                                  </button>
-                                )}
                               </div>
                             )}
                           </div>

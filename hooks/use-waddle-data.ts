@@ -172,6 +172,8 @@ interface UseWaddleData {
   addTask: (categoryId: string, title: string) => Promise<void>
   updateTask: (taskId: string, updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => Promise<void>
   toggleTaskComplete: (taskId: string) => Promise<void>
+  /** Mark several incomplete tasks complete with one sound, one write, and one undo step. */
+  completeTasks: (taskIds: string[]) => Promise<void>
   deleteTask: (taskId: string, targetDate?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice) => Promise<void>
   rescheduleTask: (taskId: string, date: string | undefined, startTime: string, endTime: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => Promise<void>
   /**
@@ -1397,6 +1399,76 @@ export function useWaddleData(): UseWaddleData {
         undo: () => toggleTaskComplete(taskId, false),
         redo: () => toggleTaskComplete(taskId, false),
       })
+    }
+  }, [supabase])
+
+  const completeTasks = useCallback(async (
+    taskIds: string[],
+    nextValue: boolean = true,
+    recordUndo: boolean = true,
+  ) => {
+    const uniqueIds = [...new Set(taskIds)]
+    if (uniqueIds.length === 0) return
+
+    await Promise.all(uniqueIds.map((id) => pendingTaskCreatesRef.current[id]))
+
+    const idSet = new Set(uniqueIds)
+    const previous = new Map<string, { isCompleted: boolean; completedAt?: string }>()
+    const completedAt = nextValue ? new Date().toISOString() : undefined
+
+    setWorkspaces((prev) => prev.map((workspace) => ({
+      ...workspace,
+      categories: workspace.categories.map((category) => ({
+        ...category,
+        tasks: category.tasks.map((task) => {
+          if (!idSet.has(task.id)) return task
+          previous.set(task.id, {
+            isCompleted: task.isCompleted,
+            completedAt: task.completedAt,
+          })
+          return { ...task, isCompleted: nextValue, completedAt }
+        }),
+      })),
+    })))
+
+    if (nextValue) {
+      playTaskCompleteSound()
+      hapticTaskComplete()
+    }
+
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ is_completed: nextValue, completed_at: completedAt ?? null })
+        .in('id', uniqueIds)
+        .select('id')
+
+      if (error || !data || data.length !== uniqueIds.length) {
+        setWorkspaces((prev) => prev.map((workspace) => ({
+          ...workspace,
+          categories: workspace.categories.map((category) => ({
+            ...category,
+            tasks: category.tasks.map((task) => {
+              const snapshot = previous.get(task.id)
+              return snapshot ? { ...task, ...snapshot } : task
+            }),
+          })),
+        })))
+        if (error) handleDbError('批次完成任務')(error)
+        else toast.error(translate('有些任務沒有成功儲存，已恢復原狀'))
+        return
+      }
+
+      if (recordUndo) {
+        pushUndoableAction({
+          label: translate('完成 {count} 個任務', { count: uniqueIds.length }),
+          undo: () => completeTasks(uniqueIds, false, false),
+          redo: () => completeTasks(uniqueIds, true, false),
+        })
+      }
+    } finally {
+      pendingWritesRef.current -= 1
     }
   }, [supabase])
 
@@ -2776,6 +2848,7 @@ export function useWaddleData(): UseWaddleData {
     createTask,
     updateTask,
     toggleTaskComplete,
+    completeTasks,
     deleteTask,
     rescheduleTask,
     unscheduleTask,

@@ -1,10 +1,10 @@
 'use client'
 
 import { useRef, useState, useMemo, useEffect } from 'react'
-import { FolderTree, Clock, SlidersHorizontal, ChevronDown, AlertCircle, CheckCircle2, ChevronRight } from 'lucide-react'
+import { FolderTree, Clock, SlidersHorizontal, ChevronDown, AlertCircle, CheckCircle2, ChevronRight, CalendarClock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
-import { forEachTask } from '@/lib/task-utils'
+import { forEachTask, isTaskOverdue } from '@/lib/task-utils'
 import type { Workspace, Task } from '@/lib/types'
 import { PanelHeader } from './panel-header'
 import { WorkspaceSection } from './workspace-section'
@@ -51,6 +51,7 @@ interface TaskPanelProps {
   onDeleteWorkspace?: (workspaceId: string) => void
   onArchiveWorkspace?: (workspaceId: string) => void
   onOpenSettings?: () => void
+  onOpenOverdueReview?: () => void
   onClosePanel?: () => void
   onToggleExpand?: () => void
   className?: string
@@ -75,6 +76,7 @@ export function TaskPanel({
   onDeleteWorkspace,
   onArchiveWorkspace,
   onOpenSettings,
+  onOpenOverdueReview,
   onClosePanel,
   onToggleExpand,
   className,
@@ -128,6 +130,14 @@ export function TaskPanel({
     return n
   }, [workspaces])
 
+  const overdueCount = useMemo(() => {
+    let count = 0
+    forEachTask(workspaces, (task) => {
+      if (isTaskOverdue(task, todayStr)) count += 1
+    })
+    return count
+  }, [todayStr, workspaces])
+
   // Filter workspaces and tasks
   const filteredWorkspaces = useMemo(() => {
     return workspaces
@@ -140,6 +150,7 @@ export function TaskPanel({
           .map((category) => ({
             ...category,
             tasks: category.tasks.filter((task) => {
+              if (task.isArchived) return false
               // Calendar-only opt-out: user unchecked "加入左側任務欄" on this task.
               if (task.showInTaskList === false) {
                 return false
@@ -250,6 +261,20 @@ export function TaskPanel({
             workspaces={workspaces}
             onSelectTask={onSelectTask}
           />
+          {overdueCount > 0 && onOpenOverdueReview && (
+            <button
+              type="button"
+              onClick={onOpenOverdueReview}
+              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-overdue transition-colors hover:bg-overdue/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={t('整理 {count} 個待處理任務', { count: overdueCount })}
+            >
+              <CalendarClock className="size-3" aria-hidden="true" />
+              {t('待整理')}
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-overdue/12 px-1 text-[9px] font-semibold">
+                {overdueCount}
+              </span>
+            </button>
+          )}
           <button
             type="button"
             data-tour="completed-tasks-button"

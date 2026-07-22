@@ -14,6 +14,7 @@ import { OnboardingTour } from '@/components/onboarding-tour'
 import { SettingsModal } from '@/components/modals/settings-modal'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { DailyClearCelebration } from '@/components/celebration/daily-clear-celebration'
+import { OverdueTaskReview } from '@/components/task-panel/overdue-task-review'
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { useMeetingReminders } from '@/hooks/use-meeting-reminders'
 import { useWaterReminder } from '@/hooks/use-water-reminder'
@@ -51,6 +52,7 @@ function WaddlePage() {
     createTask,
     updateTask,
     toggleTaskComplete,
+    completeTasks,
     deleteTask,
     rescheduleTask,
     unscheduleTask,
@@ -129,6 +131,7 @@ function WaddlePage() {
     return findTaskById(workspaces, selectedTask.id) ?? selectedTask
   }, [selectedTask, workspaces, taskMode])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isOverdueReviewOpen, setIsOverdueReviewOpen] = useState(false)
   const [selectedTimeBlock, setSelectedTimeBlock] = useState<TimeBlock | null>(null)
 
   const handleSelectTask = useCallback((task: Task, occurrenceDate?: string) => {
@@ -140,6 +143,23 @@ function WaddlePage() {
   const handleSelectTimeBlock = useCallback((block: TimeBlock) => {
     setSelectedTimeBlock(block)
   }, [])
+
+  const handleReturnToBacklog = useCallback((taskId: string) => {
+    return updateTask(taskId, {
+      dueDate: '',
+      scheduledDate: '',
+      scheduledStartTime: '',
+      scheduledEndTime: '',
+      showInTaskList: true,
+    })
+  }, [updateTask])
+
+  const handleArchiveTask = useCallback((taskId: string) => {
+    return updateTask(taskId, {
+      isArchived: true,
+      archivedAt: new Date().toISOString(),
+    })
+  }, [updateTask])
 
   // When a scratchpad note is promoted, we stage a draft task in the modal but
   // DON'T delete the source note yet — only after the task is actually saved
@@ -433,6 +453,7 @@ function WaddlePage() {
         onRescheduleTask={handleRescheduleTask}
         onUnscheduleTask={unscheduleTask}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenOverdueReview={() => setIsOverdueReviewOpen(true)}
         onUpdateTimeBlock={updateTimeBlock}
         onDeleteTimeBlock={deleteTimeBlock}
         onTimeBlockSelect={handleSelectTimeBlock}
@@ -447,6 +468,17 @@ function WaddlePage() {
       />
       </NotebookOverlayProvider>
       </CategoryPrefixProvider>
+
+      <OverdueTaskReview
+        isOpen={isOverdueReviewOpen}
+        workspaces={workspaces}
+        onClose={() => setIsOverdueReviewOpen(false)}
+        onComplete={toggleTaskComplete}
+        onCompleteAll={completeTasks}
+        onReturnToBacklog={handleReturnToBacklog}
+        onArchive={handleArchiveTask}
+        onSelectTask={handleSelectTask}
+      />
 
       {liveSelectedTask && (
         <TaskDetailModal

@@ -43,6 +43,7 @@ interface MainLayoutProps {
   onDeleteWorkspace?: (workspaceId: string) => void
   onArchiveWorkspace?: (workspaceId: string) => void
   onOpenSettings?: () => void
+  onOpenOverdueReview?: () => void
   onCreateCalendarTask?: (date: string, startTime?: string, endTime?: string) => void
   onCreatePendingTask?: (title: string) => void
   onCreateCalendarTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string, notes?: string, description?: string) => void
@@ -93,6 +94,7 @@ export function MainLayout({
   onDeleteWorkspace,
   onArchiveWorkspace,
   onOpenSettings,
+  onOpenOverdueReview,
   onCreateCalendarTask,
   onCreatePendingTask,
   onCreateCalendarTimeBlock,
@@ -334,8 +336,10 @@ export function MainLayout({
   const getAllTasks = useCallback(() => {
     const tasks: Task[] = []
     for (const workspace of workspaces) {
+      if (workspace.isArchived) continue
       for (const category of workspace.categories) {
-        tasks.push(...category.tasks)
+        if (category.isArchived) continue
+        tasks.push(...category.tasks.filter((task) => !task.isArchived))
       }
     }
     return tasks
@@ -512,6 +516,7 @@ export function MainLayout({
                 onDeleteWorkspace={onDeleteWorkspace}
                 onArchiveWorkspace={onArchiveWorkspace}
                 onOpenSettings={onOpenSettings}
+                onOpenOverdueReview={onOpenOverdueReview}
               />
               </div>
             </ErrorBoundary>
@@ -550,6 +555,7 @@ export function MainLayout({
                 onOpenJournal={handleOpenJournalFocus}
                 onOpenReport={handleOpenReportFocus}
                 onOpenSettings={onOpenSettings}
+                onOpenOverdueReview={onOpenOverdueReview}
                 onOpenExport={() => setExportModalOpen(true)}
                 leftPanelOpen={true}
                 peerEvents={peerEvents}
@@ -757,6 +763,7 @@ export function MainLayout({
                 onDeleteWorkspace={onDeleteWorkspace}
                 onArchiveWorkspace={onArchiveWorkspace}
                 onOpenSettings={onOpenSettings}
+                onOpenOverdueReview={onOpenOverdueReview}
                 onClosePanel={() => setIsLeftPanelOpen(false)}
                 onToggleExpand={() => setIsRightPanelOpen(false)}
               />
@@ -847,6 +854,7 @@ export function MainLayout({
                   onOpenJournal={handleOpenJournalFocus}
                   onOpenReport={handleOpenReportDesktop}
                   onOpenSettings={onOpenSettings}
+                  onOpenOverdueReview={onOpenOverdueReview}
                   onOpenExport={() => setExportModalOpen(true)}
                   leftPanelOpen={isLeftPanelOpen}
                   peerEvents={peerEvents}
@@ -1099,5 +1107,4 @@ function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], on
     </div>
   )
 }
-
 
