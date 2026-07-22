@@ -15,7 +15,8 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { chromium } from 'playwright'
 
 const PORT = 3107
-const BASE_URL = `http://localhost:${PORT}`
+const EXTERNAL_BASE_URL = process.env.E2E_BASE_URL
+const BASE_URL = EXTERNAL_BASE_URL || `http://localhost:${PORT}`
 const DECODE_DELAY_MS = 7000
 
 function loadEnv(filePath) {
@@ -39,15 +40,19 @@ const email = process.env.E2E_EMAIL || env.E2E_EMAIL
 const password = process.env.E2E_PASSWORD || env.E2E_PASSWORD
 if (!email || !password) throw new Error('Missing E2E_EMAIL/E2E_PASSWORD')
 
-const server = spawn('pnpm', ['exec', 'next', 'dev', '-p', String(PORT)], {
-  cwd: process.cwd(),
-  detached: true,
-  stdio: ['ignore', 'pipe', 'pipe'],
-})
-server.stdout.on('data', (data) => process.stdout.write(`[next] ${data}`))
-server.stderr.on('data', (data) => process.stderr.write(`[next] ${data}`))
+let server
+if (!EXTERNAL_BASE_URL) {
+  server = spawn('pnpm', ['exec', 'next', 'dev', '-p', String(PORT)], {
+    cwd: process.cwd(),
+    detached: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  server.stdout.on('data', (data) => process.stdout.write(`[next] ${data}`))
+  server.stderr.on('data', (data) => process.stderr.write(`[next] ${data}`))
+}
 
 function stopServer() {
+  if (!server) return
   try { process.kill(-server.pid, 'SIGTERM') } catch { try { server.kill('SIGTERM') } catch {} }
 }
 
@@ -79,7 +84,7 @@ async function poll(page, predicate, label, timeoutMs = 4000) {
 
 let browser
 try {
-  await waitForServer()
+  if (!EXTERNAL_BASE_URL) await waitForServer()
   browser = await chromium.launch()
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
   await page.addInitScript(() => window.localStorage.setItem('waddle-language-v1', 'zh-TW'))
