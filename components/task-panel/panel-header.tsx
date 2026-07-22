@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react'
 import Image from 'next/image'
 import { Sun, Plus, X, Settings2, PanelLeftClose, Maximize2, Minimize2, ChevronUp, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
@@ -32,6 +32,46 @@ const PET_MESSAGES = [
 const PET_TOAST_CHANCE = 1 / 3
 const PET_TOAST_THROTTLE_MS = 1500
 const PET_SURPRISE_MS = 1700
+const HEADER_MODE_STORAGE_KEY = 'waddle-header-mode'
+const HEADER_MODE_CHANGE_EVENT = 'waddle-header-mode-change'
+const HEADER_MESSAGE_STORAGE_KEY = 'huddle-header-message'
+const HEADER_MESSAGES = [
+  '記下今天，看見自己的節奏',
+  '把今天，整理成明天的線索',
+  '留下紀錄，讓回顧更有方向',
+  '安排眼前，也記得長期的自己',
+  '今天的步調，由你來決定',
+  '每一天，都在累積自己的方法',
+] as const
+
+type HeaderMode = 'full' | 'compact' | 'minimal'
+
+function getHeaderModeSnapshot(): HeaderMode {
+  const savedMode = localStorage.getItem(HEADER_MODE_STORAGE_KEY)
+  if (savedMode === 'full' || savedMode === 'compact' || savedMode === 'minimal') {
+    return savedMode
+  }
+  return localStorage.getItem('waddle-header-collapsed') === 'true' ? 'compact' : 'full'
+}
+
+function subscribeHeaderMode(onChange: () => void) {
+  const handleStorage = (event: StorageEvent) => {
+    if (
+      event.key === null ||
+      event.key === HEADER_MODE_STORAGE_KEY ||
+      event.key === 'waddle-header-collapsed'
+    ) {
+      onChange()
+    }
+  }
+
+  window.addEventListener('storage', handleStorage)
+  window.addEventListener(HEADER_MODE_CHANGE_EVENT, onChange)
+  return () => {
+    window.removeEventListener('storage', handleStorage)
+    window.removeEventListener(HEADER_MODE_CHANGE_EVENT, onChange)
+  }
+}
 
 interface PanelHeaderProps {
   workspaces: Workspace[]
@@ -111,20 +151,32 @@ export function PanelHeader({
     if (petSurpriseTimerRef.current) clearTimeout(petSurpriseTimerRef.current)
   }, [])
 
-  // Header collapsed state - persisted to localStorage
-  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false)
-  
+  // Three header densities, persisted locally. The legacy boolean is retained
+  // as a fallback so existing compact-header preferences migrate seamlessly.
+  const headerMode = useSyncExternalStore(
+    subscribeHeaderMode,
+    getHeaderModeSnapshot,
+    () => 'full'
+  )
+  const [headerMessage, setHeaderMessage] = useState<string>(HEADER_MESSAGES[0])
+
+  // Pick a new thought whenever the panel mounts. Remember the previous one so
+  // consecutive visits never show the same line, while keeping the first
+  // server/client render deterministic for hydration.
   useEffect(() => {
-    const saved = localStorage.getItem('waddle-header-collapsed')
-    if (saved !== null) {
-      setIsHeaderCollapsed(saved === 'true')
-    }
+    const previousMessage = localStorage.getItem(HEADER_MESSAGE_STORAGE_KEY)
+    const candidates = HEADER_MESSAGES.filter((message) => message !== previousMessage)
+    const nextMessage = candidates[Math.floor(Math.random() * candidates.length)] ?? HEADER_MESSAGES[0]
+
+    localStorage.setItem(HEADER_MESSAGE_STORAGE_KEY, nextMessage)
+    const frame = requestAnimationFrame(() => setHeaderMessage(nextMessage))
+    return () => cancelAnimationFrame(frame)
   }, [])
 
-  const toggleHeaderCollapsed = () => {
-    const newValue = !isHeaderCollapsed
-    setIsHeaderCollapsed(newValue)
-    localStorage.setItem('waddle-header-collapsed', String(newValue))
+  const changeHeaderMode = (mode: HeaderMode) => {
+    localStorage.setItem(HEADER_MODE_STORAGE_KEY, mode)
+    localStorage.setItem('waddle-header-collapsed', String(mode !== 'full'))
+    window.dispatchEvent(new Event(HEADER_MODE_CHANGE_EVENT))
   }
 
   // Count pending tasks per workspace. Tasks marked 加入左側任務欄 = false
@@ -160,11 +212,70 @@ export function PanelHeader({
     // Mobile renders UserMenu inline (in MainLayout's mobile branch) so the
     // header can use balanced padding here.
     <div className={cn(
-      'relative py-4 border-b border-border bg-card',
+      'relative border-b border-border bg-card transition-[padding] duration-200',
+      headerMode === 'minimal' ? 'py-2' : 'py-4',
       isMobile ? 'px-4' : 'pl-5 pr-14'
     )}>
-      {/* Collapsed Mode - Single compact row */}
-      {isHeaderCollapsed ? (
+      {/* Minimal Mode - smallest useful row; panel controls stay reachable. */}
+      {headerMode === 'minimal' ? (
+        <div className="flex min-h-8 items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10">
+              <span className="text-sm font-bold text-primary tabular-nums">
+                {today.getDate()}
+              </span>
+            </div>
+            <span className="truncate text-xs font-semibold text-foreground">
+              {t('{count} 待辦', { count: totalPending })}
+            </span>
+          </div>
+
+          <div className="flex flex-shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => changeHeaderMode('compact')}
+              className="rounded-md p-1.5 transition-colors hover:bg-secondary"
+              title={t('展開成精簡列')}
+              aria-label={t('展開成精簡列')}
+            >
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            </button>
+            {onToggleExpand && (
+              <button
+                type="button"
+                onClick={onToggleExpand}
+                className={cn(
+                  'rounded-md p-1.5 transition-colors',
+                  isExpanded
+                    ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                    : 'text-muted-foreground hover:bg-secondary'
+                )}
+                title={isExpanded ? t('顯示日曆') : t('展開任務面板')}
+                aria-label={isExpanded ? t('顯示日曆') : t('展開任務面板')}
+              >
+                {isExpanded ? (
+                  <Minimize2 className="h-4 w-4" />
+                ) : (
+                  <Maximize2 className="h-4 w-4" />
+                )}
+              </button>
+            )}
+            {isMobile && <UserMenu className="relative ml-1" />}
+            {onClosePanel && !isExpanded && (
+              <button
+                type="button"
+                onClick={onClosePanel}
+                className="rounded-md p-1.5 transition-colors hover:bg-secondary"
+                title={t('收起面板')}
+                aria-label={t('收起面板')}
+              >
+                <PanelLeftClose className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+        </div>
+      ) : headerMode === 'compact' ? (
+        /* Compact Mode - date summary with controls for both directions. */
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* Compact date */}
@@ -190,17 +301,30 @@ export function PanelHeader({
           </div>
 
           <div className="flex items-center gap-1">
-            {/* Expand header button */}
+            {/* Collapse one more level */}
             <button
-              onClick={toggleHeaderCollapsed}
+              type="button"
+              onClick={() => changeHeaderMode('minimal')}
               className="p-1.5 rounded-md hover:bg-secondary transition-colors"
-              title={t('展開標題列')}
+              title={t('收合成最小列')}
+              aria-label={t('收合成最小列')}
+            >
+              <ChevronUp className="w-4 h-4 text-muted-foreground" />
+            </button>
+            {/* Expand to the full header */}
+            <button
+              type="button"
+              onClick={() => changeHeaderMode('full')}
+              className="p-1.5 rounded-md hover:bg-secondary transition-colors"
+              title={t('展開完整標題列')}
+              aria-label={t('展開完整標題列')}
             >
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </button>
             {/* Expand/Collapse Right Panel Button */}
             {onToggleExpand && (
               <button
+                type="button"
                 onClick={onToggleExpand}
                 className={cn(
                   "p-1.5 rounded-md transition-colors",
@@ -209,6 +333,7 @@ export function PanelHeader({
                     : "hover:bg-secondary text-muted-foreground"
                 )}
                 title={isExpanded ? t('顯示日曆') : t('展開任務面板')}
+                aria-label={isExpanded ? t('顯示日曆') : t('展開任務面板')}
               >
                 {isExpanded ? (
                   <Minimize2 className="w-4 h-4" />
@@ -222,9 +347,11 @@ export function PanelHeader({
             {/* Close Panel Button */}
             {onClosePanel && !isExpanded && (
               <button
+                type="button"
                 onClick={onClosePanel}
                 className="p-1.5 rounded-md hover:bg-secondary transition-colors"
                 title={t('收起面板')}
+                aria-label={t('收起面板')}
               >
                 <PanelLeftClose className="w-4 h-4 text-muted-foreground" />
               </button>
@@ -267,7 +394,7 @@ export function PanelHeader({
                     Huddle
                   </h1>
                   <p className="text-[10px] text-muted-foreground -mt-0.5">
-                    {t('慢慢搖擺，把事情做完')}
+                    {t(headerMessage)}
                   </p>
                 </div>
               </div>
@@ -282,9 +409,11 @@ export function PanelHeader({
 
               {/* Collapse header button */}
               <button
-                onClick={toggleHeaderCollapsed}
+                type="button"
+                onClick={() => changeHeaderMode('compact')}
                 className="p-1.5 rounded-md hover:bg-secondary transition-colors"
-                title={t('收合標題列')}
+                title={t('收合成精簡列')}
+                aria-label={t('收合成精簡列')}
               >
                 <ChevronUp className="w-4 h-4 text-muted-foreground" />
               </button>
@@ -292,6 +421,7 @@ export function PanelHeader({
               {/* Expand/Collapse Right Panel Button */}
               {onToggleExpand && (
                 <button
+                  type="button"
                   onClick={onToggleExpand}
                   className={cn(
                     "p-1.5 rounded-md transition-colors",
@@ -300,6 +430,7 @@ export function PanelHeader({
                       : "hover:bg-secondary text-muted-foreground"
                   )}
                   title={isExpanded ? t('顯示日曆') : t('展開任務面板')}
+                  aria-label={isExpanded ? t('顯示日曆') : t('展開任務面板')}
                 >
                   {isExpanded ? (
                     <Minimize2 className="w-4 h-4" />
@@ -312,9 +443,11 @@ export function PanelHeader({
               {/* Close Panel Button */}
               {onClosePanel && !isExpanded && (
                 <button
+                  type="button"
                   onClick={onClosePanel}
                   className="p-1.5 rounded-md hover:bg-secondary transition-colors"
                   title={t('收起面板')}
+                  aria-label={t('收起面板')}
                 >
                   <PanelLeftClose className="w-4 h-4 text-muted-foreground" />
                 </button>
