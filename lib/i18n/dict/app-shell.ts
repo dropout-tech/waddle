@@ -70,4 +70,30 @@ export const dict: Record<string, string> = {
 
   // lib/auth/oauth.ts
   'Apple 登入未取得憑證': 'Apple sign-in did not return a credential',
+
+  // app/(auth)/forgot-password/page.tsx
+  '重設密碼': 'Reset password',
+  '輸入註冊時的 Email，我們會寄一封重設連結給你。': "Enter the email you signed up with and we'll send you a reset link.",
+  '寄送重設連結': 'Send reset link',
+  '想起密碼了？': 'Remembered your password?',
+  '重設連結已寄出': 'Reset link sent',
+  '如果 {email} 有 Huddle 帳號，你會收到一封重設密碼的信。請點擊信中連結設定新密碼。': 'If {email} has a Huddle account, a password reset email is on its way. Click the link inside to set a new password.',
+  '沒收到？檢查垃圾信件匣，或稍後再試一次。': 'Nothing yet? Check your spam folder, or try again in a bit.',
+  '嘗試次數太多，請稍後再試': 'Too many attempts — please try again later',
+  '寄送失敗，請稍後再試': "Couldn't send the email — please try again later",
+
+  // app/reset-password/page.tsx
+  '設定新密碼': 'Set a new password',
+  '為你的帳號設定一組新密碼。': 'Choose a new password for your account.',
+  '新密碼': 'New password',
+  '再輸入一次新密碼': 'Re-enter new password',
+  // '至少 6 個字元' and '兩次輸入的密碼不一致' already defined above (signup page)
+  '新密碼不能與舊密碼相同': 'New password must be different from the old one',
+  '更新失敗，請再試一次': "Couldn't update the password — please try again",
+  '更新密碼': 'Update password',
+  '連結已失效': 'This link has expired',
+  '重設連結可能已過期或已被使用。請重新申請一封。': 'The reset link may have expired or already been used. Request a new one below.',
+  '重新申請重設連結': 'Request a new reset link',
+  '密碼已更新': 'Password updated',
+  '正在帶你回到 Huddle⋯': 'Taking you back to Huddle…',
 }
