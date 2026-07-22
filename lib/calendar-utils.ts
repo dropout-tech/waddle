@@ -125,6 +125,29 @@ export function minutesToTime(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
+/**
+ * Fit a task of `durationMinutes` into a visible calendar range.
+ *
+ * Pending tasks use this when they are dragged from the all-day header onto
+ * the timeline. Clamping only the start to `max - 15` can produce an end such
+ * as 24:45 for a 60-minute task, which Postgres `time` rejects and which the
+ * calendar cannot render inside the visible grid.
+ */
+export function fitTaskTimeRange(
+  startMinutes: number,
+  durationMinutes: number,
+  minMinutes: number,
+  maxMinutes: number,
+): { start: number; end: number; duration: number } {
+  const available = Math.max(SNAP_MINUTES, maxMinutes - minMinutes)
+  const requestedDuration = Number.isFinite(durationMinutes) && durationMinutes > 0
+    ? Math.round(durationMinutes)
+    : 30
+  const duration = clamp(requestedDuration, SNAP_MINUTES, available)
+  const start = clamp(snap(startMinutes), minMinutes, maxMinutes - duration)
+  return { start, end: start + duration, duration }
+}
+
 export function snap(minutes: number, step: number = SNAP_MINUTES): number {
   return Math.round(minutes / step) * step
 }

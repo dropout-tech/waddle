@@ -14,6 +14,8 @@ import {
   calculateUnifiedColumns,
   toDateString,
   autoScrollContainerNearEdge,
+  calendarHitTest,
+  fitTaskTimeRange,
   taskOccursOnDate,
 } from '@/lib/calendar-utils'
 import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
@@ -749,12 +751,8 @@ export function DayScrollView({
 
     const startX = e.clientX
     const startY = e.clientY
-    const duration = task.estimatedMinutes || 30
+    const duration = fitTaskTimeRange(MIN, task.estimatedMinutes || 30, MIN, MAX).duration
     let movedBeyondThreshold = false
-    // Closure-local mirror of pendingTaskDrag — same rationale as in
-    // handleTaskDragStart above (avoid side effects inside setState).
-    let lastDayIndex = 0
-    let lastMinutes = 0
 
     const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX
@@ -768,19 +766,23 @@ export function DayScrollView({
 
       const scrollContainer = scrollContainerRef.current
       if (!scrollContainer) return
-      const containerRect = scrollContainer.getBoundingClientRect()
-      const mouseXInContent = ev.clientX - containerRect.left + scrollContainer.scrollLeft
-      const mouseYInContent = ev.clientY - containerRect.top + scrollContainer.scrollTop
-      const relX = mouseXInContent - TIME_COL_WIDTH
-      lastDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
-      lastMinutes = clamp(snap(MIN + Math.max(0, mouseYInContent)), MIN, MAX - 15)
 
-      setPendingTaskDrag({
-        task,
-        currentDayIndex: lastDayIndex,
-        currentMinutes: lastMinutes,
-        duration,
-      })
+      // Read the actual day-grid element under the pointer. This respects the
+      // current hourHeight/zoom and cannot accidentally schedule a task when
+      // the pointer is outside the timeline.
+      const hit = calendarHitTest(ev.clientX, ev.clientY)
+      if (hit?.kind === 'grid') {
+        const dayIndex = allDates.findIndex((date) => toDateString(date) === hit.date)
+        if (dayIndex >= 0) {
+          const range = fitTaskTimeRange(hit.minutes, duration, MIN, MAX)
+          setPendingTaskDrag({
+            task,
+            currentDayIndex: dayIndex,
+            currentMinutes: range.start,
+            duration: range.duration,
+          })
+        }
+      }
 
       // Track hovered pending zone for the drop-target highlight + ghost.
       const hoveredEl = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
@@ -791,10 +793,22 @@ export function DayScrollView({
       autoScrollContainerNearEdge(scrollContainer, ev.clientY)
     }
 
-    const onUp = (ev: PointerEvent) => {
+    const removeListeners = () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+    }
+
+    const finishDragUi = () => {
+      setPendingTaskDrag(null)
+      setHoveredPendingZoneDate(null)
+      isDraggingTaskRef.current = false
+      dragEndCooldown.current = true
+      setTimeout(() => { dragEndCooldown.current = false }, 300)
+    }
+
+    const onUp = (ev: PointerEvent) => {
+      removeListeners()
 
       if (!movedBeyondThreshold) {
         // Click — let onClick fire normally to open the detail modal.
@@ -802,40 +816,39 @@ export function DayScrollView({
         return
       }
 
-      const target = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null
-      const overPending = target?.closest('[data-pending-zone]') as HTMLElement | null
+      const hit = calendarHitTest(ev.clientX, ev.clientY)
+      finishDragUi()
 
-      setPendingTaskDrag(null)
-      setHoveredPendingZoneDate(null)
-
-      if (overPending) {
+      if (hit?.kind === 'pending') {
         // Drop on a pending zone. Same date → no-op. Different date → move
         // the task to that date but keep it pending (no time).
-        const targetDate = overPending.getAttribute('data-pending-zone-date') ?? undefined
+        const targetDate = hit.date
         if (targetDate && targetDate !== task.scheduledDate) {
           onUnscheduleTask?.(task.id, targetDate)
         }
-      } else {
-        // Drop on the timeline → schedule.
-        const dropTarget = allDates[lastDayIndex]
-        if (dropTarget) {
-          onRescheduleTask?.(
-            task.id,
-            toDateString(dropTarget),
-            minutesToTime(lastMinutes),
-            minutesToTime(lastMinutes + duration),
-          )
-        }
+      } else if (hit?.kind === 'grid') {
+        // Only a real day-grid hit may schedule the task. Releasing over the
+        // time-label gutter, outside the calendar, or during a cancelled
+        // pointer gesture is a no-op instead of making the task disappear.
+        const range = fitTaskTimeRange(hit.minutes, duration, MIN, MAX)
+        onRescheduleTask?.(
+          task.id,
+          hit.date,
+          minutesToTime(range.start),
+          minutesToTime(range.end),
+        )
       }
+    }
 
-      isDraggingTaskRef.current = false
-      dragEndCooldown.current = true
-      setTimeout(() => { dragEndCooldown.current = false }, 300)
+    const onCancel = () => {
+      removeListeners()
+      if (movedBeyondThreshold) finishDragUi()
+      else setHoveredPendingZoneDate(null)
     }
 
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', onUp)
+    window.addEventListener('pointercancel', onCancel)
   }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask])
 
   const handleMouseDown = useCallback((e: React.PointerEvent, dayIndex: number) => {
@@ -1119,7 +1132,11 @@ export function DayScrollView({
                           <div
                             key={task.id}
                             onPointerDown={(e) => handlePendingTaskMouseDown(task, e)}
-                            onClick={(e) => { e.stopPropagation(); onTaskSelect(task) }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (dragEndCooldown.current) return
+                              onTaskSelect(task)
+                            }}
                             className={cn(
                               // flex + items-center on the outer div locks the
                               // text to the geometric vertical center; the old
@@ -1454,8 +1471,8 @@ export function DayScrollView({
                   <div
                     className="absolute left-1 right-1 rounded-xl px-2 py-1.5 text-left overflow-hidden pointer-events-none z-30 shadow-xl border-2 border-white/50"
                     style={{
-                      top: `${pendingTaskDrag.currentMinutes - MIN}px`,
-                      height: `${Math.max(pendingTaskDrag.duration, 30)}px`,
+                      top: `${(pendingTaskDrag.currentMinutes - MIN) * (hourHeight / 60)}px`,
+                      height: `${Math.max(pendingTaskDrag.duration * (hourHeight / 60), hourHeight / 2)}px`,
                       backgroundColor: displayColor(pendingTaskDrag.task.calendarColor || pendingTaskDrag.task.workspaceColor || WORKSPACE_COLORS.dustyLavender.hex),
                     }}
                   >
