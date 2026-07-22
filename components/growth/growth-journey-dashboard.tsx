@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import {
   Backpack,
   BookOpen,
   Check,
+  ChevronDown,
   CircleCheck,
   Flag,
   Leaf,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react'
 import { ModalShell } from '@/components/modals/modal-shell'
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { HuddleFootprints } from './huddle-footprints'
 import { useHuddleGrowth } from '@/hooks/use-huddle-growth'
 import {
@@ -53,6 +55,65 @@ const MEDALLION_SHAPES: Record<AchievementDefinition['shape'], string> = {
   'soft-square': 'rounded-2xl rotate-2',
 }
 
+const GROWTH_SECTIONS_STORAGE_KEY = 'huddle.growth.sections.v1'
+const GROWTH_SECTIONS_CHANGE_EVENT = 'huddle:growth-sections-change'
+
+type GrowthSectionKey = 'footprints' | 'room' | 'achievements'
+type GrowthSectionState = Record<GrowthSectionKey, boolean>
+
+const DEFAULT_GROWTH_SECTIONS: GrowthSectionState = {
+  footprints: true,
+  room: false,
+  achievements: false,
+}
+const DEFAULT_GROWTH_SECTIONS_SNAPSHOT = JSON.stringify(DEFAULT_GROWTH_SECTIONS)
+let volatileGrowthSectionsSnapshot = DEFAULT_GROWTH_SECTIONS_SNAPSHOT
+
+function readGrowthSectionsSnapshot() {
+  try {
+    const saved = window.localStorage.getItem(GROWTH_SECTIONS_STORAGE_KEY)
+    if (saved) volatileGrowthSectionsSnapshot = saved
+  } catch {
+    // Fall through to the in-memory snapshot when storage is unavailable.
+  }
+  return volatileGrowthSectionsSnapshot
+}
+
+function subscribeToGrowthSections(onStoreChange: () => void) {
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === GROWTH_SECTIONS_STORAGE_KEY) onStoreChange()
+  }
+  window.addEventListener('storage', handleStorage)
+  window.addEventListener(GROWTH_SECTIONS_CHANGE_EVENT, onStoreChange)
+  return () => {
+    window.removeEventListener('storage', handleStorage)
+    window.removeEventListener(GROWTH_SECTIONS_CHANGE_EVENT, onStoreChange)
+  }
+}
+
+function parseGrowthSections(snapshot: string): GrowthSectionState {
+  try {
+    const parsed = JSON.parse(snapshot) as Partial<GrowthSectionState>
+    return {
+      footprints: typeof parsed.footprints === 'boolean' ? parsed.footprints : DEFAULT_GROWTH_SECTIONS.footprints,
+      room: typeof parsed.room === 'boolean' ? parsed.room : DEFAULT_GROWTH_SECTIONS.room,
+      achievements: typeof parsed.achievements === 'boolean' ? parsed.achievements : DEFAULT_GROWTH_SECTIONS.achievements,
+    }
+  } catch {
+    return DEFAULT_GROWTH_SECTIONS
+  }
+}
+
+function writeGrowthSections(next: GrowthSectionState) {
+  volatileGrowthSectionsSnapshot = JSON.stringify(next)
+  try {
+    window.localStorage.setItem(GROWTH_SECTIONS_STORAGE_KEY, volatileGrowthSectionsSnapshot)
+  } catch {
+    // The current interaction still completes even when storage is unavailable.
+  }
+  window.dispatchEvent(new Event(GROWTH_SECTIONS_CHANGE_EVENT))
+}
+
 function dayLabel(dateKey: string, lang: string) {
   const date = parseDateString(dateKey)
   if (lang === 'en') return `${date.getMonth() + 1}/${date.getDate()}`
@@ -66,6 +127,12 @@ export function GrowthJourneyDashboard({ workspaces, scratchpadByDate }: GrowthJ
   const [title, setTitle] = useState('')
   const [dailyStep, setDailyStep] = useState('')
   const [durationDays, setDurationDays] = useState<7 | 14 | 30>(14)
+  const openSectionsSnapshot = useSyncExternalStore(
+    subscribeToGrowthSections,
+    readGrowthSectionsSnapshot,
+    () => DEFAULT_GROWTH_SECTIONS_SNAPSHOT
+  )
+  const openSections = useMemo(() => parseGrowthSections(openSectionsSnapshot), [openSectionsSnapshot])
   const today = toDateString(new Date())
   const recentDates = useMemo(() => getRecentDateKeys(28), [])
   const daysByDate = useMemo(
@@ -87,6 +154,10 @@ export function GrowthJourneyDashboard({ workspaces, scratchpadByDate }: GrowthJ
     : []
   const completedJourneyDays = journeyEntries.filter((entry) => entry.isComplete).length
   const todayJourneyEntry = journeyEntries.find((entry) => entry.entryDate === today)
+
+  function setSectionOpen(section: GrowthSectionKey, open: boolean) {
+    writeGrowthSections({ ...openSections, [section]: open })
+  }
 
   async function handleCreateJourney(event: React.FormEvent) {
     event.preventDefault()
@@ -175,48 +246,58 @@ export function GrowthJourneyDashboard({ workspaces, scratchpadByDate }: GrowthJ
       )}
 
       <div className="grid gap-x-10 gap-y-12 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,.95fr)]">
-        <section aria-labelledby="footprints-heading" className="min-w-0">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h2 id="footprints-heading" className="text-lg font-semibold">{t('今日腳印')}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{t('做過一件有意義的事，今天就會留下兩枚圓圓腳印。')}</p>
-            </div>
-            <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-              {t('最近 28 天')}
-            </span>
-          </div>
-          <div className="rounded-[1.25rem] border border-border/80 bg-card px-3 py-5 shadow-sm sm:px-5">
-            <ol className="grid grid-cols-7 gap-x-2 gap-y-5" aria-label={t('最近 28 天的腳印')}>
-              {recentDates.map((dateKey) => {
-                const day = daysByDate.get(dateKey)
-                const earned = Boolean(day?.footprintEarned)
-                return (
-                  <li key={dateKey} className="flex min-w-0 flex-col items-center gap-2">
-                    <time
-                      dateTime={dateKey}
-                      className={cn(
-                        'text-[0.7rem] tabular-nums text-muted-foreground',
-                        dateKey === today && 'font-semibold text-primary'
-                      )}
-                    >
-                      {dayLabel(dateKey, lang)}
-                    </time>
-                    <HuddleFootprints
-                      earned={earned}
-                      current={dateKey === today}
-                      className="h-8 w-10"
-                    />
-                    <span className="sr-only">
-                      {earned ? t('這天留下了 Huddle 腳印') : t('這天還沒有腳印')}
-                    </span>
-                  </li>
-                )
-              })}
-            </ol>
-          </div>
-        </section>
+        <Collapsible
+          asChild
+          open={openSections.footprints}
+          onOpenChange={(open) => setSectionOpen('footprints', open)}
+        >
+          <section aria-labelledby="footprints-heading" className="min-w-0 self-start">
+            <CollapsibleSectionHeader
+              headingId="footprints-heading"
+              title={t('今日腳印')}
+              description={t('做過一件有意義的事，今天就會留下兩枚圓圓腳印。')}
+              meta={t('最近 28 天')}
+              open={openSections.footprints}
+            />
+            <CollapsibleContent>
+              <div className="rounded-[1.25rem] border border-border/80 bg-card px-3 py-5 shadow-sm sm:px-5">
+                <ol className="grid grid-cols-7 gap-x-2 gap-y-5" aria-label={t('最近 28 天的腳印')}>
+                  {recentDates.map((dateKey) => {
+                    const day = daysByDate.get(dateKey)
+                    const earned = Boolean(day?.footprintEarned)
+                    return (
+                      <li key={dateKey} className="flex min-w-0 flex-col items-center gap-2">
+                        <time
+                          dateTime={dateKey}
+                          className={cn(
+                            'text-[0.7rem] tabular-nums text-muted-foreground',
+                            dateKey === today && 'font-semibold text-primary'
+                          )}
+                        >
+                          {dayLabel(dateKey, lang)}
+                        </time>
+                        <HuddleFootprints
+                          earned={earned}
+                          current={dateKey === today}
+                          className="h-8 w-10"
+                        />
+                        <span className="sr-only">
+                          {earned ? t('這天留下了 Huddle 腳印') : t('這天還沒有腳印')}
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ol>
+              </div>
+            </CollapsibleContent>
+          </section>
+        </Collapsible>
 
-        <HuddleRoom unlockedCount={unlockedKeys.size} />
+        <HuddleRoom
+          unlockedCount={unlockedKeys.size}
+          open={openSections.room}
+          onOpenChange={(open) => setSectionOpen('room', open)}
+        />
 
         <JourneyNotebook
           activeJourney={activeJourney}
@@ -228,34 +309,40 @@ export function GrowthJourneyDashboard({ workspaces, scratchpadByDate }: GrowthJ
           onComplete={handleCompleteJourney}
         />
 
-        <section aria-labelledby="achievements-heading" className="min-w-0">
-          <div className="mb-3 flex items-end justify-between gap-3">
-            <div>
-              <h2 id="achievements-heading" className="text-lg font-semibold">{t('成就收藏')}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{t('不是比快，只是把走過的路收好。')}</p>
-            </div>
-            <span className="text-sm tabular-nums text-muted-foreground">
-              {unlockedKeys.size}/{ACHIEVEMENT_DEFINITIONS.length}
-            </span>
-          </div>
-          <div className="overflow-x-auto pb-3">
-            <div className="flex min-w-max items-end gap-3 px-1 pt-4">
-              {ACHIEVEMENT_DEFINITIONS.map((definition) => {
-                const unlocked = unlockedKeys.has(definition.key)
-                const progress = getAchievementProgress(definition, achievementContext)
-                return (
-                  <AchievementMedallion
-                    key={definition.key}
-                    definition={definition}
-                    unlocked={unlocked}
-                    progress={progress}
-                  />
-                )
-              })}
-            </div>
-            <div className="h-4 min-w-max rounded-b-xl border-x border-b border-[oklch(0.55_0.055_55)] bg-[oklch(0.68_0.065_55)] shadow-sm" aria-hidden="true" />
-          </div>
-        </section>
+        <Collapsible
+          asChild
+          open={openSections.achievements}
+          onOpenChange={(open) => setSectionOpen('achievements', open)}
+        >
+          <section aria-labelledby="achievements-heading" className="min-w-0 self-start">
+            <CollapsibleSectionHeader
+              headingId="achievements-heading"
+              title={t('成就收藏')}
+              description={t('不是比快，只是把走過的路收好。')}
+              meta={`${unlockedKeys.size}/${ACHIEVEMENT_DEFINITIONS.length}`}
+              open={openSections.achievements}
+            />
+            <CollapsibleContent>
+              <div className="overflow-x-auto pb-3">
+                <div className="flex min-w-max items-end gap-3 px-1 pt-4">
+                  {ACHIEVEMENT_DEFINITIONS.map((definition) => {
+                    const unlocked = unlockedKeys.has(definition.key)
+                    const progress = getAchievementProgress(definition, achievementContext)
+                    return (
+                      <AchievementMedallion
+                        key={definition.key}
+                        definition={definition}
+                        unlocked={unlocked}
+                        progress={progress}
+                      />
+                    )
+                  })}
+                </div>
+                <div className="h-4 min-w-max rounded-b-xl border-x border-b border-[oklch(0.55_0.055_55)] bg-[oklch(0.68_0.065_55)] shadow-sm" aria-hidden="true" />
+              </div>
+            </CollapsibleContent>
+          </section>
+        </Collapsible>
       </div>
 
       <JourneyCreateModal
@@ -274,50 +361,103 @@ export function GrowthJourneyDashboard({ workspaces, scratchpadByDate }: GrowthJ
   )
 }
 
-function HuddleRoom({ unlockedCount }: { unlockedCount: number }) {
+function CollapsibleSectionHeader({
+  headingId,
+  title,
+  description,
+  meta,
+  open,
+}: {
+  headingId: string
+  title: ReactNode
+  description: ReactNode
+  meta?: ReactNode
+  open: boolean
+}) {
+  return (
+    <CollapsibleTrigger asChild>
+      <button
+        type="button"
+        className={cn(
+          'group mb-3 flex min-h-11 w-full items-center justify-between gap-3 rounded-xl px-2 py-1.5 text-left transition-colors duration-200 ease-quart',
+          'hover:bg-secondary/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+          !open && 'border-b border-border/70'
+        )}
+      >
+        <span className="min-w-0">
+          <span id={headingId} className="block text-lg font-semibold text-foreground">{title}</span>
+          <span className="mt-1 block text-sm leading-5 text-muted-foreground">{description}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2 text-sm tabular-nums text-muted-foreground">
+          {meta}
+          <ChevronDown
+            className={cn('h-5 w-5 transition-transform duration-200 ease-quart', !open && '-rotate-90')}
+            aria-hidden="true"
+          />
+        </span>
+      </button>
+    </CollapsibleTrigger>
+  )
+}
+
+function HuddleRoom({
+  unlockedCount,
+  open,
+  onOpenChange,
+}: {
+  unlockedCount: number
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
   const { t } = useI18n()
   return (
-    <section aria-labelledby="room-heading" className="min-w-0">
-      <div className="mb-3">
-        <h2 id="room-heading" className="text-lg font-semibold">{t('Huddle 的房間')}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{t('收藏增加時，房間也會慢慢住進新的東西。')}</p>
-      </div>
-      <div className="relative min-h-[260px] overflow-hidden rounded-[44%_44%_1.4rem_1.4rem/22%_22%_1.4rem_1.4rem] border border-border bg-[oklch(0.96_0.012_85)] shadow-inner dark:bg-[oklch(0.235_0.016_55)]">
-        <div className="absolute left-[8%] top-[22%] flex h-20 w-16 items-center justify-center rounded-t-[50%] border-4 border-[oklch(0.62_0.05_55)] bg-background/75" aria-hidden="true">
-          <span className="h-full w-px bg-[oklch(0.62_0.05_55)]" />
-        </div>
-        {unlockedCount >= 1 && (
-          <div className="absolute bottom-7 left-[10%] flex flex-col items-center text-[oklch(0.45_0.08_145)]" aria-hidden="true">
-            <Leaf className="h-12 w-12" />
-            <span className="h-8 w-10 rounded-b-xl rounded-t-md bg-[oklch(0.67_0.09_35)]" />
+    <Collapsible asChild open={open} onOpenChange={onOpenChange}>
+      <section aria-labelledby="room-heading" className="min-w-0 self-start">
+        <CollapsibleSectionHeader
+          headingId="room-heading"
+          title={t('Huddle 的房間')}
+          description={t('收藏增加時，房間也會慢慢住進新的東西。')}
+          open={open}
+        />
+        <CollapsibleContent>
+          <div className="relative min-h-[260px] overflow-hidden rounded-[44%_44%_1.4rem_1.4rem/22%_22%_1.4rem_1.4rem] border border-border bg-[oklch(0.96_0.012_85)] shadow-inner dark:bg-[oklch(0.235_0.016_55)]">
+            <div className="absolute left-[8%] top-[22%] flex h-20 w-16 items-center justify-center rounded-t-[50%] border-4 border-[oklch(0.62_0.05_55)] bg-background/75" aria-hidden="true">
+              <span className="h-full w-px bg-[oklch(0.62_0.05_55)]" />
+            </div>
+            {unlockedCount >= 1 && (
+              <div className="absolute bottom-7 left-[10%] flex flex-col items-center text-[oklch(0.45_0.08_145)]" aria-hidden="true">
+                <Leaf className="h-12 w-12" />
+                <span className="h-8 w-10 rounded-b-xl rounded-t-md bg-[oklch(0.67_0.09_35)]" />
+              </div>
+            )}
+            {unlockedCount >= 3 && (
+              <div className="absolute bottom-7 right-[10%] flex items-end gap-1 rounded-lg bg-[oklch(0.67_0.04_145)] px-3 py-2 text-[oklch(0.28_0.025_55)]" aria-hidden="true">
+                <BookOpen className="h-8 w-8" />
+                <span className="h-10 w-2 rounded-sm bg-primary/70" />
+                <span className="h-8 w-2 rounded-sm bg-accent" />
+              </div>
+            )}
+            {unlockedCount >= 5 && (
+              <Backpack className="absolute bottom-8 right-[29%] h-11 w-11 text-[oklch(0.57_0.105_35)]" aria-hidden="true" />
+            )}
+            <div className="absolute inset-x-0 bottom-4 flex justify-center">
+              <div className="flex h-11 w-40 items-end justify-center rounded-[50%] bg-[oklch(0.78_0.04_145)]/70">
+                <HuddleMascot
+                  className="mb-1 h-32 w-32 origin-bottom [transform:scaleY(.97)]"
+                  phase="auto"
+                  decorative={false}
+                />
+              </div>
+            </div>
+            {unlockedCount === 0 && (
+              <p className="absolute right-4 top-4 max-w-40 text-right text-xs leading-5 text-muted-foreground">
+                {t('第一枚成就會帶來房間的第一盆植物。')}
+              </p>
+            )}
           </div>
-        )}
-        {unlockedCount >= 3 && (
-          <div className="absolute bottom-7 right-[10%] flex items-end gap-1 rounded-lg bg-[oklch(0.67_0.04_145)] px-3 py-2 text-[oklch(0.28_0.025_55)]" aria-hidden="true">
-            <BookOpen className="h-8 w-8" />
-            <span className="h-10 w-2 rounded-sm bg-primary/70" />
-            <span className="h-8 w-2 rounded-sm bg-accent" />
-          </div>
-        )}
-        {unlockedCount >= 5 && (
-          <Backpack className="absolute bottom-8 right-[29%] h-11 w-11 text-[oklch(0.57_0.105_35)]" aria-hidden="true" />
-        )}
-        <div className="absolute inset-x-0 bottom-4 flex justify-center">
-          <div className="flex h-11 w-40 items-end justify-center rounded-[50%] bg-[oklch(0.78_0.04_145)]/70">
-            <HuddleMascot
-              className="mb-1 h-32 w-32 origin-bottom [transform:scaleY(.97)]"
-              phase="auto"
-              decorative={false}
-            />
-          </div>
-        </div>
-        {unlockedCount === 0 && (
-          <p className="absolute right-4 top-4 max-w-40 text-right text-xs leading-5 text-muted-foreground">
-            {t('第一枚成就會帶來房間的第一盆植物。')}
-          </p>
-        )}
-      </div>
-    </section>
+        </CollapsibleContent>
+      </section>
+    </Collapsible>
   )
 }
 
