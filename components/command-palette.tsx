@@ -15,6 +15,7 @@ import {
 import { ModalShell } from '@/components/modals/modal-shell'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { useNotebookOverlay } from '@/components/notebook/notebook-overlay-provider'
+import { useI18n } from '@/lib/i18n/react'
 import {
   Command,
   CommandInput,
@@ -63,6 +64,7 @@ export function CommandPalette({
   const [search, setSearch] = useState('')
   const { open: openNotebook } = useNotebookOverlay()
   const displayColor = useDisplayColor()
+  const { t, lang } = useI18n()
 
   // ⌘K / Ctrl+K toggles the palette. Deliberately NOT gated on input focus —
   // unlike single-letter shortcuts, this chord isn't something people type by
@@ -109,58 +111,58 @@ export function CommandPalette({
       isOpen={open}
       onClose={close}
       size="xl"
-      ariaLabel="指令面板"
+      ariaLabel={t('指令面板')}
     >
       <div data-command-palette className="contents">
         <Command className="rounded-2xl">
           <CommandInput
             value={search}
             onValueChange={setSearch}
-            placeholder="搜尋任務、或輸入指令…"
+            placeholder={t('搜尋任務、或輸入指令…')}
             autoFocus
           />
           <CommandList className="max-h-[60vh]">
-            <CommandEmpty>沒有符合的結果</CommandEmpty>
+            <CommandEmpty>{t('沒有符合的結果')}</CommandEmpty>
 
-            <CommandGroup heading="動作">
-              <CommandItem value="跳到今天" onSelect={() => runAction(onJumpToday)}>
+            <CommandGroup heading={t('動作')}>
+              <CommandItem value={t('跳到今天')} onSelect={() => runAction(onJumpToday)}>
                 <CalendarClock />
-                <span>跳到今天</span>
+                <span>{t('跳到今天')}</span>
               </CommandItem>
-              <CommandItem value="切換為日檢視" onSelect={() => runAction(() => onSetViewMode('day'))}>
+              <CommandItem value={t('切換為日檢視')} onSelect={() => runAction(() => onSetViewMode('day'))}>
                 <CalendarIcon />
-                <span>切換為日檢視</span>
+                <span>{t('切換為日檢視')}</span>
               </CommandItem>
-              <CommandItem value="切換為週檢視" onSelect={() => runAction(() => onSetViewMode('week'))}>
+              <CommandItem value={t('切換為週檢視')} onSelect={() => runAction(() => onSetViewMode('week'))}>
                 <CalendarRange />
-                <span>切換為週檢視</span>
+                <span>{t('切換為週檢視')}</span>
               </CommandItem>
-              <CommandItem value="切換為月檢視" onSelect={() => runAction(() => onSetViewMode('month'))}>
+              <CommandItem value={t('切換為月檢視')} onSelect={() => runAction(() => onSetViewMode('month'))}>
                 <CalendarDays />
-                <span>切換為月檢視</span>
+                <span>{t('切換為月檢視')}</span>
               </CommandItem>
-              <CommandItem value="開記事本" onSelect={() => runAction(openNotebook)}>
+              <CommandItem value={t('開記事本')} onSelect={() => runAction(openNotebook)}>
                 <NotebookPen />
-                <span>開記事本</span>
+                <span>{t('開記事本')}</span>
               </CommandItem>
-              <CommandItem value="返回日曆" onSelect={() => runAction(onReturnToCalendar)}>
+              <CommandItem value={t('返回日曆')} onSelect={() => runAction(onReturnToCalendar)}>
                 <LayoutGrid />
-                <span>返回日曆</span>
+                <span>{t('返回日曆')}</span>
               </CommandItem>
               {onOpenSettings && (
-                <CommandItem value="開設定" onSelect={() => runAction(onOpenSettings)}>
+                <CommandItem value={t('開設定')} onSelect={() => runAction(onOpenSettings)}>
                   <Settings />
-                  <span>開設定</span>
+                  <span>{t('開設定')}</span>
                 </CommandItem>
               )}
-              <CommandItem value="新增任務" onSelect={() => runAction(onCreateTask)}>
+              <CommandItem value={t('新增任務')} onSelect={() => runAction(onCreateTask)}>
                 <Plus />
-                <span>新增任務</span>
+                <span>{t('新增任務')}</span>
               </CommandItem>
             </CommandGroup>
 
             {search.trim() && matchingTasks.length > 0 && (
-              <CommandGroup heading="任務">
+              <CommandGroup heading={lang === 'en' ? 'Tasks' : '任務'}>
                 {matchingTasks.map((task) => (
                   <CommandItem
                     key={task.id}

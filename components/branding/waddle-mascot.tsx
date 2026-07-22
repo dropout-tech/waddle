@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import { useDayPhase, type DayPhase } from '@/hooks/use-day-phase'
+import { useI18n } from '@/lib/i18n/react'
 
 /**
  * Mascot mood. Pass a specific phase for control, `'auto'` to follow the
@@ -39,6 +40,7 @@ export function WaddleMascot({
   // value, the hook result is just ignored.
   const autoPhase = useDayPhase()
   const resolved: DayPhase = phase === 'auto' ? autoPhase : phase
+  const { t } = useI18n()
 
   // Eye and beak geometry varies by phase. The body / belly / feet are
   // intentionally constant — silhouette stays the same so the mascot still
@@ -52,7 +54,7 @@ export function WaddleMascot({
       xmlns="http://www.w3.org/2000/svg"
       role={decorative ? undefined : 'img'}
       aria-hidden={decorative || undefined}
-      aria-label={decorative ? undefined : 'Huddle 企鵝吉祥物'}
+      aria-label={decorative ? undefined : t('Huddle 企鵝吉祥物')}
       className={cn('block', className)}
     >
       <defs>

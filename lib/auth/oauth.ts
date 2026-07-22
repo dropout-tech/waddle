@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { isNative } from '@/lib/platform'
 import { OAUTH_REDIRECT, APPLE_SERVICES_ID } from '@/lib/native-config'
+import { t } from '@/lib/i18n'
 
 // Shared OAuth entry points for the login and signup pages. Each branches on
 // platform: web uses the standard browser redirect to /auth/callback; native
@@ -52,7 +53,7 @@ export async function signInWithApple(): Promise<void> {
       scopes: 'email name',
     })
     const idToken = result.response?.identityToken
-    if (!idToken) throw new Error('Apple 登入未取得憑證')
+    if (!idToken) throw new Error(t('Apple 登入未取得憑證'))
     const { error } = await supabase.auth.signInWithIdToken({
       provider: 'apple',
       token: idToken,

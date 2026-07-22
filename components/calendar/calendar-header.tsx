@@ -10,7 +10,11 @@ import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { UserMenu } from '@/components/user-menu'
 import { useNotebookOverlay } from '@/components/notebook/notebook-overlay-provider'
+import { isPeerVisible, type SharePeer } from '@/hooks/use-calendar-sharing'
+import { User as UserIcon } from 'lucide-react'
 import type { Workspace, Task } from '@/lib/types'
+import { useI18n } from '@/lib/i18n/react'
+import { format } from 'date-fns'
 
 interface CalendarHeaderProps {
   selectedDate: Date
@@ -37,6 +41,11 @@ interface CalendarHeaderProps {
   /** When false, the top nav row is shifted right to leave room for the
    * floating "open task panel" button at the top-left of the calendar area. */
   leftPanelOpen?: boolean
+  // Calendar sharing — connected peers + per-peer overlay visibility toggle.
+  // When there are no peers, nothing sharing-related renders at all.
+  sharePeers?: SharePeer[]
+  visiblePeers?: Record<string, boolean>
+  onTogglePeerVisible?: (peerId: string) => void
 }
 
 const ZOOM_LABELS = ['緊湊', '標準', '寬鬆', '詳細']
@@ -58,8 +67,12 @@ export function CalendarHeader({
   onOpenSettings,
   onOpenExport,
   leftPanelOpen = true,
+  sharePeers = [],
+  visiblePeers = {},
+  onTogglePeerVisible,
 }: CalendarHeaderProps) {
   const isMobile = useIsMobile()
+  const { t, lang } = useI18n()
   const { open: openNotebook } = useNotebookOverlay()
   const [overflowOpen, setOverflowOpen] = useState(false)
   const overflowRef = useRef<HTMLDivElement>(null)
@@ -81,7 +94,16 @@ export function CalendarHeader({
     return () => document.removeEventListener('mousedown', onClick)
   }, [overflowOpen, viewPickerOpen])
 
-  const viewModeLabel = viewMode === 'day' ? '日' : viewMode === 'week' ? '週' : '月'
+  // Bare "日/週/月" collide with WEEKDAY_NAMES' "日" (Sunday) in the shared
+  // t() dictionary — a single-char key can't carry two unrelated meanings.
+  // Resolve the compact view-mode label directly per language instead of
+  // routing it through t().
+  const dayWeekMonthLabel = (mode: 'day' | 'week' | 'month') =>
+    lang === 'en'
+      ? mode === 'day' ? 'Day' : mode === 'week' ? 'Week' : 'Month'
+      : mode === 'day' ? '日' : mode === 'week' ? '週' : '月'
+
+  const viewModeLabel = dayWeekMonthLabel(viewMode)
 
   const isToday = () => {
     const today = new Date()
@@ -96,9 +118,11 @@ export function CalendarHeader({
     // Mobile + day view: show the actual visible day so users always know
     // where they are after swiping. Desktop keeps the year + month label.
     if (isMobile && viewMode === 'day') {
+      if (lang === 'en') return format(selectedDate, 'M/d EEE')
       const wd = ['日', '一', '二', '三', '四', '五', '六'][selectedDate.getDay()]
       return `${selectedDate.getMonth() + 1}/${selectedDate.getDate()} 週${wd}`
     }
+    if (lang === 'en') return format(selectedDate, 'MMMM yyyy')
     return `${selectedDate.getFullYear()}年 ${selectedDate.getMonth() + 1}月`
   }
 
@@ -118,7 +142,7 @@ export function CalendarHeader({
   }
 
   return (
-    <div className="border-b border-border bg-card" role="toolbar" aria-label="日曆導航">
+    <div className="border-b border-border bg-card" role="toolbar" aria-label={t('日曆導航')}>
       {/* Primary Row: Navigation + View Mode + Today.
           Reserve ~56px on the left when the task panel is closed so the
           floating reopen button doesn't overlap the prev-month chevron.
@@ -149,7 +173,7 @@ export function CalendarHeader({
           <button
             type="button"
             onClick={() => stepDate(-1)}
-            aria-label={viewMode === 'day' ? '前一天' : viewMode === 'week' ? '前一週' : '前一個月'}
+            aria-label={viewMode === 'day' ? t('前一天') : viewMode === 'week' ? t('前一週') : t('前一個月')}
             className="relative flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:content-[''] before:absolute before:inset-0 before:-m-1.5 md:before:hidden"
           >
             <ChevronLeft className="w-4 h-4" aria-hidden="true" />
@@ -157,7 +181,7 @@ export function CalendarHeader({
           <button
             type="button"
             onClick={() => stepDate(1)}
-            aria-label={viewMode === 'day' ? '後一天' : viewMode === 'week' ? '後一週' : '後一個月'}
+            aria-label={viewMode === 'day' ? t('後一天') : viewMode === 'week' ? t('後一週') : t('後一個月')}
             className="relative flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:content-[''] before:absolute before:inset-0 before:-m-1.5 md:before:hidden"
           >
             <ChevronRight className="w-4 h-4" aria-hidden="true" />
@@ -181,7 +205,7 @@ export function CalendarHeader({
               data-tour="view-modes"
               className="hidden md:flex items-center border border-border rounded-lg overflow-hidden ml-auto"
               role="group"
-              aria-label="檢視模式"
+              aria-label={t('檢視模式')}
             >
               {(['day', 'week', 'month'] as const).map((mode) => (
                 <button
@@ -189,7 +213,7 @@ export function CalendarHeader({
                   type="button"
                   onClick={() => onViewModeChange(mode)}
                   aria-pressed={viewMode === mode}
-                  aria-label={mode === 'day' ? '日檢視' : mode === 'week' ? '週檢視' : '月檢視'}
+                  aria-label={mode === 'day' ? t('日檢視') : mode === 'week' ? t('週檢視') : t('月檢視')}
                   className={cn(
                     'px-3 py-1.5 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
                     viewMode === mode
@@ -197,7 +221,7 @@ export function CalendarHeader({
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                   )}
                 >
-                  {mode === 'day' ? '日' : mode === 'week' ? '週' : '月'}
+                  {dayWeekMonthLabel(mode)}
                 </button>
               ))}
             </div>
@@ -208,7 +232,13 @@ export function CalendarHeader({
                 onClick={() => setViewPickerOpen(v => !v)}
                 aria-haspopup="menu"
                 aria-expanded={viewPickerOpen}
-                aria-label={`目前是${viewModeLabel}檢視，點擊更換`}
+                aria-label={
+                  viewMode === 'day'
+                    ? t('目前是日檢視，點擊更換')
+                    : viewMode === 'week'
+                    ? t('目前是週檢視，點擊更換')
+                    : t('目前是月檢視，點擊更換')
+                }
                 className={cn(
                   // Mobile-only button (desktop renders the segmented control
                   // above instead) — h-11 keeps the tap target at the 44px floor.
@@ -223,9 +253,9 @@ export function CalendarHeader({
               {viewPickerOpen && (
                 <div className="absolute left-0 top-full mt-1 w-32 max-w-[calc(100vw-1.5rem)] bg-card border border-border rounded-xl shadow-lg overflow-hidden z-popover" role="menu">
                   {([
-                    { id: 'day' as const, label: '日檢視', desc: '單天時間軸' },
-                    { id: 'week' as const, label: '週檢視', desc: '七天概覽' },
-                    { id: 'month' as const, label: '月檢視', desc: '月曆格' },
+                    { id: 'day' as const, label: t('日檢視'), desc: t('單天時間軸') },
+                    { id: 'week' as const, label: t('週檢視'), desc: t('七天概覽') },
+                    { id: 'month' as const, label: t('月檢視'), desc: t('月曆格') },
                   ]).map(item => (
                     <button
                       key={item.id}
@@ -255,13 +285,13 @@ export function CalendarHeader({
             variant={isToday() ? 'secondary' : 'outline'}
             size="sm"
             onClick={onTodayClick}
-            aria-label={isToday() ? '已是今天' : '回到今天'}
+            aria-label={isToday() ? t('已是今天') : t('回到今天')}
             className={cn(
               'text-xs font-medium rounded-lg h-8 border-border transition-colors',
               isToday() && 'text-muted-foreground'
             )}
           >
-            今天
+            {t('今天')}
           </Button>
 
           <div className="hidden md:block">
@@ -282,7 +312,7 @@ export function CalendarHeader({
               <button
                 type="button"
                 onClick={() => setOverflowOpen(v => !v)}
-                aria-label="更多"
+                aria-label={t('更多')}
                 aria-expanded={overflowOpen}
                 className="flex items-center justify-center w-11 h-11 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
@@ -296,7 +326,7 @@ export function CalendarHeader({
                     className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                   >
                     <NotebookPen className="w-4 h-4" />
-                    <span>記事本</span>
+                    <span>{t('記事本')}</span>
                   </button>
                   {onOpenJournal && (
                     <button
@@ -304,7 +334,7 @@ export function CalendarHeader({
                       className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
                       <BookOpen className="w-4 h-4" />
-                      <span>日記</span>
+                      <span>{t('日記')}</span>
                     </button>
                   )}
                   {onOpenReport && (
@@ -313,7 +343,7 @@ export function CalendarHeader({
                       className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
                       <BarChart3 className="w-4 h-4" />
-                      <span>報告</span>
+                      <span>{t('報告')}</span>
                     </button>
                   )}
                   {onOpenExport && (
@@ -322,7 +352,7 @@ export function CalendarHeader({
                       className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
                       <Download className="w-4 h-4" />
-                      <span>匯出行程</span>
+                      <span>{t('匯出行程')}</span>
                     </button>
                   )}
                   {onOpenSettings && (
@@ -331,7 +361,7 @@ export function CalendarHeader({
                       className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
                       <Settings className="w-4 h-4" />
-                      <span>設定</span>
+                      <span>{t('設定')}</span>
                     </button>
                   )}
                 </div>
@@ -341,19 +371,63 @@ export function CalendarHeader({
         </div>
       </div>
 
+      {/* Peer chips — one per connected calendar-share peer; tap toggles
+          that peer's overlay on/off. Renders nothing when there are no
+          peers. h-9 visual + invisible ::before expansion clears the 44px
+          touch floor on mobile without inflating the row. */}
+      {sharePeers.length > 0 && onTogglePeerVisible && (
+        <div
+          className="flex items-center gap-1.5 px-3 pb-1.5 pt-0.5 overflow-x-auto scrollbar-hide"
+          role="group"
+          aria-label={t('共享行事曆顯示')}
+        >
+          {sharePeers.map((peer) => {
+            const visible = isPeerVisible(visiblePeers, peer.peerId)
+            const name = peer.displayName || t('未命名使用者')
+            return (
+              <button
+                key={peer.peerId}
+                type="button"
+                onClick={() => onTogglePeerVisible(peer.peerId)}
+                aria-pressed={visible}
+                title={visible ? t('點擊隱藏 {name} 的行事曆', { name }) : t('點擊顯示 {name} 的行事曆', { name })}
+                className={cn(
+                  'relative flex items-center gap-1.5 h-9 pl-1.5 pr-2.5 rounded-full border text-xs font-medium flex-shrink-0 transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  "before:content-[''] before:absolute before:inset-0 before:-my-1.5 md:before:hidden",
+                  visible
+                    ? 'border-primary/40 bg-primary/10 text-foreground'
+                    : 'border-border bg-transparent text-muted-foreground opacity-60'
+                )}
+              >
+                <span className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {peer.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- static export has no image optimizer
+                    <img src={peer.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <UserIcon className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+                  )}
+                </span>
+                <span className="truncate max-w-[96px]">{name}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Secondary Row — desktop only. Mobile uses pinch zoom + the
           overflow menu above for journal / report / settings. */}
       <div className="hidden md:flex items-center justify-between px-4 py-2 gap-4 border-t border-border/50 bg-muted/30">
         {/* Left: Zoom Controls */}
         {viewMode !== 'month' && onZoomChange ? (
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground font-medium">縮放</span>
+            <span className="text-[10px] text-muted-foreground font-medium">{t('縮放')}</span>
             <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-background border border-border/50">
               <button
                 type="button"
                 onClick={() => onZoomChange(Math.max(1, zoomLevel - 1))}
                 disabled={zoomLevel <= 1}
-                aria-label="縮小"
+                aria-label={t('縮小')}
                 className={cn(
                   'p-0.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   zoomLevel <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
@@ -362,13 +436,13 @@ export function CalendarHeader({
                 <ZoomOut className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
               <span className="text-[10px] text-muted-foreground min-w-[30px] text-center" aria-live="polite">
-                {ZOOM_LABELS[zoomLevel - 1]}
+                {t(ZOOM_LABELS[zoomLevel - 1])}
               </span>
               <button
                 type="button"
                 onClick={() => onZoomChange(Math.min(4, zoomLevel + 1))}
                 disabled={zoomLevel >= 4}
-                aria-label="放大"
+                aria-label={t('放大')}
                 className={cn(
                   'p-0.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   zoomLevel >= 4 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
@@ -398,7 +472,7 @@ export function CalendarHeader({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <NotebookPen className="w-3.5 h-3.5" aria-hidden="true" />
-            記事本
+            {t('記事本')}
           </button>
           {onOpenJournal && (
             <button
@@ -407,7 +481,7 @@ export function CalendarHeader({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <BookOpen className="w-3.5 h-3.5" aria-hidden="true" />
-              日記
+              {t('日記')}
             </button>
           )}
           {onOpenReport && (
@@ -417,7 +491,7 @@ export function CalendarHeader({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <BarChart3 className="w-3.5 h-3.5" aria-hidden="true" />
-              報告
+              {t('報告')}
             </button>
           )}
           {onOpenExport && (
@@ -425,18 +499,18 @@ export function CalendarHeader({
               type="button"
               data-tour="calendar-export"
               onClick={onOpenExport}
-              aria-label="匯出行程圖檔"
+              aria-label={t('匯出行程圖檔')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Download className="w-3.5 h-3.5" aria-hidden="true" />
-              匯出
+              {t('匯出')}
             </button>
           )}
           {onOpenSettings && (
             <button
               type="button"
               onClick={onOpenSettings}
-              aria-label="設定"
+              aria-label={t('設定')}
               className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Settings className="w-3.5 h-3.5" aria-hidden="true" />
@@ -458,6 +532,7 @@ interface TodayProgressRingProps {
 }
 
 function TodayProgressRing({ workspaces }: TodayProgressRingProps) {
+  const { t } = useI18n()
   const stats = useMemo(() => {
     const today = toDateString(new Date())
     let total = 0
@@ -495,10 +570,10 @@ function TodayProgressRing({ workspaces }: TodayProgressRingProps) {
 
   const tooltip =
     stats.total === 0
-      ? '今日尚無排程任務'
+      ? t('今日尚無排程任務')
       : stats.allDone
-      ? `今天 ${stats.total} 個任務全部完成 ✨`
-      : `今天 ${stats.completed} / ${stats.total} 完成 · ${stats.pct}%`
+      ? t('今天 {total} 個任務全部完成 ✨', { total: stats.total })
+      : t('今天 {completed} / {total} 完成 · {pct}%', { completed: stats.completed, total: stats.total, pct: stats.pct })
 
   return (
     <div

@@ -665,18 +665,55 @@
   font-weight: 600;
   list-style: none;
 }
-.nb-prose .nb-details > div { margin-top: 0.4em; }
-/* Tiptap's Details renders a button + summary + content; hide native marker
-   and add our own rotating caret. */
+/* Tiptap's Details renders <div.nb-details><button/><div><summary/>content</div></div>.
+   The button ships with no content (0×0 — unclickable); lay the block out as
+   caret + body and draw our own rotating caret so the toggle is usable. */
+.nb-prose .nb-details {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.15em;
+}
+.nb-prose .nb-details > div { flex: 1 1 auto; min-width: 0; }
+.nb-prose .nb-details > div > div[data-type='detailsContent'] { margin-top: 0.4em; }
 .nb-prose .nb-details > button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6em;
+  height: 1.6em;
+  margin-top: 0.05em;
+  padding: 0;
   background: none;
   border: none;
+  border-radius: 0.35rem;
   cursor: pointer;
   color: var(--muted-foreground);
-  margin-right: 0.3em;
-  transition: transform 0.15s var(--ease-quart, ease);
+  transition: transform 0.15s var(--ease-quart, ease), background-color 0.15s ease;
 }
+.nb-prose .nb-details > button:hover { background: var(--secondary); }
+.nb-prose .nb-details > button::before { content: '▸'; font-size: 1em; line-height: 1; }
+/* Tiptap v3 toggles the `is-open` class (not the `open` attribute) on click;
+   keep [open] too for statically rendered (read-only) HTML. */
+.nb-prose .nb-details.is-open > button,
 .nb-prose .nb-details[open] > button { transform: rotate(90deg); }
+
+/* Images (image extension) — Notion-style: rounded, breathing room, never
+   overflow the document column. ProseMirror-selectednode is the class
+   prosemirror-view itself toggles on node selection; we just need to make it
+   visible (no base prosemirror.css is imported in this project). */
+.nb-prose img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.6rem;
+  margin: 0.75em 0;
+}
+.nb-prose img.ProseMirror-selectednode {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 0.6rem;
+}
 
 /* Placeholder (empty-node hint) */
 .nb-prose p.is-empty::before,

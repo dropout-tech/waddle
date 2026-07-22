@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
 import { forEachTask } from '@/lib/task-utils'
 import type { Workspace, Task } from '@/lib/types'
+import { getLang } from '@/lib/i18n'
+import { useI18n } from '@/lib/i18n/react'
 import {
   Sheet,
   SheetContent,
@@ -41,18 +43,32 @@ function groupLabel(d: string, currentYear: number): string {
   const [y, m] = d.split('-')
   const year = parseInt(y, 10)
   const month = parseInt(m, 10)
+  if (getLang() === 'en') {
+    const monthName = new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short' })
+    return year === currentYear ? monthName : `${monthName} ${year}`
+  }
   return year === currentYear ? `${month} 月` : `${year} 年 ${month} 月`
 }
 
 /** "幾天前 / 幾小時前 / 幾分鐘前" — humanized duration label. */
 function humanizeMinutes(mins: number): string {
   if (!Number.isFinite(mins) || mins < 0) return '—'
-  if (mins < 60) return `${Math.round(mins)} 分`
+  const isEn = getLang() === 'en'
+  if (mins < 60) return isEn ? `${Math.round(mins)} min` : `${Math.round(mins)} 分`
   const hours = mins / 60
-  if (hours < 24) return `${hours.toFixed(hours < 10 ? 1 : 0)} 小時`
+  if (hours < 24) return isEn ? `${hours.toFixed(hours < 10 ? 1 : 0)} hr` : `${hours.toFixed(hours < 10 ? 1 : 0)} 小時`
   const days = hours / 24
-  if (days < 14) return `${days.toFixed(days < 10 ? 1 : 0)} 天`
-  return `${Math.round(days / 7)} 週`
+  if (days < 14) return isEn ? `${days.toFixed(days < 10 ? 1 : 0)} d` : `${days.toFixed(days < 10 ? 1 : 0)} 天`
+  return isEn ? `${Math.round(days / 7)} wk` : `${Math.round(days / 7)} 週`
+}
+
+/** Date + weekday for a completed row, e.g. "7/13（週日）" / "Jul 13 (Sun)". */
+function formatDateWeekday(date: Date, isEn: boolean): string {
+  if (isEn) {
+    const month = date.toLocaleDateString('en-US', { month: 'short' })
+    return `${month} ${date.getDate()} (${date.toLocaleDateString('en-US', { weekday: 'short' })})`
+  }
+  return `${date.getMonth() + 1}/${date.getDate()}（${WEEKDAY_LABEL[date.getDay()]}）`
 }
 
 export function CompletedTasksDrawer({
@@ -61,6 +77,10 @@ export function CompletedTasksDrawer({
   onClose,
   onSelectTask,
 }: CompletedTasksDrawerProps) {
+  // Aliased to `tr` — this file uses `t` as the loop variable name for
+  // individual Task objects throughout, which would shadow the i18n
+  // translate function.
+  const { t: tr } = useI18n()
   // Flatten all completed tasks. Tasks without a completedAt timestamp
   // (e.g. ones completed before the write-through fix shipped, or rows
   // whose migration-0007 backfill didn't run) are kept in the list but
@@ -173,7 +193,7 @@ export function CompletedTasksDrawer({
       // sort is "most recent first".
       const label = t.completedAt
         ? groupLabel(dateKey(t.completedAt), currentYear)
-        : '未知時間'
+        : tr('未知時間')
       let idx = indexByLabel.get(label)
       if (idx === undefined) {
         idx = buckets.length
@@ -183,7 +203,7 @@ export function CompletedTasksDrawer({
       buckets[idx].tasks.push(t)
     }
     return buckets
-  }, [completed])
+  }, [completed, tr])
 
   return (
     <Sheet open={isOpen} onOpenChange={(v) => { if (!v) onClose() }}>
@@ -194,10 +214,10 @@ export function CompletedTasksDrawer({
         <SheetHeader className="border-b border-border px-5 py-4">
           <SheetTitle className="flex items-center gap-2 text-base">
             <CheckCircle2 className="w-4 h-4 text-primary" />
-            已完成任務
+            {tr('已完成任務')}
           </SheetTitle>
           <SheetDescription className="text-xs">
-            共 {stats.total} 個任務，本週完成 {stats.week} 個。
+            {tr('共 {total} 個任務，本週完成 {week} 個。', { total: stats.total, week: stats.week })}
           </SheetDescription>
         </SheetHeader>
 
@@ -205,27 +225,27 @@ export function CompletedTasksDrawer({
         <div className="grid grid-cols-2 gap-2 px-5 py-4 border-b border-border bg-muted/30">
           <StatCard
             icon={<TrendingUp className="w-3.5 h-3.5" />}
-            label="本週完成"
+            label={tr('本週完成')}
             value={String(stats.week)}
-            sub={`本月 ${stats.month}`}
+            sub={tr('本月 {count}', { count: stats.month })}
           />
           <StatCard
             icon={<Flame className="w-3.5 h-3.5" />}
-            label="連續天數"
+            label={tr('連續天數')}
             value={String(stats.streak)}
-            sub={stats.streak > 0 ? '繼續加油' : '今天開始吧'}
+            sub={stats.streak > 0 ? tr('繼續加油') : tr('今天開始吧')}
           />
           <StatCard
             icon={<Clock className="w-3.5 h-3.5" />}
-            label="平均耗時"
+            label={tr('平均耗時')}
             value={stats.avgMinutes !== null ? humanizeMinutes(stats.avgMinutes) : '—'}
-            sub="從建立到完成"
+            sub={tr('從建立到完成')}
           />
           <StatCard
             icon={<CalendarIcon className="w-3.5 h-3.5" />}
-            label="最常完成"
+            label={tr('最常完成')}
             value={stats.topHour !== null ? `${String(stats.topHour).padStart(2, '0')}:00` : '—'}
-            sub={stats.topHour !== null ? `${stats.topHourCount} 次` : '尚無資料'}
+            sub={stats.topHour !== null ? tr('{count} 次', { count: stats.topHourCount }) : tr('尚無資料')}
           />
         </div>
 
@@ -234,8 +254,8 @@ export function CompletedTasksDrawer({
           {groups.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
               <CheckCircle2 className="w-10 h-10 opacity-30 mb-3" />
-              <p className="text-sm">還沒有完成任何任務</p>
-              <p className="text-xs mt-1 opacity-80">勾選一個任務就會出現在這裡</p>
+              <p className="text-sm">{tr('還沒有完成任何任務')}</p>
+              <p className="text-xs mt-1 opacity-80">{tr('勾選一個任務就會出現在這裡')}</p>
             </div>
           ) : (
             groups.map((g) => (
@@ -248,7 +268,7 @@ export function CompletedTasksDrawer({
                     sticky behavior. */}
                 <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 py-1">
                   {g.label}
-                  <span className="text-muted-foreground/60 normal-case font-normal">・已完成 {g.tasks.length}</span>
+                  <span className="text-muted-foreground/60 normal-case font-normal">{tr('・已完成 {count}', { count: g.tasks.length })}</span>
                 </h3>
                 <ul className="space-y-1.5">
                   {g.tasks.map((t) => (
@@ -288,15 +308,14 @@ function StatCard({
 }
 
 function CompletedRow({ task, onSelect }: { task: CompletedFlat; onSelect?: (t: Task) => void }) {
+  const { t: tr, lang } = useI18n()
   // completedAt may be missing on rows completed before write-through
   // shipped (or whose 0007 backfill wasn't run). We still render the row
   // with an em-dash placeholder so the user can see the task exists.
   const t = task.completedAt ? new Date(task.completedAt) : null
   const hh = t ? String(t.getHours()).padStart(2, '0') : '—'
   const mm = t ? String(t.getMinutes()).padStart(2, '0') : '—'
-  const weekday = t ? WEEKDAY_LABEL[t.getDay()] : ''
-  const m = t ? t.getMonth() + 1 : null
-  const d = t ? t.getDate() : null
+  const dateWeekday = t ? formatDateWeekday(t, lang === 'en') : ''
 
   // Time-to-complete (createdAt → completedAt). Useful glance at how long
   // each task took to actually get done.
@@ -324,7 +343,7 @@ function CompletedRow({ task, onSelect }: { task: CompletedFlat; onSelect?: (t: 
         />
         <div className="min-w-0 flex-1">
           <div className="text-sm text-foreground line-through decoration-muted-foreground/40 truncate">
-            {task.title || '（未命名任務）'}
+            {task.title || tr('（未命名任務）')}
           </div>
           <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
             <span>{task.workspaceName} · {task.categoryName}</span>
@@ -334,15 +353,15 @@ function CompletedRow({ task, onSelect }: { task: CompletedFlat; onSelect?: (t: 
           {t ? (
             <>
               <div className="text-[11px] font-mono text-muted-foreground">
-                {m}/{d}（{weekday}）
+                {dateWeekday}
               </div>
               <div className="text-xs font-mono text-foreground/80">{hh}:{mm}</div>
               {elapsed && (
-                <div className="text-[10px] text-muted-foreground/70 mt-0.5">耗時 {elapsed}</div>
+                <div className="text-[10px] text-muted-foreground/70 mt-0.5">{tr('耗時 {elapsed}', { elapsed })}</div>
               )}
             </>
           ) : (
-            <div className="text-[10px] text-muted-foreground/70 italic">時間未知</div>
+            <div className="text-[10px] text-muted-foreground/70 italic">{tr('時間未知')}</div>
           )}
         </div>
       </button>

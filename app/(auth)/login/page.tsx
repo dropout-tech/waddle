@@ -7,10 +7,13 @@ import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
 import { useBrowserFinished } from '@/lib/auth/use-browser-finished'
+import { PENDING_SHARE_INVITE_KEY } from '@/hooks/use-calendar-sharing'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n/react'
+import { t } from '@/lib/i18n'
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -52,6 +55,12 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
+  // Subscribes this component to language changes; translations below use the
+  // plain `t` import (same underlying function) so the helper translateError
+  // outside this component can share it without a naming clash.
+  // Hook-bound t shadows the module-level import inside the component so
+  // render output follows the hydration-safe language (SSR = zh first paint).
+  const { t } = useI18n()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -60,7 +69,7 @@ function LoginForm() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [appleLoading, setAppleLoading] = useState(false)
   const [error, setError] = useState<string | null>(
-    searchParams.get('error') === 'auth_callback_failed' ? '登入失敗，請再試一次' : null
+    searchParams.get('error') === 'auth_callback_failed' ? t('登入失敗，請再試一次') : null
   )
   const oauthBusy = loading || googleLoading || appleLoading
 
@@ -78,6 +87,16 @@ function LoginForm() {
     if (err) {
       setError(translateError(err.message))
       setLoading(false)
+      return
+    }
+
+    // A share-invite link that bounced here to authenticate first hands off
+    // via sessionStorage (the URL fragment it arrived with doesn't survive
+    // this redirect) — send the user back to finish accepting instead of the
+    // normal post-login destination.
+    if (window.sessionStorage.getItem(PENDING_SHARE_INVITE_KEY)) {
+      router.push('/share/invite')
+      router.refresh()
       return
     }
 
@@ -112,8 +131,8 @@ function LoginForm() {
   return (
     <div className="bg-card border border-border rounded-2xl shadow-ceramic p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">歡迎回來</h1>
-        <p className="text-sm text-muted-foreground mt-1">登入以繼續使用 Huddle</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t('歡迎回來')}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{t('登入以繼續使用 Huddle')}</p>
       </div>
 
       <div className="space-y-2.5">
@@ -129,7 +148,7 @@ function LoginForm() {
           ) : (
             <GoogleIcon className="w-4 h-4" />
           )}
-          <span className="ml-2">使用 Google 登入</span>
+          <span className="ml-2">{t('使用 Google 登入')}</span>
         </Button>
 
         <Button
@@ -144,7 +163,7 @@ function LoginForm() {
           ) : (
             <AppleIcon className="w-4 h-4" />
           )}
-          <span className="ml-2">使用 Apple 登入</span>
+          <span className="ml-2">{t('使用 Apple 登入')}</span>
         </Button>
       </div>
 
@@ -153,7 +172,7 @@ function LoginForm() {
           <div className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 text-muted-foreground">或使用 Email</span>
+          <span className="bg-card px-2 text-muted-foreground">{t('或使用 Email')}</span>
         </div>
       </div>
 
@@ -175,12 +194,12 @@ function LoginForm() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">密碼</Label>
+            <Label htmlFor="password">{t('密碼')}</Label>
             <Link
               href="/forgot-password"
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
-              忘記密碼？
+              {t('忘記密碼？')}
             </Link>
           </div>
           <div className="relative">
@@ -199,7 +218,7 @@ function LoginForm() {
               type="button"
               onClick={() => setShowPassword((v) => !v)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={showPassword ? '隱藏密碼' : '顯示密碼'}
+              aria-label={showPassword ? t('隱藏密碼') : t('顯示密碼')}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -217,14 +236,14 @@ function LoginForm() {
         )}
 
         <Button type="submit" className="w-full h-11" disabled={oauthBusy}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : '登入'}
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t('登入')}
         </Button>
       </form>
 
       <p className="text-center text-sm text-muted-foreground mt-6">
-        還沒有帳號？{' '}
+        {t('還沒有帳號？')}{' '}
         <Link href="/signup" className="text-foreground font-medium hover:underline">
-          建立帳號
+          {t('建立帳號')}
         </Link>
       </p>
     </div>
@@ -233,10 +252,10 @@ function LoginForm() {
 
 function translateError(message: string): string {
   const map: Record<string, string> = {
-    'Invalid login credentials': 'Email 或密碼不正確',
-    'Email not confirmed': '請先到信箱點擊驗證連結',
-    'User already registered': '此 Email 已註冊，請直接登入',
-    'Password should be at least 6 characters': '密碼至少需要 6 個字元',
+    'Invalid login credentials': t('Email 或密碼不正確'),
+    'Email not confirmed': t('請先到信箱點擊驗證連結'),
+    'User already registered': t('此 Email 已註冊，請直接登入'),
+    'Password should be at least 6 characters': t('密碼至少需要 6 個字元'),
   }
   return map[message] ?? message
 }

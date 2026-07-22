@@ -9,6 +9,7 @@ import type { Workspace, Task } from '@/lib/types'
 import { collectMeetings, meetingStartAsDate } from '@/lib/meeting-reminder'
 import { detectMeetingProvider, MEETING_PROVIDER_LABEL } from '@/lib/meeting-utils'
 import { findTaskById } from '@/lib/task-utils'
+import { useI18n } from '@/lib/i18n/react'
 
 interface TodayMeetingsPopoverProps {
   workspaces: Workspace[]
@@ -26,6 +27,7 @@ interface TodayMeetingsPopoverProps {
  * a hand-rolled approach is straightforward.
  */
 export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetingsPopoverProps) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   // Tick once a minute so:
@@ -109,10 +111,10 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
             ? 'bg-primary/10 text-primary hover:bg-primary/15'
             : 'bg-muted text-muted-foreground hover:bg-muted/80',
         )}
-        title={count > 0 ? `今天有 ${count} 場會議` : '今天沒有會議'}
+        title={count > 0 ? t('今天有 {count} 場會議', { count }) : t('今天沒有會議')}
       >
         <Users className="w-3 h-3" />
-        <span>今日會議</span>
+        <span>{t('今日會議')}</span>
         <span
           className={cn(
             'inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[9px] font-semibold',
@@ -126,19 +128,19 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
       {open && (
         <div
           role="dialog"
-          aria-label="今日會議"
+          aria-label={t('今日會議')}
           className="absolute left-0 top-full mt-1.5 w-[320px] max-w-[calc(100vw-2rem)] bg-card border border-border rounded-xl shadow-xl z-modal overflow-hidden animate-in fade-in zoom-in-95 duration-150"
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="flex items-center gap-2">
               <Calendar className="w-3.5 h-3.5 text-primary" />
-              <span className="text-sm font-semibold text-foreground">今日會議</span>
+              <span className="text-sm font-semibold text-foreground">{t('今日會議')}</span>
               <span className="text-xs text-muted-foreground">{todayStr}</span>
             </div>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="關閉"
+              aria-label={t('關閉')}
               className="flex items-center justify-center w-8 h-8 -mr-1.5 rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors"
             >
               <X className="w-3.5 h-3.5" />
@@ -148,7 +150,7 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
           {count === 0 ? (
             <div className="px-4 py-6 text-center">
               <Users className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-              <p className="text-xs text-muted-foreground">今天沒有會議，享受深度工作時間</p>
+              <p className="text-xs text-muted-foreground">{t('今天沒有會議，享受深度工作時間')}</p>
             </div>
           ) : (
             <ul className="max-h-[60vh] overflow-y-auto divide-y divide-border">
@@ -198,7 +200,7 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
                           }}
                           className="text-left text-sm font-medium text-foreground hover:text-primary transition-colors block w-full truncate"
                         >
-                          {m.title || '（未命名會議）'}
+                          {m.title || t('（未命名會議）')}
                         </button>
                         <div className="mt-1 flex items-center flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                           <span className="inline-flex items-center gap-1">
@@ -210,12 +212,12 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
                           {isCurrent && (
                             <span className="inline-flex items-center gap-1 text-success font-semibold">
                               <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                              進行中
+                              {t('進行中')}
                             </span>
                           )}
                           {!isCurrent && upcomingMins !== null && upcomingMins > 0 && upcomingMins < 60 && (
                             <span className="text-primary font-medium">
-                              {upcomingMins} 分鐘後
+                              {t('{mins} 分鐘後', { mins: upcomingMins })}
                             </span>
                           )}
                         </div>
@@ -242,10 +244,10 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
                             handleExternalAnchorClick(e, m.meetingUrl!)
                           }}
                           className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                          title={`開啟 ${MEETING_PROVIDER_LABEL[provider]}`}
+                          title={t('開啟 {provider}', { provider: t(MEETING_PROVIDER_LABEL[provider]) })}
                         >
                           <Video className="w-2.5 h-2.5" />
-                          加入
+                          {t('加入')}
                         </a>
                       )}
                     </div>

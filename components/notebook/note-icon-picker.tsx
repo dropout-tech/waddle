@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n/react'
 
 // Curated set — journaling/note-taking themes, not the full emoji keyboard.
 // Kept short (24) so the grid stays a single glanceable block, not another
@@ -23,14 +24,15 @@ interface NoteIconPickerProps {
 // placeholder invites the click without implying the note already has one.
 export function NoteIconPicker({ icon, onChange }: NoteIconPickerProps) {
   const [open, setOpen] = useState(false)
+  const { t } = useI18n()
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={icon ? '更換圖示' : '加入圖示'}
-          title={icon ? '更換圖示' : '加入圖示'}
+          aria-label={icon ? t('更換圖示') : t('加入圖示')}
+          title={icon ? t('更換圖示') : t('加入圖示')}
           className={cn(
             'flex h-10 w-10 items-center justify-center rounded-lg text-2xl leading-none transition-colors hover:bg-secondary',
             !icon && 'opacity-40',
@@ -69,7 +71,7 @@ export function NoteIconPicker({ icon, onChange }: NoteIconPickerProps) {
             }}
             className="mt-2 w-full rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
-            移除圖示
+            {t('移除圖示')}
           </button>
         )}
       </PopoverContent>

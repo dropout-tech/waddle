@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { Drawer as Vaul } from 'vaul'
 import { CalendarDays, CalendarRange, Repeat } from 'lucide-react'
+import { useI18n } from '@/lib/i18n/react'
 
 export type RecurrenceChoice = 'only_this' | 'this_and_following' | 'all'
 
@@ -51,10 +52,13 @@ export function RecurrenceChoiceModal({
   isOpen,
   onClose,
   onConfirm,
-  title = '套用到這個重複事件',
+  title,
   defaultChoice = 'only_this',
-  actionLabel = '套用',
+  actionLabel,
 }: RecurrenceChoiceModalProps) {
+  const { t } = useI18n()
+  const resolvedTitle = title ?? t('套用到這個重複事件')
+  const resolvedActionLabel = actionLabel ?? t('套用')
   const [choice, setChoice] = useState<RecurrenceChoice>(defaultChoice)
   const isMobile = useIsMobile()
 
@@ -118,10 +122,10 @@ export function RecurrenceChoiceModal({
             />
             <span className="flex flex-col min-w-0">
               <span className="text-sm font-medium text-foreground leading-snug">
-                {label}
+                {t(label)}
               </span>
               <span className="text-xs text-muted-foreground leading-snug mt-0.5">
-                {hint}
+                {t(hint)}
               </span>
             </span>
           </button>
@@ -139,12 +143,12 @@ export function RecurrenceChoiceModal({
             className="fixed inset-x-0 bottom-0 z-popover flex max-h-[85dvh] flex-col rounded-t-2xl bg-card outline-none overflow-hidden"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
-            <Vaul.Title className="sr-only">{title}</Vaul.Title>
+            <Vaul.Title className="sr-only">{resolvedTitle}</Vaul.Title>
             {/* Drag handle */}
             <div className="mx-auto mt-2 mb-1 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
 
             <header className="px-5 pt-3 pb-2">
-              <h2 className="text-base font-semibold text-foreground">{title}</h2>
+              <h2 className="text-base font-semibold text-foreground">{resolvedTitle}</h2>
             </header>
 
             {optionList}
@@ -155,14 +159,14 @@ export function RecurrenceChoiceModal({
                 onClick={handleConfirm}
                 className="w-full h-12 rounded-xl text-sm font-semibold bg-primary text-primary-foreground active:brightness-95 transition-all"
               >
-                {actionLabel}
+                {resolvedActionLabel}
               </button>
               <button
                 type="button"
                 onClick={onClose}
                 className="w-full h-12 rounded-xl text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
               >
-                取消
+                {t('取消')}
               </button>
             </footer>
           </Vaul.Content>
@@ -180,11 +184,11 @@ export function RecurrenceChoiceModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-label={resolvedTitle}
         className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
       >
         <header className="px-5 pt-5 pb-3">
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+          <h2 className="text-base font-semibold text-foreground">{resolvedTitle}</h2>
         </header>
 
         {optionList}
@@ -195,14 +199,14 @@ export function RecurrenceChoiceModal({
             onClick={onClose}
             className="px-3 py-1.5 text-sm rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
           >
-            取消
+            {t('取消')}
           </button>
           <button
             type="button"
             onClick={handleConfirm}
             className="px-3 py-1.5 text-sm rounded-lg bg-primary text-primary-foreground hover:brightness-105 transition-all"
           >
-            {actionLabel}
+            {resolvedActionLabel}
           </button>
         </footer>
       </div>

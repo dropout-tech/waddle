@@ -6,6 +6,7 @@ import type { Task } from '@/lib/types'
 import type { Density, MetaField } from './task-panel'
 import { TaskRow } from './task-row'
 import { toDateString } from '@/lib/calendar-utils'
+import { useI18n } from '@/lib/i18n/react'
 
 export type UnifiedGroupBy = 'time' | 'urgency'
 
@@ -45,6 +46,7 @@ export function UnifiedTaskList({
   onToggleComplete,
   onSelectTask,
 }: UnifiedTaskListProps) {
+  const { t } = useI18n()
   // Always send completed to the bottom regardless of grouping.
   const visibleTasks = useMemo(() => {
     return [...tasks].sort((a, b) => {
@@ -71,9 +73,9 @@ export function UnifiedTaskList({
 
       const result: Group[] = []
       for (const r of URGENCY_RANGES) {
-        const subset = sorted.filter((t) => t.urgency >= r.min && t.urgency <= r.max)
+        const subset = sorted.filter((task) => task.urgency >= r.min && task.urgency <= r.max)
         if (subset.length > 0) {
-          result.push({ key: r.label, label: r.label, color: r.color, tasks: subset })
+          result.push({ key: r.label, label: t(r.label), color: r.color, tasks: subset })
         }
       }
       return result
@@ -127,17 +129,17 @@ export function UnifiedTaskList({
     laterTasks.sort(byDateThenTime)
 
     const result: Group[] = []
-    if (todayTasks.length) result.push({ key: 'today', label: '今天', color: 'oklch(0.60 0.18 35)', tasks: todayTasks })
-    if (upcomingTasks.length) result.push({ key: 'upcoming', label: '即將（七天內）', color: 'oklch(0.70 0.14 70)', tasks: upcomingTasks })
-    if (laterTasks.length) result.push({ key: 'later', label: '之後', color: 'oklch(0.68 0.12 145)', tasks: laterTasks })
-    if (unscheduledTasks.length) result.push({ key: 'unscheduled', label: '未排程', color: 'oklch(0.65 0.04 230)', tasks: unscheduledTasks })
+    if (todayTasks.length) result.push({ key: 'today', label: t('今天'), color: 'oklch(0.60 0.18 35)', tasks: todayTasks })
+    if (upcomingTasks.length) result.push({ key: 'upcoming', label: t('即將（七天內）'), color: 'oklch(0.70 0.14 70)', tasks: upcomingTasks })
+    if (laterTasks.length) result.push({ key: 'later', label: t('之後'), color: 'oklch(0.68 0.12 145)', tasks: laterTasks })
+    if (unscheduledTasks.length) result.push({ key: 'unscheduled', label: t('未排程'), color: 'oklch(0.65 0.04 230)', tasks: unscheduledTasks })
     return result
-  }, [visibleTasks, groupBy])
+  }, [visibleTasks, groupBy, t])
 
   if (visibleTasks.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-        沒有任務
+        {t('沒有任務')}
       </div>
     )
   }

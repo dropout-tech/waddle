@@ -20,6 +20,8 @@ import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swip
 import { useIsMobile } from '@/hooks/use-mobile'
 import { CurrentTimeLine } from './current-time-line'
 import { TaskBlock, type TaskDragStart } from './task-block'
+import { PeerEventBlock } from './peer-event-block'
+import type { PeerEvent } from '@/hooks/use-calendar-sharing'
 import { SlotIcon } from './slot-icon'
 import { X, ChevronLeft } from 'lucide-react'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from '../modals/recurrence-choice-modal'
@@ -27,6 +29,9 @@ import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { WORKSPACE_COLORS } from '@/lib/palette'
+import { useI18n } from '@/lib/i18n/react'
+import { getTaiwanHoliday, useTaiwanHolidaysEnabled } from '@/lib/taiwan-holidays'
+import { format } from 'date-fns'
 
 interface DayScrollViewProps {
   selectedDate: Date
@@ -52,6 +57,9 @@ interface DayScrollViewProps {
   /** How many days should fit in the viewport at once (1-3). Desktop only;
    *  mobile always shows one day per viewport for snap-scroll behavior. */
   dayViewDays?: number
+  /** Shared-calendar overlay: peers' events (read-only, pre-filtered by
+   *  visibility toggles). Recurring masters expand via taskOccursOnDate. */
+  peerEvents?: PeerEvent[]
 }
 
 interface ActiveTaskDrag extends TaskDragStart {
@@ -59,6 +67,11 @@ interface ActiveTaskDrag extends TaskDragStart {
   currentEnd: number
   dayIndex: number
 }
+
+// Bare weekday chars collide with other single-char meanings elsewhere in
+// the shared t() dictionary (see calendar-header.tsx) — resolve English
+// weekday abbreviations directly by index instead of routing through t().
+const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 const DEFAULT_DAY_WIDTH = 280
 // Initial window centered on selectedDate. Mobile uses a tighter window
@@ -92,10 +105,13 @@ export function DayScrollView({
   endHour = 24,
   hourHeight = 60,
   dayViewDays = 1,
+  peerEvents = [],
 }: DayScrollViewProps) {
   const isMobile = useIsMobile()
   const showCategoryPrefix = useShowCategoryPrefix()
   const displayColor = useDisplayColor()
+  const { t: translate, lang } = useI18n()
+  const holidaysEnabled = useTaiwanHolidaysEnabled()
   // On mobile, each day fills (viewport - time column) so the user sees one
   // full day per swipe and scroll-snap lands on day boundaries. Desktop
   // measures the actual scroll container and divides by dayViewDays so the
@@ -400,6 +416,14 @@ export function DayScrollView({
     return timeBlocks.filter(b => b.date === dateStr)
   }, [timeBlocks])
 
+  // Peer overlay events for a date — same recurring expansion as own tasks
+  // (PeerEvent is Task-shaped so taskOccursOnDate works unchanged).
+  const getPeerEventsForDate = useCallback((date: Date) => {
+    return peerEvents.filter(
+      (ev) => taskOccursOnDate(ev, date) && ev.scheduledStartTime && ev.scheduledEndTime
+    )
+  }, [peerEvents])
+
   // Get all-day tasks (including recurring expansions)
   const getAllDayTasksForDate = useCallback((date: Date) => {
     const dateStr = toDateString(date)
@@ -538,7 +562,7 @@ export function DayScrollView({
         // the task vanishes from where they were looking, so we remember the
         // pre-drag schedule and offer a one-tap undo.
         const pendingDate = overPending.getAttribute('data-pending-zone-date') ?? undefined
-        const taskTitle = tasks.find((t) => t.id === finalState.taskId)?.title || '任務'
+        const taskTitle = tasks.find((t) => t.id === finalState.taskId)?.title || translate('任務')
         const originalDate = tasks.find((t) => t.id === finalState.taskId)?.scheduledDate
         const originalStart = minutesToTime(finalState.originalStart)
         const originalEnd = minutesToTime(finalState.originalEnd)
@@ -560,11 +584,14 @@ export function DayScrollView({
         }
         
         toast(
-          `「${taskTitle}」已移到 ${pendingDate ?? '待排程'}（時間移除）`,
+          translate('「{title}」已移到 {date}（時間移除）', {
+            title: taskTitle,
+            date: pendingDate ?? translate('待排程'),
+          }),
           {
             duration: 8000,
             action: {
-              label: '復原',
+              label: translate('復原'),
               onClick: () => {
                 if (originalDate) {
                   onRescheduleTask?.(finalState.taskId, originalDate, originalStart, originalEnd)
@@ -611,7 +638,7 @@ export function DayScrollView({
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
-  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask, tasks])
+  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask, tasks, DAY_WIDTH, translate])
 
   // Time block drag (move / resize-top / resize-bottom). Same window-level
   // pattern as task drags — preview activates after cursor moves past
@@ -975,7 +1002,7 @@ export function DayScrollView({
           isOpen={recurrenceModal.isOpen}
           onClose={() => setRecurrenceModal(null)}
           onConfirm={handleRecurrenceConfirm}
-          title={recurrenceModal.type === 'reschedule' ? '重新排程重複任務' : '取消排程重複任務'}
+          title={recurrenceModal.type === 'reschedule' ? translate('重新排程重複任務') : translate('取消排程重複任務')}
         />
       )}
       {/* Resizable Header Row */}
@@ -1003,6 +1030,7 @@ export function DayScrollView({
                 const isToday = dateStr === todayString
                 const allDayTasks = getAllDayTasksForDate(date)
                 const weekdayIndex = date.getDay()
+                const holidayName = holidaysEnabled ? getTaiwanHoliday(dateStr) : null
 
                 // The single task currently being dragged (if any). We render
                 // this as a "ghost" preview inside whichever pending zone the
@@ -1047,14 +1075,21 @@ export function DayScrollView({
                       isToday && 'bg-primary/10'
                     )}>
                       <div className="text-xs text-muted-foreground font-medium">
-                        {date.getMonth() + 1}/{date.getDate()} 週{WEEKDAY_NAMES[weekdayIndex]}
+                        {lang === 'en'
+                          ? format(date, 'M/d EEE')
+                          : `${date.getMonth() + 1}/${date.getDate()} 週${WEEKDAY_NAMES[weekdayIndex]}`}
                       </div>
                       <div className={cn(
                         'text-2xl font-bold',
-                        isToday ? 'text-primary' : 'text-foreground'
+                        isToday ? 'text-primary' : holidayName ? 'text-red-600 dark:text-red-400' : 'text-foreground'
                       )}>
                         {date.getDate()}
                       </div>
+                      {holidayName && (
+                        <div className="text-[10px] leading-tight text-red-600 dark:text-red-400 truncate">
+                          {translate(holidayName)}
+                        </div>
+                      )}
                     </div>
                     {/* Pending/All-day tasks — also acts as drop zone for
                          scheduled tasks dragged here to clear their time. */}
@@ -1076,7 +1111,7 @@ export function DayScrollView({
                         // timeline below.
                         onCreateTask?.(dateStr)
                       }}
-                      title={(activeTaskDrag || pendingTaskDrag) ? '放開以放到待排程' : '點擊新增任務'}
+                      title={(activeTaskDrag || pendingTaskDrag) ? translate('放開以放到待排程') : translate('點擊新增任務')}
                     >
                       {allDayTasks.map((task) => {
                         const isThisTaskBeingDragged = pendingTaskDrag?.task.id === task.id
@@ -1182,12 +1217,14 @@ export function DayScrollView({
             const isToday = dateStr === todayString
             const dayTasks = getTasksForDate(date)
             const dayBlocks = getBlocksForDate(date)
+            const dayPeerEvents = getPeerEventsForDate(date)
             const dragSelection = getDragSelection(dayIndex)
-            // Pack tasks and TimeBlocks into shared columns so a block that
-            // overlaps a task's time range gets a sibling column instead of
-            // hiding underneath. Both layers consume {column, totalColumns}
-            // from the same grid.
-            const { tasks: taskCols, blocks: blockCols } = calculateUnifiedColumns(dayTasks, dayBlocks)
+            // Pack tasks, TimeBlocks and peer events into shared columns so
+            // a block that overlaps a task's time range gets a sibling
+            // column instead of hiding underneath. All layers consume
+            // {column, totalColumns} from the same grid.
+            const { tasks: taskCols, blocks: blockCols, peers: peerCols } =
+              calculateUnifiedColumns(dayTasks, dayBlocks, dayPeerEvents)
 
             return (
               <div
@@ -1446,6 +1483,22 @@ export function DayScrollView({
                   </div>
                 )}
 
+                {/* Peer shared events — read-only overlay, packed into the
+                    same columns as own tasks/blocks (no handlers attached). */}
+                {dayPeerEvents.map((ev) => {
+                  const col = peerCols.get(ev.id)
+                  return (
+                    <PeerEventBlock
+                      key={ev.id}
+                      event={ev}
+                      top={getTimePosition(ev.scheduledStartTime!)}
+                      height={getDurationHeight(ev.scheduledStartTime!, ev.scheduledEndTime!)}
+                      column={col?.column ?? 0}
+                      totalColumns={col?.totalColumns ?? 1}
+                    />
+                  )
+                })}
+
                 {/* Current time line for today — compact mode because the
                     time gutter is a separate sticky column. */}
                 {isToday && <CurrentTimeLine startHour={startHour} compact />}
@@ -1481,19 +1534,19 @@ export function DayScrollView({
                   className="flex items-center gap-1 text-xs font-semibold text-foreground hover:text-primary transition-colors"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
-                  返回
+                  {translate('返回')}
                 </button>
               ) : (
                 <span className="text-xs font-semibold text-foreground">
                   {pendingSlot.startTime} - {pendingSlot.endTime}
                 </span>
               )}
-              <button onClick={() => { setPendingSlot(null); setSelectedParent(null) }} aria-label="關閉" className="p-1 rounded-lg hover:bg-muted transition-colors">
+              <button onClick={() => { setPendingSlot(null); setSelectedParent(null) }} aria-label={translate('關閉')} className="p-1 rounded-lg hover:bg-muted transition-colors">
                 <X className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
               </button>
             </div>
             <p className="text-[10px] text-muted-foreground mb-2">
-              {selectedParent ? slotTypes.find(s => s.id === selectedParent)?.label : '選擇時間區塊的類型'}
+              {selectedParent ? slotTypes.find(s => s.id === selectedParent)?.label : translate('選擇時間區塊的類型')}
             </p>
             <div className="flex flex-col gap-1">
               {(selectedParent ? getChildSlotTypes(selectedParent) : topLevelSlotTypes).map((slotType) => {

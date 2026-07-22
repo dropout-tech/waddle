@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useI18n } from '@/lib/i18n/react'
 import { Drawer as Vaul } from 'vaul'
 import {
   WATER_REMINDER_INTERVALS,
@@ -40,6 +41,7 @@ interface WaterReminderModalProps {
  * shared mascot component with one-off props.
  */
 export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: WaterReminderModalProps) {
+  const { t } = useI18n()
   const [mounted, setMounted] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [interval, setIntervalState] = useState<WaterReminderInterval>(DEFAULT_WATER_INTERVAL)
@@ -64,8 +66,8 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
 
   const handleDisable = () => {
     onDisable()
-    toast('已關閉喝水提醒', {
-      description: '想恢復時：右上角「設定」→ 一般 → 喝水提醒',
+    toast(t('已關閉喝水提醒'), {
+      description: t('想恢復時：右上角「設定」→ 一般 → 喝水提醒'),
     })
   }
 
@@ -80,9 +82,9 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
     <button
       type="button"
       onClick={() => setShowSettings((v) => !v)}
-      aria-label="提醒設定"
+      aria-label={t('提醒設定')}
       aria-expanded={showSettings}
-      title="提醒設定"
+      title={t('提醒設定')}
       className={cn(
         'absolute z-10 grid place-items-center rounded-full text-muted-foreground/70 hover:text-foreground hover:bg-secondary/70 transition-colors',
         isMobile ? 'top-2.5 right-2.5 h-11 w-11' : 'top-3 right-3 h-9 w-9',
@@ -96,8 +98,8 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
     <div className="mx-5 mb-1 rounded-2xl border border-border/60 bg-secondary/30 px-4 py-3 space-y-2.5 text-left">
       <label className="flex items-center justify-between cursor-pointer">
         <div className="flex-1 pr-4">
-          <div className="text-sm text-foreground">喝水提醒</div>
-          <div className="text-xs text-muted-foreground">關掉後不再跳出，設定 → 一般 可重新開啟</div>
+          <div className="text-sm text-foreground">{t('喝水提醒')}</div>
+          <div className="text-xs text-muted-foreground">{t('關掉後不再跳出，設定 → 一般 可重新開啟')}</div>
         </div>
         <input
           type="checkbox"
@@ -107,7 +109,7 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
         />
       </label>
       <div className="space-y-1.5">
-        <div className="text-xs text-muted-foreground">提醒間隔</div>
+        <div className="text-xs text-muted-foreground">{t('提醒間隔')}</div>
         <div className="flex flex-wrap gap-1.5">
           {WATER_REMINDER_INTERVALS.map((mins) => (
             <button
@@ -121,7 +123,7 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
                   : 'bg-card border border-border text-muted-foreground hover:text-foreground',
               )}
             >
-              {mins} 分鐘
+              {t('{mins} 分鐘', { mins })}
             </button>
           ))}
         </div>
@@ -138,12 +140,12 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
         className="mt-3 text-[1.35rem] font-semibold text-foreground tracking-wide"
         style={{ fontFamily: "'Caveat', 'Patrick Hand', 'Noto Sans TC', cursive" }}
       >
-        該喝水囉～
+        {t('該喝水囉～')}
       </h2>
 
       <p className="mt-2 text-sm text-muted-foreground leading-relaxed max-w-[18rem]">
-        搖搖擺擺地工作了一陣子，<br />
-        記得補一口水，再慢慢繼續。
+        {t('搖搖擺擺地工作了一陣子，')}<br />
+        {t('記得補一口水，再慢慢繼續。')}
       </p>
     </div>
   )
@@ -157,7 +159,7 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
             className="fixed inset-x-0 bottom-0 z-popover flex flex-col rounded-t-2xl bg-card outline-none overflow-hidden"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
-            <Vaul.Title className="sr-only">該喝水囉</Vaul.Title>
+            <Vaul.Title className="sr-only">{t('該喝水囉')}</Vaul.Title>
             {/* Drag handle */}
             <div className="mx-auto mt-2 mb-1 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/30" />
             {gearButton}
@@ -171,14 +173,14 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
                 className="w-full h-12 rounded-xl gap-1.5 text-base"
               >
                 <span aria-hidden>💧</span>
-                好，去喝水
+                {t('好，去喝水')}
               </Button>
               <Button
                 variant="secondary"
                 onClick={onSnooze}
                 className="w-full h-12 rounded-xl text-base"
               >
-                再過一下
+                {t('再過一下')}
               </Button>
             </div>
           </Vaul.Content>
@@ -219,14 +221,14 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
             onClick={onSnooze}
             className="flex-1 h-10 rounded-xl"
           >
-            再過一下
+            {t('再過一下')}
           </Button>
           <Button
             onClick={onDrink}
             className="flex-1 h-10 rounded-xl gap-1.5"
           >
             <span aria-hidden>💧</span>
-            好，去喝水
+            {t('好，去喝水')}
           </Button>
         </div>
       </div>
@@ -241,12 +243,13 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
  * needs this variant.
  */
 function WaddleWithWater({ className }: { className?: string }) {
+  const { t } = useI18n()
   return (
     <svg
       viewBox="0 0 120 120"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="Huddle 拿著水杯"
+      aria-label={t('Huddle 拿著水杯')}
       className={className}
     >
       {/* Soft yellow halo so the penguin reads as a focal token */}

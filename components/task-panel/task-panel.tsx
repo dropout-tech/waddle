@@ -12,6 +12,7 @@ import { FilterBar, type FilterState } from './filter-bar'
 import { UnifiedTaskList } from './unified-task-list'
 import { CompletedTasksDrawer } from './completed-tasks-drawer'
 import { TodayMeetingsPopover } from './today-meetings-popover'
+import { useI18n } from '@/lib/i18n/react'
 
 import { Button } from '@/components/ui/button'
 
@@ -78,6 +79,7 @@ export function TaskPanel({
   onToggleExpand,
   className,
 }: TaskPanelProps) {
+  const { t } = useI18n()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [density, setDensity] = useState<Density>(() => {
     if (typeof window !== 'undefined') {
@@ -255,7 +257,7 @@ export function TaskPanel({
             className="ml-auto flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium text-foreground hover:bg-muted/60 transition-colors group"
           >
             <CheckCircle2 className="w-3 h-3 text-primary" />
-            已完成
+            {t('已完成')}
             <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-primary/15 text-primary text-[9px] font-semibold">
               {totalCompleted}
             </span>
@@ -272,7 +274,7 @@ export function TaskPanel({
           <div className="flex items-center gap-2">
             <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-xs font-medium text-muted-foreground">
-              {VIEW_MODE_LABEL[viewMode]}
+              {t(VIEW_MODE_LABEL[viewMode])}
               {hasActiveFilters && (
                 <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold">
                   {filters.urgency.length + filters.workspaceIds.length + (filters.showCompleted ? 0 : 1)}
@@ -304,7 +306,7 @@ export function TaskPanel({
                 )}
               >
                 <FolderTree className="w-3 h-3" aria-hidden="true" />
-                <span>依分類</span>
+                <span>{t('依分類')}</span>
               </button>
               <button
                 onClick={() => setViewMode('unified')}
@@ -317,7 +319,7 @@ export function TaskPanel({
                 )}
               >
                 <Clock className="w-3 h-3" aria-hidden="true" />
-                <span>依時間</span>
+                <span>{t('依時間')}</span>
               </button>
               <button
                 onClick={() => setViewMode('urgency')}
@@ -330,7 +332,7 @@ export function TaskPanel({
                 )}
               >
                 <AlertCircle className="w-3 h-3" aria-hidden="true" />
-                <span>依急迫程度</span>
+                <span>{t('依急迫程度')}</span>
               </button>
             </div>
 

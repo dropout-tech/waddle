@@ -1,13 +1,36 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2 } from 'lucide-react'
+import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2, Globe2, Link2, Copy, Share2, RefreshCw, Users, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { UserSettings, TimeBlock, SlotType, Workspace, NotificationSettings } from '@/lib/types'
+import { useI18n } from '@/lib/i18n/react'
+import type { Lang } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TimeField } from '@/components/ui/date-time-field'
 import { ModalShell } from './modal-shell'
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog'
+import {
+  useCalendarSharing,
+  type PendingShareInvite,
+  type SharePeer,
+  type ShareGrant,
+  type GrantKind,
+  type GrantDetail,
+} from '@/hooks/use-calendar-sharing'
+import { createClient } from '@/lib/supabase/client'
 import {
   getTaskCompleteSoundEnabled,
   setTaskCompleteSoundEnabled,
@@ -31,6 +54,10 @@ import {
   setWaterReminderEnabled,
   setWaterReminderInterval,
 } from '@/lib/water-reminder'
+import {
+  getTaiwanHolidaysEnabled,
+  setTaiwanHolidaysEnabled,
+} from '@/lib/taiwan-holidays'
 
 // Map icon names to components
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -119,9 +146,10 @@ export function SettingsModal({
   onClose,
   onSave,
 }: SettingsModalProps) {
+  const { lang, setLang, t } = useI18n()
   const [localSettings, setLocalSettings] = useState<UserSettings>(settings)
   const [localTimeBlocks, setLocalTimeBlocks] = useState<TimeBlock[]>(timeBlocks)
-  const [activeTab, setActiveTab] = useState<'general' | 'slotTypes' | 'notifications'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'slotTypes' | 'notifications' | 'sharing'>('general')
   // Task-complete sound is a per-device pref stored in localStorage (same
   // pattern as timer sound), so it lives outside localSettings/UserSettings.
   const [taskSoundEnabled, setTaskSoundEnabledState] = useState<boolean>(() => getTaskCompleteSoundEnabled())
@@ -130,6 +158,7 @@ export function SettingsModal({
   // Water-break reminder prefs — per-device, same pattern as the others.
   const [waterEnabled, setWaterEnabledState] = useState<boolean>(() => getWaterReminderEnabled())
   const [waterInterval, setWaterIntervalState] = useState<WaterReminderInterval>(() => getWaterReminderInterval())
+  const [taiwanHolidaysEnabled, setTaiwanHolidaysEnabledState] = useState<boolean>(() => getTaiwanHolidaysEnabled())
   const [editingSlotType, setEditingSlotType] = useState<SlotType | null>(null)
   // These per-device prefs can change while this (always-mounted) modal is
   // closed — e.g. the water popup's own gear turns the reminder off. Re-read
@@ -140,6 +169,7 @@ export function SettingsModal({
     setReminderLeadState(getReminderLead())
     setWaterEnabledState(getWaterReminderEnabled())
     setWaterIntervalState(getWaterReminderInterval())
+    setTaiwanHolidaysEnabledState(getTaiwanHolidaysEnabled())
   }, [isOpen])
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [newSlotType, setNewSlotType] = useState<Partial<SlotType>>({
@@ -259,7 +289,11 @@ export function SettingsModal({
         id: `ws-${ws.id}`,
         key: `ws-${ws.id}`,
         label: ws.name,
-        description: `新增任務到「${ws.name}」`,
+        // Pre-translated at construction (not just at render) because the
+        // workspace name is interpolated in — a generic t(type.description)
+        // at the render site can't match a template that already has the
+        // variable substituted in.
+        description: t('新增任務到「{name}」', { name: ws.name }),
         icon: ws.icon,
         iconType: 'emoji' as const,
         color: ws.color,
@@ -267,7 +301,7 @@ export function SettingsModal({
         isBuiltIn: true,
         workspaceId: ws.id,
       }))
-  }, [workspaces])
+  }, [workspaces, t])
 
   // Base time block types
   const baseSlotTypes: SlotType[] = useMemo(() => [
@@ -305,10 +339,10 @@ export function SettingsModal({
   }
 
   return (
-    <ModalShell isOpen={isOpen} onClose={onClose} size="lg" ariaLabel="設定">
+    <ModalShell isOpen={isOpen} onClose={onClose} size="lg" ariaLabel={t('設定')}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">設定</h2>
+          <h2 className="text-lg font-semibold text-foreground">{t('設定')}</h2>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
@@ -328,7 +362,7 @@ export function SettingsModal({
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            一般設定
+            {t('一般設定')}
           </button>
           <button
             onClick={() => setActiveTab('notifications')}
@@ -339,7 +373,7 @@ export function SettingsModal({
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            提醒設定
+            {t('提醒設定')}
           </button>
           <button
             onClick={() => setActiveTab('slotTypes')}
@@ -350,23 +384,63 @@ export function SettingsModal({
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            時間區塊
+            {t('時間區塊')}
+          </button>
+          <button
+            onClick={() => setActiveTab('sharing')}
+            className={cn(
+              'flex-1 px-4 py-2.5 text-sm font-medium transition-colors',
+              activeTab === 'sharing'
+                ? 'text-primary border-b-2 border-primary bg-primary/5'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {t('共享')}
           </button>
         </div>
 
         {/* Content */}
         <div className="p-5 space-y-6 flex-1 min-h-0 md:flex-initial md:min-h-[unset] md:max-h-[60vh] overflow-y-auto pb-[max(env(safe-area-inset-bottom),1.25rem)] md:pb-5">
           {activeTab === 'general' && (<>
+          {/* Language — device-level preference, kept at the top since it
+              affects every other label on this screen. Option text is not
+              translated: each option is shown in its own language. */}
+          <div className="space-y-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Globe2 className="w-4 h-4" />
+              {t('語言')}
+            </h3>
+            <div className="flex gap-2">
+              {([
+                ['zh-TW', '繁體中文'],
+                ['en', 'English'],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => setLang(value as Lang)}
+                  className={cn(
+                    'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                    lang === value
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Calendar Time Range */}
           <div className="space-y-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Clock className="w-4 h-4" />
-              日曆顯示時間範圍
+              {t('日曆顯示時間範圍')}
             </h3>
-            <p className="text-xs text-muted-foreground">設定日曆顯示的時間區間</p>
+            <p className="text-xs text-muted-foreground">{t('設定日曆顯示的時間區間')}</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground">開始時間</label>
+                <label className="text-xs text-muted-foreground">{t('開始時間')}</label>
                 <Input
                   type="number"
                   min={0}
@@ -380,7 +454,7 @@ export function SettingsModal({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs text-muted-foreground">結束時間</label>
+                <label className="text-xs text-muted-foreground">{t('結束時間')}</label>
                 <Input
                   type="number"
                   min={0}
@@ -400,9 +474,9 @@ export function SettingsModal({
           <div className="space-y-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Layers className="w-4 h-4" />
-              預設視圖模式
+              {t('預設視圖模式')}
             </h3>
-            <p className="text-xs text-muted-foreground">開啟日曆時的預設顯示模式</p>
+            <p className="text-xs text-muted-foreground">{t('開啟日曆時的預設顯示模式')}</p>
             <div className="flex gap-2">
               {[
                 { key: 'day', label: '日' },
@@ -422,7 +496,7 @@ export function SettingsModal({
                       : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
                   )}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
@@ -437,15 +511,15 @@ export function SettingsModal({
           <div className="space-y-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Layers className="w-4 h-4" />
-              檢視範圍
+              {t('檢視範圍')}
             </h3>
-            <p className="text-xs text-muted-foreground">控制日視圖與週視圖一次能看到幾天（變更立即生效）</p>
+            <p className="text-xs text-muted-foreground">{t('控制日視圖與週視圖一次能看到幾天（變更立即生效）')}</p>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs font-medium text-foreground">日視圖</div>
-                  <div className="text-[10px] text-muted-foreground">適合單日聚焦或近 1-3 天規劃</div>
+                  <div className="text-xs font-medium text-foreground">{t('日視圖')}</div>
+                  <div className="text-[10px] text-muted-foreground">{t('適合單日聚焦或近 1-3 天規劃')}</div>
                 </div>
                 <div className="flex gap-1">
                   {[1, 2, 3].map((n) => (
@@ -463,7 +537,7 @@ export function SettingsModal({
                           : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
                       )}
                     >
-                      {n} 天
+                      {t('{n} 天', { n })}
                     </button>
                   ))}
                 </div>
@@ -471,8 +545,8 @@ export function SettingsModal({
 
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs font-medium text-foreground">週視圖</div>
-                  <div className="text-[10px] text-muted-foreground">5 天=工作週，7 天=完整週</div>
+                  <div className="text-xs font-medium text-foreground">{t('週視圖')}</div>
+                  <div className="text-[10px] text-muted-foreground">{t('5 天=工作週，7 天=完整週')}</div>
                 </div>
                 <div className="flex gap-1">
                   {[5, 6, 7].map((n) => (
@@ -490,7 +564,7 @@ export function SettingsModal({
                           : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
                       )}
                     >
-                      {n} 天
+                      {t('{n} 天', { n })}
                     </button>
                   ))}
                 </div>
@@ -502,9 +576,9 @@ export function SettingsModal({
           <div className="space-y-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Clock className="w-4 h-4" />
-              每週開始日
+              {t('每週開始日')}
             </h3>
-            <p className="text-xs text-muted-foreground">設定週視圖的第一天</p>
+            <p className="text-xs text-muted-foreground">{t('設定週視圖的第一天')}</p>
             <div className="flex gap-2">
               {[
                 { day: 0, label: '週日' },
@@ -523,7 +597,7 @@ export function SettingsModal({
                       : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
                   )}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
@@ -534,13 +608,13 @@ export function SettingsModal({
 
           {/* Extended Features */}
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-foreground">延伸功能</h3>
-            
+            <h3 className="text-sm font-semibold text-foreground">{t('延伸功能')}</h3>
+
             {/* Auto sync workspace tasks */}
             <label className="flex items-center justify-between cursor-pointer">
               <div>
-                <div className="text-sm text-foreground">自動同步工作區任務</div>
-                <div className="text-xs text-muted-foreground">從日曆建立任務時自動同步到左側工作區</div>
+                <div className="text-sm text-foreground">{t('自動同步工作區任務')}</div>
+                <div className="text-xs text-muted-foreground">{t('從日曆建立任務時自動同步到左側工作區')}</div>
               </div>
               <input
                 type="checkbox"
@@ -556,8 +630,8 @@ export function SettingsModal({
             {/* Show completed tasks */}
             <label className="flex items-center justify-between cursor-pointer">
               <div>
-                <div className="text-sm text-foreground">顯示已完成任務</div>
-                <div className="text-xs text-muted-foreground">在日曆上顯示已完成的任務</div>
+                <div className="text-sm text-foreground">{t('顯示已完成任務')}</div>
+                <div className="text-xs text-muted-foreground">{t('在日曆上顯示已完成的任務')}</div>
               </div>
               <input
                 type="checkbox"
@@ -575,9 +649,9 @@ export function SettingsModal({
               <div className="flex-1 pr-4">
                 <div className="flex items-center gap-2 text-sm text-foreground">
                   <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
-                  任務完成音效
+                  {t('任務完成音效')}
                 </div>
-                <div className="text-xs text-muted-foreground">勾選任務時播放可愛的提示音</div>
+                <div className="text-xs text-muted-foreground">{t('勾選任務時播放可愛的提示音')}</div>
               </div>
               <input
                 type="checkbox"
@@ -595,9 +669,9 @@ export function SettingsModal({
             {/* Meeting reminder lead time */}
             <div className="space-y-2">
               <div>
-                <div className="text-sm text-foreground">會議提醒</div>
+                <div className="text-sm text-foreground">{t('會議提醒')}</div>
                 <div className="text-xs text-muted-foreground">
-                  在會議開始前通知你（需要授權通知權限）
+                  {t('在會議開始前通知你（需要授權通知權限）')}
                 </div>
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -617,7 +691,7 @@ export function SettingsModal({
                         // gesture. requestReminderPermission branches per platform.
                         const granted = await requestReminderPermission()
                         if (!granted) {
-                          alert('通知權限被拒，請在系統設定中允許 Huddle 顯示通知後再試')
+                          alert(t('通知權限被拒，請在系統設定中允許 Huddle 顯示通知後再試'))
                           return
                         }
                       }
@@ -634,7 +708,12 @@ export function SettingsModal({
                         : 'bg-card border border-border text-muted-foreground hover:text-foreground',
                     )}
                   >
-                    {label}
+                    {/* '關閉' is deliberately not routed through the shared
+                        t() dictionary here — that exact Chinese string is
+                        also used elsewhere in the app to mean "Close" (a
+                        dialog), and the flat dictionary can only hold one
+                        English value per key. This toggle needs "Off". */}
+                    {value === null ? (lang === 'en' ? 'Off' : label) : t(label)}
                   </button>
                 ))}
               </div>
@@ -644,8 +723,8 @@ export function SettingsModal({
             <div className="space-y-2">
               <label className="flex items-center justify-between cursor-pointer">
                 <div className="flex-1 pr-4">
-                  <div className="text-sm text-foreground">喝水提醒</div>
-                  <div className="text-xs text-muted-foreground">每隔一段時間，Huddle 會跳出來提醒你補水</div>
+                  <div className="text-sm text-foreground">{t('喝水提醒')}</div>
+                  <div className="text-xs text-muted-foreground">{t('每隔一段時間，Huddle 會跳出來提醒你補水')}</div>
                 </div>
                 <input
                   type="checkbox"
@@ -679,7 +758,7 @@ export function SettingsModal({
                           : 'bg-card border border-border text-muted-foreground hover:text-foreground',
                       )}
                     >
-                      {mins} 分鐘
+                      {t('{mins} 分鐘', { mins })}
                     </button>
                   ))}
                 </div>
@@ -689,9 +768,9 @@ export function SettingsModal({
             {/* Keep today's completed in list */}
             <label className="flex items-center justify-between cursor-pointer">
               <div className="flex-1 pr-4">
-                <div className="text-sm text-foreground">保留今日已完成任務</div>
+                <div className="text-sm text-foreground">{t('保留今日已完成任務')}</div>
                 <div className="text-xs text-muted-foreground">
-                  關掉的話，勾選完成後該任務馬上從列表消失（仍可在「已完成」中看到）
+                  {t('關掉的話，勾選完成後該任務馬上從列表消失（仍可在「已完成」中看到）')}
                 </div>
               </div>
               <input
@@ -707,9 +786,9 @@ export function SettingsModal({
             {/* Auto category prefix on calendar task titles */}
             <label className="flex items-center justify-between cursor-pointer">
               <div className="flex-1 pr-4">
-                <div className="text-sm text-foreground">行事曆自動加上分類</div>
+                <div className="text-sm text-foreground">{t('行事曆自動加上分類')}</div>
                 <div className="text-xs text-muted-foreground">
-                  行事曆上的任務標題前自動加上「分類｜」，一眼看出是哪個分類（例：Let&apos;s Play｜夏令營）。不會更動你存的標題。
+                  {t("行事曆上的任務標題前自動加上「分類｜」，一眼看出是哪個分類（例：Let's Play｜夏令營）。不會更動你存的標題。")}
                 </div>
               </div>
               <input
@@ -722,11 +801,32 @@ export function SettingsModal({
               />
             </label>
 
+            {/* Taiwan public holidays on the calendar — device-level, takes
+                effect immediately (same pattern as the water reminder). */}
+            <label className="flex items-center justify-between cursor-pointer">
+              <div className="flex-1 pr-4">
+                <div className="text-sm text-foreground">{t('顯示國定假日')}</div>
+                <div className="text-xs text-muted-foreground">
+                  {t('在行事曆標示中華民國國定假日')}
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={taiwanHolidaysEnabled}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  setTaiwanHolidaysEnabledState(next)
+                  setTaiwanHolidaysEnabled(next)
+                }}
+                className="w-4 h-4 rounded border-border accent-primary"
+              />
+            </label>
+
             {/* Default task duration */}
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-foreground">預設任務時長</div>
-                <div className="text-xs text-muted-foreground">拖曳建立任務時的預設持續時間</div>
+                <div className="text-sm text-foreground">{t('預設任務時長')}</div>
+                <div className="text-xs text-muted-foreground">{t('拖曳建立任務時的預設持續時間')}</div>
               </div>
               <div className="flex items-center gap-2">
                 <Input
@@ -741,7 +841,7 @@ export function SettingsModal({
                   }))}
                   className="h-8 w-20 text-center"
                 />
-                <span className="text-xs text-muted-foreground">分鐘</span>
+                <span className="text-xs text-muted-foreground">{t('分鐘')}</span>
               </div>
             </div>
 
@@ -749,9 +849,9 @@ export function SettingsModal({
             <div className="pt-2 mt-2 border-t border-border/70 space-y-2">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-sm text-destructive">刪除帳號</div>
+                  <div className="text-sm text-destructive">{t('刪除帳號')}</div>
                   <div className="text-xs text-muted-foreground">
-                    永久刪除帳號與所有資料，無法復原
+                    {t('永久刪除帳號與所有資料，無法復原')}
                   </div>
                 </div>
                 <DeleteAccountButton />
@@ -775,7 +875,7 @@ export function SettingsModal({
               <div className="flex items-center justify-between">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                   <Layers className="w-4 h-4" />
-                  時間區塊類型管理
+                  {t('時間區塊類型管理')}
                 </h3>
                 <Button
                   size="sm"
@@ -784,34 +884,34 @@ export function SettingsModal({
                   className="h-8 gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  新增類型
+                  {t('新增類型')}
                 </Button>
               </div>
 
               <p className="text-xs text-muted-foreground">
-                自訂日曆上可建立的時間區塊類型，支援分類結構
+                {t('自訂日曆上可建立的時間區塊類型，支援分類結構')}
               </p>
 
               {/* Add new slot type form */}
               {isAddingNew && (
                 <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-3">
-                  <div className="text-sm font-medium text-foreground">新增類型</div>
+                  <div className="text-sm font-medium text-foreground">{t('新增類型')}</div>
                   <div className="grid grid-cols-2 gap-2">
                     <Input
-                      placeholder="名稱"
+                      placeholder={t('名稱')}
                       value={newSlotType.label || ''}
                       onChange={(e) => setNewSlotType(prev => ({ ...prev, label: e.target.value }))}
                       className="h-8 text-sm"
                     />
                     <Input
-                      placeholder="描述"
+                      placeholder={t('描述')}
                       value={newSlotType.description || ''}
                       onChange={(e) => setNewSlotType(prev => ({ ...prev, description: e.target.value }))}
                       className="h-8 text-sm"
                     />
                   </div>
                   <div className="space-y-2">
-                    <span className="text-xs text-muted-foreground">圖示:</span>
+                    <span className="text-xs text-muted-foreground">{t('圖示:')}</span>
                     <div className="flex flex-wrap gap-1.5">
                       {COMMON_EMOJIS.map((emoji) => (
                         <button
@@ -830,7 +930,7 @@ export function SettingsModal({
                     </div>
                     <div className="flex items-center gap-2">
                       <Input
-                        placeholder="自訂 emoji 或文字"
+                        placeholder={t('自訂 emoji 或文字')}
                         value={customIconInput}
                         onChange={(e) => {
                           setCustomIconInput(e.target.value)
@@ -840,11 +940,11 @@ export function SettingsModal({
                         }}
                         className="h-8 text-sm flex-1"
                       />
-                      <span className="text-[10px] text-muted-foreground">輸入 emoji 或文字作為圖示</span>
+                      <span className="text-[10px] text-muted-foreground">{t('輸入 emoji 或文字作為圖示')}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">顏色:</span>
+                    <span className="text-xs text-muted-foreground">{t('顏色:')}</span>
                     <div className="flex gap-1">
                       {PRESET_COLORS.slice(0, 6).map((color) => (
                         <button
@@ -866,8 +966,8 @@ export function SettingsModal({
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <span className="text-xs text-muted-foreground">關聯工作區 (選填):</span>
-                    <p className="text-[10px] text-muted-foreground">若選擇工作區，建立的項目會同步到左側任務欄</p>
+                    <span className="text-xs text-muted-foreground">{t('關聯工作區 (選填):')}</span>
+                    <p className="text-[10px] text-muted-foreground">{t('若選擇工作區，建立的項目會同步到左側任務欄')}</p>
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         onClick={() => setNewSlotType(prev => ({ ...prev, workspaceId: undefined }))}
@@ -878,7 +978,7 @@ export function SettingsModal({
                             : 'bg-secondary/50 hover:bg-secondary'
                         )}
                       >
-                        無 (純時間區塊)
+                        {t('無 (純時間區塊)')}
                       </button>
                       {workspaces.filter(w => !w.isArchived).map((ws) => (
                         <button
@@ -903,10 +1003,10 @@ export function SettingsModal({
                   </div>
                   <div className="flex justify-end gap-2">
                     <Button size="sm" variant="ghost" onClick={() => setIsAddingNew(false)} className="h-7">
-                      取消
+                      {t('取消')}
                     </Button>
                     <Button size="sm" onClick={handleAddSlotType} className="h-7">
-                      新增
+                      {t('新增')}
                     </Button>
                   </div>
                 </div>
@@ -936,17 +1036,17 @@ export function SettingsModal({
                               className="h-7 text-sm flex-1"
                             />
                             <Button size="sm" variant="ghost" onClick={() => setEditingSlotType(null)} className="h-7 px-2">
-                              取消
+                              {t('取消')}
                             </Button>
                             <Button size="sm" onClick={() => handleUpdateSlotType(editingSlotType)} className="h-7 px-2">
-                              儲存
+                              {t('儲存')}
                             </Button>
                           </div>
                         ) : (
                           <>
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-foreground">{type.label}</div>
-                              <div className="text-[10px] text-muted-foreground truncate">{type.description}</div>
+                              <div className="text-sm font-medium text-foreground">{t(type.label)}</div>
+                              <div className="text-[10px] text-muted-foreground truncate">{t(type.description)}</div>
                             </div>
                             {!type.isBuiltIn && (
                               <div className="flex items-center gap-1">
@@ -996,17 +1096,17 @@ export function SettingsModal({
                                       className="h-7 text-sm flex-1"
                                     />
                                     <Button size="sm" variant="ghost" onClick={() => setEditingSlotType(null)} className="h-7 px-2">
-                                      取消
+                                      {t('取消')}
                                     </Button>
                                     <Button size="sm" onClick={() => handleUpdateSlotType(editingSlotType)} className="h-7 px-2">
-                                      儲存
+                                      {t('儲存')}
                                     </Button>
                                   </div>
                                 ) : (
                                   <>
                                     <div className="flex-1 min-w-0">
-                                      <div className="text-sm font-medium text-foreground">{child.label}</div>
-                                      <div className="text-[10px] text-muted-foreground truncate">{child.description}</div>
+                                      <div className="text-sm font-medium text-foreground">{t(child.label)}</div>
+                                      <div className="text-[10px] text-muted-foreground truncate">{t(child.description)}</div>
                                     </div>
                                     {!child.isBuiltIn && (
                                       <div className="flex items-center gap-1">
@@ -1037,16 +1137,19 @@ export function SettingsModal({
               </div>
             </div>
           )}
+
+          {/* Sharing Tab */}
+          {activeTab === 'sharing' && <SharingSettingsTab />}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border bg-secondary/20 pb-[max(env(safe-area-inset-bottom),1rem)] md:pb-4">
           <Button variant="secondary" onClick={onClose}>
-            取消
+            {t('取消')}
           </Button>
           <Button onClick={handleSave} className="gap-2">
             <Save className="w-4 h-4" />
-            儲存
+            {t('儲存')}
           </Button>
         </div>
     </ModalShell>
@@ -1063,8 +1166,9 @@ function NotificationsSettingsTab({
   workspaces: Workspace[]
   onUpdate: (notifications: NotificationSettings) => void
 }) {
+  const { t } = useI18n()
   const notifications = settings.notifications || DEFAULT_NOTIFICATION_SETTINGS
-  
+
   const updateField = <K extends keyof NotificationSettings>(
     key: K,
     value: NotificationSettings[K]
@@ -1093,8 +1197,8 @@ function NotificationsSettingsTab({
             <Bell className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <div className="font-medium text-foreground">啟用任務提醒</div>
-            <div className="text-xs text-muted-foreground">接收任務相關的智慧提醒通知</div>
+            <div className="font-medium text-foreground">{t('啟用任務提醒')}</div>
+            <div className="text-xs text-muted-foreground">{t('接收任務相關的智慧提醒通知')}</div>
           </div>
         </div>
         <label className="relative inline-flex items-center cursor-pointer">
@@ -1114,12 +1218,12 @@ function NotificationsSettingsTab({
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-urgency-critical" />
-              <h3 className="text-sm font-semibold text-foreground">過期任務提醒</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('過期任務提醒')}</h3>
             </div>
-            
+
             <div className="space-y-3 pl-6">
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-foreground">啟用過期任務提醒</span>
+                <span className="text-sm text-foreground">{t('啟用過期任務提醒')}</span>
                 <input
                   type="checkbox"
                   checked={notifications.overdue.enabled}
@@ -1127,11 +1231,11 @@ function NotificationsSettingsTab({
                   className="w-4 h-4 rounded border-border accent-primary"
                 />
               </label>
-              
+
               {notifications.overdue.enabled && (
                 <>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">嚴重過期天數</span>
+                    <span className="text-sm text-muted-foreground">{t('嚴重過期天數')}</span>
                     <div className="flex items-center gap-2">
                       <Input
                         type="number"
@@ -1141,12 +1245,12 @@ function NotificationsSettingsTab({
                         onChange={(e) => updateNestedField('overdue', 'criticalDays', parseInt(e.target.value) || 7)}
                         className="h-8 w-16 text-center"
                       />
-                      <span className="text-xs text-muted-foreground">天</span>
+                      <span className="text-xs text-muted-foreground">{t('天')}</span>
                     </div>
                   </div>
-                  
+
                   <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-muted-foreground">顯示在通知鈴鐺</span>
+                    <span className="text-sm text-muted-foreground">{t('顯示在通知鈴鐺')}</span>
                     <input
                       type="checkbox"
                       checked={notifications.overdue.showInBell}
@@ -1154,9 +1258,9 @@ function NotificationsSettingsTab({
                       className="w-4 h-4 rounded border-border accent-primary"
                     />
                   </label>
-                  
+
                   <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-muted-foreground">每日摘要提醒</span>
+                    <span className="text-sm text-muted-foreground">{t('每日摘要提醒')}</span>
                     <input
                       type="checkbox"
                       checked={notifications.overdue.dailyDigest}
@@ -1175,12 +1279,12 @@ function NotificationsSettingsTab({
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-chart-5" />
-              <h3 className="text-sm font-semibold text-foreground">即將到期提醒</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('即將到期提醒')}</h3>
             </div>
-            
+
             <div className="space-y-3 pl-6">
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-foreground">啟用即將到期提醒</span>
+                <span className="text-sm text-foreground">{t('啟用即將到期提醒')}</span>
                 <input
                   type="checkbox"
                   checked={notifications.dueSoon.enabled}
@@ -1188,11 +1292,11 @@ function NotificationsSettingsTab({
                   className="w-4 h-4 rounded border-border accent-primary"
                 />
               </label>
-              
+
               {notifications.dueSoon.enabled && (
                 <>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">提前提醒天數</span>
+                    <span className="text-sm text-muted-foreground">{t('提前提醒天數')}</span>
                     <div className="flex items-center gap-2">
                       <Input
                         type="number"
@@ -1202,12 +1306,12 @@ function NotificationsSettingsTab({
                         onChange={(e) => updateNestedField('dueSoon', 'daysBeforeDue', parseInt(e.target.value) || 3)}
                         className="h-8 w-16 text-center"
                       />
-                      <span className="text-xs text-muted-foreground">天</span>
+                      <span className="text-xs text-muted-foreground">{t('天')}</span>
                     </div>
                   </div>
-                  
+
                   <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-muted-foreground">到期當天特別提醒</span>
+                    <span className="text-sm text-muted-foreground">{t('到期當天特別提醒')}</span>
                     <input
                       type="checkbox"
                       checked={notifications.dueSoon.notifyOnDueDay}
@@ -1215,9 +1319,9 @@ function NotificationsSettingsTab({
                       className="w-4 h-4 rounded border-border accent-primary"
                     />
                   </label>
-                  
+
                   <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-muted-foreground">到期前一天提醒</span>
+                    <span className="text-sm text-muted-foreground">{t('到期前一天提醒')}</span>
                     <input
                       type="checkbox"
                       checked={notifications.dueSoon.notifyDayBefore}
@@ -1236,12 +1340,12 @@ function NotificationsSettingsTab({
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-info" />
-              <h3 className="text-sm font-semibold text-foreground">閒置任務提醒</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('閒置任務提醒')}</h3>
             </div>
-            
+
             <div className="space-y-3 pl-6">
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-foreground">提醒閒置過久的任務</span>
+                <span className="text-sm text-foreground">{t('提醒閒置過久的任務')}</span>
                 <input
                   type="checkbox"
                   checked={notifications.staleTasks.enabled}
@@ -1249,11 +1353,11 @@ function NotificationsSettingsTab({
                   className="w-4 h-4 rounded border-border accent-primary"
                 />
               </label>
-              
+
               {notifications.staleTasks.enabled && (
                 <>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">閒置天數門檻</span>
+                    <span className="text-sm text-muted-foreground">{t('閒置天數門檻')}</span>
                     <div className="flex items-center gap-2">
                       <Input
                         type="number"
@@ -1263,12 +1367,12 @@ function NotificationsSettingsTab({
                         onChange={(e) => updateNestedField('staleTasks', 'daysUntilStale', parseInt(e.target.value) || 14)}
                         className="h-8 w-16 text-center"
                       />
-                      <span className="text-xs text-muted-foreground">天</span>
+                      <span className="text-xs text-muted-foreground">{t('天')}</span>
                     </div>
                   </div>
-                  
+
                   <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-muted-foreground">包含未排程任務</span>
+                    <span className="text-sm text-muted-foreground">{t('包含未排程任務')}</span>
                     <input
                       type="checkbox"
                       checked={notifications.staleTasks.includeUnscheduled}
@@ -1276,9 +1380,9 @@ function NotificationsSettingsTab({
                       className="w-4 h-4 rounded border-border accent-primary"
                     />
                   </label>
-                  
+
                   <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-muted-foreground">包含無截止日任務</span>
+                    <span className="text-sm text-muted-foreground">{t('包含無截止日任務')}</span>
                     <input
                       type="checkbox"
                       checked={notifications.staleTasks.includeNoDueDate}
@@ -1297,12 +1401,12 @@ function NotificationsSettingsTab({
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-urgency-high" />
-              <h3 className="text-sm font-semibold text-foreground">高優先任務提醒</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('高優先任務提醒')}</h3>
             </div>
-            
+
             <div className="space-y-3 pl-6">
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-foreground">啟用高優先任務提醒</span>
+                <span className="text-sm text-foreground">{t('啟用高優先任務提醒')}</span>
                 <input
                   type="checkbox"
                   checked={notifications.highPriority.enabled}
@@ -1310,11 +1414,11 @@ function NotificationsSettingsTab({
                   className="w-4 h-4 rounded border-border accent-primary"
                 />
               </label>
-              
+
               {notifications.highPriority.enabled && (
                 <>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">最低優先等級</span>
+                    <span className="text-sm text-muted-foreground">{t('最低優先等級')}</span>
                     <div className="flex items-center gap-2">
                       <Input
                         type="number"
@@ -1327,9 +1431,9 @@ function NotificationsSettingsTab({
                       <span className="text-xs text-muted-foreground">/ 10</span>
                     </div>
                   </div>
-                  
+
                   <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-muted-foreground">高優先任務過多時提醒</span>
+                    <span className="text-sm text-muted-foreground">{t('高優先任務過多時提醒')}</span>
                     <input
                       type="checkbox"
                       checked={notifications.highPriority.alertWhenTooMany}
@@ -1337,10 +1441,10 @@ function NotificationsSettingsTab({
                       className="w-4 h-4 rounded border-border accent-primary"
                     />
                   </label>
-                  
+
                   {notifications.highPriority.alertWhenTooMany && (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">超過幾個時提醒</span>
+                      <span className="text-sm text-muted-foreground">{t('超過幾個時提醒')}</span>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
@@ -1350,7 +1454,7 @@ function NotificationsSettingsTab({
                           onChange={(e) => updateNestedField('highPriority', 'maxBeforeAlert', parseInt(e.target.value) || 5)}
                           className="h-8 w-16 text-center"
                         />
-                        <span className="text-xs text-muted-foreground">個</span>
+                        <span className="text-xs text-muted-foreground">{t('個')}</span>
                       </div>
                     </div>
                   )}
@@ -1365,12 +1469,12 @@ function NotificationsSettingsTab({
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-chart-3" />
-              <h3 className="text-sm font-semibold text-foreground">排程提醒</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('排程提醒')}</h3>
             </div>
-            
+
             <div className="space-y-3 pl-6">
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-foreground">提醒未排程任務</span>
+                <span className="text-sm text-foreground">{t('提醒未排程任務')}</span>
                 <input
                   type="checkbox"
                   checked={notifications.scheduling.remindUnscheduled}
@@ -1378,10 +1482,10 @@ function NotificationsSettingsTab({
                   className="w-4 h-4 rounded border-border accent-primary"
                 />
               </label>
-              
+
               {notifications.scheduling.remindUnscheduled && (
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">未排程比例門檻</span>
+                  <span className="text-sm text-muted-foreground">{t('未排程比例門檻')}</span>
                   <div className="flex items-center gap-2">
                     <Input
                       type="number"
@@ -1396,9 +1500,9 @@ function NotificationsSettingsTab({
                   </div>
                 </div>
               )}
-              
+
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-foreground">每日規劃提醒</span>
+                <span className="text-sm text-foreground">{t('每日規劃提醒')}</span>
                 <input
                   type="checkbox"
                   checked={notifications.scheduling.dailyPlanningReminder}
@@ -1406,15 +1510,15 @@ function NotificationsSettingsTab({
                   className="w-4 h-4 rounded border-border accent-primary"
                 />
               </label>
-              
+
               {notifications.scheduling.dailyPlanningReminder && (
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">提醒時間</span>
+                  <span className="text-sm text-muted-foreground">{t('提醒時間')}</span>
                   <TimeField
                     value={notifications.scheduling.planningReminderTime}
                     onChange={(v) => updateNestedField('scheduling', 'planningReminderTime', v)}
                     className="h-8 w-28"
-                    aria-label="每日規劃提醒時間"
+                    aria-label={t('每日規劃提醒時間')}
                   />
                 </div>
               )}
@@ -1427,12 +1531,12 @@ function NotificationsSettingsTab({
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Moon className="w-4 h-4 text-chart-4" />
-              <h3 className="text-sm font-semibold text-foreground">勿擾時段</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('勿擾時段')}</h3>
             </div>
-            
+
             <div className="space-y-3 pl-6">
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-foreground">啟用勿擾時段</span>
+                <span className="text-sm text-foreground">{t('啟用勿擾時段')}</span>
                 <input
                   type="checkbox"
                   checked={notifications.quietHours.enabled}
@@ -1440,30 +1544,30 @@ function NotificationsSettingsTab({
                   className="w-4 h-4 rounded border-border accent-primary"
                 />
               </label>
-              
+
               {notifications.quietHours.enabled && (
                 <>
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-muted-foreground">時段</span>
+                    <span className="text-sm text-muted-foreground">{t('時段')}</span>
                     <div className="flex items-center gap-2">
                       <TimeField
                         value={notifications.quietHours.startTime}
                         onChange={(v) => updateNestedField('quietHours', 'startTime', v)}
                         className="h-8 w-28"
-                        aria-label="勿擾開始時間"
+                        aria-label={t('勿擾開始時間')}
                       />
-                      <span className="text-xs text-muted-foreground">至</span>
+                      <span className="text-xs text-muted-foreground">{t('至')}</span>
                       <TimeField
                         value={notifications.quietHours.endTime}
                         onChange={(v) => updateNestedField('quietHours', 'endTime', v)}
                         className="h-8 w-28"
-                        aria-label="勿擾結束時間"
+                        aria-label={t('勿擾結束時間')}
                       />
                     </div>
                   </div>
-                  
+
                   <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-muted-foreground">允許緊急通知</span>
+                    <span className="text-sm text-muted-foreground">{t('允許緊急通知')}</span>
                     <input
                       type="checkbox"
                       checked={notifications.quietHours.allowUrgent}
@@ -1482,9 +1586,9 @@ function NotificationsSettingsTab({
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-chart-3" />
-              <h3 className="text-sm font-semibold text-foreground">工作區設定</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('工作區設定')}</h3>
             </div>
-            <p className="text-xs text-muted-foreground pl-6">為不同工作區設定不同的提醒規則</p>
+            <p className="text-xs text-muted-foreground pl-6">{t('為不同工作區設定不同的提醒規則')}</p>
             
             <div className="space-y-2 pl-6">
               {workspaces.filter(ws => !ws.isArchived).map((workspace) => {
@@ -1521,10 +1625,10 @@ function NotificationsSettingsTab({
                         }}
                         className="h-7 px-2 text-xs rounded-md bg-background border border-border"
                       >
-                        <option value="default">預設</option>
-                        <option value="high">高優先</option>
-                        <option value="medium">中優先</option>
-                        <option value="low">低優先</option>
+                        <option value="default">{t('預設')}</option>
+                        <option value="high">{t('高優先')}</option>
+                        <option value="medium">{t('中優先')}</option>
+                        <option value="low">{t('低優先')}</option>
                       </select>
                       
                       <label className="flex items-center cursor-pointer">
@@ -1557,12 +1661,12 @@ function NotificationsSettingsTab({
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Eye className="w-4 h-4 text-cyan-500" />
-              <h3 className="text-sm font-semibold text-foreground">顯示設定</h3>
+              <h3 className="text-sm font-semibold text-foreground">{t('顯示設定')}</h3>
             </div>
-            
+
             <div className="space-y-3 pl-6">
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-foreground">顯示通知數量徽章</span>
+                <span className="text-sm text-foreground">{t('顯示通知數量徽章')}</span>
                 <input
                   type="checkbox"
                   checked={notifications.appearance.showBadgeCount}
@@ -1570,9 +1674,9 @@ function NotificationsSettingsTab({
                   className="w-4 h-4 rounded border-border accent-primary"
                 />
               </label>
-              
+
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-foreground">按類型分組顯示</span>
+                <span className="text-sm text-foreground">{t('按類型分組顯示')}</span>
                 <input
                   type="checkbox"
                   checked={notifications.appearance.groupByType}
@@ -1580,9 +1684,9 @@ function NotificationsSettingsTab({
                   className="w-4 h-4 rounded border-border accent-primary"
                 />
               </label>
-              
+
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">最多顯示通知數</span>
+                <span className="text-sm text-muted-foreground">{t('最多顯示通知數')}</span>
                 <div className="flex items-center gap-2">
                   <Input
                     type="number"
@@ -1592,13 +1696,545 @@ function NotificationsSettingsTab({
                     onChange={(e) => updateNestedField('appearance', 'maxVisible', parseInt(e.target.value) || 10)}
                     className="h-8 w-16 text-center"
                   />
-                  <span className="text-xs text-muted-foreground">個</span>
+                  <span className="text-xs text-muted-foreground">{t('個')}</span>
                 </div>
               </div>
             </div>
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// Sharing Settings Tab Component — invite / accept / revoke / dissolve (P1)
+// plus the per-peer 開放範圍 grant editor (P2, see PeerGrantEditor below).
+function formatShareDate(iso: string, lang: Lang): string {
+  try {
+    return new Date(iso).toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', {
+      month: 'short',
+      day: 'numeric',
+    })
+  } catch {
+    return iso
+  }
+}
+
+function SharingSettingsTab() {
+  const { t, lang } = useI18n()
+  const { pendingInvites, peers, grants, myUserId, loading, createInvite, revokeInvite, dissolveShare, setGrant } =
+    useCalendarSharing()
+  // Which peer's 開放範圍 editor is expanded (one at a time keeps the tab short).
+  const [expandedShareId, setExpandedShareId] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+
+  const handleCreateInvite = async () => {
+    setGenerating(true)
+    const url = await createInvite()
+    setGenerating(false)
+    if (url) {
+      setInviteUrl(url)
+      setCopied(false)
+    }
+  }
+
+  const handleCopy = async () => {
+    if (!inviteUrl) return
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setCopied(true)
+      toast.success(t('已複製連結'))
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error(t('複製失敗，請手動選取連結'))
+    }
+  }
+
+  const handleShare = async () => {
+    if (!inviteUrl) return
+    try {
+      await navigator.share({ title: t('Huddle 行事曆共享邀請'), url: inviteUrl })
+    } catch {
+      // User cancelled the native share sheet — not an error.
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Generate invite link */}
+      <div className="space-y-3">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Link2 className="w-4 h-4" />
+          {t('產生邀請連結')}
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          {t('把連結傳給對方，雙方接受後即可互相查看彼此開放的行事曆')}
+        </p>
+
+        {!inviteUrl ? (
+          <Button onClick={handleCreateInvite} disabled={generating} className="gap-2">
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+            {t('產生邀請連結')}
+          </Button>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-secondary/50 border border-border">
+              <input
+                readOnly
+                value={inviteUrl}
+                onFocus={(e) => e.currentTarget.select()}
+                className="flex-1 min-w-0 bg-transparent text-xs text-foreground truncate outline-none"
+                aria-label={t('邀請連結')}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" onClick={handleCopy} className="h-9 gap-1.5">
+                <Copy className="w-3.5 h-3.5" />
+                {copied ? t('已複製') : t('複製')}
+              </Button>
+              {canNativeShare && (
+                <Button size="sm" variant="secondary" onClick={handleShare} className="h-9 gap-1.5">
+                  <Share2 className="w-3.5 h-3.5" />
+                  {t('分享')}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleCreateInvite}
+                disabled={generating}
+                className="h-9 gap-1.5"
+              >
+                {generating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                {t('重新產生')}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">{t('連結 7 天內有效，且僅能使用一次')}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-border" />
+
+      {/* Pending invites */}
+      <div className="space-y-3">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Clock className="w-4 h-4" />
+          {t('待接受的邀請')}
+        </h3>
+        {loading ? (
+          <p className="text-xs text-muted-foreground">{t('載入中…')}</p>
+        ) : pendingInvites.length === 0 ? (
+          <p className="text-xs text-muted-foreground">{t('目前沒有待接受的邀請')}</p>
+        ) : (
+          <div className="space-y-2">
+            {pendingInvites.map((invite: PendingShareInvite) => (
+              <div
+                key={invite.id}
+                className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-secondary/30 border border-border"
+              >
+                <span className="text-xs text-muted-foreground">
+                  {t('建立於 {date}', { date: formatShareDate(invite.createdAt, lang) })}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => revokeInvite(invite.id)}
+                  className="h-8 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  {t('撤銷')}
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-border" />
+
+      {/* Linked peers */}
+      <div className="space-y-3">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Users className="w-4 h-4" />
+          {t('已連結的人')}
+        </h3>
+        {loading ? (
+          <p className="text-xs text-muted-foreground">{t('載入中…')}</p>
+        ) : peers.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {t('還沒有互相共享行事曆的對象，產生一個邀請連結開始吧')}
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {peers.map((peer: SharePeer) => {
+              const isExpanded = expandedShareId === peer.shareId
+              return (
+                <div key={peer.shareId} className="rounded-lg bg-secondary/30 border border-border">
+                  <div className="flex items-center justify-between gap-2 p-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {peer.avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- static export has no image optimizer
+                          <img src={peer.avatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-4 h-4 text-primary" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-foreground truncate">
+                          {peer.displayName || t('未命名使用者')}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {t('連結於 {date}', { date: formatShareDate(peer.createdAt, lang) })}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        aria-expanded={isExpanded}
+                        onClick={() =>
+                          setExpandedShareId((cur) => (cur === peer.shareId ? null : peer.shareId))
+                        }
+                        className="h-8 px-2 text-xs gap-0.5"
+                      >
+                        {t('開放範圍')}
+                        <ChevronRight
+                          className={cn('w-3.5 h-3.5 transition-transform', isExpanded && 'rotate-90')}
+                        />
+                      </Button>
+                      <DissolveShareButton
+                        peerName={peer.displayName}
+                        onConfirm={() => dissolveShare(peer.shareId)}
+                      />
+                    </div>
+                  </div>
+                  {isExpanded && myUserId && (
+                    <PeerGrantEditor
+                      shareId={peer.shareId}
+                      peerId={peer.peerId}
+                      peerName={peer.displayName || t('對方')}
+                      myUserId={myUserId}
+                      grants={grants}
+                      onSetGrant={setGrant}
+                    />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function DissolveShareButton({
+  peerName,
+  onConfirm,
+}: {
+  peerName: string | null
+  onConfirm: () => void | Promise<void>
+}) {
+  const { t } = useI18n()
+  const [busy, setBusy] = useState(false)
+
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        {/* Shared Button (not a raw <button>) so size="sm" picks up its
+            mobile-only invisible hit-area expansion (see button.tsx's
+            `before:` pseudo-element) and clears the 44px touch target. */}
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-8 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
+        >
+          {t('解除共享')}
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t('確定要解除共享嗎？')}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t('解除後，你和 {name} 都無法再查看對方開放的行事曆；之後想恢復需要重新邀請一次。', {
+              name: peerName || t('對方'),
+            })}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>{t('取消')}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={async (e) => {
+              e.preventDefault()
+              setBusy(true)
+              await onConfirm()
+              setBusy(false)
+            }}
+            disabled={busy}
+            className="bg-destructive text-white hover:bg-destructive/90"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : t('解除共享')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+// ─────────────────────────────────────────────────────────
+// Grant editor (P2) — per peer, two lists (workspaces / slot types), each
+// item a three-state choice: 不開放 / 只顯示忙碌 / 完整內容.
+//
+// Grantable items are read straight from the DB (RLS scopes both tables to
+// the signed-in user) rather than from props: the grants RLS WITH CHECK
+// only accepts refs that exist as MY rows, so listing DB rows guarantees
+// every option shown here is actually grantable. Note built-in slot types
+// (午休/緩衝/專注) are synthesized at runtime and NOT stored in slot_types,
+// so only custom types appear — matching what the RPC can actually share.
+// ─────────────────────────────────────────────────────────
+
+// Built-in time-block types (must mirror app/page.tsx baseTypes). They are
+// synthesized at runtime and not stored in slot_types — granting one seeds
+// its DB row first (see useCalendarSharing.setGrant), because migration
+// 0016 only accepts grant refs that exist as real slot_types rows. Labels
+// stay zh-canonical here (t() keys); display goes through t().
+const BUILT_IN_TIME_BLOCK_TYPES = [
+  { key: 'break', label: '午休', description: '休息時間', icon: 'Coffee', iconType: 'lucide' as const, color: '#F6A854' },
+  { key: 'buffer', label: '緩衝', description: '彈性緩衝時間', icon: 'Clock', iconType: 'lucide' as const, color: '#9BBFAC' },
+  { key: 'focus', label: '專注', description: '專注工作時段', icon: 'Crosshair', iconType: 'lucide' as const, color: '#D46B8A' },
+]
+
+function PeerGrantEditor({
+  shareId,
+  peerId,
+  peerName,
+  myUserId,
+  grants,
+  onSetGrant,
+}: {
+  shareId: string
+  peerId: string
+  peerName: string
+  myUserId: string
+  grants: ShareGrant[]
+  onSetGrant: (
+    shareId: string,
+    kind: GrantKind,
+    ref: string,
+    detail: GrantDetail | null,
+    seed?: { label: string; description: string; icon: string; iconType: 'lucide' | 'custom' | 'emoji'; color: string },
+  ) => Promise<boolean>
+}) {
+  const { t } = useI18n()
+  const supabase = createClient()
+  const [items, setItems] = useState<{
+    workspaces: { id: string; name: string; icon: string; color: string }[]
+    slotTypes: { key: string; label: string; color: string }[]
+  } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const [wsRes, stRes] = await Promise.all([
+        supabase
+          .from('workspaces')
+          .select('id, name, icon, color')
+          .eq('is_archived', false)
+          .order('sort_order'),
+        supabase.from('slot_types').select('key, label, color, workspace_id').order('sort_order'),
+      ])
+      if (cancelled) return
+      if (wsRes.error) console.error('[calendar-sharing] load workspaces failed', wsRes.error)
+      if (stRes.error) console.error('[calendar-sharing] load slot types failed', stRes.error)
+      setItems({
+        workspaces: wsRes.data ?? [],
+        // Workspace-bound types create tasks (covered by workspace grants);
+        // 'task'/'timeblock' are picker pseudo-entries, not block types.
+        slotTypes: (stRes.data ?? []).filter(
+          (s) => !s.workspace_id && s.key !== 'task' && s.key !== 'timeblock',
+        ),
+      })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [supabase])
+
+  const myGrants = grants.filter((g) => g.shareId === shareId && g.ownerId === myUserId)
+  const theirGrants = grants.filter((g) => g.shareId === shareId && g.ownerId === peerId)
+  const detailOf = (kind: GrantKind, ref: string): GrantDetail | null =>
+    myGrants.find((g) => g.kind === kind && g.ref === ref)?.detail ?? null
+
+  const theirWorkspaceCount = theirGrants.filter((g) => g.kind === 'workspace').length
+  const theirSlotTypeCount = theirGrants.filter((g) => g.kind === 'slot_type').length
+
+  return (
+    <div className="border-t border-border/70 px-2.5 pb-3 pt-2.5 space-y-4">
+      {/* 我開放給對方 */}
+      <div className="space-y-2">
+        <div className="text-xs font-semibold text-foreground">
+          {t('我開放給 {name} 的內容', { name: peerName })}
+        </div>
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          {t('「完整內容」會顯示事項標題；「只顯示忙碌」只給時段與類型、不含標題。預設全部不開放。')}
+        </p>
+
+        {!items ? (
+          <p className="text-xs text-muted-foreground">{t('載入中…')}</p>
+        ) : (
+          <>
+            {/* Workspaces（大分類） */}
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-medium text-muted-foreground">{t('大分類')}</div>
+              {items.workspaces.length === 0 ? (
+                <p className="text-[10px] text-muted-foreground">{t('沒有可開放的大分類')}</p>
+              ) : (
+                items.workspaces.map((ws) => (
+                  <GrantRow
+                    key={ws.id}
+                    icon={ws.icon}
+                    color={ws.color}
+                    label={ws.name}
+                    value={detailOf('workspace', ws.id)}
+                    onChange={(detail) => void onSetGrant(shareId, 'workspace', ws.id, detail)}
+                  />
+                ))
+              )}
+            </div>
+
+            {/* Slot types（時間區塊類型）— built-ins first (with seed data
+                so granting one can create its slot_types row on demand),
+                then the user's DB-backed custom types, deduped by key. */}
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-medium text-muted-foreground">{t('時間區塊類型')}</div>
+              {BUILT_IN_TIME_BLOCK_TYPES.map((bt) => (
+                <GrantRow
+                  key={bt.key}
+                  color={bt.color}
+                  label={t(bt.label)}
+                  value={detailOf('slot_type', bt.key)}
+                  onChange={(detail) =>
+                    void onSetGrant(shareId, 'slot_type', bt.key, detail, {
+                      label: bt.label,
+                      description: bt.description,
+                      icon: bt.icon,
+                      iconType: bt.iconType,
+                      color: bt.color,
+                    })
+                  }
+                />
+              ))}
+              {items.slotTypes
+                .filter((st) => !BUILT_IN_TIME_BLOCK_TYPES.some((bt) => bt.key === st.key))
+                .map((st) => (
+                  <GrantRow
+                    key={st.key}
+                    color={st.color}
+                    label={st.label}
+                    value={detailOf('slot_type', st.key)}
+                    onChange={(detail) => void onSetGrant(shareId, 'slot_type', st.key, detail)}
+                  />
+                ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* 對方開放給我 — read-only summary. Item names are the peer's private
+          data (their workspace names are unreadable to us by design), so we
+          only show counts. */}
+      <div className="space-y-1">
+        <div className="text-xs font-semibold text-foreground">
+          {t('{name} 開放給我的內容', { name: peerName })}
+        </div>
+        {theirWorkspaceCount === 0 && theirSlotTypeCount === 0 ? (
+          <p className="text-[10px] text-muted-foreground">{t('對方尚未開放任何內容')}</p>
+        ) : (
+          <p className="text-[10px] text-muted-foreground">
+            {t('對方已開放 {ws} 個大分類、{st} 個時間區塊類型（項目名稱由對方保密）', {
+              ws: theirWorkspaceCount,
+              st: theirSlotTypeCount,
+            })}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// One grantable item + its three-state control. Row wraps on narrow (390px)
+// screens so the segmented control never overflows horizontally.
+function GrantRow({
+  icon,
+  color,
+  label,
+  value,
+  onChange,
+}: {
+  icon?: string
+  color: string
+  label: string
+  value: GrantDetail | null
+  onChange: (detail: GrantDetail | null) => void
+}) {
+  const { t } = useI18n()
+  const options: { value: GrantDetail | null; label: string }[] = [
+    { value: null, label: t('不開放') },
+    { value: 'busy', label: t('只顯示忙碌') },
+    { value: 'full', label: t('完整內容') },
+  ]
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-0.5">
+      <div className="flex items-center gap-1.5 min-w-0 flex-1 basis-32">
+        <span
+          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+          style={{ backgroundColor: color }}
+          aria-hidden="true"
+        />
+        {icon && <span className="text-xs flex-shrink-0">{icon}</span>}
+        <span className="text-xs text-foreground truncate">{label}</span>
+      </div>
+      <div
+        role="radiogroup"
+        aria-label={label}
+        className="flex items-center border border-border rounded-lg overflow-hidden flex-shrink-0"
+      >
+        {options.map((opt) => {
+          const selected = value === opt.value
+          return (
+            <button
+              key={opt.label}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => {
+                if (!selected) onChange(opt.value)
+              }}
+              className={cn(
+                // 44px touch floor via invisible vertical expansion (visual
+                // stays h-9 so the row doesn't balloon).
+                "relative h-9 px-2.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset before:content-[''] before:absolute before:inset-0 before:-my-1 md:before:hidden",
+                selected
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+              )}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

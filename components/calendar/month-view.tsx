@@ -4,11 +4,15 @@ import { useMemo, useRef, useCallback, useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { Check, Plus, ChevronRight } from 'lucide-react'
-import { toDateString, taskOccursOnDate } from '@/lib/calendar-utils'
+import { toDateString, taskOccursOnDate, timeToMinutes } from '@/lib/calendar-utils'
+import type { PeerEvent } from '@/hooks/use-calendar-sharing'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { useI18n } from '@/lib/i18n/react'
+import { getTaiwanHoliday, useTaiwanHolidaysEnabled } from '@/lib/taiwan-holidays'
+import { format } from 'date-fns'
 
 interface MonthViewProps {
   selectedDate: Date
@@ -22,9 +26,16 @@ interface MonthViewProps {
   onOpenDayView?: (date: Date) => void
   onCreateTask?: (date: string) => void
   onNavigate?: (direction: 'prev' | 'next') => void
+  /** Shared-calendar overlay: peers' events (read-only, pre-filtered by
+   *  visibility toggles). Recurring masters expand via taskOccursOnDate. */
+  peerEvents?: PeerEvent[]
 }
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+// Bare weekday chars collide with other single-char meanings elsewhere in
+// the shared t() dictionary (see calendar-header.tsx) — resolve English
+// weekday abbreviations directly by index instead of routing through t().
+const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS_TO_RENDER = 3
 
 export function MonthView({
@@ -37,6 +48,7 @@ export function MonthView({
   onOpenDayView,
   onCreateTask,
   onNavigate,
+  peerEvents = [],
 }: MonthViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isScrolling = useRef(false)
@@ -44,6 +56,8 @@ export function MonthView({
   const showCategoryPrefix = useShowCategoryPrefix()
   const isMobile = useIsMobile()
   const displayColor = useDisplayColor()
+  const { t, lang } = useI18n()
+  const holidaysEnabled = useTaiwanHolidaysEnabled()
 
   // Mobile agenda: the day whose tasks are listed under the compact grid.
   // Follows selectedDate (header navigation, "today" button) but can be
@@ -180,6 +194,21 @@ export function MonthView({
     return map
   }, [timeBlocks])
 
+  // Peer overlay events for a day (read-only; PeerEvent is Task-shaped so
+  // recurring masters expand through taskOccursOnDate). Sorted by start time.
+  const getPeerEventsForDay = useCallback(
+    (date: Date): PeerEvent[] => {
+      const matched = peerEvents.filter((ev) => taskOccursOnDate(ev, date))
+      return [...matched].sort((a, b) => {
+        if (a.scheduledStartTime && b.scheduledStartTime) {
+          return timeToMinutes(a.scheduledStartTime) - timeToMinutes(b.scheduledStartTime)
+        }
+        return 0
+      })
+    },
+    [peerEvents]
+  )
+
   const handleToggleComplete = (e: React.MouseEvent, taskId: string) => {
     e.stopPropagation()
     onToggleComplete?.(taskId)
@@ -215,9 +244,13 @@ export function MonthView({
     const agendaBlocks = [...(blocksByDate[agendaDateString] || [])].sort((a, b) =>
       a.startTime.localeCompare(b.startTime)
     )
+    const agendaPeerEvents = getPeerEventsForDay(agendaDay)
     const agendaIsToday = agendaDateString === toDateString(new Date())
     const agendaEmpty =
-      agendaPending.length === 0 && agendaCompleted.length === 0 && agendaBlocks.length === 0
+      agendaPending.length === 0 &&
+      agendaCompleted.length === 0 &&
+      agendaBlocks.length === 0 &&
+      agendaPeerEvents.length === 0
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden select-none bg-panel-secondary">
@@ -250,7 +283,7 @@ export function MonthView({
                         index === 0 || index === 6 ? 'text-foreground/65' : 'text-muted-foreground'
                       )}
                     >
-                      {day}
+                      {lang === 'en' ? WEEKDAYS_EN[index] : day}
                     </div>
                   ))}
                 </div>
@@ -262,6 +295,7 @@ export function MonthView({
                     const dayPending = dayTasks.filter((t) => !t.isCompleted)
                     const hasCompletedOnly = dayPending.length === 0 && dayTasks.length > 0
                     const isAgendaDay = day.dateString === agendaDateString
+                    const holidayName = holidaysEnabled ? getTaiwanHoliday(day.dateString) : null
 
                     return (
                       <button
@@ -285,7 +319,8 @@ export function MonthView({
                           className={cn(
                             'text-[13px] font-semibold w-6 h-6 rounded-full flex items-center justify-center leading-none',
                             day.isToday && 'bg-primary text-primary-foreground',
-                            !day.isToday && !day.isCurrentMonth && 'text-muted-foreground'
+                            !day.isToday && !day.isCurrentMonth && 'text-muted-foreground',
+                            !day.isToday && holidayName && 'text-red-600 dark:text-red-400'
                           )}
                         >
                           {day.date.getDate()}
@@ -316,16 +351,18 @@ export function MonthView({
         <div className="flex-1 flex flex-col min-h-0 border-t border-border/70 bg-panel">
           <div className="flex items-center justify-between pl-4 pr-2 py-1.5 border-b border-border/50">
             <span className="text-sm font-semibold">
-              {agendaDay.getMonth() + 1}月{agendaDay.getDate()}日 週{WEEKDAYS[agendaDay.getDay()]}
+              {lang === 'en'
+                ? format(agendaDay, 'MMM d · EEE')
+                : `${agendaDay.getMonth() + 1}月${agendaDay.getDate()}日 週${WEEKDAYS[agendaDay.getDay()]}`}
               {agendaIsToday && (
-                <span className="ml-2 text-xs font-medium text-primary">今天</span>
+                <span className="ml-2 text-xs font-medium text-primary">{t('今天')}</span>
               )}
             </span>
             <div className="flex items-center">
               <button
                 type="button"
                 onClick={() => onCreateTask?.(agendaDateString)}
-                aria-label="新增任務"
+                aria-label={t('新增任務')}
                 className="w-11 h-11 flex items-center justify-center rounded-lg text-primary active:bg-secondary/60 transition-colors"
               >
                 <Plus className="w-5 h-5" />
@@ -335,7 +372,7 @@ export function MonthView({
                 onClick={() => onOpenDayView?.(agendaDay)}
                 className="h-11 pl-2 pr-1 flex items-center justify-center gap-0.5 rounded-lg text-xs text-muted-foreground active:bg-secondary/60 transition-colors"
               >
-                日視圖
+                {t('日視圖')}
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -346,13 +383,13 @@ export function MonthView({
           <div className="flex-1 overflow-y-auto px-2 pt-2 pb-24">
             {agendaEmpty ? (
               <div className="flex flex-col items-center justify-center gap-3 py-10">
-                <span className="text-sm text-muted-foreground">這天還沒有安排</span>
+                <span className="text-sm text-muted-foreground">{t('這天還沒有安排')}</span>
                 <button
                   type="button"
                   onClick={() => onCreateTask?.(agendaDateString)}
                   className="h-11 px-5 rounded-full bg-secondary border border-border text-sm font-medium text-secondary-foreground active:brightness-95 transition-all"
                 >
-                  新增一件事
+                  {t('新增一件事')}
                 </button>
               </div>
             ) : (
@@ -370,6 +407,30 @@ export function MonthView({
                   </div>
                 ))}
 
+                {/* Peer shared events — read-only rows (no tap handlers).
+                    Dashed accent + desaturation match the timeline styling. */}
+                {agendaPeerEvents.map((ev) => (
+                  <div
+                    key={ev.id}
+                    data-peer-event={ev.detail}
+                    className="flex items-center gap-3 px-2 min-h-[44px] py-1 saturate-[.55] opacity-80"
+                  >
+                    <span
+                      className="w-1 self-stretch rounded-sm flex-shrink-0 border border-dashed"
+                      style={{ borderColor: displayColor(ev.calendarColor) }}
+                    />
+                    <span className="text-xs font-mono text-muted-foreground w-[84px] flex-shrink-0">
+                      {ev.scheduledStartTime && ev.scheduledEndTime
+                        ? `${ev.scheduledStartTime}–${ev.scheduledEndTime}`
+                        : ''}
+                    </span>
+                    <span className="text-sm text-foreground/70 truncate flex-1">{ev.title}</span>
+                    <span className="text-[10px] text-muted-foreground truncate max-w-[72px] flex-shrink-0">
+                      {ev.peerName}
+                    </span>
+                  </div>
+                ))}
+
                 {agendaPending.map((task) => (
                   <div
                     key={task.id}
@@ -384,7 +445,7 @@ export function MonthView({
                     <button
                       type="button"
                       onClick={(e) => handleToggleComplete(e, task.id)}
-                      aria-label="完成任務"
+                      aria-label={t('完成任務')}
                       className="w-11 h-11 flex-shrink-0 flex items-center justify-center"
                     >
                       <span
@@ -423,7 +484,7 @@ export function MonthView({
                     <button
                       type="button"
                       onClick={(e) => handleToggleComplete(e, task.id)}
-                      aria-label="取消完成"
+                      aria-label={t('取消完成')}
                       className="w-11 h-11 flex-shrink-0 flex items-center justify-center"
                     >
                       <span
@@ -476,7 +537,7 @@ export function MonthView({
                   'text-lg font-bold',
                   isCurrentMonth ? 'text-primary' : 'text-muted-foreground'
                 )}>
-                  {monthDate.getFullYear()}年{monthDate.getMonth() + 1}月
+                  {lang === 'en' ? format(monthDate, 'MMMM yyyy') : `${monthDate.getFullYear()}年${monthDate.getMonth() + 1}月`}
                 </span>
               </div>
 
@@ -490,7 +551,7 @@ export function MonthView({
                       index === 0 || index === 6 ? 'text-foreground/65' : 'text-muted-foreground'
                     )}
                   >
-                    週{day}
+                    {lang === 'en' ? WEEKDAYS_EN[index] : `週${day}`}
                   </div>
                 ))}
               </div>
@@ -500,8 +561,10 @@ export function MonthView({
                 {calendarDays.map((day, index) => {
                   const dayTasks = getTasksForDay(day.date, day.dateString)
                   const dayBlocks = blocksByDate[day.dateString] || []
+                  const dayPeerEvents = getPeerEventsForDay(day.date)
                   const pendingTasks = dayTasks.filter((t) => !t.isCompleted)
                   const completedTasks = dayTasks.filter((t) => t.isCompleted)
+                  const holidayName = holidaysEnabled ? getTaiwanHoliday(day.dateString) : null
 
                   return (
                     <div
@@ -515,22 +578,30 @@ export function MonthView({
                       onClick={() => onDateSelect?.(day.date)}
                     >
                       {/* Date Header */}
-                      <div className="flex items-center justify-between px-1.5 py-1 border-b border-border/50">
-                        <span
-                          className={cn(
-                            'text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center',
-                            day.isToday && 'bg-primary text-primary-foreground',
-                            !day.isCurrentMonth && 'text-muted-foreground'
+                      <div className="flex items-center justify-between px-1.5 py-1 border-b border-border/50 gap-1 min-w-0">
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span
+                            className={cn(
+                              'text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0',
+                              day.isToday && 'bg-primary text-primary-foreground',
+                              !day.isToday && !day.isCurrentMonth && 'text-muted-foreground',
+                              !day.isToday && holidayName && 'text-red-600 dark:text-red-400'
+                            )}
+                          >
+                            {day.date.getDate()}
+                          </span>
+                          {holidayName && (
+                            <span className="text-[9px] leading-none text-red-600 dark:text-red-400 truncate">
+                              {t(holidayName)}
+                            </span>
                           )}
-                        >
-                          {day.date.getDate()}
-                        </span>
+                        </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
                             onCreateTask?.(day.dateString)
                           }}
-                          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-4 h-4 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-all"
+                          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-4 h-4 rounded-full bg-primary/10 hover:bg-primary/20 flex items-center justify-center transition-all flex-shrink-0"
                         >
                           <Plus className="w-2.5 h-2.5 text-primary" />
                         </button>
@@ -596,6 +667,31 @@ export function MonthView({
                         {pendingTasks.length > 3 && (
                           <div className="text-[8px] text-primary font-medium px-1">
                             +{pendingTasks.length - 3}
+                          </div>
+                        )}
+
+                        {/* Peer shared events — read-only chips (no click
+                            handlers), dashed + desaturated like the timeline. */}
+                        {dayPeerEvents.slice(0, 2).map((ev) => {
+                          const peerColor = displayColor(ev.calendarColor)
+                          return (
+                            <div
+                              key={ev.id}
+                              data-peer-event={ev.detail}
+                              title={ev.peerName}
+                              className="flex items-center gap-1 px-1 py-0.5 rounded text-[9px] border border-dashed saturate-[.55] opacity-80 select-none"
+                              style={{
+                                borderColor: peerColor,
+                                backgroundColor: `${peerColor}12`,
+                              }}
+                            >
+                              <span className="truncate text-foreground/70">{ev.title}</span>
+                            </div>
+                          )
+                        })}
+                        {dayPeerEvents.length > 2 && (
+                          <div className="text-[8px] text-muted-foreground/70 px-1">
+                            +{dayPeerEvents.length - 2}
                           </div>
                         )}
                       </div>

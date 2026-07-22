@@ -5,6 +5,7 @@ import { ArrowRight, ArrowLeft, X, Sparkles, LayoutTemplate, FilePlus2 } from 'l
 import { cn } from '@/lib/utils'
 import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useI18n } from '@/lib/i18n/react'
 
 // ─────────────────────────────────────────────────────────
 // Tour step definitions
@@ -28,7 +29,7 @@ interface TourStep {
   hint?: string
 }
 
-// 11 steps total. Mix of:
+// Mix of:
 // - Center modals for high-level concepts (welcome, sync, drag, finale).
 // - Spotlights for specific UI elements (panel, task row, calendar, view modes, scratchpad, timer, user menu).
 // - Interactive steps where the user actually clicks the highlighted element to advance.
@@ -40,7 +41,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="left-panel"]',
     title: '左側：三層結構',
-    body: '工作區（工作 / 個人 / 學習）→ 分類（本週 / 待辦…）→ 任務。所有任務都在這。',
+    body: '工作區（工作 / 個人 / 學習）→ 分類（本週 / 待辦…）→ 任務。所有任務都在這。工作區標題右邊的「＋」可以新增分類；上方篩選列還能切換「精簡 / 舒適」兩種密度，任務多的時候切精簡一次看更多。',
     placement: 'right',
     padding: 0,
   },
@@ -67,7 +68,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="calendar-panel"]',
     title: '日曆：上方待排程 / 下方時間軸',
-    body: '每一天上方那條是「待排程」（有日期沒時間）；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let\'s Play｜夏令營），一眼看出屬於哪個分類；不想要可在設定關掉。',
+    body: '每一天上方那條是「待排程」（有日期沒時間）；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let\'s Play｜夏令營），一眼看出屬於哪個分類；不想要可在設定關掉。另外在「設定 → 共享」可以邀請夥伴互看行事曆，對方開放的行程會疊加顯示在這裡。',
     placement: 'left',
     padding: 0,
   },
@@ -93,6 +94,13 @@ const DESKTOP_STEPS: TourStep[] = [
     body: '挑日期範圍，產出乾淨的 PNG，適合分享到 LINE / IG / Slack。隱私模式可以只顯示時段顏色不洩漏內容。',
     placement: 'bottom',
     padding: 6,
+  },
+  {
+    target: '[data-tour="notification-center"]',
+    title: '通知中心',
+    body: '上方鈴鐺集中放 Huddle 要跟你說的事：已逾期、快到期、放太久沒動的任務，偶爾也有小提醒。有事情時會出現數字小標，看完可以逐則關掉。',
+    placement: 'bottom',
+    padding: 4,
   },
   {
     target: '[data-tour="notebook-entry"]',
@@ -154,7 +162,7 @@ const MOBILE_STEPS: TourStep[] = [
   {
     target: '[data-tour="left-panel"]',
     title: '任務分頁',
-    body: '工作區 → 分類 → 任務的三層結構。所有任務都在這。',
+    body: '工作區 → 分類 → 任務的三層結構。所有任務都在這。工作區標題右邊的「＋」可以新增分類。',
     placement: 'top',
     padding: 0,
   },
@@ -179,9 +187,16 @@ const MOBILE_STEPS: TourStep[] = [
   {
     target: '[data-tour="calendar-panel"]',
     title: '日曆：上方待排程 / 下方時間軸',
-    body: '上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let\'s Play｜夏令營）讓你一眼分辨，不想要可在設定關掉。每週循環的任務拖到別的時間時，Huddle 會問「只改這一天 / 之後也改 / 全部改」，像 Google 日曆一樣自由。',
+    body: '上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let\'s Play｜夏令營）讓你一眼分辨，不想要可在設定關掉。每週循環的任務拖到別的時間時，Huddle 會問「只改這一天 / 之後也改 / 全部改」，像 Google 日曆一樣自由。想跟夥伴互看行事曆？「設定 → 共享」邀請對方就能疊加顯示。',
     placement: 'top',
     padding: 0,
+  },
+  {
+    target: '[data-tour="notification-center"]',
+    title: '通知中心',
+    body: '上方鈴鐺集中放 Huddle 要跟你說的事：已逾期、快到期、放太久沒動的任務。有事情時會出現數字小標，看完可以逐則關掉。',
+    placement: 'bottom',
+    padding: 4,
   },
   {
     title: '✨ 底部四分頁',
@@ -343,6 +358,7 @@ interface OnboardingTourProps {
 }
 
 export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourProps) {
+  const { t } = useI18n()
   const [stepIndex, setStepIndex] = useState(0)
   const [rect, setRect] = useState<Rect | null>(null)
   const [tooltipPos, setTooltipPos] = useState({
@@ -486,7 +502,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
       className="fixed inset-0 z-tour pointer-events-none"
       role="dialog"
       aria-modal="true"
-      aria-label="新手導覽"
+      aria-label={t('新手導覽')}
     >
       {/* Dim layer.
        *
@@ -545,7 +561,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
         <button
           onClick={onComplete}
           className="absolute top-3 right-3 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-          aria-label="關閉導覽"
+          aria-label={t('關閉導覽')}
         >
           <X className="w-4 h-4" />
         </button>
@@ -564,14 +580,14 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
 
         <div className="flex items-center gap-2 mb-2 pr-6">
           {isCenter && !isLast && <Sparkles className="w-4 h-4 text-primary" />}
-          <h3 className="text-base font-semibold tracking-tight">{step.title}</h3>
+          <h3 className="text-base font-semibold tracking-tight">{t(step.title)}</h3>
         </div>
 
-        <p className="text-sm text-muted-foreground leading-relaxed">{step.body}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed">{t(step.body)}</p>
 
         {step.hint && (
           <div className="mt-3 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20">
-            <p className="text-xs text-primary font-medium">{step.hint}</p>
+            <p className="text-xs text-primary font-medium">{t(step.hint)}</p>
           </div>
         )}
 
@@ -591,9 +607,9 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
             >
               <LayoutTemplate className="w-5 h-5 text-primary" />
               <div>
-                <div className="text-sm font-semibold">套用模板</div>
+                <div className="text-sm font-semibold">{t('套用模板')}</div>
                 <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                  工作 / 個人 / 學習 三個工作區，分類已排好，任務你來填
+                  {t('工作 / 個人 / 學習 三個工作區，分類已排好，任務你來填')}
                 </div>
               </div>
             </button>
@@ -610,9 +626,9 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
             >
               <FilePlus2 className="w-5 h-5 text-primary" />
               <div>
-                <div className="text-sm font-semibold">空白開始</div>
+                <div className="text-sm font-semibold">{t('空白開始')}</div>
                 <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                  一個空工作區，從零開始打造你自己的結構
+                  {t('一個空工作區，從零開始打造你自己的結構')}
                 </div>
               </div>
             </button>
@@ -641,14 +657,14 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
                   className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg text-muted-foreground hover:bg-muted/60 transition-colors"
                 >
                   <ArrowLeft className="w-3 h-3" />
-                  上一步
+                  {t('上一步')}
                 </button>
               )}
               <button
                 onClick={() => advance()}
                 className="flex items-center gap-1 px-4 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               >
-                下一步
+                {t('下一步')}
                 <ArrowRight className="w-3 h-3" />
               </button>
             </div>
@@ -661,7 +677,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
             onClick={onComplete}
             className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[11px] px-3 py-1 rounded-full bg-foreground/80 text-background hover:bg-foreground transition-colors backdrop-blur-sm"
           >
-            略過導覽
+            {t('略過導覽')}
           </button>
         )}
       </div>

@@ -16,6 +16,7 @@ import {
   CalendarExportView,
   type CalendarExportViewOptions,
 } from './calendar-export-view'
+import { useI18n } from '@/lib/i18n/react'
 
 interface CalendarExportModalProps {
   isOpen: boolean
@@ -59,6 +60,7 @@ export function CalendarExportModal({
   endHour,
   selectedDate,
 }: CalendarExportModalProps) {
+  const { t } = useI18n()
   const exportRef = useRef<HTMLDivElement>(null)
   const [preset, setPreset] = useState<Preset>('thisWeek')
   const [startStr, setStartStr] = useState<string>(() => toDateString(weekRange(selectedDate)[0]))
@@ -148,7 +150,7 @@ export function CalendarExportModal({
 
   const handleDownload = async () => {
     if (!isRangeValid) {
-      toast.error('日期範圍無效')
+      toast.error(t('日期範圍無效'))
       return
     }
     setIsExporting(true)
@@ -159,10 +161,10 @@ export function CalendarExportModal({
       // native share sheet. On native this opens the iOS share sheet; on web it
       // triggers a normal download.
       await saveOrShareBlob(blob, `huddle-schedule-${startStr}_${endStr}.png`)
-      toast.success(isNative() ? '已開啟分享' : '已下載')
+      toast.success(isNative() ? t('已開啟分享') : t('已下載'))
     } catch (err) {
       console.error('[export] download failed', err)
-      toast.error('匯出失敗，請再試一次')
+      toast.error(t('匯出失敗，請再試一次'))
     } finally {
       setIsExporting(false)
     }
@@ -170,7 +172,7 @@ export function CalendarExportModal({
 
   const handleCopy = async () => {
     if (!isRangeValid) {
-      toast.error('日期範圍無效')
+      toast.error(t('日期範圍無效'))
       return
     }
     setIsExporting(true)
@@ -181,38 +183,38 @@ export function CalendarExportModal({
       // sheet (clipboard image write isn't supported there).
       const result = await copyImageToClipboard(blob, `huddle-schedule-${startStr}_${endStr}.png`)
       if (result === 'unsupported') {
-        toast.error('此裝置不支援複製圖片，請改用下載')
+        toast.error(t('此裝置不支援複製圖片，請改用下載'))
         return
       }
       if (result === 'copied') {
         setJustCopied(true)
         window.setTimeout(() => setJustCopied(false), 1800)
-        toast.success('已複製到剪貼簿')
+        toast.success(t('已複製到剪貼簿'))
       } else {
-        toast.success('已開啟分享')
+        toast.success(t('已開啟分享'))
       }
     } catch (err) {
       console.error('[export] copy failed', err)
-      toast.error('複製失敗，請改用下載')
+      toast.error(t('複製失敗，請改用下載'))
     } finally {
       setIsExporting(false)
     }
   }
 
   return (
-    <ModalShell isOpen={isOpen} onClose={onClose} size="2xl" ariaLabel="匯出行程圖檔">
+    <ModalShell isOpen={isOpen} onClose={onClose} size="2xl" ariaLabel={t('匯出行程圖檔')}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div>
-            <h2 className="text-base font-semibold text-foreground">匯出行程圖檔</h2>
+            <h2 className="text-base font-semibold text-foreground">{t('匯出行程圖檔')}</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              選擇日期範圍與選項，下載或複製分享給朋友
+              {t('選擇日期範圍與選項，下載或複製分享給朋友')}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="關閉"
+            aria-label={t('關閉')}
             className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
           >
             <X className="w-4 h-4" />
@@ -225,7 +227,7 @@ export function CalendarExportModal({
             {/* Quick presets */}
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                日期範圍
+                {t('日期範圍')}
               </div>
               <div className="grid grid-cols-2 gap-1.5">
                 {([
@@ -245,35 +247,35 @@ export function CalendarExportModal({
                         : 'bg-card border border-border text-muted-foreground hover:text-foreground',
                     )}
                   >
-                    {label}
+                    {t(label)}
                   </button>
                 ))}
               </div>
               <div className="mt-3 space-y-2">
                 <div>
-                  <label className="text-[11px] text-muted-foreground block mb-1">起始</label>
+                  <label className="text-[11px] text-muted-foreground block mb-1">{t('起始')}</label>
                   <DateField
                     value={startStr}
                     onChange={onStartChange}
                     className="h-9 text-xs"
-                    aria-label="起始日期"
+                    aria-label={t('起始日期')}
                     clearable={false}
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-muted-foreground block mb-1">結束</label>
+                  <label className="text-[11px] text-muted-foreground block mb-1">{t('結束')}</label>
                   <DateField
                     value={endStr}
                     onChange={onEndChange}
                     className="h-9 text-xs"
-                    aria-label="結束日期"
+                    aria-label={t('結束日期')}
                     clearable={false}
                   />
                 </div>
                 <div className={cn('text-[11px]', !isRangeValid ? 'text-destructive' : 'text-muted-foreground')}>
-                  共 {dayCount} 天
-                  {dayCount > MAX_DAYS && `（最多 ${MAX_DAYS} 天）`}
-                  {endDate.getTime() < startDate.getTime() && '（結束日期需在起始之後）'}
+                  {t('共 {count} 天', { count: dayCount })}
+                  {dayCount > MAX_DAYS && t('（最多 {max} 天）', { max: MAX_DAYS })}
+                  {endDate.getTime() < startDate.getTime() && t('（結束日期需在起始之後）')}
                 </div>
               </div>
             </div>
@@ -281,11 +283,11 @@ export function CalendarExportModal({
             {/* Privacy options */}
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                顯示選項
+                {t('顯示選項')}
               </div>
               <div className="space-y-2">
                 <label className="flex items-center justify-between cursor-pointer text-xs">
-                  <span className="text-foreground">顯示任務名稱</span>
+                  <span className="text-foreground">{t('顯示任務名稱')}</span>
                   <input
                     type="checkbox"
                     checked={options.showTitles}
@@ -295,7 +297,7 @@ export function CalendarExportModal({
                 </label>
                 <label className="flex items-center justify-between cursor-pointer text-xs">
                   <span className={cn('text-foreground', !options.showTitles && 'opacity-40')}>
-                    顯示備註
+                    {t('顯示備註')}
                   </span>
                   <input
                     type="checkbox"
@@ -307,7 +309,7 @@ export function CalendarExportModal({
                 </label>
                 {!options.showTitles && (
                   <p className="text-[10px] text-muted-foreground leading-snug bg-muted/40 px-2 py-1.5 rounded">
-                    隱私模式：只顯示時段顏色，不會洩漏任務名稱。
+                    {t('隱私模式：只顯示時段顏色，不會洩漏任務名稱。')}
                   </p>
                 )}
               </div>
@@ -316,7 +318,7 @@ export function CalendarExportModal({
             {/* Theme */}
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                主題
+                {t('主題')}
               </div>
               <div className="grid grid-cols-2 gap-1.5">
                 <button
@@ -329,7 +331,7 @@ export function CalendarExportModal({
                       : 'bg-card border border-border text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  <Sun className="w-3 h-3" /> 淺色
+                  <Sun className="w-3 h-3" /> {t('淺色')}
                 </button>
                 <button
                   type="button"
@@ -341,7 +343,7 @@ export function CalendarExportModal({
                       : 'bg-card border border-border text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  <Moon className="w-3 h-3" /> 深色
+                  <Moon className="w-3 h-3" /> {t('深色')}
                 </button>
               </div>
             </div>
@@ -358,7 +360,7 @@ export function CalendarExportModal({
                 ) : (
                   <Download className="w-4 h-4" />
                 )}
-                下載 PNG
+                {t('下載 PNG')}
               </Button>
               <Button
                 onClick={handleCopy}
@@ -371,7 +373,7 @@ export function CalendarExportModal({
                 ) : (
                   <Copy className="w-4 h-4" />
                 )}
-                {justCopied ? '已複製' : '複製到剪貼簿'}
+                {justCopied ? t('已複製') : t('複製到剪貼簿')}
               </Button>
             </div>
           </div>
@@ -395,7 +397,7 @@ export function CalendarExportModal({
               )}
               {!isRangeValid && (
                 <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">
-                  日期範圍無效，請重新選擇
+                  {t('日期範圍無效，請重新選擇')}
                 </div>
               )}
             </PreviewScaler>

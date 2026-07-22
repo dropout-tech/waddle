@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Keyboard, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useI18n } from '@/lib/i18n/react'
 
 interface ShortcutGroup {
   title: string
@@ -67,6 +68,7 @@ export function KeyboardShortcutsHint() {
 
 function KeyboardShortcutsHintInner() {
   const [isOpen, setIsOpen] = useState(false)
+  const { t } = useI18n()
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -94,8 +96,8 @@ function KeyboardShortcutsHintInner() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        aria-label="鍵盤快捷鍵"
-        title="鍵盤快捷鍵 (?)"
+        aria-label={t('鍵盤快捷鍵')}
+        title={t('鍵盤快捷鍵 (?)')}
         className="fixed bottom-4 left-4 z-40 w-8 h-8 rounded-full bg-card/80 backdrop-blur border border-border shadow-sm flex items-center justify-center text-muted-foreground/70 hover:text-foreground hover:bg-card hover:scale-110 transition-all opacity-50 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:opacity-100"
       >
         <Keyboard className="w-3.5 h-3.5" aria-hidden="true" />
@@ -109,7 +111,7 @@ function KeyboardShortcutsHintInner() {
       onClick={() => setIsOpen(false)}
       role="dialog"
       aria-modal="true"
-      aria-label="鍵盤快捷鍵"
+      aria-label={t('鍵盤快捷鍵')}
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
@@ -119,12 +121,12 @@ function KeyboardShortcutsHintInner() {
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div className="flex items-center gap-2">
             <Keyboard className="w-4 h-4 text-primary" aria-hidden="true" />
-            <h2 className="text-sm font-semibold text-foreground">鍵盤快捷鍵</h2>
+            <h2 className="text-sm font-semibold text-foreground">{t('鍵盤快捷鍵')}</h2>
           </div>
           <button
             type="button"
             onClick={() => setIsOpen(false)}
-            aria-label="關閉"
+            aria-label={t('關閉')}
             className="p-1.5 rounded-lg hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <X className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
@@ -135,15 +137,15 @@ function KeyboardShortcutsHintInner() {
           {GROUPS.map((group) => (
             <div key={group.title} className="space-y-2">
               <h3 className="text-[11px] font-semibold tracking-wide uppercase text-muted-foreground">
-                {group.title}
+                {t(group.title)}
               </h3>
               <ul className="space-y-1.5">
                 {group.items.map((item, i) => (
                   <li key={i} className="flex items-center justify-between gap-3">
-                    <span className="text-xs text-foreground/85 flex-1 min-w-0">{item.label}</span>
+                    <span className="text-xs text-foreground/85 flex-1 min-w-0">{t(item.label)}</span>
                     <span className="flex items-center gap-1 flex-shrink-0">
                       {item.keys.map((k, ki) => (
-                        <Kbd key={ki}>{k}</Kbd>
+                        <Kbd key={ki}>{t(k)}</Kbd>
                       ))}
                     </span>
                   </li>
@@ -155,10 +157,10 @@ function KeyboardShortcutsHintInner() {
 
         <div className="px-5 py-2.5 border-t border-border bg-secondary/30 flex items-center justify-between">
           <span className="text-[10px] text-muted-foreground">
-            隨時按 <Kbd inline>?</Kbd> 重新打開這份清單
+            {t('隨時按')} <Kbd inline>?</Kbd> {t('重新打開這份清單')}
           </span>
           <span className="text-[10px] text-muted-foreground">
-            按 <Kbd inline>Esc</Kbd> 關閉
+            {t('按')} <Kbd inline>Esc</Kbd> {t('關閉')}
           </span>
         </div>
       </div>

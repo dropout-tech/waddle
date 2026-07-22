@@ -3,6 +3,7 @@
 import { useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock, SlotType, Workspace } from '@/lib/types'
+import type { PeerEvent, SharePeer } from '@/hooks/use-calendar-sharing'
 // Re-import SlotType type as it's used in the callback signature
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -12,6 +13,7 @@ import { TimeGrid } from './time-grid'
 import { DayScrollView } from './day-scroll-view'
 import { WeekView } from './week-view'
 import { MonthView } from './month-view'
+import { useI18n } from '@/lib/i18n/react'
 
 interface CalendarPanelProps {
   selectedDate: Date
@@ -53,6 +55,12 @@ interface CalendarPanelProps {
   /** From UserSettings — controls how many days fit visibly in day / week mode. */
   dayViewDays?: number
   weekViewDays?: number
+  // Calendar sharing overlay — peers' events (already filtered by the
+  // visibility toggles) + the chip controls for the header.
+  peerEvents?: PeerEvent[]
+  sharePeers?: SharePeer[]
+  visiblePeers?: Record<string, boolean>
+  onTogglePeerVisible?: (peerId: string) => void
   className?: string
 }
 
@@ -90,9 +98,14 @@ export function CalendarPanel({
   leftPanelOpen = true,
   dayViewDays = 1,
   weekViewDays = 7,
+  peerEvents = [],
+  sharePeers = [],
+  visiblePeers = {},
+  onTogglePeerVisible,
   className,
 }: CalendarPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const { t } = useI18n()
 
   const handleTodayClick = () => {
     onDateChange(new Date())
@@ -151,7 +164,7 @@ export function CalendarPanel({
     <div
       ref={panelRef}
       role="region"
-      aria-label="日曆"
+      aria-label={t('日曆')}
       data-tour="calendar-panel"
       className={cn('flex flex-col h-full bg-panel focus:outline-none', className)}
       onKeyDown={handleKeyDown}
@@ -175,6 +188,9 @@ export function CalendarPanel({
         onOpenSettings={onOpenSettings}
         onOpenExport={onOpenExport}
         leftPanelOpen={leftPanelOpen}
+        sharePeers={sharePeers}
+        visiblePeers={visiblePeers}
+        onTogglePeerVisible={onTogglePeerVisible}
       />
 
       {viewMode === 'day' && (
@@ -199,6 +215,7 @@ export function CalendarPanel({
           onTimeBlockSelect={onTimeBlockSelect}
           onNavigate={navigate}
           onDateChange={onDateChange}
+          peerEvents={peerEvents}
         />
       )}
 
@@ -225,6 +242,7 @@ export function CalendarPanel({
           onTimeBlockSelect={onTimeBlockSelect}
           onNavigate={navigate}
           onDateChange={onDateChange}
+          peerEvents={peerEvents}
         />
       )}
 
@@ -251,6 +269,7 @@ export function CalendarPanel({
             onCreateTask?.(dateString)
           }}
           onNavigate={navigate}
+          peerEvents={peerEvents}
         />
       )}
     </div>

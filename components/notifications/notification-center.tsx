@@ -4,6 +4,8 @@ import { useState, useMemo } from 'react'
 import { Bell, AlertTriangle, Clock, Calendar, CheckCircle2, Trash2, Archive, ChevronRight, X, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task, Workspace } from '@/lib/types'
+import { useI18n } from '@/lib/i18n/react'
+import { t } from '@/lib/i18n'
 
 interface NotificationCenterProps {
   workspaces: Workspace[]
@@ -31,15 +33,16 @@ const daysDiff = (date1: Date, date2: Date): number => {
 
 // Format relative time
 const formatRelativeTime = (days: number): string => {
-  if (days === 0) return '今天'
-  if (days === 1) return '昨天'
-  if (days < 7) return `${days} 天前`
-  if (days < 30) return `${Math.floor(days / 7)} 週前`
-  if (days < 365) return `${Math.floor(days / 30)} 個月前`
-  return `${Math.floor(days / 365)} 年前`
+  if (days === 0) return t('今天')
+  if (days === 1) return t('昨天')
+  if (days < 7) return t('{n} 天前', { n: days })
+  if (days < 30) return t('{n} 週前', { n: Math.floor(days / 7) })
+  if (days < 365) return t('{n} 個月前', { n: Math.floor(days / 30) })
+  return t('{n} 年前', { n: Math.floor(days / 365) })
 }
 
 export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onDeleteTask }: NotificationCenterProps) {
+  const { t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
 
@@ -89,15 +92,18 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
           return new Date(task.dueDate!) < new Date(oldest.dueDate!) ? task : oldest
         })
         const daysOverdue = daysDiff(today, new Date(oldestTask.dueDate!))
-        
+
         notifs.push({
           id: 'critical-overdue',
           type: 'overdue',
           priority: 'high',
-          title: `${criticalOverdue.length} 個任務已經放了一陣子`,
-          message: `最久的一件是${formatRelativeTime(daysOverdue)}的。有些也許已經不用做了——放心整理掉，留下真正想做的就好。`,
+          title: t('{n} 個任務已經放了一陣子', { n: criticalOverdue.length }),
+          message: t(
+            '最久的一件是{time}的。有些也許已經不用做了——放心整理掉，留下真正想做的就好。',
+            { time: formatRelativeTime(daysOverdue) }
+          ),
           tasks: criticalOverdue,
-          actionLabel: '整理任務',
+          actionLabel: t('整理任務'),
           createdAt: new Date(),
         })
       }
@@ -107,10 +113,10 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
           id: 'recent-overdue',
           type: 'overdue',
           priority: 'medium',
-          title: `${recentOverdue.length} 個任務剛過了預定日`,
-          message: '日子過了也沒關係，挑個合適的時段重新安排就好。',
+          title: t('{n} 個任務剛過了預定日', { n: recentOverdue.length }),
+          message: t('日子過了也沒關係，挑個合適的時段重新安排就好。'),
           tasks: recentOverdue,
-          actionLabel: '查看任務',
+          actionLabel: t('查看任務'),
           createdAt: new Date(),
         })
       }
@@ -134,10 +140,10 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
           id: 'due-today',
           type: 'due_soon',
           priority: 'high',
-          title: `今天排了 ${todayTasks.length} 件事`,
-          message: '還有時間，可以慢慢做——一件一件來就好。',
+          title: t('今天排了 {n} 件事', { n: todayTasks.length }),
+          message: t('還有時間，可以慢慢做——一件一件來就好。'),
           tasks: todayTasks,
-          actionLabel: '查看任務',
+          actionLabel: t('查看任務'),
           createdAt: new Date(),
         })
       }
@@ -147,10 +153,10 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
           id: 'due-soon',
           type: 'due_soon',
           priority: 'low',
-          title: `${upcomingTasks.length} 個任務這幾天到期`,
-          message: '接下來三天會陸續到期，先挑個順手的時段放上日曆，到時候就從容多了。',
+          title: t('{n} 個任務這幾天到期', { n: upcomingTasks.length }),
+          message: t('接下來三天會陸續到期，先挑個順手的時段放上日曆，到時候就從容多了。'),
           tasks: upcomingTasks,
-          actionLabel: '查看任務',
+          actionLabel: t('查看任務'),
           createdAt: new Date(),
         })
       }
@@ -169,10 +175,10 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
         id: 'stale-tasks',
         type: 'stale',
         priority: 'low',
-        title: `${staleTasks.length} 個任務靜靜躺了兩週`,
-        message: '還想做的話，挑個日子放上日曆；不想做了也沒關係，歸檔就好。',
+        title: t('{n} 個任務靜靜躺了兩週', { n: staleTasks.length }),
+        message: t('還想做的話，挑個日子放上日曆；不想做了也沒關係，歸檔就好。'),
         tasks: staleTasks,
-        actionLabel: '整理任務',
+        actionLabel: t('整理任務'),
         createdAt: new Date(),
       })
     }
@@ -187,10 +193,13 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
         id: 'too-many-urgent',
         type: 'insight',
         priority: 'medium',
-        title: '急件好像有點多',
-        message: `有 ${highUrgencyTasks.length} 個任務都標了高優先。全部都急，反而不知道從哪開始——挑出真正的前幾名，其他的緩緩也可以。`,
+        title: t('急件好像有點多'),
+        message: t(
+          '有 {n} 個任務都標了高優先。全部都急，反而不知道從哪開始——挑出真正的前幾名，其他的緩緩也可以。',
+          { n: highUrgencyTasks.length }
+        ),
         tasks: highUrgencyTasks,
-        actionLabel: '調整優先順序',
+        actionLabel: t('調整優先順序'),
         createdAt: new Date(),
       })
     }
@@ -200,17 +209,19 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
         id: 'unscheduled-tasks',
         type: 'reminder',
         priority: 'low',
-        title: '多數任務未排程',
-        message: `有 ${noScheduleTasks.length} 個任務還沒排到日曆上。挑個時段放進去，比較容易把事情做完。`,
+        title: t('多數任務未排程'),
+        message: t('有 {n} 個任務還沒排到日曆上。挑個時段放進去，比較容易把事情做完。', {
+          n: noScheduleTasks.length,
+        }),
         tasks: noScheduleTasks.slice(0, 5),
-        actionLabel: '排程任務',
+        actionLabel: t('排程任務'),
         createdAt: new Date(),
       })
     }
 
     // Filter out dismissed notifications
     return notifs.filter(n => !dismissedIds.has(n.id))
-  }, [allTasks, dismissedIds])
+  }, [allTasks, dismissedIds, t])
 
   // Count by priority
   const highPriorityCount = notifications.filter(n => n.priority === 'high').length
@@ -247,8 +258,9 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
           to 44x44 without changing what's painted, same trick as the
           Waddle skill's small-icon-btn pattern. */}
       <button
+        data-tour="notification-center"
         onClick={() => setIsOpen(!isOpen)}
-        aria-label={totalCount > 0 ? `通知 (${totalCount})` : '通知'}
+        aria-label={totalCount > 0 ? t('通知 ({n})', { n: totalCount }) : t('通知')}
         aria-haspopup="dialog"
         aria-expanded={isOpen}
         className={cn(
@@ -276,11 +288,11 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
       {isOpen && (
         <>
           {/* Backdrop */}
-          <div 
+          <div
             className="fixed inset-0 z-overlay"
             onClick={() => setIsOpen(false)}
           />
-          
+
           {/* Panel:
               - mobile: detach from the bell and fix to the viewport so it
                 doesn't overflow the left edge (the bell sits ~50px from
@@ -293,7 +305,7 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/30">
               <div className="flex items-center gap-2">
                 <Bell className="w-4 h-4 text-primary" />
-                <span className="font-semibold text-sm">通知中心</span>
+                <span className="font-semibold text-sm">{t('通知中心')}</span>
                 {totalCount > 0 && (
                   <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary">
                     {totalCount}
@@ -315,9 +327,9 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
                   <div className="w-12 h-12 rounded-full bg-success/15 flex items-center justify-center mb-3">
                     <CheckCircle2 className="w-6 h-6 text-success" />
                   </div>
-                  <p className="font-medium text-foreground">一切順利！</p>
+                  <p className="font-medium text-foreground">{t('一切順利！')}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    目前沒有需要注意的事項
+                    {t('目前沒有需要注意的事項')}
                   </p>
                 </div>
               ) : (
@@ -351,7 +363,7 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
                                 <X className="w-3 h-3 text-muted-foreground" />
                               </button>
                             </div>
-                            
+
                             <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                               {notification.message}
                             </p>
@@ -378,7 +390,7 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
                                 ))}
                                 {notification.tasks.length > 3 && (
                                   <p className="text-[10px] text-muted-foreground pl-2">
-                                    還有 {notification.tasks.length - 3} 個任務...
+                                    {t('還有 {n} 個任務...', { n: notification.tasks.length - 3 })}
                                   </p>
                                 )}
                               </div>
@@ -407,7 +419,7 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
                                     className="px-3 py-1.5 rounded-lg bg-secondary text-muted-foreground text-xs font-medium hover:bg-secondary/80 transition-colors flex items-center gap-1"
                                   >
                                     <Archive className="w-3 h-3" />
-                                    全部歸檔
+                                    {t('全部歸檔')}
                                   </button>
                                 )}
                               </div>
@@ -425,7 +437,7 @@ export function NotificationCenter({ workspaces, onTaskClick, onArchiveTask, onD
             {notifications.length > 0 && (
               <div className="px-4 py-3 border-t border-border bg-secondary/20">
                 <p className="text-[10px] text-muted-foreground text-center">
-                  慢慢搖擺，把事情做完
+                  {t('慢慢搖擺，把事情做完')}
                 </p>
               </div>
             )}

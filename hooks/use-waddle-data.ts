@@ -23,6 +23,9 @@ import {
   markDailyClearFired,
 } from '@/lib/daily-clear'
 import { WORKSPACE_COLORS } from '@/lib/palette'
+// Aliased: this file uses `t` pervasively as the loop variable for "task"
+// (c.tasks.map((t) => ...)), so importing the translator as `t` would shadow it.
+import { t as translate, getLang } from '@/lib/i18n'
 import type {
   Workspace,
   Category,
@@ -296,7 +299,7 @@ export function useWaddleData(): UseWaddleData {
           await seedUserData(user.id, user.email ?? '', supabase)
         } catch (err) {
           console.error('[seed] failed:', err)
-          toast.error('初始化資料失敗，請重新整理')
+          toast.error(translate('初始化資料失敗，請重新整理'))
           if (!isStale()) setIsLoading(false)
           return
         }
@@ -616,7 +619,7 @@ export function useWaddleData(): UseWaddleData {
 
   const handleDbError = (op: string) => (err: unknown) => {
     console.error(`[${op}]`, err)
-    toast.error(`儲存失敗：${op}`)
+    toast.error(translate('儲存失敗：{op}', { op: translate(op) }))
   }
 
   // ═════════════════════════════════════════════════════
@@ -627,6 +630,9 @@ export function useWaddleData(): UseWaddleData {
     const userId = requireUserId()
     const wsId = crypto.randomUUID()
     const catId = crypto.randomUUID()
+    // '一般' the category name means "General"; the shared dict key belongs to
+    // the urgency label ("Normal"), so the category name bypasses the dict.
+    const defaultCategoryName = getLang() === 'en' ? 'General' : '一般'
 
     setWorkspaces((prev) => [
       ...prev,
@@ -641,7 +647,7 @@ export function useWaddleData(): UseWaddleData {
           {
             id: catId,
             workspaceId: wsId,
-            name: '一般',
+            name: defaultCategoryName,
             sortOrder: 0,
             isCollapsed: false,
             isArchived: false,
@@ -659,7 +665,7 @@ export function useWaddleData(): UseWaddleData {
       if (e1) return handleDbError('新增工作區')(e1)
 
       const { error: e2 } = await supabase.from('categories').insert({
-        id: catId, user_id: userId, workspace_id: wsId, name: '一般', sort_order: 0,
+        id: catId, user_id: userId, workspace_id: wsId, name: defaultCategoryName, sort_order: 0,
       })
       if (e2) handleDbError('新增分類')(e2)
     } finally {
@@ -849,7 +855,7 @@ export function useWaddleData(): UseWaddleData {
       previousOrder.every((id, i) => id === orderedCategoryIds[i])
     if (recordUndo && previousOrder.length > 0 && !isUnchanged) {
       pushUndoableAction({
-        label: '調整分類順序',
+        label: translate('調整分類順序'),
         undo: () => reorderCategories(workspaceId, previousOrder, false),
         redo: () => reorderCategories(workspaceId, orderedCategoryIds, false),
       })
@@ -1132,7 +1138,7 @@ export function useWaddleData(): UseWaddleData {
         const title = existing.title
         const wasMove = isMove && newCategoryId !== existing.categoryId
         pushUndoableAction({
-          label: wasMove ? `移動「${title}」` : `編輯「${title}」`,
+          label: wasMove ? translate('移動「{title}」', { title }) : translate('編輯「{title}」', { title }),
           undo: () => updateTask(taskId, before, wasMove ? previousCategoryId : undefined, 'all', undefined, false),
           redo: () => updateTask(taskId, updates, newCategoryId, 'all', undefined, false),
         })
@@ -1264,7 +1270,7 @@ export function useWaddleData(): UseWaddleData {
     // so the undo action stays meaningful even if the task is later mutated.
     // scheduledDate is captured the same way for the daily-clear eligibility
     // check below (the toggle itself never changes scheduledDate).
-    let taskTitle = '任務'
+    let taskTitle = translate('任務')
     let taskEffectiveDate: string | undefined
     for (const w of workspacesRef.current) for (const c of w.categories) {
       const t = c.tasks.find((x) => x.id === taskId)
@@ -1377,7 +1383,7 @@ export function useWaddleData(): UseWaddleData {
           jwtUserId: user?.id ?? null,
         })
         rollback()
-        toast.error('儲存失敗：無法寫入這個任務（可能登入逾時，請重新整理或登出再登入）')
+        toast.error(translate('儲存失敗：無法寫入這個任務（可能登入逾時，請重新整理或登出再登入）'))
         return
       }
     } finally {
@@ -1387,7 +1393,7 @@ export function useWaddleData(): UseWaddleData {
     // Record undo: a toggle is its own inverse, so undo simply re-toggles.
     if (recordUndo) {
       pushUndoableAction({
-        label: `${nextValue ? '完成' : '取消完成'}「${taskTitle}」`,
+        label: translate(nextValue ? '完成「{title}」' : '取消完成「{title}」', { title: taskTitle }),
         undo: () => toggleTaskComplete(taskId, false),
         redo: () => toggleTaskComplete(taskId, false),
       })
@@ -1466,7 +1472,7 @@ export function useWaddleData(): UseWaddleData {
         const snapshot = task
         const exdateRestore = parentExdateCleanup
         pushUndoableAction({
-          label: `刪除「${snapshot.title}」`,
+          label: translate('刪除「{title}」', { title: snapshot.title }),
           undo: async () => {
             await createTask(snapshot)
             if (exdateRestore) {
@@ -1688,7 +1694,7 @@ export function useWaddleData(): UseWaddleData {
             attemptedUpdate: update,
             jwtUserId: user?.id ?? null,
           })
-          toast.error('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入')
+          toast.error(translate('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入'))
           return
         }
       } finally {
@@ -1707,7 +1713,7 @@ export function useWaddleData(): UseWaddleData {
         const title = task.title
         const newDate = date ?? beforeDate
         pushUndoableAction({
-          label: `重排「${title}」`,
+          label: translate('重排「{title}」', { title }),
           undo: () => {
             if (beforeStart && beforeEnd) {
               return rescheduleTask(taskId, beforeDate, beforeStart, beforeEnd, 'all', undefined, false)
@@ -1941,7 +1947,7 @@ export function useWaddleData(): UseWaddleData {
             attemptedUpdate: update,
             jwtUserId: user?.id ?? null,
           })
-          toast.error('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入')
+          toast.error(translate('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入'))
           return
         }
       } finally {
@@ -2124,7 +2130,7 @@ export function useWaddleData(): UseWaddleData {
         // and then vanish on the next refetch (the user-visible "blink and
         // gone" pattern).
         setTimeBlocks((prev) => prev.filter((b) => b.id !== id))
-        toast.error('儲存失敗：無法建立時間區塊（可能登入逾時，請重新整理或登出再登入）')
+        toast.error(translate('儲存失敗：無法建立時間區塊（可能登入逾時，請重新整理或登出再登入）'))
       }
     } finally {
       pendingWritesRef.current -= 1
@@ -2153,7 +2159,7 @@ export function useWaddleData(): UseWaddleData {
       if (!data || data.length === 0) {
         console.error('[updateTimeBlock] 0 rows updated — RLS or stale session?', { id })
         if (previous) setTimeBlocks((prev) => prev.map((b) => (b.id === id ? previous! : b)))
-        toast.error('儲存失敗：無法更新時間區塊（可能登入逾時，請重新整理或登出再登入）')
+        toast.error(translate('儲存失敗：無法更新時間區塊（可能登入逾時，請重新整理或登出再登入）'))
         return
       }
     } finally {
@@ -2172,7 +2178,7 @@ export function useWaddleData(): UseWaddleData {
       }
       const label = previous.label
       pushUndoableAction({
-        label: `更新「${label}」`,
+        label: translate('更新「{label}」', { label }),
         undo: () => updateTimeBlock(id, before, false),
         redo: () => updateTimeBlock(id, updates, false),
       })
@@ -2200,7 +2206,7 @@ export function useWaddleData(): UseWaddleData {
       if (!data || data.length === 0) {
         console.error('[deleteTimeBlock] 0 rows deleted — RLS or stale session?', { id })
         if (removed) setTimeBlocks((prev) => [...prev, removed!])
-        toast.error('儲存失敗：無法刪除時間區塊（可能登入逾時，請重新整理或登出再登入）')
+        toast.error(translate('儲存失敗：無法刪除時間區塊（可能登入逾時，請重新整理或登出再登入）'))
         return
       }
     } finally {
@@ -2212,7 +2218,7 @@ export function useWaddleData(): UseWaddleData {
     if (recordUndo && removed) {
       const snapshot = removed
       pushUndoableAction({
-        label: `刪除「${snapshot.label}」`,
+        label: translate('刪除「{label}」', { label: snapshot.label }),
         undo: () => addTimeBlock(snapshot),
         redo: () => deleteTimeBlock(id, false),
       })
@@ -2352,8 +2358,10 @@ export function useWaddleData(): UseWaddleData {
     // synthesized at runtime in app/page.tsx, so we don't write them.
     const customSlotTypes = newSettings.slotTypes.filter((s) => !s.isBuiltIn)
     if (customSlotTypes.length === 0) {
+      // Built-in rows may exist as calendar-sharing grant anchors (seeded on
+      // grant); wiping them would orphan those grants, so only clear customs.
       const { error: stError } = await supabase
-        .from('slot_types').delete().eq('user_id', userId)
+        .from('slot_types').delete().eq('user_id', userId).eq('is_built_in', false)
       if (stError) handleDbError('儲存時間區塊類型')(stError)
     } else {
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -2666,12 +2674,12 @@ export function useWaddleData(): UseWaddleData {
     const TEMPLATES: { name: string; color: string; icon: string; categories: string[] }[] =
       choice === 'template'
         ? [
-            { name: '工作', color: WORKSPACE_COLORS.lowChromaBlue.hex, icon: '💼', categories: ['本週', '進行中', '完成'] },
-            { name: '個人', color: WORKSPACE_COLORS.sage.hex, icon: '🏠', categories: ['生活', '健康'] },
-            { name: '學習', color: WORKSPACE_COLORS.dustyLavender.hex, icon: '📚', categories: ['課程', '閱讀'] },
+            { name: translate('工作'), color: WORKSPACE_COLORS.lowChromaBlue.hex, icon: '💼', categories: [translate('本週'), translate('進行中'), translate('完成')] },
+            { name: translate('個人'), color: WORKSPACE_COLORS.sage.hex, icon: '🏠', categories: [translate('生活'), getLang() === 'en' ? 'Health' : '健康'] },
+            { name: translate('學習'), color: WORKSPACE_COLORS.dustyLavender.hex, icon: '📚', categories: [translate('課程'), translate('閱讀')] },
           ]
         : [
-            { name: '我的工作區', color: WORKSPACE_COLORS.terracotta.hex, icon: '📌', categories: ['一般'] },
+            { name: translate('我的工作區'), color: WORKSPACE_COLORS.terracotta.hex, icon: '📌', categories: [getLang() === 'en' ? 'General' : '一般'] },
           ]
 
     // Build everything in memory first so the optimistic UI matches what we

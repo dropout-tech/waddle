@@ -8,6 +8,7 @@ import type { Workspace, Task } from '@/lib/types'
 import { CategorySection } from './category-section'
 import type { Density, MetaField } from './task-panel'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { useI18n } from '@/lib/i18n/react'
 
 interface WorkspaceSectionProps {
   workspace: Workspace
@@ -43,6 +44,7 @@ export function WorkspaceSection({
   onSendTaskToCalendar,
   onTaskDragActivate,
 }: WorkspaceSectionProps) {
+  const { t } = useI18n()
   const isMobile = useIsMobile()
   const displayColor = useDisplayColor()
   const wsColor = displayColor(workspace.color)
@@ -158,8 +160,8 @@ export function WorkspaceSection({
           <button
             type="button"
             onClick={() => setIsAddingCategory(true)}
-            title="新增分類"
-            aria-label={`在「${workspace.name}」新增分類`}
+            title={t('新增分類')}
+            aria-label={t('在「{name}」新增分類', { name: workspace.name })}
             className="h-6 w-6 grid place-items-center rounded-md text-muted-foreground/50 hover:text-primary hover:bg-muted/50 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -186,7 +188,7 @@ export function WorkspaceSection({
                   setIsAddingCategory(false)
                 }
               }}
-              placeholder="分類名稱..."
+              placeholder={t('分類名稱...')}
               className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
               autoFocus
             />

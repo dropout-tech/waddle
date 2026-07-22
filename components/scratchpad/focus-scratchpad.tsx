@@ -26,6 +26,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
+import { useI18n } from '@/lib/i18n/react'
 import type { ScratchpadItem } from '@/lib/types'
 
 interface FocusScratchpadProps {
@@ -73,6 +74,7 @@ export function FocusScratchpad({
   onClearDate,
   onPromoteToTask,
 }: FocusScratchpadProps) {
+  const { t, lang } = useI18n()
   const todayKey = toDateString(new Date())
   const [internalExpanded, setInternalExpanded] = useState(false)
   const isControlled = isOpen !== undefined
@@ -119,8 +121,11 @@ export function FocusScratchpad({
 
   const formatDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split('-').map(Number)
-    const weekdays = ['日', '一', '二', '三', '四', '五', '六']
     const date = new Date(year, month - 1, day)
+    if (lang === 'en') {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', weekday: 'short' })
+    }
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六']
     const weekday = weekdays[date.getDay()]
     return `${year}年${month}月${day}日 星期${weekday}`
   }
@@ -233,7 +238,7 @@ export function FocusScratchpad({
 
   const addImageFromFile = (file: File) => {
     if (file.size > 5 * 1024 * 1024) {
-      alert('圖片大小不能超過 5MB')
+      alert(t('圖片大小不能超過 5MB'))
       return
     }
     const reader = new FileReader()
@@ -321,7 +326,7 @@ export function FocusScratchpad({
   }
 
   const clearAll = () => {
-    if (confirm('確定要清除所有暫存內容嗎？')) {
+    if (confirm(t('確定要清除所有暫存內容嗎？'))) {
       onClearDate(todayKey)
     }
   }
@@ -356,7 +361,7 @@ export function FocusScratchpad({
             )}
           >
             <Sparkles className="w-3 h-3" />
-            <span>專注白板</span>
+            <span>{t('專注白板')}</span>
             {items.length > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
                 {items.length}
@@ -398,7 +403,7 @@ export function FocusScratchpad({
         <div className={hideTrigger ? 'h-full overflow-y-auto' : ''}>
         {isDragging && (
           <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary/50 z-modal flex items-center justify-center">
-            <div className="text-primary font-medium">放開以新增圖片</div>
+            <div className="text-primary font-medium">{t('放開以新增圖片')}</div>
           </div>
         )}
 
@@ -410,7 +415,7 @@ export function FocusScratchpad({
                 <Sparkles className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-foreground">專注白板</h2>
+                <h2 className="text-base font-semibold text-foreground">{t('專注白板')}</h2>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <button
                     onClick={goToPreviousDate}
@@ -424,7 +429,7 @@ export function FocusScratchpad({
                     <span>{formatDate(selectedDate)}</span>
                     {isToday && (
                       <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium">
-                        今天
+                        {t('今天')}
                       </span>
                     )}
                   </div>
@@ -446,7 +451,7 @@ export function FocusScratchpad({
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  清除
+                  {t('清除')}
                 </button>
               )}
               <button
@@ -454,7 +459,7 @@ export function FocusScratchpad({
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary/80 hover:bg-secondary text-xs font-medium transition-colors"
               >
                 <ChevronUp className="w-3.5 h-3.5" />
-                收起
+                {t('收起')}
               </button>
             </div>
           </div>
@@ -471,7 +476,7 @@ export function FocusScratchpad({
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') addTextItem()
                   }}
-                  placeholder="記下想法，或輸入 [] 建立待辦…"
+                  placeholder={t('記下想法，或輸入 [] 建立待辦…')}
                   className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground/60"
                 />
               </div>
@@ -479,7 +484,7 @@ export function FocusScratchpad({
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
-                  title="新增圖片"
+                  title={t('新增圖片')}
                 >
                   <Image className="w-4 h-4" />
                 </button>
@@ -489,7 +494,7 @@ export function FocusScratchpad({
                     "p-2 rounded-xl transition-all",
                     inputMode === 'link' ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-background/80"
                   )}
-                  title="新增連結"
+                  title={t('新增連結')}
                 >
                   <Link2 className="w-4 h-4" />
                 </button>
@@ -504,12 +509,12 @@ export function FocusScratchpad({
             </div>
           ) : (
             <div className="flex items-center justify-between mb-6 p-4 rounded-xl bg-secondary/30 border border-border">
-              <span className="text-sm text-muted-foreground">這是過去日期的記錄，僅供查看</span>
+              <span className="text-sm text-muted-foreground">{t('這是過去日期的記錄，僅供查看')}</span>
               <button
                 onClick={() => setSelectedDate(todayKey)}
                 className="text-sm font-medium text-primary hover:underline"
               >
-                返回今天
+                {t('返回今天')}
               </button>
             </div>
           )}
@@ -518,7 +523,7 @@ export function FocusScratchpad({
           {inputMode === 'link' && (
             <div className="mb-6 p-4 rounded-2xl bg-card border border-primary/20 shadow-lg space-y-3 animate-in fade-in slide-in-from-top-2">
               <div className="space-y-1">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">連結網址</label>
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">{t('連結網址')}</label>
                 <input
                   type="url"
                   value={linkInput}
@@ -529,12 +534,12 @@ export function FocusScratchpad({
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">顯示標題（可選）</label>
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">{t('顯示標題（可選）')}</label>
                 <input
                   type="text"
                   value={linkTitle}
                   onChange={(e) => setLinkTitle(e.target.value)}
-                  placeholder="輸入自訂標題..."
+                  placeholder={t('輸入自訂標題...')}
                   className="w-full bg-secondary/50 border-0 rounded-xl px-3 py-2 text-sm focus:ring-1 focus:ring-primary/30 outline-none"
                   onKeyDown={(e) => e.key === 'Enter' && addLinkItem()}
                 />
@@ -544,14 +549,14 @@ export function FocusScratchpad({
                   onClick={() => { setLinkInput(''); setLinkTitle(''); setInputMode(null) }}
                   className="px-4 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:bg-secondary transition-colors"
                 >
-                  取消
+                  {t('取消')}
                 </button>
                 <button
                   onClick={addLinkItem}
                   disabled={!linkInput.trim()}
                   className="px-4 py-2 rounded-xl text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
-                  新增連結
+                  {t('新增連結')}
                 </button>
               </div>
             </div>
@@ -563,9 +568,9 @@ export function FocusScratchpad({
               <div className="w-16 h-16 rounded-3xl bg-secondary/50 flex items-center justify-center mx-auto mb-4">
                 <Sparkles className="w-8 h-8 text-muted-foreground/40" />
               </div>
-              <h3 className="text-sm font-medium text-foreground mb-1">準備好開始記錄了嗎？</h3>
+              <h3 className="text-sm font-medium text-foreground mb-1">{t('準備好開始記錄了嗎？')}</h3>
               <p className="text-xs text-muted-foreground max-w-[240px] mx-auto">
-                專注白板是你的「快取空間」，隨手記下想法、待辦或連結，讓大腦保持清爽。
+                {t('專注白板是你的「快取空間」，隨手記下想法、待辦或連結，讓大腦保持清爽。')}
               </p>
             </div>
           ) : (
@@ -610,7 +615,7 @@ export function FocusScratchpad({
             className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all active:scale-95"
           >
             <ChevronUp className="w-3.5 h-3.5" />
-            <span>收起白板</span>
+            <span>{t('收起白板')}</span>
           </button>
         </div>
         </div>
@@ -655,6 +660,7 @@ function SortableItem({
   onUpdateEditTitle: (v: string) => void
   editTextareaRef: React.RefObject<HTMLTextAreaElement | null>
 }) {
+  const { t, lang } = useI18n()
   const {
     attributes,
     listeners,
@@ -671,7 +677,10 @@ function SortableItem({
     opacity: isDragging ? 0.5 : 1,
   }
 
-  const time = new Date(item.createdAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
+  const time = new Date(item.createdAt).toLocaleTimeString(
+    lang === 'en' ? 'en-US' : 'zh-TW',
+    { hour: '2-digit', minute: '2-digit' },
+  )
   // Actions stay visible on touch (no hover); fade-on-hover only from md up.
   const actionVis = 'opacity-100 md:opacity-0 md:group-hover:opacity-100'
   const canPromote = item.type === 'text' || item.type === 'todo'
@@ -705,7 +714,7 @@ function SortableItem({
           {item.type !== 'image' && (
             <button
               onClick={onEdit}
-              aria-label="編輯"
+              aria-label={t('編輯')}
               className="p-1 rounded-lg bg-background/80 backdrop-blur-sm hover:bg-primary/10 hover:text-primary transition-all"
             >
               <Pencil className="w-3 h-3" />
@@ -714,8 +723,8 @@ function SortableItem({
           {canPromote && (
             <button
               onClick={onPromote}
-              aria-label="轉換為正式任務"
-              title="轉換為正式任務"
+              aria-label={t('轉換為正式任務')}
+              title={t('轉換為正式任務')}
               className="p-1 rounded-lg bg-background/80 backdrop-blur-sm hover:bg-primary/10 hover:text-primary transition-all"
             >
               <ArrowUpRight className="w-3 h-3" />
@@ -723,7 +732,7 @@ function SortableItem({
           )}
           <button
             onClick={onDelete}
-            aria-label="刪除"
+            aria-label={t('刪除')}
             className="p-1 rounded-lg bg-background/80 backdrop-blur-sm hover:bg-destructive/10 hover:text-destructive transition-all"
           >
             <Trash2 className="w-3 h-3" />
@@ -739,7 +748,7 @@ function SortableItem({
                 value={editUrl}
                 onChange={(e) => onUpdateEditUrl(e.target.value)}
                 className="w-full bg-background border border-border rounded-lg px-2 py-1.5 text-sm focus:ring-1 focus:ring-primary/30 outline-none"
-                placeholder="網址"
+                placeholder={t('網址')}
                 onKeyDown={(e) => { if (e.key === 'Escape') onCancelEdit() }}
                 autoFocus
               />
@@ -747,7 +756,7 @@ function SortableItem({
                 value={editTitle}
                 onChange={(e) => onUpdateEditTitle(e.target.value)}
                 className="w-full bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-primary/30 outline-none"
-                placeholder="標題（可選）"
+                placeholder={t('標題（可選）')}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') onSaveEdit()
                   if (e.key === 'Escape') onCancelEdit()
@@ -763,14 +772,14 @@ function SortableItem({
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) onSaveEdit()
                 if (e.key === 'Escape') onCancelEdit()
               }}
-              placeholder="編輯內容...（Ctrl+Enter 儲存，Esc 取消）"
+              placeholder={t('編輯內容...（Ctrl+Enter 儲存，Esc 取消）')}
               className="w-full bg-transparent border-0 resize-none text-sm focus:outline-none min-h-[60px]"
             />
           )}
           <div className="flex justify-end gap-1.5">
-            <button onClick={onCancelEdit} className="px-2 py-1 rounded-md text-[10px] font-medium text-muted-foreground hover:bg-secondary transition-colors">取消</button>
+            <button onClick={onCancelEdit} className="px-2 py-1 rounded-md text-[10px] font-medium text-muted-foreground hover:bg-secondary transition-colors">{t('取消')}</button>
             <button onClick={onSaveEdit} className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-              <Check className="w-3 h-3" /> 儲存
+              <Check className="w-3 h-3" /> {t('儲存')}
             </button>
           </div>
         </div>
@@ -785,7 +794,7 @@ function SortableItem({
                     'mt-0.5 flex-shrink-0 transition-colors',
                     item.isChecked ? 'text-primary' : 'text-muted-foreground hover:text-primary'
                   )}
-                  aria-label={item.isChecked ? '標記為未完成' : '標記為完成'}
+                  aria-label={item.isChecked ? t('標記為未完成') : t('標記為完成')}
                 >
                   {item.isChecked ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                 </button>
@@ -793,7 +802,7 @@ function SortableItem({
                   'text-sm break-words line-clamp-4',
                   item.isChecked ? 'text-muted-foreground line-through' : 'text-foreground'
                 )}>
-                  {item.content || <span className="text-muted-foreground/50 italic">空白待辦…</span>}
+                  {item.content || <span className="text-muted-foreground/50 italic">{t('空白待辦…')}</span>}
                 </p>
               </div>
               <p className="text-[10px] text-muted-foreground mt-2">{time}</p>

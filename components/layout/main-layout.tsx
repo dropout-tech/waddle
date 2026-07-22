@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
@@ -17,10 +17,12 @@ import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useWideScreen } from '@/hooks/use-wide-screen'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
+import { useCalendarSharing, usePeerCalendarEvents } from '@/hooks/use-calendar-sharing'
 import { hapticSelection } from '@/lib/haptics'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, ScratchpadItem } from '@/lib/types'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
 import { Link2 } from 'lucide-react'
+import { useI18n } from '@/lib/i18n/react'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
@@ -109,6 +111,7 @@ export function MainLayout({
   onClearScratchpadDate,
   onPromoteToTask,
 }: MainLayoutProps) {
+  const { t, lang } = useI18n()
   const isMobile = useIsMobile()
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -301,6 +304,32 @@ export function MainLayout({
     })
   }, [])
 
+  // ── Calendar sharing overlay ──────────────────────────────
+  // Peers + per-peer visibility toggles live here (this component owns
+  // selectedDate, which drives the fetch window). The settings modal has
+  // its own hook instance for grant editing; the two only need to agree
+  // via the DB + localStorage, refreshed on refocus — no realtime.
+  const {
+    peers: sharePeers,
+    visiblePeers,
+    togglePeerVisible,
+  } = useCalendarSharing(true)
+
+  // Viewer's slot-type key → label map, used to label the peer's busy
+  // time-blocks with a human word (built-in keys are shared across users).
+  const peerTypeLabels = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const s of slotTypes ?? []) map[s.key] = s.label
+    return map
+  }, [slotTypes])
+
+  const peerEvents = usePeerCalendarEvents({
+    peers: sharePeers,
+    visiblePeers,
+    selectedDate,
+    typeLabels: peerTypeLabels,
+  })
+
   // Get all tasks flattened
   const getAllTasks = useCallback(() => {
     const tasks: Task[] = []
@@ -431,12 +460,12 @@ export function MainLayout({
                   {focusMode === 'journal' ? (
                     <>
                       <BookOpen className="w-4 h-4 text-primary" />
-                      <span className="text-sm font-semibold">日記</span>
+                      <span className="text-sm font-semibold">{t('日記')}</span>
                     </>
                   ) : (
                     <>
                       <BarChart3 className="w-4 h-4 text-primary" />
-                      <span className="text-sm font-semibold">報告</span>
+                      <span className="text-sm font-semibold">{t('報告')}</span>
                     </>
                   )}
                 </div>
@@ -445,7 +474,7 @@ export function MainLayout({
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                 >
                   <Minimize2 className="w-3.5 h-3.5" />
-                  返回
+                  {t('返回')}
                 </button>
               </div>
               <div className="flex-1 overflow-auto p-4">
@@ -523,6 +552,10 @@ export function MainLayout({
                 onOpenSettings={onOpenSettings}
                 onOpenExport={() => setExportModalOpen(true)}
                 leftPanelOpen={true}
+                peerEvents={peerEvents}
+                sharePeers={sharePeers}
+                visiblePeers={visiblePeers}
+                onTogglePeerVisible={togglePeerVisible}
               />
               </div>
             </ErrorBoundary>
@@ -538,7 +571,9 @@ export function MainLayout({
           const tabs = [
             {
               key: 'tasks' as const,
-              label: '任務',
+              // '任務' doubles as the singular time-block type label ("Task");
+              // the tab wants the plural, so it bypasses the shared dict key.
+              label: lang === 'en' ? 'Tasks' : '任務',
               Icon: ListChecks,
               active: mobileTab === 'tasks' && !mobileScratchpadOpen && !mobileLinksOpen,
               onClick: () => {
@@ -550,7 +585,7 @@ export function MainLayout({
             },
             {
               key: 'scratch' as const,
-              label: '白板',
+              label: t('白板'),
               Icon: Sparkles,
               active: mobileScratchpadOpen,
               onClick: () => {
@@ -561,7 +596,7 @@ export function MainLayout({
             },
             {
               key: 'calendar' as const,
-              label: '日曆',
+              label: t('日曆'),
               Icon: CalendarDays,
               active: mobileTab === 'calendar' && !mobileScratchpadOpen && !mobileLinksOpen,
               onClick: () => {
@@ -573,7 +608,8 @@ export function MainLayout({
             },
             {
               key: 'links' as const,
-              label: '連結',
+              // '連結' doubles as the editor "Link" button; tab wants plural.
+              label: lang === 'en' ? 'Links' : '連結',
               Icon: Link2,
               active: mobileLinksOpen,
               onClick: () => {
@@ -588,7 +624,7 @@ export function MainLayout({
             <nav
               className="relative flex-shrink-0 grid grid-cols-4 border-t border-border/70 bg-card/95 backdrop-blur z-sticky pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_0_rgba(0,0,0,0.02)]"
               role="tablist"
-              aria-label="主要分頁"
+              aria-label={t('主要分頁')}
             >
               {/* Sliding top indicator — wrapper takes one column width so
                   translateX(N * 100%) moves it by exactly one tab. The inner
@@ -673,8 +709,8 @@ export function MainLayout({
           <button
             onClick={() => setIsLeftPanelOpen(true)}
             className="flex items-center justify-center w-10 h-10 rounded-lg bg-card border border-border shadow-sm hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            title="開啟任務面板"
-            aria-label="開啟任務面板"
+            title={t('開啟任務面板')}
+            aria-label={t('開啟任務面板')}
           >
             <PanelLeftOpen className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
           </button>
@@ -741,12 +777,12 @@ export function MainLayout({
                     {focusMode === 'journal' ? (
                       <>
                         <BookOpen className="w-4 h-4 text-primary" />
-                        <span className="text-sm font-semibold">日記</span>
+                        <span className="text-sm font-semibold">{t('日記')}</span>
                       </>
                     ) : (
                       <>
                         <BarChart3 className="w-4 h-4 text-primary" />
-                        <span className="text-sm font-semibold">報告</span>
+                        <span className="text-sm font-semibold">{t('報告')}</span>
                       </>
                     )}
                   </div>
@@ -755,7 +791,7 @@ export function MainLayout({
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                   >
                     <Minimize2 className="w-3.5 h-3.5" />
-                    返回日曆
+                    {t('返回日曆')}
                   </button>
                 </div>
                 {/* Content */}
@@ -813,6 +849,10 @@ export function MainLayout({
                   onOpenSettings={onOpenSettings}
                   onOpenExport={() => setExportModalOpen(true)}
                   leftPanelOpen={isLeftPanelOpen}
+                  peerEvents={peerEvents}
+                  sharePeers={sharePeers}
+                  visiblePeers={visiblePeers}
+                  onTogglePeerVisible={togglePeerVisible}
                 />
               </ErrorBoundary>
             )}
@@ -826,7 +866,7 @@ export function MainLayout({
               mid-animation, and only fades. */}
           {isWide && (
             <aside
-              aria-label="回顧欄"
+              aria-label={t('回顧欄')}
               className="relative h-full flex-shrink-0 border-l border-border bg-panel overflow-hidden transition-[width] duration-300 ease-quart motion-reduce:transition-none"
               style={{
                 width: isReviewPaneOpen
@@ -858,8 +898,8 @@ export function MainLayout({
               {isReviewPaneOpen && (
                 <button
                   onClick={() => setIsReviewPaneOpen(false)}
-                  aria-label="收合回顧欄"
-                  title="收合回顧欄"
+                  aria-label={t('收合回顧欄')}
+                  title={t('收合回顧欄')}
                   className="absolute left-0 top-1/2 -translate-y-1/2 z-panel w-5 h-14 flex items-center justify-center rounded-r-lg border border-l-0 border-border bg-card text-muted-foreground/70 hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
@@ -870,14 +910,14 @@ export function MainLayout({
               {!isReviewPaneOpen && (
                 <button
                   onClick={() => setIsReviewPaneOpen(true)}
-                  aria-label="展開回顧欄"
-                  title="展開回顧欄"
+                  aria-label={t('展開回顧欄')}
+                  title={t('展開回顧欄')}
                   // pt-16 clears the floating UserMenu avatar (fixed top-3
                   // right-3, ~52px tall) that rides over this rail.
                   className="absolute inset-0 flex flex-col items-center gap-3 pt-16 pb-4 text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
                   <BarChart3 className="w-4 h-4" aria-hidden="true" />
-                  <span className="text-xs tracking-widest [writing-mode:vertical-rl]">回顧</span>
+                  <span className="text-xs tracking-widest [writing-mode:vertical-rl]">{t('回顧')}</span>
                   <ChevronLeft className="w-3.5 h-3.5 mt-auto" aria-hidden="true" />
                 </button>
               )}
@@ -926,11 +966,12 @@ export function MainLayout({
 
 // Journal Focus View Component
 function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], onClose: () => void }) {
+  const { t, lang } = useI18n()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [content, setContent] = useState('')
-  
+
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('zh-TW', {
+    return date.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -957,14 +998,14 @@ function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], on
           onClick={() => setSelectedDate(d => new Date(d.getTime() - 86400000))}
           className="px-3 py-1.5 rounded-lg text-sm hover:bg-secondary transition-colors"
         >
-          前一天
+          {t('前一天')}
         </button>
         <h2 className="text-xl font-medium">{formatDate(selectedDate)}</h2>
         <button
           onClick={() => setSelectedDate(d => new Date(d.getTime() + 86400000))}
           className="px-3 py-1.5 rounded-lg text-sm hover:bg-secondary transition-colors"
         >
-          後一天
+          {t('後一天')}
         </button>
       </div>
 
@@ -972,22 +1013,22 @@ function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], on
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="p-4 rounded-xl bg-success/10 border border-success/30">
           <div className="text-2xl font-bold text-success">{completedTasks.length}</div>
-          <div className="text-sm text-muted-foreground">已完成任務</div>
+          <div className="text-sm text-muted-foreground">{t('已完成任務')}</div>
         </div>
         <div className="p-4 rounded-xl bg-urgency-high/10 border border-urgency-high/30">
           <div className="text-2xl font-bold text-urgency-high">{incompleteTasks.length}</div>
-          <div className="text-sm text-muted-foreground">未完成任務</div>
+          <div className="text-sm text-muted-foreground">{t('未完成任務')}</div>
         </div>
         <div className="p-4 rounded-xl bg-info/10 border border-info/30">
           <div className="text-2xl font-bold text-info">{tasksForDate.length}</div>
-          <div className="text-sm text-muted-foreground">總任務數</div>
+          <div className="text-sm text-muted-foreground">{t('總任務數')}</div>
         </div>
       </div>
 
       {/* Tasks Overview */}
       {tasksForDate.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground">今日任務</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">{t('今日任務')}</h3>
           <div className="space-y-2">
             {tasksForDate.map(task => (
               <div 
@@ -1026,31 +1067,31 @@ function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], on
 
       {/* Journal Entry */}
       <div className="space-y-3">
-        <h3 className="text-sm font-medium text-muted-foreground">日記內容</h3>
+        <h3 className="text-sm font-medium text-muted-foreground">{t('日記內容')}</h3>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="今天發生了什麼事？有什麼想法或感受？..."
+          placeholder={t('今天發生了什麼事？有什麼想法或感受？...')}
           className="w-full h-64 p-4 rounded-xl border border-border bg-card resize-none focus:outline-none focus:ring-2 focus:ring-primary/20"
         />
       </div>
 
       {/* Prompts */}
       <div className="space-y-3">
-        <h3 className="text-sm font-medium text-muted-foreground">反思提示</h3>
+        <h3 className="text-sm font-medium text-muted-foreground">{t('反思提示')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {[
-            '今天最有成就感的事是什麼���',
+            '今天最有成就感的事是什麼？',
             '有什麼事情可以做得更好？',
             '今天學到了什麼新東西？',
             '明天最重要的任務是什麼？'
           ].map((prompt, i) => (
             <button
               key={i}
-              onClick={() => setContent(prev => prev + (prev ? '\n\n' : '') + prompt + '\n')}
+              onClick={() => setContent(prev => prev + (prev ? '\n\n' : '') + t(prompt) + '\n')}
               className="p-3 text-left rounded-lg border border-border hover:bg-secondary transition-colors text-sm"
             >
-              {prompt}
+              {t(prompt)}
             </button>
           ))}
         </div>

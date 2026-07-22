@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { useI18n } from '@/lib/i18n/react'
 
 interface TaskRowProps {
   task: Task
@@ -55,12 +56,13 @@ function TaskRowImpl({
   isDragging,
   showWorkspaceTag = false,
 }: TaskRowProps) {
+  const { t } = useI18n()
   const displayColor = useDisplayColor()
   const workspaceDisplayColor = displayColor(task.workspaceColor)
   const colors = getUrgencyColor(task, workspaceDisplayColor)
   // Empty-title tasks (e.g. created via drag with no save) should still be
   // visible and tappable. Show a placeholder so the row never collapses.
-  const displayTitle = task.title?.trim() || '未命名任務'
+  const displayTitle = task.title?.trim() || t('未命名任務')
 
   // Drag-to-calendar state. Activated only after the cursor crosses
   // DRAG_THRESHOLD so plain clicks still open the detail modal.
@@ -257,7 +259,7 @@ function TaskRowImpl({
                 burst && 'animate-[task-pop_500ms_ease-out]'
               )}
               aria-checked={task.isCompleted}
-              aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
+              aria-label={task.isCompleted ? t('標記為未完成') : t('標記為完成')}
               role="checkbox"
             >
               <span
@@ -312,7 +314,7 @@ function TaskRowImpl({
           {task.isMeeting && (
             <Users
               className="flex-shrink-0 w-3 h-3 text-primary"
-              aria-label="會議"
+              aria-label={t('會議')}
             />
           )}
 
@@ -394,7 +396,7 @@ function TaskRowImpl({
               burst && 'animate-[task-pop_500ms_ease-out]'
             )}
             aria-checked={task.isCompleted}
-            aria-label={task.isCompleted ? '標記為未完成' : '標記為完成'}
+            aria-label={task.isCompleted ? t('標記為未完成') : t('標記為完成')}
             role="checkbox"
           >
             <span
@@ -450,10 +452,10 @@ function TaskRowImpl({
             {task.isMeeting && (
               <span
                 className="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary"
-                title="會議"
+                title={t('會議')}
               >
                 <Users className="w-2.5 h-2.5" />
-                會議
+                {t('會議')}
               </span>
             )}
             <span className={cn(

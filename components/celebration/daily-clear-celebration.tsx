@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DAILY_CLEAR_EVENT } from '@/lib/daily-clear'
 import { SkatingPenguin } from './skating-penguin'
+import { t } from '@/lib/i18n'
 
 // Matches the CSS animation duration below (2.2s, see the
 // daily-clear-skate keyframes in app/globals.css) plus a small buffer so
@@ -35,11 +36,14 @@ export function DailyClearCelebration() {
   const [playKey, setPlayKey] = useState(0)
   const [visible, setVisible] = useState(false)
   const hideTimerRef = useRef<number | null>(null)
+  // The only translated string fires inside an event handler (toast), so the
+  // event-time global t is correct here and the mount-once effect keeps its
+  // empty dependency array.
 
   useEffect(() => {
     const handleDailyClear = () => {
       const message = CELEBRATION_MESSAGES[Math.floor(Math.random() * CELEBRATION_MESSAGES.length)]
-      toast.success(message)
+      toast.success(t(message))
 
       // Respect prefers-reduced-motion: toast only, no slide animation.
       // (Global CSS also collapses animation-duration to ~0 under this

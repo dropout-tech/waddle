@@ -12,6 +12,7 @@ import { WaddleMascot } from '@/components/branding/waddle-mascot'
 import { UserMenu } from '@/components/user-menu'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { hapticSelection } from '@/lib/haptics'
+import { useI18n } from '@/lib/i18n/react'
 
 // Pet-the-mascot easter egg — small talk, not a feature. About a third of
 // pets get an extra line (kept quiet the rest of the time so it stays a
@@ -55,6 +56,7 @@ export function PanelHeader({
   onClosePanel,
   onToggleExpand,
 }: PanelHeaderProps) {
+  const { t, lang } = useI18n()
   const isMobile = useIsMobile()
   const displayColor = useDisplayColor()
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null)
@@ -85,7 +87,7 @@ export function PanelHeader({
     const now = Date.now()
     if (now - lastPetToastAtRef.current < PET_TOAST_THROTTLE_MS) return
     lastPetToastAtRef.current = now
-    toast(PET_MESSAGES[Math.floor(Math.random() * PET_MESSAGES.length)])
+    toast(t(PET_MESSAGES[Math.floor(Math.random() * PET_MESSAGES.length)]))
   }
 
   // Header collapsed state - persisted to localStorage
@@ -153,16 +155,16 @@ export function PanelHeader({
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-foreground">
-                  {today.toLocaleDateString('zh-TW', { month: 'short' })}
+                  {today.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', { month: 'short' })}
                 </span>
                 <span className="text-[10px] text-muted-foreground -mt-0.5">
-                  {today.toLocaleDateString('zh-TW', { weekday: 'short' })}
+                  {today.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', { weekday: 'short' })}
                 </span>
               </div>
             </div>
             {/* Pending count */}
             <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-primary/10 text-primary">
-              {totalPending} 待辦
+              {t('{count} 待辦', { count: totalPending })}
             </span>
           </div>
 
@@ -171,7 +173,7 @@ export function PanelHeader({
             <button
               onClick={toggleHeaderCollapsed}
               className="p-1.5 rounded-md hover:bg-secondary transition-colors"
-              title="展開標題列"
+              title={t('展開標題列')}
             >
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -181,11 +183,11 @@ export function PanelHeader({
                 onClick={onToggleExpand}
                 className={cn(
                   "p-1.5 rounded-md transition-colors",
-                  isExpanded 
-                    ? "bg-primary/10 text-primary hover:bg-primary/20" 
+                  isExpanded
+                    ? "bg-primary/10 text-primary hover:bg-primary/20"
                     : "hover:bg-secondary text-muted-foreground"
                 )}
-                title={isExpanded ? "顯示日曆" : "展開任務面板"}
+                title={isExpanded ? t('顯示日曆') : t('展開任務面板')}
               >
                 {isExpanded ? (
                   <Minimize2 className="w-4 h-4" />
@@ -201,7 +203,7 @@ export function PanelHeader({
               <button
                 onClick={onClosePanel}
                 className="p-1.5 rounded-md hover:bg-secondary transition-colors"
-                title="收起面板"
+                title={t('收起面板')}
               >
                 <PanelLeftClose className="w-4 h-4 text-muted-foreground" />
               </button>
@@ -218,7 +220,7 @@ export function PanelHeader({
                 <button
                   type="button"
                   onClick={handlePetMascot}
-                  aria-label="摸摸企鵝"
+                  aria-label={t('摸摸企鵝')}
                   className="cursor-pointer rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span
@@ -233,7 +235,7 @@ export function PanelHeader({
                     Huddle
                   </h1>
                   <p className="text-[10px] text-muted-foreground -mt-0.5">
-                    慢慢搖擺，把事情做完
+                    {t('慢慢搖擺，把事情做完')}
                   </p>
                 </div>
               </div>
@@ -250,7 +252,7 @@ export function PanelHeader({
               <button
                 onClick={toggleHeaderCollapsed}
                 className="p-1.5 rounded-md hover:bg-secondary transition-colors"
-                title="收合標題列"
+                title={t('收合標題列')}
               >
                 <ChevronUp className="w-4 h-4 text-muted-foreground" />
               </button>
@@ -261,11 +263,11 @@ export function PanelHeader({
                   onClick={onToggleExpand}
                   className={cn(
                     "p-1.5 rounded-md transition-colors",
-                    isExpanded 
-                      ? "bg-primary/10 text-primary hover:bg-primary/20" 
+                    isExpanded
+                      ? "bg-primary/10 text-primary hover:bg-primary/20"
                       : "hover:bg-secondary text-muted-foreground"
                   )}
-                  title={isExpanded ? "顯示日曆" : "展開任務面板"}
+                  title={isExpanded ? t('顯示日曆') : t('展開任務面板')}
                 >
                   {isExpanded ? (
                     <Minimize2 className="w-4 h-4" />
@@ -280,7 +282,7 @@ export function PanelHeader({
                 <button
                   onClick={onClosePanel}
                   className="p-1.5 rounded-md hover:bg-secondary transition-colors"
-                  title="收起面板"
+                  title={t('收起面板')}
                 >
                   <PanelLeftClose className="w-4 h-4 text-muted-foreground" />
                 </button>
@@ -304,19 +306,19 @@ export function PanelHeader({
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-sm font-semibold text-foreground">
-                    {today.toLocaleDateString('zh-TW', { month: 'long' })}
+                    {today.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', { month: 'long' })}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {today.getFullYear()}
                   </span>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {today.toLocaleDateString('zh-TW', { weekday: 'long' })}
+                  {today.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', { weekday: 'long' })}
                 </span>
               </div>
             </div>
             <span className="stamp text-primary border-primary">
-              {totalPending} 待辦
+              {t('{count} 待辦', { count: totalPending })}
             </span>
           </div>
 
@@ -379,7 +381,7 @@ export function PanelHeader({
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-all flex-shrink-0"
             >
               <Plus className="w-3 h-3" />
-              <span>新增</span>
+              <span>{t('新增')}</span>
             </button>
           </div>
         </>
@@ -404,7 +406,7 @@ export function PanelHeader({
       {isAdding && (
         <div className="absolute inset-x-0 top-full mt-2 mx-4 p-4 bg-card border border-border rounded-xl shadow-lg z-modal">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-foreground">新增工作區</span>
+            <span className="text-sm font-semibold text-foreground">{t('新增工作區')}</span>
             <button
               onClick={() => setIsAdding(false)}
               className="p-1 rounded hover:bg-secondary"
@@ -421,14 +423,14 @@ export function PanelHeader({
               if (e.key === 'Enter') handleAddWorkspace()
               else if (e.key === 'Escape') setIsAdding(false)
             }}
-            placeholder="工作區名稱..."
+            placeholder={t('工作區名稱...')}
             className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-primary"
             autoFocus
           />
 
           {/* Color Picker */}
           <div className="mb-3">
-            <span className="text-xs text-muted-foreground mb-1.5 block">顏色</span>
+            <span className="text-xs text-muted-foreground mb-1.5 block">{t('顏色')}</span>
             <div className="flex gap-2">
               {PRESET_COLORS.map((color) => (
                 <button
@@ -446,13 +448,13 @@ export function PanelHeader({
 
           {/* Icon Picker */}
           <div className="mb-4">
-            <span className="text-xs text-muted-foreground mb-1.5 block">圖示</span>
+            <span className="text-xs text-muted-foreground mb-1.5 block">{t('圖示')}</span>
             <div className="flex gap-2 flex-wrap">
               {PRESET_ICONS.map(({ value, label }) => (
                 <button
                   key={label}
                   onClick={() => setSelectedIcon(value)}
-                  title={label}
+                  title={t(label)}
                   className={cn(
                     'w-8 h-8 rounded-lg border flex items-center justify-center text-base transition-all',
                     selectedIcon === value
@@ -460,7 +462,7 @@ export function PanelHeader({
                       : 'border-border hover:border-primary/50'
                   )}
                 >
-                  {value || <span className="text-muted-foreground text-xs">無</span>}
+                  {value || <span className="text-muted-foreground text-xs">{t('無')}</span>}
                 </button>
               ))}
             </div>
@@ -471,7 +473,7 @@ export function PanelHeader({
             disabled={!newName.trim()}
             className="w-full py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
           >
-            建立工作區
+            {t('建立工作區')}
           </button>
         </div>
       )}

@@ -178,6 +178,65 @@ type SlotTypesRow = {
   created_at: string
 }
 
+// Migration 0016 — calendar sharing between accounts. Cross-account reads
+// happen only through the RPCs below (Functions section); these table types
+// cover the client's own direct reads/writes: inviter reads/revokes their own
+// invites, either member reads/deletes a share, both members read grants.
+type CalendarShareInvitesRow = {
+  id: string
+  inviter_id: string
+  token_hash: string
+  created_at: string
+  expires_at: string
+  accepted_by: string | null
+  accepted_at: string | null
+  revoked_at: string | null
+}
+
+type CalendarShareInvitesInsert = {
+  id?: string
+  inviter_id: string
+  token_hash: string
+  expires_at?: string
+  accepted_by?: string | null
+  accepted_at?: string | null
+  revoked_at?: string | null
+}
+
+type CalendarSharesRow = {
+  id: string
+  user_lo: string
+  user_hi: string
+  invite_id: string | null
+  created_at: string
+}
+
+type CalendarSharesInsert = {
+  id?: string
+  user_lo: string
+  user_hi: string
+  invite_id?: string | null
+}
+
+// `ref` is TEXT (workspaces.id::text or slot_types.key), not uuid — see
+// migration 0016 comment on this table for why.
+type CalendarShareGrantsRow = {
+  share_id: string
+  owner_id: string
+  kind: 'workspace' | 'slot_type'
+  ref: string
+  detail: 'full' | 'busy'
+  created_at: string
+}
+
+type CalendarShareGrantsInsert = {
+  share_id: string
+  owner_id: string
+  kind: 'workspace' | 'slot_type'
+  ref: string
+  detail: 'full' | 'busy'
+}
+
 type UserSettingsRow = {
   user_id: string
   calendar_start_hour: number
@@ -405,9 +464,64 @@ export type Database = {
       time_blocks: Tbl<TimeBlocksRow, TimeBlocksInsert>
       slot_types: Tbl<SlotTypesRow, SlotTypesInsert>
       user_settings: Tbl<UserSettingsRow, UserSettingsInsert>
+      calendar_share_invites: Tbl<CalendarShareInvitesRow, CalendarShareInvitesInsert>
+      calendar_shares: Tbl<CalendarSharesRow, CalendarSharesInsert>
+      calendar_share_grants: Tbl<CalendarShareGrantsRow, CalendarShareGrantsInsert>
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    // Migration 0016's five RPCs — the only path for cross-account reads.
+    // Hand-written (supabase gen would rewrite this whole file); keep in sync
+    // with supabase/migrations/0016_calendar_sharing.sql if it changes.
+    Functions: {
+      create_share_invite: {
+        Args: Record<PropertyKey, never>
+        /** Raw invite token, returned exactly once (only its hash is stored). */
+        Returns: string
+      }
+      preview_share_invite: {
+        Args: { p_token: string }
+        Returns: {
+          display_name: string | null
+          avatar_url: string | null
+        }[]
+      }
+      accept_share_invite: {
+        Args: { p_token: string }
+        /** New (or already-existing) calendar_shares.id for the pair. */
+        Returns: string
+      }
+      get_share_peers: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          share_id: string
+          peer_id: string
+          display_name: string | null
+          avatar_url: string | null
+          created_at: string
+        }[]
+      }
+      get_shared_calendar: {
+        Args: { p_peer: string; p_from: string; p_to: string }
+        Returns: {
+          source: 'task' | 'time_block'
+          id: string
+          event_date: string
+          start_time: string
+          end_time: string
+          type_key: string | null
+          color: string
+          detail: 'full' | 'busy'
+          title: string | null
+          is_recurring: boolean
+          recurrence_type: string | null
+          recurrence_interval: number | null
+          recurrence_days_of_week: number[] | null
+          recurrence_end_date: string | null
+          exdates: Json | null
+          parent_id: string | null
+        }[]
+      }
+    }
     Enums: {
       task_type_enum: 'one_time' | 'routine' | 'project'
       recurrence_type_enum: 'daily' | 'weekly' | 'monthly' | 'custom'

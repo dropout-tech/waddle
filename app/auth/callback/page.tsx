@@ -4,6 +4,7 @@ import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { PENDING_SHARE_INVITE_KEY } from '@/hooks/use-calendar-sharing'
 
 // Client-side OAuth/PKCE callback. Replaces the former server route handler
 // (app/auth/callback/route.ts) so the page survives `output: 'export'` and
@@ -36,7 +37,15 @@ function Callback() {
       }
       const { data: { session } } = await supabase.auth.getSession()
       if (cancelled) return
-      router.replace(session ? next : '/login?error=auth_callback_failed')
+      if (!session) {
+        router.replace('/login?error=auth_callback_failed')
+        return
+      }
+      // Same share-invite handoff as the email-login path: the fragment
+      // token doesn't survive the OAuth round-trip, so it was stashed in
+      // sessionStorage before leaving for the provider.
+      const pendingInvite = window.sessionStorage.getItem(PENDING_SHARE_INVITE_KEY)
+      router.replace(pendingInvite ? '/share/invite' : next)
     }
 
     finish()
