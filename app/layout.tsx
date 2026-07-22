@@ -38,8 +38,23 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    icon: [{ url: '/huddle-mascot.png', type: 'image/png', sizes: '512x512' }],
-    apple: [{ url: '/huddle-mascot.png', type: 'image/png', sizes: '512x512' }],
+    icon: [
+      {
+        url: '/icon-light-32x32.png',
+        type: 'image/png',
+        sizes: '32x32',
+        media: '(prefers-color-scheme: light)',
+      },
+      {
+        url: '/icon-dark-32x32.png',
+        type: 'image/png',
+        sizes: '32x32',
+        media: '(prefers-color-scheme: dark)',
+      },
+      { url: '/app-icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/app-icon-512.png', type: 'image/png', sizes: '512x512' },
+    ],
+    apple: [{ url: '/apple-icon.png', type: 'image/png', sizes: '180x180' }],
   },
 }
 
