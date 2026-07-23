@@ -38,6 +38,12 @@ interface TaskRowProps {
    * onto the calendar without first switching tabs themselves.
    */
   onDragActivate?: () => void
+  /** Moves the task when the pointer is released over another category. */
+  onMoveToCategory?: (taskId: string, categoryId: string) => void
+  /** Lets the panel highlight the category currently under the drag pointer. */
+  onCategoryDragHover?: (categoryId: string | null) => void
+  /** Shows the drag handle when category moves are available. */
+  canMoveBetweenCategories?: boolean
   isDragging?: boolean
   showWorkspaceTag?: boolean
 }
@@ -53,6 +59,9 @@ function TaskRowImpl({
   onSelect,
   onSendToCalendar,
   onDragActivate,
+  onMoveToCategory,
+  onCategoryDragHover,
+  canMoveBetweenCategories = false,
   isDragging,
   showWorkspaceTag = false,
 }: TaskRowProps) {
@@ -97,7 +106,7 @@ function TaskRowImpl({
   }
 
   const handleMouseDown = (e: React.PointerEvent) => {
-    if (!onSendToCalendar) return
+    if (!onSendToCalendar && !onMoveToCategory) return
     if (e.button !== 0 && e.pointerType === 'mouse') return
     // Don't start a drag from interactive children (checkbox).
     if ((e.target as HTMLElement).closest('button')) return
@@ -105,6 +114,7 @@ function TaskRowImpl({
     const startX = e.clientX
     const startY = e.clientY
     let activated = false
+    let calendarDragActivated = false
     // For touch input we want a long-press before drag activates so the
     // user can still scroll the task list with their finger. Mouse keeps
     // the snappy 5px threshold.
@@ -118,7 +128,12 @@ function TaskRowImpl({
           if (!activated && stillInThreshold) {
             activated = true
             setExternalDragActive(true)
-            onDragActivate?.()
+            const categoryId = categoryIdAtPoint(startX, startY)
+            onCategoryDragHover?.(categoryId === task.categoryId ? null : categoryId)
+            if (!categoryId) {
+              calendarDragActivated = true
+              onDragActivate?.()
+            }
             haptic(15)
           }
         }, longPressMs)
@@ -136,12 +151,17 @@ function TaskRowImpl({
         if (!activated && !isTouch) {
           activated = true
           setExternalDragActive(true)
-          onDragActivate?.()
           haptic(12)
         }
       }
       if (activated) {
         setGhostPos({ x: ev.clientX, y: ev.clientY })
+        const categoryId = categoryIdAtPoint(ev.clientX, ev.clientY)
+        onCategoryDragHover?.(categoryId === task.categoryId ? null : categoryId)
+        if (!categoryId && !calendarDragActivated) {
+          calendarDragActivated = true
+          onDragActivate?.()
+        }
       }
     }
 
@@ -160,10 +180,22 @@ function TaskRowImpl({
       }
 
       setExternalDragActive(false)
+      onCategoryDragHover?.(null)
       // Suppress the click event that fires after this mouseup, otherwise
       // the row's onClick would also open the detail modal.
       suppressNextClickRef.current = true
 
+      if (ev.type === 'pointercancel') return
+
+      const targetCategoryId = categoryIdAtPoint(ev.clientX, ev.clientY)
+      if (targetCategoryId) {
+        if (targetCategoryId !== task.categoryId) {
+          onMoveToCategory?.(task.id, targetCategoryId)
+        }
+        return
+      }
+
+      if (!onSendToCalendar) return
       const hit = calendarHitTest(ev.clientX, ev.clientY)
       if (!hit) return
 
@@ -188,6 +220,11 @@ function TaskRowImpl({
     window.addEventListener('pointercancel', onUp)
   }
 
+  const categoryIdAtPoint = (x: number, y: number) => {
+    const element = document.elementFromPoint(x, y)
+    return element?.closest<HTMLElement>('[data-task-category-id]')?.dataset.taskCategoryId ?? null
+  }
+
   // Floating ghost portal — only rendered while a drag is active. Lives in
   // document.body so position: fixed coords are relative to the viewport
   // regardless of any transformed ancestor.
@@ -208,6 +245,23 @@ function TaskRowImpl({
       )
     : null
 
+  const categoryDragHandle = (
+    <div
+      data-task-category-drag-handle
+      onClick={(e) => e.stopPropagation()}
+      className={cn(
+        'flex-shrink-0 text-muted-foreground transition-opacity',
+        canMoveBetweenCategories
+          ? 'cursor-grab active:cursor-grabbing opacity-40 md:opacity-0 md:group-hover:opacity-50'
+          : 'cursor-default opacity-20'
+      )}
+      title={canMoveBetweenCategories ? t('拖曳移動到其他分類') : undefined}
+      aria-label={canMoveBetweenCategories ? t('拖曳移動到其他分類') : undefined}
+    >
+      <GripVertical className="w-3.5 h-3.5" />
+    </div>
+  )
+
   // M/D prefix shown before the scheduled time (both densities) — two tasks
   // at "10:00" on different days would otherwise look identical in the panel.
   // Year is dropped since the panel is for current work.
@@ -226,7 +280,7 @@ function TaskRowImpl({
           onPointerDown={handleMouseDown}
           onClick={handleRowClick}
           className={cn(
-            'flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-all duration-150 ease-quart rounded-md select-none',
+            'group flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-all duration-150 ease-quart rounded-md select-none',
             // Hover feedback beyond the drag handle: wash the row towards the
             // accent (dusty rose) and nudge right. The base color lives in a
             // CSS variable so hover can color-mix it — Tailwind classes can't
@@ -243,6 +297,8 @@ function TaskRowImpl({
             borderLeft: `3px solid ${colors.accentColor}`,
           }}
         >
+          {categoryDragHandle}
+
           {/* Checkbox — visual circle stays small; the actual <button>
               gets padding so the tap target reaches 44px on mobile even
               though the visible dot is 14 px. Layout doesn't shift because
@@ -380,8 +436,8 @@ function TaskRowImpl({
         onClick={handleRowClick}
       >
         {/* Drag Handle */}
-        <div className="opacity-40 md:opacity-0 md:group-hover:opacity-40 transition-opacity cursor-grab active:cursor-grabbing pt-0.5">
-          <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
+        <div className="pt-0.5">
+          {categoryDragHandle}
         </div>
 
         {/* Checkbox with celebration burst — same touch-target trick as

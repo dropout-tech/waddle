@@ -347,6 +347,15 @@ function HuddlePage() {
     [rescheduleTask, unscheduleTask]
   )
 
+  const handleMoveTask = useCallback(
+    (taskId: string, categoryId: string) => {
+      const task = findTaskById(workspaces, taskId)
+      if (!task || task.categoryId === categoryId) return
+      return updateTask(taskId, {}, categoryId)
+    },
+    [updateTask, workspaces]
+  )
+
   const handleCreatePendingTask = useCallback(async (title: string) => {
     const firstWorkspace = workspaces[0]
     const firstCategory = firstWorkspace?.categories[0]
@@ -441,6 +450,7 @@ function HuddlePage() {
         onAddCategory={addCategory}
         onDeleteCategory={deleteCategory}
         onSendTaskToCalendar={handleSendToCalendar}
+        onMoveTask={handleMoveTask}
         onAddWorkspace={addWorkspace}
         onUpdateWorkspaceColor={updateWorkspaceColor}
         onUpdateWorkspace={updateWorkspace}

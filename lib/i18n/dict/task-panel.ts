@@ -20,6 +20,8 @@ export const dict: Record<string, string> = {
     'Delete category "{name}"? This will also delete {count} tasks and cannot be undone.',
   '刪除分類「{name}」？': 'Delete category "{name}"?',
   '拖曳調整分類順序': 'Drag to reorder categories',
+  '拖曳移動到其他分類': 'Drag to move to another category',
+  '移到「{name}」': 'Move to "{name}"',
   '刪除分類「{name}」': 'Delete category "{name}"',
   '輸入任務名稱...': 'Enter task name...',
   '新增任務': "Add task",

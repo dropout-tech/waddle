@@ -44,6 +44,7 @@ interface TaskPanelProps {
   onAddCategory?: (workspaceId: string, name: string) => void
   onDeleteCategory?: (categoryId: string) => void
   onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
+  onMoveTask?: (taskId: string, categoryId: string) => void
   onTaskDragActivate?: () => void
   onAddWorkspace?: (name: string, color: string, icon: string) => void
   onUpdateWorkspaceColor?: (workspaceId: string, color: string) => void
@@ -69,6 +70,7 @@ export function TaskPanel({
   onAddCategory,
   onDeleteCategory,
   onSendTaskToCalendar,
+  onMoveTask,
   onTaskDragActivate,
   onAddWorkspace,
   onUpdateWorkspaceColor,
@@ -100,6 +102,7 @@ export function TaskPanel({
   })
   const [toolbarOpen, setToolbarOpen] = useState(false)
   const [completedDrawerOpen, setCompletedDrawerOpen] = useState(false)
+  const [taskDropTargetId, setTaskDropTargetId] = useState<string | null>(null)
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     urgency: [],
@@ -401,6 +404,9 @@ export function TaskPanel({
                 onAddCategory={onAddCategory}
                 onDeleteCategory={onDeleteCategory}
                 onSendTaskToCalendar={onSendTaskToCalendar}
+                onMoveTask={onMoveTask}
+                taskDropTargetId={taskDropTargetId}
+                onTaskCategoryDragHover={setTaskDropTargetId}
                 onTaskDragActivate={onTaskDragActivate}
               />
             </div>

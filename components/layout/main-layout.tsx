@@ -39,6 +39,7 @@ interface MainLayoutProps {
   onAddCategory?: (workspaceId: string, name: string) => void
   onDeleteCategory?: (categoryId: string) => void
   onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
+  onMoveTask?: (taskId: string, categoryId: string) => void
   onAddWorkspace?: (name: string, color: string, icon: string) => void
   onUpdateWorkspaceColor?: (workspaceId: string, color: string) => void
   onUpdateWorkspace?: (workspaceId: string, updates: Partial<Pick<Workspace, 'name' | 'color' | 'icon'>>) => void
@@ -90,6 +91,7 @@ export function MainLayout({
   onAddCategory,
   onDeleteCategory,
   onSendTaskToCalendar,
+  onMoveTask,
   onAddWorkspace,
   onUpdateWorkspaceColor,
   onUpdateWorkspace,
@@ -522,6 +524,7 @@ export function MainLayout({
                 onAddCategory={onAddCategory}
                 onDeleteCategory={onDeleteCategory}
                 onSendTaskToCalendar={onSendTaskToCalendar}
+                onMoveTask={onMoveTask}
                 // Auto-switch to calendar tab the moment a row's drag
                 // activates so the user's finger ends up over the
                 // calendar grid at release time.
@@ -774,6 +777,7 @@ export function MainLayout({
                 onAddCategory={onAddCategory}
                 onDeleteCategory={onDeleteCategory}
                 onSendTaskToCalendar={onSendTaskToCalendar}
+                onMoveTask={onMoveTask}
                 onAddWorkspace={onAddWorkspace}
                 onUpdateWorkspaceColor={onUpdateWorkspaceColor}
                 onUpdateWorkspace={onUpdateWorkspace}

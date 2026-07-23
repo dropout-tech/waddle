@@ -18,6 +18,9 @@ interface CategorySectionProps {
   onAddTask: (categoryId: string, title: string) => void
   onDelete?: (categoryId: string) => void
   onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
+  onMoveTask?: (taskId: string, categoryId: string) => void
+  taskDropTargetId?: string | null
+  onTaskCategoryDragHover?: (categoryId: string | null) => void
   /** Mobile: forwards to TaskRow so drag-activation can switch the bottom tab. */
   onTaskDragActivate?: () => void
   // Drag-reorder integration. Owned by WorkspaceSection — this component just
@@ -43,6 +46,9 @@ export function CategorySection({
   onDelete,
   onSendTaskToCalendar,
   onTaskDragActivate,
+  onMoveTask,
+  taskDropTargetId,
+  onTaskCategoryDragHover,
   isReorderable = false,
   isDragging = false,
   dropIndicator = null,
@@ -56,6 +62,7 @@ export function CategorySection({
   const [newTaskTitle, setNewTaskTitle] = useState('')
   // Completed tasks default-collapsed so they don't pad out the active list.
   const [showCompleted, setShowCompleted] = useState(false)
+  const isTaskDragOver = taskDropTargetId === category.id
 
   const pendingCount = category.tasks.filter((t) => !t.isCompleted).length
   const completedCount = category.tasks.filter((t) => t.isCompleted).length
@@ -100,7 +107,20 @@ export function CategorySection({
     .sort((a, b) => a.sortOrder - b.sortOrder)
 
   return (
-    <div className="mb-3">
+    <div
+      data-task-category-id={category.id}
+      className={cn(
+        'relative mb-3 rounded-xl transition-[background-color,box-shadow] duration-150',
+        isTaskDragOver && 'bg-primary/8 ring-2 ring-primary/45 ring-offset-2 ring-offset-card'
+      )}
+    >
+      {isTaskDragOver && (
+        <div className="pointer-events-none absolute inset-x-2 -top-2 z-10 flex justify-center">
+          <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-sm">
+            {t('移到「{name}」', { name: category.name })}
+          </span>
+        </div>
+      )}
       {/* Category Header */}
       <div
         onClick={() => onToggleCollapse(category.id)}
@@ -172,6 +192,9 @@ export function CategorySection({
               onSelect={onSelectTask}
               onSendToCalendar={onSendTaskToCalendar}
               onDragActivate={onTaskDragActivate}
+              onMoveToCategory={onMoveTask}
+              onCategoryDragHover={onTaskCategoryDragHover}
+              canMoveBetweenCategories={!!onMoveTask}
             />
           ))}
 
@@ -236,6 +259,9 @@ export function CategorySection({
                   onSelect={onSelectTask}
                   onSendToCalendar={onSendTaskToCalendar}
                   onDragActivate={onTaskDragActivate}
+                  onMoveToCategory={onMoveTask}
+                  onCategoryDragHover={onTaskCategoryDragHover}
+                  canMoveBetweenCategories={!!onMoveTask}
                 />
               ))}
             </>

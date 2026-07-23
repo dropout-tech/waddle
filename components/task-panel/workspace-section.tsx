@@ -22,6 +22,9 @@ interface WorkspaceSectionProps {
   onAddCategory?: (workspaceId: string, name: string) => void
   onDeleteCategory?: (categoryId: string) => void
   onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
+  onMoveTask?: (taskId: string, categoryId: string) => void
+  taskDropTargetId?: string | null
+  onTaskCategoryDragHover?: (categoryId: string | null) => void
   onTaskDragActivate?: () => void
 }
 
@@ -42,6 +45,9 @@ export function WorkspaceSection({
   onAddCategory,
   onDeleteCategory,
   onSendTaskToCalendar,
+  onMoveTask,
+  taskDropTargetId,
+  onTaskCategoryDragHover,
   onTaskDragActivate,
 }: WorkspaceSectionProps) {
   const { t } = useI18n()
@@ -212,6 +218,9 @@ export function WorkspaceSection({
               onAddTask={onAddTask}
               onDelete={onDeleteCategory}
               onSendTaskToCalendar={onSendTaskToCalendar}
+              onMoveTask={onMoveTask}
+              taskDropTargetId={taskDropTargetId}
+              onTaskCategoryDragHover={onTaskCategoryDragHover}
               onTaskDragActivate={onTaskDragActivate}
               isReorderable={!!onReorderCategories && !isMobile}
               isDragging={isDragging}
