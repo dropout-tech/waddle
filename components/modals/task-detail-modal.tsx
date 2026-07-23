@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useMemo } from 'react'
-import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat, List, CheckSquare, ListChecks, Link2, Users, MapPin, Video } from 'lucide-react'
+import { useState, useRef, useMemo, useId, type ReactNode } from 'react'
+import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat, List, CheckSquare, ListChecks, Link2, Users, MapPin, Video, ImagePlus, Loader2 } from 'lucide-react'
 import { detectMeetingProvider, MEETING_PROVIDER_LABEL } from '@/lib/meeting-utils'
 import { cn } from '@/lib/utils'
 import type { Task, Workspace } from '@/lib/types'
@@ -15,6 +15,8 @@ import { ModalShell } from './modal-shell'
 import { PICKER_COLOR_HEXES } from '@/lib/palette'
 import { useI18n } from '@/lib/i18n/react'
 import { getLang, t } from '@/lib/i18n'
+import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
 
 // Weekday letters for the recurrence day-picker. Kept lang-aware directly
 // (not routed through t()) because a single Chinese character like '日'
@@ -27,6 +29,38 @@ function weekdayLabels() {
 }
 
 const PRESET_COLORS = PICKER_COLOR_HEXES
+const MAX_TASK_NOTE_IMAGE_BYTES = 5 * 1024 * 1024
+const TASK_NOTE_IMAGE_EXTENSIONS: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+}
+
+async function uploadTaskNoteImage(file: File): Promise<string> {
+  const extension = TASK_NOTE_IMAGE_EXTENSIONS[file.type]
+  if (!extension) throw new Error(t('只能插入 PNG、JPG、GIF 或 WebP 圖片'))
+  if (file.size > MAX_TASK_NOTE_IMAGE_BYTES) throw new Error(t('圖片太大，上限 5MB'))
+
+  const supabase = createClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+  if (userError) throw userError
+  if (!user) throw new Error(t('尚未登入'))
+
+  const path = `${user.id}/${crypto.randomUUID()}.${extension}`
+  const { error } = await supabase.storage
+    .from('notebook-images')
+    .upload(path, file, {
+      cacheControl: '3600',
+      contentType: file.type,
+    })
+  if (error) throw error
+
+  return supabase.storage.from('notebook-images').getPublicUrl(path).data.publicUrl
+}
 
 interface TaskDetailModalProps {
   task: Task
@@ -73,6 +107,8 @@ export function TaskDetailModal({
   const [calendarColor, setCalendarColor] = useState(task.calendarColor || task.workspaceColor)
   const [selectedCategoryId, setSelectedCategoryId] = useState(task.categoryId)
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
+  const [showSecondaryDetails, setShowSecondaryDetails] = useState(false)
+  const secondaryDetailsId = useId()
   
   // Recurrence settings
   const [isRecurring, setIsRecurring] = useState(task.isRecurring || false)
@@ -279,6 +315,23 @@ export function TaskDetailModal({
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setShowSecondaryDetails((visible) => !visible)}
+              aria-expanded={showSecondaryDetails}
+              aria-controls={secondaryDetailsId}
+              aria-label={showSecondaryDetails ? t('收合其他設定') : t('展開其他設定')}
+              title={showSecondaryDetails ? t('收合其他設定') : t('展開其他設定')}
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-8 md:w-8"
+            >
+              <ChevronDown
+                className={cn(
+                  'h-4 w-4 transition-transform duration-200 motion-reduce:transition-none',
+                  showSecondaryDetails && 'rotate-180',
+                )}
+                aria-hidden="true"
+              />
+            </button>
             {!isCreate && onDelete && (
               <button
                 onClick={() => {
@@ -321,6 +374,24 @@ export function TaskDetailModal({
           {/* Urgency — visual slider with color-coded level */}
           <UrgencySlider value={urgency} onChange={setUrgency} />
 
+          {/* The task's meaning comes before its logistics. Keeping description
+              and notes near the title makes the drawer scan like a notebook,
+              while schedule and secondary metadata stay available below. */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <FileText className="w-3.5 h-3.5" />
+              {t('描述')}
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t('添加任務描述...')}
+              className="w-full min-h-[100px] px-3 py-2 rounded-lg border border-input bg-secondary/30 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          <NotesEditor value={notes} onChange={setNotes} />
+
           {/* Time block: scheduled date + start/end + duration + quick presets */}
           <TimeBlockSection
             scheduledDate={scheduledDate}
@@ -329,7 +400,27 @@ export function TaskDetailModal({
             onScheduledDateChange={setScheduledDate}
             onStartTimeChange={setScheduledStartTime}
             onEndTimeChange={setScheduledEndTime}
-          />
+          >
+            <RecurrenceSettings
+              isRecurring={isRecurring}
+              recurrenceType={recurrenceType}
+              recurrenceInterval={recurrenceInterval}
+              recurrenceDays={recurrenceDays}
+              recurrenceEndDate={recurrenceEndDate}
+              onRecurringChange={(next) => {
+                setIsRecurring(next)
+                // Recurring tasks would otherwise spawn unbounded copies in
+                // the left task panel. Auto-hide on enable so the calendar
+                // stays the source of truth for repeats; users can re-enable
+                // the task-list toggle below when they want that behavior.
+                if (next) setShowInTaskList(false)
+              }}
+              onRecurrenceTypeChange={setRecurrenceType}
+              onRecurrenceIntervalChange={setRecurrenceInterval}
+              onToggleRecurrenceDay={toggleRecurrenceDay}
+              onRecurrenceEndDateChange={setRecurrenceEndDate}
+            />
+          </TimeBlockSection>
 
           {/* List visibility toggle — uncheck for recurring meetings the user
               wants on the calendar but not in the left task list. Only
@@ -382,182 +473,8 @@ export function TaskDetailModal({
             )
           })()}
 
-          {/* Secondary metadata grid */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Estimated Time */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Clock className="w-3.5 h-3.5" />
-                {t('預估時間 (分鐘)')}
-              </label>
-              <Input
-                type="number"
-                value={estimatedMinutes}
-                onChange={(e) => setEstimatedMinutes(e.target.value)}
-                placeholder="60"
-                className="h-9"
-              />
-            </div>
-
-            {/* Due Date */}
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Calendar className="w-3.5 h-3.5" />
-                {t('截止日期')}
-              </label>
-              <DateField
-                value={dueDate}
-                onChange={setDueDate}
-                className="h-9"
-                aria-label={t('截止日期')}
-              />
-            </div>
-          </div>
-
-          {/* Calendar Color */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <Palette className="w-3.5 h-3.5" />
-              {t('日曆顏色')}
-            </label>
-            <div className="flex items-center gap-2 flex-wrap">
-              {PRESET_COLORS.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => setCalendarColor(color)}
-                  className={cn(
-                    'w-7 h-7 rounded-full border-2 transition-all',
-                    calendarColor === color
-                      ? 'border-foreground scale-110'
-                      : 'border-transparent hover:scale-105'
-                  )}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-              <input
-                type="color"
-                value={calendarColor}
-                onChange={(e) => setCalendarColor(e.target.value)}
-                className="w-7 h-7 rounded-full cursor-pointer"
-                title={t('自訂顏色')}
-              />
-            </div>
-          </div>
-
-          {/* Recurrence Settings */}
-          <div className="space-y-3 p-4 rounded-xl bg-secondary/30 border border-border">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Repeat className="w-3.5 h-3.5" />
-                {t('重複設定')}
-              </label>
-              <button
-                onClick={() => {
-                  const next = !isRecurring
-                  setIsRecurring(next)
-                  // Recurring tasks would otherwise spawn unbounded copies in
-                  // the left task panel. Auto-hide on enable so the calendar
-                  // stays the source of truth for repeats; user can still
-                  // re-enable the toggle below if they prefer it visible.
-                  if (next) setShowInTaskList(false)
-                }}
-                aria-pressed={isRecurring}
-                className={cn(
-                  'relative w-10 h-5 flex-shrink-0 rounded-full transition-colors',
-                  isRecurring ? 'bg-primary' : 'bg-muted'
-                )}
-                style={{ padding: 0, appearance: 'none' as const }}
-              >
-                <span
-                  className={cn(
-                    'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform',
-                    isRecurring ? 'translate-x-5' : 'translate-x-0.5'
-                  )}
-                />
-              </button>
-            </div>
-
-            {isRecurring && (
-              <div className="space-y-4 pt-2">
-                {/* Recurrence Type */}
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { value: 'daily', label: '每天' },
-                    { value: 'weekly', label: '每週' },
-                    { value: 'monthly', label: '每月' },
-                    { value: 'custom', label: '自訂' },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setRecurrenceType(option.value as typeof recurrenceType)}
-                      className={cn(
-                        'px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
-                        recurrenceType === option.value
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
-                      )}
-                    >
-                      {t(option.label)}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Interval (for custom) */}
-                {recurrenceType === 'custom' && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{t('每')}</span>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={recurrenceInterval}
-                      onChange={(e) => setRecurrenceInterval(e.target.value)}
-                      className="w-16 h-8 text-center"
-                    />
-                    <span className="text-xs text-muted-foreground">{t('天重複一次')}</span>
-                  </div>
-                )}
-
-                {/* Days of Week (for weekly) */}
-                {recurrenceType === 'weekly' && (
-                  <div className="space-y-2">
-                    <span className="text-xs text-muted-foreground">{t('選擇重複的星期')}</span>
-                    <div className="flex gap-1.5">
-                      {weekdayLabels().map((label, index) => (
-                        <button
-                          key={index}
-                          onClick={() => toggleRecurrenceDay(index)}
-                          className={cn(
-                            'w-8 h-8 rounded-full text-xs font-medium transition-all',
-                            recurrenceDays.includes(index)
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
-                          )}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* End Date */}
-                <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">{t('結束日期 (可選)')}</label>
-                  <DateField
-                    value={recurrenceEndDate}
-                    onChange={setRecurrenceEndDate}
-                    className="h-8"
-                    aria-label={t('重複結束日期')}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Meeting toggle + fields. Placed above Description because it
-              changes what kind of task this is — a higher-level switch — and
-              the related fields read better grouped at the top than buried
-              with the body text. */}
+          {/* Meeting toggle + fields stay near scheduling because they change
+              how this task is represented on the calendar. */}
           <div className="space-y-2">
             <button
               type="button"
@@ -651,22 +568,80 @@ export function TaskDetailModal({
             )}
           </div>
 
-          {/* Description */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <FileText className="w-3.5 h-3.5" />
-              {t('描述')}
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t('添加任務描述...')}
-              className="w-full min-h-[100px] px-3 py-2 rounded-lg border border-input bg-secondary/30 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
+          {showSecondaryDetails && (
+            <section
+              id={secondaryDetailsId}
+              aria-label={t('其他設定')}
+              className="space-y-4 border-t border-border pt-5"
+            >
+              <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                {t('其他設定')}
+              </div>
 
-          {/* Notes — supports bullet/checklist via toolbar */}
-          <NotesEditor value={notes} onChange={setNotes} />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5" />
+                    {t('預估時間 (分鐘)')}
+                  </label>
+                  <Input
+                    type="number"
+                    value={estimatedMinutes}
+                    onChange={(e) => setEstimatedMinutes(e.target.value)}
+                    placeholder="60"
+                    className="h-9"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {t('截止日期')}
+                  </label>
+                  <DateField
+                    value={dueDate}
+                    onChange={setDueDate}
+                    className="h-9"
+                    aria-label={t('截止日期')}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <Palette className="w-3.5 h-3.5" />
+                  {t('日曆顏色')}
+                </label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {PRESET_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setCalendarColor(color)}
+                      aria-label={t('選擇日曆顏色')}
+                      aria-pressed={calendarColor === color}
+                      className={cn(
+                        'w-7 h-7 rounded-full border-2 transition-all',
+                        calendarColor === color
+                          ? 'border-foreground scale-110'
+                          : 'border-transparent hover:scale-105'
+                      )}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                  <input
+                    type="color"
+                    value={calendarColor}
+                    onChange={(e) => setCalendarColor(e.target.value)}
+                    className="w-7 h-7 rounded-full cursor-pointer"
+                    title={t('自訂顏色')}
+                    aria-label={t('自訂顏色')}
+                  />
+                </div>
+              </div>
+            </section>
+          )}
         </div>
 
         {/* Footer */}
@@ -809,6 +784,7 @@ interface TimeBlockSectionProps {
   onScheduledDateChange: (v: string) => void
   onStartTimeChange: (v: string) => void
   onEndTimeChange: (v: string) => void
+  children?: ReactNode
 }
 
 function TimeBlockSection({
@@ -818,8 +794,10 @@ function TimeBlockSection({
   onScheduledDateChange,
   onStartTimeChange,
   onEndTimeChange,
+  children,
 }: TimeBlockSectionProps) {
   const { t } = useI18n()
+  const [referenceDate] = useState(() => new Date())
   const startMin = parseTime(startTime)
   const endMin = parseTime(endTime)
   const duration = useMemo(() => {
@@ -850,8 +828,10 @@ function TimeBlockSection({
 
   // Quick-date helpers — most tasks land on today, tomorrow, or "next Mon".
   // Native date picker is still available for anything farther out.
-  const todayStr = toDateString(new Date())
-  const tomorrowStr = toDateString(new Date(Date.now() + 86400000))
+  const todayStr = toDateString(referenceDate)
+  const tomorrow = new Date(referenceDate)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowStr = toDateString(tomorrow)
   const quickDates: { label: string; value: string }[] = [
     { label: '今天', value: todayStr },
     { label: '明天', value: tomorrowStr },
@@ -1003,13 +983,151 @@ function TimeBlockSection({
           })}
         </div>
       </div>
+
+      {children && (
+        <div className="border-t border-border pt-4">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface RecurrenceSettingsProps {
+  isRecurring: boolean
+  recurrenceType: 'daily' | 'weekly' | 'monthly' | 'custom'
+  recurrenceInterval: string
+  recurrenceDays: number[]
+  recurrenceEndDate: string
+  onRecurringChange: (value: boolean) => void
+  onRecurrenceTypeChange: (value: 'daily' | 'weekly' | 'monthly' | 'custom') => void
+  onRecurrenceIntervalChange: (value: string) => void
+  onToggleRecurrenceDay: (day: number) => void
+  onRecurrenceEndDateChange: (value: string) => void
+}
+
+function RecurrenceSettings({
+  isRecurring,
+  recurrenceType,
+  recurrenceInterval,
+  recurrenceDays,
+  recurrenceEndDate,
+  onRecurringChange,
+  onRecurrenceTypeChange,
+  onRecurrenceIntervalChange,
+  onToggleRecurrenceDay,
+  onRecurrenceEndDateChange,
+}: RecurrenceSettingsProps) {
+  const { t } = useI18n()
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          <Repeat className="w-3.5 h-3.5" />
+          {t('重複設定')}
+        </label>
+        <button
+          type="button"
+          onClick={() => onRecurringChange(!isRecurring)}
+          aria-pressed={isRecurring}
+          aria-label={t('重複設定')}
+          className={cn(
+            'relative w-10 h-5 flex-shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            isRecurring ? 'bg-primary' : 'bg-muted'
+          )}
+          style={{ padding: 0, appearance: 'none' as const }}
+        >
+          <span
+            className={cn(
+              'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform motion-reduce:transition-none',
+              isRecurring ? 'translate-x-5' : 'translate-x-0.5'
+            )}
+          />
+        </button>
+      </div>
+
+      {isRecurring && (
+        <div className="space-y-4 pt-1">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: 'daily', label: '每天' },
+              { value: 'weekly', label: '每週' },
+              { value: 'monthly', label: '每月' },
+              { value: 'custom', label: '自訂' },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onRecurrenceTypeChange(option.value as RecurrenceSettingsProps['recurrenceType'])}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  recurrenceType === option.value
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-card text-muted-foreground border border-border hover:bg-secondary'
+                )}
+              >
+                {t(option.label)}
+              </button>
+            ))}
+          </div>
+
+          {recurrenceType === 'custom' && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{t('每')}</span>
+              <Input
+                type="number"
+                min="1"
+                value={recurrenceInterval}
+                onChange={(e) => onRecurrenceIntervalChange(e.target.value)}
+                className="w-16 h-8 text-center"
+              />
+              <span className="text-xs text-muted-foreground">{t('天重複一次')}</span>
+            </div>
+          )}
+
+          {recurrenceType === 'weekly' && (
+            <div className="space-y-2">
+              <span className="text-xs text-muted-foreground">{t('選擇重複的星期')}</span>
+              <div className="flex gap-1.5">
+                {weekdayLabels().map((label, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => onToggleRecurrenceDay(index)}
+                    aria-pressed={recurrenceDays.includes(index)}
+                    className={cn(
+                      'w-8 h-8 rounded-full text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      recurrenceDays.includes(index)
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-card text-muted-foreground border border-border hover:bg-secondary'
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-xs text-muted-foreground">{t('結束日期 (可選)')}</label>
+            <DateField
+              value={recurrenceEndDate}
+              onChange={onRecurrenceEndDateChange}
+              className="h-8"
+              aria-label={t('重複結束日期')}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // NotesEditor: textarea with bullet/checklist toolbar, auto-continue on Enter,
-// and click-to-toggle ☐ ↔ ☑.
+// click-to-toggle ☐ ↔ ☑, and Storage-backed images.
 // ────────────────────────────────────────────────────────────────────────────
 
 interface NotesEditorProps {
@@ -1020,6 +1138,9 @@ interface NotesEditorProps {
 function NotesEditor({ value, onChange }: NotesEditorProps) {
   const { t } = useI18n()
   const ref = useRef<HTMLTextAreaElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const isComposingRef = useRef(false)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
 
   const insertLink = () => {
     const ta = ref.current
@@ -1072,6 +1193,53 @@ function NotesEditor({ value, onChange }: NotesEditorProps) {
     })
   }
 
+  const insertImageMarkdown = (src: string, fileName: string) => {
+    const ta = ref.current
+    const v = ta?.value ?? value
+    const start = ta?.selectionStart ?? v.length
+    const end = ta?.selectionEnd ?? v.length
+    const alt = fileName.replace(/\.[^.]+$/, '').replace(/[\[\]]/g, '').trim() || t('備註圖片')
+    const image = `![${alt}](${src})`
+    const prefix = start > 0 && v[start - 1] !== '\n' ? '\n' : ''
+    const suffix = end < v.length && v[end] !== '\n' ? '\n' : ''
+    const insertion = `${prefix}${image}${suffix}`
+    const next = v.slice(0, start) + insertion + v.slice(end)
+    onChange(next)
+    requestAnimationFrame(() => {
+      if (!ta) return
+      ta.focus()
+      const cursorAt = start + insertion.length
+      ta.setSelectionRange(cursorAt, cursorAt)
+    })
+  }
+
+  const handleImageSelection = async (file?: File) => {
+    if (!file) return
+    if (!TASK_NOTE_IMAGE_EXTENSIONS[file.type]) {
+      toast.error(t('只能插入 PNG、JPG、GIF 或 WebP 圖片'))
+      return
+    }
+    if (file.size > MAX_TASK_NOTE_IMAGE_BYTES) {
+      toast.error(t('圖片太大，上限 5MB'))
+      return
+    }
+
+    const toastId = toast.loading(t('上傳圖片中…'))
+    setIsUploadingImage(true)
+    try {
+      const src = await uploadTaskNoteImage(file)
+      insertImageMarkdown(src, file.name)
+      toast.success(t('圖片已插入'), { id: toastId })
+    } catch (error) {
+      console.error('[task-notes] image upload failed', error)
+      const message = error instanceof Error ? error.message : t('圖片上傳失敗，請再試一次')
+      toast.error(message, { id: toastId })
+    } finally {
+      setIsUploadingImage(false)
+      if (imageInputRef.current) imageInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -1107,13 +1275,47 @@ function NotesEditor({ value, onChange }: NotesEditorProps) {
           >
             <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
+          <button
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            disabled={isUploadingImage}
+            title={t('加入圖片')}
+            aria-label={t('加入圖片')}
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:cursor-wait disabled:opacity-50"
+          >
+            {isUploadingImage
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              : <ImagePlus className="w-3.5 h-3.5" aria-hidden="true" />}
+          </button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={(event) => void handleImageSelection(event.target.files?.[0])}
+          />
         </div>
       </div>
       <textarea
         ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onCompositionStart={() => {
+          isComposingRef.current = true
+        }}
+        onCompositionEnd={() => {
+          isComposingRef.current = false
+        }}
         onKeyDown={(e) => {
+          const nativeEvent = e.nativeEvent
+          if (
+            e.key === 'Enter' &&
+            (isComposingRef.current || nativeEvent.isComposing || nativeEvent.keyCode === 229)
+          ) {
+            return
+          }
           if (e.key === 'Enter' && !e.shiftKey) {
             const ta = e.currentTarget
             const pos = ta.selectionStart ?? 0
@@ -1156,10 +1358,10 @@ function NotesEditor({ value, onChange }: NotesEditorProps) {
       />
       {/* Live preview — only shown when notes contain a link, so the user
           can click to verify the URL without leaving the modal. */}
-      {/\[[^\]]+\]\([^)]+\)|https?:\/\//.test(value) && (
+      {/\[[^\]]*\]\([^)]+\)|https?:\/\//.test(value) && (
         <div className="px-3 py-2 rounded-lg border border-dashed border-border bg-card text-xs leading-relaxed whitespace-pre-wrap break-words">
           <div className="text-[10px] text-muted-foreground mb-1">{t('預覽')}</div>
-          {renderNotesWithLinks(value)}
+          {renderNotesWithLinks(value, { renderImages: true })}
         </div>
       )}
     </div>

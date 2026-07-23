@@ -139,6 +139,9 @@ export const dict: Record<string, string> = {
   '刪除重複任務': 'Delete recurring task',
   '新增任務': "Add task", // aligned with dict/calendar.ts, task-panel.ts, data-layer.ts
   '任務詳情': 'Task Details',
+  '展開其他設定': 'Expand other settings',
+  '收合其他設定': 'Collapse other settings',
+  '其他設定': 'Other settings',
   '標記為未完成': "Mark as not done", // aligned with dict/task-panel.ts, dict/timer.ts (majority)
   '標記為完成': "Mark as done", // aligned with dict/task-panel.ts, dict/timer.ts (majority)
   '刪除任務': 'Delete task',
@@ -151,6 +154,7 @@ export const dict: Record<string, string> = {
   '預估時間 (分鐘)': 'Estimated time (min)',
   '截止日期': 'Due date',
   '日曆顏色': 'Calendar color',
+  '選擇日曆顏色': 'Choose calendar color',
   '自訂顏色': 'Custom color',
   '重複設定': 'Recurrence',
   '每天': 'Daily',
@@ -195,6 +199,14 @@ export const dict: Record<string, string> = {
   '加項目符號': 'Add bullet',
   '加待辦項目': 'Add checklist item',
   '插入超連結': 'Insert link',
+  '加入圖片': 'Add image',
+  '備註圖片': 'Note image',
+  '只能插入 PNG、JPG、GIF 或 WebP 圖片': 'Only PNG, JPG, GIF, or WebP images can be added',
+  '圖片太大，上限 5MB': 'Image is too large; the limit is 5 MB',
+  '上傳圖片中…': 'Uploading image…',
+  '圖片已插入': 'Image added',
+  '圖片上傳失敗，請再試一次': 'Image upload failed. Please try again.',
+  '尚未登入': 'Not signed in',
   '輸入網址（例如 https://example.com）': 'Enter a URL (e.g. https://example.com)',
   '連結要顯示的文字（留空則顯示網址）': 'Text to display for the link (leave blank to show the URL)',
   '寫下細節 · 子彈或待辦清單\n例如：\n• 確認流程\n☐ 寄信給客戶\n☐ 整理會議紀錄': 'Jot down details · bullets or checklist\nFor example:\n• Confirm the process\n☐ Email the client\n☐ Write up meeting notes',
