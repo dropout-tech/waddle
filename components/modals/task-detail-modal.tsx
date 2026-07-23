@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useMemo, useId, type ReactNode } from 'react'
+import { useState, useRef, useMemo, type ReactNode } from 'react'
 import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, Repeat, List, CheckSquare, ListChecks, Link2, Users, MapPin, Video, ImagePlus, Loader2 } from 'lucide-react'
 import { detectMeetingProvider, MEETING_PROVIDER_LABEL } from '@/lib/meeting-utils'
 import { cn } from '@/lib/utils'
@@ -107,8 +107,6 @@ export function TaskDetailModal({
   const [calendarColor, setCalendarColor] = useState(task.calendarColor || task.workspaceColor)
   const [selectedCategoryId, setSelectedCategoryId] = useState(task.categoryId)
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
-  const [showSecondaryDetails, setShowSecondaryDetails] = useState(false)
-  const secondaryDetailsId = useId()
   
   // Recurrence settings
   const [isRecurring, setIsRecurring] = useState(task.isRecurring || false)
@@ -315,23 +313,6 @@ export function TaskDetailModal({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setShowSecondaryDetails((visible) => !visible)}
-              aria-expanded={showSecondaryDetails}
-              aria-controls={secondaryDetailsId}
-              aria-label={showSecondaryDetails ? t('收合其他設定') : t('展開其他設定')}
-              title={showSecondaryDetails ? t('收合其他設定') : t('展開其他設定')}
-              className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-8 md:w-8"
-            >
-              <ChevronDown
-                className={cn(
-                  'h-4 w-4 transition-transform duration-200 motion-reduce:transition-none',
-                  showSecondaryDetails && 'rotate-180',
-                )}
-                aria-hidden="true"
-              />
-            </button>
             {!isCreate && onDelete && (
               <button
                 onClick={() => {
@@ -374,32 +355,18 @@ export function TaskDetailModal({
           {/* Urgency — visual slider with color-coded level */}
           <UrgencySlider value={urgency} onChange={setUrgency} />
 
-          {/* The task's meaning comes before its logistics. Keeping description
-              and notes near the title makes the drawer scan like a notebook,
-              while schedule and secondary metadata stay available below. */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-              <FileText className="w-3.5 h-3.5" />
-              {t('描述')}
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t('添加任務描述...')}
-              className="w-full min-h-[100px] px-3 py-2 rounded-lg border border-input bg-secondary/30 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-
-          <NotesEditor value={notes} onChange={setNotes} />
-
           {/* Time block: scheduled date + start/end + duration + quick presets */}
           <TimeBlockSection
             scheduledDate={scheduledDate}
             startTime={scheduledStartTime}
             endTime={scheduledEndTime}
+            estimatedMinutes={estimatedMinutes}
+            dueDate={dueDate}
             onScheduledDateChange={setScheduledDate}
             onStartTimeChange={setScheduledStartTime}
             onEndTimeChange={setScheduledEndTime}
+            onEstimatedMinutesChange={setEstimatedMinutes}
+            onDueDateChange={setDueDate}
           >
             <RecurrenceSettings
               isRecurring={isRecurring}
@@ -422,59 +389,23 @@ export function TaskDetailModal({
             />
           </TimeBlockSection>
 
-          {/* List visibility toggle — uncheck for recurring meetings the user
-              wants on the calendar but not in the left task list. Only
-              meaningful for scheduled tasks; unscheduled ones must show in
-              the list or they'd be invisible everywhere. Scheduled meetings
-              are forced calendar-only (the panels filter them out), so the
-              toggle locks off for them. */}
-          {(() => {
-            const forcedOffByMeeting = isMeeting && !!scheduledDate
-            const canToggle = !!scheduledDate && !forcedOffByMeeting
-            const effective = forcedOffByMeeting ? false : canToggle ? showInTaskList : true
-            return (
-              <button
-                type="button"
-                onClick={() => canToggle && setShowInTaskList(!showInTaskList)}
-                aria-pressed={effective}
-                aria-disabled={!canToggle}
-                className={cn(
-                  'w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-secondary/30 border border-border transition-colors text-left',
-                  canToggle ? 'hover:bg-secondary/50' : 'opacity-60 cursor-not-allowed'
-                )}
-              >
-                <div className="flex items-start gap-3 min-w-0">
-                  <ListChecks className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-foreground">{t('加入左側任務欄')}</div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                      {forcedOffByMeeting
-                        ? t('會議僅顯示在日曆上，不會出現在左側任務欄')
-                        : canToggle
-                          ? t('關閉後此任務僅顯示在日曆上，例如例行會議')
-                          : t('需先排程才能僅顯示在日曆')}
-                    </div>
-                  </div>
-                </div>
-                <span
-                  className={cn(
-                    'relative w-10 h-5 rounded-full transition-colors flex-shrink-0',
-                    effective ? 'bg-primary' : 'bg-muted'
-                  )}
-                >
-                  <span
-                    className={cn(
-                      'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform',
-                      effective ? 'translate-x-5' : 'translate-x-0.5'
-                    )}
-                  />
-                </span>
-              </button>
-            )
-          })()}
+          {/* Task content follows scheduling in the main reading flow. */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <FileText className="w-3.5 h-3.5" />
+              {t('描述')}
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t('添加任務描述...')}
+              className="w-full min-h-[100px] px-3 py-2 rounded-lg border border-input bg-secondary/30 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
 
-          {/* Meeting toggle + fields stay near scheduling because they change
-              how this task is represented on the calendar. */}
+          <NotesEditor value={notes} onChange={setNotes} />
+
+          {/* Bottom behavior controls start with meeting metadata. */}
           <div className="space-y-2">
             <button
               type="button"
@@ -568,80 +499,96 @@ export function TaskDetailModal({
             )}
           </div>
 
-          {showSecondaryDetails && (
-            <section
-              id={secondaryDetailsId}
-              aria-label={t('其他設定')}
-              className="space-y-4 border-t border-border pt-5"
-            >
-              <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-                {t('其他設定')}
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                    <Clock className="w-3.5 h-3.5" />
-                    {t('預估時間 (分鐘)')}
-                  </label>
-                  <Input
-                    type="number"
-                    value={estimatedMinutes}
-                    onChange={(e) => setEstimatedMinutes(e.target.value)}
-                    placeholder="60"
-                    className="h-9"
-                  />
+          {/* List visibility follows the meeting control. It is only
+              meaningful for scheduled tasks; unscheduled tasks must remain
+              visible somewhere. Scheduled meetings are calendar-only. */}
+          {(() => {
+            const forcedOffByMeeting = isMeeting && !!scheduledDate
+            const canToggle = !!scheduledDate && !forcedOffByMeeting
+            const effective = forcedOffByMeeting ? false : canToggle ? showInTaskList : true
+            return (
+              <button
+                type="button"
+                onClick={() => canToggle && setShowInTaskList(!showInTaskList)}
+                aria-pressed={effective}
+                aria-disabled={!canToggle}
+                className={cn(
+                  'w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-secondary/30 border border-border transition-colors text-left',
+                  canToggle ? 'hover:bg-secondary/50' : 'opacity-60 cursor-not-allowed'
+                )}
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <ListChecks className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-foreground">{t('加入左側任務欄')}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                      {forcedOffByMeeting
+                        ? t('會議僅顯示在日曆上，不會出現在左側任務欄')
+                        : canToggle
+                          ? t('關閉後此任務僅顯示在日曆上，例如例行會議')
+                          : t('需先排程才能僅顯示在日曆')}
+                    </div>
+                  </div>
                 </div>
-
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {t('截止日期')}
-                  </label>
-                  <DateField
-                    value={dueDate}
-                    onChange={setDueDate}
-                    className="h-9"
-                    aria-label={t('截止日期')}
+                <span
+                  className={cn(
+                    'relative w-10 h-5 rounded-full transition-colors flex-shrink-0',
+                    effective ? 'bg-primary' : 'bg-muted'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform',
+                      effective ? 'translate-x-5' : 'translate-x-0.5'
+                    )}
                   />
-                </div>
-              </div>
+                </span>
+              </button>
+            )
+          })()}
 
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Palette className="w-3.5 h-3.5" />
-                  {t('日曆顏色')}
-                </label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {PRESET_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setCalendarColor(color)}
-                      aria-label={t('選擇日曆顏色')}
-                      aria-pressed={calendarColor === color}
-                      className={cn(
-                        'w-7 h-7 rounded-full border-2 transition-all',
-                        calendarColor === color
-                          ? 'border-foreground scale-110'
-                          : 'border-transparent hover:scale-105'
-                      )}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                  <input
-                    type="color"
-                    value={calendarColor}
-                    onChange={(e) => setCalendarColor(e.target.value)}
-                    className="w-7 h-7 rounded-full cursor-pointer"
-                    title={t('自訂顏色')}
-                    aria-label={t('自訂顏色')}
-                  />
-                </div>
-              </div>
-            </section>
-          )}
+          {/* Calendar color is the final, always-visible visual setting. */}
+          <div className="space-y-2 border-t border-border pt-5">
+            <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Palette className="w-3.5 h-3.5" />
+              {t('日曆顏色')}
+            </label>
+            <div className="flex items-center gap-2 flex-wrap">
+              {PRESET_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setCalendarColor(color)}
+                  aria-label={t('選擇日曆顏色')}
+                  aria-pressed={calendarColor === color}
+                  className={cn(
+                    'w-7 h-7 rounded-full transition-all',
+                    calendarColor === color
+                      ? 'ring-2 ring-offset-2 ring-ring scale-110'
+                      : 'hover:scale-110'
+                  )}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+              <label
+                className="relative w-7 h-7 rounded-full overflow-hidden border-2 border-dashed border-muted-foreground/40 cursor-pointer hover:border-muted-foreground transition-colors"
+                title={t('自訂顏色')}
+              >
+                <input
+                  type="color"
+                  value={calendarColor}
+                  onChange={(event) => setCalendarColor(event.target.value)}
+                  aria-label={t('自訂顏色')}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <span
+                  className="absolute inset-1 rounded-full"
+                  style={{ backgroundColor: calendarColor }}
+                />
+              </label>
+            </div>
+          </div>
+
         </div>
 
         {/* Footer */}
@@ -781,9 +728,13 @@ interface TimeBlockSectionProps {
   scheduledDate: string
   startTime: string
   endTime: string
+  estimatedMinutes: string
+  dueDate: string
   onScheduledDateChange: (v: string) => void
   onStartTimeChange: (v: string) => void
   onEndTimeChange: (v: string) => void
+  onEstimatedMinutesChange: (v: string) => void
+  onDueDateChange: (v: string) => void
   children?: ReactNode
 }
 
@@ -791,13 +742,18 @@ function TimeBlockSection({
   scheduledDate,
   startTime,
   endTime,
+  estimatedMinutes,
+  dueDate,
   onScheduledDateChange,
   onStartTimeChange,
   onEndTimeChange,
+  onEstimatedMinutesChange,
+  onDueDateChange,
   children,
 }: TimeBlockSectionProps) {
   const { t } = useI18n()
   const [referenceDate] = useState(() => new Date())
+  const [showTimingDetails, setShowTimingDetails] = useState(false)
   const startMin = parseTime(startTime)
   const endMin = parseTime(endTime)
   const duration = useMemo(() => {
@@ -989,6 +945,71 @@ function TimeBlockSection({
           {children}
         </div>
       )}
+
+      {/* Estimated effort and deadline are secondary scheduling details.
+          Keep them together at the bottom of this card so the main date/time
+          controls remain quick to scan. */}
+      <div className="border-t border-border pt-4">
+        <button
+          type="button"
+          onClick={() => setShowTimingDetails((visible) => !visible)}
+          aria-expanded={showTimingDetails}
+          aria-label={t(showTimingDetails ? '收合時間與期限' : '展開時間與期限')}
+          title={t(showTimingDetails ? '收合時間與期限' : '展開時間與期限')}
+          className="flex w-full items-center justify-between gap-3 rounded-lg py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            {t('時間與期限')}
+          </span>
+          <span className="flex min-w-0 items-center gap-2">
+            {!showTimingDetails && (estimatedMinutes || dueDate) && (
+              <span className="truncate text-[10px] text-muted-foreground">
+                {[
+                  estimatedMinutes ? t('{min} 分', { min: estimatedMinutes }) : '',
+                  dueDate,
+                ].filter(Boolean).join(' · ')}
+              </span>
+            )}
+            <ChevronDown
+              className={cn(
+                'h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform',
+                showTimingDetails && 'rotate-180',
+              )}
+            />
+          </span>
+        </button>
+
+        {showTimingDetails && (
+          <div className="grid grid-cols-1 gap-4 pt-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                {t('預估時間 (分鐘)')}
+              </label>
+              <Input
+                type="number"
+                min="0"
+                value={estimatedMinutes}
+                onChange={(event) => onEstimatedMinutesChange(event.target.value)}
+                placeholder="60"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Calendar className="h-3.5 w-3.5" />
+                {t('截止日期')}
+              </label>
+              <DateField
+                value={dueDate}
+                onChange={onDueDateChange}
+                className="h-10"
+                aria-label={t('截止日期')}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
