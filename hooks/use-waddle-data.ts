@@ -1585,6 +1585,7 @@ export function useWaddleData(): UseWaddleData {
     if (recurrenceChoice === 'only_this' && targetDate) {
       // If it's already a detached task, just delete it.
       if (task.parentId) {
+        const snapshot = task
         setWorkspaces((prev) =>
           prev.map((w) => ({
             ...w,
@@ -1601,10 +1602,18 @@ export function useWaddleData(): UseWaddleData {
         } finally {
           pendingWritesRef.current -= 1
         }
+        if (recordUndo) {
+          pushUndoableAction({
+            label: translate('刪除「{title}」', { title: snapshot.title }),
+            undo: () => createTask(snapshot),
+            redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
+          })
+        }
       } else {
         // It's a virtual occurrence of a master task.
         // Add targetDate to exdates.
-        const nextExdates = [...(task.exdates || []), targetDate]
+        const previousExdates = [...(task.exdates || [])]
+        const nextExdates = [...previousExdates, targetDate]
         setWorkspaces((prev) =>
           prev.map((w) => ({
             ...w,
@@ -1626,6 +1635,30 @@ export function useWaddleData(): UseWaddleData {
         } finally {
           pendingWritesRef.current -= 1
         }
+        if (recordUndo) {
+          const snapshot = task
+          pushUndoableAction({
+            label: translate('刪除「{title}」', { title: snapshot.title }),
+            undo: async () => {
+              setWorkspaces((prev) =>
+                prev.map((w) => ({
+                  ...w,
+                  categories: w.categories.map((c) => ({
+                    ...c,
+                    tasks: c.tasks.map((t) =>
+                      t.id === taskId ? { ...t, exdates: previousExdates } : t
+                    ),
+                  })),
+                }))
+              )
+              await supabase
+                .from('tasks')
+                .update({ exdates: previousExdates })
+                .eq('id', taskId)
+            },
+            redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
+          })
+        }
       }
       return
     }
@@ -1635,6 +1668,7 @@ export function useWaddleData(): UseWaddleData {
       // If the targetDate is the original scheduledDate, it's effectively "all"
       if (targetDate === task.scheduledDate) {
         // Reuse "all" logic
+        const snapshot = task
         setWorkspaces((prev) =>
           prev.map((w) => ({
             ...w,
@@ -1651,10 +1685,18 @@ export function useWaddleData(): UseWaddleData {
         } finally {
           pendingWritesRef.current -= 1
         }
+        if (recordUndo) {
+          pushUndoableAction({
+            label: translate('刪除「{title}」', { title: snapshot.title }),
+            undo: () => createTask(snapshot),
+            redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
+          })
+        }
         return
       }
 
       // 1. Cap the master task
+      const previousEndDate = task.recurrence?.endDate || ''
       const dayBefore = new Date(parseDateString(targetDate))
       dayBefore.setDate(dayBefore.getDate() - 1)
       const endDate = toDateString(dayBefore)
@@ -1686,6 +1728,38 @@ export function useWaddleData(): UseWaddleData {
         // For simplicity, we just delete the master's "future" via endDate.
       } finally {
         pendingWritesRef.current -= 1
+      }
+      if (recordUndo) {
+        const snapshot = task
+        pushUndoableAction({
+          label: translate('刪除「{title}」', { title: snapshot.title }),
+          undo: async () => {
+            setWorkspaces((prev) =>
+              prev.map((w) => ({
+                ...w,
+                categories: w.categories.map((c) => ({
+                  ...c,
+                  tasks: c.tasks.map((t) =>
+                    t.id === taskId
+                      ? {
+                          ...t,
+                          recurrence: {
+                            ...t.recurrence!,
+                            endDate: previousEndDate,
+                          },
+                        }
+                      : t
+                  ),
+                })),
+              }))
+            )
+            await supabase
+              .from('tasks')
+              .update({ recurrence_end_date: previousEndDate || null })
+              .eq('id', taskId)
+          },
+          redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
+        })
       }
     }
   }, [supabase])

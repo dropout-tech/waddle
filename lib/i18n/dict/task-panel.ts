@@ -105,6 +105,7 @@ export const dict: Record<string, string> = {
   '標記為未完成': "Mark as not done",
   '標記為完成': "Mark as done",
   '會議': "Meeting",
+  '已刪除「{title}」': 'Deleted "{title}"',
 
   // today-meetings-popover.tsx
   '今天有 {count} 場會議': "{count} meetings today",

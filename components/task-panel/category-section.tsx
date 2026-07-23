@@ -17,6 +17,9 @@ interface CategorySectionProps {
   onSelectTask: (task: Task) => void
   onAddTask: (categoryId: string, title: string) => void
   onDelete?: (categoryId: string) => void
+  onDeleteTask?: (task: Task) => void
+  revealedDeleteTaskId?: string | null
+  onRevealDeleteTask?: (taskId: string | null) => void
   onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
   onMoveTask?: (taskId: string, categoryId: string) => void
   taskDropTargetId?: string | null
@@ -44,6 +47,9 @@ export function CategorySection({
   onSelectTask,
   onAddTask,
   onDelete,
+  onDeleteTask,
+  revealedDeleteTaskId,
+  onRevealDeleteTask,
   onSendTaskToCalendar,
   onTaskDragActivate,
   onMoveTask,
@@ -190,6 +196,9 @@ export function CategorySection({
               metaOrder={metaOrder}
               onToggleComplete={onToggleComplete}
               onSelect={onSelectTask}
+              onDelete={onDeleteTask}
+              isDeleteRevealed={revealedDeleteTaskId === task.id}
+              onDeleteRevealChange={onRevealDeleteTask}
               onSendToCalendar={onSendTaskToCalendar}
               onDragActivate={onTaskDragActivate}
               onMoveToCategory={onMoveTask}
@@ -257,6 +266,9 @@ export function CategorySection({
                   metaOrder={metaOrder}
                   onToggleComplete={onToggleComplete}
                   onSelect={onSelectTask}
+                  onDelete={onDeleteTask}
+                  isDeleteRevealed={revealedDeleteTaskId === task.id}
+                  onDeleteRevealChange={onRevealDeleteTask}
                   onSendToCalendar={onSendTaskToCalendar}
                   onDragActivate={onTaskDragActivate}
                   onMoveToCategory={onMoveTask}

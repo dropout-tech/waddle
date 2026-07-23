@@ -21,6 +21,9 @@ interface WorkspaceSectionProps {
   onAddTask: (categoryId: string, title: string) => void
   onAddCategory?: (workspaceId: string, name: string) => void
   onDeleteCategory?: (categoryId: string) => void
+  onDeleteTask?: (task: Task) => void
+  revealedDeleteTaskId?: string | null
+  onRevealDeleteTask?: (taskId: string | null) => void
   onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
   onMoveTask?: (taskId: string, categoryId: string) => void
   taskDropTargetId?: string | null
@@ -44,6 +47,9 @@ export function WorkspaceSection({
   onAddTask,
   onAddCategory,
   onDeleteCategory,
+  onDeleteTask,
+  revealedDeleteTaskId,
+  onRevealDeleteTask,
   onSendTaskToCalendar,
   onMoveTask,
   taskDropTargetId,
@@ -217,6 +223,9 @@ export function WorkspaceSection({
               onSelectTask={onSelectTask}
               onAddTask={onAddTask}
               onDelete={onDeleteCategory}
+              onDeleteTask={onDeleteTask}
+              revealedDeleteTaskId={revealedDeleteTaskId}
+              onRevealDeleteTask={onRevealDeleteTask}
               onSendTaskToCalendar={onSendTaskToCalendar}
               onMoveTask={onMoveTask}
               taskDropTargetId={taskDropTargetId}

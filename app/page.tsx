@@ -449,6 +449,7 @@ function HuddlePage() {
         onAddTask={addTask}
         onAddCategory={addCategory}
         onDeleteCategory={deleteCategory}
+        onDeleteTask={deleteTask}
         onSendTaskToCalendar={handleSendToCalendar}
         onMoveTask={handleMoveTask}
         onAddWorkspace={addWorkspace}

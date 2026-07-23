@@ -1,8 +1,8 @@
 'use client'
 
-import { memo, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Clock, Calendar, MessageSquare, Timer, AlertCircle, GripVertical, Users } from 'lucide-react'
+import { Check, Clock, Calendar, MessageSquare, Timer, AlertCircle, GripVertical, Trash2, Users } from 'lucide-react'
 import { cn, haptic } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import { getUrgencyColor, formatEstimatedTime } from '@/lib/task-utils'
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/tooltip'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { useI18n } from '@/lib/i18n/react'
+import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 
 interface TaskRowProps {
   task: Task
@@ -24,6 +25,9 @@ interface TaskRowProps {
   metaOrder?: MetaField[]
   onToggleComplete: (taskId: string) => void
   onSelect: (task: Task) => void
+  onDelete?: (task: Task) => void
+  isDeleteRevealed?: boolean
+  onDeleteRevealChange?: (taskId: string | null) => void
   /**
    * Called when the row is dragged onto the calendar:
    *   - Drop on a day grid → schedules the task with start/end times.
@@ -50,6 +54,8 @@ interface TaskRowProps {
 
 const DEFAULT_META_ORDER: MetaField[] = ['duration', 'date', 'time']
 const DRAG_THRESHOLD = 5
+const DELETE_REVEAL_WIDTH = 76
+const DELETE_REVEAL_THRESHOLD = DELETE_REVEAL_WIDTH / 2
 
 function TaskRowImpl({
   task,
@@ -57,6 +63,9 @@ function TaskRowImpl({
   metaOrder = DEFAULT_META_ORDER,
   onToggleComplete,
   onSelect,
+  onDelete,
+  isDeleteRevealed = false,
+  onDeleteRevealChange,
   onSendToCalendar,
   onDragActivate,
   onMoveToCategory,
@@ -81,6 +90,7 @@ function TaskRowImpl({
   // directly avoids re-rendering the full task row on every event.
   const [ghostOrigin, setGhostOrigin] = useState({ x: 0, y: 0 })
   const ghostElementRef = useRef<HTMLDivElement>(null)
+  const swipeSurfaceRef = useRef<HTMLDivElement>(null)
   // Once the drag activates, the trailing click event (if any) needs to be
   // suppressed so we don't open the modal at the same time as the drop.
   const suppressNextClickRef = useRef(false)
@@ -89,8 +99,22 @@ function TaskRowImpl({
   // sparkles flying outward.
   const [burst, setBurst] = useState(false)
 
+  const setSwipeOffset = (offset: number, animate: boolean) => {
+    const surface = swipeSurfaceRef.current
+    if (!surface) return
+    surface.style.transition = animate
+      ? 'transform 180ms cubic-bezier(0.22, 1, 0.36, 1)'
+      : 'none'
+    surface.style.transform = `translate3d(${offset}px, 0, 0)`
+  }
+
+  useEffect(() => {
+    setSwipeOffset(isDeleteRevealed ? -DELETE_REVEAL_WIDTH : 0, true)
+  }, [isDeleteRevealed])
+
   const handleCheck = (e: React.MouseEvent) => {
     e.stopPropagation()
+    onDeleteRevealChange?.(null)
     if (!task.isCompleted) {
       setBurst(true)
       window.setTimeout(() => setBurst(false), 700)
@@ -106,11 +130,27 @@ function TaskRowImpl({
       suppressNextClickRef.current = false
       return
     }
+    if (isDeleteRevealed) {
+      e.preventDefault()
+      e.stopPropagation()
+      onDeleteRevealChange?.(null)
+      return
+    }
+    // Selecting another task should close any revealed delete action first.
+    onDeleteRevealChange?.(null)
     onSelect(task)
   }
 
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onDeleteRevealChange?.(null)
+    haptic(16)
+    onDelete?.(task)
+  }
+
   const handleMouseDown = (e: React.PointerEvent) => {
-    if (!onSendToCalendar && !onMoveToCategory) return
+    if (!onSendToCalendar && !onMoveToCategory && !onDelete) return
     if (e.button !== 0 && e.pointerType === 'mouse') return
     // Don't start a drag from interactive children (checkbox).
     if ((e.target as HTMLElement).closest('button')) return
@@ -119,6 +159,10 @@ function TaskRowImpl({
     const startY = e.clientY
     let activated = false
     let calendarDragActivated = false
+    let horizontalDeleteSwipe = false
+    let gestureSuppressed = false
+    let swipeOffset = isDeleteRevealed ? -DELETE_REVEAL_WIDTH : 0
+    const swipeStartOffset = swipeOffset
     // For touch input we want a long-press before drag activates so the
     // user can still scroll the task list with their finger. Mouse keeps
     // the snappy 5px threshold.
@@ -149,6 +193,34 @@ function TaskRowImpl({
       const dx = ev.clientX - startX
       const dy = ev.clientY - startY
       const dist = Math.sqrt(dx * dx + dy * dy)
+
+      if (
+        isTouch &&
+        onDelete &&
+        !activated &&
+        !horizontalDeleteSwipe &&
+        Math.abs(dx) > 8 &&
+        Math.abs(dx) > Math.abs(dy) * 1.25
+      ) {
+        horizontalDeleteSwipe = true
+        gestureSuppressed = true
+        beginGestureSuppression()
+        if (longPressTimer != null) {
+          window.clearTimeout(longPressTimer)
+          longPressTimer = null
+        }
+      }
+
+      if (horizontalDeleteSwipe) {
+        ev.preventDefault()
+        swipeOffset = Math.max(
+          -DELETE_REVEAL_WIDTH,
+          Math.min(0, swipeStartOffset + dx),
+        )
+        setSwipeOffset(swipeOffset, false)
+        return
+      }
+
       if (dist > DRAG_THRESHOLD) {
         stillInThreshold = false
         // Touch: only start drag via long-press timer; finger-drag without
@@ -182,6 +254,19 @@ function TaskRowImpl({
         window.clearTimeout(longPressTimer)
         longPressTimer = null
       }
+
+      if (horizontalDeleteSwipe) {
+        suppressNextClickRef.current = true
+        const shouldReveal =
+          ev.type !== 'pointercancel' && swipeOffset <= -DELETE_REVEAL_THRESHOLD
+        setSwipeOffset(shouldReveal ? -DELETE_REVEAL_WIDTH : 0, true)
+        onDeleteRevealChange?.(shouldReveal ? task.id : null)
+        if (shouldReveal && !isDeleteRevealed) haptic(12)
+        if (gestureSuppressed) endGestureSuppression()
+        return
+      }
+
+      if (gestureSuppressed) endGestureSuppression()
 
       if (!activated) {
         // No drag — leave the trailing click alone so onSelect can fire.
@@ -281,16 +366,61 @@ function TaskRowImpl({
     if (m && d) scheduledDatePrefix = `${parseInt(m, 10)}/${parseInt(d, 10)} `
   }
 
+  const desktopDeleteButton = onDelete ? (
+    <button
+      type="button"
+      data-task-delete-action="desktop"
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={handleDelete}
+      className="absolute right-2 top-1/2 z-[2] hidden size-8 -translate-y-1/2 items-center justify-center rounded-lg border border-border/80 bg-card/95 text-muted-foreground opacity-0 shadow-sm backdrop-blur-sm transition-[opacity,color,background-color,transform] duration-150 hover:scale-105 hover:bg-primary/10 hover:text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:flex md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+      title={t('刪除任務')}
+      aria-label={t('刪除任務')}
+    >
+      <Trash2 className="size-4" aria-hidden="true" />
+    </button>
+  ) : null
+
+  const withDeleteReveal = (row: ReactNode) => (
+    <>
+      <div
+        className={cn(
+          'relative',
+          onDelete && 'overflow-hidden md:overflow-visible',
+          density === 'compact' ? 'rounded-md' : 'rounded-xl',
+        )}
+      >
+        {onDelete && (
+          <button
+            type="button"
+            data-task-delete-action="mobile"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={handleDelete}
+            className="absolute inset-y-0 right-0 flex w-[76px] items-center justify-center gap-1.5 bg-primary/12 text-xs font-semibold text-primary transition-colors active:bg-primary/20 md:hidden"
+            aria-label={t('刪除任務')}
+            tabIndex={isDeleteRevealed ? 0 : -1}
+            aria-hidden={!isDeleteRevealed}
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+            <span>{t('刪除')}</span>
+          </button>
+        )}
+        <div ref={swipeSurfaceRef} className="relative z-[1] md:!transform-none">
+          {row}
+        </div>
+      </div>
+      {ghost}
+    </>
+  )
+
   // ─── COMPACT: single tight line, left border only ────────────────────────
   if (density === 'compact') {
-    return (
-      <>
+    return withDeleteReveal(
         <div
           data-tour="task-row"
           onPointerDown={handleMouseDown}
           onClick={handleRowClick}
           className={cn(
-            'group flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-all duration-150 ease-quart rounded-md select-none',
+            'group relative flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-all duration-150 ease-quart rounded-md select-none',
             // Hover feedback beyond the drag handle: wash the row towards the
             // accent (dusty rose) and nudge right. The base color lives in a
             // CSS variable so hover can color-mix it — Tailwind classes can't
@@ -409,15 +539,13 @@ function TaskRowImpl({
           {colors.isOverdue && (
             <AlertCircle className="flex-shrink-0 w-3 h-3" style={{ color: colors.accentColor }} />
           )}
+          {desktopDeleteButton}
         </div>
-        {ghost}
-      </>
     )
   }
 
   // ─── COMFORTABLE (default): full detail, extra padding, notes always visible ────────
-  return (
-    <>
+  return withDeleteReveal(
       <div
         data-tour="task-row"
         className={cn(
@@ -612,9 +740,8 @@ function TaskRowImpl({
             </p>
           )}
         </div>
+        {desktopDeleteButton}
       </div>
-      {ghost}
-    </>
   )
 }
 

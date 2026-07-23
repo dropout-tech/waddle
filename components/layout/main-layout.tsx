@@ -25,6 +25,7 @@ import { Link2 } from 'lucide-react'
 import { useI18n } from '@/lib/i18n/react'
 import { GrowthJourneyDashboard } from '@/components/growth/growth-journey-dashboard'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
+import type { RecurrenceChoice } from '@/components/modals/recurrence-choice-modal'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
@@ -38,6 +39,7 @@ interface MainLayoutProps {
   onAddTask: (categoryId: string, title: string) => void
   onAddCategory?: (workspaceId: string, name: string) => void
   onDeleteCategory?: (categoryId: string) => void
+  onDeleteTask?: (taskId: string, targetDate?: string, recurrenceChoice?: RecurrenceChoice) => void | Promise<void>
   onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
   onMoveTask?: (taskId: string, categoryId: string) => void
   onAddWorkspace?: (name: string, color: string, icon: string) => void
@@ -90,6 +92,7 @@ export function MainLayout({
   onAddTask,
   onAddCategory,
   onDeleteCategory,
+  onDeleteTask,
   onSendTaskToCalendar,
   onMoveTask,
   onAddWorkspace,
@@ -523,6 +526,7 @@ export function MainLayout({
                 onAddTask={onAddTask}
                 onAddCategory={onAddCategory}
                 onDeleteCategory={onDeleteCategory}
+                onDeleteTask={onDeleteTask}
                 onSendTaskToCalendar={onSendTaskToCalendar}
                 onMoveTask={onMoveTask}
                 // Auto-switch to calendar tab the moment a row's drag
@@ -776,6 +780,7 @@ export function MainLayout({
                 onAddTask={onAddTask}
                 onAddCategory={onAddCategory}
                 onDeleteCategory={onDeleteCategory}
+                onDeleteTask={onDeleteTask}
                 onSendTaskToCalendar={onSendTaskToCalendar}
                 onMoveTask={onMoveTask}
                 onAddWorkspace={onAddWorkspace}

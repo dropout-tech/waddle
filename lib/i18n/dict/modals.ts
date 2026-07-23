@@ -137,6 +137,12 @@ export const dict: Record<string, string> = {
   // ── task-detail-modal.tsx ───────────────────────────────────────────────
   '儲存重複任務': 'Save recurring task',
   '刪除重複任務': 'Delete recurring task',
+  '只刪這一天': 'Delete only this day',
+  '其他循環日會保留': 'Other occurrences will stay',
+  '刪除這天與之後': 'Delete this and following',
+  '保留先前的循環，只刪除這天開始的項目': 'Keep earlier occurrences and delete from this day onward',
+  '刪除所有循環': 'Delete all occurrences',
+  '刪除整個重複任務': 'Delete the entire recurring task',
   '新增任務': "Add task", // aligned with dict/calendar.ts, task-panel.ts, data-layer.ts
   '任務詳情': 'Task Details',
   '展開其他設定': 'Expand other settings',

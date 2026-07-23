@@ -21,6 +21,9 @@ interface UnifiedTaskListProps {
   groupBy?: UnifiedGroupBy
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task) => void
+  onDeleteTask?: (task: Task) => void
+  revealedDeleteTaskId?: string | null
+  onRevealDeleteTask?: (taskId: string | null) => void
 }
 
 interface Group {
@@ -45,6 +48,9 @@ export function UnifiedTaskList({
   groupBy = 'urgency',
   onToggleComplete,
   onSelectTask,
+  onDeleteTask,
+  revealedDeleteTaskId,
+  onRevealDeleteTask,
 }: UnifiedTaskListProps) {
   const { t } = useI18n()
   // Always send completed to the bottom regardless of grouping.
@@ -175,6 +181,9 @@ export function UnifiedTaskList({
                     metaOrder={metaOrder}
                     onToggleComplete={onToggleComplete}
                     onSelect={onSelectTask}
+                    onDelete={onDeleteTask}
+                    isDeleteRevealed={revealedDeleteTaskId === task.id}
+                    onDeleteRevealChange={onRevealDeleteTask}
                     showWorkspaceTag
                   />
                 </div>

@@ -13,6 +13,12 @@ import { UnifiedTaskList } from './unified-task-list'
 import { CompletedTasksDrawer } from './completed-tasks-drawer'
 import { TodayMeetingsPopover } from './today-meetings-popover'
 import { useI18n } from '@/lib/i18n/react'
+import { toast } from 'sonner'
+import { performUndo } from '@/lib/undo-stack'
+import {
+  RecurrenceChoiceModal,
+  type RecurrenceChoice,
+} from '@/components/modals/recurrence-choice-modal'
 
 import { Button } from '@/components/ui/button'
 
@@ -43,6 +49,7 @@ interface TaskPanelProps {
   onAddTask: (categoryId: string, title: string) => void
   onAddCategory?: (workspaceId: string, name: string) => void
   onDeleteCategory?: (categoryId: string) => void
+  onDeleteTask?: (taskId: string, targetDate?: string, recurrenceChoice?: RecurrenceChoice) => void | Promise<void>
   onSendTaskToCalendar?: (taskId: string, date: string, startTime?: string, endTime?: string) => void
   onMoveTask?: (taskId: string, categoryId: string) => void
   onTaskDragActivate?: () => void
@@ -69,6 +76,7 @@ export function TaskPanel({
   onAddTask,
   onAddCategory,
   onDeleteCategory,
+  onDeleteTask,
   onSendTaskToCalendar,
   onMoveTask,
   onTaskDragActivate,
@@ -102,6 +110,8 @@ export function TaskPanel({
   })
   const [toolbarOpen, setToolbarOpen] = useState(false)
   const [completedDrawerOpen, setCompletedDrawerOpen] = useState(false)
+  const [revealedDeleteTaskId, setRevealedDeleteTaskId] = useState<string | null>(null)
+  const [recurringDeleteTask, setRecurringDeleteTask] = useState<Task | null>(null)
   const [taskDropTargetId, setTaskDropTargetId] = useState<string | null>(null)
   const [filters, setFilters] = useState<FilterState>({
     search: '',
@@ -220,6 +230,35 @@ export function TaskPanel({
     if (element && scrollContainerRef.current) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
+  }
+
+  const commitQuickDelete = async (task: Task, recurrenceChoice?: RecurrenceChoice) => {
+    if (!onDeleteTask) return
+    setRevealedDeleteTaskId(null)
+    await onDeleteTask(task.id, task.scheduledDate, recurrenceChoice)
+    toast(t('已刪除「{title}」', { title: task.title?.trim() || t('未命名任務') }), {
+      duration: 8000,
+      action: {
+        label: t('復原'),
+        onClick: async () => {
+          try {
+            const action = await performUndo()
+            if (action) toast.success(t('已復原：{label}', { label: action.label }))
+          } catch {
+            toast.error(t('復原失敗'))
+          }
+        },
+      },
+    })
+  }
+
+  const handleQuickDelete = (task: Task) => {
+    if (task.isRecurring) {
+      setRevealedDeleteTaskId(null)
+      setRecurringDeleteTask(task)
+      return
+    }
+    void commitQuickDelete(task)
   }
 
   return (
@@ -403,6 +442,9 @@ export function TaskPanel({
                 onAddTask={onAddTask}
                 onAddCategory={onAddCategory}
                 onDeleteCategory={onDeleteCategory}
+                onDeleteTask={onDeleteTask ? handleQuickDelete : undefined}
+                revealedDeleteTaskId={revealedDeleteTaskId}
+                onRevealDeleteTask={setRevealedDeleteTaskId}
                 onSendTaskToCalendar={onSendTaskToCalendar}
                 onMoveTask={onMoveTask}
                 taskDropTargetId={taskDropTargetId}
@@ -419,6 +461,9 @@ export function TaskPanel({
             groupBy={viewMode === 'urgency' ? 'urgency' : 'time'}
             onToggleComplete={onToggleComplete}
             onSelectTask={onSelectTask}
+            onDeleteTask={onDeleteTask ? handleQuickDelete : undefined}
+            revealedDeleteTaskId={revealedDeleteTaskId}
+            onRevealDeleteTask={setRevealedDeleteTaskId}
           />
         )}
       </div>
@@ -436,6 +481,18 @@ export function TaskPanel({
           setCompletedDrawerOpen(false)
           onSelectTask(task)
         }}
+      />
+      <RecurrenceChoiceModal
+        isOpen={!!recurringDeleteTask}
+        onClose={() => setRecurringDeleteTask(null)}
+        onConfirm={(choice) => {
+          const task = recurringDeleteTask
+          setRecurringDeleteTask(null)
+          if (task) void commitQuickDelete(task, choice)
+        }}
+        title={t('刪除重複任務')}
+        actionLabel={t('刪除')}
+        mode="delete"
       />
     </div>
   )

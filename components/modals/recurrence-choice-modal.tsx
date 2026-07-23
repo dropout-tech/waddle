@@ -20,9 +20,11 @@ interface RecurrenceChoiceModalProps {
    * the master row itself and there are no other overrides in play. */
   defaultChoice?: RecurrenceChoice
   actionLabel?: string
+  /** Uses delete-specific option copy while keeping the same recurrence scope. */
+  mode?: 'edit' | 'delete'
 }
 
-const OPTIONS: Array<{
+const EDIT_OPTIONS: Array<{
   value: RecurrenceChoice
   label: string
   hint: string
@@ -55,12 +57,35 @@ export function RecurrenceChoiceModal({
   title,
   defaultChoice = 'only_this',
   actionLabel,
+  mode = 'edit',
 }: RecurrenceChoiceModalProps) {
   const { t } = useI18n()
   const resolvedTitle = title ?? t('套用到這個重複事件')
   const resolvedActionLabel = actionLabel ?? t('套用')
   const [choice, setChoice] = useState<RecurrenceChoice>(defaultChoice)
   const isMobile = useIsMobile()
+  const options = mode === 'delete'
+    ? [
+        {
+          value: 'only_this' as const,
+          label: '只刪這一天',
+          hint: '其他循環日會保留',
+          Icon: CalendarDays,
+        },
+        {
+          value: 'this_and_following' as const,
+          label: '刪除這天與之後',
+          hint: '保留先前的循環，只刪除這天開始的項目',
+          Icon: CalendarRange,
+        },
+        {
+          value: 'all' as const,
+          label: '刪除所有循環',
+          hint: '刪除整個重複任務',
+          Icon: Repeat,
+        },
+      ]
+    : EDIT_OPTIONS
 
   // Hand-rolled dialog (not ModalShell) — with no Esc handling of its own,
   // a stray Escape here fell through to whatever else was listening on
@@ -90,7 +115,7 @@ export function RecurrenceChoiceModal({
 
   const optionList = (
     <div className="px-3 pb-3 space-y-1.5">
-      {OPTIONS.map(({ value, label, hint, Icon }) => {
+      {options.map(({ value, label, hint, Icon }) => {
         const active = choice === value
         return (
           <button
