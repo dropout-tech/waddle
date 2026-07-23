@@ -46,6 +46,7 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
     saveNoteContent,
     deleteNote,
     reorderNotes,
+    moveNote,
     createCategory,
     renameCategory,
     deleteCategory,
@@ -214,6 +215,7 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
               onCreate={handleCreate}
               onDelete={deleteNote}
               onReorder={reorderNotes}
+              onMove={moveNote}
               onSetNoteCategory={setNoteCategory}
               onCreateCategory={(name) => createCategory(name)}
               onRenameCategory={renameCategory}

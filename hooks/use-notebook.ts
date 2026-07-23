@@ -260,11 +260,15 @@ export function useNotebook() {
 
   // ── Reorder ──────────────────────────────────────────────
   const reorderNotes = useCallback(
-    async (orderedIds: string[]) => {
+    async (
+      orderedIds: string[],
+      move?: { id: string; categoryId: string | null },
+    ) => {
       const userId = userIdRef.current
       if (!userId) return
       let snapshot: NotebookNote[] = []
       const byId = new Map<string, NotebookNote>()
+      const now = new Date().toISOString()
 
       setNotes((prev) => {
         snapshot = prev
@@ -272,7 +276,13 @@ export function useNotebook() {
         return orderedIds
           .map((id, i) => {
             const n = byId.get(id)
-            return n ? { ...n, sortOrder: i * 10 } : null
+            if (!n) return null
+            const isMovedNote = move?.id === id
+            return {
+              ...n,
+              ...(isMovedNote ? { categoryId: move.categoryId, updatedAt: now } : {}),
+              sortOrder: i * 10,
+            }
           })
           .filter((n): n is NotebookNote => n !== null)
       })
@@ -281,20 +291,23 @@ export function useNotebook() {
         .map((id, i) => {
           const n = byId.get(id)
           if (!n) return null
+          const isMovedNote = move?.id === id
           return {
             id,
             user_id: userId,
             title: n.title,
             content: (n.content as unknown as never) ?? null,
-            // upsert writes the whole row — omitting category_id would reset
-            // every reordered note back to 未分類. Carry it through.
-            category_id: n.categoryId,
+            // upsert writes the whole row. Carry category_id through for
+            // ordinary reorders, and update it atomically for cross-folder
+            // drags so a failed request can roll the whole gesture back.
+            category_id: isMovedNote ? move.categoryId : n.categoryId,
             sort_order: i * 10,
-            updated_at: n.updatedAt,
+            updated_at: isMovedNote ? now : n.updatedAt,
           }
         })
         .filter((r): r is NonNullable<typeof r> => r !== null)
 
+      await Promise.all(orderedIds.map((id) => pendingCreates.current[id]))
       const { error } = await supabase.from('notebook_notes').upsert(rows)
       if (error) {
         console.error('[notebook] reorder failed', error)
@@ -302,6 +315,12 @@ export function useNotebook() {
       }
     },
     [supabase],
+  )
+
+  const moveNote = useCallback(
+    (id: string, categoryId: string | null, orderedIds: string[]) =>
+      reorderNotes(orderedIds, { id, categoryId }),
+    [reorderNotes],
   )
 
   // ── Category CRUD (notebook-only folders) ────────────────
@@ -470,6 +489,7 @@ export function useNotebook() {
     saveNoteContent,
     deleteNote,
     reorderNotes,
+    moveNote,
     createCategory,
     renameCategory,
     setCategoryIcon,

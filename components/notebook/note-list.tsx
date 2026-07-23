@@ -3,11 +3,18 @@
 import { useState } from 'react'
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
+  pointerWithin,
+  rectIntersection,
   PointerSensor,
   KeyboardSensor,
+  useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
+  type DragStartEvent,
+  type DragOverEvent,
   type DragEndEvent,
 } from '@dnd-kit/core'
 import {
@@ -45,6 +52,28 @@ import {
 // Sentinel id for the always-present "未分類" bucket's local collapse state —
 // never sent to the server, just a key inside the collapsed-set below.
 const UNCATEGORIZED_KEY = '__uncategorized__'
+const folderDropId = (categoryId: string | null) =>
+  `notebook-folder:${categoryId ?? UNCATEGORIZED_KEY}`
+
+const notebookCollisionDetection: CollisionDetection = (args) => {
+  const preferNoteRows = (collisions: ReturnType<typeof pointerWithin>) => {
+    const noteRows = collisions.filter(
+      ({ id }) =>
+        args.droppableContainers.find((container) => container.id === id)?.data.current?.type === 'note',
+    )
+    return noteRows.length > 0 ? noteRows : collisions
+  }
+
+  const pointerHits = preferNoteRows(pointerWithin(args))
+  if (pointerHits.length > 0) return pointerHits
+
+  const intersecting = preferNoteRows(rectIntersection(args))
+  if (intersecting.length > 0) return intersecting
+
+  // Pointer drops outside the notebook should be a no-op. Keyboard sorting
+  // has no pointer coordinates, so it still uses the sortable fallback.
+  return args.pointerCoordinates ? [] : closestCenter(args)
+}
 
 interface NoteListProps {
   notes: NotebookNote[]
@@ -55,6 +84,7 @@ interface NoteListProps {
   onCreate: (categoryId?: string | null) => void
   onDelete: (id: string) => void
   onReorder: (orderedIds: string[]) => void
+  onMove: (noteId: string, categoryId: string | null, orderedIds: string[]) => void
   onSetNoteCategory: (noteId: string, categoryId: string | null) => void
   onCreateCategory: (name: string) => void
   onRenameCategory: (id: string, name: string) => void
@@ -74,6 +104,7 @@ export function NoteList({
   onCreate,
   onDelete,
   onReorder,
+  onMove,
   onSetNoteCategory,
   onCreateCategory,
   onRenameCategory,
@@ -83,6 +114,13 @@ export function NoteList({
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [overCategoryId, setOverCategoryId] = useState<string | null | undefined>(undefined)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   const toggleCollapse = (key: string) => {
     setCollapsed((prev) => {
@@ -101,17 +139,86 @@ export function NoteList({
     .filter((n) => !n.categoryId || !categoryIds.has(n.categoryId))
     .sort((a, b) => a.sortOrder - b.sortOrder)
 
-  // A drag only ever reorders within one group's SortableContext, so we only
-  // get (oldIndex, newIndex) scoped to that group. reorderNotes() in the hook
-  // replaces the *entire* notes array with whatever ids you pass it, so we
-  // must always hand it every note id — we splice the group's new order back
-  // into its original slots and leave every other note's position untouched.
-  const commitGroupReorder = (groupNotes: NotebookNote[], oldIndex: number, newIndex: number) => {
-    const newGroupOrder = arrayMove(groupNotes, oldIndex, newIndex).map((n) => n.id)
-    const groupIdSet = new Set(groupNotes.map((n) => n.id))
-    let gi = 0
-    const fullOrder = notes.map((n) => (groupIdSet.has(n.id) ? newGroupOrder[gi++] : n.id))
-    onReorder(fullOrder)
+  const normalizeCategoryId = (categoryId: string | null) =>
+    categoryId && categoryIds.has(categoryId) ? categoryId : null
+
+  const notesInCategory = (categoryId: string | null) =>
+    notes
+      .filter((note) => normalizeCategoryId(note.categoryId) === categoryId)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+
+  const orderedIdsFromGroups = (groups: Map<string, NotebookNote[]>) => [
+    ...sortedCategories.flatMap((category) => groups.get(category.id) ?? []),
+    ...(groups.get(UNCATEGORIZED_KEY) ?? []),
+  ].map((note) => note.id)
+
+  const categoryFromOver = (event: DragOverEvent | DragEndEvent) => {
+    const data = event.over?.data.current
+    if (data?.type !== 'note' && data?.type !== 'folder') return undefined
+    return normalizeCategoryId((data.categoryId as string | null | undefined) ?? null)
+  }
+
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setDraggedId(String(active.id))
+    const data = active.data.current
+    setOverCategoryId(
+      normalizeCategoryId((data?.categoryId as string | null | undefined) ?? null),
+    )
+  }
+
+  const handleDragOver = (event: DragOverEvent) => {
+    setOverCategoryId(categoryFromOver(event))
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setDraggedId(null)
+    setOverCategoryId(undefined)
+
+    const activeNote = notes.find((note) => note.id === event.active.id)
+    const targetCategoryId = categoryFromOver(event)
+    if (!activeNote || targetCategoryId === undefined || !event.over) return
+
+    const sourceCategoryId = normalizeCategoryId(activeNote.categoryId)
+    const groupKeys = [...sortedCategories.map((category) => category.id), UNCATEGORIZED_KEY]
+    const groups = new Map(
+      groupKeys.map((key) => [
+        key,
+        notesInCategory(key === UNCATEGORIZED_KEY ? null : key),
+      ]),
+    )
+    const sourceKey = sourceCategoryId ?? UNCATEGORIZED_KEY
+    const targetKey = targetCategoryId ?? UNCATEGORIZED_KEY
+    const overData = event.over.data.current
+
+    if (sourceKey === targetKey) {
+      if (overData?.type !== 'note' || event.active.id === event.over.id) return
+      const groupNotes = groups.get(sourceKey) ?? []
+      const oldIndex = groupNotes.findIndex((note) => note.id === event.active.id)
+      const newIndex = groupNotes.findIndex((note) => note.id === event.over?.id)
+      if (oldIndex < 0 || newIndex < 0) return
+      groups.set(sourceKey, arrayMove(groupNotes, oldIndex, newIndex))
+      onReorder(orderedIdsFromGroups(groups))
+      return
+    }
+
+    groups.set(
+      sourceKey,
+      (groups.get(sourceKey) ?? []).filter((note) => note.id !== activeNote.id),
+    )
+    const targetNotes = (groups.get(targetKey) ?? []).filter((note) => note.id !== activeNote.id)
+    const overIndex =
+      overData?.type === 'note'
+        ? targetNotes.findIndex((note) => note.id === event.over?.id)
+        : -1
+    // Dropping on a note inserts beside that note. Dropping on the folder
+    // header puts the moved note at the top so the result is immediately
+    // visible when the folder is expanded.
+    targetNotes.splice(overIndex >= 0 ? overIndex : 0, 0, {
+      ...activeNote,
+      categoryId: targetCategoryId,
+    })
+    groups.set(targetKey, targetNotes)
+    onMove(activeNote.id, targetCategoryId, orderedIdsFromGroups(groups))
   }
 
   const handleAddCategorySubmit = () => {
@@ -162,6 +269,17 @@ export function NoteList({
           </button>
         </div>
       ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={notebookCollisionDetection}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragCancel={() => {
+            setDraggedId(null)
+            setOverCategoryId(undefined)
+          }}
+          onDragEnd={handleDragEnd}
+        >
         <div className="flex-1 overflow-y-auto px-2 pb-3">
           {addingCategory && (
             <div className="mb-2 flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-2 py-1.5">
@@ -206,7 +324,7 @@ export function NoteList({
                 onRenameCategory={(name) => onRenameCategory(category.id, name)}
                 onDeleteCategory={() => onDeleteCategory(category.id)}
                 onSetNoteCategory={onSetNoteCategory}
-                onReorderWithin={(oldIdx, newIdx) => commitGroupReorder(groupNotes, oldIdx, newIdx)}
+                isDragTarget={draggedId !== null && overCategoryId === category.id}
               />
             )
           })}
@@ -220,9 +338,15 @@ export function NoteList({
             onSelect={onSelect}
             onDelete={onDelete}
             onSetNoteCategory={onSetNoteCategory}
-            onReorderWithin={(oldIdx, newIdx) => commitGroupReorder(uncategorized, oldIdx, newIdx)}
+            isDragTarget={draggedId !== null && overCategoryId === null}
           />
         </div>
+        <DragOverlay>
+          {draggedId ? (
+            <NoteDragOverlay note={notes.find((note) => note.id === draggedId)} />
+          ) : null}
+        </DragOverlay>
+        </DndContext>
       )}
     </div>
   )
@@ -241,7 +365,7 @@ function CategoryGroup({
   onRenameCategory,
   onDeleteCategory,
   onSetNoteCategory,
-  onReorderWithin,
+  isDragTarget,
 }: {
   category: NotebookCategory
   notes: NotebookNote[]
@@ -255,12 +379,16 @@ function CategoryGroup({
   onRenameCategory: (name: string) => void
   onDeleteCategory: () => void
   onSetNoteCategory: (noteId: string, categoryId: string | null) => void
-  onReorderWithin: (oldIndex: number, newIndex: number) => void
+  isDragTarget: boolean
 }) {
   const { t } = useI18n()
   const [renaming, setRenaming] = useState(false)
   const [nameDraft, setNameDraft] = useState(category.name)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const { setNodeRef } = useDroppable({
+    id: folderDropId(category.id),
+    data: { type: 'folder', categoryId: category.id },
+  })
 
   // Seed the draft from the latest name only when entering edit mode — avoids
   // a set-state-in-effect that would fire on every unrelated re-render.
@@ -277,8 +405,13 @@ function CategoryGroup({
   }
 
   return (
-    <div className="mb-1">
-      <div className="group flex items-center gap-1.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-secondary">
+    <div ref={setNodeRef} className="mb-1" data-notebook-folder-drop={category.id}>
+      <div
+        className={cn(
+          'group flex items-center gap-1.5 rounded-lg px-1.5 py-1.5 transition-[background-color,box-shadow] duration-150 hover:bg-secondary',
+          isDragTarget && 'bg-primary/10 ring-1 ring-inset ring-primary/35',
+        )}
+      >
         <button
           type="button"
           onClick={onToggleCollapse}
@@ -391,7 +524,6 @@ function CategoryGroup({
               onSelect={onSelect}
               onDelete={onDelete}
               onSetNoteCategory={onSetNoteCategory}
-              onReorderWithin={onReorderWithin}
             />
           </div>
         ))}
@@ -408,7 +540,7 @@ function UncategorizedGroup({
   onSelect,
   onDelete,
   onSetNoteCategory,
-  onReorderWithin,
+  isDragTarget,
 }: {
   notes: NotebookNote[]
   allCategories: NotebookCategory[]
@@ -418,15 +550,26 @@ function UncategorizedGroup({
   onSelect: (id: string) => void
   onDelete: (id: string) => void
   onSetNoteCategory: (noteId: string, categoryId: string | null) => void
-  onReorderWithin: (oldIndex: number, newIndex: number) => void
+  isDragTarget: boolean
 }) {
   const { t } = useI18n()
+  const { setNodeRef } = useDroppable({
+    id: folderDropId(null),
+    data: { type: 'folder', categoryId: null },
+  })
   return (
-    <div className={cn('mb-1', allCategories.length > 0 && 'mt-2 border-t border-border/60 pt-2')}>
+    <div
+      ref={setNodeRef}
+      data-notebook-folder-drop={UNCATEGORIZED_KEY}
+      className={cn('mb-1', allCategories.length > 0 && 'mt-2 border-t border-border/60 pt-2')}
+    >
       <button
         type="button"
         onClick={onToggleCollapse}
-        className="group flex w-full items-center gap-1.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-secondary"
+        className={cn(
+          'group flex w-full items-center gap-1.5 rounded-lg px-1.5 py-1.5 transition-[background-color,box-shadow] duration-150 hover:bg-secondary',
+          isDragTarget && 'bg-primary/10 ring-1 ring-inset ring-primary/35',
+        )}
         aria-expanded={!collapsed}
       >
         <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform duration-150', collapsed && '-rotate-90')} />
@@ -446,7 +589,6 @@ function UncategorizedGroup({
               onSelect={onSelect}
               onDelete={onDelete}
               onSetNoteCategory={onSetNoteCategory}
-              onReorderWithin={onReorderWithin}
             />
           </div>
         ))}
@@ -454,10 +596,9 @@ function UncategorizedGroup({
   )
 }
 
-// Shared drag-to-reorder list used by both a category group and the
-// 未分類 bucket. Each instance owns its own DndContext, so dragging never
-// crosses group boundaries — moving a note to a different category goes
-// through the "移到分類" menu on each row instead.
+// Each folder keeps its own SortableContext, while NoteList owns one shared
+// DndContext. That makes row sorting precise and still allows a row to cross
+// into another folder (including collapsed or empty folders).
 function NoteRowsSortable({
   notes,
   activeId,
@@ -465,7 +606,6 @@ function NoteRowsSortable({
   onSelect,
   onDelete,
   onSetNoteCategory,
-  onReorderWithin,
 }: {
   notes: NotebookNote[]
   activeId: string | null
@@ -473,38 +613,21 @@ function NoteRowsSortable({
   onSelect: (id: string) => void
   onDelete: (id: string) => void
   onSetNoteCategory: (noteId: string, categoryId: string | null) => void
-  onReorderWithin: (oldIndex: number, newIndex: number) => void
 }) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 180, tolerance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  )
-
-  const handleDragEnd = (e: DragEndEvent) => {
-    const { active, over } = e
-    if (!over || active.id === over.id) return
-    const oldIndex = notes.findIndex((n) => n.id === active.id)
-    const newIndex = notes.findIndex((n) => n.id === over.id)
-    if (oldIndex < 0 || newIndex < 0) return
-    onReorderWithin(oldIndex, newIndex)
-  }
-
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={notes.map((n) => n.id)} strategy={verticalListSortingStrategy}>
-        {notes.map((note) => (
-          <NoteRow
-            key={note.id}
-            note={note}
-            active={note.id === activeId}
-            allCategories={allCategories}
-            onSelect={() => onSelect(note.id)}
-            onDelete={() => onDelete(note.id)}
-            onMoveToCategory={(categoryId) => onSetNoteCategory(note.id, categoryId)}
-          />
-        ))}
-      </SortableContext>
-    </DndContext>
+    <SortableContext items={notes.map((n) => n.id)} strategy={verticalListSortingStrategy}>
+      {notes.map((note) => (
+        <NoteRow
+          key={note.id}
+          note={note}
+          active={note.id === activeId}
+          allCategories={allCategories}
+          onSelect={() => onSelect(note.id)}
+          onDelete={() => onDelete(note.id)}
+          onMoveToCategory={(categoryId) => onSetNoteCategory(note.id, categoryId)}
+        />
+      ))}
+    </SortableContext>
   )
 }
 
@@ -524,7 +647,10 @@ function NoteRow({
   onMoveToCategory: (categoryId: string | null) => void
 }) {
   const { t, lang } = useI18n()
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: note.id })
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: note.id,
+    data: { type: 'note', categoryId: note.categoryId },
+  })
   const [confirming, setConfirming] = useState(false)
 
   const style = { transform: CSS.Transform.toString(transform), transition }
@@ -549,7 +675,7 @@ function NoteRow({
           'opacity-0 group-hover:opacity-100',
           '[@media(hover:none)]:opacity-60',
         )}
-        aria-label={t('拖曳排序')}
+        aria-label={t('拖曳排序或移到其他分類')}
         {...attributes}
         {...listeners}
       >
@@ -641,6 +767,21 @@ function NoteRow({
           </button>
         </span>
       )}
+    </div>
+  )
+}
+
+function NoteDragOverlay({ note }: { note: NotebookNote | undefined }) {
+  const { t } = useI18n()
+  if (!note) return null
+
+  return (
+    <div className="flex w-64 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-lg border border-primary/30 bg-card px-2 py-2 shadow-lg">
+      <GripVertical className="h-4 w-4 shrink-0 text-primary/70" />
+      <span className="shrink-0 text-base leading-none">{note.icon ?? '📄'}</span>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+        {note.title.trim() || t('無標題')}
+      </span>
     </div>
   )
 }

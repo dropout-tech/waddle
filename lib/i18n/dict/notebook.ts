@@ -47,6 +47,7 @@ export const dict: Record<string, string> = {
   '未分類': 'Uncategorized',
   '沒有未分類的記事': 'No uncategorized notes',
   '拖曳排序': 'Drag to reorder',
+  '拖曳排序或移到其他分類': 'Drag to reorder or move to another category',
   '無標題': 'Untitled',
   '移到分類': 'Move to category',
   '刪除記事': 'Delete note',
