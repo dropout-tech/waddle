@@ -38,22 +38,6 @@ interface GrowthJourneyDashboardProps {
   scratchpadByDate: Record<string, ScratchpadItem[]>
 }
 
-const MEDALLION_TONES: Record<AchievementDefinition['tone'], string> = {
-  sage: 'bg-[oklch(0.79_0.055_145)] text-[oklch(0.28_0.035_145)] border-[oklch(0.62_0.06_145)]',
-  terracotta: 'bg-[oklch(0.76_0.09_35)] text-[oklch(0.3_0.055_35)] border-[oklch(0.58_0.11_35)]',
-  rose: 'bg-[oklch(0.84_0.055_15)] text-[oklch(0.31_0.045_15)] border-[oklch(0.66_0.07_15)]',
-  cream: 'bg-[oklch(0.91_0.025_85)] text-[oklch(0.3_0.025_55)] border-[oklch(0.75_0.035_85)]',
-  charcoal: 'bg-[oklch(0.48_0.02_55)] text-[oklch(0.95_0.008_85)] border-[oklch(0.34_0.025_55)]',
-}
-
-const MEDALLION_SHAPES: Record<AchievementDefinition['shape'], string> = {
-  round: 'rounded-full',
-  drop: 'rounded-[52%_52%_48%_48%/65%_65%_35%_35%]',
-  flower: 'rounded-[44%_56%_48%_52%/52%_44%_56%_48%]',
-  arch: 'rounded-t-[50%] rounded-b-[28%]',
-  'soft-square': 'rounded-2xl rotate-2',
-}
-
 const GROWTH_SECTIONS_STORAGE_KEY = 'huddle.growth.sections.v1'
 const GROWTH_SECTIONS_CHANGE_EVENT = 'huddle:growth-sections-change'
 
@@ -322,23 +306,13 @@ export function GrowthJourneyDashboard({ workspaces, scratchpadByDate }: GrowthJ
               open={openSections.achievements}
             />
             <CollapsibleContent>
-              <div className="overflow-x-auto pb-3">
-                <div className="flex min-w-max items-end gap-3 px-1 pt-4">
-                  {ACHIEVEMENT_DEFINITIONS.map((definition) => {
-                    const unlocked = unlockedKeys.has(definition.key)
-                    const progress = getAchievementProgress(definition, achievementContext)
-                    return (
-                      <AchievementMedallion
-                        key={definition.key}
-                        definition={definition}
-                        unlocked={unlocked}
-                        progress={progress}
-                      />
-                    )
-                  })}
-                </div>
-                <div className="h-4 min-w-max rounded-b-xl border-x border-b border-[oklch(0.55_0.055_55)] bg-[oklch(0.68_0.065_55)] shadow-sm" aria-hidden="true" />
-              </div>
+              <AchievementShelf
+                items={ACHIEVEMENT_DEFINITIONS.map((definition) => ({
+                  definition,
+                  unlocked: unlockedKeys.has(definition.key),
+                  progress: getAchievementProgress(definition, achievementContext),
+                }))}
+              />
             </CollapsibleContent>
           </section>
         </Collapsible>
@@ -581,39 +555,89 @@ function JourneyNotebook({
   )
 }
 
-function AchievementMedallion({
-  definition,
-  unlocked,
-  progress,
-}: {
+interface AchievementShelfItem {
   definition: AchievementDefinition
   unlocked: boolean
   progress: number
-}) {
+}
+
+function AchievementShelf({ items }: { items: AchievementShelfItem[] }) {
   const { t } = useI18n()
+
   return (
-    <div className="flex w-24 flex-col items-center gap-2 text-center">
-      <div
-        className={cn(
-          'relative flex h-[4.6rem] w-[4.6rem] items-center justify-center border-2 shadow-sm transition-[filter,opacity] duration-200 ease-quart',
-          MEDALLION_SHAPES[definition.shape],
-          unlocked ? MEDALLION_TONES[definition.tone] : 'border-border bg-muted text-muted-foreground opacity-60 grayscale'
-        )}
-        title={unlocked ? t(definition.description) : t(definition.hint)}
-      >
-        {unlocked ? (
-          definition.key.includes('journey') ? <Flag className="h-7 w-7" />
-            : definition.key.includes('focus') ? <Sparkles className="h-7 w-7" />
-              : <Leaf className="h-7 w-7" />
-        ) : (
-          <LockKeyhole className="h-6 w-6" />
-        )}
-      </div>
-      <div>
-        <p className="text-xs font-semibold leading-4">{unlocked ? t(definition.title) : t('還沒揭曉')}</p>
-        {!unlocked && (
-          <p className="mt-0.5 text-[0.68rem] tabular-nums text-muted-foreground">{progress}%</p>
-        )}
+    <div className="-mx-1 overflow-x-auto px-1 pb-3 pt-2">
+      <div className="relative min-w-[700px] pb-1">
+        <div className="relative h-[196px]" aria-hidden="true">
+          <ol className="pointer-events-none absolute inset-x-0 top-0 grid h-[125px] grid-cols-7">
+            {items.map(({ definition, unlocked }, index) => (
+              <li key={definition.key} className="relative">
+                <span
+                  className={cn(
+                    'absolute inset-0 bg-[url("/growth/achievement-medallions.png")] bg-[length:700%_100%] bg-no-repeat transition-[filter,opacity] duration-200 ease-quart',
+                    !unlocked && 'opacity-55 grayscale-[.72] saturate-50'
+                  )}
+                  style={{ backgroundPosition: `${(index / Math.max(items.length - 1, 1)) * 100}% 0` }}
+                />
+              </li>
+            ))}
+          </ol>
+          <Image
+            src="/growth/achievement-shelf.png"
+            alt=""
+            width={1400}
+            height={194}
+            sizes="700px"
+            className="pointer-events-none absolute inset-x-0 top-[98px] h-[97px] w-full object-contain object-top"
+          />
+        </div>
+
+        <ol className="absolute inset-x-0 top-0 grid h-[132px] grid-cols-7 px-[1.5%]">
+          {items.map(({ definition, unlocked, progress }) => (
+            <li
+              key={definition.key}
+              className="relative flex justify-center"
+              aria-label={
+                unlocked
+                  ? `${t(definition.title)}：${t(definition.description)}`
+                  : `${t(definition.title)}：${t(definition.hint)}，${Math.round(progress)}%`
+              }
+              title={unlocked ? t(definition.description) : t(definition.hint)}
+            >
+              {!unlocked && (
+                <span className="absolute right-[10%] top-1 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-white/75 bg-[oklch(0.94_0.012_85)]/92 text-[oklch(0.39_0.025_55)] shadow-sm backdrop-blur-sm">
+                  <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                </span>
+              )}
+            </li>
+          ))}
+        </ol>
+
+        <ol className="grid grid-cols-7 gap-2 px-[1.5%] text-center">
+          {items.map(({ definition, unlocked, progress }) => (
+            <li key={definition.key} className="min-w-0">
+              <p className="text-xs font-semibold leading-4 text-foreground">
+                {t(definition.title)}
+              </p>
+              {unlocked ? (
+                <p className="mt-1 text-[0.68rem] leading-4 text-[oklch(0.43_0.035_145)]">
+                  {t('已收藏')}
+                </p>
+              ) : (
+                <div className="mx-auto mt-1.5 max-w-[4.5rem]">
+                  <div className="h-1 overflow-hidden rounded-full bg-[oklch(0.86_0.012_75)]">
+                    <span
+                      className="block h-full rounded-full bg-[oklch(0.58_0.06_55)] transition-[width] duration-200 ease-quart"
+                      style={{ width: `${Math.max(4, progress)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[0.65rem] tabular-nums leading-4 text-muted-foreground">
+                    {Math.round(progress)}%
+                  </p>
+                </div>
+              )}
+            </li>
+          ))}
+        </ol>
       </div>
     </div>
   )
