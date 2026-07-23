@@ -4,8 +4,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, NotebookPen, BarChart3, Settings, Sparkles, MoreHorizontal, Download } from 'lucide-react'
+import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, NotebookPen, BarChart3, Settings, Sparkles, MoreHorizontal, Download, Users } from 'lucide-react'
 import { UndoRedoButtons } from '@/components/undo-redo-buttons'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { UserMenu } from '@/components/user-menu'
@@ -36,6 +42,7 @@ interface CalendarHeaderProps {
   onOpenReport?: () => void
   onOpenGrowth?: () => void
   onOpenSettings?: () => void
+  onOpenSharing?: () => void
   onOpenOverdueReview?: () => void
   /** Open the "export schedule as PNG" modal. Lives in the calendar header
    *  next to journal / report / settings on desktop, in the overflow menu
@@ -69,6 +76,7 @@ export function CalendarHeader({
   onOpenReport,
   onOpenGrowth,
   onOpenSettings,
+  onOpenSharing,
   onOpenOverdueReview,
   onOpenExport,
   leftPanelOpen = true,
@@ -80,6 +88,7 @@ export function CalendarHeader({
   const { t, lang } = useI18n()
   const { open: openNotebook } = useNotebookOverlay()
   const [overflowOpen, setOverflowOpen] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
   const overflowRef = useRef<HTMLDivElement>(null)
   // Independent view-mode picker on mobile: tap a single button to pick 日 / 週 / 月.
   const [viewPickerOpen, setViewPickerOpen] = useState(false)
@@ -312,7 +321,9 @@ export function CalendarHeader({
           {/* Inline UserMenu on mobile (replaces the floating one) */}
           {isMobile && <UserMenu className="relative" />}
 
-          {/* Mobile-only overflow menu: 記事本 / 日記 / 報告 / 匯出 / 設定 */}
+          {/* Mobile-only overflow menu. Keep the permanent desktop hierarchy,
+              but adapt it to one touch-safe menu instead of squeezing five
+              icons into the already dense primary row. */}
           {isMobile && (
             <div className="relative" ref={overflowRef}>
               <button
@@ -334,6 +345,15 @@ export function CalendarHeader({
                     <NotebookPen className="w-4 h-4" />
                     <span>{t('記事本')}</span>
                   </button>
+                  {onOpenSharing && (
+                    <button
+                      onClick={() => { setOverflowOpen(false); onOpenSharing() }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                    >
+                      <Users className="w-4 h-4" />
+                      <span>{t('共享')}</span>
+                    </button>
+                  )}
                   {onOpenJournal && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenJournal() }}
@@ -477,7 +497,8 @@ export function CalendarHeader({
           <div />
         )}
 
-        {/* Right: Undo/Redo / Journal / Report / Settings */}
+        {/* Right: frequent tools stay visible; lower-frequency views live in
+            one stable disclosure menu so the toolbar never grows sideways. */}
         <div className="flex items-center gap-1">
           <UndoRedoButtons className="mr-1" />
           <button
@@ -489,48 +510,66 @@ export function CalendarHeader({
             <NotebookPen className="w-3.5 h-3.5" aria-hidden="true" />
             {t('記事本')}
           </button>
-          {onOpenJournal && (
+          {onOpenSharing && (
             <button
               type="button"
-              onClick={onOpenJournal}
+              onClick={onOpenSharing}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <BookOpen className="w-3.5 h-3.5" aria-hidden="true" />
-              {t('日記')}
+              <Users className="w-3.5 h-3.5" aria-hidden="true" />
+              {t('共享')}
             </button>
           )}
-          {onOpenReport && (
-            <button
-              type="button"
-              onClick={onOpenReport}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <BarChart3 className="w-3.5 h-3.5" aria-hidden="true" />
-              {t('報告')}
-            </button>
-          )}
-          {onOpenGrowth && (
-            <button
-              type="button"
-              onClick={onOpenGrowth}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <HuddleFootprints className="h-3.5 w-4 gap-0.5" />
-              {t('成長')}
-            </button>
-          )}
-          {onOpenExport && (
-            <button
-              type="button"
-              data-tour="calendar-export"
-              onClick={onOpenExport}
-              aria-label={t('匯出行程圖檔')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <Download className="w-3.5 h-3.5" aria-hidden="true" />
-              {t('匯出')}
-            </button>
-          )}
+          <DropdownMenu open={toolsOpen} onOpenChange={setToolsOpen}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                data-tour="calendar-export"
+                aria-label={t('更多工具')}
+                className={cn(
+                  'flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  toolsOpen && 'bg-secondary text-foreground'
+                )}
+              >
+                <ChevronDown
+                  className={cn(
+                    'w-3.5 h-3.5 transition-transform duration-200 motion-reduce:transition-none',
+                    toolsOpen && 'rotate-180'
+                  )}
+                  aria-hidden="true"
+                />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40 rounded-xl p-1.5">
+              {onOpenJournal && (
+                <DropdownMenuItem onSelect={onOpenJournal} className="gap-2.5 rounded-lg py-2 text-xs">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  {t('日記')}
+                </DropdownMenuItem>
+              )}
+              {onOpenReport && (
+                <DropdownMenuItem onSelect={onOpenReport} className="gap-2.5 rounded-lg py-2 text-xs">
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  {t('報告')}
+                </DropdownMenuItem>
+              )}
+              {onOpenGrowth && (
+                <DropdownMenuItem onSelect={onOpenGrowth} className="gap-2.5 rounded-lg py-2 text-xs">
+                  <HuddleFootprints className="h-3.5 w-4 gap-0.5" />
+                  {t('成長')}
+                </DropdownMenuItem>
+              )}
+              {onOpenExport && (
+                <DropdownMenuItem
+                  onSelect={onOpenExport}
+                  className="gap-2.5 rounded-lg py-2 text-xs"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {t('匯出')}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {onOpenSettings && (
             <button
               type="button"

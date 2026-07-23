@@ -80,12 +80,15 @@ const AVAILABLE_ICONS = [
 
 interface SettingsModalProps {
   isOpen: boolean
+  initialTab?: SettingsTab
   settings: UserSettings
   timeBlocks: TimeBlock[]
   workspaces: Workspace[]
   onClose: () => void
   onSave: (settings: UserSettings, timeBlocks: TimeBlock[]) => void
 }
+
+export type SettingsTab = 'general' | 'slotTypes' | 'notifications' | 'sharing'
 
 const PRESET_COLORS = PICKER_COLOR_HEXES
 
@@ -140,6 +143,7 @@ const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 
 export function SettingsModal({
   isOpen,
+  initialTab = 'general',
   settings,
   timeBlocks,
   workspaces,
@@ -149,7 +153,7 @@ export function SettingsModal({
   const { lang, setLang, t } = useI18n()
   const [localSettings, setLocalSettings] = useState<UserSettings>(settings)
   const [localTimeBlocks, setLocalTimeBlocks] = useState<TimeBlock[]>(timeBlocks)
-  const [activeTab, setActiveTab] = useState<'general' | 'slotTypes' | 'notifications' | 'sharing'>('general')
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
   // Task-complete sound is a per-device pref stored in localStorage (same
   // pattern as timer sound), so it lives outside localSettings/UserSettings.
   const [taskSoundEnabled, setTaskSoundEnabledState] = useState<boolean>(() => getTaskCompleteSoundEnabled())
@@ -170,7 +174,7 @@ export function SettingsModal({
     setWaterEnabledState(getWaterReminderEnabled())
     setWaterIntervalState(getWaterReminderInterval())
     setTaiwanHolidaysEnabledState(getTaiwanHolidaysEnabled())
-  }, [isOpen])
+  }, [isOpen, initialTab])
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [newSlotType, setNewSlotType] = useState<Partial<SlotType>>({
     label: '',

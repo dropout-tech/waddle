@@ -50,6 +50,7 @@ export const dict: Record<string, string> = {
   '今天': 'Today',
   '更多': 'More',
   '記事本': 'Notebook',
+  '更多工具': 'More tools',
   '日記': 'Journal',
   '報告': "Reports",
   '匯出行程': 'Export schedule',

@@ -11,7 +11,7 @@ import { KeyboardShortcutsHint } from '@/components/keyboard-shortcuts'
 import { UserMenu } from '@/components/user-menu'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { OnboardingTour } from '@/components/onboarding-tour'
-import { SettingsModal } from '@/components/modals/settings-modal'
+import { SettingsModal, type SettingsTab } from '@/components/modals/settings-modal'
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { DailyClearCelebration } from '@/components/celebration/daily-clear-celebration'
 import { OverdueTaskReview } from '@/components/task-panel/overdue-task-review'
@@ -131,6 +131,7 @@ function HuddlePage() {
     return findTaskById(workspaces, selectedTask.id) ?? selectedTask
   }, [selectedTask, workspaces, taskMode])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('general')
   const [isOverdueReviewOpen, setIsOverdueReviewOpen] = useState(false)
   const [selectedTimeBlock, setSelectedTimeBlock] = useState<TimeBlock | null>(null)
 
@@ -463,7 +464,14 @@ function HuddlePage() {
         onOpenCreateTask={handleOpenCreateTask}
         onRescheduleTask={handleRescheduleTask}
         onUnscheduleTask={unscheduleTask}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={() => {
+          setSettingsInitialTab('general')
+          setIsSettingsOpen(true)
+        }}
+        onOpenSharing={() => {
+          setSettingsInitialTab('sharing')
+          setIsSettingsOpen(true)
+        }}
         onOpenOverdueReview={() => setIsOverdueReviewOpen(true)}
         onUpdateTimeBlock={updateTimeBlock}
         onDeleteTimeBlock={deleteTimeBlock}
@@ -510,14 +518,17 @@ function HuddlePage() {
         />
       )}
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        settings={settings}
-        timeBlocks={timeBlocks}
-        workspaces={workspaces}
-        onClose={() => setIsSettingsOpen(false)}
-        onSave={saveSettings}
-      />
+      {isSettingsOpen && (
+        <SettingsModal
+          isOpen
+          initialTab={settingsInitialTab}
+          settings={settings}
+          timeBlocks={timeBlocks}
+          workspaces={workspaces}
+          onClose={() => setIsSettingsOpen(false)}
+          onSave={saveSettings}
+        />
+      )}
 
       <TimeBlockModal
         block={selectedTimeBlock}

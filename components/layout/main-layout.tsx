@@ -48,6 +48,7 @@ interface MainLayoutProps {
   onDeleteWorkspace?: (workspaceId: string) => void
   onArchiveWorkspace?: (workspaceId: string) => void
   onOpenSettings?: () => void
+  onOpenSharing?: () => void
   onOpenOverdueReview?: () => void
   onCreateCalendarTask?: (date: string, startTime?: string, endTime?: string) => void
   onCreatePendingTask?: (title: string) => void
@@ -101,6 +102,7 @@ export function MainLayout({
   onDeleteWorkspace,
   onArchiveWorkspace,
   onOpenSettings,
+  onOpenSharing,
   onOpenOverdueReview,
   onCreateCalendarTask,
   onCreatePendingTask,
@@ -579,6 +581,7 @@ export function MainLayout({
                 onOpenReport={handleOpenReportFocus}
                 onOpenGrowth={handleOpenGrowthFocus}
                 onOpenSettings={onOpenSettings}
+                onOpenSharing={onOpenSharing}
                 onOpenOverdueReview={onOpenOverdueReview}
                 onOpenExport={() => setExportModalOpen(true)}
                 leftPanelOpen={true}
@@ -891,6 +894,7 @@ export function MainLayout({
                   onOpenReport={handleOpenReportDesktop}
                   onOpenGrowth={handleOpenGrowthFocus}
                   onOpenSettings={onOpenSettings}
+                  onOpenSharing={onOpenSharing}
                   onOpenOverdueReview={onOpenOverdueReview}
                   onOpenExport={() => setExportModalOpen(true)}
                   leftPanelOpen={isLeftPanelOpen}

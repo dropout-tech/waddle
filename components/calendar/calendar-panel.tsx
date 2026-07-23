@@ -49,6 +49,7 @@ interface CalendarPanelProps {
   onOpenReport?: () => void
   onOpenGrowth?: () => void
   onOpenSettings?: () => void
+  onOpenSharing?: () => void
   onOpenOverdueReview?: () => void
   onOpenExport?: () => void
   /** When the left task panel is closed, the calendar header reserves space
@@ -97,6 +98,7 @@ export function CalendarPanel({
   onOpenReport,
   onOpenGrowth,
   onOpenSettings,
+  onOpenSharing,
   onOpenOverdueReview,
   onOpenExport,
   leftPanelOpen = true,
@@ -191,6 +193,7 @@ export function CalendarPanel({
         onOpenReport={onOpenReport}
         onOpenGrowth={onOpenGrowth}
         onOpenSettings={onOpenSettings}
+        onOpenSharing={onOpenSharing}
         onOpenOverdueReview={onOpenOverdueReview}
         onOpenExport={onOpenExport}
         leftPanelOpen={leftPanelOpen}

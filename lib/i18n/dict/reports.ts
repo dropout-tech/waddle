@@ -152,8 +152,8 @@ export const dict: Record<string, string> = {
     'Pick a date range to generate a clean PNG — great for sharing to LINE / IG / Slack. Privacy mode shows only time-block colors without revealing the content.',
   '上方鈴鐺集中放 Huddle 要跟你說的事：已逾期、快到期、放太久沒動的任務，偶爾也有小提醒。有事情時會出現數字小標，看完可以逐則關掉。':
     "The bell up top gathers everything Huddle wants to tell you: overdue, due-soon, and untouched-for-too-long tasks, plus the occasional gentle nudge. A number badge shows up when there's something to see, and you can dismiss each one once you've read it.",
-  'Notion 式的長文筆記空間——打字時輸入「/」就能叫出區塊選單（標題／待辦／清單／收合／引言…），選取文字則會跳出格式工具列。跟每天的白板分開存，就在「日記」旁邊，想寫長一點的東西點這裡。':
-    "A Notion-style space for long-form notes — type / to summon the block menu (heading / to-do / list / toggle / quote…), or select text to bring up the formatting toolbar. It's kept separate from the daily scratchpad, right next to Journal — tap here when you want to write something longer.",
+  'Notion 式的長文筆記空間——打字時輸入「/」就能叫出區塊選單（標題／待辦／清單／收合／引言…），選取文字則會跳出格式工具列。跟每天的白板分開存，工具列上有常駐入口，想寫長一點的東西點這裡。':
+    "A Notion-style space for long-form notes — type / to summon the block menu (heading / to-do / list / toggle / quote…), or select text to bring up the formatting toolbar. It's kept separate from the daily scratchpad, with a permanent toolbar entry whenever you want to write something longer.",
   '工作中冒出靈感？拉開白板丟文字、貼圖、連結，事後還能隨手編輯。每天分開存。':
     'Got an idea mid-work? Pull open the scratchpad and drop in text, images, or links — you can tidy it up later. Each day gets its own space.',
   '👉 點開試試': '👉 Give it a try',
