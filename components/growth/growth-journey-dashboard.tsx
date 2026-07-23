@@ -1,10 +1,9 @@
 'use client'
 
+import Image from 'next/image'
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import {
-  Backpack,
-  BookOpen,
   Check,
   ChevronDown,
   CircleCheck,
@@ -420,44 +419,59 @@ function HuddleRoom({
           open={open}
         />
         <CollapsibleContent>
-          <div className="relative min-h-[260px] overflow-hidden rounded-[44%_44%_1.4rem_1.4rem/22%_22%_1.4rem_1.4rem] border border-border bg-[oklch(0.96_0.012_85)] shadow-inner dark:bg-[oklch(0.235_0.016_55)]">
-            <div className="absolute left-[8%] top-[22%] flex h-20 w-16 items-center justify-center rounded-t-[50%] border-4 border-[oklch(0.62_0.05_55)] bg-background/75" aria-hidden="true">
-              <span className="h-full w-px bg-[oklch(0.62_0.05_55)]" />
-            </div>
-            {unlockedCount >= 1 && (
-              <div className="absolute bottom-7 left-[10%] flex flex-col items-center text-[oklch(0.45_0.08_145)]" aria-hidden="true">
-                <Leaf className="h-12 w-12" />
-                <span className="h-8 w-10 rounded-b-xl rounded-t-md bg-[oklch(0.67_0.09_35)]" />
-              </div>
+          <div className="relative aspect-[1400/788] overflow-hidden rounded-[1.5rem] border border-border/75 bg-[oklch(0.965_0.012_85)] shadow-sm">
+            <Image
+              src="/growth/huddle-room.jpg"
+              alt={t('Huddle 坐在陶土質感的房間裡，周圍有植物、書架與背包。')}
+              fill
+              priority
+              sizes="(min-width: 1024px) 540px, 100vw"
+              className="object-cover"
+            />
+
+            {unlockedCount < 1 && (
+              <RoomObjectVeil
+                className="bottom-[22%] left-[15%]"
+                label={t('獲得第一枚成就後，植物會住進房間。')}
+              />
             )}
-            {unlockedCount >= 3 && (
-              <div className="absolute bottom-7 right-[10%] flex items-end gap-1 rounded-lg bg-[oklch(0.67_0.04_145)] px-3 py-2 text-[oklch(0.28_0.025_55)]" aria-hidden="true">
-                <BookOpen className="h-8 w-8" />
-                <span className="h-10 w-2 rounded-sm bg-primary/70" />
-                <span className="h-8 w-2 rounded-sm bg-accent" />
-              </div>
+            {unlockedCount < 3 && (
+              <RoomObjectVeil
+                className="bottom-[25%] right-[31%]"
+                label={t('獲得三枚成就後，收藏與書櫃會住進房間。')}
+              />
             )}
-            {unlockedCount >= 5 && (
-              <Backpack className="absolute bottom-8 right-[29%] h-11 w-11 text-[oklch(0.57_0.105_35)]" aria-hidden="true" />
-            )}
-            <div className="absolute inset-x-0 bottom-4 flex justify-center">
-              <div className="flex h-11 w-40 items-end justify-center rounded-[50%] bg-[oklch(0.78_0.04_145)]/70">
-                <HuddleMascot
-                  className="mb-1 h-32 w-32 origin-bottom [transform:scaleY(.97)]"
-                  phase="auto"
-                  decorative={false}
-                />
-              </div>
-            </div>
-            {unlockedCount === 0 && (
-              <p className="absolute right-4 top-4 max-w-40 text-right text-xs leading-5 text-muted-foreground">
-                {t('第一枚成就會帶來房間的第一盆植物。')}
-              </p>
+            {unlockedCount < 5 && (
+              <RoomObjectVeil
+                className="bottom-[19%] right-[8.5%]"
+                label={t('獲得五枚成就後，背包會住進房間。')}
+              />
             )}
           </div>
         </CollapsibleContent>
       </section>
     </Collapsible>
+  )
+}
+
+function RoomObjectVeil({
+  className,
+  label,
+}: {
+  className: string
+  label: string
+}) {
+  return (
+    <div
+      className={cn(
+        'absolute flex h-9 w-9 items-center justify-center rounded-full border border-white/70 bg-[oklch(0.965_0.012_85)]/88 shadow-sm backdrop-blur-[3px]',
+        className
+      )}
+      aria-label={label}
+      role="img"
+    >
+      <LockKeyhole className="h-4 w-4 text-[oklch(0.43_0.025_55)]/75" aria-hidden="true" />
+    </div>
   )
 }
 
