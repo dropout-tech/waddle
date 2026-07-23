@@ -76,7 +76,11 @@ function TaskRowImpl({
   // Drag-to-calendar state. Activated only after the cursor crosses
   // DRAG_THRESHOLD so plain clicks still open the detail modal.
   const [externalDragActive, setExternalDragActive] = useState(false)
-  const [ghostPos, setGhostPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  // Keep pointer-following coordinates outside React state. Pointermove can
+  // fire faster than the display refresh rate; mutating the small portal
+  // directly avoids re-rendering the full task row on every event.
+  const [ghostOrigin, setGhostOrigin] = useState({ x: 0, y: 0 })
+  const ghostElementRef = useRef<HTMLDivElement>(null)
   // Once the drag activates, the trailing click event (if any) needs to be
   // suppressed so we don't open the modal at the same time as the drop.
   const suppressNextClickRef = useRef(false)
@@ -127,6 +131,7 @@ function TaskRowImpl({
           // threshold (in which case we'll treat it as a scroll, not a drag).
           if (!activated && stillInThreshold) {
             activated = true
+            setGhostOrigin({ x: startX, y: startY })
             setExternalDragActive(true)
             const categoryId = categoryIdAtPoint(startX, startY)
             onCategoryDragHover?.(categoryId === task.categoryId ? null : categoryId)
@@ -150,12 +155,16 @@ function TaskRowImpl({
         // hold = scroll. Mouse: any movement past threshold activates.
         if (!activated && !isTouch) {
           activated = true
+          setGhostOrigin({ x: ev.clientX, y: ev.clientY })
           setExternalDragActive(true)
           haptic(12)
         }
       }
       if (activated) {
-        setGhostPos({ x: ev.clientX, y: ev.clientY })
+        if (ghostElementRef.current) {
+          ghostElementRef.current.style.left = `${ev.clientX + 12}px`
+          ghostElementRef.current.style.top = `${ev.clientY + 12}px`
+        }
         const categoryId = categoryIdAtPoint(ev.clientX, ev.clientY)
         onCategoryDragHover?.(categoryId === task.categoryId ? null : categoryId)
         if (!categoryId && !calendarDragActivated) {
@@ -181,11 +190,11 @@ function TaskRowImpl({
 
       setExternalDragActive(false)
       onCategoryDragHover?.(null)
+      if (ev.type === 'pointercancel') return
+
       // Suppress the click event that fires after this mouseup, otherwise
       // the row's onClick would also open the detail modal.
       suppressNextClickRef.current = true
-
-      if (ev.type === 'pointercancel') return
 
       const targetCategoryId = categoryIdAtPoint(ev.clientX, ev.clientY)
       if (targetCategoryId) {
@@ -231,10 +240,11 @@ function TaskRowImpl({
   const ghost = externalDragActive && typeof document !== 'undefined'
     ? createPortal(
         <div
+          ref={ghostElementRef}
           className="fixed pointer-events-none z-max px-2.5 py-1.5 rounded-lg text-[11px] font-semibold shadow-2xl ring-2 ring-white/60 select-none max-w-[200px] truncate"
           style={{
-            left: ghostPos.x + 12,
-            top: ghostPos.y + 12,
+            left: ghostOrigin.x + 12,
+            top: ghostOrigin.y + 12,
             backgroundColor: displayColor(task.calendarColor || task.workspaceColor),
             color: '#fff',
           }}
