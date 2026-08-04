@@ -43,6 +43,8 @@ type CategoriesRow = {
   sort_order: number
   is_collapsed: boolean
   is_archived: boolean
+  /** Migration 20260804120000 — optional in case the column hasn't shipped yet. */
+  is_default?: boolean
   created_at: string
   updated_at: string
 }
@@ -253,6 +255,8 @@ type UserSettingsRow = {
   quick_links?: Json
   /** Migration 0013 — optional in case the column hasn't shipped yet. */
   show_category_prefix?: boolean
+  /** Migration 20260804120000 — optional in case the column hasn't shipped yet. */
+  default_category_enabled?: boolean
   weather_city: string
   weather_unit: 'celsius' | 'fahrenheit'
   lunch_break: Json
@@ -341,6 +345,7 @@ type CategoriesInsert = {
   sort_order?: number
   is_collapsed?: boolean
   is_archived?: boolean
+  is_default?: boolean
 }
 
 type TasksInsert = {
@@ -473,6 +478,7 @@ type UserSettingsInsert = {
   keep_completed_today_in_list?: boolean
   quick_links?: Json
   show_category_prefix?: boolean
+  default_category_enabled?: boolean
   weather_city?: string
   weather_unit?: 'celsius' | 'fahrenheit'
   lunch_break?: Json

@@ -73,12 +73,32 @@ export async function seedUserData(
         sort_order: cat.sortOrder,
         is_collapsed: cat.isCollapsed,
         is_archived: cat.isArchived,
+        is_default: false,
       }
     })
   )
 
-  if (categoryRows.length) {
-    const { error: catError } = await supabase.from('categories').insert(categoryRows)
+  // Every workspace gets its own "未分類" (Uncategorized) default category,
+  // appended after the seed data's own categories — this is the fallback
+  // target for tasks created without an explicit category pick (see
+  // lib/default-category.ts). None of the mock/demo workspaces above mark
+  // one of their own categories as default, so this is always a fresh insert.
+  const defaultCategoryRows = workspaces.map((ws) => ({
+    id: crypto.randomUUID(),
+    user_id: userId,
+    workspace_id: workspaceIdMap.get(ws.id)!,
+    name: t('未分類'),
+    sort_order: ws.categories.length
+      ? Math.max(...ws.categories.map((c) => c.sortOrder)) + 1
+      : 0,
+    is_collapsed: false,
+    is_archived: false,
+    is_default: true,
+  }))
+
+  const allCategoryRows = [...categoryRows, ...defaultCategoryRows]
+  if (allCategoryRows.length) {
+    const { error: catError } = await supabase.from('categories').insert(allCategoryRows)
     if (catError) throw new Error(`seed categories failed: ${catError.message}`)
   }
 

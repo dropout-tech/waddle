@@ -98,10 +98,10 @@ function buildTaskInsert(task: Task, userId: string) {
 }
 
 // User-settings extension columns — migrations 0006 (view-range), 0007
-// (keep_completed_today_in_list), and 0009 (quick_links). Same latch
-// shape so saveSettings matches createTask/updateTask instead of paying
-// the failed-write cost on every save.
-const SETTINGS_EXT_COL_RE = /day_view_days|week_view_days|keep_completed_today_in_list|quick_links|show_category_prefix/
+// (keep_completed_today_in_list), 0009 (quick_links), and 20260804120000
+// (default_category_enabled). Same latch shape so saveSettings matches
+// createTask/updateTask instead of paying the failed-write cost on every save.
+const SETTINGS_EXT_COL_RE = /day_view_days|week_view_days|keep_completed_today_in_list|quick_links|show_category_prefix|default_category_enabled/
 let settingsExtColsKnownMissing = false
 const isMissingSettingsExtColumnError = (err: unknown) => isMissingColumnError(err, SETTINGS_EXT_COL_RE)
 
@@ -117,6 +117,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   weekViewDays: 7,
   keepCompletedTodayInList: true,
   showCategoryPrefix: true,
+  defaultCategoryEnabled: true,
   quickLinks: [],
   weatherCity: 'Taipei',
   weatherUnit: 'celsius',
@@ -168,6 +169,12 @@ interface UseWaddleData {
   deleteCategory: (categoryId: string) => Promise<void>
   toggleCategoryCollapse: (categoryId: string) => Promise<void>
   reorderCategories: (workspaceId: string, orderedCategoryIds: string[]) => Promise<void>
+  /**
+   * Designate `categoryId` as workspace `workspaceId`'s default (fallback)
+   * category, clearing any previous holder. Pass `categoryId: null` to
+   * clear without setting a new one.
+   */
+  setDefaultCategory: (workspaceId: string, categoryId: string | null) => Promise<void>
   // Task
   addTask: (categoryId: string, title: string) => Promise<void>
   updateTask: (taskId: string, updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => Promise<void>
@@ -345,6 +352,8 @@ export function useWaddleData(): UseWaddleData {
           sortOrder: c.sort_order,
           isCollapsed: c.is_collapsed,
           isArchived: c.is_archived,
+          // Migration 20260804120000 — optional column; default false pre-migration.
+          isDefault: c.is_default ?? false,
           tasks: tasksByCategory.get(c.id) ?? [],
         }
         const arr = categoriesByWorkspace.get(c.workspace_id) ?? []
@@ -460,6 +469,21 @@ export function useWaddleData(): UseWaddleData {
               const parsed = JSON.parse(raw) as { showCategoryPrefix?: boolean }
               if (typeof parsed.showCategoryPrefix === 'boolean') {
                 builtSettings.showCategoryPrefix = parsed.showCategoryPrefix
+              }
+            }
+          } catch {
+            /* ignore corrupt localStorage */
+          }
+        }
+
+        const dbDefaultCategoryEnabled = settingsRow?.default_category_enabled
+        if (dbDefaultCategoryEnabled === undefined) {
+          try {
+            const raw = window.localStorage.getItem('waddle-default-category-v1')
+            if (raw) {
+              const parsed = JSON.parse(raw) as { defaultCategoryEnabled?: boolean }
+              if (typeof parsed.defaultCategoryEnabled === 'boolean') {
+                builtSettings.defaultCategoryEnabled = parsed.defaultCategoryEnabled
               }
             }
           } catch {
@@ -653,6 +677,9 @@ export function useWaddleData(): UseWaddleData {
             sortOrder: 0,
             isCollapsed: false,
             isArchived: false,
+            // This is the workspace's only category at creation time, so it
+            // doubles as the default-category fallback target.
+            isDefault: true,
             tasks: [],
           },
         ],
@@ -667,7 +694,7 @@ export function useWaddleData(): UseWaddleData {
       if (e1) return handleDbError('新增工作區')(e1)
 
       const { error: e2 } = await supabase.from('categories').insert({
-        id: catId, user_id: userId, workspace_id: wsId, name: defaultCategoryName, sort_order: 0,
+        id: catId, user_id: userId, workspace_id: wsId, name: defaultCategoryName, sort_order: 0, is_default: true,
       })
       if (e2) handleDbError('新增分類')(e2)
     } finally {
@@ -774,7 +801,7 @@ export function useWaddleData(): UseWaddleData {
             ...w.categories,
             {
               id, workspaceId, name, sortOrder,
-              isCollapsed: false, isArchived: false, tasks: [],
+              isCollapsed: false, isArchived: false, isDefault: false, tasks: [],
             },
           ],
         }
@@ -861,6 +888,77 @@ export function useWaddleData(): UseWaddleData {
         undo: () => reorderCategories(workspaceId, previousOrder, false),
         redo: () => reorderCategories(workspaceId, orderedCategoryIds, false),
       })
+    }
+  }, [supabase])
+
+  // Set (or clear) the workspace's default category — the fallback target
+  // for tasks created without an explicit category pick (see
+  // lib/default-category.ts). At most one category per workspace may carry
+  // is_default=true, so this clears any previous holder first.
+  const setDefaultCategory = useCallback(async (workspaceId: string, categoryId: string | null) => {
+    // Snapshot for rollback — captures each category's previous isDefault
+    // value in this workspace so a failed write can be undone precisely.
+    let previous: { id: string; isDefault: boolean }[] = []
+    for (const w of workspacesRef.current) {
+      if (w.id !== workspaceId) continue
+      previous = w.categories.map((c) => ({ id: c.id, isDefault: c.isDefault }))
+      break
+    }
+
+    setWorkspaces((prev) =>
+      prev.map((w) => {
+        if (w.id !== workspaceId) return w
+        return {
+          ...w,
+          categories: w.categories.map((c) => ({ ...c, isDefault: c.id === categoryId })),
+        }
+      })
+    )
+
+    const rollback = () => {
+      setWorkspaces((prev) =>
+        prev.map((w) => {
+          if (w.id !== workspaceId) return w
+          const prevById = new Map(previous.map((p) => [p.id, p.isDefault]))
+          return {
+            ...w,
+            categories: w.categories.map((c) =>
+              prevById.has(c.id) ? { ...c, isDefault: prevById.get(c.id)! } : c
+            ),
+          }
+        })
+      )
+    }
+
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
+    try {
+      // Clear the previous default(s) first — a partial unique index only
+      // allows one is_default=true row per workspace, so setting the new
+      // one before clearing the old would violate it.
+      const { error: clearError } = await supabase
+        .from('categories')
+        .update({ is_default: false })
+        .eq('workspace_id', workspaceId)
+        .eq('is_default', true)
+      if (clearError) {
+        rollback()
+        handleDbError('設定預設分類')(clearError)
+        return
+      }
+
+      if (categoryId) {
+        const { error: setError } = await supabase
+          .from('categories')
+          .update({ is_default: true })
+          .eq('id', categoryId)
+        if (setError) {
+          rollback()
+          handleDbError('設定預設分類')(setError)
+          return
+        }
+      }
+    } finally {
+      pendingWritesRef.current -= 1
     }
   }, [supabase])
 
@@ -2431,6 +2529,10 @@ export function useWaddleData(): UseWaddleData {
           'waddle-category-prefix-v1',
           JSON.stringify({ showCategoryPrefix: newSettings.showCategoryPrefix }),
         )
+        window.localStorage.setItem(
+          'waddle-default-category-v1',
+          JSON.stringify({ defaultCategoryEnabled: newSettings.defaultCategoryEnabled }),
+        )
       } catch {
         /* localStorage unavailable; ignore */
       }
@@ -2449,6 +2551,7 @@ export function useWaddleData(): UseWaddleData {
           keep_completed_today_in_list: newSettings.keepCompletedTodayInList,
           quick_links: newSettings.quickLinks as unknown as Json,
           show_category_prefix: newSettings.showCategoryPrefix,
+          default_category_enabled: newSettings.defaultCategoryEnabled,
         }
     let { error } = await supabase.from('user_settings').upsert(fullSettingsRow)
     if (error && isMissingSettingsExtColumnError(error)) {
@@ -2854,13 +2957,16 @@ export function useWaddleData(): UseWaddleData {
         icon: ws.icon,
         sortOrder: ws.sortOrder,
         isArchived: false,
-        categories: ws.categories.map((c) => ({
+        categories: ws.categories.map((c, catIdx) => ({
           id: c.id,
           workspaceId: ws.id,
           name: c.name,
           sortOrder: c.sortOrder,
           isCollapsed: false,
           isArchived: false,
+          // First category in a freshly-created workspace doubles as its
+          // default-category fallback target.
+          isDefault: catIdx === 0,
           tasks: [],
         })),
       }))
@@ -2887,12 +2993,13 @@ export function useWaddleData(): UseWaddleData {
 
     // Insert categories
     const catRows = newWorkspaces.flatMap((ws) =>
-      ws.categories.map((c) => ({
+      ws.categories.map((c, catIdx) => ({
         id: c.id,
         user_id: userId,
         workspace_id: ws.id,
         name: c.name,
         sort_order: c.sortOrder,
+        is_default: catIdx === 0,
       }))
     )
     if (catRows.length) {
@@ -2918,6 +3025,7 @@ export function useWaddleData(): UseWaddleData {
     deleteCategory,
     toggleCategoryCollapse,
     reorderCategories,
+    setDefaultCategory,
     addTask,
     createTask,
     updateTask,

@@ -143,6 +143,16 @@ export function TaskDetailModal({
     .flatMap((w) => w.categories.map((c) => ({ ...c, workspace: w })))
     .find((c) => c.id === selectedCategoryId)
 
+  // Category picker order: float the task's own workspace to the top. The
+  // calendar flow already asked which workspace this belongs to, so making
+  // the user scroll past every other workspace to reach it reads as a bug.
+  const activeWorkspaceId = selectedCategory?.workspace.id ?? task.workspaceId
+  const orderedWorkspaces = useMemo(() => {
+    const index = workspaces.findIndex((w) => w.id === activeWorkspaceId)
+    if (index <= 0) return workspaces
+    return [workspaces[index], ...workspaces.slice(0, index), ...workspaces.slice(index + 1)]
+  }, [workspaces, activeWorkspaceId])
+
   const toggleRecurrenceDay = (day: number) => {
     setRecurrenceDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
@@ -278,7 +288,7 @@ export function TaskDetailModal({
                   ran 64 px past the right edge before this). */}
               {showCategoryPicker && workspaces.length > 0 && (
                 <div className="fixed left-3 right-3 top-[calc(env(safe-area-inset-top,0px)+72px)] max-h-[60vh] md:absolute md:left-0 md:right-auto md:top-full md:mt-1 md:w-64 md:max-h-64 bg-card rounded-xl border border-border shadow-xl z-popover py-2 overflow-y-auto">
-                  {workspaces.map((workspace) => (
+                  {orderedWorkspaces.map((workspace) => (
                     <div key={workspace.id}>
                       <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
                         <div

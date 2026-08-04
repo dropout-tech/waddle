@@ -86,6 +86,7 @@ interface SettingsModalProps {
   workspaces: Workspace[]
   onClose: () => void
   onSave: (settings: UserSettings, timeBlocks: TimeBlock[]) => void
+  onSetDefaultCategory: (workspaceId: string, categoryId: string | null) => Promise<void>
 }
 
 export type SettingsTab = 'general' | 'slotTypes' | 'notifications' | 'sharing'
@@ -149,6 +150,7 @@ export function SettingsModal({
   workspaces,
   onClose,
   onSave,
+  onSetDefaultCategory,
 }: SettingsModalProps) {
   const { lang, setLang, t } = useI18n()
   const [localSettings, setLocalSettings] = useState<UserSettings>(settings)
@@ -804,6 +806,78 @@ export function SettingsModal({
                 className="w-4 h-4 rounded border-border accent-primary"
               />
             </label>
+
+            {/* Default category (Category.isDefault) — where tasks land when
+                created without an explicit category pick (calendar drag,
+                quick-add). Toggle rides the normal settings save path, same
+                as showCategoryPrefix above; the per-workspace pick fires
+                onSetDefaultCategory immediately (hook does optimistic
+                update + rollback). */}
+            <div className="space-y-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Layers className="w-4 h-4" />
+                {t('預設分類')}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {t('從日曆或快速新增建立任務時，沒有選分類就會自動歸到這裡。')}
+              </p>
+              <label className="flex items-center justify-between cursor-pointer">
+                <div className="text-sm text-foreground">{t('自動歸到預設分類')}</div>
+                <input
+                  type="checkbox"
+                  checked={localSettings.defaultCategoryEnabled ?? true}
+                  onChange={(e) =>
+                    setLocalSettings(prev => ({ ...prev, defaultCategoryEnabled: e.target.checked }))
+                  }
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+              </label>
+              {localSettings.defaultCategoryEnabled ?? true ? (
+                <div className="space-y-2 pl-1">
+                  {workspaces.filter(ws => !ws.isArchived).map((workspace) => {
+                    const activeCategories = workspace.categories.filter(c => !c.isArchived)
+                    const currentDefault = activeCategories.find(c => c.isDefault)
+                    return (
+                      <div
+                        key={workspace.id}
+                        className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-secondary/50 border border-border"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: workspace.color }}
+                          />
+                          <span className="text-sm font-medium truncate">{workspace.name}</span>
+                        </div>
+                        {activeCategories.length === 0 ? (
+                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                            {t('這個大分類還沒有分類')}
+                          </span>
+                        ) : (
+                          <select
+                            value={currentDefault?.id ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              void onSetDefaultCategory(workspace.id, value === '' ? null : value)
+                            }}
+                            className="h-11 md:h-8 px-2 text-xs rounded-md bg-background border border-border flex-shrink-0"
+                          >
+                            <option value="">{t('（未設定）')}</option>
+                            {activeCategories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground pl-1">
+                  {t('關閉時，會使用該大分類的第一個分類。')}
+                </p>
+              )}
+            </div>
 
             {/* Taiwan public holidays on the calendar — device-level, takes
                 effect immediately (same pattern as the water reminder). */}
