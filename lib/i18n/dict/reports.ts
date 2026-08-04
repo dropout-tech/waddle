@@ -113,7 +113,7 @@ export const dict: Record<string, string> = {
   '歡迎來到 Huddle': 'Welcome to Huddle',
   '左側：三層結構': 'Left side: three layers',
   '勾選 / 點開任務': 'Check off / open a task',
-  '今日會議 ＆ 已完成': "Today's meetings & completed",
+  '今日會議 ＆ 待整理 ＆ 已完成': "Today's meetings, review & completed",
   '🔄 左邊 = 右邊': '🔄 Left = right',
   '日曆：上方待排程 / 下方時間軸': 'Calendar: unscheduled above / timeline below',
   '🤚 拖曳就是排程': '🤚 Drag to schedule',
@@ -138,8 +138,8 @@ export const dict: Record<string, string> = {
   '左邊圈圈 = 完成；點任務本身 = 打開詳細編輯。打開後可以把任務標為「會議」，會多三個欄位（參與者 / 地點 / 視訊連結）。':
     'The circle on the left marks it done; tapping the task itself opens the detail editor. Once open, you can mark it as a Meeting to reveal three more fields (attendees / location / video link).',
   '👉 試試點一下這個任務': '👉 Try tapping this task',
-  '左邊 chip 顯示今天還剩幾場會議，點開可一鍵加入視訊。右邊「已完成」進到專屬抽屜，內含 KPI 統計（連續天數、平均耗時）。':
-    "The chip on the left shows how many meetings are left today — tap it to join the video call with one tap. Completed on the right opens a dedicated drawer with stats (streak days, average time to finish).",
+  '左邊 chip 顯示今天還剩幾場會議，點開可一鍵加入視訊。中間「待整理」是過了原本時間的任務，點進去可以一件一件重新決定（完成／排今天／移回任務欄／封存）。右邊「已完成」進到專屬抽屜，內含 KPI 統計（連續天數、平均耗時）。':
+    "The chip on the left shows how many meetings are left today — tap it to join the video call with one tap. Review in the middle collects tasks that passed their original time; open it to decide each one again (complete / do it today / back to the task list / archive). Completed on the right opens a dedicated drawer with stats (streak days, average time to finish).",
   '左側清單和右側日曆是**同一份資料的兩種視圖**。在任一邊改動（完成、編輯、刪除）都會即時同步，不會重複。':
     'The list on the left and the calendar on the right are **two views of the same data**. Changes on either side (complete, edit, delete) sync instantly — nothing gets duplicated.',
   "每一天上方那條是「待排程」（有日期沒時間）；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let's Play｜夏令營），一眼看出屬於哪個分類；不想要可在設定關掉。另外在「設定 → 共享」可以邀請夥伴互看行事曆，對方開放的行程會疊加顯示在這裡。":
@@ -175,8 +175,8 @@ export const dict: Record<string, string> = {
     'Three layers: workspaces → categories → tasks. Everything lives here. The "+" next to a workspace name adds a category.',
   '輕點任務開啟詳細頁；長按 0.3 秒後拖移可以直接排到日曆上的時間。打開後可以把任務標為「會議」，會多參與者 / 地點 / 視訊連結。':
     'Tap a task to open its detail page; long-press for 0.3s then drag to schedule it directly onto the calendar. Once open, you can mark it as a Meeting to add attendees / location / video link.',
-  '今日會議 chip 點開可以一鍵加入視訊；已完成抽屜含 KPI（連續天數、平均耗時）。日曆頁右上「⋯」選單裡還有「匯出行程」可以產 PNG 分享。':
-    "Tap the today's-meetings chip to join a video call with one tap; the Completed drawer has stats (streak days, average time to finish). The calendar page's top-right ⋯ menu also has Export schedule, for sharing a PNG.",
+  '今日會議 chip 點開可以一鍵加入視訊；「待整理」收過期任務，進去後可以滑卡片整理——右滑完成、左滑移回任務欄、上滑排今天、下滑封存。已完成抽屜含 KPI（連續天數、平均耗時）。':
+    "Tap the today's-meetings chip to join a video call with one tap. Review collects tasks that are past due — open it and swipe the cards: right to complete, left to send back to the task list, up to do it today, down to archive. The Completed drawer has stats (streak days, average time to finish).",
   '在「任務」分頁向左滑 → 切到日曆。日曆內向左右滑 → 切換昨天 / 明天。':
     'Swipe left on the Tasks tab to switch to the calendar. Inside the calendar, swipe left or right to move between yesterday and tomorrow.',
   "上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let's Play｜夏令營）讓你一眼分辨，不想要可在設定關掉。每週循環的任務拖到別的時間時，Huddle 會問「只改這一天 / 之後也改 / 全部改」，像 Google 日曆一樣自由。想跟夥伴互看行事曆？「設定 → 共享」邀請對方就能疊加顯示。":

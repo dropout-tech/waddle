@@ -56,8 +56,8 @@ const DESKTOP_STEPS: TourStep[] = [
   },
   {
     target: '[data-tour="task-shortcut-row"]',
-    title: '今日會議 ＆ 已完成',
-    body: '左邊 chip 顯示今天還剩幾場會議，點開可一鍵加入視訊。右邊「已完成」進到專屬抽屜，內含 KPI 統計（連續天數、平均耗時）。',
+    title: '今日會議 ＆ 待整理 ＆ 已完成',
+    body: '左邊 chip 顯示今天還剩幾場會議，點開可一鍵加入視訊。中間「待整理」是過了原本時間的任務，點進去可以一件一件重新決定（完成／排今天／移回任務欄／封存）。右邊「已完成」進到專屬抽屜，內含 KPI 統計（連續天數、平均耗時）。',
     placement: 'bottom',
     padding: 4,
   },
@@ -175,8 +175,8 @@ const MOBILE_STEPS: TourStep[] = [
   },
   {
     target: '[data-tour="task-shortcut-row"]',
-    title: '今日會議 ＆ 已完成',
-    body: '今日會議 chip 點開可以一鍵加入視訊；已完成抽屜含 KPI（連續天數、平均耗時）。日曆頁右上「⋯」選單裡還有「匯出行程」可以產 PNG 分享。',
+    title: '今日會議 ＆ 待整理 ＆ 已完成',
+    body: '今日會議 chip 點開可以一鍵加入視訊；「待整理」收過期任務，進去後可以滑卡片整理——右滑完成、左滑移回任務欄、上滑排今天、下滑封存。已完成抽屜含 KPI（連續天數、平均耗時）。',
     placement: 'bottom',
     padding: 4,
   },
