@@ -1,10 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Archive,
   ArrowLeft,
   CalendarClock,
+  CalendarPlus,
   Check,
   CheckCheck,
   ChevronRight,
@@ -17,6 +18,9 @@ import { ModalShell } from '@/components/modals/modal-shell'
 import { getTaskOverdueDate } from '@/lib/task-utils'
 import { parseDateString, toDateString } from '@/lib/calendar-utils'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { hapticSelection, hapticTaskComplete } from '@/lib/haptics'
+import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 import { useI18n } from '@/lib/i18n/react'
 import type { Task, Workspace } from '@/lib/types'
 
@@ -27,11 +31,25 @@ interface OverdueTaskReviewProps {
   onComplete: (taskId: string) => Promise<void>
   onCompleteAll: (taskIds: string[]) => Promise<void>
   onReturnToBacklog: (taskId: string) => Promise<void>
+  onScheduleToday: (taskId: string) => Promise<void>
   onArchive: (taskId: string) => Promise<void>
   onSelectTask: (task: Task) => void
 }
 
 type ReviewMode = 'list' | 'review'
+
+/** The four one-decision gestures available on the review card (mobile only).
+ *  Every one of them also has a visible button underneath — the swipe is an
+ *  accelerator, never the only way in. */
+type SwipeDir = 'right' | 'left' | 'up' | 'down'
+
+/** Travel (px) needed before a drag counts as a decision. */
+const SWIPE_COMMIT_PX = 88
+/** Travel (px) before we lock the drag to one axis, so a diagonal wobble at
+ *  the start of a vertical drag doesn't register as a horizontal one. */
+const AXIS_LOCK_PX = 10
+/** Must outlast the card's fly-out transition below. */
+const EXIT_MS = 220
 
 function daysAgo(date: string, today: string): number {
   const start = parseDateString(date).getTime()
@@ -46,11 +64,13 @@ export function OverdueTaskReview({
   onComplete,
   onCompleteAll,
   onReturnToBacklog,
+  onScheduleToday,
   onArchive,
   onSelectTask,
 }: OverdueTaskReviewProps) {
   const { t, lang } = useI18n()
   const displayColor = useDisplayColor()
+  const isMobile = useIsMobile()
   const [mode, setMode] = useState<ReviewMode>('list')
   const [activeIndex, setActiveIndex] = useState(0)
   const [startingCount, setStartingCount] = useState(0)
@@ -96,6 +116,126 @@ export function OverdueTaskReview({
       setBusyAction(null)
     }
   }
+
+  // ---- Swipe-to-decide (mobile) ------------------------------------------
+  // Each direction maps 1:1 onto a button below the card. Right = the happy
+  // path (done), left = push it back to the backlog, up = do it today,
+  // down = let it go.
+  const swipeEnabled = isMobile && mode === 'review'
+  const dragRef = useRef<{ id: number; x: number; y: number; axis: 'none' | 'x' | 'y' } | null>(null)
+  const suppressingRef = useRef(false)
+  const [drag, setDrag] = useState({ dx: 0, dy: 0 })
+  const [exit, setExit] = useState<{ taskId: string; dir: SwipeDir } | null>(null)
+
+  const releaseSuppression = useCallback(() => {
+    if (!suppressingRef.current) return
+    suppressingRef.current = false
+    endGestureSuppression()
+  }, [])
+
+  // A drag interrupted by an unmount (sheet closed mid-swipe) would otherwise
+  // leave the app-wide swipe navigation permanently suppressed.
+  useEffect(() => releaseSuppression, [releaseSuppression])
+
+  const swipeAction = useCallback(
+    (dir: SwipeDir) => {
+      switch (dir) {
+        case 'right':
+          return { key: 'complete', label: t('標記為已完成'), Icon: Check, tone: 'text-success', bg: 'bg-success/12' }
+        case 'left':
+          return { key: 'backlog', label: t('移回任務欄'), Icon: Inbox, tone: 'text-primary', bg: 'bg-primary/12' }
+        case 'up':
+          return { key: 'today', label: t('排今天'), Icon: CalendarPlus, tone: 'text-primary', bg: 'bg-primary/12' }
+        case 'down':
+          return { key: 'archive', label: t('封存'), Icon: Archive, tone: 'text-muted-foreground', bg: 'bg-secondary' }
+      }
+    },
+    [t],
+  )
+
+  const commitSwipe = (dir: SwipeDir) => {
+    const task = currentTask
+    if (!task || busyAction) return
+    setExit({ taskId: task.id, dir })
+    if (dir === 'right') hapticTaskComplete()
+    else hapticSelection()
+    const run = () => {
+      switch (dir) {
+        case 'right':
+          return onComplete(task.id)
+        case 'left':
+          return onReturnToBacklog(task.id)
+        case 'up':
+          return onScheduleToday(task.id)
+        case 'down':
+          return onArchive(task.id)
+      }
+    }
+    // Hold the card off-screen until the write lands, then drop the exit
+    // state — by that point the list has advanced, so the incoming card is
+    // matched by id and renders untransformed instead of flying back in.
+    void (async () => {
+      const started = Date.now()
+      await runAction(swipeAction(dir).key, run)
+      const wait = Math.max(0, EXIT_MS - (Date.now() - started))
+      if (wait) await new Promise(resolve => setTimeout(resolve, wait))
+      setExit(null)
+    })()
+  }
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!swipeEnabled || busyAction || event.pointerType === 'mouse') return
+    dragRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY, axis: 'none' }
+  }
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const state = dragRef.current
+    if (!state || state.id !== event.pointerId) return
+    const dx = event.clientX - state.x
+    const dy = event.clientY - state.y
+    if (state.axis === 'none') {
+      if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return
+      state.axis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y'
+      event.currentTarget.setPointerCapture(event.pointerId)
+      // Stop the calendar/tasks panel swipe from also reading this gesture.
+      if (!suppressingRef.current) {
+        suppressingRef.current = true
+        beginGestureSuppression()
+      }
+    }
+    setDrag(state.axis === 'x' ? { dx, dy: 0 } : { dx: 0, dy })
+  }
+
+  const handlePointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    const state = dragRef.current
+    if (!state || state.id !== event.pointerId) return
+    dragRef.current = null
+    releaseSuppression()
+    const dx = event.clientX - state.x
+    const dy = event.clientY - state.y
+    setDrag({ dx: 0, dy: 0 })
+    if (state.axis === 'x' && Math.abs(dx) >= SWIPE_COMMIT_PX) commitSwipe(dx > 0 ? 'right' : 'left')
+    else if (state.axis === 'y' && Math.abs(dy) >= SWIPE_COMMIT_PX) commitSwipe(dy < 0 ? 'up' : 'down')
+  }
+
+  const isExiting = !!exit && !!currentTask && exit.taskId === currentTask.id
+  const activeDir: SwipeDir | null =
+    isExiting
+      ? exit!.dir
+      : Math.abs(drag.dx) > AXIS_LOCK_PX
+        ? drag.dx > 0
+          ? 'right'
+          : 'left'
+        : Math.abs(drag.dy) > AXIS_LOCK_PX
+          ? drag.dy < 0
+            ? 'up'
+            : 'down'
+          : null
+
+  const cardOffset = isExiting
+    ? { x: exit!.dir === 'right' ? 520 : exit!.dir === 'left' ? -520 : 0, y: exit!.dir === 'up' ? -720 : exit!.dir === 'down' ? 720 : 0 }
+    : { x: drag.dx, y: drag.dy }
+  const swipeProgress = Math.min(1, Math.max(Math.abs(cardOffset.x), Math.abs(cardOffset.y)) / SWIPE_COMMIT_PX)
 
   const formatDate = (value: string) =>
     parseDateString(value).toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', {
@@ -253,38 +393,92 @@ export function OverdueTaskReview({
             />
           </div>
 
-          <div className="flex flex-1 flex-col justify-center py-8">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span
-                className="size-2.5 rounded-full"
-                style={{ backgroundColor: displayColor(currentTask.workspaceColor) }}
-                aria-hidden="true"
-              />
-              <span>{currentTask.workspaceName} · {currentTask.categoryName}</span>
+          <div className="flex flex-1 flex-col justify-center py-6">
+            <div
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerEnd}
+              onPointerCancel={handlePointerEnd}
+              style={{
+                transform: `translate3d(${cardOffset.x}px, ${cardOffset.y}px, 0) rotate(${Math.max(-12, Math.min(12, cardOffset.x / 18))}deg)`,
+                transition:
+                  drag.dx === 0 && drag.dy === 0
+                    ? 'transform 220ms cubic-bezier(0.25, 1, 0.5, 1), opacity 220ms ease-out'
+                    : 'none',
+                opacity: isExiting ? 0 : 1,
+                touchAction: swipeEnabled ? 'none' : undefined,
+              }}
+              className={
+                swipeEnabled
+                  ? 'relative select-none rounded-2xl border border-border bg-secondary/35 p-5 will-change-transform'
+                  : 'relative'
+              }
+            >
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span
+                  className="size-2.5 rounded-full"
+                  style={{ backgroundColor: displayColor(currentTask.workspaceColor) }}
+                  aria-hidden="true"
+                />
+                <span>{currentTask.workspaceName} · {currentTask.categoryName}</span>
+              </div>
+              <h3 className="mt-4 text-2xl font-semibold leading-snug text-foreground text-pretty">
+                {currentTask.title || t('未命名任務')}
+              </h3>
+              {currentTask.description && (
+                <p className="mt-3 max-w-[65ch] text-sm leading-relaxed text-muted-foreground text-pretty line-clamp-4">
+                  {currentTask.description}
+                </p>
+              )}
+              {(() => {
+                const overdueDate = getTaskOverdueDate(currentTask, today)!
+                const isScheduled = currentTask.scheduledDate === overdueDate
+                return (
+                  <div className="mt-5 flex items-center gap-2 text-sm text-overdue">
+                    <CalendarClock className="size-4" aria-hidden="true" />
+                    <span>
+                      {isScheduled
+                        ? t('原本排在 {date}', { date: formatDate(overdueDate) })
+                        : t('原本截止於 {date}', { date: formatDate(overdueDate) })}
+                      {currentTask.scheduledStartTime && ` · ${currentTask.scheduledStartTime}`}
+                    </span>
+                  </div>
+                )
+              })()}
+
+              {/* What this swipe is about to do. Fades in with the drag so the
+                  decision is confirmed before the finger lifts. */}
+              {swipeEnabled && activeDir && (
+                <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl" aria-hidden="true">
+                  {/* Only the scrim and the colour wash fade with the drag —
+                      putting the opacity on a shared parent would make the
+                      label itself translucent and let the task title bleed
+                      straight through it. */}
+                  <div className="absolute inset-0 bg-card/95 backdrop-blur-[2px]" style={{ opacity: swipeProgress }} />
+                  <div className={`absolute inset-0 ${swipeAction(activeDir).bg}`} style={{ opacity: swipeProgress }} />
+                  <div
+                    className="relative flex h-full items-center justify-center"
+                    style={{ opacity: Math.min(1, swipeProgress * 3) }}
+                  >
+                    <span className={`flex items-center gap-2 rounded-full bg-card px-4 py-2 text-sm font-semibold shadow-lg ${swipeAction(activeDir).tone}`}>
+                      {(() => {
+                        const { Icon } = swipeAction(activeDir)
+                        return <Icon className="size-4" />
+                      })()}
+                      {swipeAction(activeDir).label}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
-            <h3 className="mt-4 text-2xl font-semibold leading-snug text-foreground text-pretty">
-              {currentTask.title || t('未命名任務')}
-            </h3>
-            {currentTask.description && (
-              <p className="mt-3 max-w-[65ch] text-sm leading-relaxed text-muted-foreground text-pretty">
-                {currentTask.description}
+
+            {swipeEnabled && (
+              <p className="mt-5 text-center text-xs leading-relaxed text-muted-foreground">
+                {t('滑動卡片：右＝完成，左＝移回任務欄')}
+                <br />
+                {t('上＝排今天，下＝封存')}
               </p>
             )}
-            {(() => {
-              const overdueDate = getTaskOverdueDate(currentTask, today)!
-              const isScheduled = currentTask.scheduledDate === overdueDate
-              return (
-                <div className="mt-5 flex items-center gap-2 text-sm text-overdue">
-                  <CalendarClock className="size-4" aria-hidden="true" />
-                  <span>
-                    {isScheduled
-                      ? t('原本排在 {date}', { date: formatDate(overdueDate) })
-                      : t('原本截止於 {date}', { date: formatDate(overdueDate) })}
-                    {currentTask.scheduledStartTime && ` · ${currentTask.scheduledStartTime}`}
-                  </span>
-                </div>
-              )
-            })()}
           </div>
 
           <div className="space-y-2.5 pb-[max(0px,env(safe-area-inset-bottom))]">
@@ -297,6 +491,17 @@ export function OverdueTaskReview({
               {busyAction === 'complete' ? <Loader2 className="animate-spin" /> : <Check />}
               <span className="flex-1 text-left">{t('標記為已完成')}</span>
               <span className="text-xs font-normal opacity-80">{t('事情做完了')}</span>
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-12 w-full justify-start rounded-xl px-4"
+              disabled={!!busyAction}
+              onClick={() => runAction('today', () => onScheduleToday(currentTask.id))}
+            >
+              {busyAction === 'today' ? <Loader2 className="animate-spin" /> : <CalendarPlus />}
+              <span className="flex-1 text-left">{t('排今天')}</span>
+              <span className="text-xs font-normal text-muted-foreground">{t('重新排到今天')}</span>
             </Button>
             <Button
               type="button"

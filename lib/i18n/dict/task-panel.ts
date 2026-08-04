@@ -99,6 +99,10 @@ export const dict: Record<string, string> = {
   '清除日期與時段': 'Clear date and time',
   '取消並封存': 'Cancel and archive',
   '不再顯示': 'Hide from active views',
+  '排今天': 'Do it today',
+  '重新排到今天': 'Reschedule to today',
+  '滑動卡片：右＝完成，左＝移回任務欄': 'Swipe the card: right = done, left = back to task list',
+  '上＝排今天，下＝封存': 'Up = do it today, down = archive',
 
   // task-row.tsx
   '未命名任務': 'Untitled task',

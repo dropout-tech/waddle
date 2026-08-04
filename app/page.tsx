@@ -162,6 +162,19 @@ function HuddlePage() {
     })
   }, [updateTask])
 
+  // "Move it to today" from the overdue review. A task counts as overdue when
+  // EITHER its scheduled date or its due date sits in the past, so pushing the
+  // schedule alone would leave a past due date behind and the task would stay
+  // in the review list forever. Drag the stale due date forward too.
+  const handleScheduleToday = useCallback((taskId: string) => {
+    const today = toDateString(new Date())
+    const task = findTaskById(workspaces, taskId)
+    return updateTask(taskId, {
+      scheduledDate: today,
+      ...(task?.dueDate && task.dueDate < today ? { dueDate: today } : {}),
+    })
+  }, [updateTask, workspaces])
+
   // When a scratchpad note is promoted, we stage a draft task in the modal but
   // DON'T delete the source note yet — only after the task is actually saved
   // (see handleSaveTask). Cancelling the modal leaves the note intact.
@@ -495,6 +508,7 @@ function HuddlePage() {
         onComplete={toggleTaskComplete}
         onCompleteAll={completeTasks}
         onReturnToBacklog={handleReturnToBacklog}
+        onScheduleToday={handleScheduleToday}
         onArchive={handleArchiveTask}
         onSelectTask={handleSelectTask}
       />
