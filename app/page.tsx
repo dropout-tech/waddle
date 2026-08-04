@@ -22,6 +22,7 @@ import { useUndoShortcuts } from '@/hooks/use-undo-shortcuts'
 import { WaterReminderModal } from '@/components/modals/water-reminder-modal'
 import { toDateString } from '@/lib/calendar-utils'
 import { findTaskById } from '@/lib/task-utils'
+import { resolveDefaultCategory } from '@/lib/default-category'
 import { AuthGuard } from '@/components/auth/auth-guard'
 import { CategoryPrefixProvider } from '@/components/category-prefix-context'
 import { NotebookOverlayProvider } from '@/components/notebook/notebook-overlay-provider'
@@ -48,6 +49,7 @@ function HuddlePage() {
     deleteCategory,
     toggleCategoryCollapse,
     reorderCategories,
+    setDefaultCategory,
     addTask,
     createTask,
     updateTask,
@@ -182,7 +184,7 @@ function HuddlePage() {
 
   const handlePromoteToTask = useCallback((title: string, description: string | undefined, sourceId: string) => {
     const firstWs = workspaces.find(w => !w.isArchived) || workspaces[0]
-    const firstCat = firstWs?.categories.find(c => !c.isArchived) || firstWs?.categories[0]
+    const firstCat = resolveDefaultCategory(firstWs, settings.defaultCategoryEnabled)
     if (!firstCat) return
 
     promotedScratchpadIdRef.current = sourceId
@@ -204,7 +206,7 @@ function HuddlePage() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     })
-  }, [workspaces])
+  }, [workspaces, settings.defaultCategoryEnabled])
 
   // Save handler shared by edit + create modes.
   const handleSaveTask = useCallback(async (updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => {
@@ -256,7 +258,8 @@ function HuddlePage() {
         ? workspaces.find((w) => w.id === slotType.workspaceId)
         : workspaces[0]
       if (!targetWorkspace || targetWorkspace.categories.length === 0) return
-      const targetCategory = targetWorkspace.categories[0]
+      const targetCategory = resolveDefaultCategory(targetWorkspace, settings.defaultCategoryEnabled)
+      if (!targetCategory) return
       const now = new Date().toISOString()
       const draft: Task = {
         id: crypto.randomUUID(),
@@ -281,7 +284,7 @@ function HuddlePage() {
       setTaskMode('create')
       setSelectedTask(draft)
     },
-    [workspaces]
+    [workspaces, settings.defaultCategoryEnabled]
   )
 
   // Calendar drag → either creates a task in workspace or a time block,
@@ -300,8 +303,10 @@ function HuddlePage() {
 
     if (slotType?.workspaceId) {
       const workspace = workspaces.find((w) => w.id === slotType.workspaceId)
-      if (workspace && workspace.categories.length > 0) {
-        const defaultCategory = workspace.categories[0]
+      const defaultCategory = workspace
+        ? resolveDefaultCategory(workspace, settings.defaultCategoryEnabled)
+        : undefined
+      if (workspace && defaultCategory) {
         const now = new Date().toISOString()
         const newTask: Task = {
           id: crypto.randomUUID(),
@@ -332,7 +337,7 @@ function HuddlePage() {
     await addTimeBlock({
       date, startTime, endTime, type, label, color, isRecurring: false,
     })
-  }, [activeSlotTypes, workspaces, createTask, addTimeBlock])
+  }, [activeSlotTypes, workspaces, createTask, addTimeBlock, settings.defaultCategoryEnabled])
 
   const handleRescheduleTask = useCallback((
     taskId: string,
@@ -372,7 +377,7 @@ function HuddlePage() {
 
   const handleCreatePendingTask = useCallback(async (title: string) => {
     const firstWorkspace = workspaces[0]
-    const firstCategory = firstWorkspace?.categories[0]
+    const firstCategory = resolveDefaultCategory(firstWorkspace, settings.defaultCategoryEnabled)
     if (!firstWorkspace || !firstCategory) return
 
     const today = toDateString(new Date())
@@ -395,11 +400,11 @@ function HuddlePage() {
       updatedAt: now,
     }
     await createTask(newTask)
-  }, [workspaces, createTask])
+  }, [workspaces, createTask, settings.defaultCategoryEnabled])
 
   const handleCreateCalendarTask = useCallback(async (date: string, startTime?: string, endTime?: string) => {
     const firstWorkspace = workspaces[0]
-    const firstCategory = firstWorkspace?.categories[0]
+    const firstCategory = resolveDefaultCategory(firstWorkspace, settings.defaultCategoryEnabled)
     if (!firstWorkspace || !firstCategory) return
 
     const now = new Date().toISOString()
@@ -431,7 +436,7 @@ function HuddlePage() {
     // sticky, so without this it could still be 'create' from a prior action.
     setTaskMode('edit')
     setSelectedTask(newTask)
-  }, [workspaces, createTask, t])
+  }, [workspaces, createTask, t, settings.defaultCategoryEnabled])
 
   if (isLoading) {
     return (
@@ -541,6 +546,7 @@ function HuddlePage() {
           workspaces={workspaces}
           onClose={() => setIsSettingsOpen(false)}
           onSave={saveSettings}
+          onSetDefaultCategory={setDefaultCategory}
         />
       )}
 

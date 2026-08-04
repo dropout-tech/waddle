@@ -13,6 +13,8 @@ export const dict: Record<string, string> = {
   // where reused, as undo-stack action labels)
   '新增工作區': "Add workspace",
   '新增分類': "Add category",
+  '設定預設分類': 'Set default category',
+  '未分類': 'Uncategorized',
   '更新工作區': 'Update workspace',
   '封存工作區': 'Archive workspace',
   '刪除工作區': 'Delete workspace',

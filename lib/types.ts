@@ -80,6 +80,12 @@ export interface Category {
   sortOrder: number
   isCollapsed: boolean
   isArchived: boolean
+  /**
+   * When true, this is the workspace's fallback category — tasks created
+   * without an explicit category pick land here (when the user's
+   * `defaultCategoryEnabled` setting is on). At most one per workspace.
+   */
+  isDefault: boolean
   tasks: Task[]
 }
 
@@ -222,6 +228,12 @@ export interface UserSettings {
    * already groups by category so the prefix is redundant there.
    */
   showCategoryPrefix: boolean
+  /**
+   * When true (default), tasks created without an explicit category pick
+   * fall back to the workspace's designated default category (see
+   * `Category.isDefault`) instead of always landing in the first category.
+   */
+  defaultCategoryEnabled: boolean
   weatherCity: string
   weatherUnit: 'celsius' | 'fahrenheit'
   // Time block defaults

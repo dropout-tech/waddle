@@ -17,6 +17,7 @@ export const mockWorkspaces: Workspace[] = [
         name: '發文',
         sortOrder: 1,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
@@ -80,6 +81,7 @@ export const mockWorkspaces: Workspace[] = [
         name: 'web',
         sortOrder: 2,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
@@ -148,6 +150,7 @@ export const mockWorkspaces: Workspace[] = [
         name: '培訓',
         sortOrder: 3,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
@@ -217,6 +220,7 @@ export const mockWorkspaces: Workspace[] = [
         name: '師培總監',
         sortOrder: 4,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
@@ -281,6 +285,7 @@ export const mockWorkspaces: Workspace[] = [
         name: '訪談',
         sortOrder: 5,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
@@ -333,6 +338,7 @@ export const mockWorkspaces: Workspace[] = [
         name: "Let's Play",
         sortOrder: 1,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
@@ -422,6 +428,7 @@ export const mockWorkspaces: Workspace[] = [
         name: '行程',
         sortOrder: 1,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
@@ -451,6 +458,7 @@ export const mockWorkspaces: Workspace[] = [
         name: '學習',
         sortOrder: 2,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
@@ -478,6 +486,7 @@ export const mockWorkspaces: Workspace[] = [
         name: '其他',
         sortOrder: 3,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {

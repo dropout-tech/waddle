@@ -155,6 +155,8 @@ export function rowToCategory(row: CategoryRow, tasks: Task[]): Category {
     sortOrder: row.sort_order,
     isCollapsed: row.is_collapsed,
     isArchived: row.is_archived,
+    // Migration 20260804120000 — optional column; default false pre-migration.
+    isDefault: row.is_default ?? false,
     tasks,
   }
 }
@@ -250,6 +252,9 @@ export function rowToSettings(
     // Migration 0013 — same graceful-fallback pattern; defaults to true.
     showCategoryPrefix:
       row.show_category_prefix ?? fallbackSettings.showCategoryPrefix,
+    // Migration 20260804120000 — same graceful-fallback pattern; defaults to true.
+    defaultCategoryEnabled:
+      row.default_category_enabled ?? fallbackSettings.defaultCategoryEnabled,
     // Migration 0009 — JSONB array. Default to fallback (typically `[]`)
     // when the column is absent so older deployments degrade cleanly.
     quickLinks: Array.isArray(row.quick_links)

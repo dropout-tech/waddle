@@ -34,6 +34,7 @@ export const demoWorkspaces: Workspace[] = [
         name: '快速上手',
         sortOrder: 0,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
@@ -106,6 +107,7 @@ export const demoWorkspaces: Workspace[] = [
         name: '本週',
         sortOrder: 0,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
@@ -175,6 +177,7 @@ export const demoWorkspaces: Workspace[] = [
         name: '專案',
         sortOrder: 1,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
@@ -214,6 +217,7 @@ export const demoWorkspaces: Workspace[] = [
         name: '生活',
         sortOrder: 0,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
@@ -265,6 +269,7 @@ export const demoWorkspaces: Workspace[] = [
         name: '學習',
         sortOrder: 1,
         isCollapsed: false,
+        isDefault: false,
         isArchived: false,
         tasks: [
           {
