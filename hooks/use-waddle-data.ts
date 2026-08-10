@@ -23,6 +23,8 @@ import {
   markDailyClearFired,
 } from '@/lib/daily-clear'
 import { WORKSPACE_COLORS } from '@/lib/palette'
+import { DEFAULT_FOCUS_SETTINGS, normalizeFocusSettings } from '@/lib/focus'
+import type { FocusSettings } from '@/lib/focus'
 // Aliased: this file uses `t` pervasively as the loop variable for "task"
 // (c.tasks.map((t) => ...)), so importing the translator as `t` would shadow it.
 import { t as translate, getLang } from '@/lib/i18n'
@@ -98,10 +100,11 @@ function buildTaskInsert(task: Task, userId: string) {
 }
 
 // User-settings extension columns — migrations 0006 (view-range), 0007
-// (keep_completed_today_in_list), 0009 (quick_links), and 20260804120000
-// (default_category_enabled). Same latch shape so saveSettings matches
-// createTask/updateTask instead of paying the failed-write cost on every save.
-const SETTINGS_EXT_COL_RE = /day_view_days|week_view_days|keep_completed_today_in_list|quick_links|show_category_prefix|default_category_enabled/
+// (keep_completed_today_in_list), 0009 (quick_links), 20260804120000
+// (default_category_enabled), and 20260810120000 (focus_board). Same latch
+// shape so saveSettings matches createTask/updateTask instead of paying the
+// failed-write cost on every save.
+const SETTINGS_EXT_COL_RE = /day_view_days|week_view_days|keep_completed_today_in_list|quick_links|show_category_prefix|default_category_enabled|focus_board/
 let settingsExtColsKnownMissing = false
 const isMissingSettingsExtColumnError = (err: unknown) => isMissingColumnError(err, SETTINGS_EXT_COL_RE)
 
@@ -119,6 +122,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   showCategoryPrefix: true,
   defaultCategoryEnabled: true,
   quickLinks: [],
+  focusBoard: DEFAULT_FOCUS_SETTINGS,
   weatherCity: 'Taipei',
   weatherUnit: 'celsius',
   lunchBreak: { enabled: true, startTime: '12:00', endTime: '13:00', color: '#F5F5F5' },
@@ -202,6 +206,11 @@ interface UseWaddleData {
    * every add/edit/delete from the bar.
    */
   setQuickLinks: (next: import('@/lib/types').QuickLink[]) => Promise<void>
+  /**
+   * Narrow mutation for the "當前重點" (current focus) block. Updates only
+   * the `focus_board` column, same pattern as `setQuickLinks`.
+   */
+  setFocusBoard: (next: FocusSettings) => Promise<void>
   // Scratchpad (focus board). Items are stored per-date in the DB so
   // history navigation works across devices; the localStorage-only
   // implementation it replaced lost everything on a browser switch.
@@ -485,6 +494,18 @@ export function useWaddleData(): UseWaddleData {
               if (typeof parsed.defaultCategoryEnabled === 'boolean') {
                 builtSettings.defaultCategoryEnabled = parsed.defaultCategoryEnabled
               }
+            }
+          } catch {
+            /* ignore corrupt localStorage */
+          }
+        }
+
+        const dbFocusBoard = settingsRow?.focus_board
+        if (dbFocusBoard === undefined) {
+          try {
+            const raw = window.localStorage.getItem('waddle-focus-board-v1')
+            if (raw) {
+              builtSettings.focusBoard = normalizeFocusSettings(JSON.parse(raw))
             }
           } catch {
             /* ignore corrupt localStorage */
@@ -2533,6 +2554,10 @@ export function useWaddleData(): UseWaddleData {
           'waddle-default-category-v1',
           JSON.stringify({ defaultCategoryEnabled: newSettings.defaultCategoryEnabled }),
         )
+        window.localStorage.setItem(
+          'waddle-focus-board-v1',
+          JSON.stringify(newSettings.focusBoard),
+        )
       } catch {
         /* localStorage unavailable; ignore */
       }
@@ -2552,6 +2577,7 @@ export function useWaddleData(): UseWaddleData {
           quick_links: newSettings.quickLinks as unknown as Json,
           show_category_prefix: newSettings.showCategoryPrefix,
           default_category_enabled: newSettings.defaultCategoryEnabled,
+          focus_board: newSettings.focusBoard as unknown as Json,
         }
     let { error } = await supabase.from('user_settings').upsert(fullSettingsRow)
     if (error && isMissingSettingsExtColumnError(error)) {
@@ -2696,6 +2722,48 @@ export function useWaddleData(): UseWaddleData {
         return
       }
       if (error) handleDbError('儲存常用連結')(error)
+    } finally {
+      pendingWritesRef.current -= 1
+    }
+  }, [supabase])
+
+  /**
+   * "當前重點" mutation surface. Same narrow-column pattern as
+   * `setQuickLinks` — avoids rewriting time_blocks + slot_types on every
+   * pin/edit.
+   */
+  const setFocusBoard = useCallback(async (next: FocusSettings) => {
+    const userId = requireUserId()
+    setSettings((prev) => ({ ...prev, focusBoard: next }))
+
+    // Mirror to localStorage so the block still works pre-migration and
+    // recovers on page reload even if the DB write fails.
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('waddle-focus-board-v1', JSON.stringify(next))
+      } catch {
+        /* ignore */
+      }
+    }
+
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
+    try {
+      // Upsert (not update) — the row is normally created by the
+      // `handle_new_user` trigger, but defensively upserting means a
+      // missing row never silently swallows the user's focus pin.
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert(
+          { user_id: userId, focus_board: next as unknown as Json },
+          { onConflict: 'user_id' },
+        )
+      if (error && isMissingSettingsExtColumnError(error)) {
+        settingsExtColsKnownMissing = true
+        console.warn('[setFocusBoard] focus_board column missing — kept in localStorage only. Run latest migration.', error)
+        // Already mirrored to localStorage; nothing more to do.
+        return
+      }
+      if (error) handleDbError('儲存當前重點')(error)
     } finally {
       pendingWritesRef.current -= 1
     }
@@ -3039,6 +3107,7 @@ export function useWaddleData(): UseWaddleData {
     deleteTimeBlock,
     saveSettings,
     setQuickLinks,
+    setFocusBoard,
     scratchpadByDate,
     addScratchpadItem,
     updateScratchpadItem,

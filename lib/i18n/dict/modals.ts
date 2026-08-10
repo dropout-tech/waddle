@@ -345,4 +345,25 @@ export const dict: Record<string, string> = {
   '請向對方確認連結，或請他重新產生一份邀請':
     'Double-check the link with them, or ask them to create a new invite',
   '回到 Huddle': 'Back to Huddle',
+
+  // ── focus-editor-modal.tsx ──────────────────────────────────────────────
+  '設定當前重點': 'Set your current focus',
+  '設定「{name}」的重點': 'Set the focus for "{name}"',
+  '自動推薦': 'Auto',
+  '自訂文字': 'Custom text',
+  '釘選任務': 'Pin a task',
+  '不顯示': 'Hide',
+  'Huddle 會挑逾期最久 → 今天排程 → 最急迫的任務':
+    'Huddle picks the longest overdue task, then today’s schedule, then the most urgent one',
+  '現在會顯示': 'Showing now',
+  '例：推進講師資源站': 'e.g. Push the instructor resource site forward',
+  '已選擇：{title}': 'Selected: {title}',
+  '沒有符合的任務': 'No matching tasks',
+  '這個工作區不會出現在「各工作區重點」清單裡。':
+    'This workspace stays out of the “Focus by workspace” list.',
+
+  // ── settings-modal.tsx · 當前重點 ───────────────────────────────────────
+  '顯示當前重點': 'Show current focus',
+  '在任務欄最上面釘一句「現在最重要的事」，可以自己打字或釘一個任務。':
+    'Pin one line at the top of the task panel — type it yourself or pin a task.',
 }

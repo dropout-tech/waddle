@@ -11,6 +11,7 @@ import type {
   JournalEntry,
   UserSettings,
 } from '@/lib/types'
+import { normalizeFocusSettings } from '@/lib/focus'
 
 type TaskRow = Database['public']['Tables']['tasks']['Row']
 type TaskInsert = Database['public']['Tables']['tasks']['Insert']
@@ -267,5 +268,9 @@ export function rowToSettings(
     defaultTaskColors: row.default_task_colors as unknown as UserSettings['defaultTaskColors'],
     slotTypes: fallbackSettings.slotTypes, // slot_types lives in its own table; merge later
     notifications,
+    // Migration 20260810120000 — JSONB blob. normalizeFocusSettings defaults
+    // to DEFAULT_FOCUS_SETTINGS when the column is absent (undefined) or
+    // malformed, so older deployments degrade cleanly.
+    focusBoard: normalizeFocusSettings(row.focus_board),
   }
 }

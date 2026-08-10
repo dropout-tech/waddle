@@ -112,6 +112,10 @@ export const dict: Record<string, string> = {
   // onboarding-tour.tsx — tour step titles
   '歡迎來到 Huddle': 'Welcome to Huddle',
   '左側：三層結構': 'Left side: three layers',
+  '最上面這條是「此刻最重要的事」，一眼就知道現在該推什麼。沒設定時 Huddle 會自動挑（逾期最久 → 今天排程 → 最急迫）；點右邊鉛筆可以改成自己打一句推進狀態，或釘選某個任務。下面還能展開「各工作區重點」，每個工作區各釘一條。':
+    'The top line is whatever matters most right now, so you can see at a glance what to push. Leave it alone and Huddle picks for you (longest overdue → scheduled today → most urgent); tap the pencil to type your own status line or pin a specific task. Expand "Focus by workspace" below to pin one per workspace.',
+  '任務欄最上面這條是「此刻最重要的事」。沒設定時 Huddle 會自動挑（逾期最久 → 今天排程 → 最急迫）；點右邊鉛筆可改成自己打一句推進狀態，或釘選某個任務。':
+    'The line at the top of the task list is whatever matters most right now. Leave it alone and Huddle picks for you (longest overdue → scheduled today → most urgent); tap the pencil to type your own status line or pin a specific task.',
   '勾選 / 點開任務': 'Check off / open a task',
   '今日會議 ＆ 待整理 ＆ 已完成': "Today's meetings, review & completed",
   '🔄 左邊 = 右邊': '🔄 Left = right',

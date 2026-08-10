@@ -63,6 +63,7 @@ function HuddlePage() {
     deleteTimeBlock,
     saveSettings,
     setQuickLinks,
+    setFocusBoard,
     scratchpadByDate,
     addScratchpadItem,
     updateScratchpadItem,
@@ -495,6 +496,7 @@ function HuddlePage() {
         onDeleteTimeBlock={deleteTimeBlock}
         onTimeBlockSelect={handleSelectTimeBlock}
         onSetQuickLinks={setQuickLinks}
+        onSetFocusBoard={setFocusBoard}
         scratchpadByDate={scratchpadByDate}
         onAddScratchpadItem={addScratchpadItem}
         onUpdateScratchpadItem={updateScratchpadItem}

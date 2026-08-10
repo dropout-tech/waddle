@@ -20,6 +20,7 @@ import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { useCalendarSharing, usePeerCalendarEvents } from '@/hooks/use-calendar-sharing'
 import { hapticSelection } from '@/lib/haptics'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, ScratchpadItem } from '@/lib/types'
+import type { FocusSettings } from '@/lib/focus'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
 import { Link2 } from 'lucide-react'
 import { useI18n } from '@/lib/i18n/react'
@@ -61,6 +62,8 @@ interface MainLayoutProps {
   onTimeBlockSelect?: (block: TimeBlock) => void
   /** Narrow mutation for the quick-links bar (separate from saveSettings). */
   onSetQuickLinks?: (next: QuickLink[]) => void
+  /** Narrow mutation for the "當前重點" block (separate from saveSettings). */
+  onSetFocusBoard?: (next: FocusSettings) => Promise<void> | void
   // Scratchpad — DB-backed; per-date map plus narrow mutations.
   scratchpadByDate?: Record<string, ScratchpadItem[]>
   onAddScratchpadItem?: (date: string, item: ScratchpadItem) => void
@@ -114,6 +117,7 @@ export function MainLayout({
   onDeleteTimeBlock,
   onTimeBlockSelect,
   onSetQuickLinks,
+  onSetFocusBoard,
   scratchpadByDate,
   onAddScratchpadItem,
   onUpdateScratchpadItem,
@@ -521,6 +525,8 @@ export function MainLayout({
                 workspaces={workspaces}
                 isExpanded={true}
                 keepCompletedTodayInList={settings?.keepCompletedTodayInList ?? true}
+                focusBoard={settings?.focusBoard}
+                onSetFocusBoard={onSetFocusBoard}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
                 onReorderCategories={onReorderCategories}
                 onToggleComplete={onToggleComplete}
@@ -776,6 +782,8 @@ export function MainLayout({
                 workspaces={workspaces}
                 isExpanded={false}
                 keepCompletedTodayInList={settings?.keepCompletedTodayInList ?? true}
+                focusBoard={settings?.focusBoard}
+                onSetFocusBoard={onSetFocusBoard}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
                 onReorderCategories={onReorderCategories}
                 onToggleComplete={onToggleComplete}
