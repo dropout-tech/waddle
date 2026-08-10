@@ -257,6 +257,8 @@ type UserSettingsRow = {
   show_category_prefix?: boolean
   /** Migration 20260804120000 — optional in case the column hasn't shipped yet. */
   default_category_enabled?: boolean
+  /** Migration 20260805000000 — optional in case the column hasn't shipped yet. */
+  focus_board?: Json | null
   weather_city: string
   weather_unit: 'celsius' | 'fahrenheit'
   lunch_break: Json
@@ -479,6 +481,7 @@ type UserSettingsInsert = {
   quick_links?: Json
   show_category_prefix?: boolean
   default_category_enabled?: boolean
+  focus_board?: Json | null
   weather_city?: string
   weather_unit?: 'celsius' | 'fahrenheit'
   lunch_break?: Json

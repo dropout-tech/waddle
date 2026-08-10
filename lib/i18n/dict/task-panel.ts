@@ -216,4 +216,20 @@ export const dict: Record<string, string> = {
   '注意': 'Caution',
   '警示': 'Warning',
   '狀態：{label}': 'Status: {label}',
+
+  // focus-block.tsx
+  '當前重點': 'Current focus',
+  '編輯當前重點': 'Edit current focus',
+  '逾期 {days} 天': '{days} days overdue',
+  '逾期': 'Overdue',
+  '急迫': 'Urgent',
+  '手動釘選': 'Pinned',
+  '自訂': 'Custom',
+  '原本釘的任務已完成，已換下一個': 'The pinned task is done — showing the next one',
+  '各工作區重點': 'Focus by workspace',
+  '還有 {count} 個工作區': '{count} more workspaces',
+  '設定工作區重點': 'Set a workspace focus',
+  '編輯「{name}」的重點': 'Edit focus for "{name}"',
+  '今天很輕鬆 🐧': 'Nothing pressing today 🐧',
+  '設定重點': 'Set a focus',
 }

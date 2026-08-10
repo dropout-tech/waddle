@@ -46,6 +46,13 @@ const DESKTOP_STEPS: TourStep[] = [
     padding: 0,
   },
   {
+    target: '[data-tour="focus-block"]',
+    title: '當前重點',
+    body: '最上面這條是「此刻最重要的事」，一眼就知道現在該推什麼。沒設定時 Huddle 會自動挑（逾期最久 → 今天排程 → 最急迫）；點右邊鉛筆可以改成自己打一句推進狀態，或釘選某個任務。下面還能展開「各工作區重點」，每個工作區各釘一條。',
+    placement: 'right',
+    padding: 0,
+  },
+  {
     target: '[data-tour="task-row"]',
     title: '勾選 / 點開任務',
     body: '左邊圈圈 = 完成；點任務本身 = 打開詳細編輯。打開後可以把任務標為「會議」，會多三個欄位（參與者 / 地點 / 視訊連結）。',
@@ -164,6 +171,13 @@ const MOBILE_STEPS: TourStep[] = [
     title: '任務分頁',
     body: '工作區 → 分類 → 任務的三層結構。所有任務都在這。工作區標題右邊的「＋」可以新增分類。',
     placement: 'top',
+    padding: 0,
+  },
+  {
+    target: '[data-tour="focus-block"]',
+    title: '當前重點',
+    body: '任務欄最上面這條是「此刻最重要的事」。沒設定時 Huddle 會自動挑（逾期最久 → 今天排程 → 最急迫）；點右邊鉛筆可改成自己打一句推進狀態，或釘選某個任務。',
+    placement: 'bottom',
     padding: 0,
   },
   {

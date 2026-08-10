@@ -1,5 +1,7 @@
 // Waddle Type Definitions
 
+import type { FocusSettings } from './focus'
+
 // Scratchpad (Focus Capture) Types
 export interface ScratchpadItem {
   id: string
@@ -256,6 +258,13 @@ export interface UserSettings {
   notifications: NotificationSettings
   // User's pinned shortcuts surfaced in the bottom quick-links bar.
   quickLinks: QuickLink[]
+  /**
+   * "當前重點" — the pinned focus line at the top of the task panel, plus
+   * optional per-workspace focuses. Stored as a single JSONB blob
+   * (`user_settings.focus_board`) so adding fields later needs no
+   * migration (same trick as `quickLinks`). See lib/focus.ts.
+   */
+  focusBoard: FocusSettings
 }
 
 /**

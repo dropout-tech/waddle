@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { UserSettings, TimeBlock, SlotType, Workspace, NotificationSettings } from '@/lib/types'
 import { useI18n } from '@/lib/i18n/react'
+import { DEFAULT_FOCUS_SETTINGS } from '@/lib/focus'
 import type { Lang } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -802,6 +803,31 @@ export function SettingsModal({
                 checked={localSettings.showCategoryPrefix ?? true}
                 onChange={(e) =>
                   setLocalSettings(prev => ({ ...prev, showCategoryPrefix: e.target.checked }))
+                }
+                className="w-4 h-4 rounded border-border accent-primary"
+              />
+            </label>
+
+            {/* "當前重點" block at the top of the task panel. Master switch
+                only — what it shows is edited from the block itself. */}
+            <label className="flex items-center justify-between cursor-pointer">
+              <div className="flex-1 pr-4">
+                <div className="text-sm text-foreground">{t('顯示當前重點')}</div>
+                <div className="text-xs text-muted-foreground">
+                  {t('在任務欄最上面釘一句「現在最重要的事」，可以自己打字或釘一個任務。')}
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={localSettings.focusBoard?.enabled ?? true}
+                onChange={(e) =>
+                  setLocalSettings(prev => ({
+                    ...prev,
+                    focusBoard: {
+                      ...(prev.focusBoard ?? DEFAULT_FOCUS_SETTINGS),
+                      enabled: e.target.checked,
+                    },
+                  }))
                 }
                 className="w-4 h-4 rounded border-border accent-primary"
               />
