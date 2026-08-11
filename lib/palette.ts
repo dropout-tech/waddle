@@ -74,6 +74,20 @@ export const WORKSPACE_COLOR_ORDER: PaletteColor[] = [
 /** Default color for a brand-new workspace (Workspace 1 slot / primary). */
 export const DEFAULT_WORKSPACE_COLOR = WORKSPACE_COLORS.terracotta.hex
 
+/**
+ * Dedicated color for the global "未分類" (Uncategorized) workspace — the
+ * one workspace every user has exactly one of, where tasks created without
+ * an explicit category pick land (see lib/default-category.ts).
+ *
+ * Deliberate exception to DESIGN.md's "warm hue 25-155 only" rule: this is a
+ * near-neutral warm grey (hue ~70 but chroma 0.015, i.e. effectively
+ * colorless) chosen precisely so the bucket reads as "not a real workspace"
+ * and never competes visually with the user's own color-coded workspaces.
+ * It is NOT offered in PICKER_COLORS — users can still recolor the
+ * workspace manually if they want.
+ */
+export const UNCATEGORIZED_WORKSPACE_COLOR = '#9C9086' // oklch(0.64 0.015 70)
+
 /** Default value for user_settings.calendar_color (replaces old '#3b82f6'). */
 export const DEFAULT_CALENDAR_COLOR = WORKSPACE_COLORS.terracotta.hex
 

@@ -55,11 +55,11 @@ export const dict: Record<string, string> = {
   '行事曆自動加上分類': 'Auto-prefix calendar titles with category',
   "行事曆上的任務標題前自動加上「分類｜」，一眼看出是哪個分類（例：Let's Play｜夏令營）。不會更動你存的標題。": 'Adds "Category | " to the front of task titles on the calendar so you can tell at a glance (e.g. "Let\'s Play | Summer Camp"). Your saved title is not changed.',
   '預設分類': 'Default category',
-  '從日曆或快速新增建立任務時，沒有選分類就會自動歸到這裡。': "When you create a task from the calendar or quick-add without picking a category, it lands here automatically.",
+  '新任務在沒有指定分類時會落在這裡。': 'New tasks land here when no category is specified.',
   '自動歸到預設分類': 'Auto-assign to default category',
-  '這個大分類還沒有分類': 'This workspace has no categories yet',
+  '還沒有任何分類': 'No categories yet',
   '（未設定）': '(Not set)',
-  '關閉時，會使用該大分類的第一個分類。': "When off, the workspace's first category is used instead.",
+  '關閉時，會使用第一個大分類的第一個分類。': "When off, the first workspace's first category is used instead.",
   '顯示國定假日': 'Show public holidays',
   '在行事曆標示中華民國國定假日': 'Marks Taiwan (ROC) public holidays on the calendar',
   '預設任務時長': 'Default task duration',
@@ -361,6 +361,9 @@ export const dict: Record<string, string> = {
   '沒有符合的任務': 'No matching tasks',
   '這個工作區不會出現在「各工作區重點」清單裡。':
     'This workspace stays out of the “Focus by workspace” list.',
+
+  // ── task-detail-modal.tsx · 兩層分類選單 ────────────────────────────────
+  '這個大分類還沒有小分類': 'No sub-categories in this workspace yet',
 
   // ── settings-modal.tsx · 當前重點 ───────────────────────────────────────
   '顯示當前重點': 'Show current focus',

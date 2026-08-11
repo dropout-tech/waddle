@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { sortWorkspacesForDisplay } from '@/lib/default-category'
 import { getLang } from '@/lib/i18n'
 import { useI18n } from '@/lib/i18n/react'
 
@@ -248,8 +249,7 @@ export function FullScreenTaskView({
     const upcoming = new Date(now)
     upcoming.setDate(upcoming.getDate() + 3)
 
-    return workspaces
-      .filter(ws => !ws.isArchived)
+    return sortWorkspacesForDisplay(workspaces.filter(ws => !ws.isArchived))
       .map(ws => {
         const cats = ws.categories?.filter(c => !c.isArchived) ?? []
         const tasks = cats.flatMap(cat => cat.tasks || [])
@@ -696,7 +696,7 @@ export function FullScreenTaskView({
                 className="px-3 py-2 rounded-lg border border-border bg-card text-sm"
               >
                 <option value="">{t('所有工作區')}</option>
-                {workspaces.filter(w => !w.isArchived).map(ws => (
+                {sortWorkspacesForDisplay(workspaces.filter(w => !w.isArchived)).map(ws => (
                   <option key={ws.id} value={ws.id}>{ws.name}</option>
                 ))}
               </select>

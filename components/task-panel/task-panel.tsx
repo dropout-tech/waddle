@@ -17,6 +17,7 @@ import { TodayMeetingsPopover } from './today-meetings-popover'
 import { useI18n } from '@/lib/i18n/react'
 import { toast } from 'sonner'
 import { performUndo } from '@/lib/undo-stack'
+import { sortWorkspacesForDisplay } from '@/lib/default-category'
 import {
   RecurrenceChoiceModal,
   type RecurrenceChoice,
@@ -161,7 +162,7 @@ export function TaskPanel({
 
   // Filter workspaces and tasks
   const filteredWorkspaces = useMemo(() => {
-    return workspaces
+    const list = workspaces
       .filter((w) => !w.isArchived)
       .filter((w) => filters.workspaceIds.length === 0 || filters.workspaceIds.includes(w.id))
       .map((workspace) => ({
@@ -213,7 +214,8 @@ export function TaskPanel({
             }),
           })),
       }))
-      .sort((a, b) => a.sortOrder - b.sortOrder)
+    // 未分類 pinned to the top, everyone else by sortOrder.
+    return sortWorkspacesForDisplay(list)
   }, [workspaces, filters, keepCompletedTodayInList, todayStr])
 
   // Flatten all tasks for unified view

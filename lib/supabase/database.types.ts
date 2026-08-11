@@ -31,6 +31,8 @@ type WorkspacesRow = {
   icon: string
   sort_order: number
   is_archived: boolean
+  /** Migration 20260810130000 — optional in case the column hasn't shipped yet. */
+  is_default?: boolean
   created_at: string
   updated_at: string
 }
@@ -337,6 +339,7 @@ type WorkspacesInsert = {
   icon: string
   sort_order?: number
   is_archived?: boolean
+  is_default?: boolean
 }
 
 type CategoriesInsert = {

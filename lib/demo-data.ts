@@ -27,6 +27,7 @@ export const demoWorkspaces: Workspace[] = [
     icon: '👋',
     sortOrder: 0,
     isArchived: false,
+    isDefault: false,
     categories: [
       {
         id: 'demo-cat-1-1',
@@ -100,6 +101,7 @@ export const demoWorkspaces: Workspace[] = [
     icon: '💼',
     sortOrder: 1,
     isArchived: false,
+    isDefault: false,
     categories: [
       {
         id: 'demo-cat-2-1',
@@ -210,6 +212,7 @@ export const demoWorkspaces: Workspace[] = [
     icon: '🏠',
     sortOrder: 2,
     isArchived: false,
+    isDefault: false,
     categories: [
       {
         id: 'demo-cat-3-1',

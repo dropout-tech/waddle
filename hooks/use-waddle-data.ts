@@ -22,7 +22,8 @@ import {
   isDailyClearEligible,
   markDailyClearFired,
 } from '@/lib/daily-clear'
-import { WORKSPACE_COLORS } from '@/lib/palette'
+import { WORKSPACE_COLORS, UNCATEGORIZED_WORKSPACE_COLOR } from '@/lib/palette'
+import { UNCATEGORIZED_WORKSPACE_ICON } from '@/lib/default-category'
 import { DEFAULT_FOCUS_SETTINGS, normalizeFocusSettings } from '@/lib/focus'
 import type { FocusSettings } from '@/lib/focus'
 // Aliased: this file uses `t` pervasively as the loop variable for "task"
@@ -178,7 +179,8 @@ interface UseWaddleData {
    * category, clearing any previous holder. Pass `categoryId: null` to
    * clear without setting a new one.
    */
-  setDefaultCategory: (workspaceId: string, categoryId: string | null) => Promise<void>
+  /** Global default category (未分類 by default) — pass null to clear. */
+  setDefaultCategory: (categoryId: string | null) => Promise<void>
   // Task
   addTask: (categoryId: string, title: string) => Promise<void>
   updateTask: (taskId: string, updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => Promise<void>
@@ -377,6 +379,8 @@ export function useWaddleData(): UseWaddleData {
         icon: w.icon,
         sortOrder: w.sort_order,
         isArchived: w.is_archived,
+        // Migration 20260810130000 — optional column; default false pre-migration.
+        isDefault: w.is_default ?? false,
         categories: categoriesByWorkspace.get(w.id) ?? [],
       }))
 
@@ -690,6 +694,9 @@ export function useWaddleData(): UseWaddleData {
         icon,
         sortOrder: prev.length,
         isArchived: false,
+        // Only the global 未分類 workspace carries isDefault; user-created
+        // workspaces never do.
+        isDefault: false,
         categories: [
           {
             id: catId,
@@ -698,9 +705,11 @@ export function useWaddleData(): UseWaddleData {
             sortOrder: 0,
             isCollapsed: false,
             isArchived: false,
-            // This is the workspace's only category at creation time, so it
-            // doubles as the default-category fallback target.
-            isDefault: true,
+            // The default-category flag is global now (it lives on the 未分類
+            // workspace's category), so a new workspace's first category must
+            // NOT claim it — resolveDefaultCategory still falls back to the
+            // first category for workspace-scoped creation paths.
+            isDefault: false,
             tasks: [],
           },
         ],
@@ -711,11 +720,12 @@ export function useWaddleData(): UseWaddleData {
     try {
       const { error: e1 } = await supabase.from('workspaces').insert({
         id: wsId, user_id: userId, name, color, icon, sort_order: workspaces.length,
+        is_default: false,
       })
       if (e1) return handleDbError('新增工作區')(e1)
 
       const { error: e2 } = await supabase.from('categories').insert({
-        id: catId, user_id: userId, workspace_id: wsId, name: defaultCategoryName, sort_order: 0, is_default: true,
+        id: catId, user_id: userId, workspace_id: wsId, name: defaultCategoryName, sort_order: 0, is_default: false,
       })
       if (e2) handleDbError('新增分類')(e2)
     } finally {
@@ -776,7 +786,18 @@ export function useWaddleData(): UseWaddleData {
     return updateWorkspace(workspaceId, { color: newColor })
   }, [updateWorkspace])
 
+  // The global 未分類 workspace is the fallback target for every task created
+  // without an explicit category pick — archiving or deleting it would leave
+  // those creation paths with nowhere to land, so both are refused here
+  // (renaming and recoloring stay allowed).
+  const isProtectedWorkspace = (workspaceId: string) =>
+    workspacesRef.current.some((w) => w.id === workspaceId && w.isDefault)
+
   const archiveWorkspace = useCallback(async (workspaceId: string) => {
+    if (isProtectedWorkspace(workspaceId)) {
+      toast.error(translate('「未分類」大分類不能封存或刪除'))
+      return
+    }
     setWorkspaces((prev) =>
       prev.map((w) => (w.id === workspaceId ? { ...w, isArchived: true } : w))
     )
@@ -793,6 +814,10 @@ export function useWaddleData(): UseWaddleData {
   }, [supabase])
 
   const deleteWorkspace = useCallback(async (workspaceId: string) => {
+    if (isProtectedWorkspace(workspaceId)) {
+      toast.error(translate('「未分類」大分類不能封存或刪除'))
+      return
+    }
     setWorkspaces((prev) => prev.filter((w) => w.id !== workspaceId))
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
@@ -912,42 +937,35 @@ export function useWaddleData(): UseWaddleData {
     }
   }, [supabase])
 
-  // Set (or clear) the workspace's default category — the fallback target
-  // for tasks created without an explicit category pick (see
-  // lib/default-category.ts). At most one category per workspace may carry
-  // is_default=true, so this clears any previous holder first.
-  const setDefaultCategory = useCallback(async (workspaceId: string, categoryId: string | null) => {
-    // Snapshot for rollback — captures each category's previous isDefault
-    // value in this workspace so a failed write can be undone precisely.
-    let previous: { id: string; isDefault: boolean }[] = []
-    for (const w of workspacesRef.current) {
-      if (w.id !== workspaceId) continue
-      previous = w.categories.map((c) => ({ id: c.id, isDefault: c.isDefault }))
-      break
-    }
+  // Set (or clear) the user's ONE global default category — the fallback
+  // target for tasks created without an explicit category pick (see
+  // lib/default-category.ts). Normally this is 未分類 / 未分類, but the user
+  // can point it at any category from settings. Global, not per-workspace:
+  // any previously-flagged category anywhere is cleared first.
+  const setDefaultCategory = useCallback(async (categoryId: string | null) => {
+    const userId = requireUserId()
+    // Snapshot for rollback — every category's previous isDefault value, so
+    // a failed write can be undone precisely.
+    const previous: { id: string; isDefault: boolean }[] = workspacesRef.current.flatMap((w) =>
+      w.categories.map((c) => ({ id: c.id, isDefault: c.isDefault }))
+    )
 
     setWorkspaces((prev) =>
-      prev.map((w) => {
-        if (w.id !== workspaceId) return w
-        return {
-          ...w,
-          categories: w.categories.map((c) => ({ ...c, isDefault: c.id === categoryId })),
-        }
-      })
+      prev.map((w) => ({
+        ...w,
+        categories: w.categories.map((c) => ({ ...c, isDefault: c.id === categoryId })),
+      }))
     )
 
     const rollback = () => {
+      const prevById = new Map(previous.map((p) => [p.id, p.isDefault]))
       setWorkspaces((prev) =>
-        prev.map((w) => {
-          if (w.id !== workspaceId) return w
-          const prevById = new Map(previous.map((p) => [p.id, p.isDefault]))
-          return {
-            ...w,
-            categories: w.categories.map((c) =>
-              prevById.has(c.id) ? { ...c, isDefault: prevById.get(c.id)! } : c
-            ),
-          }
-        })
+        prev.map((w) => ({
+          ...w,
+          categories: w.categories.map((c) =>
+            prevById.has(c.id) ? { ...c, isDefault: prevById.get(c.id)! } : c
+          ),
+        }))
       )
     }
 
@@ -955,11 +973,11 @@ export function useWaddleData(): UseWaddleData {
     try {
       // Clear the previous default(s) first — a partial unique index only
       // allows one is_default=true row per workspace, so setting the new
-      // one before clearing the old would violate it.
+      // one before clearing the old could violate it.
       const { error: clearError } = await supabase
         .from('categories')
         .update({ is_default: false })
-        .eq('workspace_id', workspaceId)
+        .eq('user_id', userId)
         .eq('is_default', true)
       if (clearError) {
         rollback()
@@ -3002,19 +3020,36 @@ export function useWaddleData(): UseWaddleData {
     // Build everything in memory first so the optimistic UI matches what we
     // ultimately persist; if anything fails downstream, we can leave the local
     // state alone and the toast will tell the user to retry.
-    type WsBuild = { id: string; name: string; color: string; icon: string; sortOrder: number; categories: { id: string; name: string; sortOrder: number }[] }
-    const newWorkspaces: WsBuild[] = TEMPLATES.map((t, wsIdx) => ({
+    type WsBuild = { id: string; name: string; color: string; icon: string; sortOrder: number; isDefault: boolean; categories: { id: string; name: string; sortOrder: number }[] }
+    // This flow wipes every existing workspace, including the global 未分類
+    // bucket created by migration 20260810130000 — so it has to rebuild it,
+    // or the no-context creation paths would lose their landing spot.
+    const uncategorizedName = translate('未分類')
+    const uncategorizedWorkspace: WsBuild = {
       id: crypto.randomUUID(),
-      name: t.name,
-      color: t.color,
-      icon: t.icon,
-      sortOrder: wsIdx,
-      categories: t.categories.map((catName, catIdx) => ({
+      name: uncategorizedName,
+      color: UNCATEGORIZED_WORKSPACE_COLOR,
+      icon: UNCATEGORIZED_WORKSPACE_ICON,
+      sortOrder: -1,
+      isDefault: true,
+      categories: [{ id: crypto.randomUUID(), name: uncategorizedName, sortOrder: 0 }],
+    }
+    const newWorkspaces: WsBuild[] = [
+      uncategorizedWorkspace,
+      ...TEMPLATES.map((t, wsIdx) => ({
         id: crypto.randomUUID(),
-        name: catName,
-        sortOrder: catIdx,
+        name: t.name,
+        color: t.color,
+        icon: t.icon,
+        sortOrder: wsIdx,
+        isDefault: false,
+        categories: t.categories.map((catName, catIdx) => ({
+          id: crypto.randomUUID(),
+          name: catName,
+          sortOrder: catIdx,
+        })),
       })),
-    }))
+    ]
 
     // Optimistic local update
     setWorkspaces(
@@ -3025,6 +3060,7 @@ export function useWaddleData(): UseWaddleData {
         icon: ws.icon,
         sortOrder: ws.sortOrder,
         isArchived: false,
+        isDefault: ws.isDefault,
         categories: ws.categories.map((c, catIdx) => ({
           id: c.id,
           workspaceId: ws.id,
@@ -3032,9 +3068,9 @@ export function useWaddleData(): UseWaddleData {
           sortOrder: c.sortOrder,
           isCollapsed: false,
           isArchived: false,
-          // First category in a freshly-created workspace doubles as its
-          // default-category fallback target.
-          isDefault: catIdx === 0,
+          // Exactly one category account-wide is the default target: the
+          // 未分類 category inside the 未分類 workspace.
+          isDefault: ws.isDefault && catIdx === 0,
           tasks: [],
         })),
       }))
@@ -3055,6 +3091,7 @@ export function useWaddleData(): UseWaddleData {
       color: ws.color,
       icon: ws.icon,
       sort_order: ws.sortOrder,
+      is_default: ws.isDefault,
     }))
     const { error: wsError } = await supabase.from('workspaces').insert(wsRows)
     if (wsError) return handleDbError('建立工作區')(wsError)
@@ -3067,7 +3104,8 @@ export function useWaddleData(): UseWaddleData {
         workspace_id: ws.id,
         name: c.name,
         sort_order: c.sortOrder,
-        is_default: catIdx === 0,
+        // Only the 未分類 workspace's first category is the global default.
+        is_default: ws.isDefault && catIdx === 0,
       }))
     )
     if (catRows.length) {

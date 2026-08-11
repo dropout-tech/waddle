@@ -46,6 +46,7 @@ import {
 import { requestReminderPermission, syncMeetingReminders } from '@/lib/notifications'
 import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 import { PICKER_COLOR_HEXES, WORKSPACE_COLORS } from '@/lib/palette'
+import { resolveDefaultWorkspace, sortWorkspacesForDisplay } from '@/lib/default-category'
 import {
   WATER_REMINDER_INTERVALS,
   type WaterReminderInterval,
@@ -87,7 +88,8 @@ interface SettingsModalProps {
   workspaces: Workspace[]
   onClose: () => void
   onSave: (settings: UserSettings, timeBlocks: TimeBlock[]) => void
-  onSetDefaultCategory: (workspaceId: string, categoryId: string | null) => Promise<void>
+  /** Sets the ONE global default category (null clears it). */
+  onSetDefaultCategory: (categoryId: string | null) => Promise<void>
 }
 
 export type SettingsTab = 'general' | 'slotTypes' | 'notifications' | 'sharing'
@@ -287,6 +289,31 @@ export function SettingsModal({
   const handleDeleteSlotType = (id: string) => {
     persistSlotTypes(localSettings.slotTypes.filter(s => s.id !== id))
   }
+
+  // Flat "大分類 / 小分類" list for the single global default-category picker.
+  // 未分類 is pinned first (sortWorkspacesForDisplay), so the natural first
+  // option is 未分類 / 未分類.
+  const defaultCategoryOptions = useMemo(() => {
+    return sortWorkspacesForDisplay(workspaces.filter(ws => !ws.isArchived)).flatMap((ws) =>
+      ws.categories
+        .filter(c => !c.isArchived)
+        .map((cat) => ({ id: cat.id, label: `${ws.name} / ${cat.name}` }))
+    )
+  }, [workspaces])
+
+  // The single flagged category. Legacy accounts can still carry one flag per
+  // workspace (pre-20260810130000 data), so prefer the one inside the 未分類
+  // workspace and fall back to the first flagged one in display order.
+  const globalDefaultCategoryId = useMemo(() => {
+    const inDefaultWs = resolveDefaultWorkspace(workspaces)?.categories
+      .find(c => !c.isArchived && c.isDefault)
+    if (inDefaultWs) return inDefaultWs.id
+    for (const ws of sortWorkspacesForDisplay(workspaces.filter(w => !w.isArchived))) {
+      const hit = ws.categories.find(c => !c.isArchived && c.isDefault)
+      if (hit) return hit.id
+    }
+    return ''
+  }, [workspaces])
 
   // Generate workspace-based slot types for display
   const workspaceSlotTypes: SlotType[] = useMemo(() => {
@@ -835,17 +862,18 @@ export function SettingsModal({
 
             {/* Default category (Category.isDefault) — where tasks land when
                 created without an explicit category pick (calendar drag,
-                quick-add). Toggle rides the normal settings save path, same
-                as showCategoryPrefix above; the per-workspace pick fires
-                onSetDefaultCategory immediately (hook does optimistic
-                update + rollback). */}
+                quick-add, promote-from-notebook). ONE global pick, normally
+                「未分類 / 未分類」. The toggle rides the normal settings save
+                path (same as showCategoryPrefix above); the select fires
+                onSetDefaultCategory immediately, which clears the previous
+                global default (hook does optimistic update + rollback). */}
             <div className="space-y-3">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Layers className="w-4 h-4" />
                 {t('預設分類')}
               </h3>
               <p className="text-xs text-muted-foreground">
-                {t('從日曆或快速新增建立任務時，沒有選分類就會自動歸到這裡。')}
+                {t('新任務在沒有指定分類時會落在這裡。')}
               </p>
               <label className="flex items-center justify-between cursor-pointer">
                 <div className="text-sm text-foreground">{t('自動歸到預設分類')}</div>
@@ -859,48 +887,30 @@ export function SettingsModal({
                 />
               </label>
               {localSettings.defaultCategoryEnabled ?? true ? (
-                <div className="space-y-2 pl-1">
-                  {workspaces.filter(ws => !ws.isArchived).map((workspace) => {
-                    const activeCategories = workspace.categories.filter(c => !c.isArchived)
-                    const currentDefault = activeCategories.find(c => c.isDefault)
-                    return (
-                      <div
-                        key={workspace.id}
-                        className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-secondary/50 border border-border"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: workspace.color }}
-                          />
-                          <span className="text-sm font-medium truncate">{workspace.name}</span>
-                        </div>
-                        {activeCategories.length === 0 ? (
-                          <span className="text-xs text-muted-foreground flex-shrink-0">
-                            {t('這個大分類還沒有分類')}
-                          </span>
-                        ) : (
-                          <select
-                            value={currentDefault?.id ?? ''}
-                            onChange={(e) => {
-                              const value = e.target.value
-                              void onSetDefaultCategory(workspace.id, value === '' ? null : value)
-                            }}
-                            className="h-11 md:h-8 px-2 text-xs rounded-md bg-background border border-border flex-shrink-0"
-                          >
-                            <option value="">{t('（未設定）')}</option>
-                            {activeCategories.map((cat) => (
-                              <option key={cat.id} value={cat.id}>{cat.name}</option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    )
-                  })}
+                <div className="pl-1">
+                  {defaultCategoryOptions.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">
+                      {t('還沒有任何分類')}
+                    </span>
+                  ) : (
+                    <select
+                      value={globalDefaultCategoryId}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        void onSetDefaultCategory(value === '' ? null : value)
+                      }}
+                      className="w-full h-11 md:h-9 px-2 text-xs rounded-md bg-background border border-border"
+                    >
+                      <option value="">{t('（未設定）')}</option>
+                      {defaultCategoryOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>{opt.label}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground pl-1">
-                  {t('關閉時，會使用該大分類的第一個分類。')}
+                  {t('關閉時，會使用第一個大分類的第一個分類。')}
                 </p>
               )}
             </div>

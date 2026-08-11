@@ -15,6 +15,7 @@ export const dict: Record<string, string> = {
   '新增分類': "Add category",
   '設定預設分類': 'Set default category',
   '未分類': 'Uncategorized',
+  '「未分類」大分類不能封存或刪除': 'The "Uncategorized" workspace can\'t be archived or deleted',
   '更新工作區': 'Update workspace',
   '封存工作區': 'Archive workspace',
   '刪除工作區': 'Delete workspace',
