@@ -72,6 +72,13 @@ export interface Workspace {
   icon: string
   sortOrder: number
   isArchived: boolean
+  /**
+   * The global "未分類" (Uncategorized) workspace — where tasks created
+   * without an explicit category pick land. At most one per user, always
+   * shown first in the task panel, and it cannot be deleted or archived
+   * (renaming and recoloring are allowed). See lib/default-category.ts.
+   */
+  isDefault: boolean
   categories: Category[]
 }
 

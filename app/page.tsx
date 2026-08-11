@@ -22,7 +22,7 @@ import { useUndoShortcuts } from '@/hooks/use-undo-shortcuts'
 import { WaterReminderModal } from '@/components/modals/water-reminder-modal'
 import { toDateString } from '@/lib/calendar-utils'
 import { findTaskById } from '@/lib/task-utils'
-import { resolveDefaultCategory } from '@/lib/default-category'
+import { resolveDefaultCategory, resolveGlobalDefaultCategory } from '@/lib/default-category'
 import { AuthGuard } from '@/components/auth/auth-guard'
 import { CategoryPrefixProvider } from '@/components/category-prefix-context'
 import { NotebookOverlayProvider } from '@/components/notebook/notebook-overlay-provider'
@@ -184,9 +184,11 @@ function HuddlePage() {
   const promotedScratchpadIdRef = useRef<string | null>(null)
 
   const handlePromoteToTask = useCallback((title: string, description: string | undefined, sourceId: string) => {
-    const firstWs = workspaces.find(w => !w.isArchived) || workspaces[0]
-    const firstCat = resolveDefaultCategory(firstWs, settings.defaultCategoryEnabled)
-    if (!firstCat) return
+    // Promoting a scratchpad/notebook note carries no workspace context →
+    // global 未分類 bucket.
+    const target = resolveGlobalDefaultCategory(workspaces, settings.defaultCategoryEnabled)
+    if (!target) return
+    const { workspace: firstWs, category: firstCat } = target
 
     promotedScratchpadIdRef.current = sourceId
     setTaskMode('create')
@@ -255,12 +257,19 @@ function HuddlePage() {
   // from the calendar slot the user clicked.
   const handleOpenCreateTask = useCallback(
     (slotType: SlotType, date: string, startTime: string, endTime: string) => {
-      const targetWorkspace = slotType.workspaceId
+      // A slot type bound to a workspace gives us real context → resolve
+      // inside that workspace. An unbound slot type doesn't → global 未分類.
+      const boundWorkspace = slotType.workspaceId
         ? workspaces.find((w) => w.id === slotType.workspaceId)
-        : workspaces[0]
-      if (!targetWorkspace || targetWorkspace.categories.length === 0) return
-      const targetCategory = resolveDefaultCategory(targetWorkspace, settings.defaultCategoryEnabled)
-      if (!targetCategory) return
+        : undefined
+      const resolved = boundWorkspace
+        ? (() => {
+            const category = resolveDefaultCategory(boundWorkspace, settings.defaultCategoryEnabled)
+            return category ? { workspace: boundWorkspace, category } : undefined
+          })()
+        : resolveGlobalDefaultCategory(workspaces, settings.defaultCategoryEnabled)
+      if (!resolved) return
+      const { workspace: targetWorkspace, category: targetCategory } = resolved
       const now = new Date().toISOString()
       const draft: Task = {
         id: crypto.randomUUID(),
@@ -377,9 +386,10 @@ function HuddlePage() {
   )
 
   const handleCreatePendingTask = useCallback(async (title: string) => {
-    const firstWorkspace = workspaces[0]
-    const firstCategory = resolveDefaultCategory(firstWorkspace, settings.defaultCategoryEnabled)
-    if (!firstWorkspace || !firstCategory) return
+    // Quick-add from the calendar's pending zone — no workspace context.
+    const target = resolveGlobalDefaultCategory(workspaces, settings.defaultCategoryEnabled)
+    if (!target) return
+    const { workspace: firstWorkspace, category: firstCategory } = target
 
     const today = toDateString(new Date())
     const now = new Date().toISOString()
@@ -404,9 +414,10 @@ function HuddlePage() {
   }, [workspaces, createTask, settings.defaultCategoryEnabled])
 
   const handleCreateCalendarTask = useCallback(async (date: string, startTime?: string, endTime?: string) => {
-    const firstWorkspace = workspaces[0]
-    const firstCategory = resolveDefaultCategory(firstWorkspace, settings.defaultCategoryEnabled)
-    if (!firstWorkspace || !firstCategory) return
+    // Click on empty calendar space — no workspace context.
+    const target = resolveGlobalDefaultCategory(workspaces, settings.defaultCategoryEnabled)
+    if (!target) return
+    const { workspace: firstWorkspace, category: firstCategory } = target
 
     const now = new Date().toISOString()
     // No times → create as a pending (unscheduled) task on that date so it

@@ -10,6 +10,7 @@ export const mockWorkspaces: Workspace[] = [
     icon: '🚀',
     sortOrder: 1,
     isArchived: false,
+    isDefault: false,
     categories: [
       {
         id: 'cat-1-1',
@@ -331,6 +332,7 @@ export const mockWorkspaces: Workspace[] = [
   icon: '💼',
     sortOrder: 2,
     isArchived: false,
+    isDefault: false,
     categories: [
       {
         id: 'cat-2-1',
@@ -421,6 +423,7 @@ export const mockWorkspaces: Workspace[] = [
   icon: '🏠',
     sortOrder: 3,
     isArchived: false,
+    isDefault: false,
     categories: [
       {
         id: 'cat-3-1',

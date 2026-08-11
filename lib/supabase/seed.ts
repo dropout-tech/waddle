@@ -11,6 +11,8 @@ import type { Workspace, TimeBlock } from '@/lib/types'
 import { mockWorkspaces, mockTimeBlocks } from '@/lib/mock-data'
 import { demoWorkspaces, demoTimeBlocks } from '@/lib/demo-data'
 import { t } from '@/lib/i18n'
+import { UNCATEGORIZED_WORKSPACE_COLOR } from '@/lib/palette'
+import { UNCATEGORIZED_WORKSPACE_ICON } from '@/lib/default-category'
 
 type SB = SupabaseClient<Database>
 
@@ -54,7 +56,27 @@ export async function seedUserData(
       icon: ws.icon,
       sort_order: ws.sortOrder,
       is_archived: ws.isArchived,
+      is_default: false,
     }
+  })
+
+  // The global "未分類" (Uncategorized) workspace — one per user, pinned to
+  // the top of the task panel, and the landing spot for tasks created
+  // without an explicit category pick (see lib/default-category.ts). Mirrors
+  // what migration 20260810130000 backfills for existing accounts.
+  const uncategorizedWorkspaceId = crypto.randomUUID()
+  const uncategorizedCategoryId = crypto.randomUUID()
+  workspaceRows.unshift({
+    id: uncategorizedWorkspaceId,
+    user_id: userId,
+    name: t('未分類'),
+    color: UNCATEGORIZED_WORKSPACE_COLOR,
+    icon: UNCATEGORIZED_WORKSPACE_ICON,
+    // Sorts ahead of every seed workspace; display order additionally pins
+    // is_default first regardless (sortWorkspacesForDisplay).
+    sort_order: -1,
+    is_archived: false,
+    is_default: true,
   })
 
   const { error: wsError } = await supabase.from('workspaces').insert(workspaceRows)
@@ -78,23 +100,18 @@ export async function seedUserData(
     })
   )
 
-  // Every workspace gets its own "未分類" (Uncategorized) default category,
-  // appended after the seed data's own categories — this is the fallback
-  // target for tasks created without an explicit category pick (see
-  // lib/default-category.ts). None of the mock/demo workspaces above mark
-  // one of their own categories as default, so this is always a fresh insert.
-  const defaultCategoryRows = workspaces.map((ws) => ({
-    id: crypto.randomUUID(),
+  // The one global default category, living inside the 未分類 workspace
+  // created above. Exactly one category account-wide carries is_default.
+  const defaultCategoryRows = [{
+    id: uncategorizedCategoryId,
     user_id: userId,
-    workspace_id: workspaceIdMap.get(ws.id)!,
+    workspace_id: uncategorizedWorkspaceId,
     name: t('未分類'),
-    sort_order: ws.categories.length
-      ? Math.max(...ws.categories.map((c) => c.sortOrder)) + 1
-      : 0,
+    sort_order: 0,
     is_collapsed: false,
     is_archived: false,
     is_default: true,
-  }))
+  }]
 
   const allCategoryRows = [...categoryRows, ...defaultCategoryRows]
   if (allCategoryRows.length) {

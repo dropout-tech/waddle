@@ -173,6 +173,9 @@ export function rowToWorkspace(row: WorkspaceRow, categories: Category[]): Works
     icon: row.icon,
     sortOrder: row.sort_order,
     isArchived: row.is_archived,
+    // Migration 20260810130000 — optional column; default false pre-migration
+    // so a deployment that runs ahead of the SQL still hydrates cleanly.
+    isDefault: row.is_default ?? false,
     categories,
   }
 }

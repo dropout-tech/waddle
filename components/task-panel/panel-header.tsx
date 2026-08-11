@@ -12,6 +12,7 @@ import { WorkspaceIcon, PRESET_ICONS, PRESET_ICON_NAMES } from '@/lib/workspace-
 import { UserMenu } from '@/components/user-menu'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { hapticSelection } from '@/lib/haptics'
+import { sortWorkspacesForDisplay } from '@/lib/default-category'
 import { useI18n } from '@/lib/i18n/react'
 import {
   DEFAULT_MASCOT_SRC,
@@ -496,9 +497,7 @@ export function PanelHeader({
             )}
             style={isMobile ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : undefined}
           >
-            {workspaces
-              .filter((w) => !w.isArchived)
-              .sort((a, b) => a.sortOrder - b.sortOrder)
+            {sortWorkspacesForDisplay(workspaces.filter((w) => !w.isArchived))
               .map((workspace) => {
                 const count = getWorkspaceCount(workspace)
                 const wsColor = displayColor(workspace.color)
