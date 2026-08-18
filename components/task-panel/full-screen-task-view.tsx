@@ -32,6 +32,8 @@ import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { sortWorkspacesForDisplay } from '@/lib/default-category'
+import type { FocusSettings } from '@/lib/focus'
+import { FocusBlock } from './focus-block'
 import { getLang } from '@/lib/i18n'
 import { useI18n } from '@/lib/i18n/react'
 
@@ -82,14 +84,20 @@ interface FullScreenTaskViewProps {
   onToggleComplete?: (taskId: string) => void
   onClose: () => void
   onAddTask?: (categoryId: string, title: string) => void
+  /** "當前重點" settings. Omitted ⇒ the block doesn't render. */
+  focusBoard?: FocusSettings
+  /** Narrow mutation for the focus block; omitted ⇒ block stays read-only. */
+  onSetFocusBoard?: (next: FocusSettings) => Promise<void> | void
 }
 
-export function FullScreenTaskView({ 
-  workspaces, 
+export function FullScreenTaskView({
+  workspaces,
   onTaskClick,
   onToggleComplete,
   onClose,
-  onAddTask
+  onAddTask,
+  focusBoard,
+  onSetFocusBoard
 }: FullScreenTaskViewProps) {
   const { t, lang } = useI18n()
   const displayColor = useDisplayColor()
@@ -401,6 +409,21 @@ export function FullScreenTaskView({
       <div className="flex-1 overflow-auto">
         {activeTab === 'overview' && (
           <div className="p-6">
+            {/* "當前重點" — the page opens on what matters right now, before
+                any of the counting. */}
+            {focusBoard && (
+              <div className="mb-6">
+                <FocusBlock
+                  variant="page"
+                  workspaces={workspaces}
+                  focus={focusBoard}
+                  todayStr={todayStr}
+                  onSelectTask={(task) => onTaskClick?.(task)}
+                  onSetFocusBoard={onSetFocusBoard}
+                />
+              </div>
+            )}
+
             {/* Stats Grid */}
             <div className="grid grid-cols-5 gap-4 mb-8">
               <div className="p-4 rounded-xl bg-card border border-border">
