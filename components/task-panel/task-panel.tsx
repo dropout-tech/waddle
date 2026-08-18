@@ -302,9 +302,10 @@ export function TaskPanel({
           onToggleExpand={onToggleExpand}
         />
 
-        {/* "當前重點" — the one thing that matters right now, above the
-            shortcuts so it's the first thing read in the panel. */}
-        {focusBoard && (
+        {/* "當前重點" — only on the mobile 任務 tab (isExpanded). The desktop
+            sidebar is too narrow for it; there it lives in the full-screen
+            task view's 總覽 tab instead (FullScreenTaskView). */}
+        {isExpanded && focusBoard && (
           <FocusBlock
             workspaces={workspaces}
             focus={focusBoard}

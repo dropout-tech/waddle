@@ -765,6 +765,8 @@ export function MainLayout({
             onToggleComplete={onToggleComplete}
             onClose={() => setIsRightPanelOpen(true)}
             onAddTask={onAddTask}
+            focusBoard={settings?.focusBoard}
+            onSetFocusBoard={onSetFocusBoard}
           />
         </div>
       ) : (
@@ -782,8 +784,6 @@ export function MainLayout({
                 workspaces={workspaces}
                 isExpanded={false}
                 keepCompletedTodayInList={settings?.keepCompletedTodayInList ?? true}
-                focusBoard={settings?.focusBoard}
-                onSetFocusBoard={onSetFocusBoard}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
                 onReorderCategories={onReorderCategories}
                 onToggleComplete={onToggleComplete}
