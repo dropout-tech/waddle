@@ -10,6 +10,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { NoteIconPicker } from './note-icon-picker'
 import { insertImage, type UploadImageFn } from './upload-image'
 import { useI18n } from '@/lib/i18n/react'
+import { isImeComposing } from '@/lib/ime'
 
 const EMPTY_DOC: TiptapDoc = { type: 'doc', content: [{ type: 'paragraph' }] }
 const TITLE_DEBOUNCE_MS = 500
@@ -150,6 +151,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
             onChange={(e) => handleTitleChange(e.target.value)}
             onBlur={(e) => commitTitle(e.target.value)}
             onKeyDown={(e) => {
+              if (e.key === 'Enter' && isImeComposing(e)) return
               if (e.key === 'Enter') {
                 e.preventDefault()
                 commitTitle((e.target as HTMLInputElement).value)

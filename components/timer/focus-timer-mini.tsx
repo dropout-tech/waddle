@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Check, Pause, Play, Maximize2, X } from 'lucide-react'
+import { Check, Pause, Play, Maximize2, PictureInPicture2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
 
@@ -30,6 +30,11 @@ export interface FocusTimerMiniProps {
   onStop: () => void
   /** Tap the pill during the completion sequence → skip to the end state. */
   onSkipCompletion?: () => void
+  /** 這個瀏覽器支援「永遠置頂的懸浮視窗」時才顯示彈出鈕。 */
+  canFloat?: boolean
+  /** 懸浮視窗現在開著（按鈕變成「收回」）。 */
+  isFloating?: boolean
+  onToggleFloat?: () => void
 }
 
 // Slightly shorter than the immersive exit hold — the corner pill is a quick
@@ -39,6 +44,7 @@ const STOP_HOLD_MS = 600
 export function FocusTimerMini({
   state, phase, color, timeText, progress, label,
   isMobile, mobileBottomOffsetPx, completion, onPause, onResume, onExpand, onStop, onSkipCompletion,
+  canFloat, isFloating, onToggleFloat,
 }: FocusTimerMiniProps) {
   const { t } = useI18n()
   const mobileStyle = isMobile
@@ -94,7 +100,9 @@ export function FocusTimerMini({
       : t('先到這裡也很好')
     return (
       <div
-        className="fixed z-40 bottom-6 right-6"
+        // z-toast（70）：計時膠囊要壓在任何 modal（50）之上——記事本彈窗、
+        // 設定視窗開著時，角落的倒數也不能消失（這正是跨路由常駐計時的意義）。
+        className="fixed z-toast bottom-6 right-6"
         style={mobileStyle}
         role="region"
         aria-label={t('計時完成')}
@@ -127,7 +135,8 @@ export function FocusTimerMini({
 
   return (
     <div
-      className="fixed z-40 bottom-6 right-6"
+      // 同上：z-toast 讓膠囊不被 modal 蓋住。
+      className="fixed z-toast bottom-6 right-6"
       style={mobileStyle}
       role="region"
       aria-label={phase === 'break' ? t('休息計時迷你顯示') : t('專注計時迷你顯示')}
@@ -188,6 +197,25 @@ export function FocusTimerMini({
         >
           {timeText}
         </span>
+
+        {/* 彈出成懸浮視窗（永遠置頂，蓋在其他軟體上面） */}
+        {canFloat && onToggleFloat && (
+          <button
+            type="button"
+            data-timer-float-toggle
+            onClick={onToggleFloat}
+            aria-label={isFloating ? t('收回懸浮視窗') : t('彈出懸浮視窗')}
+            title={isFloating ? t('收回懸浮視窗') : t('彈出懸浮視窗（永遠置頂）')}
+            className={cn(
+              'h-7 w-7 rounded-full grid place-items-center transition-colors',
+              isFloating
+                ? 'bg-secondary text-foreground'
+                : 'text-foreground/55 hover:text-foreground hover:bg-secondary/70',
+            )}
+          >
+            <PictureInPicture2 className="w-3.5 h-3.5" />
+          </button>
+        )}
 
         {/* Expand to immersive */}
         <button

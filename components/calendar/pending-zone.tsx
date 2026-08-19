@@ -8,6 +8,7 @@ import { formatEstimatedTime } from '@/lib/task-utils'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useI18n } from '@/lib/i18n/react'
+import { isImeComposing } from '@/lib/ime'
 
 interface PendingZoneProps {
   tasks: Task[]
@@ -33,6 +34,7 @@ export function PendingZone({ tasks, onTaskSelect, onToggleComplete, onCreateTas
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      if (isImeComposing(e)) return
       handleSubmit()
     } else if (e.key === 'Escape') {
       setIsAdding(false)

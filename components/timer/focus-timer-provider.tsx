@@ -19,7 +19,7 @@
 // fetches). See the `engaged` gate below — audio wiring only turns on once
 // the user opens the setup card or a session is actually running.
 import {
-  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
+  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore,
 } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
@@ -35,6 +35,11 @@ import {
 } from '@/lib/timer-bgm'
 import { loadPomodoroCount, recordPomodoroCompletion, type PomodoroDayCount } from '@/lib/pomodoro-count'
 import { formatTime, formatTimeHHMM, formatDateISO } from '@/lib/timer-format'
+import {
+  closeFloatingHub, getHubServerState, getHubState, hubAvailable,
+  openFloatingHub, setHubTab, subscribeHub,
+} from '@/lib/floating-hub'
+import { FloatingTimerCard } from './floating-timer-card'
 import { FocusTimerImmersive } from './focus-timer-immersive'
 import { FocusTimerMini } from './focus-timer-mini'
 
@@ -226,10 +231,18 @@ export interface FocusTimerContextValue {
   setPrefs: (v: TimerPrefs | ((prev: TimerPrefs) => TimerPrefs)) => void
   unavailableSrcs: Set<string>
 
-  startTimer: (opts?: { immersive?: boolean }) => void
+  /** `presetIndex` 指定 POMODORO_PRESETS 直接開跑（懸浮工作站的快速開始）；
+   *  `forceMini` 跳過「開始時進沉浸畫面」偏好——從懸浮視窗啟動時，主視窗
+   *  突然蓋上全螢幕會嚇到人。 */
+  startTimer: (opts?: { immersive?: boolean; presetIndex?: number; forceMini?: boolean }) => void
   /** MainLayout registers its onCreateCalendarTimeBlock here on mount;
    *  returns the unregister function for the effect cleanup. */
   registerRecorder: (fn: RecorderFn) => () => void
+
+  // ── 懸浮工作站（子母畫面）────────────────────────────
+  /** 懸浮視窗裡的計時卡（<FloatingHub> 的計時器分頁渲染它）。
+   *  idle 時為 null——那時工作站顯示快速開始畫面。 */
+  floatingTimerCard: React.ReactNode
 }
 
 const FocusTimerContext = createContext<FocusTimerContextValue | null>(null)
@@ -412,7 +425,7 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     return POMODORO_PRESETS[selectedPreset].minutes * 60
   }, [useCustom, customMinutes, selectedPreset])
 
-  const startTimer = useCallback((opts?: { immersive?: boolean }) => {
+  const startTimer = useCallback((opts?: { immersive?: boolean; presetIndex?: number; forceMini?: boolean }) => {
     const eng = getBgmEngine()
     eng?.unlockAudio()
     eng?.prepareMusic(prefs.music)
@@ -420,22 +433,39 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     // previous session's mute so playback follows prefs + timer state again.
     setBgmManualPlaying(false)
     setBgmOverride(null)
+    // 懸浮工作站的快速開始：指定 preset 直接開跑，不吃設定卡當下的
+    // mode/custom 狀態（也把它們同步過去，回主視窗看到的選擇才一致）。
+    const preset = opts?.presetIndex != null ? POMODORO_PRESETS[opts.presetIndex] : null
+    if (preset) {
+      setMode('pomodoro')
+      setSelectedPreset(opts!.presetIndex!)
+      setUseCustom(false)
+    }
+    const effMode: TimerMode = preset ? 'pomodoro' : mode
     const now = new Date()
-    const label = customLabel || (mode === 'pomodoro'
-      ? (useCustom ? t('{minutes}分鐘專注', { minutes: customMinutes }) : t(POMODORO_PRESETS[selectedPreset].label))
-      : t(focusType.label))
-    const color = mode === 'pomodoro'
-      ? (useCustom ? focusType.color : POMODORO_PRESETS[selectedPreset].color)
-      : focusType.color
-    const targetSeconds = getTargetSeconds()
+    const label = preset
+      ? (customLabel || t(preset.label))
+      : customLabel || (mode === 'pomodoro'
+        ? (useCustom ? t('{minutes}分鐘專注', { minutes: customMinutes }) : t(POMODORO_PRESETS[selectedPreset].label))
+        : t(focusType.label))
+    const color = preset
+      ? preset.color
+      : mode === 'pomodoro'
+        ? (useCustom ? focusType.color : POMODORO_PRESETS[selectedPreset].color)
+        : focusType.color
+    const targetSeconds = preset ? preset.minutes * 60 : getTargetSeconds()
 
     setSession({
-      mode, phase: 'work', startedAt: now, pausedMs: 0, pausedAt: null,
+      mode: effMode, phase: 'work', startedAt: now, pausedMs: 0, pausedAt: null,
       targetSeconds, label, color,
     })
-    if (mode === 'pomodoro') setTimeLeft(targetSeconds)
+    if (effMode === 'pomodoro') setTimeLeft(targetSeconds)
     else setElapsed(0)
-    setView(opts?.immersive || prefs.openInImmersive || isMobile ? 'immersive' : 'mini')
+    setView(
+      opts?.forceMini ? 'mini'
+      : opts?.immersive || prefs.openInImmersive || isMobile ? 'immersive'
+      : 'mini',
+    )
     setState('running')
   }, [customLabel, mode, useCustom, customMinutes, selectedPreset, focusType, prefs.music, prefs.openInImmersive, isMobile, getTargetSeconds, t])
 
@@ -509,6 +539,8 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
   const resetTimer = useCallback(() => {
     setState('idle')
     setSession(null)
+    // 計時結束**不**收掉懸浮工作站——回到 idle 時計時器分頁會換成
+    // 快速開始畫面（而且記事本/白板分頁可能還在用）。
     setTimeLeft(getTargetSeconds())
     setElapsed(0)
     setCustomLabel('')
@@ -641,6 +673,35 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
   const [canPortal, setCanPortal] = useState(false)
   useEffect(() => { setCanPortal(true) }, [])
 
+  // ── 懸浮工作站（Document Picture-in-Picture）────────────────────────
+  // 那顆唯一的置頂視窗現在由 lib/floating-hub.ts + <FloatingHub> 管；
+  // 這裡只負責兩件事：⑴ 判斷這環境能不能懸浮（決定迷你膠囊的彈出鈕顯不
+  // 顯示）；⑵ 產出計時卡節點交給工作站的計時器分頁渲染。計時卡是 portal
+  // 內容、仍屬這棵 React 樹，所以懸浮視窗裡的暫停/繼續/結束吃的就是上面
+  // 那台 state machine——不需要跨視窗同步。
+  const [canFloatTimer, setCanFloatTimer] = useState(false)
+  useEffect(() => { setCanFloatTimer(hubAvailable()) }, [])
+  const hub = useSyncExternalStore(subscribeHub, getHubState, getHubServerState)
+  const hubOpenOnTimer = hub.window !== null && hub.tab === 'timer'
+
+  // 計時卡節點（idle 時 null，工作站那邊會改顯示快速開始畫面）。
+  const floatingTimerCard: React.ReactNode = session && state !== 'idle' ? (
+    <FloatingTimerCard
+      state={state}
+      phase={session.phase}
+      color={session.color}
+      timeText={formatTime(displayTime)}
+      progress={mode === 'pomodoro' ? progress : Math.min(100, (elapsed % 3600) / 36)}
+      label={session.label}
+      completion={completion ? { kind: completion.kind, exiting: completionExiting } : null}
+      onPause={pauseTimer}
+      onResume={resumeTimer}
+      onStop={() => beginCompletion(session, 'manual', 'idle', false, COMPLETION_HOLD_MANUAL_MS)}
+      onSkipCompletion={skipCompletion}
+      onReturn={closeFloatingHub}
+    />
+  ) : null
+
   const contextValue = useMemo<FocusTimerContextValue>(() => ({
     state, session, displayTime,
     isExpanded, setIsExpanded,
@@ -657,10 +718,11 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     unavailableSrcs,
     startTimer,
     registerRecorder,
+    floatingTimerCard,
   }), [
     state, session, displayTime, isExpanded, mode, selectedPreset, customMinutes,
     useCustom, focusType, customLabel, showSettings, showBgmSettings, bgmManualPlaying,
-    prefs, unavailableSrcs, startTimer, registerRecorder,
+    prefs, unavailableSrcs, startTimer, registerRecorder, floatingTimerCard,
   ])
 
   let overlay: React.ReactNode = null
@@ -741,6 +803,15 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
           onExpand={() => setView('immersive')}
           onStop={() => beginCompletion(session, 'manual', 'idle', false, COMPLETION_HOLD_MANUAL_MS)}
           onSkipCompletion={skipCompletion}
+          canFloat={canFloatTimer}
+          isFloating={hubOpenOnTimer}
+          onToggleFloat={() => {
+            // 沒開 → 開工作站到計時器分頁；開著但停在別的分頁 → 切過去；
+            // 已經在看計時器 → 收回。
+            if (!hub.window) void openFloatingHub('timer')
+            else if (hub.tab !== 'timer') setHubTab('timer')
+            else closeFloatingHub()
+          }}
         />
       )
     }

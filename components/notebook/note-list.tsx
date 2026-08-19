@@ -40,6 +40,7 @@ import { zhTW, enUS } from 'date-fns/locale'
 import type { NotebookNote, NotebookCategory } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
+import { isImeComposing } from '@/lib/ime'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -289,6 +290,7 @@ export function NoteList({
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
                 onKeyDown={(e) => {
+                  if (e.key === 'Enter' && isImeComposing(e)) return
                   if (e.key === 'Enter') handleAddCategorySubmit()
                   else if (e.key === 'Escape') {
                     setNewCategoryName('')
@@ -435,6 +437,7 @@ function CategoryGroup({
             onChange={(e) => setNameDraft(e.target.value)}
             onBlur={commitRename}
             onKeyDown={(e) => {
+              if (e.key === 'Enter' && isImeComposing(e)) return
               if (e.key === 'Enter') commitRename()
               else if (e.key === 'Escape') {
                 setNameDraft(category.name)

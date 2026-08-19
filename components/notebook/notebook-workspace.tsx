@@ -7,6 +7,7 @@ import { useNotebook } from '@/hooks/use-notebook'
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
 import type { Task } from '@/lib/types'
+import { FloatOutButton } from '@/components/floating/float-out-button'
 import { NoteList } from './note-list'
 import { NoteEditor, type NoteEditorHandle } from './note-editor'
 import { cn } from '@/lib/utils'
@@ -188,6 +189,15 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
               <ListPlus className="h-3.5 w-3.5" />
               {t('升級為任務')}
             </button>
+          )}
+          {/* 把這則記事彈出成永遠置頂的便條紙（懸浮工作站的記事本分頁） */}
+          {activeNote && (
+            <FloatOutButton
+              tab="note"
+              noteId={activeNote.id}
+              fallbackUrl={`/float/note?id=${encodeURIComponent(activeNote.id)}`}
+              windowName={`huddle-note-${activeNote.id}`}
+            />
           )}
           <SaveIndicator status={saveStatus} hasNote={!!activeNote} />
         </div>

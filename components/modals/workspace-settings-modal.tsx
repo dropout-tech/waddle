@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import type { Workspace } from '@/lib/types'
 import { ModalShell } from './modal-shell'
 import { useI18n } from '@/lib/i18n/react'
+import { isImeComposing } from '@/lib/ime'
 
 const PRESET_COLORS = [
   '#c9847a', '#8fae8b', '#a8927f', '#7da2b8', '#c4a4b5', '#d4a76a',
@@ -182,7 +183,7 @@ export function WorkspaceSettingsModal({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !isImeComposing(e)) handleSave() }}
               className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-shadow"
               placeholder={t('工作區名稱...')}
             />

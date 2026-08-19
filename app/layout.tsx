@@ -6,6 +6,7 @@ import { AuthProvider } from '@/components/auth/auth-provider'
 import { NativeShell } from '@/components/native/native-shell'
 import { ThemeProvider } from '@/components/theme-provider'
 import { FocusTimerProvider } from '@/components/timer/focus-timer-provider'
+import { FloatingHub } from '@/components/floating/floating-hub'
 
 const geist = Geist({
   subsets: ['latin'],
@@ -105,7 +106,13 @@ export default function RootLayout({
                 outlet so a running session (and its BGM) survives
                 navigating to any route, not just while MainLayout happens
                 to be mounted. See focus-timer-provider.tsx. */}
-            <FocusTimerProvider>{children}</FocusTimerProvider>
+            <FocusTimerProvider>
+              {/* 懸浮工作站：唯一那顆永遠置頂的視窗（計時器/記事本/白板
+                  三分頁共用）。掛在 FocusTimerProvider 裡面，計時器分頁
+                  才吃得到同一份計時狀態。 */}
+              <FloatingHub />
+              {children}
+            </FocusTimerProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -9,6 +9,7 @@ import { CategorySection } from './category-section'
 import type { Density, MetaField } from './task-panel'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { useI18n } from '@/lib/i18n/react'
+import { isImeComposing } from '@/lib/ime'
 
 interface WorkspaceSectionProps {
   workspace: Workspace
@@ -136,6 +137,7 @@ export function WorkspaceSection({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      if (isImeComposing(e)) return
       handleAddCategory()
     } else if (e.key === 'Escape') {
       setNewCategoryName('')

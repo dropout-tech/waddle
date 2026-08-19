@@ -80,6 +80,15 @@ export const dict: Record<string, string> = {
   '長按結束（0.6 秒）': 'Hold to end (0.6s)',
   '長按結束並儲存到日曆': 'Hold to end and save to calendar',
 
+  // 懸浮工作站（子母畫面）
+  '彈出懸浮視窗': 'Pop out floating window',
+  '彈出懸浮視窗（永遠置頂）': 'Pop out a floating window (always on top)',
+  '收回懸浮視窗': 'Close floating window',
+  '回到主視窗': 'Back to main window',
+  '計時器': 'Timer',
+  '還沒有進行中的計時': 'Nothing is being timed yet',
+  '彈出成便條紙（懸浮在最上層）': 'Pop out as a sticky note (always on top)',
+
   // Immersive screen
   '休息計時中': 'Break in progress',
   '專注計時中': 'Focus in progress',

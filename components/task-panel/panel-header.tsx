@@ -14,6 +14,7 @@ import { useDisplayColor } from '@/hooks/use-display-color'
 import { hapticSelection } from '@/lib/haptics'
 import { sortWorkspacesForDisplay } from '@/lib/default-category'
 import { useI18n } from '@/lib/i18n/react'
+import { isImeComposing } from '@/lib/ime'
 import {
   DEFAULT_MASCOT_SRC,
   getMascotSurprise,
@@ -584,7 +585,7 @@ export function PanelHeader({
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleAddWorkspace()
+              if (e.key === 'Enter' && !isImeComposing(e)) handleAddWorkspace()
               else if (e.key === 'Escape') setIsAdding(false)
             }}
             placeholder={t('工作區名稱...')}
