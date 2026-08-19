@@ -7,6 +7,7 @@ import type { Category, Task } from '@/lib/types'
 import { TaskRow } from './task-row'
 import type { Density, MetaField } from './task-panel'
 import { useI18n } from '@/lib/i18n/react'
+import { isImeComposing } from '@/lib/ime'
 
 interface CategorySectionProps {
   category: Category
@@ -95,6 +96,7 @@ export function CategorySection({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      if (isImeComposing(e)) return
       handleAddSubmit()
     } else if (e.key === 'Escape') {
       setNewTaskTitle('')

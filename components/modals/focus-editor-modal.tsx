@@ -13,6 +13,7 @@ import {
 import { forEachTask } from '@/lib/task-utils'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { useI18n } from '@/lib/i18n/react'
+import { isImeComposing } from '@/lib/ime'
 import { ModalShell } from './modal-shell'
 
 /**
@@ -261,7 +262,7 @@ export function FocusEditorModal({
               maxLength={MAX_TEXT_LENGTH}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void handleSave()
+                if (e.key === 'Enter' && !isImeComposing(e)) void handleSave()
               }}
               placeholder={t('例：推進講師資源站')}
               className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-primary/50 md:h-10"

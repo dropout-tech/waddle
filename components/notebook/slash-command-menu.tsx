@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
+import { isImeComposing } from '@/lib/ime'
 import { pickAndInsertImage, type UploadImageFn } from './upload-image'
 
 // Notion-style "/" block menu — item catalogue + the popup list itself.
@@ -182,6 +183,7 @@ export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function Sl
         setSelected((i) => (i - 1 + items.length) % items.length)
         return true
       }
+      if (event.key === 'Enter' && isImeComposing(event)) return false
       if (event.key === 'Enter' || event.key === 'Tab') {
         const item = items[selected]
         if (item) command(item)

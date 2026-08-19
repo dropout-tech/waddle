@@ -36,6 +36,7 @@ import type { FocusSettings } from '@/lib/focus'
 import { FocusBlock } from './focus-block'
 import { getLang } from '@/lib/i18n'
 import { useI18n } from '@/lib/i18n/react'
+import { isImeComposing } from '@/lib/ime'
 
 type TaskSortKey = 'category' | 'dueDate' | 'urgency' | 'created'
 
@@ -988,6 +989,9 @@ export function FullScreenTaskView({
                                           value={newTaskTitle}
                                           onChange={(e) => setNewTaskTitle(e.target.value)}
                                           onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && isImeComposing(e)) {
+                                              return
+                                            }
                                             if (e.key === 'Enter' && newTaskTitle.trim()) {
                                               onAddTask?.(category.id, newTaskTitle.trim())
                                               setNewTaskTitle('')
