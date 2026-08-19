@@ -156,11 +156,11 @@ export const dict: Record<string, string> = {
     "The bell up top gathers everything Huddle wants to tell you: overdue, due-soon, and untouched-for-too-long tasks, plus the occasional gentle nudge. A number badge shows up when there's something to see, and you can dismiss each one once you've read it.",
   'Notion 式的長文筆記空間——打字時輸入「/」就能叫出區塊選單（標題／待辦／清單／收合／引言…），選取文字則會跳出格式工具列。跟每天的白板分開存，工具列上有常駐入口，想寫長一點的東西點這裡。':
     "A Notion-style space for long-form notes — type / to summon the block menu (heading / to-do / list / toggle / quote…), or select text to bring up the formatting toolbar. It's kept separate from the daily scratchpad, with a permanent toolbar entry whenever you want to write something longer.",
-  '工作中冒出靈感？拉開白板丟文字、貼圖、連結，事後還能隨手編輯。每天分開存。':
-    'Got an idea mid-work? Pull open the scratchpad and drop in text, images, or links — you can tidy it up later. Each day gets its own space.',
+  '工作中冒出靈感？拉開白板丟文字、貼圖、連結，事後還能隨手編輯。每天分開存。右上角的「⇱」可以把白板**彈到永遠置頂的懸浮小視窗**——切去別的軟體也蓋不住它（Chrome / Edge）。':
+    'Got an idea mid-work? Pull open the scratchpad and drop in text, images, or links — you can tidy it up later. Each day gets its own space. The ⇱ button in the top right pops the board into an **always-on-top floating window** that no other app can cover (Chrome / Edge).',
   '👉 點開試試': '👉 Give it a try',
-  '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Huddle 會輕輕提醒你。':
-    'A Pomodoro timer in the bottom right — set 25 minutes to focus on one thing. Expand it to pick background sound (Lo-fi, rain, coffee-shop noise…) to work alongside, and Huddle will gently nudge you when time is up.',
+  '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Huddle 會輕輕提醒你。開始計時後，角落小膠囊上的「⧉」會打開**永遠置頂的懸浮小視窗**——裡面還有記事本和白板分頁，切去任何軟體都蓋不住（Chrome / Edge）。':
+    'A Pomodoro timer in the bottom right — set 25 minutes to focus on one thing. Expand it to pick background sound (Lo-fi, rain, coffee-shop noise…) to work alongside, and Huddle will gently nudge you when time is up. Once it is running, the ⧉ button on the corner pill opens an **always-on-top floating window** — with Notebook and Scratchpad tabs inside — that stays visible over every other app (Chrome / Edge).',
   '👉 點開計時器': '👉 Open the timer',
   '預設每 60 分鐘，Huddle 會跳出來提醒你喝口水。可以選「再過一下」snooze 五分鐘，或在設定裡改成 30/90/120 分鐘，不想要也可以關掉。':
     'Every 60 minutes by default, Huddle will pop up to remind you to drink some water. Choose Snooze for 5 more minutes, change the interval to 30/90/120 minutes in Settings, or turn it off entirely.',

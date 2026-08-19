@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useI18n } from '@/lib/i18n/react'
+import { isImeComposing } from '@/lib/ime'
 
 // ─────────────────────────────────────────────────────────
 // Tour step definitions
@@ -112,7 +113,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="scratchpad"]',
     title: '專注白板',
-    body: '工作中冒出靈感？拉開白板丟文字、貼圖、連結，事後還能隨手編輯。每天分開存。',
+    body: '工作中冒出靈感？拉開白板丟文字、貼圖、連結，事後還能隨手編輯。每天分開存。右上角的「⇱」可以把白板**彈到永遠置頂的懸浮小視窗**——切去別的軟體也蓋不住它（Chrome / Edge）。',
     placement: 'bottom',
     padding: 6,
     interactive: true,
@@ -121,7 +122,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="focus-timer"]',
     title: '專注計時器 ＋ 背景音',
-    body: '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Huddle 會輕輕提醒你。',
+    body: '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Huddle 會輕輕提醒你。開始計時後，角落小膠囊上的「⧉」會打開**永遠置頂的懸浮小視窗**——裡面還有記事本和白板分頁，切去任何軟體都蓋不住（Chrome / Edge）。',
     placement: 'left',
     padding: 6,
     interactive: true,
@@ -476,6 +477,8 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
       if (e.key === 'Escape') {
         e.preventDefault()
         onComplete()
+      } else if (e.key === 'Enter' && isImeComposing(e)) {
+        return
       } else if ((e.key === 'ArrowRight' || e.key === 'Enter') && !isLast) {
         e.preventDefault()
         advance()

@@ -27,6 +27,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
 import { useI18n } from '@/lib/i18n/react'
+import { isImeComposing } from '@/lib/ime'
+import { FloatOutButton } from '@/components/floating/float-out-button'
 import type { ScratchpadItem } from '@/lib/types'
 
 interface FocusScratchpadProps {
@@ -40,6 +42,11 @@ interface FocusScratchpadProps {
   onOpenChange?: (open: boolean) => void
   /** Hide the built-in pull-down trigger (mobile uses an external button). */
   hideTrigger?: boolean
+  /**
+   * 便條紙視窗模式：面板直接填滿整個視窗，沒有滑入動畫、也不留手機底欄的
+   * 58px 空間。搭配 `hideTrigger` + `isOpen` 使用（見 app/float/scratchpad）。
+   */
+  fill?: boolean
   // Cloud-synced scratchpad — see useWaddleData. Keyed by YYYY-MM-DD.
   // Items within each date are ordered oldest-first (by sort_order); new
   // items append to the end, drag reorders persist the new sort_order.
@@ -66,6 +73,7 @@ export function FocusScratchpad({
   isOpen,
   onOpenChange,
   hideTrigger,
+  fill,
   scratchpadByDate,
   onAddItem,
   onUpdateItem,
@@ -333,8 +341,8 @@ export function FocusScratchpad({
 
   return (
     <>
-      {/* Backdrop */}
-      {isExpanded && (
+      {/* Backdrop — 便條紙視窗模式沒有「底下的頁面」，不需要遮罩 */}
+      {isExpanded && !fill && (
         <div
           className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-popover"
           onClick={() => setIsExpanded(false)}
@@ -375,7 +383,9 @@ export function FocusScratchpad({
         <div
           ref={panelRef}
           className={cn(
-            hideTrigger
+            fill
+              ? 'fixed inset-0 bg-card'
+              : hideTrigger
               ? cn(
                   'fixed left-0 right-0 top-0 bottom-[58px]',
                   'bg-card border-t border-border shadow-2xl',
@@ -389,7 +399,7 @@ export function FocusScratchpad({
                   isExpanded ? 'max-h-[85vh] opacity-100' : 'max-h-0 opacity-0 pointer-events-none',
                 )
           )}
-          style={hideTrigger ? {
+          style={fill ? undefined : hideTrigger ? {
             paddingTop: 'env(safe-area-inset-top)',
             transform: isExpanded
               ? 'translateY(0)'
@@ -400,7 +410,7 @@ export function FocusScratchpad({
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
         >
-        <div className={hideTrigger ? 'h-full overflow-y-auto' : ''}>
+        <div className={hideTrigger || fill ? 'h-full overflow-y-auto' : ''}>
         {isDragging && (
           <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary/50 z-modal flex items-center justify-center">
             <div className="text-primary font-medium">{t('放開以新增圖片')}</div>
@@ -445,6 +455,16 @@ export function FocusScratchpad({
             </div>
 
             <div className="flex items-center gap-2">
+              {/* 彈出成置頂便條紙（在懸浮視窗裡就不必再彈一次） */}
+              {!fill && (
+                <FloatOutButton
+                  tab="scratchpad"
+                  fallbackUrl="/float/scratchpad"
+                  windowName="huddle-scratchpad"
+                  width={480}
+                  height={620}
+                />
+              )}
               {items.length > 0 && isToday && (
                 <button
                   onClick={clearAll}
@@ -454,13 +474,16 @@ export function FocusScratchpad({
                   {t('清除')}
                 </button>
               )}
-              <button
-                onClick={() => setIsExpanded(false)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary/80 hover:bg-secondary text-xs font-medium transition-colors"
-              >
-                <ChevronUp className="w-3.5 h-3.5" />
-                {t('收起')}
-              </button>
+              {/* 便條紙視窗裡沒有「收起」可言——收起就只剩一片空白視窗 */}
+              {!fill && (
+                <button
+                  onClick={() => setIsExpanded(false)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary/80 hover:bg-secondary text-xs font-medium transition-colors"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  {t('收起')}
+                </button>
+              )}
             </div>
           </div>
 
@@ -474,7 +497,7 @@ export function FocusScratchpad({
                   value={textInput}
                   onChange={(e) => handleTextInputChange(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') addTextItem()
+                    if (e.key === 'Enter' && !isImeComposing(e)) addTextItem()
                   }}
                   placeholder={t('記下想法，或輸入 [] 建立待辦…')}
                   className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground/60"
@@ -541,7 +564,9 @@ export function FocusScratchpad({
                   onChange={(e) => setLinkTitle(e.target.value)}
                   placeholder={t('輸入自訂標題...')}
                   className="w-full bg-secondary/50 border-0 rounded-xl px-3 py-2 text-sm focus:ring-1 focus:ring-primary/30 outline-none"
-                  onKeyDown={(e) => e.key === 'Enter' && addLinkItem()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isImeComposing(e)) addLinkItem()
+                  }}
                 />
               </div>
               <div className="flex justify-end gap-2">
@@ -758,7 +783,7 @@ function SortableItem({
                 className="w-full bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-primary/30 outline-none"
                 placeholder={t('標題（可選）')}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') onSaveEdit()
+                  if (e.key === 'Enter' && !isImeComposing(e)) onSaveEdit()
                   if (e.key === 'Escape') onCancelEdit()
                 }}
               />
@@ -769,7 +794,7 @@ function SortableItem({
               value={editText}
               onChange={(e) => onUpdateEditText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) onSaveEdit()
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !isImeComposing(e)) onSaveEdit()
                 if (e.key === 'Escape') onCancelEdit()
               }}
               placeholder={t('編輯內容...（Ctrl+Enter 儲存，Esc 取消）')}

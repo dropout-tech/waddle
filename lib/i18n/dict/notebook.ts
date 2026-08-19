@@ -66,6 +66,11 @@ export const dict: Record<string, string> = {
   '請先在主面板建立工作區與分類': 'Create a workspace and category on the main board first',
   '已建立任務': 'Task created',
 
+  // 便條紙視窗（懸浮）
+  '彈出成便條紙視窗': 'Pop out as a sticky note window',
+  '回到記事列表': 'Back to note list',
+  '在主視窗開啟': 'Open in the main window',
+
   // Tiptap placeholders
   '標題': 'Heading',
   '收合標題': 'Toggle heading',
