@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useMemo, useEffect, type ReactNode } from 'react'
-import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, FolderTree, ChevronDown, ChevronRight, Repeat, List, CheckSquare, ListChecks, Link2, Users, MapPin, Video, ImagePlus, Loader2 } from 'lucide-react'
+import { useState, useRef, useMemo, type ReactNode } from 'react'
+import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, ChevronDown, Repeat, List, CheckSquare, ListChecks, Link2, Users, MapPin, Video, ImagePlus, Loader2 } from 'lucide-react'
 import { detectMeetingProvider, MEETING_PROVIDER_LABEL } from '@/lib/meeting-utils'
 import { cn } from '@/lib/utils'
 import type { Task, Workspace } from '@/lib/types'
@@ -13,8 +13,7 @@ import { toDateString } from '@/lib/calendar-utils'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from './recurrence-choice-modal'
 import { ModalShell } from './modal-shell'
 import { PICKER_COLOR_HEXES } from '@/lib/palette'
-import { sortWorkspacesForDisplay } from '@/lib/default-category'
-import { useIsMobile } from '@/hooks/use-mobile'
+import { CategoryCascadePicker } from '@/components/category/category-cascade-picker'
 import { useI18n } from '@/lib/i18n/react'
 import { getLang, t } from '@/lib/i18n'
 import { createClient } from '@/lib/supabase/client'
@@ -108,8 +107,7 @@ export function TaskDetailModal({
   const [notes, setNotes] = useState(task.notes || '')
   const [calendarColor, setCalendarColor] = useState(task.calendarColor || task.workspaceColor)
   const [selectedCategoryId, setSelectedCategoryId] = useState(task.categoryId)
-  const [showCategoryPicker, setShowCategoryPicker] = useState(false)
-  
+
   // Recurrence settings
   const [isRecurring, setIsRecurring] = useState(task.isRecurring || false)
   const [recurrenceType, setRecurrenceType] = useState<'daily' | 'weekly' | 'monthly' | 'custom'>(
@@ -148,50 +146,6 @@ export function TaskDetailModal({
     .find((c) => c.id === selectedCategoryId)
 
   const activeWorkspaceId = selectedCategory?.workspace.id ?? task.workspaceId
-
-  // Two-level picker source: archived workspaces/categories are dropped (they
-  // aren't valid destinations), 未分類 is pinned first, categories follow
-  // their own sortOrder.
-  const pickerWorkspaces = useMemo(() => {
-    return sortWorkspacesForDisplay(workspaces.filter((w) => !w.isArchived)).map((w) => ({
-      ...w,
-      categories: [...w.categories]
-        .filter((c) => !c.isArchived)
-        .sort((a, b) => a.sortOrder - b.sortOrder),
-    }))
-  }, [workspaces])
-
-  // Which workspace's categories the second level is showing. Desktop: the
-  // column hovered/focused on the left. Mobile: the one accordion row that's
-  // open (null = all collapsed).
-  const [pickerWorkspaceId, setPickerWorkspaceId] = useState<string | null>(null)
-  const categoryPickerRef = useRef<HTMLDivElement>(null)
-  const categoryColumnRef = useRef<HTMLDivElement>(null)
-  const isMobile = useIsMobile()
-
-  const pickerCategories =
-    pickerWorkspaces.find((w) => w.id === pickerWorkspaceId)?.categories ?? []
-
-  const openCategoryPicker = () => {
-    // Start on the task's own workspace (create-from-calendar lands on 未分類),
-    // falling back to the first row when that workspace is gone/archived.
-    const hasActive = pickerWorkspaces.some((w) => w.id === activeWorkspaceId)
-    setPickerWorkspaceId(hasActive ? activeWorkspaceId : pickerWorkspaces[0]?.id ?? null)
-    setShowCategoryPicker(true)
-  }
-
-  // Dismiss on outside click (mousedown, so it also fires on touch), same
-  // pattern as user-menu.tsx / calendar-header.tsx.
-  useEffect(() => {
-    if (!showCategoryPicker) return
-    const handlePointerDown = (e: MouseEvent) => {
-      if (categoryPickerRef.current && !categoryPickerRef.current.contains(e.target as Node)) {
-        setShowCategoryPicker(false)
-      }
-    }
-    document.addEventListener('mousedown', handlePointerDown)
-    return () => document.removeEventListener('mousedown', handlePointerDown)
-  }, [showCategoryPicker])
 
   const toggleRecurrenceDay = (day: number) => {
     setRecurrenceDays((prev) =>
@@ -288,8 +242,10 @@ export function TaskDetailModal({
         variant="drawer"
         ariaLabel={isCreate ? t('新增任務') : t('任務詳情')}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        {/* Header — `relative` so the category picker's desktop panel can
+            anchor to the drawer's content gutters (left-5 / right-5) rather
+            than to the chip trigger. */}
+        <div className="relative flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             {/* Completion Checkbox (edit mode only) */}
             {!isCreate && (
@@ -306,156 +262,20 @@ export function TaskDetailModal({
                 {task.isCompleted && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
               </button>
             )}
-            {/* Category Selector */}
-            <div className="relative" ref={categoryPickerRef}>
-              <button
-                onClick={() => (showCategoryPicker ? setShowCategoryPicker(false) : openCategoryPicker())}
-                className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-secondary transition-colors"
-              >
-                <div
-                  className="w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: selectedCategory?.workspace.color || task.workspaceColor }}
-                />
-                <span className="text-xs font-medium text-muted-foreground">
-                  {selectedCategory?.workspace.name || task.workspaceName} / {selectedCategory?.name || task.categoryName}
-                </span>
-                <ChevronDown className="w-3 h-3 text-muted-foreground" />
-              </button>
-
-              {/* Category picker — two levels, because a flat list of every
-                  category across every workspace turns into a scroll marathon
-                  once the user has more than a handful of workspaces.
-                  Desktop: a context-menu-style two-column popover, left =
-                  workspaces (hover switches the right column), right =
-                  that workspace's categories. Mobile has no hover, so it
-                  becomes a single-open accordion in the same full-width
-                  sheet as before (side margins keep 320 px screens safe). */}
-              {showCategoryPicker && pickerWorkspaces.length > 0 && (isMobile ? (
-                <div
-                  data-category-picker="mobile"
-                  className="fixed left-3 right-3 top-[calc(env(safe-area-inset-top,0px)+72px)] max-h-[60vh] bg-card rounded-xl border border-border shadow-xl z-popover py-2 overflow-y-auto"
-                >
-                  {pickerWorkspaces.map((workspace) => {
-                    const isExpanded = pickerWorkspaceId === workspace.id
-                    return (
-                      <div key={workspace.id}>
-                        <button
-                          data-picker-workspace={workspace.id}
-                          aria-expanded={isExpanded}
-                          onClick={() => setPickerWorkspaceId(isExpanded ? null : workspace.id)}
-                          className="w-full min-h-[44px] flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-secondary transition-colors"
-                        >
-                          <div
-                            className="w-2.5 h-2.5 flex-shrink-0 rounded-full"
-                            style={{ backgroundColor: workspace.color }}
-                          />
-                          <span className="flex-1 min-w-0 truncate font-medium">{workspace.name}</span>
-                          {isExpanded ? (
-                            <ChevronDown className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
-                          )}
-                        </button>
-                        {isExpanded && (
-                          workspace.categories.length === 0 ? (
-                            <p className="px-3 pl-9 py-2 text-xs text-muted-foreground">
-                              {t('這個大分類還沒有小分類')}
-                            </p>
-                          ) : (
-                            workspace.categories.map((category) => (
-                              <button
-                                key={category.id}
-                                data-picker-category={category.id}
-                                onClick={() => {
-                                  setSelectedCategoryId(category.id)
-                                  setShowCategoryPicker(false)
-                                }}
-                                className={cn(
-                                  'w-full min-h-[44px] text-left pl-9 pr-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center gap-2',
-                                  selectedCategoryId === category.id && 'bg-primary/10 text-primary'
-                                )}
-                              >
-                                <FolderTree className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
-                                <span className="flex-1 min-w-0 truncate">{category.name}</span>
-                                {selectedCategoryId === category.id && (
-                                  <Check className="w-3.5 h-3.5 flex-shrink-0" />
-                                )}
-                              </button>
-                            ))
-                          )
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div
-                  data-category-picker="desktop"
-                  className="absolute left-0 top-full mt-1 flex w-[21rem] max-h-72 bg-card rounded-xl border border-border shadow-xl z-popover overflow-hidden"
-                >
-                  {/* Level 1 — workspaces */}
-                  <div className="w-[9.5rem] flex-shrink-0 border-r border-border py-1.5 overflow-y-auto">
-                    {pickerWorkspaces.map((workspace) => (
-                      <button
-                        key={workspace.id}
-                        data-picker-workspace={workspace.id}
-                        // Hover switches the right column (the user asked for
-                        // right-click-menu behaviour); focus does the same so
-                        // Tab-only navigation sees the matching categories.
-                        onMouseEnter={() => setPickerWorkspaceId(workspace.id)}
-                        onFocus={() => setPickerWorkspaceId(workspace.id)}
-                        onClick={() => setPickerWorkspaceId(workspace.id)}
-                        onKeyDown={(e) => {
-                          if (e.key !== 'ArrowRight') return
-                          e.preventDefault()
-                          categoryColumnRef.current?.querySelector('button')?.focus()
-                        }}
-                        className={cn(
-                          'w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center gap-2',
-                          pickerWorkspaceId === workspace.id && 'bg-secondary'
-                        )}
-                      >
-                        <div
-                          className="w-2.5 h-2.5 flex-shrink-0 rounded-full"
-                          style={{ backgroundColor: workspace.color }}
-                        />
-                        <span className="flex-1 min-w-0 truncate">{workspace.name}</span>
-                        <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
-                      </button>
-                    ))}
-                  </div>
-                  {/* Level 2 — categories of the highlighted workspace */}
-                  <div ref={categoryColumnRef} className="flex-1 min-w-0 py-1.5 overflow-y-auto">
-                    {pickerCategories.length === 0 ? (
-                      <p className="px-3 py-2 text-xs text-muted-foreground">
-                        {t('這個大分類還沒有小分類')}
-                      </p>
-                    ) : (
-                      pickerCategories.map((category) => (
-                        <button
-                          key={category.id}
-                          data-picker-category={category.id}
-                          onClick={() => {
-                            setSelectedCategoryId(category.id)
-                            setShowCategoryPicker(false)
-                          }}
-                          className={cn(
-                            'w-full text-left px-3 py-2 text-sm hover:bg-secondary transition-colors flex items-center gap-2',
-                            selectedCategoryId === category.id && 'bg-primary/10 text-primary'
-                          )}
-                        >
-                          <FolderTree className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
-                          <span className="flex-1 min-w-0 truncate">{category.name}</span>
-                          {selectedCategoryId === category.id && (
-                            <Check className="w-3.5 h-3.5 flex-shrink-0" />
-                          )}
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            {/* Category Selector — the panel is anchored to the drawer
+                header (which is `relative`), not to this little chip, so it
+                spans the drawer's content gutters instead of slicing the
+                title input underneath in half. */}
+            <CategoryCascadePicker
+              workspaces={workspaces}
+              value={selectedCategoryId}
+              onChange={setSelectedCategoryId}
+              preferredWorkspaceId={activeWorkspaceId}
+              fallbackLabel={`${task.workspaceName} / ${task.categoryName}`}
+              fallbackColor={task.workspaceColor}
+              panelAnchor="container"
+              desktopPanelClassName="left-5 right-5 top-full mt-1"
+            />
           </div>
           <div className="flex items-center gap-1">
             {!isCreate && onDelete && (

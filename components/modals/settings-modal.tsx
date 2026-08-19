@@ -47,6 +47,7 @@ import { requestReminderPermission, syncMeetingReminders } from '@/lib/notificat
 import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 import { PICKER_COLOR_HEXES, WORKSPACE_COLORS } from '@/lib/palette'
 import { resolveDefaultWorkspace, sortWorkspacesForDisplay } from '@/lib/default-category'
+import { CategoryCascadePicker } from '@/components/category/category-cascade-picker'
 import {
   WATER_REMINDER_INTERVALS,
   type WaterReminderInterval,
@@ -290,16 +291,13 @@ export function SettingsModal({
     persistSlotTypes(localSettings.slotTypes.filter(s => s.id !== id))
   }
 
-  // Flat "大分類 / 小分類" list for the single global default-category picker.
-  // 未分類 is pinned first (sortWorkspacesForDisplay), so the natural first
-  // option is 未分類 / 未分類.
-  const defaultCategoryOptions = useMemo(() => {
-    return sortWorkspacesForDisplay(workspaces.filter(ws => !ws.isArchived)).flatMap((ws) =>
-      ws.categories
-        .filter(c => !c.isArchived)
-        .map((cat) => ({ id: cat.id, label: `${ws.name} / ${cat.name}` }))
-    )
-  }, [workspaces])
+  // Is there anything to pick at all? (The cascade picker does its own
+  // archived-filtering and 未分類-first ordering internally.)
+  const hasAnyPickableCategory = useMemo(
+    () =>
+      workspaces.some(ws => !ws.isArchived && ws.categories.some(c => !c.isArchived)),
+    [workspaces]
+  )
 
   // The single flagged category. Legacy accounts can still carry one flag per
   // workspace (pre-20260810130000 data), so prefer the one inside the 未分類
@@ -888,24 +886,21 @@ export function SettingsModal({
               </label>
               {localSettings.defaultCategoryEnabled ?? true ? (
                 <div className="pl-1">
-                  {defaultCategoryOptions.length === 0 ? (
+                  {!hasAnyPickableCategory ? (
                     <span className="text-xs text-muted-foreground">
                       {t('還沒有任何分類')}
                     </span>
                   ) : (
-                    <select
+                    <CategoryCascadePicker
+                      workspaces={workspaces}
                       value={globalDefaultCategoryId}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        void onSetDefaultCategory(value === '' ? null : value)
-                      }}
-                      className="w-full h-11 md:h-9 px-2 text-xs rounded-md bg-background border border-border"
-                    >
-                      <option value="">{t('（未設定）')}</option>
-                      {defaultCategoryOptions.map((opt) => (
-                        <option key={opt.id} value={opt.id}>{opt.label}</option>
-                      ))}
-                    </select>
+                      onChange={(categoryId) => void onSetDefaultCategory(categoryId)}
+                      onClear={() => void onSetDefaultCategory(null)}
+                      variant="control"
+                      placement="inline"
+                      fallbackLabel={t('（未設定）')}
+                      triggerAriaLabel={t('預設分類')}
+                    />
                   )}
                 </div>
               ) : (
