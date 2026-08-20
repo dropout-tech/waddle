@@ -22,6 +22,7 @@ import type { Workspace, Task } from '@/lib/types'
 import { useI18n } from '@/lib/i18n/react'
 import { format } from 'date-fns'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
+import { HubLauncherButton } from '@/components/floating/hub-launcher-button'
 
 interface CalendarHeaderProps {
   selectedDate: Date
@@ -501,6 +502,8 @@ export function CalendarHeader({
             one stable disclosure menu so the toolbar never grows sideways. */}
         <div className="flex items-center gap-1">
           <UndoRedoButtons className="mr-1" />
+          {/* 常駐的懸浮小視窗啟動鈕——不必先開計時（不支援 PiP 的環境自動不顯示） */}
+          <HubLauncherButton />
           <button
             type="button"
             data-tour="notebook-entry"

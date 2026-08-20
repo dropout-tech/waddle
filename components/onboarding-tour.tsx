@@ -122,7 +122,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="focus-timer"]',
     title: '專注計時器 ＋ 背景音',
-    body: '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Huddle 會輕輕提醒你。開始計時後，角落小膠囊上的「⧉」會打開**永遠置頂的懸浮小視窗**——裡面還有記事本和白板分頁，切去任何軟體都蓋不住（Chrome / Edge）。',
+    body: '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Huddle 會輕輕提醒你。日曆頁右上工具列的「⧉」隨時能打開**永遠置頂的懸浮小視窗**——計時器、記事本、白板三分頁，切去任何軟體都蓋不住（Chrome / Edge）。',
     placement: 'left',
     padding: 6,
     interactive: true,

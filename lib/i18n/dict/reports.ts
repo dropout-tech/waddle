@@ -159,8 +159,8 @@ export const dict: Record<string, string> = {
   '工作中冒出靈感？拉開白板丟文字、貼圖、連結，事後還能隨手編輯。每天分開存。右上角的「⇱」可以把白板**彈到永遠置頂的懸浮小視窗**——切去別的軟體也蓋不住它（Chrome / Edge）。':
     'Got an idea mid-work? Pull open the scratchpad and drop in text, images, or links — you can tidy it up later. Each day gets its own space. The ⇱ button in the top right pops the board into an **always-on-top floating window** that no other app can cover (Chrome / Edge).',
   '👉 點開試試': '👉 Give it a try',
-  '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Huddle 會輕輕提醒你。開始計時後，角落小膠囊上的「⧉」會打開**永遠置頂的懸浮小視窗**——裡面還有記事本和白板分頁，切去任何軟體都蓋不住（Chrome / Edge）。':
-    'A Pomodoro timer in the bottom right — set 25 minutes to focus on one thing. Expand it to pick background sound (Lo-fi, rain, coffee-shop noise…) to work alongside, and Huddle will gently nudge you when time is up. Once it is running, the ⧉ button on the corner pill opens an **always-on-top floating window** — with Notebook and Scratchpad tabs inside — that stays visible over every other app (Chrome / Edge).',
+  '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Huddle 會輕輕提醒你。日曆頁右上工具列的「⧉」隨時能打開**永遠置頂的懸浮小視窗**——計時器、記事本、白板三分頁，切去任何軟體都蓋不住（Chrome / Edge）。':
+    'A Pomodoro timer in the bottom right — set 25 minutes to focus on one thing. Expand it to pick background sound (Lo-fi, rain, coffee-shop noise…) to work alongside, and Huddle will gently nudge you when time is up. The ⧉ button in the calendar toolbar opens an **always-on-top floating window** any time — Timer, Notebook, and Scratchpad tabs — that stays visible over every other app (Chrome / Edge).',
   '👉 點開計時器': '👉 Open the timer',
   '預設每 60 分鐘，Huddle 會跳出來提醒你喝口水。可以選「再過一下」snooze 五分鐘，或在設定裡改成 30/90/120 分鐘，不想要也可以關掉。':
     'Every 60 minutes by default, Huddle will pop up to remind you to drink some water. Choose Snooze for 5 more minutes, change the interval to 30/90/120 minutes in Settings, or turn it off entirely.',
