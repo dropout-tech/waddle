@@ -87,6 +87,8 @@ export const dict: Record<string, string> = {
   '回到主視窗': 'Back to main window',
   '計時器': 'Timer',
   '還沒有進行中的計時': 'Nothing is being timed yet',
+  '懸浮小視窗（永遠置頂）': 'Floating window (always on top)',
+  '收回懸浮小視窗': 'Close the floating window',
   '彈出成便條紙（懸浮在最上層）': 'Pop out as a sticky note (always on top)',
 
   // Immersive screen
