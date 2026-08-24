@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2, Globe2, Link2, Copy, Share2, RefreshCw, Users, Loader2 } from 'lucide-react'
+import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2, Globe2, Link2, Copy, Share2, RefreshCw, Users, Loader2, Type } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { UserSettings, TimeBlock, SlotType, Workspace, NotificationSettings } from '@/lib/types'
 import { useI18n } from '@/lib/i18n/react'
 import { DEFAULT_FOCUS_SETTINGS } from '@/lib/focus'
 import type { Lang } from '@/lib/i18n'
+import { FONT_SIZES, getFontSize, setFontSize, type FontSizeKey } from '@/lib/font-size'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TimeField } from '@/components/ui/date-time-field'
@@ -163,6 +164,8 @@ export function SettingsModal({
   // Task-complete sound is a per-device pref stored in localStorage (same
   // pattern as timer sound), so it lives outside localSettings/UserSettings.
   const [taskSoundEnabled, setTaskSoundEnabledState] = useState<boolean>(() => getTaskCompleteSoundEnabled())
+  // 字級 — per-device（localStorage），同語言的模式：點了立即生效不用存檔。
+  const [fontSizeKey, setFontSizeKey] = useState<FontSizeKey>(() => getFontSize())
   // Meeting reminder lead time (5/10/15 mins, or null = off). Per-device.
   const [reminderLead, setReminderLeadState] = useState<ReminderLead>(() => getReminderLead())
   // Water-break reminder prefs — per-device, same pattern as the others.
@@ -458,6 +461,32 @@ export function SettingsModal({
                   )}
                 >
                   {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 字級 — 跟語言一樣是裝置層級偏好，點了立即全站生效（含懸浮視窗）。 */}
+          <div className="space-y-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Type className="w-4 h-4" />
+              {t('字級')}
+            </h3>
+            <p className="text-xs text-muted-foreground">{t('調整全站文字大小，懸浮小視窗也會跟著變')}</p>
+            <div className="flex gap-2">
+              {FONT_SIZES.map(({ key, label }) => (
+                <button
+                  key={key}
+                  data-font-size-option={key}
+                  onClick={() => { setFontSize(key); setFontSizeKey(key) }}
+                  className={cn(
+                    'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                    fontSizeKey === key
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                  )}
+                >
+                  {t(label)}
                 </button>
               ))}
             </div>

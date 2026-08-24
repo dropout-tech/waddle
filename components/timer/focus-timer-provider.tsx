@@ -231,10 +231,10 @@ export interface FocusTimerContextValue {
   setPrefs: (v: TimerPrefs | ((prev: TimerPrefs) => TimerPrefs)) => void
   unavailableSrcs: Set<string>
 
-  /** `presetIndex` 指定 POMODORO_PRESETS 直接開跑（懸浮工作站的快速開始）；
-   *  `forceMini` 跳過「開始時進沉浸畫面」偏好——從懸浮視窗啟動時，主視窗
-   *  突然蓋上全螢幕會嚇到人。 */
-  startTimer: (opts?: { immersive?: boolean; presetIndex?: number; forceMini?: boolean }) => void
+  /** `presetIndex` 指定 POMODORO_PRESETS 直接開跑；`stopwatch` 直接開正計時
+   *  （兩者都是懸浮工作站快速開始用的捷徑）；`forceMini` 跳過「開始時進沉浸
+   *  畫面」偏好——從懸浮視窗啟動時，主視窗突然蓋上全螢幕會嚇到人。 */
+  startTimer: (opts?: { immersive?: boolean; presetIndex?: number; stopwatch?: boolean; forceMini?: boolean }) => void
   /** MainLayout registers its onCreateCalendarTimeBlock here on mount;
    *  returns the unregister function for the effect cleanup. */
   registerRecorder: (fn: RecorderFn) => () => void
@@ -425,7 +425,7 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     return POMODORO_PRESETS[selectedPreset].minutes * 60
   }, [useCustom, customMinutes, selectedPreset])
 
-  const startTimer = useCallback((opts?: { immersive?: boolean; presetIndex?: number; forceMini?: boolean }) => {
+  const startTimer = useCallback((opts?: { immersive?: boolean; presetIndex?: number; stopwatch?: boolean; forceMini?: boolean }) => {
     const eng = getBgmEngine()
     eng?.unlockAudio()
     eng?.prepareMusic(prefs.music)
@@ -433,26 +433,31 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     // previous session's mute so playback follows prefs + timer state again.
     setBgmManualPlaying(false)
     setBgmOverride(null)
-    // 懸浮工作站的快速開始：指定 preset 直接開跑，不吃設定卡當下的
-    // mode/custom 狀態（也把它們同步過去，回主視窗看到的選擇才一致）。
+    // 懸浮工作站的快速開始：指定 preset（倒數）或 stopwatch（正計時）直接
+    // 開跑，不吃設定卡當下的 mode/custom 狀態（也把它們同步過去，回主視窗
+    // 看到的選擇才一致）。
     const preset = opts?.presetIndex != null ? POMODORO_PRESETS[opts.presetIndex] : null
     if (preset) {
       setMode('pomodoro')
       setSelectedPreset(opts!.presetIndex!)
       setUseCustom(false)
+    } else if (opts?.stopwatch) {
+      setMode('stopwatch')
     }
-    const effMode: TimerMode = preset ? 'pomodoro' : mode
+    const effMode: TimerMode = preset ? 'pomodoro' : opts?.stopwatch ? 'stopwatch' : mode
     const now = new Date()
     const label = preset
       ? (customLabel || t(preset.label))
-      : customLabel || (mode === 'pomodoro'
-        ? (useCustom ? t('{minutes}分鐘專注', { minutes: customMinutes }) : t(POMODORO_PRESETS[selectedPreset].label))
-        : t(focusType.label))
+      : opts?.stopwatch
+        ? (customLabel || t(focusType.label))
+        : customLabel || (mode === 'pomodoro'
+          ? (useCustom ? t('{minutes}分鐘專注', { minutes: customMinutes }) : t(POMODORO_PRESETS[selectedPreset].label))
+          : t(focusType.label))
     const color = preset
       ? preset.color
-      : mode === 'pomodoro'
-        ? (useCustom ? focusType.color : POMODORO_PRESETS[selectedPreset].color)
-        : focusType.color
+      : opts?.stopwatch || mode !== 'pomodoro'
+        ? focusType.color
+        : (useCustom ? focusType.color : POMODORO_PRESETS[selectedPreset].color)
     const targetSeconds = preset ? preset.minutes * 60 : getTargetSeconds()
 
     setSession({

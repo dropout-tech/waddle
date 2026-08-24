@@ -9,6 +9,12 @@ export const dict: Record<string, string> = {
   // shared flat dictionary consistent app-wide.
   '時間區塊': 'Time block',
   '語言': 'Language',
+  // 字級（settings 一般頁；「標準」沿用 calendar.ts 既有的 'Standard'）
+  '字級': 'Text size',
+  '調整全站文字大小，懸浮小視窗也會跟著變': 'Scales text across the app — the floating window follows too',
+  '小': 'Small',
+  '大': 'Large',
+  '特大': 'Extra large',
   '日曆顯示時間範圍': 'Calendar time range',
   '設定日曆顯示的時間區間': 'Set the hours shown on the calendar',
   '開始時間': 'Start time',
@@ -361,6 +367,20 @@ export const dict: Record<string, string> = {
   '沒有符合的任務': 'No matching tasks',
   '這個工作區不會出現在「各工作區重點」清單裡。':
     'This workspace stays out of the “Focus by workspace” list.',
+
+  // ── focus-board-editor-modal.tsx ────────────────────────────────────────
+  '編輯重點版面': 'Edit the focus board',
+  '勾選要出現在看板上的分類，拖曳可以調整同一個工作區內的順序。':
+    'Tick the categories you want on the board; drag to reorder them within a workspace.',
+  '勾選要出現在看板上的分類，用上下箭頭調整順序。':
+    'Tick the categories you want on the board; use the arrows to reorder them.',
+  '{count} 個未完成': '{count} open',
+  '把「{name}」往上移': 'Move “{name}” up',
+  '把「{name}」往下移': 'Move “{name}” down',
+  '「{name}」的進度': 'Progress note for “{name}”',
+  '這個分類現在推到哪了？（選填）': 'Where does this one stand? (optional)',
+  '還沒有分類可以選': 'No categories to pick yet',
+  '已選 {count} 張卡': '{count} cards selected',
 
   // ── task-detail-modal.tsx · 兩層分類選單 ────────────────────────────────
   '這個大分類還沒有小分類': 'No sub-categories in this workspace yet',

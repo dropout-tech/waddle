@@ -82,7 +82,7 @@ export default function RootLayout({
             value on first paint and avoid the desktop-flash on mobile. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var m=window.matchMedia('(max-width:767px)').matches;document.documentElement.dataset.viewport=m?'mobile':'desktop';if(m)document.documentElement.classList.add('is-mobile');}catch(e){}})();`,
+            __html: `(function(){try{var m=window.matchMedia('(max-width:767px)').matches;document.documentElement.dataset.viewport=m?'mobile':'desktop';if(m)document.documentElement.classList.add('is-mobile');var f=localStorage.getItem('waddle-font-size-v1');var map={sm:'87.5%',lg:'112.5%',xl:'125%'};if(f&&map[f])document.documentElement.style.fontSize=map[f];}catch(e){}})();`,
           }}
         />
       </head>
