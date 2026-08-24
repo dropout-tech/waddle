@@ -94,6 +94,9 @@ export function mirrorStylesInto(target: Window): () => void {
   const syncAttributes = () => {
     doc.documentElement.className = document.documentElement.className
     doc.documentElement.dataset.viewport = 'desktop'
+    // 使用者的字級偏好掛在 <html> 的 inline font-size（lib/font-size.ts），
+    // rem 才會在懸浮視窗裡跟主視窗同一個基準。
+    doc.documentElement.style.fontSize = document.documentElement.style.fontSize
     doc.body.className = document.body.className
     // PiP 視窗本身就是內容，撐滿並禁止外層捲動。
     doc.body.style.margin = '0'
@@ -104,7 +107,7 @@ export function mirrorStylesInto(target: Window): () => void {
   syncAttributes()
 
   const themeObserver = new MutationObserver(syncAttributes)
-  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
 
   // 開發模式下 Next.js 會邊改邊塞新的 <style>；正式站幾乎不會觸發。
   const headObserver = new MutationObserver((records) => {

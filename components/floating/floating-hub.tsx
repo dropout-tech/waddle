@@ -98,7 +98,10 @@ export function FloatingHub() {
             {timerState !== 'idle' && floatingTimerCard ? (
               floatingTimerCard
             ) : (
-              <HubIdleTimer onStart={(presetIndex) => startTimer({ presetIndex, forceMini: true })} />
+              <HubIdleTimer
+                onStart={(presetIndex) => startTimer({ presetIndex, forceMini: true })}
+                onStartStopwatch={() => startTimer({ stopwatch: true, forceMini: true })}
+              />
             )}
           </div>
 
@@ -123,8 +126,14 @@ export function FloatingHub() {
   )
 }
 
-/** 計時器分頁的閒置畫面：一鍵開始，不用回主視窗。 */
-function HubIdleTimer({ onStart }: { onStart: (presetIndex: number) => void }) {
+/** 計時器分頁的閒置畫面：一鍵開始（倒數五段＋正計時），不用回主視窗。 */
+function HubIdleTimer({
+  onStart,
+  onStartStopwatch,
+}: {
+  onStart: (presetIndex: number) => void
+  onStartStopwatch: () => void
+}) {
   const { t } = useI18n()
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 overflow-y-auto p-4">
@@ -147,6 +156,19 @@ function HubIdleTimer({ onStart }: { onStart: (presetIndex: number) => void }) {
             </span>
           </button>
         ))}
+        {/* 正計時（碼表）——不設終點，從 0:00 往上數，長按 ✕ 結束並記錄 */}
+        <button
+          type="button"
+          data-hub-idle-stopwatch
+          onClick={onStartStopwatch}
+          className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2 text-sm transition-colors hover:bg-secondary"
+        >
+          <span className="flex items-center gap-2 font-medium">
+            <Timer className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+            {t('正計時')}
+          </span>
+          <span className="tabular-nums text-xs text-muted-foreground">0:00 ↑</span>
+        </button>
       </div>
     </div>
   )
