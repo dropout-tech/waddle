@@ -109,6 +109,16 @@ const SETTINGS_EXT_COL_RE = /day_view_days|week_view_days|keep_completed_today_i
 let settingsExtColsKnownMissing = false
 const isMissingSettingsExtColumnError = (err: unknown) => isMissingColumnError(err, SETTINGS_EXT_COL_RE)
 
+// time_blocks.notes — migration 20260824120000_time_blocks_notes.sql (not
+// yet applied to prod as of this writing). Same latch-and-retry shape as the
+// meeting/settings-ext columns above: most time-block writes never touch
+// `notes` at all (buildPayload/timeBlockToRow just omit the key), so this
+// only costs a retry on the rare write that actually has notes to save
+// while the migration hasn't landed yet.
+const TIME_BLOCK_NOTES_COL_RE = /notes/
+let timeBlockNotesColKnownMissing = false
+const isMissingTimeBlockNotesColumnError = (err: unknown) => isMissingColumnError(err, TIME_BLOCK_NOTES_COL_RE)
+
 // ─────────────────────────────────────────────────────────
 // Default settings — used as fallback for partial DB rows
 // ─────────────────────────────────────────────────────────
@@ -2386,20 +2396,32 @@ export function useWaddleData(): UseWaddleData {
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const row = timeBlockToRow(newBlock)
+      // notes only ever gets added to the payload when there's actually a
+      // value — keeps the common (no-notes) insert untouched by the
+      // migration-not-applied-yet fallback below.
+      const buildPayload = (stripNotes: boolean) => ({
+        id, user_id: userId,
+        date: row.date!, start_time: row.start_time!, end_time: row.end_time!,
+        type: row.type!, label: row.label!, color: row.color!,
+        is_recurring: row.is_recurring,
+        recurrence_rule: row.recurrence_rule ?? null,
+        ...(!stripNotes && row.notes ? { notes: row.notes } : {}),
+      })
       // .select() so PostgREST returns the inserted row; 0 rows here means
       // RLS or a session issue silently dropped the write — the same pattern
       // that caused time blocks to "disappear" after a tab focus refetch
       // wiped local state back to the DB snapshot.
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('time_blocks')
-        .insert({
-          id, user_id: userId,
-          date: row.date!, start_time: row.start_time!, end_time: row.end_time!,
-          type: row.type!, label: row.label!, color: row.color!,
-          is_recurring: row.is_recurring,
-          recurrence_rule: row.recurrence_rule ?? null,
-        })
+        .insert(buildPayload(timeBlockNotesColKnownMissing))
         .select('id')
+      // Pre-migration-20260824120000 fallback: retry without notes once we
+      // detect the column doesn't exist yet, then latch for the session.
+      if (error && isMissingTimeBlockNotesColumnError(error)) {
+        timeBlockNotesColKnownMissing = true
+        console.warn('[addTimeBlock] time_blocks.notes column missing — falling back. Run migration 20260824120000.', error)
+        ;({ data, error } = await supabase.from('time_blocks').insert(buildPayload(true)).select('id'))
+      }
       if (error) {
         handleDbError('建立時間區塊')(error)
         return
@@ -2430,11 +2452,28 @@ export function useWaddleData(): UseWaddleData {
 
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
-      const { data, error } = await supabase
+      // timeBlockToRow already omits `notes` entirely when updates.notes is
+      // undefined, so the common (notes-untouched) update never risks the
+      // missing-column path below.
+      const buildUpdatePayload = (stripNotes: boolean) => {
+        const out = timeBlockToRow(updates)
+        if (stripNotes) delete out.notes
+        return out
+      }
+      let { data, error } = await supabase
         .from('time_blocks')
-        .update(timeBlockToRow(updates))
+        .update(buildUpdatePayload(timeBlockNotesColKnownMissing))
         .eq('id', id)
         .select('id')
+      if (error && isMissingTimeBlockNotesColumnError(error)) {
+        timeBlockNotesColKnownMissing = true
+        console.warn('[updateTimeBlock] time_blocks.notes column missing — falling back. Run migration 20260824120000.', error)
+        ;({ data, error } = await supabase
+          .from('time_blocks')
+          .update(buildUpdatePayload(true))
+          .eq('id', id)
+          .select('id'))
+      }
       if (error) {
         handleDbError('更新時間區塊')(error)
         return

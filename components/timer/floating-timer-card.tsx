@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Pause, Play, X, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
+import { formatFocusDuration } from '@/lib/timer-format'
 
 const STOP_HOLD_MS = 600
 
@@ -28,7 +29,12 @@ export interface FloatingTimerCardProps {
   /** 這段在做什麼（使用者輸入的標籤或預設名稱）。 */
   label: string
   /** 溫柔收尾播放中時非 null。 */
-  completion?: { kind: 'work' | 'break' | 'manual'; exiting: boolean } | null
+  completion?: {
+    kind: 'work' | 'break' | 'manual'
+    exiting: boolean
+    /** Non-null for a praised session — random line + actual duration. */
+    praise?: { key: string; seconds: number } | null
+  } | null
   onPause: () => void
   onResume: () => void
   onStop: () => void
@@ -78,8 +84,9 @@ export function FloatingTimerCard({
   const R = 46
   const C = 2 * Math.PI * R
 
-  const doneLabel =
-    completion?.kind === 'work' ? t('這段專注完成了')
+  const doneLabel = completion?.praise
+    ? t(completion.praise.key, { duration: formatFocusDuration(completion.praise.seconds, t) })
+    : completion?.kind === 'work' ? t('這段專注完成了')
     : completion?.kind === 'break' ? t('休息結束')
     : t('先到這裡也很好')
 

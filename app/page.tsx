@@ -345,7 +345,7 @@ function HuddlePage() {
     }
 
     await addTimeBlock({
-      date, startTime, endTime, type, label, color, isRecurring: false,
+      date, startTime, endTime, type, label, color, isRecurring: false, notes: notes || undefined,
     })
   }, [activeSlotTypes, workspaces, createTask, addTimeBlock, settings.defaultCategoryEnabled])
 

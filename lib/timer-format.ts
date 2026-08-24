@@ -25,3 +25,19 @@ export function formatTimeHHMM(date: Date): string {
 export function formatDateISO(date: Date): string {
   return toDateString(date)
 }
+
+/** Translate function shape shared by both `t` (lib/i18n) and useI18n()'s `t`. */
+type Translate = (text: string, vars?: Record<string, string | number>) => string
+
+/** "25 分鐘" / "1 小時" / "1 小時 30 分鐘" — human duration for the random
+ *  post-session praise line and the session-log dialog's subtitle. Rounds to
+ *  the nearest whole minute, floored at 1 (a >=60s session always reads as
+ *  at least "1 分鐘", never "0 分鐘"). */
+export function formatFocusDuration(seconds: number, t: Translate): string {
+  const m = Math.max(1, Math.round(seconds / 60))
+  if (m < 60) return t('{m} 分鐘', { m })
+  const h = Math.floor(m / 60)
+  const r = m % 60
+  if (r === 0) return t('{h} 小時', { h })
+  return t('{h} 小時 {m} 分鐘', { h, m: r })
+}

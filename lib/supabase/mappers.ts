@@ -194,6 +194,7 @@ export function rowToTimeBlock(row: TimeBlockRow): TimeBlock {
     color: row.color,
     isRecurring: row.is_recurring,
     recurrenceRule: row.recurrence_rule ?? undefined,
+    notes: row.notes ?? undefined,
   }
 }
 
@@ -208,6 +209,7 @@ export function timeBlockToRow(tb: Partial<TimeBlock>): Partial<TimeBlockInsert>
   if (tb.color !== undefined) out.color = tb.color
   if (tb.isRecurring !== undefined) out.is_recurring = tb.isRecurring
   if (tb.recurrenceRule !== undefined) out.recurrence_rule = tb.recurrenceRule ?? null
+  if (tb.notes !== undefined) out.notes = tb.notes ?? null
   return out
 }
 
