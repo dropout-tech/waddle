@@ -161,6 +161,10 @@ type TimeBlocksRow = {
   color: string
   is_recurring: boolean
   recurrence_rule: string | null
+  // Nullable, added by migration 20260824120000_time_blocks_notes.sql — not
+  // yet applied to prod as of this writing (see that migration's comment
+  // and use-waddle-data.ts's PGRST204 retry guard on the mutations below).
+  notes: string | null
   created_at: string
   updated_at: string
 }
@@ -454,6 +458,7 @@ type TimeBlocksInsert = {
   color: string
   is_recurring?: boolean
   recurrence_rule?: string | null
+  notes?: string | null
 }
 
 type SlotTypesInsert = {

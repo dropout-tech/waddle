@@ -67,6 +67,29 @@ export const dict: Record<string, string> = {
   '嗶嗶': 'Beep',
   '靜音': 'Silent',
 
+  // Post-session praise — random pick, duration is interpolated via
+  // formatFocusDuration (lib/timer-format.ts). Also used as the literal
+  // PRAISE_KEYS list in focus-timer-provider.tsx.
+  '{m} 分鐘': '{m} min',
+  // '{h} 小時' already exists in dict/modals.ts ('{h} h') — reused as-is,
+  // not redefined here, so the two duration formatters agree.
+  '{h} 小時 {m} 分鐘': '{h} hr {m} min',
+  '這次又專注了 {duration}，超棒！': 'Another {duration} of focus — awesome!',
+  '剛剛專注了 {duration}，給自己一點掌聲！': 'You just focused for {duration}. Give yourself a hand!',
+  '{duration} 的專注入袋，繼續保持！': '{duration} of focus in the bag. Keep it up!',
+  '好穩，這一段專注了 {duration}！': 'Rock steady — {duration} of focus!',
+  '又累積了 {duration} 的專注，太厲害了！': 'Another {duration} of focus stacked up. Impressive!',
+  '專注 {duration} 達成，小企鵝為你驕傲 🐧': '{duration} of focus done — the penguin is proud of you 🐧',
+
+  // Post-session log dialog ("what did you get done?")
+  '這段時間做了什麼？': 'What did you get done?',
+  '這次專注了 {duration}': 'You focused for {duration}',
+  '不填也沒關係，跳過就記成純粹的專注時間': "Optional — skip and it'll be saved as pure focus time",
+  '標題（選填）': 'Title (optional)',
+  '想多記一點？（選填）': 'More details? (optional)',
+  '記下來': 'Save it',
+  '跳過': 'Skip',
+
   // Mini pill
   '這段專注完成了': 'That focus session is done',
   '休息結束': 'Break time is over',

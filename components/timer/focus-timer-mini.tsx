@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, Pause, Play, Maximize2, PictureInPicture2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
+import { formatFocusDuration } from '@/lib/timer-format'
 
 export interface FocusTimerMiniProps {
   state: 'running' | 'paused' | 'completed'
@@ -22,7 +23,12 @@ export interface FocusTimerMiniProps {
    *  editor toolbar — pass a smaller value so the pill clears it. */
   mobileBottomOffsetPx?: number
   /** Non-null while the gentle completion sequence is playing. */
-  completion?: { kind: 'work' | 'break' | 'manual'; exiting: boolean } | null
+  completion?: {
+    kind: 'work' | 'break' | 'manual'
+    exiting: boolean
+    /** Non-null for a praised session — random line + actual duration. */
+    praise?: { key: string; seconds: number } | null
+  } | null
   onPause: () => void
   onResume: () => void
   onExpand: () => void
@@ -134,8 +140,9 @@ export function FocusTimerMini({
   // Gentle completion state — same wind-down the immersive screen gets, in
   // pill form: a small check, one soft line, tap to skip, fade out.
   if (completion) {
-    const doneLabel =
-      completion.kind === 'work' ? t('這段專注完成了')
+    const doneLabel = completion.praise
+      ? t(completion.praise.key, { duration: formatFocusDuration(completion.praise.seconds, t) })
+      : completion.kind === 'work' ? t('這段專注完成了')
       : completion.kind === 'break' ? t('休息結束')
       : t('先到這裡也很好')
     return (

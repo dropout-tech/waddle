@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { useI18n } from '@/lib/i18n/react'
 import { hapticSelection } from '@/lib/haptics'
+import { formatFocusDuration } from '@/lib/timer-format'
 import {
   DEFAULT_MASCOT_SRC,
   MASCOT_SURPRISES,
@@ -26,6 +27,9 @@ export interface ImmersiveCompletion {
   next: 'break' | 'idle'
   /** True during the final 400ms opacity fade before finalizing. */
   exiting: boolean
+  /** Non-null for a praised session — random line + actual duration,
+   *  replacing COMPLETION_COPY[kind].title (the sub-line is unaffected). */
+  praise?: { key: string; seconds: number } | null
 }
 
 export interface ImmersiveProps {
@@ -712,7 +716,9 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
             </div>
           </div>
           <h2 className="text-2xl font-semibold text-foreground tracking-tight">
-            {t(COMPLETION_COPY[completion.kind].title)}
+            {completion.praise
+              ? t(completion.praise.key, { duration: formatFocusDuration(completion.praise.seconds, t) })
+              : t(COMPLETION_COPY[completion.kind].title)}
           </h2>
           <p className="text-sm text-muted-foreground mt-2">
             {t(COMPLETION_COPY[completion.kind].sub)}
@@ -988,6 +994,7 @@ function BgmBar({
       <div className={cn('flex items-center gap-2', expanded ? 'px-3 py-2' : 'pl-2 pr-3 py-1.5')}>
         <button
           type="button"
+          data-timer-bgm-toggle
           onClick={onTogglePlay}
           disabled={!hasSelection}
           aria-pressed={playing && hasSelection}

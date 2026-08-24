@@ -5,6 +5,7 @@ import { X, Calendar, Clock, Palette, Trash2, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { DateField, TimeField } from '@/components/ui/date-time-field'
 import { Drawer as Vaul } from 'vaul'
 import type { TimeBlock, SlotType } from '@/lib/types'
@@ -69,6 +70,7 @@ export function TimeBlockModal({
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [color, setColor] = useState('')
+  const [notes, setNotes] = useState('')
 
   // Re-seed local form state whenever the parent passes a different block.
   useEffect(() => {
@@ -79,6 +81,7 @@ export function TimeBlockModal({
     setStartTime(block.startTime)
     setEndTime(block.endTime)
     setColor(block.color)
+    setNotes(block.notes ?? '')
   }, [block?.id])
 
   const isMobile = useIsMobile()
@@ -125,6 +128,7 @@ export function TimeBlockModal({
   const handleSave = () => {
     if (!label.trim()) return
     if (duration !== null && duration <= 0) return
+    const trimmedNotes = notes.trim()
     onSave(block.id, {
       type,
       label: label.trim(),
@@ -132,6 +136,11 @@ export function TimeBlockModal({
       startTime,
       endTime,
       color,
+      // Omit the key entirely when there was never a note (keeps plain
+      // edits from paying the notes-column retry cost pre-migration);
+      // an explicit clear (block had notes, field is now empty) still
+      // sends '' so the stored note actually goes away.
+      notes: trimmedNotes ? trimmedNotes : block.notes ? '' : undefined,
     })
     onClose()
   }
@@ -342,6 +351,19 @@ export function TimeBlockModal({
                 aria-label={t('自訂顏色')}
               />
             </div>
+          </div>
+
+          {/* Notes — free-form, e.g. what a focus session actually got done. */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">{t('備註')}</label>
+            <Textarea
+              data-timeblock-notes
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={t('想多記一點？（選填）')}
+              rows={3}
+              className="resize-none text-sm"
+            />
           </div>
         </div>
 

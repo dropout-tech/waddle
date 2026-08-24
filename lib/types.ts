@@ -168,6 +168,8 @@ export interface TimeBlock {
   color: string
   isRecurring: boolean
   recurrenceRule?: string
+  /** Free-form notes — e.g. what a focus session actually accomplished. */
+  notes?: string
 }
 
 // Customizable slot type for time blocks
