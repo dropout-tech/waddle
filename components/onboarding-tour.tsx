@@ -512,6 +512,9 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
       className="fixed inset-0 z-tour pointer-events-none"
       role="dialog"
       aria-modal="true"
+      // 計時膠囊的「彈窗開啟就閃避到左下」邏輯認 aria-modal；導覽文案指著
+      // 膠囊平常待的右下角，所以用這個標記讓它豁免（focus-timer-mini.tsx）。
+      data-onboarding-tour
       aria-label={t('新手導覽')}
     >
       {/* Dim layer.
