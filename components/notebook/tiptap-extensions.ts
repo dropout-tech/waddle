@@ -39,7 +39,10 @@ export function notebookExtensions(uploadImage: UploadImageFn): Extensions {
       placeholder: ({ node }) => {
         if (node.type.name === 'heading') return t('標題')
         if (node.type.name === 'detailsSummary') return t('收合標題')
-        return t('輸入文字，或輸入「/」加入區塊…')
+        // 一般段落不給提示字（2026-08-24 使用者要求拿掉）：這行提示在窄視窗
+        // （便條紙）折成兩行時因 height:0 不佔版面，會直接疊在下一個區塊的
+        // 文字上。段落 placeholder 整個移除，標題/收合標題保留（單行不折）。
+        return ''
       },
       includeChildren: true,
     }),

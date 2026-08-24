@@ -70,11 +70,13 @@ export const dict: Record<string, string> = {
   '彈出成便條紙視窗': 'Pop out as a sticky note window',
   '回到記事列表': 'Back to note list',
   '在主視窗開啟': 'Open in the main window',
+  '縮小字級': 'Decrease text size',
+  '放大字級': 'Increase text size',
+  '內文字級（{min}–{max}）': 'Body text size ({min}–{max})',
 
   // Tiptap placeholders
   '標題': 'Heading',
   '收合標題': 'Toggle heading',
-  '輸入文字，或輸入「/」加入區塊…': 'Type something, or type "/" to add a block…',
 
   // Slash "/" block menu
   '插入區塊': 'Insert block',
