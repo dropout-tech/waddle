@@ -41,18 +41,58 @@ export interface FocusTimerMiniProps {
 // surface, so 600ms feels snappy without being accident-prone.
 const STOP_HOLD_MS = 600
 
+/** True while a full-screen modal/sheet is open (anything marked
+ *  aria-modal, except the onboarding tour — its copy points at the pill's
+ *  usual corner). The pill lives at the bottom-right, exactly where the
+ *  drawer/dialog footers put their primary buttons, so while a modal is up
+ *  it slides to the bottom-left instead of covering them. */
+function useModalDodge() {
+  const [dodge, setDodge] = useState(false)
+  useEffect(() => {
+    let raf = 0
+    const check = () => {
+      raf = 0
+      setDodge(!!document.querySelector('[aria-modal="true"]:not([data-onboarding-tour])'))
+    }
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(check) }
+    check()
+    const observer = new MutationObserver(schedule)
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-modal'],
+    })
+    return () => {
+      observer.disconnect()
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [])
+  return dodge
+}
+
 export function FocusTimerMini({
   state, phase, color, timeText, progress, label,
   isMobile, mobileBottomOffsetPx, completion, onPause, onResume, onExpand, onStop, onSkipCompletion,
   canFloat, isFloating, onToggleFloat,
 }: FocusTimerMiniProps) {
   const { t } = useI18n()
+  const dodgeLeft = useModalDodge()
   const mobileStyle = isMobile
     ? {
         bottom: `calc(${mobileBottomOffsetPx ?? 78}px + env(safe-area-inset-bottom))`,
         right: '0.75rem',
       }
     : undefined
+  // 彈窗開著 → 滑到左下角讓出送出按鈕；位移 = -(視窗寬 - 自身寬 - 兩側邊距)，
+  // 100% 是自身寬，所以落點剛好是鏡像的左下角。
+  const containerStyle = {
+    ...mobileStyle,
+    transform: dodgeLeft
+      ? `translateX(calc(-100vw + 100% + ${isMobile ? '1.5rem' : '3rem'}))`
+      : 'translateX(0)',
+    transition: 'transform 480ms var(--ease-quart)',
+  }
   const [stopProgress, setStopProgress] = useState(0)
   const holdRef = useRef<{ raf: number; cleared: boolean } | null>(null)
 
@@ -102,8 +142,9 @@ export function FocusTimerMini({
       <div
         // z-toast（70）：計時膠囊要壓在任何 modal（50）之上——記事本彈窗、
         // 設定視窗開著時，角落的倒數也不能消失（這正是跨路由常駐計時的意義）。
+        data-waddle-mini-root
         className="fixed z-toast bottom-6 right-6"
-        style={mobileStyle}
+        style={containerStyle}
         role="region"
         aria-label={t('計時完成')}
       >
@@ -136,8 +177,9 @@ export function FocusTimerMini({
   return (
     <div
       // 同上：z-toast 讓膠囊不被 modal 蓋住。
+      data-waddle-mini-root
       className="fixed z-toast bottom-6 right-6"
-      style={mobileStyle}
+      style={containerStyle}
       role="region"
       aria-label={phase === 'break' ? t('休息計時迷你顯示') : t('專注計時迷你顯示')}
     >
@@ -285,6 +327,7 @@ export function FocusTimerMini({
           }
           @media (prefers-reduced-motion: reduce) {
             [data-waddle-mini-pulse] { animation: none !important; }
+            [data-waddle-mini-root] { transition: none !important; }
           }
         `}</style>
       </div>
