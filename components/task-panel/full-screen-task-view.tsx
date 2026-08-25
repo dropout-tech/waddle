@@ -22,6 +22,7 @@ import {
   Search,
   SlidersHorizontal,
   Hourglass,
+  Focus,
   ArrowRight,
   ShieldCheck,
   ShieldAlert,
@@ -33,7 +34,7 @@ import type { Workspace, Task } from '@/lib/types'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { sortWorkspacesForDisplay } from '@/lib/default-category'
 import type { FocusSettings } from '@/lib/focus'
-import { FocusBlock } from './focus-block'
+import { FocusBoard } from './focus-board'
 import { getLang } from '@/lib/i18n'
 import { useI18n } from '@/lib/i18n/react'
 import { isImeComposing } from '@/lib/ime'
@@ -102,7 +103,13 @@ export function FullScreenTaskView({
 }: FullScreenTaskViewProps) {
   const { t, lang } = useI18n()
   const displayColor = useDisplayColor()
-  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'workspaces'>('overview')
+  // 總覽 opens the page. 任務重點 sits last in the row (the user's own
+  // ordering), and landing on a tab that isn't the first one reads as a
+  // glitch rather than a choice.
+  const [activeTab, setActiveTab] = useState<'focus' | 'overview' | 'tasks' | 'workspaces'>('overview')
+  // Focus settings arrive with the settings row; until they do (or on a build
+  // that never wires them), the 任務重點 tab doesn't exist and 總覽 stands in.
+  const effectiveTab = activeTab === 'focus' && !focusBoard ? 'overview' : activeTab
   const [taskFilter, setTaskFilter] = useState<'all' | 'today' | 'upcoming' | 'overdue' | 'unscheduled'>('all')
   const [selectedWorkspace, setSelectedWorkspace] = useState<string | null>(null)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
@@ -388,13 +395,14 @@ export function FullScreenTaskView({
             { id: 'overview', label: t('總覽'), icon: LayoutGrid },
             { id: 'tasks', label: t('所有任務'), icon: List },
             { id: 'workspaces', label: t('工作區'), icon: Target },
+            ...(focusBoard ? [{ id: 'focus', label: t('任務重點'), icon: Focus }] : []),
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-                activeTab === tab.id
+                effectiveTab === tab.id
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-secondary"
               )}
@@ -408,23 +416,20 @@ export function FullScreenTaskView({
 
       {/* Content */}
       <div className="flex-1 overflow-auto">
-        {activeTab === 'overview' && (
+        {effectiveTab === 'focus' && focusBoard && (
           <div className="p-6">
-            {/* "當前重點" — the page opens on what matters right now, before
-                any of the counting. */}
-            {focusBoard && (
-              <div className="mb-6">
-                <FocusBlock
-                  variant="page"
-                  workspaces={workspaces}
-                  focus={focusBoard}
-                  todayStr={todayStr}
-                  onSelectTask={(task) => onTaskClick?.(task)}
-                  onSetFocusBoard={onSetFocusBoard}
-                />
-              </div>
-            )}
+            <FocusBoard
+              workspaces={workspaces}
+              focus={focusBoard}
+              todayStr={todayStr}
+              onSelectTask={(task) => onTaskClick?.(task)}
+              onSetFocusBoard={onSetFocusBoard}
+            />
+          </div>
+        )}
 
+        {effectiveTab === 'overview' && (
+          <div className="p-6">
             {/* Stats Grid */}
             <div className="grid grid-cols-5 gap-4 mb-8">
               <div className="p-4 rounded-xl bg-card border border-border">
@@ -676,7 +681,7 @@ export function FullScreenTaskView({
           </div>
         )}
 
-        {activeTab === 'tasks' && (
+        {effectiveTab === 'tasks' && (
           <div className="p-6">
             {/* Filter Bar Row 1 */}
             <div className="flex items-center gap-4 mb-4">
@@ -1178,7 +1183,7 @@ export function FullScreenTaskView({
           </div>
         )}
 
-        {activeTab === 'workspaces' && (
+        {effectiveTab === 'workspaces' && (
           <WorkspacesView
             workspaceStats={workspaceStats}
             now={now}

@@ -48,8 +48,19 @@ interface FocusBlockProps {
    * on a build where the data layer hasn't wired it up yet.
    */
   onSetFocusBoard?: (next: FocusSettings) => Promise<void> | void
-  /** 'panel' = narrow sidebar/mobile tab, 'page' = full-screen overview card. */
-  variant?: 'panel' | 'page'
+  /**
+   * 'panel' = narrow sidebar/mobile tab, 'page' = full-screen overview card,
+   * 'page-mobile' = the opening line of the phone 重點 overlay (single column,
+   * headline only — the board underneath already groups by workspace).
+   */
+  variant?: 'panel' | 'page' | 'page-mobile'
+  /**
+   * Whether to list the follow-up tasks under the headline. The 重點 board
+   * page turns this off: the board below already shows that category's queue,
+   * and printing the same three titles twice on one screen reads like a bug.
+   * Defaults to true so the panel variant is untouched.
+   */
+  showNextTasks?: boolean
 }
 
 export function FocusBlock({
@@ -59,6 +70,7 @@ export function FocusBlock({
   onSelectTask,
   onSetFocusBoard,
   variant = 'panel',
+  showNextTasks = true,
 }: FocusBlockProps) {
   const { t } = useI18n()
   const displayColor = useDisplayColor()
@@ -72,8 +84,15 @@ export function FocusBlock({
   const [pageExpanded, setPageExpanded] = useState(true)
 
   const global = useMemo(
-    () => resolveFocus(focus?.global, workspaces, { scope: 'global', today: todayStr }),
-    [focus?.global, workspaces, todayStr]
+    () =>
+      resolveFocus(focus?.global, workspaces, {
+        scope: 'global',
+        today: todayStr,
+        // Ask for none rather than fetching then hiding — `undefined` keeps
+        // resolveFocus's own default (2) for every existing caller.
+        nextLimit: showNextTasks ? undefined : 0,
+      }),
+    [focus?.global, workspaces, todayStr, showNextTasks]
   )
   const workspaceFocuses = useMemo(
     () => (focus ? resolveWorkspaceFocuses(focus, workspaces, todayStr) : []),
@@ -159,6 +178,100 @@ export function FocusBlock({
       onSave={onSetFocusBoard}
     />
   ) : null
+
+  // ── 'page-mobile': the headline of the phone 重點 overlay ───────────────
+  // Deliberately NOT the 'page' layout squeezed into 390px: that one is a
+  // lg:grid-cols-3 card built for a 1392px column. Here the headline is the
+  // only protagonist on the first screenful — no card, no second tier, no
+  // follow-up queue (the board below lists that category's queue already).
+  if (variant === 'page-mobile') {
+    // A blank headline with a live meta line reads as a decapitated layout
+    // ("● 未分類 · 講師資源站 · 逾期 3 天" floating with nothing above it).
+    // `resolveFocus` only reports `source: 'empty'` for an unset pin, so a
+    // task whose title is blank would still arrive here with metadata —
+    // treat it as empty instead of rendering the orphan line.
+    const mobileEmpty = isEmpty || !global.title.trim()
+    const mobileHeadline = (
+      <>
+        <span className="block text-xl font-bold leading-snug tracking-tight text-foreground line-clamp-3">
+          {global.title}
+        </span>
+        {(metaParts.length > 0 || globalStatus) && (
+          <span className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{
+                backgroundColor: displayColor(global.workspaceColor) || 'var(--muted-foreground)',
+              }}
+              aria-hidden="true"
+            />
+            <span className="min-w-0 truncate">
+              {metaParts.join(' · ')}
+              {metaParts.length > 0 && globalStatus ? ' · ' : ''}
+              {globalStatus && (
+                <span className={cn(global.reason === 'overdue' && 'text-urgency-critical')}>
+                  {globalStatus}
+                </span>
+              )}
+            </span>
+          </span>
+        )}
+      </>
+    )
+
+    return (
+      <section
+        data-testid="focus-headline-mobile"
+        aria-label={t('當前重點')}
+        className="px-4 pb-5 pt-4"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {t('當前重點')}
+          </p>
+          <button
+            type="button"
+            onClick={() => setEditorTarget({ scope: 'global' })}
+            aria-label={t('編輯當前重點')}
+            className="-mr-2 -mt-1.5 flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-quart active:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Pencil className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        {mobileEmpty ? (
+          <div className="mt-1 flex flex-wrap items-center gap-3">
+            <span className="text-lg text-muted-foreground">{t('今天很輕鬆 🐧')}</span>
+            <button
+              type="button"
+              onClick={() => setEditorTarget({ scope: 'global' })}
+              className="min-h-11 rounded-lg px-3 text-sm font-medium text-primary transition-colors duration-150 ease-quart active:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {t('設定重點')}
+            </button>
+          </div>
+        ) : global.task ? (
+          <button
+            type="button"
+            onClick={() => onSelectTask(global.task!)}
+            className="-mx-2 mt-0.5 block w-full rounded-lg px-2 py-1 text-left transition-colors duration-150 ease-quart active:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {mobileHeadline}
+          </button>
+        ) : (
+          <div className="mt-0.5 py-1">{mobileHeadline}</div>
+        )}
+
+        {global.pinFellBack && (
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {t('原本釘的任務已完成，已換下一個')}
+          </p>
+        )}
+
+        {editorModal}
+      </section>
+    )
+  }
 
   // ── 'page' variant: a card among cards, read from across the room ───────
   if (variant === 'page') {

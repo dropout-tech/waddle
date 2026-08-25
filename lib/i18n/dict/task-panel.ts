@@ -160,6 +160,10 @@ export const dict: Record<string, string> = {
   '任務管理': 'Task Management',
   '{pending} 個待完成 · {completed} 個已完成': '{pending} pending · {completed} completed',
   '返回日曆': "Back to calendar",
+  // Bottom tab bar keeps the two-character label — at 320px each column is
+  // only 64px wide and the longer name wraps.
+  '重點': 'Focus',
+  '任務重點': 'Task focus',
   '總覽': 'Overview',
   '所有任務': 'All Tasks',
   '完成率': 'Completion Rate',
@@ -232,4 +236,35 @@ export const dict: Record<string, string> = {
   '編輯「{name}」的重點': 'Edit focus for "{name}"',
   '今天很輕鬆 🐧': 'Nothing pressing today 🐧',
   '設定重點': 'Set a focus',
+
+  // focus-board.tsx — the 重點 tab's per-category board
+  '分類看板': 'Category board',
+  '編輯版面': 'Edit board',
+  '還沒挑要追蹤的分類': 'No categories on the board yet',
+  '挑幾個分類放上來，這裡就會列出它們接下來的幾件事。':
+    'Put a few categories up here and this page will list what comes next in each one.',
+  '選擇分類': 'Pick categories',
+  '這個分類都完成了 🐧': 'All clear in this one 🐧',
+  '還有 {count} 個': '{count} more',
+  '{count} 個逾期': '{count} overdue',
+
+  // focus-board tiers / density / search / pinning
+  // NB: '精簡' ('Compact') and '今天' ('Today') already live in this file.
+  '釘選': 'Pinned',
+  '需要注意': 'Needs attention',
+  '停滯': 'Stalled',
+  '其他': 'Other',
+  '超過 {days} 天沒有動靜': 'No activity for over {days} days',
+  '{days} 天沒動靜': 'Quiet for {days} days',
+  '今天到期 {count} 個': '{count} due today',
+  '今天到期': 'Due today',
+  '搜尋結果': 'Search results',
+  '{count} 件': '{count} items',
+  '卡片': 'Cards',
+  '搜尋大項目': 'Search categories',
+  '沒有符合的大項目': 'No matching categories',
+  '換個關鍵字，或清除搜尋。': 'Try another keyword, or clear the search.',
+  '釘選「{name}」': 'Pin "{name}"',
+  '取消釘選「{name}」': 'Unpin "{name}"',
+  '取消釘選': 'Unpin',
 }

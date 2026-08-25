@@ -5,9 +5,10 @@ import { cn } from '@/lib/utils'
 import { ResizeHandle } from './resize-handle'
 import { TaskPanel } from '@/components/task-panel/task-panel'
 import { FullScreenTaskView } from '@/components/task-panel/full-screen-task-view'
+import { FocusBoardMobile } from '@/components/task-panel/focus-board-mobile'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
 import { CalendarExportModal } from '@/components/calendar/calendar-export-modal'
-import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ListChecks, CalendarDays, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react'
+import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ListChecks, CalendarDays, Sparkles, ChevronLeft, ChevronRight, Focus } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
 import { FocusScratchpad } from '@/components/scratchpad/focus-scratchpad'
 import { FocusTimer } from '@/components/timer/focus-timer'
@@ -20,7 +21,7 @@ import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { useCalendarSharing, usePeerCalendarEvents } from '@/hooks/use-calendar-sharing'
 import { hapticSelection } from '@/lib/haptics'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, ScratchpadItem } from '@/lib/types'
-import type { FocusSettings } from '@/lib/focus'
+import { DEFAULT_FOCUS_SETTINGS, type FocusSettings } from '@/lib/focus'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
 import { Link2 } from 'lucide-react'
 import { useI18n } from '@/lib/i18n/react'
@@ -144,6 +145,11 @@ export function MainLayout({
   const [mobileLinksOpen, setMobileLinksOpen] = useState(false)
   // Mobile-only — drives the FocusScratchpad open/close from the bottom tab bar.
   const [mobileScratchpadOpen, setMobileScratchpadOpen] = useState(false)
+  // Mobile-only — the 重點 board (desktop shows it as the first tab of the
+  // full-screen task view, which never mounts on phones). Same "overlay tab"
+  // shape as 白板 / 連結: it takes over the content area while the bottom bar
+  // stays put, so `mobileTab` is untouched and closing lands where you were.
+  const [mobileFocusBoardOpen, setMobileFocusBoardOpen] = useState(false)
   // Mobile horizontal swipe between Tasks and Calendar tabs.
   // Lower thresholds than the desktop calendar swipe — phone gestures are
   // shorter and faster, and tab switching is binary (no chance of skipping
@@ -463,7 +469,7 @@ export function MainLayout({
             calendar tab; sits above the content so its touch handler runs
             before day-scroll-view's native horizontal scroll. Stops short of
             the bottom tab bar so taps on the tab buttons still register. */}
-        {mobileTab === 'calendar' && focusMode === 'none' && (
+        {mobileTab === 'calendar' && focusMode === 'none' && !mobileFocusBoardOpen && (
           <div
             ref={leftEdgeRef}
             aria-hidden="true"
@@ -472,7 +478,33 @@ export function MainLayout({
           />
         )}
 
-        <div ref={mobileContentRef} className="flex-1 min-h-0 flex flex-col">
+        {/* 重點 board. Rendered as a sibling of the tab content rather than a
+            fixed overlay: the bottom bar then sits below it by layout instead
+            of by a magic pixel offset, so the last card can never end up
+            underneath it. The tab content stays mounted (just hidden) so
+            reopening 日曆 doesn't lose its scroll position — and a hidden
+            element receives no touches, so the swipe-between-tabs handler
+            can't fire behind the board. */}
+        {mobileFocusBoardOpen && focusMode === 'none' && (
+          <ErrorBoundary>
+            <FocusBoardMobile
+              className="flex-1 animate-in fade-in duration-200"
+              workspaces={workspaces}
+              focus={settings?.focusBoard ?? DEFAULT_FOCUS_SETTINGS}
+              onSelectTask={onSelectTask}
+              onSetFocusBoard={onSetFocusBoard}
+              onClose={() => setMobileFocusBoardOpen(false)}
+            />
+          </ErrorBoundary>
+        )}
+
+        <div
+          ref={mobileContentRef}
+          className={cn(
+            'flex-1 min-h-0 flex flex-col',
+            mobileFocusBoardOpen && focusMode === 'none' && 'hidden'
+          )}
+        >
           {focusMode !== 'none' ? (
             // Journal/Report focus view full-screen on mobile too
             <div className="flex flex-col h-full bg-background">
@@ -607,18 +639,34 @@ export function MainLayout({
           // stays trivial. Position drives both the icon-pill highlight and
           // the top sliding indicator — overlays (白板 / 連結) win over the
           // route tabs while open.
+          const overlayOpen = mobileScratchpadOpen || mobileLinksOpen || mobileFocusBoardOpen
           const tabs = [
+            {
+              // Same order as the desktop full-screen view's tabs (重點 first),
+              // so the two surfaces teach the same mental model.
+              key: 'focus' as const,
+              label: t('重點'),
+              Icon: Focus,
+              active: mobileFocusBoardOpen,
+              onClick: () => {
+                hapticSelection()
+                setMobileScratchpadOpen(false)
+                setMobileLinksOpen(false)
+                setMobileFocusBoardOpen(v => !v)
+              },
+            },
             {
               key: 'tasks' as const,
               // '任務' doubles as the singular time-block type label ("Task");
               // the tab wants the plural, so it bypasses the shared dict key.
               label: lang === 'en' ? 'Tasks' : '任務',
               Icon: ListChecks,
-              active: mobileTab === 'tasks' && !mobileScratchpadOpen && !mobileLinksOpen,
+              active: mobileTab === 'tasks' && !overlayOpen,
               onClick: () => {
                 hapticSelection()
                 setMobileScratchpadOpen(false)
                 setMobileLinksOpen(false)
+                setMobileFocusBoardOpen(false)
                 setMobileTab('tasks')
               },
             },
@@ -630,6 +678,7 @@ export function MainLayout({
               onClick: () => {
                 hapticSelection()
                 setMobileLinksOpen(false)
+                setMobileFocusBoardOpen(false)
                 setMobileScratchpadOpen(v => !v)
               },
             },
@@ -637,11 +686,12 @@ export function MainLayout({
               key: 'calendar' as const,
               label: t('日曆'),
               Icon: CalendarDays,
-              active: mobileTab === 'calendar' && !mobileScratchpadOpen && !mobileLinksOpen,
+              active: mobileTab === 'calendar' && !overlayOpen,
               onClick: () => {
                 hapticSelection()
                 setMobileScratchpadOpen(false)
                 setMobileLinksOpen(false)
+                setMobileFocusBoardOpen(false)
                 setMobileTab('calendar')
               },
             },
@@ -654,6 +704,7 @@ export function MainLayout({
               onClick: () => {
                 hapticSelection()
                 setMobileScratchpadOpen(false)
+                setMobileFocusBoardOpen(false)
                 setMobileLinksOpen(v => !v)
               },
             },
@@ -661,7 +712,7 @@ export function MainLayout({
           const activeIndex = tabs.findIndex(t => t.active)
           return (
             <nav
-              className="relative flex-shrink-0 grid grid-cols-4 border-t border-border/70 bg-card/95 backdrop-blur z-sticky pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_0_rgba(0,0,0,0.02)]"
+              className="relative flex-shrink-0 grid grid-cols-5 border-t border-border/70 bg-card/95 backdrop-blur z-sticky pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_0_rgba(0,0,0,0.02)]"
               role="tablist"
               aria-label={t('主要分頁')}
             >
@@ -671,7 +722,7 @@ export function MainLayout({
               <span
                 aria-hidden="true"
                 className={cn(
-                  'absolute top-0 left-0 h-[3px] w-1/4 flex items-center justify-center transition-[transform,opacity] duration-200 ease-quart pointer-events-none',
+                  'absolute top-0 left-0 h-[3px] w-1/5 flex items-center justify-center transition-[transform,opacity] duration-200 ease-quart pointer-events-none',
                   activeIndex < 0 && 'opacity-0',
                 )}
                 style={{ transform: `translateX(${Math.max(activeIndex, 0) * 100}%)` }}
@@ -685,19 +736,23 @@ export function MainLayout({
                   aria-selected={active}
                   onClick={onClick}
                   className={cn(
-                    'group flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[60px] transition-all active:scale-[0.96]',
+                    'group flex flex-col items-center justify-center gap-0.5 px-0.5 pt-2 pb-1.5 min-h-[60px] transition-all active:scale-[0.96]',
                     active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
                   <span
                     className={cn(
-                      'flex items-center justify-center w-11 h-7 rounded-full transition-all',
+                      // Five columns: at 320px each is 64px wide, so the pill
+                      // narrows there to keep 8px of gutter on each side.
+                      'flex items-center justify-center w-10 h-7 rounded-full transition-all min-[360px]:w-11',
                       active ? 'bg-primary/10 scale-100' : 'scale-95 group-active:bg-secondary/60',
                     )}
                   >
                     <Icon className={cn('w-5 h-5 transition-transform', active && 'scale-105')} />
                   </span>
-                  <span className={cn('text-[11px] tracking-tight', active ? 'font-semibold' : 'font-medium')}>
+                  {/* Labels never wrap or truncate: they step down a point
+                      below 360px, where "Scratchpad" would otherwise break. */}
+                  <span className={cn('text-[10px] leading-tight tracking-tight whitespace-nowrap min-[360px]:text-[11px]', active ? 'font-semibold' : 'font-medium')}>
                     {label}
                   </span>
                 </button>

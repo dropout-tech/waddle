@@ -36,6 +36,21 @@ export interface FocusPin {
 }
 
 /**
+ * One card on the 重點 board — a category the user wants to keep an eye
+ * on, optionally with a hand-typed line describing where it stands
+ * ("推進講師資源站").
+ */
+export interface FocusCard {
+  categoryId: string
+  /** Free-text status shown under the category name. Optional. */
+  note?: string
+  /** Position on the board, ascending. */
+  sortOrder: number
+  /** Pinned cards sit above every tier and never collapse. */
+  pinned?: boolean
+}
+
+/**
  * Persisted as a single JSONB blob on `user_settings.focus_board` so
  * adding fields later needs no migration (same trick as `quickLinks`).
  */
@@ -46,6 +61,13 @@ export interface FocusSettings {
   global: FocusPin
   /** Per-workspace focus, keyed by workspace id. Missing ≡ `{ mode: 'off' }`. */
   byWorkspace: Record<string, FocusPin>
+  /**
+   * Cards on the 重點 board, in display order. `undefined` means the user
+   * has never curated it — {@link resolveFocusBoard} then falls back to
+   * {@link defaultCards} so the page isn't blank on first visit. An empty
+   * array is a real choice ("show nothing") and is honoured as such.
+   */
+  cards?: FocusCard[]
 }
 
 export const DEFAULT_FOCUS_PIN: FocusPin = { mode: 'auto' }
@@ -328,9 +350,288 @@ export function normalizeFocusSettings(raw: unknown): FocusSettings {
       byWorkspace[id] = normalizePin(pin)
     }
   }
+  let cards: FocusCard[] | undefined
+  if (Array.isArray(obj.cards)) {
+    cards = obj.cards
+      .filter((c): c is FocusCard => !!c && typeof (c as FocusCard).categoryId === 'string')
+      .map((c, i) => ({
+        categoryId: c.categoryId,
+        note: typeof c.note === 'string' && c.note.trim() ? c.note : undefined,
+        sortOrder: typeof c.sortOrder === 'number' ? c.sortOrder : i,
+        pinned: c.pinned === true,
+      }))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+  }
+
   return {
     enabled: obj.enabled !== false,
     global: normalizePin(obj.global),
     byWorkspace,
+    cards,
   }
+}
+
+// ─────────────────────────────────────────────────────────
+// The 重點 board — one card per category, grouped by workspace.
+//
+// This is the sketch the user drew at the start: workspace headings,
+// each with a few cards, each card carrying its own next actions.
+// ─────────────────────────────────────────────────────────
+
+/**
+ * Days without any activity before a category counts as stalled.
+ *
+ * "Activity" is the newest `updatedAt` across the category's tasks,
+ * completed ones included — ticking something off is a sign of life.
+ */
+export const STALE_AFTER_DAYS = 14
+
+/**
+ * Which band a card falls into. The board renders these in order and only
+ * collapses `other`, so nothing that needs a human ever hides itself.
+ *
+ * `stalled` exists as its own band rather than a badge for a specific
+ * reason: a category nobody has touched in two weeks usually has no
+ * overdue date either (nothing was ever scheduled), so a badge would end
+ * up inside the collapsed bucket — invisible exactly when it matters.
+ */
+export type FocusTier = 'pinned' | 'attention' | 'stalled' | 'other'
+
+export interface ResolvedCard {
+  categoryId: string
+  categoryName: string
+  workspaceId: string
+  workspaceName: string
+  workspaceColor: string
+  /** Hand-typed status line, when the user set one. */
+  note?: string
+  /** Top-ranked incomplete tasks, capped by `tasksPerCard`. */
+  tasks: Task[]
+  /** Incomplete tasks beyond the ones listed — drives "還有 N 個". */
+  remainingCount: number
+  /** How many of this category's tasks are overdue. */
+  overdueCount: number
+  /** Total incomplete tasks, shown in the compact list. */
+  totalCount: number
+  tier: FocusTier
+  pinned: boolean
+  /** Whole days since the last activity. `undefined` when unknown. */
+  quietDays?: number
+}
+
+export interface ResolvedBoardGroup {
+  workspaceId: string
+  workspaceName: string
+  workspaceColor: string
+  cards: ResolvedCard[]
+}
+
+export interface ResolvedTier {
+  tier: FocusTier
+  cards: ResolvedCard[]
+}
+
+/** Every category that currently has something to do, best-ranked first. */
+function rankedCategories(
+  workspaces: Workspace[],
+  today: string,
+): Array<{ workspaceId: string; categoryId: string; best: Task }> {
+  const byCategory = new Map<string, { workspaceId: string; categoryId: string; best: Task }>()
+  forEachTask(workspaces, (task, category, workspace) => {
+    if (!isFocusCandidate(task)) return
+    const found = byCategory.get(category.id)
+    if (!found) {
+      byCategory.set(category.id, { workspaceId: workspace.id, categoryId: category.id, best: task })
+    } else if (compareByRank(task, found.best, today) < 0) {
+      found.best = task
+    }
+  })
+  return [...byCategory.values()].sort((a, b) => compareByRank(a.best, b.best, today))
+}
+
+/**
+ * What the board shows before the user has curated it: **every** category
+ * that currently has something to do, most pressing first.
+ *
+ * This deliberately isn't capped. The user's ask was "每個任務的大項目都有"
+ * — the board is the one place that answers *where does each line of work
+ * stand*, and a card missing because it ranked 7th makes it answer that
+ * question wrongly. Trimming is what the editor is for; `limit` stays
+ * available for callers that need a preview.
+ */
+export function defaultCards(
+  workspaces: Workspace[],
+  today: string = toDateString(new Date()),
+  limit = Number.POSITIVE_INFINITY,
+): FocusCard[] {
+  return rankedCategories(workspaces, today)
+    .slice(0, limit)
+    .map((entry, i) => ({ categoryId: entry.categoryId, sortOrder: i }))
+}
+
+/** Whole days between an ISO timestamp and `today`. Negative clamps to 0. */
+function daysSince(iso: string | undefined, today: string): number | undefined {
+  if (!iso) return undefined
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return undefined
+  const days = Math.floor((new Date(`${today}T23:59:59`).getTime() - then) / 86_400_000)
+  return days > 0 ? days : 0
+}
+
+/**
+ * Resolve the board into tiers, in the order they should be rendered:
+ * pinned → attention → stalled → other. Empty tiers are omitted.
+ *
+ * Cards pointing at a deleted or archived category are dropped silently —
+ * curation shouldn't break because a category went away.
+ *
+ * Pinned cards keep the user's own `sortOrder`; every other tier sorts by
+ * how pressing its best task is, so the top of each band is the thing
+ * worth looking at first.
+ */
+export function resolveFocusBoard(
+  settings: FocusSettings,
+  workspaces: Workspace[],
+  options: { today?: string; tasksPerCard?: number; staleAfterDays?: number } = {},
+): ResolvedTier[] {
+  const today = options.today ?? toDateString(new Date())
+  const tasksPerCard = options.tasksPerCard ?? 3
+  const staleAfter = options.staleAfterDays ?? STALE_AFTER_DAYS
+  const cards = settings.cards ?? defaultCards(workspaces, today)
+
+  // Index every live category once so card lookup stays O(1).
+  const index = new Map<
+    string,
+    { workspace: Workspace; categoryName: string; tasks: Task[]; lastActivity?: string }
+  >()
+  for (const ws of workspaces) {
+    if (ws.isArchived) continue
+    for (const cat of ws.categories) {
+      if (cat.isArchived) continue
+      // Activity looks at every live task, completed included — ticking
+      // something off is a sign of life, and only counting open tasks
+      // would mark a category "stalled" the moment it goes well.
+      let lastActivity: string | undefined
+      for (const task of cat.tasks) {
+        if (task.isArchived) continue
+        const stamp = task.updatedAt || task.createdAt
+        if (stamp && (!lastActivity || stamp > lastActivity)) lastActivity = stamp
+      }
+      index.set(cat.id, {
+        workspace: ws,
+        categoryName: cat.name,
+        tasks: cat.tasks.filter(isFocusCandidate).sort((a, b) => compareByRank(a, b, today)),
+        lastActivity,
+      })
+    }
+  }
+
+  const resolved: ResolvedCard[] = []
+  for (const card of [...cards].sort((a, b) => a.sortOrder - b.sortOrder)) {
+    const entry = index.get(card.categoryId)
+    if (!entry) continue
+    const { workspace, categoryName, tasks, lastActivity } = entry
+    const overdueCount = tasks.filter((t) => !!getTaskOverdueDate(t, today)).length
+    const dueToday = tasks.some((t) => t.scheduledDate === today || t.dueDate === today)
+    const quietDays = daysSince(lastActivity, today)
+    const pinned = card.pinned === true
+
+    let tier: FocusTier
+    if (pinned) tier = 'pinned'
+    else if (overdueCount > 0 || dueToday) tier = 'attention'
+    else if (quietDays !== undefined && quietDays >= staleAfter) tier = 'stalled'
+    else tier = 'other'
+
+    resolved.push({
+      categoryId: card.categoryId,
+      categoryName,
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      workspaceColor: workspace.color,
+      note: card.note,
+      tasks: tasks.slice(0, tasksPerCard),
+      remainingCount: Math.max(0, tasks.length - tasksPerCard),
+      overdueCount,
+      totalCount: tasks.length,
+      tier,
+      pinned,
+      quietDays,
+    })
+  }
+
+  const cardOrder = new Map(cards.map((c, i) => [c.categoryId, c.sortOrder ?? i]))
+  const byPressure = (a: ResolvedCard, b: ResolvedCard) => {
+    const ta = a.tasks[0]
+    const tb = b.tasks[0]
+    if (ta && tb) {
+      const cmp = compareByRank(ta, tb, today)
+      if (cmp !== 0) return cmp
+    } else if (ta !== tb) {
+      return ta ? -1 : 1
+    }
+    return (cardOrder.get(a.categoryId) ?? 0) - (cardOrder.get(b.categoryId) ?? 0)
+  }
+
+  const order: FocusTier[] = ['pinned', 'attention', 'stalled', 'other']
+  return order
+    .map((tier) => {
+      const inTier = resolved.filter((c) => c.tier === tier)
+      // Pinned is the user's own arrangement; don't second-guess it.
+      if (tier !== 'pinned') inTier.sort(byPressure)
+      else inTier.sort((a, b) => (cardOrder.get(a.categoryId) ?? 0) - (cardOrder.get(b.categoryId) ?? 0))
+      return { tier, cards: inTier }
+    })
+    .filter((t) => t.cards.length > 0)
+}
+
+/**
+ * Group cards under workspace headings. The board uses this for the
+ * `other` band — once it's expanded there can be dozens of cards, and
+ * workspace headings make that browsable. The urgent bands stay flat:
+ * they're short, and there ordering by pressure beats tidiness.
+ */
+export function groupCardsByWorkspace(
+  cards: ResolvedCard[],
+  workspaces: Workspace[],
+): ResolvedBoardGroup[] {
+  const groups = new Map<string, ResolvedBoardGroup>()
+  for (const card of cards) {
+    let group = groups.get(card.workspaceId)
+    if (!group) {
+      group = {
+        workspaceId: card.workspaceId,
+        workspaceName: card.workspaceName,
+        workspaceColor: card.workspaceColor,
+        cards: [],
+      }
+      groups.set(card.workspaceId, group)
+    }
+    group.cards.push(card)
+  }
+  // Follow the user's own workspace ordering, so headings read the same
+  // as everywhere else in the app.
+  const order = new Map(workspaces.map((w, i) => [w.id, i]))
+  return [...groups.values()].sort(
+    (a, b) => (order.get(a.workspaceId) ?? 0) - (order.get(b.workspaceId) ?? 0),
+  )
+}
+
+/**
+ * Free-text filter across everything visible on a card: category, the
+ * hand-typed note, the workspace, and the task titles. Matching a task
+ * title keeps the card — you usually remember the task, not the bucket
+ * it lives in.
+ */
+export function filterCards(cards: ResolvedCard[], query: string): ResolvedCard[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return cards
+  return cards.filter((card) => {
+    const haystack = [
+      card.categoryName,
+      card.note ?? '',
+      card.workspaceName,
+      ...card.tasks.map((t) => t.title),
+    ]
+    return haystack.some((s) => s.toLowerCase().includes(q))
+  })
 }
