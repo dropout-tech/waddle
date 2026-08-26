@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import {
   Play, Timer, Clock,
   ChevronDown, Settings2,
@@ -21,6 +21,7 @@ import {
 import { Music2 } from 'lucide-react'
 import { formatTime } from '@/lib/timer-format'
 import { useFocusTimer, POMODORO_PRESETS, FOCUS_TYPES } from './focus-timer-provider'
+import { useIsScrolling, useControlYield, freeHitArea } from './use-floating-dodge'
 
 interface FocusTimerProps {
   workspaces: Workspace[]
@@ -54,6 +55,15 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ft.registerRecorder, onCreateTimeBlock])
 
+  // 手機上收合的浮動啟動鈕跟執行中的計時膠囊住同一個角落，也吃同一套讓路
+  // 規矩（見 use-floating-dodge.ts）：捲動中不吃點擊、壓到小控制項時把那條
+  // 讓出去。展開成 bottom sheet 時它就是主角，不套。桌機完全不套。
+  const floatRef = useRef<HTMLDivElement>(null)
+  const glance = isMobile && !ft.isExpanded && ft.state === 'idle'
+  const { scrolling } = useIsScrolling(glance)
+  const blocked = useControlYield(glance && !scrolling, floatRef)
+  const hitArea = useMemo(() => freeHitArea(blocked), [blocked])
+
   // Running/paused/completed sessions are rendered globally by the provider
   // (portal onto document.body) — this component only ever shows the idle
   // setup card. state is only ever non-'idle' here for a brief instant
@@ -73,6 +83,14 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
   // slide-up from above the tab bar). Desktop keeps the corner card.
   const mobileExpanded = isMobile && isExpanded
 
+  // 收合鈕與它的透明點擊層走同一個入口，兩邊行為不會漂移。
+  const openSetup = () => {
+    const eng = getBgmEngine()
+    eng?.unlockAudio()
+    eng?.prepareMusic(prefs.music)
+    setIsExpanded(true)
+  }
+
   return (
     <>
       {/* Mobile sheet backdrop — clicking it collapses the panel. */}
@@ -89,6 +107,9 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
           panel becomes a full-width bottom sheet that slides up from the
           screen edge. */}
       <div
+        ref={floatRef}
+        data-timer-launcher-root
+        data-timer-launcher-quiet={glance ? (scrolling ? 'scroll' : blocked ? 'yield' : 'off') : 'off'}
         className={cn(
           "fixed z-40 transition-all duration-300",
           // Collapsed mobile: floating chip in the right corner above the
@@ -100,7 +121,14 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
               : 'bottom-6 right-6',
           !isMobile && (isExpanded ? "w-80 max-w-[calc(100vw-2rem)]" : "w-auto")
         )}
-        style={isMobile && !mobileExpanded ? { bottom: 'calc(78px + env(safe-area-inset-bottom))' } : undefined}
+        style={{
+          ...(isMobile && !mobileExpanded ? { bottom: 'calc(78px + env(safe-area-inset-bottom))' } : null),
+          // 收合的手機 chip＝顯示模式：看得見的按鈕本身不吃點擊，點擊交給
+          // 只鋪在安全區的透明層（下方 data-timer-launch-hit）。
+          ...(glance
+            ? { opacity: scrolling ? 0.45 : blocked ? 0.85 : 1, pointerEvents: 'none' as const }
+            : null),
+        }}
       >
         {/* Expanded Panel */}
         {isExpanded ? (
@@ -678,20 +706,31 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
              (ring, live digits) can never actually show here; that branch
              lived in the original component too, gated by the same
              upstream idle check, just expressed as a runtime ternary. */
-          <button
-            data-tour="focus-timer"
-            onClick={() => {
-              const eng = getBgmEngine()
-              eng?.unlockAudio()
-              eng?.prepareMusic(prefs.music)
-              setIsExpanded(true)
-            }}
-            className="flex items-center gap-2 px-4 py-3 rounded-2xl shadow-lg transition-all hover:scale-105 bg-card border border-border"
-          >
-            <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground" />
-            <Timer className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{t('專注計時')}</span>
-          </button>
+          <>
+            <button
+              data-tour="focus-timer"
+              onClick={openSetup}
+              className="flex items-center gap-2 px-4 py-3 rounded-2xl shadow-lg transition-all hover:scale-105 bg-card border border-border"
+            >
+              <div className="w-2.5 h-2.5 rounded-full bg-muted-foreground" />
+              <Timer className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium">{t('專注計時')}</span>
+            </button>
+            {/* 手機收合態的實際點擊區：只鋪在沒壓到別人控制項的那一條。
+                鍵盤與螢幕閱讀器仍走上面那顆真按鈕（pointer-events 不影響
+                focus），所以這層對輔助科技隱藏。 */}
+            {glance && hitArea && (
+              <button
+                type="button"
+                data-timer-launch-hit
+                aria-hidden="true"
+                tabIndex={-1}
+                onClick={openSetup}
+                className="absolute rounded-2xl"
+                style={{ ...hitArea, pointerEvents: scrolling ? 'none' : 'auto' }}
+              />
+            )}
+          </>
         )}
       </div>
     </>

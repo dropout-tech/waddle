@@ -235,22 +235,52 @@ const MOBILE_STEPS: TourStep[] = [
 interface Rect { top: number; left: number; width: number; height: number }
 
 const TOOLTIP_WIDTH = 380
+/** Fallback height used only before the tooltip has ever been measured. */
+const TOOLTIP_FALLBACK_HEIGHT = 240
+const EDGE_MARGIN = 8
+/**
+ * Extra bottom margin: the 「略過導覽」 pill is absolutely positioned 32px
+ * below the card (`-bottom-8`), so the clamp has to reserve room for it or it
+ * lands off-screen on bottom-anchored steps.
+ */
+const SKIP_LINK_MARGIN = 32
 
+/**
+ * Positions the tooltip next to the spotlight and then **hard-clamps it into
+ * the viewport**.
+ *
+ * `size` must be the *measured* box of the rendered tooltip. Steps with long
+ * copy render 300px+ tall; a hardcoded height estimate under-clamps and pushes
+ * the card's bottom — including the 下一步 button — outside the viewport, which
+ * dead-ends the tour (2026-08-26 production bug on the 專注計時器 step).
+ */
 function computeTooltipPosition(
   rect: Rect | null,
   placement: TourStep['placement'],
+  size?: { width: number; height: number } | null,
 ): { top: number; left: number; placement: TourStep['placement'] | 'center' } {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const tooltipW = size && size.width > 0 ? size.width : Math.min(TOOLTIP_WIDTH, vw - 24)
+  const tooltipH = size && size.height > 0 ? size.height : TOOLTIP_FALLBACK_HEIGHT
+
+  // Final safety net for every code path below: never let any edge of the
+  // tooltip leave the viewport.
+  const clamp = (p: { top: number; left: number }) => ({
+    left: Math.max(EDGE_MARGIN, Math.min(Math.max(EDGE_MARGIN, vw - tooltipW - EDGE_MARGIN), p.left)),
+    top: Math.max(
+      EDGE_MARGIN,
+      Math.min(Math.max(EDGE_MARGIN, vh - tooltipH - EDGE_MARGIN - SKIP_LINK_MARGIN), p.top),
+    ),
+  })
+
   if (!rect) {
     return {
-      top: window.innerHeight / 2 - 140,
-      left: window.innerWidth / 2 - TOOLTIP_WIDTH / 2,
+      ...clamp({ top: vh / 2 - tooltipH / 2, left: vw / 2 - tooltipW / 2 }),
       placement: 'center',
     }
   }
 
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const tooltipH = 240
   const gap = 16
 
   const tryPlacement = (p: NonNullable<TourStep['placement']>): { top: number; left: number } => {
@@ -258,11 +288,11 @@ function computeTooltipPosition(
       case 'right':
         return { top: rect.top + rect.height / 2 - tooltipH / 2, left: rect.left + rect.width + gap }
       case 'left':
-        return { top: rect.top + rect.height / 2 - tooltipH / 2, left: rect.left - TOOLTIP_WIDTH - gap }
+        return { top: rect.top + rect.height / 2 - tooltipH / 2, left: rect.left - tooltipW - gap }
       case 'bottom':
-        return { top: rect.top + rect.height + gap, left: rect.left + rect.width / 2 - TOOLTIP_WIDTH / 2 }
+        return { top: rect.top + rect.height + gap, left: rect.left + rect.width / 2 - tooltipW / 2 }
       case 'top':
-        return { top: rect.top - tooltipH - gap, left: rect.left + rect.width / 2 - TOOLTIP_WIDTH / 2 }
+        return { top: rect.top - tooltipH - gap, left: rect.left + rect.width / 2 - tooltipW / 2 }
     }
   }
 
@@ -271,7 +301,10 @@ function computeTooltipPosition(
   let chosen: TourStep['placement'] = pref
 
   const fits = (p: { top: number; left: number }) =>
-    p.left >= 8 && p.left + TOOLTIP_WIDTH <= vw - 8 && p.top >= 8 && p.top + tooltipH <= vh - 8
+    p.left >= EDGE_MARGIN
+    && p.left + tooltipW <= vw - EDGE_MARGIN
+    && p.top >= EDGE_MARGIN
+    && p.top + tooltipH <= vh - EDGE_MARGIN - SKIP_LINK_MARGIN
 
   if (!fits(pos)) {
     const fallbacks: NonNullable<TourStep['placement']>[] = ['bottom', 'top', 'right', 'left']
@@ -282,10 +315,7 @@ function computeTooltipPosition(
     }
   }
 
-  pos.left = Math.max(8, Math.min(vw - TOOLTIP_WIDTH - 8, pos.left))
-  pos.top = Math.max(8, Math.min(vh - tooltipH - 8, pos.top))
-
-  return { ...pos, placement: chosen }
+  return { ...clamp(pos), placement: chosen }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -390,16 +420,27 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
   useLayoutEffect(() => {
     if (!open) return
 
+    // Measured box of the *currently rendered* tooltip. This layout effect runs
+    // after React commits the new step's DOM, so the height we read here is the
+    // new step's real height — which is what the viewport clamp needs.
+    function tooltipSize() {
+      const el = tooltipRef.current
+      if (!el) return null
+      const r = el.getBoundingClientRect()
+      return r.height > 0 ? { width: r.width, height: r.height } : null
+    }
+
     function update() {
+      const size = tooltipSize()
       if (!step.target) {
         setRect(null)
-        setTooltipPos(computeTooltipPosition(null, step.placement))
+        setTooltipPos(computeTooltipPosition(null, step.placement, size))
         return
       }
       const el = document.querySelector<HTMLElement>(step.target)
       if (!el) {
         setRect(null)
-        setTooltipPos(computeTooltipPosition(null, step.placement))
+        setTooltipPos(computeTooltipPosition(null, step.placement, size))
         return
       }
       const r = el.getBoundingClientRect()
@@ -411,7 +452,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
         height: r.height + pad * 2,
       }
       setRect(next)
-      setTooltipPos(computeTooltipPosition(next, step.placement))
+      setTooltipPos(computeTooltipPosition(next, step.placement, size))
     }
 
     update()

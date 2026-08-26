@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Pause, Play, Maximize2, PictureInPicture2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
 import { formatFocusDuration } from '@/lib/timer-format'
+import { useIsScrolling, useControlYield, freeHitArea } from './use-floating-dodge'
 
 export interface FocusTimerMiniProps {
   state: 'running' | 'paused' | 'completed'
@@ -47,6 +48,10 @@ export interface FocusTimerMiniProps {
 // surface, so 600ms feels snappy without being accident-prone.
 const STOP_HOLD_MS = 600
 
+/** How long the phone pill stays open after the last touch before it folds
+ *  back into glance mode. */
+const EXPANDED_IDLE_MS = 5000
+
 /** True while a full-screen modal/sheet is open (anything marked
  *  aria-modal, except the onboarding tour — its copy points at the pill's
  *  usual corner). The pill lives at the bottom-right, exactly where the
@@ -84,6 +89,40 @@ export function FocusTimerMini({
 }: FocusTimerMiniProps) {
   const { t } = useI18n()
   const dodgeLeft = useModalDodge()
+  const rootRef = useRef<HTMLDivElement>(null)
+  // Phone only: the pill starts as a glance chip (ring + time) and opens on
+  // tap. Desktop keeps the full pill it always had.
+  // `openedAt` doubles as "last touched" — any scroll started after it wins,
+  // so scrolling away folds the pill without a second piece of state.
+  const [openedAt, setOpenedAt] = useState(0)
+  const phone = !!isMobile && !completion
+  const { scrolling, scrollAt } = useIsScrolling(phone)
+  const expanded = phone && openedAt > 0 && openedAt > scrollAt
+  const collapsed = phone && !expanded
+  const blocked = useControlYield(collapsed && !scrolling, rootRef)
+  // Glance mode's tap area — the part of the chip that isn't standing on
+  // someone else's control (null = nothing safe left, glance only).
+  const hitArea = useMemo(() => freeHitArea(blocked), [blocked])
+  // "Visible but not clickable": mid-scroll, or parked on someone else's
+  // touch target. Never on desktop, never during the completion sequence.
+  const quiet = phone && (scrolling || (collapsed && !!blocked))
+
+  // Auto-fold after a quiet beat; every touch inside the pill restarts it.
+  useEffect(() => {
+    if (!expanded) return
+    const timer = setTimeout(() => setOpenedAt(0), EXPANDED_IDLE_MS)
+    return () => clearTimeout(timer)
+  }, [expanded, openedAt])
+  // Tapping anywhere else folds it immediately.
+  useEffect(() => {
+    if (!expanded) return
+    const onDown = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpenedAt(0)
+    }
+    document.addEventListener('pointerdown', onDown, true)
+    return () => document.removeEventListener('pointerdown', onDown, true)
+  }, [expanded])
+
   const mobileStyle = isMobile
     ? {
         bottom: `calc(${mobileBottomOffsetPx ?? 78}px + env(safe-area-inset-bottom))`,
@@ -97,7 +136,13 @@ export function FocusTimerMini({
     transform: dodgeLeft
       ? `translateX(calc(-100vw + 100% + ${isMobile ? '1.5rem' : '3rem'}))`
       : 'translateX(0)',
-    transition: 'transform 480ms var(--ease-quart)',
+    // Still readable at a glance, but out of the way of the finger: clearly
+    // dimmed mid-scroll, barely receded while it stands on someone's control.
+    opacity: scrolling ? 0.45 : collapsed && blocked ? 0.85 : 1,
+    // Collapsed = glance mode: the visible chip never takes a tap, only the
+    // free strip below does (see hitArea).
+    pointerEvents: collapsed || quiet ? ('none' as const) : ('auto' as const),
+    transition: 'transform 480ms var(--ease-quart), opacity 180ms var(--ease-quart)',
   }
   const [stopProgress, setStopProgress] = useState(0)
   const holdRef = useRef<{ raf: number; cleared: boolean } | null>(null)
@@ -181,27 +226,23 @@ export function FocusTimerMini({
     )
   }
 
-  return (
-    <div
-      // 同上：z-toast 讓膠囊不被 modal 蓋住。
-      data-waddle-mini-root
-      className="fixed z-toast bottom-6 right-6"
-      style={containerStyle}
-      role="region"
-      aria-label={phase === 'break' ? t('休息計時迷你顯示') : t('專注計時迷你顯示')}
-    >
-      <div
-        className={cn(
-          'flex items-center gap-1 pl-2.5 pr-1.5 py-1.5 rounded-full shadow-lg',
-          'bg-card border transition-all duration-300',
-          'animate-in fade-in slide-in-from-bottom-2',
-        )}
-        style={{
-          borderColor: `color-mix(in oklch, ${color} 38%, var(--border))`,
-          boxShadow: `0 6px 24px -8px color-mix(in oklch, ${color} 35%, transparent), 0 2px 6px -2px color-mix(in oklch, ${color} 20%, transparent)`,
-        }}
-      >
-        {/* Mini progress ring */}
+  const pillClass = cn(
+    'flex items-center gap-1 rounded-full shadow-lg',
+    'bg-card border',
+    collapsed ? 'pl-2.5 pr-3 py-2.5' : 'pl-2.5 pr-1.5 py-1.5',
+    // 手機會在收合／展開之間換寬度，DESIGN 禁止 animate width——只淡入淡出。
+    phone ? 'transition-opacity duration-200' : 'transition-all duration-300',
+    // 進場動畫掛在外層容器（收合／展開會換元素型別而重掛，動畫留在這裡才不會
+    // 每按一次就重播一次滑入）。
+    phone ? null : 'animate-in fade-in slide-in-from-bottom-2',
+  )
+  const pillStyle = {
+    borderColor: `color-mix(in oklch, ${color} 38%, var(--border))`,
+    boxShadow: `0 6px 24px -8px color-mix(in oklch, ${color} 35%, transparent), 0 2px 6px -2px color-mix(in oklch, ${color} 20%, transparent)`,
+  }
+
+  // Mini progress ring
+  const ring = (
         <div className="relative shrink-0 grid place-items-center" aria-hidden>
           <svg className="-rotate-90" width="22" height="22" viewBox="0 0 22 22">
             <circle
@@ -234,10 +275,16 @@ export function FocusTimerMini({
             />
           )}
         </div>
+  )
 
-        {/* Time text */}
+  // Time text — the whole reason the pill exists, so it survives every state.
+  const time = (
         <span
-          className="ml-0.5 font-mono font-semibold tabular-nums tracking-tight text-[13px] min-w-[3.25rem]"
+          data-timer-mini-time
+          className={cn(
+            'ml-0.5 font-mono font-semibold tabular-nums tracking-tight text-[13px]',
+            collapsed ? 'min-w-[2.5rem]' : 'min-w-[3.25rem]',
+          )}
           style={{
             color: isPaused ? 'var(--muted-foreground)' : 'var(--foreground)',
             transition: 'color 300ms ease-out',
@@ -246,7 +293,10 @@ export function FocusTimerMini({
         >
           {timeText}
         </span>
+  )
 
+  const controls = (
+      <>
         {/* 彈出成懸浮視窗（永遠置頂，蓋在其他軟體上面） */}
         {canFloat && onToggleFloat && (
           <button
@@ -326,18 +376,81 @@ export function FocusTimerMini({
             </svg>
           )}
         </button>
+      </>
+  )
 
-        <style>{`
-          @keyframes waddle-mini-pulse {
-            0%, 100% { opacity: 0.35; transform: scale(0.9); }
-            50% { opacity: 0.95; transform: scale(1.2); }
-          }
-          @media (prefers-reduced-motion: reduce) {
-            [data-waddle-mini-pulse] { animation: none !important; }
-            [data-waddle-mini-root] { transition: none !important; }
-          }
-        `}</style>
-      </div>
+  return (
+    <div
+      // 同上：z-toast 讓膠囊不被 modal 蓋住。
+      ref={rootRef}
+      data-waddle-mini-root
+      data-timer-mini-state={phone ? (collapsed ? 'collapsed' : 'expanded') : 'desktop'}
+      data-timer-mini-quiet={quiet ? (scrolling ? 'scroll' : 'yield') : 'off'}
+      className={cn('fixed z-toast bottom-6 right-6', phone && 'animate-in fade-in slide-in-from-bottom-2')}
+      style={containerStyle}
+      role="region"
+      aria-label={phase === 'break' ? t('休息計時迷你顯示') : t('專注計時迷你顯示')}
+    >
+      {collapsed ? (
+        // 手機收合＝純顯示模式：只有進度環＋時間。看得見的膠囊本身不吃點擊，
+        // 點擊區是下面那顆透明按鈕——而且只鋪在「沒壓到別人控制項」的那一條。
+        <>
+          <div data-waddle-mini-pill className={pillClass} style={pillStyle}>
+            {ring}
+            {time}
+          </div>
+          {hitArea && (
+            <button
+              type="button"
+              data-timer-mini-toggle
+              aria-expanded={false}
+              aria-label={t('{time}，點一下顯示計時控制', { time: timeText })}
+              onClick={() => setOpenedAt(Date.now())}
+              className="absolute rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              style={{ ...hitArea, pointerEvents: scrolling ? 'none' : 'auto' }}
+            />
+          )}
+        </>
+      ) : (
+        <div
+          data-waddle-mini-pill
+          className={pillClass}
+          style={pillStyle}
+          onPointerDown={phone ? () => setOpenedAt(Date.now()) : undefined}
+        >
+          {phone ? (
+            <button
+              type="button"
+              data-timer-mini-toggle
+              aria-expanded
+              aria-label={t('收合計時控制')}
+              onClick={() => setOpenedAt(0)}
+              className="flex items-center gap-1 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {ring}
+              {time}
+            </button>
+          ) : (
+            <>
+              {ring}
+              {time}
+            </>
+          )}
+          {controls}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes waddle-mini-pulse {
+          0%, 100% { opacity: 0.35; transform: scale(0.9); }
+          50% { opacity: 0.95; transform: scale(1.2); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [data-waddle-mini-pulse] { animation: none !important; }
+          /* 位移不動畫，只留透明度——收合／讓路的狀態變化仍然看得懂。 */
+          [data-waddle-mini-root] { transition: opacity 180ms linear !important; }
+        }
+      `}</style>
     </div>
   )
 }
