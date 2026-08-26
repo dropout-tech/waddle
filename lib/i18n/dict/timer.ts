@@ -102,6 +102,8 @@ export const dict: Record<string, string> = {
   '繼續': 'Resume',
   '長按結束（0.6 秒）': 'Hold to end (0.6s)',
   '長按結束並儲存到日曆': 'Hold to end and save to calendar',
+  '{time}，點一下顯示計時控制': '{time} — tap to show timer controls',
+  '收合計時控制': 'Hide timer controls',
 
   // 懸浮工作站（子母畫面）
   '彈出懸浮視窗': 'Pop out floating window',
