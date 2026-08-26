@@ -267,4 +267,16 @@ export const dict: Record<string, string> = {
   '釘選「{name}」': 'Pin "{name}"',
   '取消釘選「{name}」': 'Unpin "{name}"',
   '取消釘選': 'Unpin',
+
+  // focus-outline.tsx — 大綱 mode. The three labels are printed verbatim on
+  // every entry, so they carry their own colon (fullwidth in zh, ASCII in en)
+  // instead of one being appended in JSX.
+  '大綱': 'Outline',
+  '標題：': 'Title:',
+  '當前重點：': 'Current focus:',
+  '當前進展：': 'Current progress:',
+  '任務：': 'Tasks:',
+  '點一下寫下進展': 'Add a progress note',
+  '這個分類現在推到哪了？': 'Where does this one stand?',
+  'Enter 存檔・Esc 取消・點別處也會存': 'Enter to save · Esc to cancel · clicking away saves too',
 }

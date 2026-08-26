@@ -1,7 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, LayoutGrid, List, Pin, Search, SlidersHorizontal, X } from 'lucide-react'
+import {
+  ChevronRight,
+  LayoutGrid,
+  List,
+  ListTree,
+  Pin,
+  Search,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task, Workspace } from '@/lib/types'
 import {
@@ -15,6 +24,7 @@ import { useDisplayColor } from '@/hooks/use-display-color'
 import { useI18n } from '@/lib/i18n/react'
 import { FocusBlock } from './focus-block'
 import { FocusBoardEditorModal } from './focus-board-editor-modal'
+import { FocusOutline } from './focus-outline'
 import {
   cardMarkers,
   cardStatus,
@@ -27,7 +37,20 @@ import {
 /**
  * The 任務重點 tab of the full-screen task view.
  *
- * Reading order is deliberate and single-protagonist (DESIGN.md):
+ * Three display modes, chosen with the toolbar switch:
+ *
+ *   大綱 (default) — the plain 一覽表 the user specified verbatim: workspace
+ *     heading, then 標題：／當前進展：／任務： 1. 2. 3. for every category, all
+ *     at one type size, nothing collapsed, nothing re-ranked. See
+ *     focus-outline.tsx, which owns the format for both desktop and phone.
+ *   卡片 / 精簡 — the tiered views below, unchanged.
+ *
+ * 大綱 is the default because the question this page answers for its owner is
+ * "where does every line of work stand", and a board that sorts, sizes and
+ * hides on his behalf keeps answering a different one.
+ *
+ * Reading order in the tiered modes is deliberate and single-protagonist
+ * (DESIGN.md):
  *   1. `FocusBlock variant="page"` — the loudest thing on the page (text-2xl).
  *   2. a hairline + the quiet toolbar (search · density · 編輯版面).
  *   3. tier headings (釘選／需要注意／停滯／其他), each carrying flat cards.
@@ -66,23 +89,35 @@ export function FocusBoard({
   const { t } = useI18n()
   const [editorOpen, setEditorOpen] = useState(false)
   const view = useFocusBoardView({ focus, workspaces, todayStr, onSetFocusBoard })
+  const outline = view.density === 'outline'
 
   return (
     <div data-testid="focus-board">
-      <FocusBlock
-        variant="page"
-        // The board below lists this category's queue already — no echo.
-        showNextTasks={false}
-        workspaces={workspaces}
-        focus={focus}
-        todayStr={todayStr}
-        onSelectTask={onSelectTask}
-        onSetFocusBoard={onSetFocusBoard}
-      />
+      {/* 當前重點 is a text-2xl headline — 1.7× the outline's body size, and the
+          user's spec starts straight at the workspace name. In 大綱 mode it is
+          not rendered at all; the two tiered modes keep it. */}
+      {!outline && (
+        <FocusBlock
+          variant="page"
+          // The board below lists this category's queue already — no echo.
+          showNextTasks={false}
+          workspaces={workspaces}
+          focus={focus}
+          todayStr={todayStr}
+          onSelectTask={onSelectTask}
+          onSetFocusBoard={onSetFocusBoard}
+        />
+      )}
 
       {/* Section break: the board below is a different kind of answer than the
-          headline above it, so it gets a hairline rather than another card. */}
-      <div className="mt-8 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border pt-5">
+          headline above it, so it gets a hairline rather than another card.
+          With no headline above (大綱), there is nothing to break away from. */}
+      <div
+        className={cn(
+          'flex flex-wrap items-center gap-x-3 gap-y-2',
+          outline ? 'pb-1' : 'mt-8 border-t border-border pt-5'
+        )}
+      >
         <p className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           {t('分類看板')}
         </p>
@@ -149,6 +184,20 @@ export function FocusBoard({
           <p className="text-sm text-foreground">{t('沒有符合的大項目')}</p>
           <p className="mt-1.5 text-xs text-muted-foreground">{t('換個關鍵字，或清除搜尋。')}</p>
         </div>
+      ) : view.density === 'outline' ? (
+        // No tier branch here on purpose: 大綱 shows every card, always.
+        // Search just narrows the same list in place.
+        <FocusOutline
+          className="mt-6"
+          groups={view.outlineGroups}
+          canEdit={view.canPin}
+          onSetNote={view.setNote}
+          onSelectTask={onSelectTask}
+          focus={focus}
+          workspaces={workspaces}
+          todayStr={todayStr}
+          onSetFocusBoard={onSetFocusBoard}
+        />
       ) : view.searching ? (
         // A search answers a question the user just asked — filing the hits
         // back under 「其他 1」 would answer a different one.
@@ -239,7 +288,7 @@ export function FocusBoard({
   )
 }
 
-/** Two quiet icon buttons — a segmented control would out-shout the board. */
+/** Three quiet icon buttons — a segmented control would out-shout the board. */
 function DensityToggle({
   value,
   onChange,
@@ -248,7 +297,10 @@ function DensityToggle({
   onChange: (next: FocusDensity) => void
 }) {
   const { t } = useI18n()
+  // 大綱 first: it is the default, and the switch should read left-to-right
+  // as "the overview, or one of the two summarised views".
   const options: Array<{ key: FocusDensity; label: string; Icon: typeof LayoutGrid }> = [
+    { key: 'outline', label: t('大綱'), Icon: ListTree },
     { key: 'card', label: t('卡片'), Icon: LayoutGrid },
     { key: 'compact', label: t('精簡'), Icon: List },
   ]
