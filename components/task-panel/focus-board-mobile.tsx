@@ -6,6 +6,7 @@ import {
   Focus,
   LayoutGrid,
   List,
+  ListTree,
   Pin,
   Search,
   SlidersHorizontal,
@@ -25,6 +26,7 @@ import { useDisplayColor } from '@/hooks/use-display-color'
 import { useI18n } from '@/lib/i18n/react'
 import { FocusBlock } from './focus-block'
 import { FocusBoardEditorModal } from './focus-board-editor-modal'
+import { FocusOutline } from './focus-outline'
 import {
   cardMarkers,
   cardStatus,
@@ -36,6 +38,11 @@ import {
 
 /**
  * The 任務重點 board, rebuilt for a phone.
+ *
+ * 大綱 mode (the default) is deliberately *not* re-cut for the phone: the
+ * printed format 標題：／當前進展：／任務： is the feature, so both ends render
+ * the same `FocusOutline`, single column here, with fatter tap targets. Only
+ * the two tiered modes below get phone-specific markup.
  *
  * Not a narrow copy of `focus-board.tsx`: that one is a 1-3 column grid under
  * a `variant="page"` headline card, both sized for the desktop full-screen
@@ -101,6 +108,7 @@ export function FocusBoardMobile({
   const todayStr = useMemo(() => toDateString(new Date()), [nowTick])
 
   const view = useFocusBoardView({ focus, workspaces, todayStr, onSetFocusBoard })
+  const outline = view.density === 'outline'
 
   return (
     <div
@@ -172,18 +180,22 @@ export function FocusBoardMobile({
           bottom on every mobile surface and would otherwise sit on the last
           card's footer row. */}
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <FocusBlock
-          variant="page-mobile"
-          // The board below lists this category's queue already — no echo.
-          showNextTasks={false}
-          workspaces={workspaces}
-          focus={focus}
-          todayStr={todayStr}
-          onSelectTask={onSelectTask}
-          onSetFocusBoard={onSetFocusBoard}
-        />
+        {/* Same call as the desktop board: 大綱 starts at the workspace name,
+            with no oversized headline above it. */}
+        {!outline && (
+          <FocusBlock
+            variant="page-mobile"
+            // The board below lists this category's queue already — no echo.
+            showNextTasks={false}
+            workspaces={workspaces}
+            focus={focus}
+            todayStr={todayStr}
+            onSelectTask={onSelectTask}
+            onSetFocusBoard={onSetFocusBoard}
+          />
+        )}
 
-        <div className="border-t border-border px-4 pb-24 pt-4">
+        <div className={cn('px-4 pb-24 pt-4', !outline && 'border-t border-border')}>
           <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             {t('分類看板')}
           </p>
@@ -211,6 +223,20 @@ export function FocusBoardMobile({
               <p className="text-sm text-foreground">{t('沒有符合的大項目')}</p>
               <p className="mt-2 text-xs text-muted-foreground">{t('換個關鍵字，或清除搜尋。')}</p>
             </div>
+          ) : view.density === 'outline' ? (
+            // Every card, always — search narrows this same list in place.
+            <FocusOutline
+              className="mt-5"
+              mobile
+              groups={view.outlineGroups}
+              canEdit={view.canPin}
+              onSetNote={view.setNote}
+              onSelectTask={onSelectTask}
+              focus={focus}
+              workspaces={workspaces}
+              todayStr={todayStr}
+              onSetFocusBoard={onSetFocusBoard}
+            />
           ) : view.searching ? (
             // Hits get their own heading: filing them back under 「其他」
             // would rank the thing the user just went looking for.
@@ -307,7 +333,9 @@ function MobileDensityToggle({
   onChange: (next: FocusDensity) => void
 }) {
   const { t } = useI18n()
+  // Same order and same default as the desktop switch — 大綱 first.
   const options: Array<{ key: FocusDensity; label: string; Icon: typeof LayoutGrid }> = [
+    { key: 'outline', label: t('大綱'), Icon: ListTree },
     { key: 'card', label: t('卡片'), Icon: LayoutGrid },
     { key: 'compact', label: t('精簡'), Icon: List },
   ]

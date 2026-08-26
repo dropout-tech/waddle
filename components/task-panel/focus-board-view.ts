@@ -5,11 +5,13 @@ import type { Workspace } from '@/lib/types'
 import {
   defaultCards,
   filterCards,
+  groupCardsByWorkspace,
   resolveFocusBoard,
   STALE_AFTER_DAYS,
   type FocusCard,
   type FocusSettings,
   type FocusTier,
+  type ResolvedBoardGroup,
   type ResolvedCard,
   type ResolvedTier,
 } from '@/lib/focus'
@@ -24,8 +26,17 @@ import {
  * cards survive the query) and writes the two per-device preferences.
  */
 
-/** Card vs. compact list. Per-device, like the panel's own density switch. */
-export type FocusDensity = 'card' | 'compact'
+/**
+ * How the board draws itself. Per-device, like the panel's own density switch.
+ *
+ * - `outline` — the default. One flat, text-only 一覽表: workspace heading,
+ *   then 標題／當前進展／任務 for every category, all at the same type size.
+ *   No tiers, no collapsing, no ranking — the user asked to see *everything*
+ *   at once, and any hierarchy we add is us re-sorting their work for them.
+ * - `card`    — the tiered card grid (釘選／需要注意／停滯／其他).
+ * - `compact` — one row per category, tiers kept.
+ */
+export type FocusDensity = 'card' | 'compact' | 'outline'
 
 export const DENSITY_STORAGE_KEY = 'waddle-focus-density-v1'
 export const OTHER_COLLAPSED_STORAGE_KEY = 'waddle-focus-tier-other-v1'
@@ -34,13 +45,20 @@ type Translate = (text: string, vars?: Record<string, string | number>) => strin
 
 /** Stable empty array so `tiers` keeps its identity while searching. */
 const EMPTY_TIERS: ResolvedTier[] = []
+/** Same trick for the outline groups, which only card/compact mode skips. */
+const EMPTY_GROUPS: ResolvedBoardGroup[] = []
 
+/**
+ * Anything but an explicit stored choice means "outline" — a device that has
+ * never touched the switch gets the overview, not last year's default.
+ */
 function readDensity(): FocusDensity {
-  if (typeof window === 'undefined') return 'card'
+  if (typeof window === 'undefined') return 'outline'
   try {
-    return localStorage.getItem(DENSITY_STORAGE_KEY) === 'compact' ? 'compact' : 'card'
+    const stored = localStorage.getItem(DENSITY_STORAGE_KEY)
+    return stored === 'compact' || stored === 'card' ? stored : 'outline'
   } catch {
-    return 'card'
+    return 'outline'
   }
 }
 
@@ -55,6 +73,16 @@ function readOtherCollapsed(): boolean {
     return localStorage.getItem(OTHER_COLLAPSED_STORAGE_KEY) !== '0'
   } catch {
     return true
+  }
+}
+
+/** Has this device ever made an explicit choice about the 其他 band? */
+function hasOtherPreference(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return localStorage.getItem(OTHER_COLLAPSED_STORAGE_KEY) !== null
+  } catch {
+    return false
   }
 }
 
@@ -161,6 +189,12 @@ interface UseFocusBoardViewArgs {
 export interface FocusBoardView {
   /** The bands, in render order. Empty while a search is running. */
   tiers: ResolvedTier[]
+  /**
+   * Outline mode's whole payload: every card on the board, tiers dissolved,
+   * filed under its workspace in the user's own board order. Filtered by the
+   * query like everything else. Empty unless `density === 'outline'`.
+   */
+  outlineGroups: ResolvedBoardGroup[]
   /** True while the search box has content — the board switches to a flat list. */
   searching: boolean
   /** Search hits, most pressing first. Empty unless `searching`. */
@@ -179,6 +213,8 @@ export interface FocusBoardView {
   isTierOpen: (tier: FocusTier) => boolean
   canPin: boolean
   togglePin: (categoryId: string) => void
+  /** Write a card's 當前進展 line. No-op on a read-only board. */
+  setNote: (categoryId: string, note: string) => void
 }
 
 export function useFocusBoardView({
@@ -189,6 +225,7 @@ export function useFocusBoardView({
 }: UseFocusBoardViewArgs): FocusBoardView {
   const [density, setDensityState] = useState<FocusDensity>(readDensity)
   const [otherCollapsed, setOtherCollapsedState] = useState<boolean>(readOtherCollapsed)
+  const [otherPrefStored, setOtherPrefStored] = useState<boolean>(hasOtherPreference)
   const [query, setQuery] = useState('')
 
   const setDensity = useCallback((next: FocusDensity) => {
@@ -198,18 +235,6 @@ export function useFocusBoardView({
     } catch {
       /* private mode — in-memory only */
     }
-  }, [])
-
-  const toggleOther = useCallback(() => {
-    setOtherCollapsedState((prev) => {
-      const next = !prev
-      try {
-        localStorage.setItem(OTHER_COLLAPSED_STORAGE_KEY, next ? '1' : '0')
-      } catch {
-        /* private mode — in-memory only */
-      }
-      return next
-    })
   }, [])
 
   const allTiers = useMemo(
@@ -234,6 +259,33 @@ export function useFocusBoardView({
   const tiers = searching ? EMPTY_TIERS : allTiers
 
   /**
+   * Outline mode dissolves the bands and re-files every card under its
+   * workspace, in the order the user arranged in 編輯版面 — not by pressure.
+   * A one-glance overview has to sit still: if the rows reshuffled every time
+   * a due date passed, "where does each line of work stand" would need
+   * re-reading from the top each morning, which is the opposite of the ask.
+   */
+  const outlineGroups = useMemo(() => {
+    if (density !== 'outline') return EMPTY_GROUPS
+    // Its own resolve, with the per-card task cap lifted: the tiered views
+    // show the top 3 and count the rest, but the outline is the place the
+    // user asked to see *every* task, so truncating there answers a smaller
+    // question than the one he asked. (Card/compact keep the default cap.)
+    const resolved = resolveFocusBoard(focus, workspaces, {
+      today: todayStr,
+      tasksPerCard: Number.POSITIVE_INFINITY,
+    })
+    const order = new Map(
+      (focus.cards ?? defaultCards(workspaces, todayStr)).map((c, i) => [c.categoryId, c.sortOrder ?? i])
+    )
+    const flat = filterCards(
+      resolved.flatMap((tier) => tier.cards),
+      query
+    ).sort((a, b) => (order.get(a.categoryId) ?? 0) - (order.get(b.categoryId) ?? 0))
+    return groupCardsByWorkspace(flat, workspaces)
+  }, [density, focus, query, workspaces, todayStr])
+
+  /**
    * Pinning writes `cards[].pinned`. An uncurated board has no `cards` array
    * at all, so materialise `defaultCards` first — otherwise the very first
    * pin would save an empty board and wipe the page.
@@ -250,15 +302,60 @@ export function useFocusBoardView({
     [focus, workspaces, todayStr, onSetFocusBoard]
   )
 
+  /**
+   * Same materialise-first rule as `togglePin`: an uncurated board has no
+   * `cards` array, so typing the first 當前進展 has to write the whole default
+   * selection or the save would blank the page.
+   */
+  const setNote = useCallback(
+    (categoryId: string, note: string) => {
+      if (!onSetFocusBoard) return
+      const trimmed = note.trim()
+      const base = focus.cards ?? defaultCards(workspaces, todayStr)
+      const next: FocusCard[] = base.map((card) =>
+        card.categoryId === categoryId ? { ...card, note: trimmed || undefined } : card
+      )
+      void onSetFocusBoard({ ...focus, cards: next })
+    },
+    [focus, workspaces, todayStr, onSetFocusBoard]
+  )
+
+  /**
+   * 其他 collapsed by default buys a short page *only* when there are other
+   * bands to read instead. When 其他 is the only band that has cards, the
+   * default hid the entire board behind a heading reading 「其他 6」 — which
+   * looks exactly like data loss. Nothing there needs to be prioritised over
+   * anything else, so there is nothing to save the reader from: start open.
+   * An explicit choice on this device still wins, in either direction.
+   */
+  const otherIsOnlyBand = allTiers.length === 1 && allTiers[0].tier === 'other'
+  const otherEffectivelyCollapsed =
+    otherCollapsed && !(otherIsOnlyBand && !otherPrefStored)
+
   // 其他 is the only collapsible band. (A search no longer needs to force it
   // open — searching replaces the bands with a flat result list.)
   const isTierOpen = useCallback(
-    (tier: FocusTier) => tier !== 'other' || !otherCollapsed,
-    [otherCollapsed]
+    (tier: FocusTier) => tier !== 'other' || !otherEffectivelyCollapsed,
+    [otherEffectivelyCollapsed]
   )
+
+  // Toggles relative to what is on screen, not to the raw stored flag —
+  // otherwise the first click on an auto-opened band would appear to do
+  // nothing (it would only flip a value that was already being overridden).
+  const toggleOther = useCallback(() => {
+    const next = !otherEffectivelyCollapsed
+    setOtherCollapsedState(next)
+    setOtherPrefStored(true)
+    try {
+      localStorage.setItem(OTHER_COLLAPSED_STORAGE_KEY, next ? '1' : '0')
+    } catch {
+      /* private mode — in-memory only */
+    }
+  }, [otherEffectivelyCollapsed])
 
   return {
     tiers,
+    outlineGroups,
     searching,
     results,
     isEmpty: allTiers.length === 0,
@@ -267,10 +364,11 @@ export function useFocusBoardView({
     setQuery,
     density,
     setDensity,
-    otherCollapsed,
+    otherCollapsed: otherEffectivelyCollapsed,
     toggleOther,
     isTierOpen,
     canPin: !!onSetFocusBoard,
     togglePin,
+    setNote,
   }
 }
