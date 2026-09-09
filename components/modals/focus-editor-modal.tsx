@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { Check, Search, Sparkles, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Task, Workspace } from '@/lib/types'
@@ -136,6 +137,8 @@ export function FocusEditorModal({
     try {
       await onSave(next)
       onClose()
+    } catch {
+      toast.error(t('儲存失敗，請重試'))
     } finally {
       setSaving(false)
     }

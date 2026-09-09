@@ -493,6 +493,8 @@ export function MainLayout({
               focus={settings?.focusBoard ?? DEFAULT_FOCUS_SETTINGS}
               onSelectTask={onSelectTask}
               onSetFocusBoard={onSetFocusBoard}
+              onToggleComplete={onToggleComplete}
+              onAddTask={onAddTask}
               onClose={() => setMobileFocusBoardOpen(false)}
             />
           </ErrorBoundary>

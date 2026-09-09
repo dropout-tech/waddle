@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { ChevronDown, GripVertical, Plus, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Category, Task } from '@/lib/types'
@@ -67,6 +68,8 @@ export function CategorySection({
   const { t } = useI18n()
   const [isAdding, setIsAdding] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [creatingTask, setCreatingTask] = useState(false)
+  const creatingTaskRef = useRef(false)
   // Completed tasks default-collapsed so they don't pad out the active list.
   const [showCompleted, setShowCompleted] = useState(false)
   const isTaskDragOver = taskDropTargetId === category.id
@@ -74,11 +77,20 @@ export function CategorySection({
   const pendingCount = category.tasks.filter((t) => !t.isCompleted).length
   const completedCount = category.tasks.filter((t) => t.isCompleted).length
 
-  const handleAddSubmit = () => {
-    if (newTaskTitle.trim()) {
-      onAddTask(category.id, newTaskTitle.trim())
+  const handleAddSubmit = async () => {
+    if (creatingTaskRef.current || !newTaskTitle.trim()) return
+    creatingTaskRef.current = true
+    setCreatingTask(true)
+    try {
+      const created: unknown = await onAddTask(category.id, newTaskTitle.trim())
+      if (created === false) return
       setNewTaskTitle('')
       setIsAdding(false)
+    } catch {
+      toast.error(t('建立任務失敗，請重試'))
+    } finally {
+      creatingTaskRef.current = false
+      setCreatingTask(false)
     }
   }
 
@@ -95,6 +107,7 @@ export function CategorySection({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (creatingTaskRef.current) return
     if (e.key === 'Enter') {
       if (isImeComposing(e)) return
       handleAddSubmit()
@@ -218,6 +231,7 @@ export function CategorySection({
               <input
                 type="text"
                 value={newTaskTitle}
+                disabled={creatingTask}
                 onChange={(e) => setNewTaskTitle(e.target.value)}
                 onKeyDown={handleKeyDown}
                 onBlur={() => {

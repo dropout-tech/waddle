@@ -97,7 +97,7 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
   const count = meetings.length
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -106,7 +106,7 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
         // min-h ensures the chip stays a comfortable touch target on
         // phones — the original ~22px height failed the 36-40px guideline.
         className={cn(
-          'flex items-center gap-1.5 px-2.5 py-1.5 min-h-[32px] rounded-md text-[11px] font-medium transition-colors',
+          'flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 min-h-[32px] rounded-md text-[11px] font-medium transition-colors',
           count > 0
             ? 'bg-primary/10 text-primary hover:bg-primary/15'
             : 'bg-muted text-muted-foreground hover:bg-muted/80',

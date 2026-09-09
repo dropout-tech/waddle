@@ -320,7 +320,7 @@ export function TaskPanel({
             header doesn't tower over the task list itself. */}
         <div
           data-tour="task-shortcut-row"
-          className="flex items-center gap-2 px-3 py-2 border-b border-border bg-card/50"
+          className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border bg-card/50"
         >
           <TodayMeetingsPopover
             workspaces={workspaces}
@@ -330,7 +330,7 @@ export function TaskPanel({
             <button
               type="button"
               onClick={onOpenOverdueReview}
-              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-overdue transition-colors hover:bg-overdue/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium text-overdue transition-colors hover:bg-overdue/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={t('整理 {count} 個待處理任務', { count: overdueCount })}
             >
               <CalendarClock className="size-3" aria-hidden="true" />
@@ -344,7 +344,7 @@ export function TaskPanel({
             type="button"
             data-tour="completed-tasks-button"
             onClick={() => setCompletedDrawerOpen(true)}
-            className="ml-auto flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium text-foreground hover:bg-muted/60 transition-colors group"
+            className="ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 py-1 rounded-md text-[11px] font-medium text-foreground hover:bg-muted/60 transition-colors group"
           >
             <CheckCircle2 className="w-3 h-3 text-primary" />
             {t('已完成')}
