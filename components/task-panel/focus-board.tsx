@@ -96,7 +96,7 @@ export function FocusBoard(props: FocusBoardProps) {
           placeholder={t("搜尋分類或任務")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="h-11 min-w-0 flex-1 basis-48 rounded-lg border border-border bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="h-11 min-w-0 flex-1 basis-48 rounded-lg border border-border bg-card px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <div className="flex shrink-0 gap-1">
           {(["card", "list"] as const).map((value) => (
@@ -236,7 +236,7 @@ function ProgressCard({
     });
   const editable = !!onSetFocusBoard;
   const field =
-    "w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    "min-h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
   function edit() {
     setMode(card.status?.mode === "task" ? "task" : "text");
     setTaskId(linked?.id ?? "");
@@ -387,7 +387,7 @@ function ProgressCard({
             {linked ? (
               <button
                 onClick={() => onSelectTask(linked)}
-                className="text-left text-base font-medium leading-relaxed hover:underline"
+                className="min-h-11 w-full min-w-0 max-w-full break-words text-left text-base font-medium leading-relaxed hover:underline"
               >
                 <Target className="mr-1.5 inline size-4" />
                 <span className="break-words">{linked.title}</span>
@@ -470,7 +470,7 @@ function ProgressCard({
                   taskSort: e.target.value as FocusCard["taskSort"],
                 }).catch(() => toast.error(t("儲存失敗，請重試")))
               }
-              className="min-h-11 max-w-full rounded-md bg-muted/50 px-2 text-xs"
+              className="min-h-11 max-w-full rounded-md bg-muted/50 px-2 text-base md:text-xs"
             >
               <option value="manual">{t("任務欄順序")}</option>
               <option value="dueDate">{t("依到期日")}</option>

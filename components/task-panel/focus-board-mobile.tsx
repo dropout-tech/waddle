@@ -27,8 +27,10 @@ export function FocusBoardMobile({
   return (
     <section
       data-testid="focus-board-mobile"
+      // Reserve space outside the scroller so the floating timer never covers
+      // readable task/status text while browsing the middle of the board.
       className={cn(
-        "min-h-0 overflow-y-auto bg-background p-4 pb-20",
+        "min-h-0 overflow-y-auto bg-background p-4 mb-20",
         className,
       )}
     >

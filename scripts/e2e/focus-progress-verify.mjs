@@ -111,7 +111,7 @@ const TASKS = [
   { cat: CATS[4].id, title: '每天背二十個單字', urgency: 8 },
   { cat: CATS[4].id, title: '找一位英文口說夥伴', urgency: 6 },
   { cat: CATS[4].id, title: '看完一部沒有字幕的影集', urgency: 5 },
-  { cat: CATS[5].id, title: '禮拜三晚上去跑步', urgency: 6 },
+  { cat: CATS[5].id, title: '健康管理：' + 'tracking/'.repeat(22), urgency: 6 },
 ]
 
 const EXPECTED_TASKS = {}
@@ -303,11 +303,61 @@ try {
   const mobileOpen = page.getByRole('tab', { name: '重點', exact: true })
   await mobileOpen.click(); await sleep(500)
   check('Mobile uses same progress board', await page.getByTestId('focus-board-mobile').isVisible())
-  for (const width of [390, 320]) {
+  const mobileBoard = page.getByTestId('focus-board-mobile')
+  for (const width of [320, 390, 430]) {
     await page.setViewportSize({ width, height: 844 })
     check(`No horizontal overflow at ${width}`, await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
     await page.screenshot({ path: path.join(SHOTS, `mobile-${width}.png`), fullPage: true })
   }
+  await page.setViewportSize({ width: 320, height: 640 })
+  await mobileBoard.getByRole('button', { name: '編輯「Nova air」狀態與備註' }).click()
+  const mobileCard = page.locator(`[data-focus-card="${CATS[1].id}"]`)
+  const longStatus = '等待合作夥伴確認下階段時程與物流報價'.repeat(4)
+  await mobileCard.getByRole('textbox', { name: '自訂狀態' }).fill(longStatus)
+  await mobileCard.getByRole('textbox', { name: '備註' }).fill('需要核對的事項\n' + 'https://example.com/' + 'long-path-'.repeat(24))
+  check('Mobile text fields avoid iOS focus zoom', await mobileCard.locator('input[type=text], input:not([type]), textarea, select').evaluateAll((els) => els.every((el) => parseFloat(getComputedStyle(el).fontSize) >= 16)))
+  await page.setViewportSize({ width: 320, height: 420 })
+  await mobileCard.getByRole('button', { name: '儲存', exact: true }).click()
+  await mobileCard.locator('form').waitFor({ state: 'detached' })
+  check('Status can save with reduced keyboard-like height', await mobileCard.getByText(longStatus, { exact: true }).isVisible())
+  await page.setViewportSize({ width: 320, height: 640 })
+  await page.evaluate(() => { document.documentElement.style.fontSize = '24px' })
+  await mobileCard.scrollIntoViewIfNeeded()
+  check('Long mobile content at 150% font stays inside card', await mobileCard.evaluate((el) => el.scrollWidth <= el.clientWidth))
+  check('Focus scroller ends above floating timer', await mobileBoard.evaluate((el) => { const timer = document.querySelector('[data-waddle-mini-root]') || [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === '專注計時'); return !timer || el.getBoundingClientRect().bottom <= timer.getBoundingClientRect().top }))
+  await mobileBoard.screenshot({ path: path.join(SHOTS, 'mobile-long-large-text.png') })
+  await page.evaluate(() => { document.documentElement.style.fontSize = '' })
+  await mobileBoard.getByRole('button', { name: '編輯版面' }).click()
+  const phoneModal = page.getByRole('dialog', { name: '編輯重點版面' })
+  for (const height of [640, 420]) {
+    await page.setViewportSize({ width: 320, height })
+    await sleep(300)
+    const save = phoneModal.getByRole('button', { name: '儲存', exact: true })
+    check(`Layout editor save is visible and unobstructed at height ${height}`, await save.evaluate((el) => { const r = el.getBoundingClientRect(); const hit = document.elementFromPoint(r.x + r.width/2, r.y + r.height/2); return r.bottom <= innerHeight && r.top >= 0 && (hit === el || el.contains(hit)) }))
+    check(`Layout editor has no horizontal overflow at height ${height}`, await phoneModal.evaluate((el) => el.scrollWidth <= el.clientWidth))
+    await phoneModal.screenshot({ path: path.join(SHOTS, `mobile-editor-${height}.png`) })
+  }
+  await phoneModal.getByRole('button', { name: '取消', exact: true }).click()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.evaluate(() => { const board = document.querySelector('[data-testid=focus-board-mobile]'); board.scrollTop = board.scrollHeight })
+  await sleep(400)
+  const lastTaskButton = mobileBoard.locator('article').last().getByRole('button', { name: /設為目前狀態/ }).last()
+  await lastTaskButton.click()
+  await sleep(300)
+  check('Long linked task status wraps inside mobile card', await mobileBoard.locator('article').last().evaluate((el) => el.scrollWidth <= el.clientWidth))
+  await page.evaluate(() => { const board = document.querySelector('[data-testid=focus-board-mobile]'); board.scrollTop = board.scrollHeight })
+  check('Last task action can be reached above bottom overlays', await lastTaskButton.evaluate((el) => { const r=el.getBoundingClientRect(); const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2); return r.bottom <= innerHeight && (hit===el || el.contains(hit)) }))
+  await mobileBoard.screenshot({ path: path.join(SHOTS, 'mobile-bottom.png') })
+  await page.locator('[data-timer-launch-hit]').click()
+  await page.getByRole('button', { name: '開始專注', exact: true }).click()
+  await page.getByRole('button', { name: '縮小到角落', exact: true }).click()
+  await page.locator('[data-waddle-mini-root]').waitFor()
+  await page.evaluate(() => { document.documentElement.style.fontSize = '24px' })
+  await sleep(400)
+  check('Running timer stays outside focus scroller at 150% font', await mobileBoard.evaluate((el) => el.getBoundingClientRect().bottom <= document.querySelector('[data-waddle-mini-root]').getBoundingClientRect().top))
+  await page.screenshot({ path: path.join(SHOTS, 'mobile-running-timer.png'), fullPage: true })
+  await page.evaluate(() => { document.documentElement.style.fontSize = '' })
+
   await page.getByRole('tab', { name: '任務', exact: true }).click()
   await page.evaluate(() => { document.documentElement.style.fontSize = '24px'; localStorage.setItem('waddle-header-mode', 'compact'); dispatchEvent(new Event('waddle-header-mode-change')) })
   await sleep(600)

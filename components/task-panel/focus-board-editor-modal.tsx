@@ -74,18 +74,18 @@ export function FocusBoardEditorModal({
       size="lg"
       ariaLabel={t("編輯重點版面")}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-border p-5">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border p-5 pt-[calc(1.25rem+env(safe-area-inset-top))] md:pt-5">
         <h2 className="text-lg font-semibold">{t("編輯重點版面")}</h2>
         <button
           disabled={saving}
           aria-label={t("關閉")}
           onClick={onClose}
-          className="flex size-11 items-center justify-center rounded-lg hover:bg-muted"
+          className="flex size-11 shrink-0 items-center justify-center rounded-lg hover:bg-muted"
         >
           <X className="size-4" />
         </button>
       </div>
-      <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 md:max-h-[60dvh] md:flex-auto">
         <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
           {t("勾選要顯示的分類，用上下箭頭排列卡片。隱藏會保留狀態與備註。")}
         </p>
@@ -134,7 +134,7 @@ export function FocusBoardEditorModal({
           ))}
         </ul>
       </div>
-      <div className="flex justify-end gap-2 border-t border-border p-4">
+      <div className="flex shrink-0 justify-end gap-2 border-t border-border p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-4">
         <button
           disabled={saving}
           onClick={onClose}
