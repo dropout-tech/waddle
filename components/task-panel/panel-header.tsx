@@ -277,12 +277,12 @@ export function PanelHeader({
           </div>
         </div>
       ) : headerMode === 'compact' ? (
-        /* Compact Mode - date summary with controls for both directions. */
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        /* Wrap at the panel width, including when the user increases text size. */
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-3 whitespace-nowrap">
             {/* Compact date */}
             <div className="flex items-center gap-2">
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 border border-primary/20">
+              <div className="flex shrink-0 items-center justify-center w-8 h-8 rounded-lg bg-primary/10 border border-primary/20">
                 <span className="text-base font-bold text-primary tabular-nums">
                   {today.getDate()}
                 </span>

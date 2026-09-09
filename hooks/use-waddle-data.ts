@@ -192,7 +192,7 @@ interface UseWaddleData {
   /** Global default category (未分類 by default) — pass null to clear. */
   setDefaultCategory: (categoryId: string | null) => Promise<void>
   // Task
-  addTask: (categoryId: string, title: string) => Promise<void>
+  addTask: (categoryId: string, title: string) => Promise<boolean>
   updateTask: (taskId: string, updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => Promise<void>
   toggleTaskComplete: (taskId: string) => Promise<void>
   /** Mark several incomplete tasks complete with one sound, one write, and one undo step. */
@@ -1045,34 +1045,27 @@ export function useWaddleData(): UseWaddleData {
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
 
-    let workspaceId = ''
-    let workspaceName = ''
-    let workspaceColor = ''
-    let categoryName = ''
-    let sortOrder = 0
-
-    setWorkspaces((prev) =>
-      prev.map((w) => ({
-        ...w,
-        categories: w.categories.map((c) => {
-          if (c.id !== categoryId) return c
-          workspaceId = w.id
-          workspaceName = w.name
-          workspaceColor = w.color
-          categoryName = c.name
-          sortOrder = c.tasks.length
-          const newTask: Task = {
-            id, categoryId, workspaceId, workspaceName, workspaceColor, categoryName,
-            title, taskType: 'one_time', urgency: 5,
-            calendarColor: workspaceColor, isCompleted: false,
-            sortOrder, createdAt: now, updatedAt: now,
-          }
-          return { ...c, tasks: [...c.tasks, newTask] }
-        }),
-      }))
-    )
-
-    if (!workspaceId) return // category not found
+    const workspace = workspacesRef.current.find((w) => !w.isArchived && w.categories.some((c) => c.id === categoryId && !c.isArchived))
+    const category = workspace?.categories.find((c) => c.id === categoryId)
+    if (!workspace || !category) {
+      handleDbError('新增任務')(new Error('Category is no longer available'))
+      return false
+    }
+    const workspaceId = workspace.id
+    const workspaceName = workspace.name
+    const workspaceColor = workspace.color
+    const categoryName = category.name
+    const sortOrder = Math.max(-1, ...category.tasks.map((task) => task.sortOrder)) + 1
+    const newTask: Task = {
+      id, categoryId, workspaceId, workspaceName, workspaceColor, categoryName,
+      title, taskType: 'one_time', urgency: 5,
+      calendarColor: workspaceColor, isCompleted: false,
+      sortOrder, createdAt: now, updatedAt: now,
+    }
+    setWorkspaces((prev) => prev.map((w) => ({ ...w, categories: w.categories.map((c) =>
+      c.id === categoryId ? { ...c, tasks: [...c.tasks, newTask] } : c
+    ) })))
+    let createError: unknown
 
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
     // Register the in-flight INSERT so a mutation on this task that fires
@@ -1085,7 +1078,11 @@ export function useWaddleData(): UseWaddleData {
           id, user_id: userId, workspace_id: workspaceId, category_id: categoryId,
           title, urgency: 5, calendar_color: workspaceColor, sort_order: sortOrder,
         })
-        if (error) handleDbError('新增任務')(error)
+        if (error) {
+          createError = error
+          handleDbError('新增任務')(error)
+          setWorkspaces((prev) => prev.map((w) => ({ ...w, categories: w.categories.map((c) => ({ ...c, tasks: c.tasks.filter((task) => task.id !== id) })) })))
+        }
       } finally {
         pendingWritesRef.current -= 1
         delete pendingTaskCreatesRef.current[id]
@@ -1093,6 +1090,7 @@ export function useWaddleData(): UseWaddleData {
     })()
     pendingTaskCreatesRef.current[id] = insertPromise
     await insertPromise
+    return !createError
   }, [supabase])
 
   /**
@@ -2817,10 +2815,12 @@ export function useWaddleData(): UseWaddleData {
       if (error && isMissingSettingsExtColumnError(error)) {
         settingsExtColsKnownMissing = true
         console.warn('[setFocusBoard] focus_board column missing — kept in localStorage only. Run latest migration.', error)
-        // Already mirrored to localStorage; nothing more to do.
-        return
+        throw error
       }
-      if (error) handleDbError('儲存當前重點')(error)
+      if (error) {
+        handleDbError('儲存當前重點')(error)
+        throw error
+      }
     } finally {
       pendingWritesRef.current -= 1
     }

@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import {
   Calendar,
   CheckCircle2,
@@ -120,6 +121,25 @@ export function FullScreenTaskView({
   const [density, setDensity] = useState<'compact' | 'comfortable' | 'relaxed'>('comfortable')
   const [addingTaskInCategory, setAddingTaskInCategory] = useState<string | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [creatingTask, setCreatingTask] = useState(false)
+  const creatingTaskRef = useRef(false)
+
+  async function handleAddTask(categoryId: string) {
+    if (creatingTaskRef.current || !onAddTask || !newTaskTitle.trim()) return
+    creatingTaskRef.current = true
+    setCreatingTask(true)
+    try {
+      const created: unknown = await onAddTask(categoryId, newTaskTitle.trim())
+      if (created === false) return
+      setNewTaskTitle('')
+      setAddingTaskInCategory(null)
+    } catch {
+      toast.error(t('建立任務失敗，請重試'))
+    } finally {
+      creatingTaskRef.current = false
+      setCreatingTask(false)
+    }
+  }
   
   const now = new Date()
   const todayStr = toDateString(now)
@@ -424,6 +444,8 @@ export function FullScreenTaskView({
               todayStr={todayStr}
               onSelectTask={(task) => onTaskClick?.(task)}
               onSetFocusBoard={onSetFocusBoard}
+              onToggleComplete={onToggleComplete}
+              onAddTask={onAddTask}
             />
           </div>
         )}
@@ -992,15 +1014,15 @@ export function FullScreenTaskView({
                                         <input
                                           type="text"
                                           value={newTaskTitle}
+                                          disabled={creatingTask}
                                           onChange={(e) => setNewTaskTitle(e.target.value)}
                                           onKeyDown={(e) => {
+                                            if (creatingTaskRef.current) return
                                             if (e.key === 'Enter' && isImeComposing(e)) {
                                               return
                                             }
                                             if (e.key === 'Enter' && newTaskTitle.trim()) {
-                                              onAddTask?.(category.id, newTaskTitle.trim())
-                                              setNewTaskTitle('')
-                                              setAddingTaskInCategory(null)
+                                              void handleAddTask(category.id)
                                             } else if (e.key === 'Escape') {
                                               setNewTaskTitle('')
                                               setAddingTaskInCategory(null)
@@ -1011,13 +1033,8 @@ export function FullScreenTaskView({
                                           autoFocus
                                         />
                                         <button
-                                          onClick={() => {
-                                            if (newTaskTitle.trim()) {
-                                              onAddTask?.(category.id, newTaskTitle.trim())
-                                              setNewTaskTitle('')
-                                            }
-                                            setAddingTaskInCategory(null)
-                                          }}
+                                          disabled={creatingTask || !newTaskTitle.trim() || !onAddTask}
+                                          onClick={() => void handleAddTask(category.id)}
                                           className="px-3 py-1.5 text-xs rounded-lg bg-primary text-primary-foreground hover:bg-primary/90"
                                         >
                                           {t('新增')}
@@ -1025,6 +1042,7 @@ export function FullScreenTaskView({
                                       </div>
                                     ) : (
                                       <button
+                                        disabled={creatingTask}
                                         onClick={() => setAddingTaskInCategory(category.id)}
                                         className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
                                       >

@@ -42,6 +42,11 @@ export interface FocusPin {
  */
 export interface FocusCard {
   categoryId: string
+  hidden?: boolean
+  status?: FocusPin
+  remarks?: string
+  taskSort?: 'manual' | 'dueDate' | 'urgency' | 'created'
+  showCompleted?: boolean
   /** Free-text status shown under the category name. Optional. */
   note?: string
   /** Position on the board, ascending. */
@@ -356,6 +361,11 @@ export function normalizeFocusSettings(raw: unknown): FocusSettings {
       .filter((c): c is FocusCard => !!c && typeof (c as FocusCard).categoryId === 'string')
       .map((c, i) => ({
         categoryId: c.categoryId,
+        hidden: c.hidden === true,
+        status: c.status ? normalizePin(c.status) : undefined,
+        remarks: typeof c.remarks === 'string' ? c.remarks : undefined,
+        taskSort: ['manual', 'dueDate', 'urgency', 'created'].includes(c.taskSort ?? '') ? c.taskSort : 'manual',
+        showCompleted: c.showCompleted === true,
         note: typeof c.note === 'string' && c.note.trim() ? c.note : undefined,
         sortOrder: typeof c.sortOrder === 'number' ? c.sortOrder : i,
         pinned: c.pinned === true,
@@ -497,7 +507,7 @@ export function resolveFocusBoard(
   const today = options.today ?? toDateString(new Date())
   const tasksPerCard = options.tasksPerCard ?? 3
   const staleAfter = options.staleAfterDays ?? STALE_AFTER_DAYS
-  const cards = settings.cards ?? defaultCards(workspaces, today)
+  const cards = (settings.cards ?? defaultCards(workspaces, today)).filter((card) => !card.hidden)
 
   // Index every live category once so card lookup stays O(1).
   const index = new Map<
