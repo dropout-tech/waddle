@@ -29,6 +29,7 @@ import { toDateString } from '@/lib/calendar-utils'
 import { useI18n } from '@/lib/i18n/react'
 import { isImeComposing } from '@/lib/ime'
 import { FloatOutButton } from '@/components/floating/float-out-button'
+import { ScratchpadCanvas } from './scratchpad-canvas'
 import type { ScratchpadItem } from '@/lib/types'
 
 interface FocusScratchpadProps {
@@ -63,10 +64,6 @@ interface FocusScratchpadProps {
    */
   onPromoteToTask?: (title: string, description: string | undefined, sourceId: string) => void
 }
-
-// Phase 1 block types. Heading/divider/callout/toggle/rich_text are deferred —
-// they belong to a vertical-document layout, not this card grid.
-type BlockType = 'text' | 'image' | 'link' | 'todo'
 
 export function FocusScratchpad({
   className,
@@ -118,7 +115,7 @@ export function FocusScratchpad({
   useEffect(() => {
     if (!isExpanded) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || e.defaultPrevented) return
       if (editingId !== null) return
       setIsExpanded(false)
     }
@@ -142,6 +139,8 @@ export function FocusScratchpad({
     () => scratchpadByDate[selectedDate] ?? [],
     [scratchpadByDate, selectedDate],
   )
+  const cards = items.filter(item => !item.metadata?.canvas)
+  const canvasItems = items.filter(item => !!item.metadata?.canvas)
   const savedDates = useMemo(
     () =>
       Object.keys(scratchpadByDate)
@@ -189,13 +188,14 @@ export function FocusScratchpad({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (over && active.id !== over.id) {
-      const oldIndex = items.findIndex((i) => i.id === active.id)
-      const newIndex = items.findIndex((i) => i.id === over.id)
-      const reordered = arrayMove(items, oldIndex, newIndex).map((item, index) => ({
+      const oldIndex = cards.findIndex((i) => i.id === active.id)
+      const newIndex = cards.findIndex((i) => i.id === over.id)
+      if (oldIndex < 0 || newIndex < 0) return
+      const reorderedCards = arrayMove(cards, oldIndex, newIndex).map((item, index) => ({
         ...item,
         sortOrder: index * 10,
       }))
-      onReorderItems(selectedDate, reordered)
+      onReorderItems(selectedDate, reorderedCards)
     }
   }
 
@@ -406,22 +406,26 @@ export function FocusScratchpad({
               : 'translateY(calc(100% + 58px))',
           } : undefined}
           onPaste={handlePaste}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+          onDragOver={(e) => {
+            e.preventDefault()
+            const target = e.target instanceof Element ? e.target : null
+            setIsDragging(!target?.closest('[data-testid="scratchpad-canvas"]'))
+          }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
         >
-        <div className={hideTrigger || fill ? 'h-full overflow-y-auto' : ''}>
+        <div className={hideTrigger || fill ? 'h-full overflow-y-auto' : 'max-h-[85dvh] overflow-y-auto'}>
         {isDragging && (
-          <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary/50 z-modal flex items-center justify-center">
+          <div className="pointer-events-none absolute inset-0 bg-primary/10 border-2 border-dashed border-primary/50 z-modal flex items-center justify-center">
             <div className="text-primary font-medium">{t('放開以新增圖片')}</div>
           </div>
         )}
 
-        <div className="max-w-4xl mx-auto p-4 md:p-6">
+        <div className="max-w-6xl mx-auto p-3 sm:p-4 md:p-6">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <div className="hidden sm:flex w-10 h-10 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Sparkles className="w-5 h-5 text-primary" />
               </div>
               <div>
@@ -430,7 +434,7 @@ export function FocusScratchpad({
                   <button
                     onClick={goToPreviousDate}
                     disabled={!canGoPrevious}
-                    className="p-1 rounded hover:bg-secondary disabled:opacity-30"
+                    className="min-w-11 min-h-11 flex items-center justify-center rounded hover:bg-secondary disabled:opacity-30"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
@@ -446,7 +450,7 @@ export function FocusScratchpad({
                   <button
                     onClick={goToNextDate}
                     disabled={!canGoNext}
-                    className="p-1 rounded hover:bg-secondary disabled:opacity-30"
+                    className="min-w-11 min-h-11 flex items-center justify-center rounded hover:bg-secondary disabled:opacity-30"
                   >
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
@@ -490,7 +494,7 @@ export function FocusScratchpad({
           {/* Quick Add Bar */}
           {isToday ? (
             <div className="flex items-center gap-2 mb-6 p-2 rounded-2xl bg-secondary/30 border border-border/50">
-              <div className="flex-1 flex items-center gap-2 px-3">
+              <div className="min-w-0 flex-1 flex items-center gap-2 px-1 sm:px-3">
                 <Type className="w-4 h-4 text-muted-foreground" />
                 <input
                   ref={inputRef}
@@ -500,13 +504,13 @@ export function FocusScratchpad({
                     if (e.key === 'Enter' && !isImeComposing(e)) addTextItem()
                   }}
                   placeholder={t('記下想法，或輸入 [] 建立待辦…')}
-                  className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground/60"
+                  className="min-w-0 flex-1 bg-transparent border-0 text-base md:text-sm focus:outline-none placeholder:text-muted-foreground/60"
                 />
               </div>
               <div className="flex items-center gap-1 pr-1">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
+                  className="min-w-11 min-h-11 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
                   title={t('新增圖片')}
                 >
                   <Image className="w-4 h-4" />
@@ -514,7 +518,7 @@ export function FocusScratchpad({
                 <button
                   onClick={() => setInputMode(inputMode === 'link' ? null : 'link')}
                   className={cn(
-                    "p-2 rounded-xl transition-all",
+                    "min-w-11 min-h-11 flex items-center justify-center rounded-xl transition-all",
                     inputMode === 'link' ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-background/80"
                   )}
                   title={t('新增連結')}
@@ -531,7 +535,7 @@ export function FocusScratchpad({
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between mb-6 p-4 rounded-xl bg-secondary/30 border border-border">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-4 rounded-xl bg-secondary/30 border border-border">
               <span className="text-sm text-muted-foreground">{t('這是過去日期的記錄，僅供查看')}</span>
               <button
                 onClick={() => setSelectedDate(todayKey)}
@@ -552,7 +556,7 @@ export function FocusScratchpad({
                   value={linkInput}
                   onChange={(e) => setLinkInput(e.target.value)}
                   placeholder="https://..."
-                  className="w-full bg-secondary/50 border-0 rounded-xl px-3 py-2 text-sm focus:ring-1 focus:ring-primary/30 outline-none"
+                  className="w-full bg-secondary/50 border-0 rounded-xl px-3 py-2 text-base md:text-sm focus:ring-1 focus:ring-primary/30 outline-none"
                   autoFocus
                 />
               </div>
@@ -563,7 +567,7 @@ export function FocusScratchpad({
                   value={linkTitle}
                   onChange={(e) => setLinkTitle(e.target.value)}
                   placeholder={t('輸入自訂標題...')}
-                  className="w-full bg-secondary/50 border-0 rounded-xl px-3 py-2 text-sm focus:ring-1 focus:ring-primary/30 outline-none"
+                  className="w-full bg-secondary/50 border-0 rounded-xl px-3 py-2 text-base md:text-sm focus:ring-1 focus:ring-primary/30 outline-none"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !isImeComposing(e)) addLinkItem()
                   }}
@@ -587,9 +591,10 @@ export function FocusScratchpad({
             </div>
           )}
 
+          <h3 className="text-sm font-medium mb-3">{t('快速卡片')} <span className="text-muted-foreground">{cards.length}</span></h3>
           {/* Items Grid */}
-          {items.length === 0 ? (
-            <div className="py-16 text-center">
+          {cards.length === 0 ? (
+            <div className="py-4 text-center">
               <div className="w-16 h-16 rounded-3xl bg-secondary/50 flex items-center justify-center mx-auto mb-4">
                 <Sparkles className="w-8 h-8 text-muted-foreground/40" />
               </div>
@@ -604,9 +609,9 @@ export function FocusScratchpad({
               collisionDetection={closestCenter}
               onDragEnd={handleDragEnd}
             >
-              <SortableContext items={items.map(i => i.id)} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[55vh] overflow-y-auto pb-2">
-                  {items.map((item) => (
+              <SortableContext items={cards.map(i => i.id)} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[30dvh] overflow-y-auto pb-2">
+                  {cards.map((item) => (
                     <SortableItem
                       key={item.id}
                       item={item}
@@ -633,8 +638,21 @@ export function FocusScratchpad({
           )}
         </div>
 
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 pb-4">
+          <ScratchpadCanvas
+            key={selectedDate}
+            items={canvasItems}
+            cards={cards}
+            date={selectedDate}
+            readOnly={!isToday}
+            onAddItem={onAddItem}
+            onUpdateItem={onUpdateItem}
+            onDeleteItem={onDeleteItem}
+          />
+        </div>
+
         {/* Close Handle */}
-        <div className="flex justify-center pb-4">
+        {!fill && <div className="flex justify-center pb-4">
           <button
             onClick={() => setIsExpanded(false)}
             className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all active:scale-95"
@@ -642,7 +660,7 @@ export function FocusScratchpad({
             <ChevronUp className="w-3.5 h-3.5" />
             <span>{t('收起白板')}</span>
           </button>
-        </div>
+        </div>}
         </div>
       </div>
     </div>
