@@ -128,7 +128,7 @@ Workspace ─┬─ Category ─── Task ─── (is_meeting? → attendees
 TimeBlock          # 非任務時段（午休、緩衝、專注）
 SlotType           # 可自訂的時間區塊類別系統，可 parent → workspace
 UserSettings       # 視圖範圍、calendar hour range、通知偏好、slot types、會議提醒（localStorage）
-ScratchpadItem     # 白板區塊（text/image/link/todo，可勾選 isChecked、可拖曳排序 sortOrder），依 date 分組、雲端同步；可一鍵升級成任務
+ScratchpadItem     # 白板卡片（text/image/link/todo），依 date 分組、雲端同步；metadata.canvas 保存自由畫布位置與大小
 ```
 
 ## 開發須知
@@ -139,10 +139,12 @@ ScratchpadItem     # 白板區塊（text/image/link/todo，可勾選 isChecked�
 - 跨檔案的 workspace 樹狀走訪用 [lib/task-utils.ts](lib/task-utils.ts) 的 `forEachTask / findTaskById / filterTasks`，不要自己寫 nested for
 - 部署到 Zeabur，`pnpm install --no-optional` 跳過 ESLint dependency tree（lint 走 optionalDependencies）
 - 新增功能時記得同步更新 [components/onboarding-tour.tsx](components/onboarding-tour.tsx) 的 spotlight steps
-- 白板（scratchpad）走 `scratchpad_items` 雲端表（block 模型 schema 見 migration `0011`：`type` 改為 text 欄，加 `sort_order`/`is_checked`/`parent_id`/`metadata`）；首次載入會自動把舊 localStorage `scratchpad-YYYY-MM-DD` 鍵搬遷上去（一次性，記在 `waddle-scratchpad-migrated-v1` flag）。常用連結用 upsert 寫 `user_settings.quick_links`，避免 row 缺失時 silently 0-rows。
+- 白板（scratchpad）走 `scratchpad_items` 雲端表（block 模型 schema 見 migration `0011`）。上方快速卡片與下方每日自由畫布共用同一筆資料與 ID；卡片進入畫布時只於 `metadata.canvas` 保存 `x/y/width/height`，移回上方時清除這段 metadata，不複製內容。手寫筆跡以圖片卡片儲存，也能移動與調整大小。所有新增、編輯、排序、刪除與清空寫入依序處理，避免位置或新卡片被舊請求覆蓋。首次載入會自動把舊 localStorage `scratchpad-YYYY-MM-DD` 鍵搬遷上去（一次性，記在 `waddle-scratchpad-migrated-v1` flag）。常用連結用 upsert 寫 `user_settings.quick_links`，避免 row 缺失時 silently 0-rows。
 
 ## 發布紀律
 
 此個人專案的有意義變更完成驗證後須 commit、push 並建立 PR；使用者已授權直接合併 PR。`main` 合併會自動部署至 [Zeabur 正式站](https://waddle.zeabur.app)。發布時分別確認提交、遠端推送、PR 合併、該 SHA 的部署結果與線上功能，保留不相關的未完成工作。
 
 分類進度看板的操作回歸：`node scripts/e2e/focus-progress-verify.mjs`（讀取 `.env.e2e.local` 測試登入；任務與設定寫入全部攔截為 mock，不修改真實資料）。設定沿用 `user_settings.focus_board` JSONB；狀態文字不會自動新增任務，隱藏卡片不刪除其設定或原任務。
+
+自由畫布回歸：`node scripts/e2e/scratchpad-canvas-verify.mjs`（同樣將 `scratchpad_items` 的所有寫入攔截為 mock），驗證原卡片保留、同 ID 移入／移回、拖曳與縮放只在操作結束寫入、失敗回滾、重新整理還原、手寫與 320/390/430 px 手機寬度。

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { seedUserData } from '@/lib/supabase/seed'
-import type { Json } from '@/lib/supabase/database.types'
+import type { Database, Json } from '@/lib/supabase/database.types'
 import {
   rowToTask,
   rowToTimeBlock,
@@ -159,6 +159,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   },
 }
 
+type ScratchpadUpdate = Database['public']['Tables']['scratchpad_items']['Update']
+
 interface UseWaddleData {
   workspaces: Workspace[]
   timeBlocks: TimeBlock[]
@@ -239,7 +241,23 @@ export function useWaddleData(): UseWaddleData {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([])
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
-  const [scratchpadByDate, setScratchpadByDate] = useState<Record<string, ScratchpadItem[]>>({})
+  const [scratchpadByDate, commitScratchpadByDate] = useState<Record<string, ScratchpadItem[]>>({})
+  const scratchpadRef = useRef<Record<string, ScratchpadItem[]>>({})
+  // A single FIFO includes date-wide clear and reorder operations, so a
+  // pending insert cannot land after its delete or overwrite a later edit.
+  const scratchpadWriteTailRef = useRef<Promise<unknown>>(Promise.resolve())
+  const enqueueScratchpadWrite = useCallback(<T,>(write: () => PromiseLike<T>): Promise<T> => {
+    const result = scratchpadWriteTailRef.current.catch(() => undefined).then(write)
+    scratchpadWriteTailRef.current = result
+    return result
+  }, [])
+  // Resolve mutation snapshots synchronously. React may defer/replay state
+  // updaters, so request payloads and rollback data must never depend on them.
+  const setScratchpadByDate = useCallback((action: Record<string, ScratchpadItem[]> | ((previous: Record<string, ScratchpadItem[]>) => Record<string, ScratchpadItem[]>)) => {
+    const next = typeof action === 'function' ? action(scratchpadRef.current) : action
+    scratchpadRef.current = next
+    commitScratchpadByDate(next)
+  }, [])
   const [isLoading, setIsLoading] = useState(true)
   const [onboardingCompleted, setOnboardingCompleted] = useState(true)
   const userIdRef = useRef<string | null>(null)
@@ -2831,20 +2849,15 @@ export function useWaddleData(): UseWaddleData {
   // ═════════════════════════════════════════════════════
 
   const addScratchpadItem = useCallback(async (date: string, item: ScratchpadItem) => {
-    const userId = requireUserId()
-    // Assign sort_order from the authoritative current state (not the caller's
-    // possibly-stale snapshot) so two quick adds can't collide — append to the
-    // bottom with a gap of 10.
-    let placed = item
-    setScratchpadByDate((prev) => {
-      const existing = prev[date] ?? []
-      const nextOrder = existing.length ? Math.max(...existing.map((i) => i.sortOrder)) + 10 : 0
-      placed = { ...item, sortOrder: nextOrder }
-      return { ...prev, [date]: [...existing, placed] }
-    })
+    const userId = userIdRef.current
+    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    const existing = scratchpadRef.current[date] ?? []
+    const nextOrder = existing.length ? Math.max(...existing.map((i) => i.sortOrder)) + 10 : 0
+    const placed = { ...item, sortOrder: nextOrder }
+    setScratchpadByDate((prev) => ({ ...prev, [date]: [...(prev[date] ?? []), placed] }))
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
-      const { error } = await supabase.from('scratchpad_items').insert({
+      const { error } = await enqueueScratchpadWrite(() => supabase.from('scratchpad_items').insert({
         id: placed.id,
         user_id: userId,
         date,
@@ -2854,173 +2867,156 @@ export function useWaddleData(): UseWaddleData {
         is_checked: placed.isChecked ?? false,
         sort_order: placed.sortOrder,
         parent_id: placed.parentId ?? null,
-        metadata: (placed.metadata as any) ?? null,
-      })
-      if (error) {
-        setScratchpadByDate((prev) => ({
-          ...prev,
-          [date]: (prev[date] ?? []).filter((i) => i.id !== placed.id),
-        }))
-        handleDbError('儲存白板')(error)
-      }
+        metadata: (placed.metadata ?? null) as never,
+      }))
+      if (error) throw error
+    } catch (error) {
+      setScratchpadByDate((prev) => ({
+        ...prev,
+        [date]: (prev[date] ?? []).filter((i) => i.id !== placed.id),
+      }))
+      handleDbError('儲存白板')(error)
     } finally {
       pendingWritesRef.current -= 1
     }
-  }, [supabase])
+  }, [supabase, setScratchpadByDate, enqueueScratchpadWrite])
 
   const deleteScratchpadItem = useCallback(async (id: string) => {
-    let removedFromDate: string | null = null
-    let removedItem: ScratchpadItem | null = null
-    setScratchpadByDate((prev) => {
-      const next: Record<string, ScratchpadItem[]> = {}
-      for (const [date, items] of Object.entries(prev)) {
-        const found = items.find((i) => i.id === id)
-        if (found) {
-          removedFromDate = date
-          removedItem = found
-          next[date] = items.filter((i) => i.id !== id)
-        } else {
-          next[date] = items
-        }
-      }
-      return next
-    })
+    const userId = userIdRef.current
+    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    const entry = Object.entries(scratchpadRef.current).find(([, items]) => items.some((i) => i.id === id))
+    if (!entry) return
+    const [date, items] = entry
+    const removed = items.find((i) => i.id === id)!
+    setScratchpadByDate((prev) => ({ ...prev, [date]: (prev[date] ?? []).filter((i) => i.id !== id) }))
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
-      const { error } = await supabase.from('scratchpad_items').delete().eq('id', id)
-      if (error) {
-        if (removedFromDate && removedItem) {
-          setScratchpadByDate((prev) => ({
-            ...prev,
-            [removedFromDate!]: [...(prev[removedFromDate!] ?? []), removedItem!].sort((a, b) => a.sortOrder - b.sortOrder),
-          }))
-        }
-        handleDbError('刪除白板項目')(error)
-      }
+      const { error } = await enqueueScratchpadWrite(() => supabase.from('scratchpad_items')
+        .delete().eq('id', id).eq('user_id', userId))
+      if (error) throw error
+    } catch (error) {
+      setScratchpadByDate((prev) => ({
+        ...prev,
+        [date]: (prev[date] ?? []).some((i) => i.id === id)
+          ? prev[date]
+          : [...(prev[date] ?? []), removed].sort((a, b) => a.sortOrder - b.sortOrder),
+      }))
+      handleDbError('刪除白板項目')(error)
     } finally {
       pendingWritesRef.current -= 1
     }
-  }, [supabase])
+  }, [supabase, setScratchpadByDate, enqueueScratchpadWrite])
 
-  const updateScratchpadItem = useCallback(
-    async (id: string, patch: Partial<ScratchpadItem>) => {
-      let editedDate: string | null = null
-      let previous: ScratchpadItem | null = null
-      setScratchpadByDate((prev) => {
-        const next: Record<string, ScratchpadItem[]> = {}
-        for (const [date, items] of Object.entries(prev)) {
-          const found = items.find((i) => i.id === id)
-          if (found) {
-            editedDate = date
-            previous = { ...found }
-            next[date] = items.map((i) =>
-              i.id === id
-                ? {
-                    ...i,
-                    ...patch,
-                  }
-                : i,
-            )
-          } else {
-            next[date] = items
+  const updateScratchpadItem = useCallback(async (id: string, patch: Partial<ScratchpadItem>) => {
+    const userId = userIdRef.current
+    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    const entry = Object.entries(scratchpadRef.current).find(([, items]) => items.some((i) => i.id === id))
+    if (!entry) { toast.error('儲存失敗：找不到白板項目，請重新整理'); return }
+    const [date, items] = entry
+    const previous = items.find((i) => i.id === id)!
+    const optimistic = { ...previous, ...patch }
+    setScratchpadByDate((prev) => ({
+      ...prev,
+      [date]: (prev[date] ?? []).map((i) => i.id === id ? optimistic : i),
+    }))
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
+    try {
+      const dbPatch: ScratchpadUpdate = {}
+      if (patch.content !== undefined) dbPatch.content = patch.content
+      if (patch.title !== undefined) dbPatch.title = patch.title
+      if (patch.type !== undefined) dbPatch.type = patch.type
+      if (patch.isChecked !== undefined) dbPatch.is_checked = patch.isChecked
+      if (patch.sortOrder !== undefined) dbPatch.sort_order = patch.sortOrder
+      if (patch.parentId !== undefined) dbPatch.parent_id = patch.parentId
+      if (patch.metadata !== undefined) dbPatch.metadata = patch.metadata as ScratchpadUpdate['metadata']
+      const { error } = await enqueueScratchpadWrite(() => supabase.from('scratchpad_items')
+        .update(dbPatch).eq('id', id).eq('user_id', userId).select('id').single())
+      if (error) throw error
+    } catch (error) {
+      // Restore only fields still owned by this optimistic edit. Another item's
+      // content, or a later edit to this item, must survive this request's failure.
+      setScratchpadByDate((prev) => ({
+        ...prev,
+        [date]: (prev[date] ?? []).map((item) => {
+          if (item.id !== id) return item
+          const restore = { ...item }
+          for (const key of Object.keys(patch) as (keyof ScratchpadItem)[]) {
+            if (Object.is(item[key], optimistic[key])) {
+              Object.assign(restore, { [key]: previous[key] })
+            }
           }
-        }
-        return next
-      })
-      if (!editedDate || !previous) return
-      pendingWritesRef.current += 1; mutationSeqRef.current += 1
-      try {
-        const dbPatch: any = {}
-        if (patch.content !== undefined) dbPatch.content = patch.content
-        if (patch.title !== undefined) dbPatch.title = patch.title
-        if (patch.type !== undefined) dbPatch.type = patch.type
-        if (patch.isChecked !== undefined) dbPatch.is_checked = patch.isChecked
-        if (patch.sortOrder !== undefined) dbPatch.sort_order = patch.sortOrder
-        if (patch.parentId !== undefined) dbPatch.parent_id = patch.parentId
-        if (patch.metadata !== undefined) dbPatch.metadata = patch.metadata
-
-        const { error } = await supabase
-          .from('scratchpad_items')
-          .update(dbPatch)
-          .eq('id', id)
-        if (error) {
-          setScratchpadByDate((prev) => ({
-            ...prev,
-            [editedDate!]: (prev[editedDate!] ?? []).map((i) =>
-              i.id === id ? previous! : i,
-            ),
-          }))
-          handleDbError('編輯白板項目')(error)
-        }
-      } finally {
-        pendingWritesRef.current -= 1
-      }
-    },
-    [supabase],
-  )
+          return restore
+        }),
+      }))
+      handleDbError('編輯白板項目')(error)
+    } finally {
+      pendingWritesRef.current -= 1
+    }
+  }, [supabase, setScratchpadByDate, enqueueScratchpadWrite])
 
   const reorderScratchpadItems = useCallback(async (date: string, items: ScratchpadItem[]) => {
-    const userId = requireUserId()
-    // Capture the pre-reorder list from authoritative state (guarded against an
-    // absent key) so an error rollback can't write `undefined` into the bucket.
-    let previousItems: ScratchpadItem[] = []
-    setScratchpadByDate((prev) => {
-      previousItems = prev[date] ?? []
-      return { ...prev, [date]: items }
-    })
-
+    const userId = userIdRef.current
+    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    const previousOrders = new Map((scratchpadRef.current[date] ?? []).map((i) => [i.id, i.sortOrder]))
+    const orders = new Map(items.filter((i) => previousOrders.has(i.id)).map((i) => [i.id, i.sortOrder]))
+    // The caller may hold stale content/geometry or omit newly created items.
+    // Only merge the requested order; never replace or upsert whole records.
+    setScratchpadByDate((prev) => ({
+      ...prev,
+      [date]: (prev[date] ?? []).map((i) => orders.has(i.id) ? { ...i, sortOrder: orders.get(i.id)! } : i)
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    }))
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
-      // Persist the whole reordered set in ONE upsert. A single statement avoids
-      // the partial-failure window of N parallel UPDATEs (some rows commit, others
-      // don't → DB half-reordered). Full rows are required because upsert's INSERT
-      // path must satisfy the NOT NULL columns.
-      const rows = items.map((item) => ({
-        id: item.id,
-        user_id: userId,
-        date,
-        type: item.type,
-        content: item.content,
-        title: item.title ?? null,
-        is_checked: item.isChecked ?? false,
-        sort_order: item.sortOrder,
-        parent_id: item.parentId ?? null,
-        metadata: (item.metadata as any) ?? null,
-      }))
-      const { error } = await supabase.from('scratchpad_items').upsert(rows)
-      if (error) {
-        setScratchpadByDate((prev) => ({ ...prev, [date]: previousItems }))
-        handleDbError('重新排序白板')(error)
-      }
+      await enqueueScratchpadWrite(async () => {
+        await Promise.all(Array.from(orders, async ([id, sortOrder]) => {
+          try {
+            const { error } = await supabase.from('scratchpad_items')
+              .update({ sort_order: sortOrder }).eq('id', id).eq('user_id', userId).select('id').single()
+            if (error) throw error
+          } catch (error) {
+            // A partial failure restores only this item's unchanged order;
+            // successful orders, newer edits and additional items remain intact.
+            setScratchpadByDate((prev) => ({
+              ...prev,
+              [date]: (prev[date] ?? []).map((i) => i.id === id && i.sortOrder === sortOrder
+                ? { ...i, sortOrder: previousOrders.get(id)! } : i).sort((a, b) => a.sortOrder - b.sortOrder),
+            }))
+            handleDbError('重新排序白板')(error)
+          }
+        }))
+      })
     } finally {
       pendingWritesRef.current -= 1
     }
-  }, [supabase])
+  }, [supabase, setScratchpadByDate, enqueueScratchpadWrite])
 
   const clearScratchpadDate = useCallback(async (date: string) => {
-    const userId = requireUserId()
-    let snapshot: ScratchpadItem[] = []
+    const userId = userIdRef.current
+    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    const snapshot = scratchpadRef.current[date] ?? []
     setScratchpadByDate((prev) => {
-      snapshot = prev[date] ?? []
       const next = { ...prev }
       delete next[date]
       return next
     })
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
-      const { error } = await supabase
-        .from('scratchpad_items')
-        .delete()
-        .eq('user_id', userId)
-        .eq('date', date)
-      if (error) {
-        setScratchpadByDate((prev) => ({ ...prev, [date]: snapshot }))
-        handleDbError('清空白板')(error)
-      }
+      const { error } = await enqueueScratchpadWrite(() => supabase.from('scratchpad_items')
+        .delete().eq('user_id', userId).eq('date', date))
+      if (error) throw error
+    } catch (error) {
+      setScratchpadByDate((prev) => {
+        const current = prev[date] ?? []
+        const currentIds = new Set(current.map((i) => i.id))
+        return { ...prev, [date]: [...current, ...snapshot.filter((i) => !currentIds.has(i.id))]
+          .sort((a, b) => a.sortOrder - b.sortOrder) }
+      })
+      handleDbError('清空白板')(error)
     } finally {
       pendingWritesRef.current -= 1
     }
-  }, [supabase])
+  }, [supabase, setScratchpadByDate, enqueueScratchpadWrite])
 
   const completeOnboarding = useCallback(async () => {
     const userId = requireUserId()
