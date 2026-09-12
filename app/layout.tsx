@@ -25,11 +25,24 @@ const notoSansTC = Noto_Sans_TC({
 })
 
 export const metadata: Metadata = {
-  title: 'Huddle | Unified Workspace',
+  metadataBase: new URL('https://waddle.zeabur.app'),
+  title: 'Huddle｜慢慢搖擺，把事情做完',
   description:
-    'Huddle — a unified workspace that merges task management, time-block scheduling, and daily journaling into a single split-screen interface. Take it slow, get it done.',
-  generator: 'v0.app',
+    '把任務、行程、專注與筆記收進同一張桌面。Huddle 是一個溫柔、不催促的個人工作空間。',
   applicationName: 'Huddle',
+  openGraph: {
+    title: 'Huddle｜慢慢搖擺，把事情做完',
+    description: '把任務、行程、專注與筆記收進同一張桌面。',
+    type: 'website',
+    locale: 'zh_TW',
+    images: [{ url: '/app-icon-512.png', width: 512, height: 512, alt: 'Huddle' }],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Huddle｜慢慢搖擺，把事情做完',
+    description: '把任務、行程、專注與筆記收進同一張桌面。',
+    images: ['/app-icon-512.png'],
+  },
   appleWebApp: {
     capable: true,
     title: 'Huddle',

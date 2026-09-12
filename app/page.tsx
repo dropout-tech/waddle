@@ -23,6 +23,9 @@ import { WaterReminderModal } from '@/components/modals/water-reminder-modal'
 import { toDateString } from '@/lib/calendar-utils'
 import { findTaskById } from '@/lib/task-utils'
 import { resolveDefaultCategory, resolveGlobalDefaultCategory } from '@/lib/default-category'
+import { useAuth } from '@/components/auth/auth-provider'
+import { MarketingPage } from '@/components/marketing/marketing-page'
+import { isDesktop, isNative } from '@/lib/platform'
 import { AuthGuard } from '@/components/auth/auth-guard'
 import { CategoryPrefixProvider } from '@/components/category-prefix-context'
 import { NotebookOverlayProvider } from '@/components/notebook/notebook-overlay-provider'
@@ -593,13 +596,25 @@ function HuddlePage() {
   )
 }
 
-// AuthGuard ensures HuddlePage (and its legacy data hook) only mounts for an
-// authenticated user; otherwise it redirects to /login. This replaces the
-// server middleware that previously gated this route.
 export default function Page() {
+  const { session, loading } = useAuth()
+
+  if (loading) {
+    // Keep the static response useful to visitors and search engines instead
+    // of shipping a loader-only first page while the local session resolves.
+    return <MarketingPage />
+  }
+
+  // Native shells keep their direct-to-login behavior. On the public web,
+  // the root route now doubles as Huddle's product website for new visitors.
+  if (!session) {
+    if (isNative() || isDesktop()) {
+      return <AuthGuard><HuddlePage /></AuthGuard>
+    }
+    return <MarketingPage />
+  }
+
   return (
-    <AuthGuard>
-      <HuddlePage />
-    </AuthGuard>
+    <HuddlePage />
   )
 }
