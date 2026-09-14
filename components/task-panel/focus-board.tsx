@@ -4,6 +4,8 @@ import { useState } from "react";
 import {
   CheckCircle2,
   Circle,
+  ChevronDown,
+  ChevronUp,
   LayoutGrid,
   List,
   Pencil,
@@ -45,6 +47,7 @@ export function FocusBoard(props: FocusBoardProps) {
     }
   });
   const [saving, setSaving] = useState(false);
+  const [taskViews, setTaskViews] = useState<Record<string, "preview" | "expanded" | "collapsed">>({});
   const cards = focus.cards ?? defaultCards(workspaces, todayStr);
   const entries = cards
     .filter((c) => !c.hidden)
@@ -91,11 +94,22 @@ export function FocusBoard(props: FocusBoardProps) {
     <div data-testid="focus-board" className="min-w-0">
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <h2 className="mr-auto text-xl font-semibold">{t("當前重點")}</h2>
+        <div className="flex gap-1">
+          <button type="button" onClick={() => setTaskViews(Object.fromEntries(cards.map(c => [c.categoryId, "expanded"]))) } className="min-h-11 rounded-lg px-3 text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">{t("全部展開")}</button>
+          <button type="button" onClick={() => setTaskViews(Object.fromEntries(cards.map(c => [c.categoryId, "collapsed"]))) } className="min-h-11 rounded-lg px-3 text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">{t("全部收起")}</button>
+        </div>
         <input
           aria-label={t("搜尋分類或任務")}
           placeholder={t("搜尋分類或任務")}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            // Search includes every task, so matching tasks beyond the preview
+            // must be visible. Clearing search restores the compact default.
+            setTaskViews(e.target.value.trim()
+              ? Object.fromEntries(cards.map(c => [c.categoryId, "expanded"]))
+              : {});
+          }}
           className="h-11 min-w-0 flex-1 basis-48 rounded-lg border border-border bg-card px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <div className="flex shrink-0 gap-1">
@@ -143,7 +157,7 @@ export function FocusBoard(props: FocusBoardProps) {
       )}
       <div
         className={cn(
-          "grid items-start gap-5",
+          "grid items-start gap-3",
           layout === "card" &&
             "grid-cols-[repeat(auto-fit,minmax(min(100%,26rem),1fr))]",
         )}
@@ -156,6 +170,8 @@ export function FocusBoard(props: FocusBoardProps) {
             workspace={workspace}
             category={category}
             saving={saving}
+            taskView={taskViews[category.id] ?? "preview"}
+            onTaskViewChange={(value) => setTaskViews(previous => ({ ...previous, [category.id]: value }))}
             onUpdate={(patch) => update(category.id, patch)}
           />
         ))}
@@ -184,16 +200,20 @@ function ProgressCard({
   onToggleComplete,
   onAddTask,
   onSetFocusBoard,
+  taskView,
+  onTaskViewChange,
 }: FocusBoardProps & {
   card: FocusCard;
   workspace: Workspace;
   category: Workspace["categories"][number];
   saving: boolean;
   onUpdate: (patch: Partial<FocusCard>) => Promise<void>;
+  taskView: "preview" | "expanded" | "collapsed";
+  onTaskViewChange: (value: "preview" | "expanded" | "collapsed") => void;
 }) {
   const { t } = useI18n();
   const displayColor = useDisplayColor();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState<"all" | "status" | "remarks" | null>(null);
   const [text, setText] = useState("");
   const [remarks, setRemarks] = useState("");
   const [mode, setMode] = useState<"text" | "task">("text");
@@ -237,7 +257,7 @@ function ProgressCard({
   const editable = !!onSetFocusBoard;
   const field =
     "min-h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-  function edit() {
+  function edit(target: "all" | "status" | "remarks" = "all") {
     setMode(card.status?.mode === "task" ? "task" : "text");
     setTaskId(linked?.id ?? "");
     setText(
@@ -246,12 +266,12 @@ function ProgressCard({
         : (card.note ?? ""),
     );
     setRemarks(card.remarks ?? "");
-    setEditing(true);
+    setEditing(target);
   }
   return (
     <article
       data-focus-card={category.id}
-      className="min-w-0 rounded-xl border border-border bg-card p-5 sm:p-6"
+      className="min-w-0 rounded-xl border border-border bg-card p-3 sm:p-4"
     >
       <div className="flex items-start gap-3">
         <span
@@ -261,7 +281,7 @@ function ProgressCard({
         <div className="min-w-0 flex-1">
           <h3
             data-focus-card-title
-            className="break-words text-2xl font-semibold leading-snug"
+            className="break-words text-lg font-semibold leading-snug"
           >
             {category.name}
           </h3>
@@ -273,7 +293,7 @@ function ProgressCard({
           <button
             aria-label={t("編輯「{name}」狀態與備註", { name: category.name })}
             disabled={saving}
-            onClick={edit}
+            onClick={() => edit()}
             className="-mr-2 -mt-2 flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Pencil className="size-4" />
@@ -282,15 +302,20 @@ function ProgressCard({
       </div>
       {editing ? (
         <form
-          className="mt-5 space-y-3"
+          className="mt-3 space-y-3"
           onKeyDown={(e) => {
             if (e.key === "Enter" && isImeComposing(e)) e.preventDefault();
+            if (e.key === "Escape" && !isImeComposing(e)) {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!saving) setEditing(null);
+            }
           }}
           onSubmit={async (e) => {
             e.preventDefault();
             try {
               await onUpdate({
-                status:
+                ...(editing !== "remarks" ? { status:
                   mode === "task"
                     ? {
                         mode: "task",
@@ -301,15 +326,16 @@ function ProgressCard({
                         mode: "text",
                         text: text.trim(),
                         updatedAt: new Date().toISOString(),
-                      },
-                remarks: remarks.trim(),
+                      } } : {}),
+                ...(editing !== "status" ? { remarks: remarks.trim() } : {}),
               });
-              setEditing(false);
+              setEditing(null);
             } catch {
               toast.error(t("儲存失敗，請重試"));
             }
           }}
         >
+          {editing !== "remarks" && <>
           <label className="block space-y-1 text-sm">
             <span>{t("目前狀態")}</span>
             <select
@@ -325,6 +351,7 @@ function ProgressCard({
             <>
               <input
                 aria-label={t("自訂狀態")}
+                autoFocus
                 className={field}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -337,6 +364,7 @@ function ProgressCard({
           ) : (
             <select
               aria-label={t("選擇狀態任務")}
+              autoFocus
               required
               className={field}
               value={taskId}
@@ -351,19 +379,21 @@ function ProgressCard({
               ))}
             </select>
           )}
-          <label className="block space-y-1 text-sm">
+          </>}
+          {editing !== "status" && <label className="block space-y-1 text-sm">
             <span>{t("備註")}</span>
             <textarea
               className={field}
+              autoFocus={editing === "remarks"}
               rows={3}
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               maxLength={10000}
             />
-          </label>
+          </label>}
           <div className="flex gap-2">
             <button
-              disabled={saving || (mode === "task" && !taskId)}
+              disabled={saving || (editing !== "remarks" && mode === "task" && !taskId)}
               className="min-h-11 rounded-lg bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50"
             >
               {t(saving ? "儲存中…" : "儲存")}
@@ -371,7 +401,7 @@ function ProgressCard({
             <button
               type="button"
               disabled={saving}
-              onClick={() => setEditing(false)}
+              onClick={() => setEditing(null)}
               className="min-h-11 rounded-lg px-4 text-sm hover:bg-muted"
             >
               {t("取消")}
@@ -379,12 +409,17 @@ function ProgressCard({
           </div>
         </form>
       ) : (
-        <div className="mt-5 space-y-4">
-          <div>
+        <div className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+          <div className="min-w-0 [overflow-wrap:anywhere]">
             <p className="mb-1 text-xs font-medium text-muted-foreground">
               {t("目前狀態")}
             </p>
-            {linked ? (
+            {editable ? (
+              <button type="button" disabled={saving} onClick={() => edit("status")} aria-label={t("編輯「{name}」目前狀態", { name: category.name })} className="min-h-11 w-full min-w-0 rounded-md px-1 py-1 text-left text-sm whitespace-pre-wrap break-words hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+                {linked && <Target className="mr-1.5 inline size-4" />}
+                {statusText || t(card.status?.mode === "task" ? "原任務已移動或移除，請重新設定狀態" : "尚未設定狀態")}
+              </button>
+            ) : linked ? (
               <button
                 onClick={() => onSelectTask(linked)}
                 className="min-h-11 w-full min-w-0 max-w-full break-words text-left text-base font-medium leading-relaxed hover:underline"
@@ -407,6 +442,7 @@ function ProgressCard({
                   )}
               </p>
             )}
+            {editable && linked && <button type="button" onClick={() => onSelectTask(linked)} className="min-h-11 rounded-md px-2 text-xs text-primary hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">{t("開啟原任務")}</button>}
             {editable &&
               statusText &&
               card.status?.mode !== "task" &&
@@ -442,24 +478,27 @@ function ProgressCard({
                 </button>
               )}
           </div>
-          <div>
+          <div className="min-w-0 [overflow-wrap:anywhere]">
             <p className="mb-1 text-xs font-medium text-muted-foreground">
               {t("備註")}
             </p>
-            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">
+            {editable ? <button type="button" disabled={saving} onClick={() => edit("remarks")} aria-label={t("編輯「{name}」備註", { name: category.name })} className="min-h-11 w-full min-w-0 rounded-md px-1 py-1 text-left text-sm whitespace-pre-wrap break-words text-muted-foreground hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
               {card.remarks || t("尚無備註")}
-            </p>
+            </button> : <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">
+              {card.remarks || t("尚無備註")}
+            </p>}
           </div>
         </div>
       )}
-      <div className="mt-5 border-t border-border pt-4">
+      <div className="mt-2 border-t border-border pt-1">
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-          <p>
+          <button type="button" aria-label={t(taskView === "collapsed" ? "展開「{name}」任務" : "收起「{name}」任務", { name: category.name })} aria-expanded={taskView !== "collapsed"} onClick={() => onTaskViewChange(taskView === "collapsed" ? "preview" : "collapsed")} className="flex min-h-11 items-center gap-1 rounded-md px-1 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+            {taskView === "collapsed" ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}
             {t("任務")}{" "}
             <span className="ml-1 text-muted-foreground">
               {done} / {tasks.length} {t("已完成")}
             </span>
-          </p>
+          </button>
           {editable && (
             <select
               aria-label={t("「{name}」任務排序", { name: category.name })}
@@ -479,6 +518,7 @@ function ProgressCard({
             </select>
           )}
         </div>
+        {taskView !== "collapsed" && <>
         {editable && (
           <label className="mt-1 flex min-h-11 items-center gap-2 text-xs text-muted-foreground">
             <input
@@ -494,9 +534,9 @@ function ProgressCard({
             {t("顯示已完成任務")}
           </label>
         )}
-        <ul className="mt-2 divide-y divide-border/50">
-          {sorted.map((task) => (
-            <li key={task.id} className="flex min-w-0 items-center gap-1 py-1">
+        <ul className="divide-y divide-border/50">
+          {(taskView === "expanded" ? sorted : sorted.slice(0, 4)).map((task) => (
+            <li key={task.id} className="flex min-w-0 items-center gap-1">
               <button
                 aria-label={t(
                   task.isCompleted
@@ -516,7 +556,7 @@ function ProgressCard({
               </button>
               <button
                 onClick={() => onSelectTask(task)}
-                className="min-h-11 min-w-0 flex-1 rounded-lg px-1 py-2 text-left hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
+                className="min-h-11 min-w-0 flex-1 rounded-lg px-1 py-1 text-left hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span
                   className={cn(
@@ -526,10 +566,7 @@ function ProgressCard({
                 >
                   {task.title}
                 </span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  {t(task.isCompleted ? "已完成" : "待辦")}
-                  {task.dueDate ? ` · ${task.dueDate}` : ""}
-                </span>
+                {task.dueDate && <span className="text-xs text-muted-foreground">{task.dueDate}</span>}
               </button>
               {editable && (
                 <button
@@ -560,11 +597,13 @@ function ProgressCard({
             </li>
           ))}
         </ul>
+        {sorted.length > 4 && <button type="button" aria-expanded={taskView === "expanded"} onClick={() => onTaskViewChange(taskView === "expanded" ? "preview" : "expanded")} className="min-h-11 w-full rounded-md px-2 text-sm text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">{taskView === "expanded" ? t("只顯示 4 個任務") : t("展開其餘 {count} 個任務", { count: sorted.length - 4 })}</button>}
         {sorted.length === 0 && (
           <p className="py-4 text-sm text-muted-foreground">
             {t(tasks.length ? "目前沒有待辦任務" : "這個分類還沒有任務")}
           </p>
         )}
+        </>}
       </div>
     </article>
   );
