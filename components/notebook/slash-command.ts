@@ -67,7 +67,10 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
               popup.className = 'nb-slash-menu fixed z-50'
               popup.style.display = props.items.length === 0 ? 'none' : ''
               popup.appendChild(component.element)
-              document.body.appendChild(popup)
+              // Whiteboard uses a focused document layer. Keep its menu within
+              // the dialog so modal pointer/focus guards permit interaction.
+              const overlay = props.editor.view.dom.closest('[data-whiteboard-detail]')
+              ;(overlay ?? document.body).appendChild(popup)
               position(props.clientRect?.())
             },
             onUpdate: (props) => {

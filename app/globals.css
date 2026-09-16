@@ -670,6 +670,24 @@
   text-decoration: line-through;
 }
 
+/* Whiteboard checklists retain the notebook's small check mark while giving
+   fingers a full touch target and aligning the first text line with it. */
+@media (max-width: 767px) {
+  [data-whiteboard-detail] .nb-prose ul[data-type='taskList'] li > label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 44px;
+    min-width: 44px;
+    min-height: 44px;
+    margin-top: 0;
+  }
+  [data-whiteboard-detail] .nb-prose ul[data-type='taskList'] li > div {
+    min-height: 44px;
+    padding-top: 8px;
+  }
+}
+
 /* Toggle / collapsible (details extension) */
 .nb-prose .nb-details {
   border: 1px solid var(--border);
