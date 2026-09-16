@@ -3,8 +3,8 @@
 /**
  * 便條紙視窗裡的專注白板。
  *
- * 直接重用主視窗的 `<FocusScratchpad>`（同一份卡片 grid、同一套拖曳排序、
- * 同一個貼圖流程），只是換成 `fill` 版面填滿整個視窗、並改吃輕量的
+ * 直接重用主視窗的 `<FocusScratchpad>`（同一份白板與內容編輯器），
+ * 只是換成 `fill` 版面填滿整個視窗、並改吃輕量的
  * `useScratchpad()` 資料層而不是整套 useWaddleData。
  *
  * 「升級為任務」在這裡刻意不接：建立任務要選工作區/分類，那是主視窗的事。
@@ -19,7 +19,7 @@ export function FloatingScratchpad() {
   const { scratchpadByDate, loading, addItem, updateItem, deleteItem, reorderItems, clearDate } =
     useScratchpad()
 
-  useEffect(() => { document.title = `📌 ${t('專注白板')}` }, [t])
+  useEffect(() => { document.title = t('白板') }, [t])
 
   if (loading) {
     return (

@@ -1,5 +1,12 @@
 // English dictionary fragment — keys are the Traditional Chinese source strings.
 export const dict: Record<string, string> = {
+  '白板日期': 'Whiteboard date',
+  '上一個日期': 'Previous date',
+  '下一個日期': 'Next date',
+  '白板內容': 'Whiteboard content',
+  '返回白板': 'Back to whiteboard',
+  '唯讀': 'Read only',
+  '可使用記事本的文字格式、清單與圖片。': 'Use notebook formatting, lists, and images.',
   // Editor toolbar / selection toolbar (formatting marks & blocks)
   '標題 1': 'Heading 1',
   '標題 2': 'Heading 2',

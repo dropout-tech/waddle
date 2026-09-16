@@ -16,13 +16,14 @@ const ICON_OPTIONS = [
 ]
 
 interface NoteIconPickerProps {
+  elevated?: boolean
   icon?: string
   onChange?: (icon: string | undefined) => void
 }
 
 // Notion-style leading icon above the title. No icon set yet → a faded 📄
 // placeholder invites the click without implying the note already has one.
-export function NoteIconPicker({ icon, onChange }: NoteIconPickerProps) {
+export function NoteIconPicker({ icon, onChange, elevated = false }: NoteIconPickerProps) {
   const [open, setOpen] = useState(false)
   const { t } = useI18n()
 
@@ -41,7 +42,7 @@ export function NoteIconPicker({ icon, onChange }: NoteIconPickerProps) {
           {icon || '📄'}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-2">
+      <PopoverContent align="start" className={cn("w-64 p-2", elevated && "z-max")}>
         <div className="grid grid-cols-6 gap-1">
           {ICON_OPTIONS.map((emoji) => (
             <button

@@ -1,893 +1,125 @@
 'use client'
 
-import { handleExternalAnchorClick } from '@/lib/external-link'
-import { useState, useRef, useEffect, useMemo } from 'react'
-import {
-  ChevronDown, ChevronUp, Image, Link2, Type,
-  Trash2, Calendar, Sparkles, ChevronLeft, ChevronRight,
-  Pencil, Check, GripVertical, Square, CheckSquare, ArrowUpRight
-} from 'lucide-react'
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  rectSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { useEffect, useMemo, useState } from 'react'
+import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
+import { canvasGeometry, type CanvasGeometry } from '@/lib/scratchpad-canvas'
 import { useI18n } from '@/lib/i18n/react'
-import { isImeComposing } from '@/lib/ime'
 import { FloatOutButton } from '@/components/floating/float-out-button'
 import { ScratchpadCanvas } from './scratchpad-canvas'
 import type { ScratchpadItem } from '@/lib/types'
 
 interface FocusScratchpadProps {
   className?: string
-  /**
-   * When provided, the component is controlled — internal isExpanded
-   * state is ignored. Used by the mobile layout so the bottom tab
-   * bar's 白板 button can drive the open state.
-   */
   isOpen?: boolean
   onOpenChange?: (open: boolean) => void
-  /** Hide the built-in pull-down trigger (mobile uses an external button). */
   hideTrigger?: boolean
-  /**
-   * 便條紙視窗模式：面板直接填滿整個視窗，沒有滑入動畫、也不留手機底欄的
-   * 58px 空間。搭配 `hideTrigger` + `isOpen` 使用（見 app/float/scratchpad）。
-   */
   fill?: boolean
-  // Cloud-synced scratchpad — see useWaddleData. Keyed by YYYY-MM-DD.
-  // Items within each date are ordered oldest-first (by sort_order); new
-  // items append to the end, drag reorders persist the new sort_order.
   scratchpadByDate: Record<string, ScratchpadItem[]>
   onAddItem: (date: string, item: ScratchpadItem) => void
   onUpdateItem: (id: string, patch: Partial<ScratchpadItem>) => void
   onDeleteItem: (id: string) => void
+  // Kept for existing callers; the whiteboard no longer has a sortable card grid.
   onReorderItems: (date: string, items: ScratchpadItem[]) => void
   onClearDate: (date: string) => void
-  /**
-   * Promote a scratchpad item to a real Huddle task. The source item is NOT
-   * deleted here — the page deletes it only after the task is actually saved,
-   * so cancelling the task modal leaves the note intact (see app/page.tsx).
-   */
   onPromoteToTask?: (title: string, description: string | undefined, sourceId: string) => void
 }
 
-export function FocusScratchpad({
-  className,
-  isOpen,
-  onOpenChange,
-  hideTrigger,
-  fill,
-  scratchpadByDate,
-  onAddItem,
-  onUpdateItem,
-  onDeleteItem,
-  onReorderItems,
-  onClearDate,
-  onPromoteToTask,
-}: FocusScratchpadProps) {
+function placeLegacyItems(items: ScratchpadItem[], previous: Map<string, CanvasGeometry>) {
+  const positions = new Map(previous)
+  const occupied = items.filter(item => item.metadata?.canvas).map(canvasGeometry)
+  for (const item of items) {
+    const saved = positions.get(item.id)
+    if (!item.metadata?.canvas && saved) occupied.push(saved)
+  }
+  for (const item of items) {
+    if (item.metadata?.canvas || positions.has(item.id)) continue
+    let geometry: CanvasGeometry
+    let index = 0
+    do {
+      geometry = { x: 24 + index % 3 * 304, y: 24 + Math.floor(index / 3) * 244, width: 280, height: 220 }
+      index += 1
+    } while (occupied.some(box => geometry.x < box.x + box.width && geometry.x + geometry.width > box.x && geometry.y < box.y + box.height && geometry.y + geometry.height > box.y))
+    positions.set(item.id, geometry)
+    occupied.push(geometry)
+  }
+  return positions
+}
+
+/** Present legacy quick cards on the board without migrating or duplicating data.
+ * Cache positions for this mounted date so editing one legacy item never moves
+ * the others. Actual movement persists geometry through the usual callback. */
+function DailyWhiteboard({ items, ...props }: {
+  items: ScratchpadItem[]
+  date: string
+  readOnly: boolean
+  onAddItem: FocusScratchpadProps['onAddItem']
+  onUpdateItem: FocusScratchpadProps['onUpdateItem']
+  onDeleteItem: FocusScratchpadProps['onDeleteItem']
+}) {
+  const [positions, setPositions] = useState(() => placeLegacyItems(items, new Map<string, CanvasGeometry>()))
+  const hasNewLegacyItem = items.some(item => !item.metadata?.canvas && !positions.has(item.id))
+  const layout = hasNewLegacyItem ? placeLegacyItems(items, positions) : positions
+  // Adjust only when newly loaded legacy IDs arrive, retaining every earlier
+  // position. The calculation is pure and does not mutate refs during render.
+  if (hasNewLegacyItem) setPositions(layout)
+  const visibleItems = items.map(item => item.metadata?.canvas ? item : {
+    ...item, metadata: { ...item.metadata, canvas: layout.get(item.id)! },
+  })
+  return <ScratchpadCanvas {...props} items={visibleItems} />
+}
+
+export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger, fill, scratchpadByDate, onAddItem, onUpdateItem, onDeleteItem, onClearDate }: FocusScratchpadProps) {
   const { t, lang } = useI18n()
   const todayKey = toDateString(new Date())
   const [internalExpanded, setInternalExpanded] = useState(false)
-  const isControlled = isOpen !== undefined
-  const isExpanded = isControlled ? !!isOpen : internalExpanded
-  const setIsExpanded = (next: boolean) => {
-    if (isControlled) {
-      onOpenChange?.(next)
-    } else {
-      setInternalExpanded(next)
-    }
-  }
+  const isExpanded = isOpen !== undefined ? isOpen : internalExpanded
+  const setIsExpanded = (next: boolean) => isOpen !== undefined ? onOpenChange?.(next) : setInternalExpanded(next)
   const [selectedDate, setSelectedDate] = useState(todayKey)
-  const [inputMode, setInputMode] = useState<'link' | null>(null)
-  const [textInput, setTextInput] = useState('')
-  const [linkInput, setLinkInput] = useState('')
-  const [linkTitle, setLinkTitle] = useState('')
-  const [isDragging, setIsDragging] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editText, setEditText] = useState('')
-  const [editUrl, setEditUrl] = useState('')
-  const [editTitle, setEditTitle] = useState('')
-  const editTextareaRef = useRef<HTMLTextAreaElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-
+  const items = scratchpadByDate[selectedDate] ?? []
   const isToday = selectedDate === todayKey
+  const dates = useMemo(() => Array.from(new Set([todayKey, ...Object.keys(scratchpadByDate).filter(date => scratchpadByDate[date]?.length)])).sort().reverse(), [todayKey, scratchpadByDate])
+  const dateIndex = dates.indexOf(selectedDate)
 
-  // Esc collapses the panel when expanded. If an item is mid-edit, its own
-  // textarea/input already handles Esc locally (cancelEdit) — we skip so
-  // that keypress cancels the edit first instead of yanking the whole panel
-  // shut in one step. A second Esc (once editingId clears) then collapses.
   useEffect(() => {
     if (!isExpanded) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return
-      if (editingId !== null) return
-      setIsExpanded(false)
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented && !event.isComposing) setIsExpanded(false)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setIsExpanded closes over isControlled/onOpenChange, re-created each render; isExpanded/editingId are the only values that should re-trigger this
-  }, [isExpanded, editingId])
+    // The canvas/editor handles Escape first and stops propagation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isExpanded, isOpen, onOpenChange])
 
-  const formatDate = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-').map(Number)
-    const date = new Date(year, month - 1, day)
-    if (lang === 'en') {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', weekday: 'short' })
-    }
-    const weekdays = ['日', '一', '二', '三', '四', '五', '六']
-    const weekday = weekdays[date.getDay()]
-    return `${year}年${month}月${day}日 星期${weekday}`
-  }
+  const dateLabel = new Date(`${selectedDate}T12:00:00`).toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
+  const control = 'inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-2 text-sm hover:bg-secondary disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
 
-  const items = useMemo(
-    () => scratchpadByDate[selectedDate] ?? [],
-    [scratchpadByDate, selectedDate],
-  )
-  const cards = items.filter(item => !item.metadata?.canvas)
-  const canvasItems = items.filter(item => !!item.metadata?.canvas)
-  const savedDates = useMemo(
-    () =>
-      Object.keys(scratchpadByDate)
-        .filter((d) => (scratchpadByDate[d]?.length ?? 0) > 0)
-        .sort()
-        .reverse(),
-    [scratchpadByDate],
-  )
-
-  const goToPreviousDate = () => {
-    const currentIndex = savedDates.indexOf(selectedDate)
-    if (currentIndex < savedDates.length - 1) {
-      setSelectedDate(savedDates[currentIndex + 1])
-    }
-  }
-
-  const goToNextDate = () => {
-    const currentIndex = savedDates.indexOf(selectedDate)
-    if (currentIndex > 0) {
-      setSelectedDate(savedDates[currentIndex - 1])
-    } else if (selectedDate !== todayKey) {
-      setSelectedDate(todayKey)
-    }
-  }
-
-  const canGoPrevious = savedDates.indexOf(selectedDate) < savedDates.length - 1
-  const canGoNext = selectedDate !== todayKey
-
-  // Focus + move caret to end when an item enters edit mode.
-  useEffect(() => {
-    const el = editTextareaRef.current
-    if (editingId && el) {
-      el.focus()
-      el.setSelectionRange(el.value.length, el.value.length)
-    }
-  }, [editingId])
-
-  // Press-and-hold to drag so taps and scroll pass through on touch (the
-  // mobile surface is a scrollable bottom sheet); distance fallback for mouse.
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  )
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    if (over && active.id !== over.id) {
-      const oldIndex = cards.findIndex((i) => i.id === active.id)
-      const newIndex = cards.findIndex((i) => i.id === over.id)
-      if (oldIndex < 0 || newIndex < 0) return
-      const reorderedCards = arrayMove(cards, oldIndex, newIndex).map((item, index) => ({
-        ...item,
-        sortOrder: index * 10,
-      }))
-      onReorderItems(selectedDate, reorderedCards)
-    }
-  }
-
-  // New items always go to today (the quick-add bar only renders on today).
-  // sort_order is assigned authoritatively in useWaddleData from current state,
-  // so concurrent adds can't collide — the value here is a placeholder.
-  const addBlock = (block: Pick<ScratchpadItem, 'type' | 'content'> & Partial<ScratchpadItem>) => {
-    const newItem: ScratchpadItem = {
-      id: crypto.randomUUID(),
-      sortOrder: 0,
-      createdAt: new Date().toISOString(),
-      ...block,
-    }
-    onAddItem(todayKey, newItem)
-    return newItem
-  }
-
-  const handleTextInputChange = (val: string) => {
-    setTextInput(val)
-    // Markdown shortcut: "[] " starts a checkable todo block, then drops
-    // straight into editing it. (Heading/list shortcuts are deferred with the
-    // document layout — see BlockType.)
-    if (val === '[] ') {
-      const created = addBlock({ type: 'todo', content: '', isChecked: false })
-      setTextInput('')
-      setEditingId(created.id)
-      setEditText('')
-    }
-  }
-
-  const addTextItem = () => {
-    if (!textInput.trim()) return
-    addBlock({ type: 'text', content: textInput.trim() })
-    setTextInput('')
-  }
-
-  const addLinkItem = () => {
-    if (!linkInput.trim()) return
-    let url = linkInput.trim()
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://' + url
-    }
-    addBlock({ type: 'link', content: url, title: linkTitle.trim() || url })
-    setLinkInput('')
-    setLinkTitle('')
-    setInputMode(null)
-  }
-
-  const addImageFromFile = (file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      alert(t('圖片大小不能超過 5MB'))
-      return
-    }
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      addBlock({ type: 'image', content: reader.result as string })
-    }
-    reader.readAsDataURL(file)
-  }
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) addImageFromFile(file)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  const handlePaste = async (e: React.ClipboardEvent) => {
-    if (!isToday) return
-    for (const item of e.clipboardData.items) {
-      if (item.type.startsWith('image/')) {
-        e.preventDefault()
-        const file = item.getAsFile()
-        if (file) addImageFromFile(file)
-        return
-      }
-    }
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-    if (!isToday) return
-    const files = e.dataTransfer.files
-    if (files.length > 0 && files[0].type.startsWith('image/')) {
-      addImageFromFile(files[0])
-    }
-  }
-
-  const startEditText = (item: ScratchpadItem) => {
-    setEditingId(item.id)
-    setEditText(item.content)
-  }
-
-  const startEditLink = (item: ScratchpadItem) => {
-    setEditingId(item.id)
-    setEditUrl(item.content)
-    setEditTitle(item.title && item.title !== item.content ? item.title : '')
-  }
-
-  const cancelEdit = () => {
-    setEditingId(null)
-    setEditText('')
-    setEditUrl('')
-    setEditTitle('')
-  }
-
-  const saveEdit = () => {
-    if (!editingId) return
-    const item = items.find(i => i.id === editingId)
-    if (!item) return
-
-    if (item.type === 'link') {
-      let url = editUrl.trim()
-      if (!url) { cancelEdit(); return } // empty url: bail without sticking the editor open
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        url = 'https://' + url
-      }
-      onUpdateItem(editingId, { content: url, title: editTitle.trim() || url })
-    } else {
-      // Don't persist a blank text note (a blank todo stays — its checkbox is
-      // the point); use delete to remove instead.
-      if (item.type === 'text' && !editText.trim()) { cancelEdit(); return }
-      onUpdateItem(editingId, { content: editText })
-    }
-    cancelEdit()
-  }
-
-  const toggleTodo = (item: ScratchpadItem) => {
-    onUpdateItem(item.id, { isChecked: !item.isChecked })
-  }
-
-  const promoteToTask = (item: ScratchpadItem) => {
-    // Hand the note to the task-create modal; the page deletes the source item
-    // only after the task is saved, so cancelling loses nothing (fixes CR-01).
-    onPromoteToTask?.(item.content, undefined, item.id)
-  }
-
-  const clearAll = () => {
-    if (confirm(t('確定要清除所有暫存內容嗎？'))) {
-      onClearDate(todayKey)
-    }
-  }
-
-  return (
-    <>
-      {/* Backdrop — 便條紙視窗模式沒有「底下的頁面」，不需要遮罩 */}
-      {isExpanded && !fill && (
-        <div
-          className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-popover"
-          onClick={() => setIsExpanded(false)}
-        />
-      )}
-
-      <div className={cn('relative z-toast', className)}>
-        {/* Pull Tab */}
-        <div
-          className={cn(
-            'absolute left-1/2 -translate-x-1/2 top-0',
-            'transition-all duration-300',
-            isExpanded || hideTrigger ? 'opacity-0 pointer-events-none' : 'opacity-100'
-          )}
-        >
-          <button
-            data-tour="scratchpad"
-            onClick={() => { setIsExpanded(true); setSelectedDate(todayKey) }}
-            className={cn(
-              'flex items-center gap-2 px-4 py-1.5 rounded-b-xl',
-              'bg-card/95 backdrop-blur-sm border border-t-0 border-border shadow-lg',
-              'hover:bg-secondary/80 transition-all group',
-              'text-xs font-medium text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <Sparkles className="w-3 h-3" />
-            <span>{t('專注白板')}</span>
-            {items.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
-                {items.length}
-              </span>
-            )}
-            <ChevronDown className="w-3 h-3 group-hover:translate-y-0.5 transition-transform" />
-          </button>
-        </div>
-
-        {/* Expanded Panel */}
-        <div
-          ref={panelRef}
-          className={cn(
-            fill
-              ? 'fixed inset-0 bg-card'
-              : hideTrigger
-              ? cn(
-                  'fixed left-0 right-0 top-0 bottom-[58px]',
-                  'bg-card border-t border-border shadow-2xl',
-                  'transition-transform duration-300 ease-out',
-                  isExpanded ? '' : 'pointer-events-none',
-                )
-              : cn(
-                  'absolute left-0 right-0 top-0',
-                  'bg-card border-b border-border shadow-xl',
-                  'transition-all duration-300 ease-out overflow-hidden',
-                  isExpanded ? 'max-h-[85vh] opacity-100' : 'max-h-0 opacity-0 pointer-events-none',
-                )
-          )}
-          style={fill ? undefined : hideTrigger ? {
-            paddingTop: 'env(safe-area-inset-top)',
-            transform: isExpanded
-              ? 'translateY(0)'
-              : 'translateY(calc(100% + 58px))',
-          } : undefined}
-          onPaste={handlePaste}
-          onDragOver={(e) => {
-            e.preventDefault()
-            const target = e.target instanceof Element ? e.target : null
-            setIsDragging(!target?.closest('[data-testid="scratchpad-canvas"]'))
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={handleDrop}
-        >
-        <div className={hideTrigger || fill ? 'h-full overflow-y-auto' : 'max-h-[85dvh] overflow-y-auto'}>
-        {isDragging && (
-          <div className="pointer-events-none absolute inset-0 bg-primary/10 border-2 border-dashed border-primary/50 z-modal flex items-center justify-center">
-            <div className="text-primary font-medium">{t('放開以新增圖片')}</div>
+  return <>
+    {isExpanded && !fill && <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-popover" onClick={() => setIsExpanded(false)} />}
+    <div className={cn('relative z-toast', className)}>
+      {!hideTrigger && !isExpanded && <button data-tour="scratchpad" className="absolute left-1/2 top-0 flex min-h-11 -translate-x-1/2 items-center gap-2 rounded-b-xl border border-t-0 border-border bg-card px-4 text-sm" onClick={() => { setSelectedDate(todayKey); setIsExpanded(true) }}>{t('白板')}<ChevronDown size={16} /></button>}
+      <div className={cn(fill ? 'fixed inset-0 bg-card' : hideTrigger ? 'fixed inset-x-0 top-0 bottom-[58px] bg-card' : 'absolute inset-x-0 top-0 overflow-hidden border-b border-border bg-card', !isExpanded && !fill && 'hidden')} style={hideTrigger && !fill ? { paddingTop: 'env(safe-area-inset-top)' } : undefined}>
+        <div className={cn('overflow-y-auto', fill || hideTrigger ? 'h-full' : 'max-h-[85dvh]')}>
+          <div className="mx-auto w-full max-w-6xl px-3 py-2 sm:px-4 md:px-6">
+            <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1" aria-label={t('白板日期')}>
+              <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                <button className={control} aria-label={t('上一個日期')} disabled={dateIndex < 0 || dateIndex >= dates.length - 1} onClick={() => setSelectedDate(dates[dateIndex + 1])}><ChevronLeft size={16} /></button>
+                <Calendar className="shrink-0" size={14} /><span>{dateLabel}</span>
+                {isToday && <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-primary">{t('今天')}</span>}
+                <button className={control} aria-label={t('下一個日期')} disabled={isToday} onClick={() => setSelectedDate(dateIndex > 0 ? dates[dateIndex - 1] : todayKey)}><ChevronRight size={16} /></button>
+              </div>
+              <div className="flex items-center gap-1">
+                {!fill && <FloatOutButton tab="scratchpad" fallbackUrl="/float/scratchpad" windowName="huddle-scratchpad" width={480} height={620} />}
+                {items.length > 0 && isToday && <button className={control} onClick={() => { if (window.confirm(t('確定要清除所有暫存內容嗎？'))) onClearDate(selectedDate) }}><Trash2 size={16} />{t('清除')}</button>}
+                {!fill && <button className={control} onClick={() => setIsExpanded(false)}><ChevronUp size={16} />{t('收起')}</button>}
+              </div>
+            </header>
+            <DailyWhiteboard key={selectedDate} items={items} date={selectedDate} readOnly={!isToday} onAddItem={onAddItem} onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem} />
           </div>
-        )}
-
-        <div className="max-w-6xl mx-auto p-3 sm:p-4 md:p-6">
-          {/* Header */}
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex w-10 h-10 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-foreground">{t('專注白板')}</h2>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <button
-                    onClick={goToPreviousDate}
-                    disabled={!canGoPrevious}
-                    className="min-w-11 min-h-11 flex items-center justify-center rounded hover:bg-secondary disabled:opacity-30"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                  </button>
-                  <div className="flex items-center gap-1.5 px-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>{formatDate(selectedDate)}</span>
-                    {isToday && (
-                      <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-medium">
-                        {t('今天')}
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    onClick={goToNextDate}
-                    disabled={!canGoNext}
-                    className="min-w-11 min-h-11 flex items-center justify-center rounded hover:bg-secondary disabled:opacity-30"
-                  >
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* 彈出成置頂便條紙（在懸浮視窗裡就不必再彈一次） */}
-              {!fill && (
-                <FloatOutButton
-                  tab="scratchpad"
-                  fallbackUrl="/float/scratchpad"
-                  windowName="huddle-scratchpad"
-                  width={480}
-                  height={620}
-                />
-              )}
-              {items.length > 0 && isToday && (
-                <button
-                  onClick={clearAll}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  {t('清除')}
-                </button>
-              )}
-              {/* 便條紙視窗裡沒有「收起」可言——收起就只剩一片空白視窗 */}
-              {!fill && (
-                <button
-                  onClick={() => setIsExpanded(false)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-secondary/80 hover:bg-secondary text-xs font-medium transition-colors"
-                >
-                  <ChevronUp className="w-3.5 h-3.5" />
-                  {t('收起')}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Add Bar */}
-          {isToday ? (
-            <div className="flex items-center gap-2 mb-6 p-2 rounded-2xl bg-secondary/30 border border-border/50">
-              <div className="min-w-0 flex-1 flex items-center gap-2 px-1 sm:px-3">
-                <Type className="w-4 h-4 text-muted-foreground" />
-                <input
-                  ref={inputRef}
-                  value={textInput}
-                  onChange={(e) => handleTextInputChange(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isImeComposing(e)) addTextItem()
-                  }}
-                  placeholder={t('記下想法，或輸入 [] 建立待辦…')}
-                  className="min-w-0 flex-1 bg-transparent border-0 text-base md:text-sm focus:outline-none placeholder:text-muted-foreground/60"
-                />
-              </div>
-              <div className="flex items-center gap-1 pr-1">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="min-w-11 min-h-11 flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-background/80 transition-all"
-                  title={t('新增圖片')}
-                >
-                  <Image className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setInputMode(inputMode === 'link' ? null : 'link')}
-                  className={cn(
-                    "min-w-11 min-h-11 flex items-center justify-center rounded-xl transition-all",
-                    inputMode === 'link' ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-background/80"
-                  )}
-                  title={t('新增連結')}
-                >
-                  <Link2 className="w-4 h-4" />
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-4 rounded-xl bg-secondary/30 border border-border">
-              <span className="text-sm text-muted-foreground">{t('這是過去日期的記錄，僅供查看')}</span>
-              <button
-                onClick={() => setSelectedDate(todayKey)}
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                {t('返回今天')}
-              </button>
-            </div>
-          )}
-
-          {/* Link Input Overlay */}
-          {inputMode === 'link' && (
-            <div className="mb-6 p-4 rounded-2xl bg-card border border-primary/20 shadow-lg space-y-3 animate-in fade-in slide-in-from-top-2">
-              <div className="space-y-1">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">{t('連結網址')}</label>
-                <input
-                  type="url"
-                  value={linkInput}
-                  onChange={(e) => setLinkInput(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full bg-secondary/50 border-0 rounded-xl px-3 py-2 text-base md:text-sm focus:ring-1 focus:ring-primary/30 outline-none"
-                  autoFocus
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">{t('顯示標題（可選）')}</label>
-                <input
-                  type="text"
-                  value={linkTitle}
-                  onChange={(e) => setLinkTitle(e.target.value)}
-                  placeholder={t('輸入自訂標題...')}
-                  className="w-full bg-secondary/50 border-0 rounded-xl px-3 py-2 text-base md:text-sm focus:ring-1 focus:ring-primary/30 outline-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isImeComposing(e)) addLinkItem()
-                  }}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => { setLinkInput(''); setLinkTitle(''); setInputMode(null) }}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:bg-secondary transition-colors"
-                >
-                  {t('取消')}
-                </button>
-                <button
-                  onClick={addLinkItem}
-                  disabled={!linkInput.trim()}
-                  className="px-4 py-2 rounded-xl text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
-                  {t('新增連結')}
-                </button>
-              </div>
-            </div>
-          )}
-
-          <h3 className="text-sm font-medium mb-3">{t('快速卡片')} <span className="text-muted-foreground">{cards.length}</span></h3>
-          {/* Items Grid */}
-          {cards.length === 0 ? (
-            <div className="py-4 text-center">
-              <div className="w-16 h-16 rounded-3xl bg-secondary/50 flex items-center justify-center mx-auto mb-4">
-                <Sparkles className="w-8 h-8 text-muted-foreground/40" />
-              </div>
-              <h3 className="text-sm font-medium text-foreground mb-1">{t('準備好開始記錄了嗎？')}</h3>
-              <p className="text-xs text-muted-foreground max-w-[240px] mx-auto">
-                {t('專注白板是你的「快取空間」，隨手記下想法、待辦或連結，讓大腦保持清爽。')}
-              </p>
-            </div>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext items={cards.map(i => i.id)} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-[30dvh] overflow-y-auto pb-2">
-                  {cards.map((item) => (
-                    <SortableItem
-                      key={item.id}
-                      item={item}
-                      isEditing={editingId === item.id}
-                      editText={editText}
-                      editUrl={editUrl}
-                      editTitle={editTitle}
-                      isToday={isToday}
-                      onEdit={() => item.type === 'link' ? startEditLink(item) : startEditText(item)}
-                      onDelete={() => onDeleteItem(item.id)}
-                      onToggleTodo={() => toggleTodo(item)}
-                      onPromote={() => promoteToTask(item)}
-                      onCancelEdit={cancelEdit}
-                      onSaveEdit={saveEdit}
-                      onUpdateEditText={setEditText}
-                      onUpdateEditUrl={setEditUrl}
-                      onUpdateEditTitle={setEditTitle}
-                      editTextareaRef={editTextareaRef}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          )}
-        </div>
-
-        <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 pb-4">
-          <ScratchpadCanvas
-            key={selectedDate}
-            items={canvasItems}
-            cards={cards}
-            date={selectedDate}
-            readOnly={!isToday}
-            onAddItem={onAddItem}
-            onUpdateItem={onUpdateItem}
-            onDeleteItem={onDeleteItem}
-          />
-        </div>
-
-        {/* Close Handle */}
-        {!fill && <div className="flex justify-center pb-4">
-          <button
-            onClick={() => setIsExpanded(false)}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-all active:scale-95"
-          >
-            <ChevronUp className="w-3.5 h-3.5" />
-            <span>{t('收起白板')}</span>
-          </button>
-        </div>}
         </div>
       </div>
     </div>
-    </>
-  )
-}
-
-function SortableItem({
-  item,
-  isEditing,
-  editText,
-  editUrl,
-  editTitle,
-  isToday,
-  onEdit,
-  onDelete,
-  onToggleTodo,
-  onPromote,
-  onCancelEdit,
-  onSaveEdit,
-  onUpdateEditText,
-  onUpdateEditUrl,
-  onUpdateEditTitle,
-  editTextareaRef,
-}: {
-  item: ScratchpadItem
-  isEditing: boolean
-  editText: string
-  editUrl: string
-  editTitle: string
-  isToday: boolean
-  onEdit: () => void
-  onDelete: () => void
-  onToggleTodo: () => void
-  onPromote: () => void
-  onCancelEdit: () => void
-  onSaveEdit: () => void
-  onUpdateEditText: (v: string) => void
-  onUpdateEditUrl: (v: string) => void
-  onUpdateEditTitle: (v: string) => void
-  editTextareaRef: React.RefObject<HTMLTextAreaElement | null>
-}) {
-  const { t, lang } = useI18n()
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.id })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 50 : undefined,
-    opacity: isDragging ? 0.5 : 1,
-  }
-
-  const time = new Date(item.createdAt).toLocaleTimeString(
-    lang === 'en' ? 'en-US' : 'zh-TW',
-    { hour: '2-digit', minute: '2-digit' },
-  )
-  // Actions stay visible on touch (no hover); fade-on-hover only from md up.
-  const actionVis = 'opacity-100 md:opacity-0 md:group-hover:opacity-100'
-  const canPromote = item.type === 'text' || item.type === 'todo'
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        'group relative rounded-xl border border-border bg-background/50 transition-all overflow-hidden',
-        isDragging ? 'bg-primary/5 shadow-md' : 'hover:bg-background hover:shadow-md'
-      )}
-    >
-      {/* Drag handle (top-left) */}
-      {isToday && !isEditing && (
-        <div
-          {...attributes}
-          {...listeners}
-          className={cn(
-            'absolute top-2 left-2 z-panel p-1 rounded-lg bg-background/80 backdrop-blur-sm cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-primary transition-all',
-            actionVis
-          )}
-        >
-          <GripVertical className="w-3 h-3" />
-        </div>
-      )}
-
-      {/* Action cluster (top-right) */}
-      {isToday && !isEditing && (
-        <div className={cn('absolute top-2 right-2 z-panel flex items-center gap-1 transition-opacity', actionVis)}>
-          {item.type !== 'image' && (
-            <button
-              onClick={onEdit}
-              aria-label={t('編輯')}
-              className="p-1 rounded-lg bg-background/80 backdrop-blur-sm hover:bg-primary/10 hover:text-primary transition-all"
-            >
-              <Pencil className="w-3 h-3" />
-            </button>
-          )}
-          {canPromote && (
-            <button
-              onClick={onPromote}
-              aria-label={t('轉換為正式任務')}
-              title={t('轉換為正式任務')}
-              className="p-1 rounded-lg bg-background/80 backdrop-blur-sm hover:bg-primary/10 hover:text-primary transition-all"
-            >
-              <ArrowUpRight className="w-3 h-3" />
-            </button>
-          )}
-          <button
-            onClick={onDelete}
-            aria-label={t('刪除')}
-            className="p-1 rounded-lg bg-background/80 backdrop-blur-sm hover:bg-destructive/10 hover:text-destructive transition-all"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        </div>
-      )}
-
-      {isEditing ? (
-        <div className="p-3 space-y-2">
-          {item.type === 'link' ? (
-            <>
-              <input
-                value={editUrl}
-                onChange={(e) => onUpdateEditUrl(e.target.value)}
-                className="w-full bg-background border border-border rounded-lg px-2 py-1.5 text-sm focus:ring-1 focus:ring-primary/30 outline-none"
-                placeholder={t('網址')}
-                onKeyDown={(e) => { if (e.key === 'Escape') onCancelEdit() }}
-                autoFocus
-              />
-              <input
-                value={editTitle}
-                onChange={(e) => onUpdateEditTitle(e.target.value)}
-                className="w-full bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-primary/30 outline-none"
-                placeholder={t('標題（可選）')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isImeComposing(e)) onSaveEdit()
-                  if (e.key === 'Escape') onCancelEdit()
-                }}
-              />
-            </>
-          ) : (
-            <textarea
-              ref={editTextareaRef}
-              value={editText}
-              onChange={(e) => onUpdateEditText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !isImeComposing(e)) onSaveEdit()
-                if (e.key === 'Escape') onCancelEdit()
-              }}
-              placeholder={t('編輯內容...（Ctrl+Enter 儲存，Esc 取消）')}
-              className="w-full bg-transparent border-0 resize-none text-sm focus:outline-none min-h-[60px]"
-            />
-          )}
-          <div className="flex justify-end gap-1.5">
-            <button onClick={onCancelEdit} className="px-2 py-1 rounded-md text-[10px] font-medium text-muted-foreground hover:bg-secondary transition-colors">{t('取消')}</button>
-            <button onClick={onSaveEdit} className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
-              <Check className="w-3 h-3" /> {t('儲存')}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          {item.type === 'todo' && (
-            <div className="p-3">
-              <div className="flex items-start gap-2">
-                <button
-                  onClick={onToggleTodo}
-                  className={cn(
-                    'mt-0.5 flex-shrink-0 transition-colors',
-                    item.isChecked ? 'text-primary' : 'text-muted-foreground hover:text-primary'
-                  )}
-                  aria-label={item.isChecked ? t('標記為未完成') : t('標記為完成')}
-                >
-                  {item.isChecked ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                </button>
-                <p className={cn(
-                  'text-sm break-words line-clamp-4',
-                  item.isChecked ? 'text-muted-foreground line-through' : 'text-foreground'
-                )}>
-                  {item.content || <span className="text-muted-foreground/50 italic">{t('空白待辦…')}</span>}
-                </p>
-              </div>
-              <p className="text-[10px] text-muted-foreground mt-2">{time}</p>
-            </div>
-          )}
-
-          {item.type === 'text' && (
-            <div className="p-3">
-              <p className="text-sm text-foreground line-clamp-4 whitespace-pre-wrap">{item.content}</p>
-              <p className="text-[10px] text-muted-foreground mt-2">{time}</p>
-            </div>
-          )}
-
-          {item.type === 'image' && (
-            <div>
-              <img src={item.content} alt="scratchpad image" className="w-full h-32 object-cover" />
-              <p className="text-[10px] text-muted-foreground p-2">{time}</p>
-            </div>
-          )}
-
-          {item.type === 'link' && (
-            <a
-              href={item.content}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => handleExternalAnchorClick(e, item.content)}
-              className="block p-3 hover:bg-primary/5 transition-colors"
-            >
-              <div className="flex items-start gap-2">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Link2 className="w-4 h-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground line-clamp-2">{item.title}</p>
-                  <p className="text-[10px] text-muted-foreground truncate mt-0.5">{item.content}</p>
-                </div>
-                <ArrowUpRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-              </div>
-            </a>
-          )}
-        </>
-      )}
-    </div>
-  )
+  </>
 }
