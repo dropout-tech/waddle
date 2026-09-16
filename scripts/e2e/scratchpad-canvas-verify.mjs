@@ -11,6 +11,22 @@ const today=new Date().toLocaleDateString('en-CA')
 let rows=[{id:'00000000-0000-4000-8000-000000000001',date:today,type:'text',content:'原本上方的筆記',sort_order:0,metadata:{preserved:'yes'},created_at:new Date().toISOString()}]
 let writes=[],fail=false,browser,passes=0
 const check=(name,ok)=>{assert.ok(ok,name);console.log('PASS',name);passes++}
+const settle = () => sleep(350)
+const canvasEditor = page => page.getByTestId('scratchpad-canvas').getByLabel('畫布內容', { exact: true })
+const blankPoint = async page => {
+ await page.getByTestId('scratchpad-canvas').scrollIntoViewIfNeeded()
+ return page.getByTestId('scratchpad-canvas').evaluate(el => {
+  const b = el.getBoundingClientRect()
+  for (let y = b.bottom - 35; y > b.top + 35; y -= 50) {
+   for (let x = b.right - 35; x > b.left + 35; x -= 50) {
+    if (document.elementFromPoint(x, y) === el) return { x, y }
+   }
+  }
+  throw new Error('No visible blank canvas point')
+ })
+}
+const blurEditor = async page => { await page.getByRole('heading', {name:'自由畫布',exact:true}).click(); await settle() }
+
 try {
  for(let i=0;i<120;i++){try{if((await fetch(base+'/login')).ok)break}catch{}await sleep(1000)}
  browser=await chromium.launch();const context=await browser.newContext({locale:'zh-TW',viewport:{width:1280,height:1000}});const page=await context.newPage()
@@ -40,14 +56,101 @@ try {
  await handle.focus();await page.keyboard.press('ArrowRight');await page.keyboard.press('ArrowRight');await sleep(350);check('Rapid keyboard movement keeps every step',rows[0].metadata.canvas.x===160)
  const previous=rows[0].metadata.canvas.x;fail=true;await handle.focus();await page.keyboard.press('ArrowRight');await sleep(500);fail=false;check('Failed move rolls back',await card.evaluate((e,x)=>e.style.left===x+'px',previous))
  await handle.focus();await page.keyboard.press('ArrowRight');await sleep(350);check('Movement after rollback starts from persisted geometry',rows[0].metadata.canvas.x===previous+20)
- await page.getByRole('button',{name:'待辦',exact:true}).click();await page.getByLabel('畫布內容').fill('長文字畫布待辦：'+ '測試'.repeat(100));await page.getByRole('button',{name:'儲存卡片',exact:true}).click();await sleep(300);check('Canvas todo created',rows.length===2&&rows[1].type==='todo')
- await page.getByLabel('完成畫布待辦').check();await sleep(300);check('Todo checked persists',rows[1].is_checked===true)
- const beforeDrop=rows.length;await page.evaluate(() => { const transfer=new DataTransfer();transfer.items.add(new File(['image'],'drop.png',{type:'image/png'}));const top=document.querySelector('input[placeholder*="記下"]');top.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:transfer}));window.__canvasDropTransfer=transfer });await page.getByText('放開以新增圖片',{exact:true}).waitFor();await page.evaluate(() => { const canvas=document.querySelector('[data-testid="scratchpad-canvas"]');canvas.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:window.__canvasDropTransfer})) });await page.getByText('放開以新增圖片',{exact:true}).waitFor({state:'hidden'});await page.evaluate(() => { const canvas=document.querySelector('[data-testid="scratchpad-canvas"]');canvas.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:window.__canvasDropTransfer}));delete window.__canvasDropTransfer });await sleep(300)
+ // Inline creation must remain a draft until leaving the object.
+ before=writes.length;const countBeforeText=rows.length
+ await page.getByRole('button',{name:'文字',exact:true}).click()
+ let editor=canvasEditor(page);await editor.waitFor()
+ check('Toolbar opens an autofocus editor inside the canvas',await editor.evaluate(e=>e===document.activeElement))
+ check('Empty inline draft creates no record',writes.length===before&&rows.length===countBeforeText)
+ await blurEditor(page)
+ check('Leaving an empty draft cancels without writes',writes.length===before&&await editor.count()===0)
+ await page.getByRole('button',{name:'文字',exact:true}).click();await editor.fill('取消的草稿');await editor.press('Escape');await settle()
+ check('Escape cancels a new draft without writes',writes.length===before&&rows.length===countBeforeText&&await editor.count()===0)
+ await page.getByRole('button',{name:'文字',exact:true}).click();await editor.fill('在畫布直接寫字')
+ await editor.dispatchEvent('compositionstart')
+ await editor.dispatchEvent('keydown',{key:'Enter',code:'Enter',isComposing:true,bubbles:true})
+ await editor.dispatchEvent('keydown',{key:'Escape',code:'Escape',isComposing:true,bubbles:true})
+ check('IME confirmation and Escape keep the inline editor open',await editor.count()===1&&writes.length===before)
+ const compositionBlank=await blankPoint(page)
+ await page.mouse.click(compositionBlank.x,compositionBlank.y)
+ check('Canvas click does not save unfinished IME composition',await editor.count()===1&&writes.length===before)
+ await editor.focus()
+ await editor.dispatchEvent('compositionend',{data:'字'})
+ await editor.press('Enter');await editor.press('End');await editor.type('第二行')
+ check('Enter inserts a newline without prematurely saving',(await editor.inputValue()).includes('\n')&&writes.length===before)
+ await blurEditor(page)
+ const newText=rows.find(row=>row.content.includes('在畫布直接寫字'))
+ check('Leaving a new text object creates exactly one record',!!newText&&rows.length===countBeforeText+1&&writes.length===before+1&&writes.at(-1).method==='POST')
+ await page.getByRole('button',{name:'顯示全部',exact:true}).click()
+ const textCard=page.locator(`[data-canvas-item="${newText.id}"]`)
+ await textCard.getByText(newText.content,{exact:true}).dblclick();await editor.waitFor()
+ const geometryBeforeEdit=JSON.stringify(newText.metadata.canvas),textId=newText.id
+ before=writes.length
+ const viewBeforeSelection=await page.getByTestId('scratchpad-canvas').evaluate(e=>e.firstElementChild.style.transform)
+ b=await editor.boundingBox();await page.mouse.move(b.x+15,b.y+15);await page.mouse.down();await page.mouse.move(b.x+100,b.y+15,{steps:6});await page.mouse.up()
+ check('Selecting text does not pan the canvas',viewBeforeSelection===await page.getByTestId('scratchpad-canvas').evaluate(e=>e.firstElementChild.style.transform)&&writes.length===before)
+ await editor.fill('原地修改，保留物件');await blurEditor(page)
+ check('Editing preserves the original ID and geometry',rows.filter(row=>row.id===textId).length===1&&rows.find(row=>row.id===textId).content==='原地修改，保留物件'&&JSON.stringify(rows.find(row=>row.id===textId).metadata.canvas)===geometryBeforeEdit&&writes.length===before+1&&writes.at(-1).method==='PATCH')
+ await textCard.getByText('原地修改，保留物件',{exact:true}).dblclick();await editor.fill('不應儲存');before=writes.length;await editor.press('Escape');await settle()
+ check('Escape discards edits to an existing object',rows.find(row=>row.id===textId).content==='原地修改，保留物件'&&writes.length===before)
+ await page.reload();await textCard.waitFor()
+ check('Reload preserves inline text content',await textCard.getByText('原地修改，保留物件',{exact:true}).isVisible())
+ await textCard.getByText('原地修改，保留物件',{exact:true}).dblclick();await editor.fill('儲存失敗的文字');fail=true;await blurEditor(page);fail=false
+ check('Failed text update restores persisted content and ID',rows.find(row=>row.id===textId).content==='原地修改，保留物件'&&await textCard.getByText('原地修改，保留物件',{exact:true}).isVisible())
+ await page.getByRole('button',{name:'連結',exact:true}).click()
+ const urlEditor=page.getByTestId('scratchpad-canvas').getByLabel('連結網址',{exact:true})
+ before=writes.length;await urlEditor.fill('http://[');await blurEditor(page)
+ check('Invalid inline link stays editable without a write',await urlEditor.count()===1&&writes.length===before)
+ await urlEditor.fill('https://example.com/notes');await page.getByTestId('scratchpad-canvas').getByLabel('連結標題',{exact:true}).fill('研究參考');await blurEditor(page)
+ const link=rows.find(row=>row.type==='link')
+ check('Link URL and title save inline',link?.content==='https://example.com/notes'&&link.title==='研究參考')
+ const linkCard=page.locator(`[data-canvas-item="${link.id}"]`)
+ await linkCard.click({position:{x:100,y:10}});await linkCard.getByRole('button',{name:'編輯卡片',exact:true}).click()
+ await page.getByTestId('scratchpad-canvas').getByLabel('連結標題',{exact:true}).fill('');await blurEditor(page)
+ check('Clearing link title persists an empty title on the same ID',rows.find(row=>row.id===link.id).title==='')
+ await linkCard.getByTestId('canvas-resize-handle').focus()
+ for(let i=0;i<3;i++)await page.keyboard.press('ArrowUp')
+ await settle();check('Link can retain compact 160px geometry',rows.find(row=>row.id===link.id).metadata.canvas.height===160)
+ await linkCard.getByRole('button',{name:'編輯卡片',exact:true}).click();await urlEditor.waitFor()
+ check('Minimum-height link editor contains URL title and footer',await linkCard.evaluate(el=>{const box=el.getBoundingClientRect();return [...el.querySelectorAll('form textarea, form input, form button')].every(control=>{const r=control.getBoundingClientRect();return r.top>=box.top&&r.bottom<=box.bottom+1&&r.left>=box.left&&r.right<=box.right+1})}))
+ mkdirSync('/tmp/huddle-canvas-inline-shots',{recursive:true});await page.screenshot({path:'/tmp/huddle-canvas-inline-shots/link-minheight-editing.png',fullPage:true})
+ await page.getByTestId('scratchpad-canvas').getByLabel('連結標題',{exact:true}).fill('保留緊湊尺寸');await blurEditor(page)
+ check('Saving compact link edits preserves its stored height',rows.find(row=>row.id===link.id).metadata.canvas.height===160&&rows.find(row=>row.id===link.id).title==='保留緊湊尺寸')
+ // Exercise placement after both zoom and pan: screen coordinates must convert to world coordinates.
+ await page.getByRole('button',{name:'縮小畫布',exact:true}).click()
+ let point=await blankPoint(page);await page.mouse.move(point.x,point.y);await page.mouse.down();await page.mouse.move(point.x-65,point.y-30,{steps:5});await page.mouse.up()
+ point=await blankPoint(page)
+ const expected=await page.getByTestId('scratchpad-canvas').evaluate((el,p)=>{const r=el.getBoundingClientRect(),m=new DOMMatrix(getComputedStyle(el.firstElementChild).transform);return {x:(p.x-r.left-m.e)/m.a,y:(p.y-r.top-m.f)/m.d}},point)
+ before=writes.length;await page.mouse.dblclick(point.x,point.y);await editor.waitFor();await editor.fill('雙擊定位文字');await blurEditor(page)
+ const placed=rows.find(row=>row.content==='雙擊定位文字')
+ check('Double click places text at the clicked point after pan and zoom',!!placed&&Math.abs(placed.metadata.canvas.x-expected.x)<3&&Math.abs(placed.metadata.canvas.y-expected.y)<3&&writes.length===before+1)
+ await page.getByRole('button',{name:'待辦',exact:true}).click();await editor.fill('長文字畫布待辦：'+ '測試'.repeat(100));await blurEditor(page)
+ const todo=rows.find(row=>row.type==='todo');check('Canvas todo created inline',!!todo)
+ await page.getByRole('button',{name:'顯示全部',exact:true}).click();await page.getByLabel('完成畫布待辦').check();await sleep(300);check('Todo checked persists',rows.find(row=>row.id===todo.id).is_checked===true)
+
+ const beforeDrop=rows.length;await page.evaluate(() => { const transfer=new DataTransfer();transfer.items.add(new File([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j5ZkAAAAASUVORK5CYII='),c=>c.charCodeAt(0))],'drop.png',{type:'image/png'}));const top=document.querySelector('input[placeholder*="記下"]');top.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:transfer}));window.__canvasDropTransfer=transfer });await page.getByText('放開以新增圖片',{exact:true}).waitFor();await page.evaluate(() => { const canvas=document.querySelector('[data-testid="scratchpad-canvas"]');canvas.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:window.__canvasDropTransfer})) });await page.getByText('放開以新增圖片',{exact:true}).waitFor({state:'hidden'});await page.evaluate(() => { const canvas=document.querySelector('[data-testid="scratchpad-canvas"]');canvas.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:window.__canvasDropTransfer}));delete window.__canvasDropTransfer });await sleep(300)
  check('Dropping over canvas clears upper overlay and creates one canvas image',rows.length===beforeDrop+1&&rows.at(-1).type==='image'&&rows.at(-1).metadata?.canvas)
  await page.getByRole('button',{name:'畫筆',exact:true}).click();const canvas=page.getByTestId('scratchpad-canvas');b=await canvas.boundingBox();await page.mouse.move(b.x+b.width-100,b.y+b.height-100);await page.mouse.down();await page.mouse.move(b.x+b.width-40,b.y+b.height-40,{steps:8});await page.mouse.up();await sleep(300)
  check('Pen stroke persists as a resizable canvas image',rows.some(row=>row.type==='image'&&row.title==='手寫筆記'&&row.metadata?.canvas))
- mkdirSync('/tmp/huddle-canvas-shots',{recursive:true})
- for(const width of [320,390,430,1280]){await page.setViewportSize({width,height:844});await page.getByTestId('scratchpad-canvas').scrollIntoViewIfNeeded();await sleep(100);check(`No document overflow at ${width}`,await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:`/tmp/huddle-canvas-shots/${width}.png`,fullPage:true})}
- await page.setViewportSize({width:1280,height:1000});await page.locator(`[data-canvas-item="${rows[0].id}"]`).click({position:{x:100,y:100}});await page.getByRole('button',{name:'移回上方',exact:true}).click();await sleep(300);check('Transfer back retains original record',rows.length===4&&rows[0].metadata.canvas===null&&rows[0].metadata.preserved==='yes')
- console.log(`${passes} checks passed`)
+ await page.getByRole('button',{name:'畫筆',exact:true}).click()
+ mkdirSync('/tmp/huddle-canvas-inline-shots',{recursive:true})
+ await page.setViewportSize({width:1280,height:1000});await page.getByRole('button',{name:'文字',exact:true}).click();await editor.fill('專注當下\n把想到的事，直接寫在這裡。');await page.screenshot({path:'/tmp/huddle-canvas-inline-shots/desktop-editing.png',fullPage:true});await editor.press('Escape')
+ await page.setViewportSize({width:390,height:844})
+ await page.getByRole('button',{name:'文字',exact:true}).click();await editor.waitFor()
+ check('Mobile inline editor remains inside visible canvas',await editor.evaluate(e=>{const r=e.getBoundingClientRect(),c=e.closest('[data-testid="scratchpad-canvas"]').getBoundingClientRect();return r.left>=c.left&&r.right<=c.right+1&&parseFloat(getComputedStyle(e).fontSize)>=16}))
+ await editor.fill('手機直接編輯');await page.screenshot({path:'/tmp/huddle-canvas-inline-shots/mobile-editing.png',fullPage:true});await blurEditor(page)
+ check('Mobile direct editing saves its text',rows.some(row=>row.content==='手機直接編輯'))
+ mkdirSync('/tmp/huddle-canvas-inline-shots',{recursive:true})
+ for(const width of [320,390,430,1280]){await page.setViewportSize({width,height:844});await page.getByTestId('scratchpad-canvas').scrollIntoViewIfNeeded();await sleep(100);check(`No document overflow at ${width}`,await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:`/tmp/huddle-canvas-inline-shots/${width}.png`,fullPage:true})}
+ await page.setViewportSize({width:1280,height:1000});await page.getByRole('button',{name:'顯示全部',exact:true}).click();await page.locator(`[data-canvas-item="${rows[0].id}"]`).getByTestId('canvas-drag-handle').focus();await page.getByRole('button',{name:'移回上方',exact:true}).click();await sleep(300);check('Transfer back retains original record',rows[0].metadata.canvas===null&&rows[0].metadata.preserved==='yes')
+ const yesterday=new Date();yesterday.setDate(yesterday.getDate()-1)
+ rows.push({id:'00000000-0000-4000-8000-000000000099',date:yesterday.toLocaleDateString('en-CA'),type:'text',content:'昨天的唯讀筆記',sort_order:0,metadata:{canvas:{x:0,y:0,width:280,height:220}},created_at:yesterday.toISOString()})
+ await page.reload();await page.getByTestId('scratchpad-canvas').waitFor()
+ await page.locator('button').filter({has:page.locator('svg.lucide-chevron-left')}).click()
+ await page.getByText('昨天的唯讀筆記',{exact:true}).waitFor();before=writes.length
+ await page.getByText('昨天的唯讀筆記',{exact:true}).dblclick()
+ point=await blankPoint(page);await page.mouse.dblclick(point.x,point.y);await settle()
+ check('Historical canvas remains read-only for existing and blank double clicks',await editor.count()===0&&writes.length===before&&await page.getByRole('button',{name:'文字',exact:true}).count()===0)
+ console.log(`${passes} checks passed; ${writes.length} mocked writes`)
+
 } finally {await browser?.close();if(server)try{process.kill(-server.pid,'SIGTERM')}catch{}}
