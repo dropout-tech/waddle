@@ -29,3 +29,13 @@ Paid quota enforcement and legacy preservation are separate release gates; these
 - Official Supabase changelog and RLS docs checked; no relevant breaking change. New tables explicitly revoke client grants. Automated Supabase advisors require a supported database connection; manual role checks do not substitute for production/staging advisors.
 
 Sources: https://supabase.com/changelog.md ; https://supabase.com/docs/guides/database/postgres/row-level-security
+
+## Scheduled reconciliation (implemented locally)
+
+`billing-reconcile-scheduled` is a cron-secret-only POST endpoint. Set `BILLING_CRON_AUTHORIZATION` to a random complete Authorization header of at least 32 characters, stored only in server/Vault settings. Deploy with gateway JWT verification disabled because this endpoint verifies its own cron secret; no browser CORS or public account enumeration. Reuses RevenueCat production-only authoritative snapshots. Returns aggregate processed/succeeded/failed counts only, 503 for failures so monitoring can alert.
+
+Apply migration `20260920182638_billing_reconciliation_queue.sql`. Existing entitlement users are seeded; a trigger queues first authoritative snapshots. Each run claims at most 10 due records with `FOR UPDATE SKIP LOCKED`, a unique lease and three-minute expiry. Work is parallel and each network call has a ten-second deadline. Success schedules six hours later; failures use bounded exponential delay, up to one hour. A crashed worker is recovered by lease expiration. A stale worker cannot finish a newer lease. Snapshot event IDs use the lease UUID, retaining transactional deduplication.
+
+Suggested scheduler cadence: one minute (configure in staging/production only after secrets and monitoring exist; no cron was activated). Capacity is 600 records/hour and must be increased with measured user volume. Monitor queue oldest due time, last successful reconciliation, and failures. First purchases lost by both webhook and client reconciliation are not discoverable from the local entitlement queue; provider webhook replay and purchase support remain necessary. The worker does not scan or enumerate all private auth accounts.
+
+Additional checks: `node --experimental-strip-types --test scripts/tests/billing-scheduled.test.mjs` and `bash scripts/tests/billing-queue-database.sh` cover cron auth, aggregate responses, provider/DB failures, seeded and triggered jobs, lease exclusion, stale lease protection, retry timing, success scheduling and denied client access.
