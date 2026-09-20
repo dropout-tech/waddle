@@ -358,15 +358,24 @@ export function useWaddleData(): UseWaddleData {
         wsRows = re.data
       }
 
-      const { data: catRows } = await supabase
-        .from('categories')
-        .select('*')
-        .order('sort_order', { ascending: true })
-
-      const { data: taskRows } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('sort_order', { ascending: true })
+      // Workspace creation/first-run seeding must finish before these reads.
+      // The remaining datasets are independent: fetch them together so startup
+      // waits for the slowest response instead of six network round trips.
+      const [
+        { data: catRows },
+        { data: taskRows },
+        { data: tbRows },
+        { data: settingsRow },
+        { data: slotTypeRows },
+        { data: scratchRows },
+      ] = await Promise.all([
+        supabase.from('categories').select('*').order('sort_order', { ascending: true }),
+        supabase.from('tasks').select('*').order('sort_order', { ascending: true }),
+        supabase.from('time_blocks').select('*').order('date', { ascending: true }),
+        supabase.from('user_settings').select('*').eq('user_id', user.id).maybeSingle(),
+        supabase.from('slot_types').select('*').order('sort_order', { ascending: true }),
+        supabase.from('scratchpad_items').select('*').order('created_at', { ascending: false }),
+      ])
 
       const wsById = new Map(wsRows?.map((w) => [w.id, w]) ?? [])
       const catById = new Map(catRows?.map((c) => [c.id, c]) ?? [])
@@ -412,23 +421,7 @@ export function useWaddleData(): UseWaddleData {
         categories: categoriesByWorkspace.get(w.id) ?? [],
       }))
 
-      const { data: tbRows } = await supabase
-        .from('time_blocks')
-        .select('*')
-        .order('date', { ascending: true })
-
       const builtTimeBlocks = (tbRows ?? []).map(rowToTimeBlock)
-
-      const { data: settingsRow } = await supabase
-        .from('user_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      const { data: slotTypeRows } = await supabase
-        .from('slot_types')
-        .select('*')
-        .order('sort_order', { ascending: true })
 
       const customSlotTypes = (slotTypeRows ?? []).map((r) => ({
         id: r.id,
@@ -550,11 +543,6 @@ export function useWaddleData(): UseWaddleData {
       // legacy `scratchpad-YYYY-MM-DD` keys and the cloud row count for
       // that date is 0, we push them up and remove the keys so the next
       // device sees them too.
-      const { data: scratchRows } = await supabase
-        .from('scratchpad_items')
-        .select('*')
-        .order('created_at', { ascending: false })
-
       const builtScratchpad: Record<string, ScratchpadItem[]> = {}
       for (const r of scratchRows ?? []) {
         const item: ScratchpadItem = {
@@ -669,6 +657,9 @@ export function useWaddleData(): UseWaddleData {
   // intentionally do NOT toggle isLoading on refetch so the UI doesn't
   // flash the loading spinner.
   useEffect(() => {
+    // A background refresh must not invalidate the initial load: only that
+    // initial request clears isLoading. Attach listeners once it has finished.
+    if (isLoading) return
     const REFETCH_THROTTLE_MS = 3000
     const tryRefetch = () => {
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
@@ -687,7 +678,7 @@ export function useWaddleData(): UseWaddleData {
       document.removeEventListener('visibilitychange', tryRefetch)
       window.removeEventListener('focus', tryRefetch)
     }
-  }, [loadData])
+  }, [loadData, isLoading])
 
   // ─── Helpers ─────────────────────────────────────────
   const requireUserId = () => {
