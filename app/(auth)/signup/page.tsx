@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { DesktopLoginPending } from '@/components/auth/desktop-login-pending'
 import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
 import { useBrowserFinished } from '@/lib/auth/use-browser-finished'
 import { Button } from '@/components/ui/button'
@@ -227,6 +228,7 @@ export default function SignupPage() {
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
+        <DesktopLoginPending active={googleLoading || appleLoading} />
           </div>
           <p className="text-xs text-muted-foreground">{t('至少 6 個字元')}</p>
         </div>

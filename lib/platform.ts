@@ -18,6 +18,9 @@ declare global {
     huddleDesktop?: {
       platform: string
       isDesktop: boolean
+      beginOAuth: () => Promise<string>
+      openOAuth: (url: string) => Promise<void>
+      cancelOAuth: () => Promise<void>
     }
   }
 }

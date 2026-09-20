@@ -1,6 +1,6 @@
 {
   "name": "huddle",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "main": "desktop/main.cjs",
   "description": "Huddle — 整合任務管理、時間區塊排程與日記反思的工作面板",
@@ -70,6 +70,7 @@
     "@radix-ui/react-toggle": "1.1.10",
     "@radix-ui/react-toggle-group": "1.1.11",
     "@radix-ui/react-tooltip": "1.2.8",
+    "@revenuecat/purchases-capacitor": "13.6.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.1",
     "@tiptap/extension-bubble-menu": "3.26.0",
@@ -153,7 +154,10 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["arm64", "x64"]
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         }
       ],
       "artifactName": "Huddle-${version}-mac-${arch}.${ext}"
@@ -163,7 +167,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "Huddle-${version}-win-${arch}.${ext}"
@@ -173,6 +179,14 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    }
+    },
+    "protocols": [
+      {
+        "name": "Huddle desktop authentication",
+        "schemes": [
+          "huddle-desktop"
+        ]
+      }
+    ]
   }
 }

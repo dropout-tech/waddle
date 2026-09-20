@@ -18,7 +18,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 
-const RELEASES_URL = 'https://github.com/dropout-tech/waddle/releases/latest'
+const RELEASES_URL = 'https://github.com/dropout-tech/waddle/releases/tag/v0.1.1-beta.1'
 
 const flow = [
   {
@@ -47,7 +47,7 @@ const questions = [
   ['資料會在不同裝置同步嗎？', '登入同一個帳號後，任務、行程與筆記會同步，讓你在電腦規劃、在其他裝置快速查看。'],
   ['現在支援哪些電腦？', '目前提供 macOS（Apple Silicon 與 Intel）測試版；請依 Mac 的晶片選擇安裝檔。Windows 版的建置流程已準備完成，正式安裝檔將在後續版本提供。'],
   ['下載後要怎麼安裝？', '打開 DMG，將 Huddle 拖進「應用程式」資料夾，再從應用程式開啟。測試版尚未完成 Apple 公證，第一次開啟可能需要在 Finder 對 Huddle 按右鍵並選擇「打開」。'],
-  ['Huddle 怎麼處理我的資料？', 'Huddle 使用帳號登入來同步任務、行程與筆記；桌面安裝包本身不會把你的內容另存成公開檔案。正式發布前仍會補上獨立的隱私權說明頁。'],
+  ['Huddle 怎麼處理我的資料？', 'Huddle 使用帳號登入來同步任務、行程與筆記；桌面安裝包本身不會把你的內容另存成公開檔案。資料使用方式與聯絡管道可查看頁尾的隱私說明。'],
 ]
 
 function ProductPreview() {
@@ -124,13 +124,14 @@ export function MarketingPage() {
     <main className="min-h-screen overflow-x-hidden bg-[oklch(0.975_0.008_85)] text-[oklch(0.28_0.025_55)] selection:bg-[oklch(0.88_0.06_15)]">
       <nav className="sticky top-0 z-40 border-b border-[oklch(0.9_0.015_85/0.72)] bg-[oklch(0.975_0.008_85/0.92)] backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
-          <Link href="/" className="flex items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.68_0.14_35)]">
+          <Link href="/about" className="flex items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.68_0.14_35)]">
             <Image src="/huddle-mascot.png" width={36} height={36} alt="Huddle" className="size-9 object-contain" priority />
             <span className="text-lg font-semibold tracking-[-0.02em]">Huddle</span>
           </Link>
           <div className="hidden items-center gap-7 text-sm text-[oklch(0.44_0.02_55)] md:flex">
             <a href="#day" className="transition-colors hover:text-[oklch(0.28_0.025_55)]">一天怎麼用</a>
             <a href="#features" className="transition-colors hover:text-[oklch(0.28_0.025_55)]">功能</a>
+            <a href="#pricing" className="transition-colors hover:text-[oklch(0.28_0.025_55)]">方案</a>
             <a href="#download" className="transition-colors hover:text-[oklch(0.28_0.025_55)]">下載</a>
           </div>
           <Link href="/login" className="inline-flex h-10 items-center rounded-full bg-[oklch(0.28_0.025_55)] px-5 text-sm font-medium text-[oklch(0.975_0.008_85)] transition-transform duration-200 ease-quart hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.68_0.14_35)] focus-visible:ring-offset-2">
@@ -150,7 +151,7 @@ export function MarketingPage() {
               Huddle 把任務、行程、專注與筆記收在同一張桌面。少一點來回切換，多一點真正做完事情的從容。
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <a href={RELEASES_URL} target="_blank" rel="noreferrer" className="inline-flex h-13 w-full items-center justify-center gap-2 rounded-full bg-[oklch(0.5_0.14_35)] px-7 font-medium text-[oklch(0.995_0.003_85)] shadow-[0_12px_30px_-16px_oklch(0.4_0.12_35/0.7)] transition-transform duration-200 ease-quart hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.5_0.14_35)] focus-visible:ring-offset-2 sm:w-auto">
+              <a href="#download" className="inline-flex h-13 w-full items-center justify-center gap-2 rounded-full bg-[oklch(0.5_0.14_35)] px-7 font-medium text-[oklch(0.995_0.003_85)] shadow-[0_12px_30px_-16px_oklch(0.4_0.12_35/0.7)] transition-transform duration-200 ease-quart hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.5_0.14_35)] focus-visible:ring-offset-2 sm:w-auto">
                 <Download className="size-4.5" /> 下載 Mac 版
               </a>
               <Link href="/signup" className="inline-flex h-13 w-full items-center justify-center gap-2 rounded-full border border-[oklch(0.82_0.022_70)] bg-[oklch(0.995_0.003_85)] px-7 font-medium transition-colors hover:bg-[oklch(0.95_0.018_85)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.68_0.14_35)] sm:w-auto">
@@ -195,7 +196,7 @@ export function MarketingPage() {
               [ListChecks, '任務與工作區', '把不同身份與專案分開整理，急迫程度、到期日與分類都清楚，但不催促。'],
               [CalendarDays, '時間區塊行程', '拖放任務到今天的時間軸，把抽象的清單變成真正做得到的安排。'],
               [Clock3, '專注計時', '番茄鐘、正計時與環境聲留在畫面一角，陪你守住這一小段時間。'],
-              [NotebookPen, '記事本與白板', '靈感、會議筆記與臨時想法先接住，準備好時再一鍵變成任務。'],
+              [NotebookPen, '記事本與白板', '在記事本整理長文，在白板直接寫下想法、加入檢查清單，再打開內頁延伸內容。'],
               [Sparkles, '回顧與成長足跡', '從完成紀錄與時間分布看見自己的節奏，讓下一次安排更貼近真實。'],
               [MousePointer2, '鍵盤與拖放操作', '用快捷鍵快速找到任務，也能直接拖曳排程；滑鼠、鍵盤都順手。'],
             ].map(([Icon, title, body]) => {
@@ -212,15 +213,39 @@ export function MarketingPage() {
         </div>
       </section>
 
+      <section id="pricing" className="scroll-mt-24 px-5 py-20 sm:px-8">
+        <div className="mx-auto max-w-6xl border-t border-[oklch(0.84_0.022_75)] pt-12">
+          <h2 className="text-4xl font-semibold tracking-[-0.035em]">從免費開始，找到自己的節奏。</h2>
+          <p className="mt-5 max-w-2xl leading-7 text-[oklch(0.48_0.02_55)]">目前核心功能免費開放。Pro 訂閱正在準備，尚未開放購買，也不會自動收費。</p>
+          <div className="mt-10 grid gap-10 md:grid-cols-2">
+            <article className="border-t border-[oklch(0.84_0.022_75)] pt-6">
+              <h3 className="text-2xl font-semibold">免費版</h3>
+              <p className="mt-4 text-4xl font-semibold">NT$0</p>
+              <p className="mt-5 leading-7 text-[oklch(0.48_0.02_55)]">現在就能使用任務、行程、專注計時、記事本與白板，登入同一帳號在不同裝置同步。</p>
+              <Link href="/signup" className="mt-6 inline-flex min-h-12 items-center rounded-full bg-[oklch(0.28_0.025_55)] px-6 text-[oklch(0.975_0.008_85)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">免費開始</Link>
+            </article>
+            <article className="border-t border-[oklch(0.84_0.022_75)] pt-6">
+              <h3 className="text-2xl font-semibold">Pro <span className="ml-2 text-sm font-normal">準備中</span></h3>
+              <p className="mt-4 text-4xl font-semibold">NT$149<span className="text-base font-normal">／月</span></p>
+              <p className="mt-3 text-lg">或 NT$1,290／年，約 NT$108／月</p>
+              <p className="mt-5 leading-7 text-[oklch(0.48_0.02_55)]">提供給想更深入使用 Huddle 的你。付費功能與額度會在開放訂閱時公布；以上為台灣預定方案，實際付款價格以商店顯示為準。</p>
+              <p className="mt-6 text-sm text-[oklch(0.48_0.02_55)]">Apple App Store 與 Google Play 訂閱串接準備中。</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <section id="download" className="scroll-mt-24 px-5 pb-24 sm:px-8 lg:pb-32">
         <div className="relative mx-auto max-w-6xl overflow-hidden rounded-2xl bg-[oklch(0.28_0.025_55)] px-6 py-14 text-[oklch(0.975_0.008_85)] shadow-[0_28px_70px_-38px_oklch(0.28_0.025_55/0.65)] sm:px-12 sm:py-16 lg:grid lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:px-16">
           <div className="relative z-10">
             <h2 className="max-w-2xl text-balance text-4xl font-semibold leading-tight tracking-[-0.035em] sm:text-5xl">把 Huddle 留在你的桌面。</h2>
             <p className="mt-5 max-w-xl text-lg leading-8 text-[oklch(0.82_0.012_85)]">一點就開、獨立視窗、保留登入狀態。每天開始工作時，它就像桌上的那本手帳一樣在那裡。</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a href={RELEASES_URL} target="_blank" rel="noreferrer" className="inline-flex h-13 items-center justify-center gap-2 rounded-full bg-[oklch(0.78_0.12_35)] px-7 font-medium text-[oklch(0.22_0.025_55)] transition-transform duration-200 ease-quart hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.96_0.01_85)]"><Download className="size-4.5" />下載 macOS 版</a>
-              <span className="inline-flex h-13 items-center justify-center gap-2 rounded-full border border-[oklch(0.5_0.02_55)] px-7 text-sm text-[oklch(0.72_0.012_85)]"><Monitor className="size-4" />Windows 版準備中</span>
+              <a href="https://github.com/dropout-tech/waddle/releases/download/v0.1.1-beta.1/Huddle-0.1.1-mac-arm64.dmg" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full bg-[oklch(0.78_0.12_35)] px-7 font-medium text-[oklch(0.22_0.025_55)] transition-transform duration-200 ease-quart hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[oklch(0.96_0.01_85)]"><Download className="size-4.5" />Mac · Apple Silicon</a>
+              <a href="https://github.com/dropout-tech/waddle/releases/download/v0.1.1-beta.1/Huddle-0.1.1-mac-x64.dmg" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-full border border-[oklch(0.5_0.02_55)] px-7 text-sm text-[oklch(0.9_0.012_85)] focus-visible:outline focus-visible:outline-2"><Monitor className="size-4" />Mac · Intel</a>
             </div>
+            <p className="mt-5 text-sm leading-6 text-[oklch(0.82_0.012_85)]">v0.1.1 測試版 · 需網路連線 · 尚未完成 Apple 公證。Windows 版準備中。</p>
+            <a href={RELEASES_URL} className="mt-3 inline-flex min-h-11 items-center text-sm underline underline-offset-4">版本紀錄與安裝說明</a>
           </div>
           <div className="relative mt-12 flex min-h-48 items-center justify-center lg:mt-0">
             <div className="absolute size-56 rounded-full bg-[oklch(0.68_0.14_35/0.18)] blur-3xl" />
@@ -248,7 +273,7 @@ export function MarketingPage() {
       <footer className="px-5 py-10 sm:px-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 text-center text-sm text-[oklch(0.52_0.02_55)] sm:flex-row sm:text-left">
           <div className="flex items-center gap-2"><Image src="/huddle-mascot.png" width={28} height={28} alt="" className="size-7 object-contain" /><span>Huddle · 慢慢搖擺，把事情做完。</span></div>
-          <div className="flex items-center gap-5"><Link href="/login" className="hover:text-[oklch(0.28_0.025_55)]">登入</Link><Link href="/signup" className="hover:text-[oklch(0.28_0.025_55)]">建立帳號</Link><a href={RELEASES_URL} target="_blank" rel="noreferrer" className="hover:text-[oklch(0.28_0.025_55)]">版本紀錄</a></div>
+          <div className="flex flex-wrap items-center justify-center gap-5"><Link href="/privacy" className="hover:text-[oklch(0.28_0.025_55)]">隱私說明</Link><Link href="/login" className="hover:text-[oklch(0.28_0.025_55)]">登入</Link><Link href="/signup" className="hover:text-[oklch(0.28_0.025_55)]">建立帳號</Link><a href={RELEASES_URL} target="_blank" rel="noreferrer" className="hover:text-[oklch(0.28_0.025_55)]">版本紀錄</a></div>
         </div>
       </footer>
     </main>

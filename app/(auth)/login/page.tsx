@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { DesktopLoginPending } from '@/components/auth/desktop-login-pending'
 import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
 import { useBrowserFinished } from '@/lib/auth/use-browser-finished'
 import { PENDING_SHARE_INVITE_KEY } from '@/hooks/use-calendar-sharing'
@@ -222,6 +223,7 @@ function LoginForm() {
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
+        <DesktopLoginPending active={googleLoading || appleLoading} />
           </div>
         </div>
 

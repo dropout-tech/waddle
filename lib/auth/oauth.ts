@@ -1,5 +1,6 @@
+import { desktopSignIn } from './desktop-oauth'
 import { createClient } from '@/lib/supabase/client'
-import { isNative } from '@/lib/platform'
+import { isNative, isDesktop } from '@/lib/platform'
 import { OAUTH_REDIRECT, APPLE_SERVICES_ID } from '@/lib/native-config'
 import { t } from '@/lib/i18n'
 
@@ -14,6 +15,7 @@ import { t } from '@/lib/i18n'
  * handler in deep-link-handler.tsx finishes the exchange.
  */
 export async function signInWithGoogle(): Promise<void> {
+  if (isDesktop()) return desktopSignIn('google')
   const supabase = createClient()
 
   if (isNative()) {
@@ -43,6 +45,7 @@ export async function signInWithGoogle(): Promise<void> {
  * web we fall back to the standard OAuth redirect.
  */
 export async function signInWithApple(): Promise<void> {
+  if (isDesktop()) return desktopSignIn('apple')
   const supabase = createClient()
 
   if (isNative()) {
