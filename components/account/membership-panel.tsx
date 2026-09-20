@@ -7,6 +7,7 @@ import { useAuth } from '@/components/auth/auth-provider'
 import { useI18n } from '@/lib/i18n/react'
 import { createClient } from '@/lib/supabase/client'
 import { loadNativeBillingSession } from '@/lib/billing/load-native-session'
+import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 import { Button } from '@/components/ui/button'
 
 type BillingSession = Awaited<ReturnType<typeof loadNativeBillingSession>>
@@ -103,6 +104,7 @@ export function MembershipPanel() {
    {!referral?.campaign_enabled?<p>{en?'This activity is not open yet. No referral reward is being granted.':'活動尚未開放，目前不會發放推薦獎勵。'}</p>:<><p className="break-all text-lg font-semibold" aria-label={en?'Your referral code':'你的推薦碼'}>{referral.code}</p><Button variant="outline" onClick={share}>{en?'Share my code':'分享我的推薦碼'}</Button>{!referral.has_redeemed&&<form className="flex flex-wrap items-end gap-3" onSubmit={e=>{e.preventDefault();void redeem()}}><label className="min-w-0 flex-1 space-y-1 text-sm">{en?'Friend’s referral code':'朋友的推薦碼'}<input className="w-full rounded-md border bg-background px-3 py-2" value={code} onChange={e=>setCode(e.target.value)} maxLength={32} autoCapitalize="characters" disabled={busy} required/></label><Button disabled={busy||!code.trim()}>{en?'Redeem code':'兌換推薦碼'}</Button></form>}</>}
    {!!referral?.rewards.length&&<ul className="space-y-2 text-sm">{referral.rewards.map(reward=><li key={reward.id}>{reward.months} {en?'months':'個月'} · {reward.status==='redeemed'?(en?'Redeemed':'已兌換'):reward.status==='revoked'?(en?'Revoked':'已撤銷'):(en?'Awaiting store redemption':'待商店兌換')}</li>)}</ul>}
   </section>
+  <section className="space-y-3 border-t pt-6"><h2 className="font-semibold">{en?'Delete account':'刪除帳號'}</h2><p className="text-sm text-muted-foreground">{en?'You can request deletion here. Cancel any active store subscription separately.':'可在此刪除帳號；進行中的商店訂閱請另行取消。'}</p><DeleteAccountButton/></section>
   {message&&<p role="status" className="rounded-md border p-3 text-sm">{message}</p>}
  </div>
 }
