@@ -1,0 +1,21 @@
+.section { background: #f3df7d; color: #25231e; padding: clamp(40px, 6vw, 88px) 20px; }
+.inner { max-width: 1152px; margin-inline: auto; min-width: 0; }
+.heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 28px; margin-bottom: 30px; }
+.heading h2 { font-size: clamp(28px, 4.5vw, 52px); line-height: 1.15; letter-spacing: -.03em; font-weight: 650; margin: 0; }
+.intro { font-size: 15px; line-height: 1.8; max-width: 340px; margin: 0; }
+.figure { margin: 0; }
+.screen { width: 100%; aspect-ratio: 16 / 9; background: #25231e; overflow: hidden; border-radius: 12px; box-shadow: 0 14px 36px -24px #25231e; }
+.screen video { display: block; width: 100%; height: 100%; object-fit: contain; }
+.caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 20px; margin-top: 14px; font-size: 12px; line-height: 1.7; }
+.caption p { margin: 0; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.actions button, .actions a { min-height: 44px; padding: 10px 18px; display: inline-flex; justify-content: center; align-items: center; gap: 8px; border: 1px solid #25231e; border-radius: 4px; font-size: 14px; cursor: pointer; }
+.actions button { background: #25231e; color: #fff9dc; }
+.actions .secondary, .actions a { background: transparent; color: #25231e; }
+.actions a { margin-left: auto; text-decoration: none; }
+.actions :is(button,a):focus-visible, .transcript summary:focus-visible { outline: 3px solid #25231e; outline-offset: 4px; }
+.error { font-size: 14px; line-height: 1.7; margin-top: 16px; }
+.transcript { margin-top: 30px; border-top: 1px solid #25231e40; padding-top: 18px; font-size: 14px; line-height: 1.85; }
+.transcript summary { min-height: 44px; cursor: pointer; font-weight: 600; }
+.transcript p { max-width: 780px; margin: 0 0 12px; }
+@media (max-width: 640px) { .heading { flex-direction: column; align-items: flex-start; gap: 18px; } .actions { gap: 8px; } .actions a { margin-left: 0; } .actions button, .actions a { padding-inline: 13px; } .caption { flex-direction: column; } }

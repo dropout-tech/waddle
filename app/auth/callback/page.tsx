@@ -4,18 +4,16 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { completeDesktopOAuth } from '@/lib/auth/desktop-oauth'
-import { createClient } from '@/lib/supabase/client'
+import { completeWebOAuth } from '@/lib/auth/web-oauth-callback'
 import { PENDING_SHARE_INVITE_KEY } from '@/hooks/use-calendar-sharing'
 
 // Client-side OAuth/PKCE callback. Replaces the former server route handler
 // (app/auth/callback/route.ts) so the page survives `output: 'export'` and
 // works identically on web and inside the Capacitor WebView.
 //
-// The browser Supabase client (createBrowserClient) auto-detects the `?code=`
-// in the URL and exchanges it for a session. We also call exchangeCodeForSession
-// explicitly for determinism; if the auto-detect already consumed the code our
-// manual call errors harmlessly and we fall through to the getSession check.
+// The callback owns PKCE exchange; SDK URL auto-detection is disabled here.
 function Callback() {
+  const [failure, setFailure] = useState<string | null>(null)
   const [desktopLink, setDesktopLink] = useState<string | null>(null)
   const [desktopError, setDesktopError] = useState(false)
   const router = useRouter()
@@ -36,32 +34,35 @@ function Callback() {
       // A deliberate click avoids blocked automatic custom-protocol navigation.
       return
     }
-    const supabase = createClient()
     // Only allow same-origin relative paths to guard against open redirect
     // (e.g. ?next=https://evil.com or //evil.com). Anything else falls back to '/'.
     const raw = searchParams.get('next') || '/'
-    const next = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
+    const next = raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('\\') ? raw : '/'
     const code = searchParams.get('code')
 
+    // A stalled network or auth lock must leave a usable way back to login.
+    let timedOut = false
+    const timer = window.setTimeout(() => {
+      timedOut = true
+      if (!cancelled) setFailure('登入連線逾時，請返回登入頁重試。')
+    }, 20000)
     async function finish() {
       if (searchParams.get('desktop_return') === '1') {
         const success = !searchParams.get('error') && await completeDesktopOAuth(code || '', searchParams.get('desktop_state') || '')
-        if (cancelled) return
+        if (cancelled || timedOut) return
         window.history.replaceState(null, '', '/auth/callback')
-        router.replace(success ? '/' : '/login?error=auth_callback_failed')
+        window.clearTimeout(timer)
+        if (success) router.replace('/')
+        else setFailure('無法完成桌面登入，請返回桌面程式重新登入。')
         return
       }
-      if (code) {
-        try {
-          await supabase.auth.exchangeCodeForSession(code)
-        } catch {
-          /* code may already be consumed by detectSessionInUrl — ignore */
-        }
-      }
-      const { data: { session } } = await supabase.auth.getSession()
-      if (cancelled) return
-      if (!session) {
-        router.replace('/login?error=auth_callback_failed')
+      const success = !searchParams.get('error') && await completeWebOAuth(code || '')
+      if (cancelled || timedOut) return
+      window.clearTimeout(timer)
+      if (!success) {
+        setFailure(searchParams.get('error') === 'access_denied'
+          ? '登入已取消，請返回登入頁重新選擇登入方式。'
+          : '登入連結已失效，或登入驗證未完成。請使用原本的瀏覽器重新登入。')
         return
       }
       // Same share-invite handoff as the email-login path: the fragment
@@ -72,9 +73,16 @@ function Callback() {
     }
 
     finish()
-    return () => { cancelled = true }
+    return () => { cancelled = true; window.clearTimeout(timer) }
   }, [router, searchParams])
 
+  // A full document navigation releases a stuck SDK instance / navigator lock.
+  // Client-side routing would retain the singleton that timed out.
+  if (failure) return <div role="alert" className="min-h-screen flex flex-col gap-4 items-center justify-center p-6 text-center">
+    <h1 className="text-xl font-semibold">登入未完成</h1>
+    <p className="max-w-md text-muted-foreground">{failure}</p>
+    <a className="rounded-xl bg-primary text-primary-foreground px-6 py-3" href="/login">返回登入頁</a>
+  </div>
   if (desktopLink || desktopError) return <div className="min-h-screen flex flex-col gap-4 items-center justify-center p-6 text-center">
     <h1 className="text-xl font-semibold">{desktopError ? '登入連結已失效' : '返回 Huddle 完成登入'}</h1>
     <p>{desktopError ? '請回到桌面程式重新登入。' : '點擊下方按鈕，並允許瀏覽器開啟 Huddle。'}</p>
