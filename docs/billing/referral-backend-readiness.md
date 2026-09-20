@@ -16,7 +16,7 @@
 
 Remaining before enabling: official store offer allocation/redemption and transaction correlation, rewards audit/reversal events, deletion/re-registration abuse policy and retention, rate limiting, user terms and campaign dates. No store code issuance or active reward is implemented. Keep disabled until these are complete; do not represent pending months as active Pro.
 
-Reconciliation complements the existing webhook after purchase/restore. A scheduled full reconciliation worker and monitoring still remain. Production recurring-only snapshot deliberately does not support sandbox or nonrecurring promotional offers; test those with an isolated staging policy before launch. All existing required RevenueCat server settings apply. `billing-reconcile` requires Supabase user authentication unlike external webhook.
+Reconciliation complements the existing webhook after purchase/restore. A scheduled reconciliation worker is implemented below; deployment, scheduler activation and monitoring still remain. Production recurring-only snapshot deliberately does not support sandbox or nonrecurring promotional offers; test those with an isolated staging policy before launch. All existing required RevenueCat server settings apply. `billing-reconcile` requires Supabase user authentication unlike external webhook.
 
 Paid quota enforcement and legacy preservation are separate release gates; these functions do not implement shared-calendar or meeting plan limits.
 
