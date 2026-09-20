@@ -1,7 +1,7 @@
 import { createBrowserClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from './database.types'
-import { isNative } from '@/lib/platform'
+import { isNative, isDesktop } from '@/lib/platform'
 import { createCapacitorStorage } from './capacitor-storage'
 
 // Single shared browser client. Many call sites (use-waddle-data, user-menu,
@@ -32,7 +32,10 @@ export function createClient() {
   } else {
     // Web: default behaviour — session in localStorage, detectSessionInUrl true
     // so the /auth/callback page can finish the OAuth round-trip.
-    client = createBrowserClient<Database>(url, anonKey)
+    client = createBrowserClient<Database>(url, anonKey, { auth: {
+      flowType: 'pkce',
+      detectSessionInUrl: !(isDesktop() || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('desktop') === '1')),
+    } })
   }
 
   return client

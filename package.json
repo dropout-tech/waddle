@@ -1,7 +1,8 @@
 {
   "name": "huddle",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
+  "main": "desktop/main.cjs",
   "description": "Huddle — 整合任務管理、時間區塊排程與日記反思的工作面板",
   "engines": {
     "node": ">=20"
@@ -17,7 +18,11 @@
     "start": "next start -p ${PORT:-3000}",
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
-    "e2e": "node scripts/e2e/smoke.mjs"
+    "e2e": "node scripts/e2e/smoke.mjs",
+    "desktop:dev": "HUDDLE_APP_URL=http://localhost:3000 electron .",
+    "desktop:dist": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --win",
+    "desktop:dist:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
+    "desktop:dist:win": "electron-builder --win"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
@@ -65,6 +70,7 @@
     "@radix-ui/react-toggle": "1.1.10",
     "@radix-ui/react-toggle-group": "1.1.11",
     "@radix-ui/react-tooltip": "1.2.8",
+    "@revenuecat/purchases-capacitor": "13.6.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.1",
     "@tiptap/extension-bubble-menu": "3.26.0",
@@ -107,6 +113,8 @@
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "electron": "^38.8.6",
+    "electron-builder": "^26.15.3",
     "playwright": "^1.61.1",
     "postcss": "^8.5",
     "tailwindcss": "^4.2.0",
@@ -120,10 +128,65 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "electron",
       "sharp"
     ],
     "patchedDependencies": {
       "@capacitor-community/apple-sign-in": "patches/@capacitor-community__apple-sign-in.patch"
     }
+  },
+  "build": {
+    "appId": "com.lazylazy.huddle.desktop",
+    "productName": "Huddle",
+    "asar": true,
+    "directories": {
+      "output": "release/desktop"
+    },
+    "files": [
+      "desktop/**/*",
+      "assets/icon-only.png",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "mac": {
+      "icon": "assets/icon-only.png",
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Huddle-${version}-mac-${arch}.${ext}"
+    },
+    "win": {
+      "icon": "assets/icon-only.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Huddle-${version}-win-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "protocols": [
+      {
+        "name": "Huddle desktop authentication",
+        "schemes": [
+          "huddle-desktop"
+        ]
+      }
+    ]
   }
 }
