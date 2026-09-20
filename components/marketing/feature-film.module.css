@@ -4,7 +4,9 @@
 .heading h2 { font-size: clamp(28px, 4.5vw, 52px); line-height: 1.15; letter-spacing: -.03em; font-weight: 650; margin: 0; }
 .intro { font-size: 15px; line-height: 1.8; max-width: 340px; margin: 0; }
 .figure { margin: 0; }
-.screen { width: 100%; aspect-ratio: 16 / 9; background: #25231e; overflow: hidden; border-radius: 12px; box-shadow: 0 14px 36px -24px #25231e; }
+.screen { width: 100%; aspect-ratio: 48 / 37; background: #25231e; overflow: hidden; border-radius: 12px; box-shadow: 0 14px 36px -24px #25231e; }
+.screen { container-type: inline-size; }
+.screen video::cue { color: #fff; background-color: #000; font-family: sans-serif; font-weight: 700; font-size: clamp(12px, 2.3cqw, 30px); text-shadow: none; }
 .screen video { display: block; width: 100%; height: 100%; object-fit: contain; }
 .caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 20px; margin-top: 14px; font-size: 12px; line-height: 1.7; }
 .caption p { margin: 0; }
