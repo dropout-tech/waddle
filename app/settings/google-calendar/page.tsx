@@ -11,12 +11,13 @@ type Connection={configured:boolean;connected:boolean;status?:string;last_synced
 export default function GoogleCalendarPage(){
  const {user,loading}=useAuth(),{lang}=useI18n(),en=lang==='en',client=useMemo(()=>createClient(),[])
  const [connection,setConnection]=useState<Connection|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[confirm,setConfirm]=useState(false)
+ const [storedUid,setStoredUid]=useState<string>()
  const [auto,setAuto]=useState(false)
  const [workspaces,setWorkspaces]=useState<{id:string;name:string}[]>([]),[selected,setSelected]=useState<string[]>([])
  const [zone,setZone]=useState(()=>Intl.DateTimeFormat().resolvedOptions().timeZone)
  const generation=useRef(0),uid=user?.id
  const reload=useCallback(async()=>{const r=await client.functions.invoke('google-calendar',{body:{action:'status'}});if(r.error)throw r.error;return r.data as Connection},[client])
- useEffect(()=>{const current=++generation.current;setConnection(null);setMessage('');setBusy(false);if(uid)void Promise.all([reload(),client.from('workspaces').select('id,name').eq('user_id',uid).eq('is_archived',false).order('sort_order')]).then(([value,rows])=>{if(current===generation.current){setConnection(value);try{setAuto(localStorage.getItem(`huddle-google-auto:${uid}`)==='true')}catch{setAuto(false)};if(rows.error)throw rows.error;setWorkspaces(rows.data||[]);setSelected([])}}).catch(()=>{if(current===generation.current)setMessage(en?'Calendar integration is not available yet. Try again later.':'日曆整合服務尚未就緒，請稍後重試。')});return()=>{generation.current++}},[uid,reload,en,client])
+ useEffect(()=>{const current=++generation.current;setStoredUid(uid);setConnection(null);setMessage('');setBusy(false);if(uid)void Promise.all([reload(),client.from('workspaces').select('id,name').eq('user_id',uid).eq('is_archived',false).order('sort_order')]).then(([value,rows])=>{if(current===generation.current){setConnection(value);try{setAuto(localStorage.getItem(`huddle-google-auto:${uid}`)==='true')}catch{setAuto(false)};if(rows.error)throw rows.error;setWorkspaces(rows.data||[]);setSelected([])}}).catch(()=>{if(current===generation.current)setMessage(en?'Calendar integration is not available yet. Try again later.':'日曆整合服務尚未就緒，請稍後重試。')});return()=>{generation.current++}},[uid,reload,en,client])
  async function act(action:'start'|'sync'|'disconnect',resolve=false){
   if(busy)return;const current=generation.current;setBusy(true);setMessage('')
   try{
@@ -37,7 +38,7 @@ export default function GoogleCalendarPage(){
  }
  return <main className="mx-auto max-w-2xl space-y-7 px-5 py-8"><Link className="underline" href="/">{en?'Back to Huddle':'返回 Huddle'}</Link><h1 className="text-3xl font-semibold">Google Calendar</h1>
  <p className="text-muted-foreground">{en?'Send your scheduled Huddle events to a separate Huddle calendar in Google. Changes made in Google are not imported.':'把 Huddle 排好的行程同步到 Google 裡獨立的 Huddle 日曆。在 Google 修改的內容不會回傳 Huddle。'}</p>
- {loading?<p>{en?'Loading…':'載入中…'}</p>:!user?<Link href="/login" className="underline">{en?'Sign in to connect':'登入以連結日曆'}</Link>:<section className="space-y-5">
+ {(loading||(uid&&storedUid!==uid))?<p>{en?'Loading…':'載入中…'}</p>:!user?<Link href="/login" className="underline">{en?'Sign in to connect':'登入以連結日曆'}</Link>:<section className="space-y-5">
  {Capacitor.isNativePlatform()?<p>{en?'Google Calendar connection on mobile apps is still being prepared. Use Huddle in your web browser for now.':'手機 App 的 Google Calendar 連結仍在準備中，目前請使用瀏覽器版 Huddle。'}</p>:<>
  <p className="font-medium">{connection?.connected?(en?'Connected':'已連結'):en?'Not connected':'尚未連結'}</p>
  {connection?.last_synced_at&&<p className="text-sm">{en?'Last synchronized':'上次同步'}：{new Date(connection.last_synced_at).toLocaleString(en?'en-US':'zh-TW')}</p>}
