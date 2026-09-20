@@ -63,3 +63,19 @@ References:
 - https://supabase.com/docs/reference/javascript/auth-onauthstatechange
 - Installed @supabase/auth-js GoTrueClient.ts: initialize, _initialize,
   exchangeCodeForSession and _getSessionFromURL.
+
+## Subsequent live desktop inspection and local update
+
+The running process was confirmed at the original repo's
+`release/desktop/mac-arm64/Huddle.app/Contents/MacOS/Huddle` (0.1.0).
+Native accessibility inspection showed `/login` with Google, Apple and email
+submit buttons disabled. This confirms the user had the old application open,
+although it does not prove every reported web login failure has the same cause.
+
+The previously published and verified 0.1.1 arm64 app was copied into the absent
+`/Applications/Huddle.app`; the old running app was quit normally and the new app
+opened. Existing user data and original release artifacts were retained.
+The running process now resolves to `/Applications/Huddle.app/Contents/MacOS/Huddle`;
+Info.plist declares `huddle-desktop`, and native UI inspection shows Google,
+Apple and email submit buttons enabled. Actual Google consent remains for the
+user to perform; no account was selected or authorized on the user's behalf.
