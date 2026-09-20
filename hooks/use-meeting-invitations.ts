@@ -32,6 +32,7 @@ export function useMeetingInvitations(selectedDate = new Date(), inviteId?: stri
  const rpc=supabase.rpc.bind(supabase) as unknown as MeetingRPC
  const currentUser = useRef(user?.id); currentUser.current=user?.id
  const refreshGeneration=useRef(0)
+ const [planUsage,setPlanUsage]=useState<{enabled:boolean;plan:string;monthly_limit:number;invitee_limit:number;used:number;resets_at:string}|null>(null)
  const [storedUserId,setStoredUserId]=useState<string>()
  const [storedMeetings,setMeetings]=useState<MeetingInvitation[]>([]),[error,setError]=useState(false),[loading,setLoading]=useState(false)
  const meetings=storedUserId===user?.id?storedMeetings:[]
@@ -40,7 +41,8 @@ export function useMeetingInvitations(selectedDate = new Date(), inviteId?: stri
  if(result.error)throw result.error;
  const listed=(result.data??[]) as MeetingInvitation[]
  if(inviteId){const one=await (supabase.rpc.bind(supabase) as unknown as MeetingRPC)('get_meeting_invitation',{p_meeting_id:inviteId});if(one.error)throw one.error;if(one.data&&!listed.some(m=>m.id===inviteId))listed.unshift(one.data as MeetingInvitation)}
- if(valid()){setMeetings(listed);setStoredUserId(user.id);setError(false)}
+ const usage=await (supabase.rpc.bind(supabase) as unknown as MeetingRPC)('get_meeting_plan_usage',{})
+ if(valid()){setPlanUsage(usage.error?null:usage.data as typeof planUsage);setMeetings(listed);setStoredUserId(user.id);setError(false)}
  }catch{if(valid())setError(true)}finally{if(valid())setLoading(false)}},[user,supabase,dateKey,inviteId])
  useEffect(()=>{let active=true;const run=()=>{if(active&&document.visibilityState==='visible')void refresh()};void refresh();const timer=setInterval(run,30000);document.addEventListener('visibilitychange',run);return()=>{active=false;refreshGeneration.current++;clearInterval(timer);document.removeEventListener('visibilitychange',run)}},[refresh])
  const respond=async(id:string,response:MeetingResponse)=>{const r=await rpc('respond_meeting_invitation',{p_meeting_id:id,p_response:response});if(r.error)throw r.error;await refresh()}
@@ -91,6 +93,6 @@ export function useMeetingInvitations(selectedDate = new Date(), inviteId?: stri
  const parts:Task[]=[];for(let cursor=new Date(start);cursor<end;){const midnight=new Date(cursor.getFullYear(),cursor.getMonth(),cursor.getDate()+1);const finish=end<midnight?end:midnight;parts.push({id:`meeting:${m.id}:${toDateString(cursor)}`,categoryId:'',workspaceId:'',workspaceName:'',workspaceColor:'#789185',categoryName:'',title:m.title,description:m.description??undefined,location:m.location??undefined,attendees:m.participants.map(p=>p.display_name??'').filter(Boolean).join(', '),taskType:'one_time',urgency:1,scheduledDate:toDateString(cursor),scheduledStartTime:hh(cursor),scheduledEndTime:finish.getTime()===midnight.getTime()?'24:00':hh(finish),calendarColor:'#789185',isCompleted:false,isMeeting:true,showInTaskList:false,sortOrder:0,createdAt:m.created_at,updatedAt:m.created_at});cursor=finish}
  return parts
  })
- return{user,meetings,loading,error,refresh,respond,cancel,retryEmail,findSlots,create,pendingCount,calendarTasks}
+ return{planUsage:storedUserId===user?.id?planUsage:null,user,meetings,loading,error,refresh,respond,cancel,retryEmail,findSlots,create,pendingCount,calendarTasks}
 }
 export type MeetingController=ReturnType<typeof useMeetingInvitations>

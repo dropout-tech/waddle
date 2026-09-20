@@ -56,6 +56,7 @@ try {
     if(name==='get_meeting_invitation')return route.fulfill({json:meetings.find(m=>m.id===body.p_meeting_id)||null})
     if(name==='get_meeting_invitations')return route.fulfill({json:meetings})
     if(name==='get_shared_meeting_busy')return failure==='permission'?route.fulfill({status:403,json:{message:'insufficient grant'}}):paged([{user_id:id(3),starts_at:instant('09:30'),ends_at:instant('10:00')}])
+    if(name==='get_meeting_plan_usage')return route.fulfill({json:{enabled:false}})
     if(name==='get_shared_calendar')return failure==='fetch'?route.fulfill({status:500,json:{message:'mock fetch failure'}}):paged([...[0,1].map(n=>({source:'task',id:id(190+n),event_date:day,start_time:'07:00',end_time:'07:30',color:'#789185',detail:'busy',title:null,is_recurring:false})),{source:'task',id:id(200+(body.p_peer===id(2)?2:3)),event_date:day,start_time:body.p_peer===id(2)?'10:00':'11:00',end_time:body.p_peer===id(2)?'10:30':'11:30',type_key:null,color:'#789185',detail:'busy',title:null,is_recurring:false,recurrence_type:null,recurrence_interval:null,recurrence_days_of_week:null,recurrence_end_date:null,exdates:[],parent_id:null}])
     if(name==='create_meeting_invitation'){
      const existing=meetings.find(m=>m.request_id===body.p_request_id)
