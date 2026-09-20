@@ -1,7 +1,7 @@
 /** Integration boundary. Store SDK results must never be used as server authorization. */
 export interface NativeBillingDriver {
   configure(options: { publicApiKey: string; appUserID: string }): Promise<void>
-  listPackages(): Promise<Array<{ identifier: string; localizedPrice: string }>>
+  listPackages(): Promise<Array<{ identifier: string; localizedPrice: string; title?: string; period?: 'monthly' | 'annual' | 'other' }>>
   purchase(packageIdentifier: string): Promise<void>
   restore(): Promise<void>
   logOut(): Promise<void>

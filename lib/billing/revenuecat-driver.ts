@@ -27,6 +27,8 @@ export function createRevenueCatDriver(sdk: RevenueCatSDK): NativeBillingDriver 
       return (offerings.current?.availablePackages ?? []).map((item) => ({
         identifier: item.identifier,
         localizedPrice: item.product.priceString,
+        title: item.product.title,
+        period: item.packageType === 'MONTHLY' ? 'monthly' as const : item.packageType === 'ANNUAL' ? 'annual' as const : 'other' as const,
       }))
     },
     async purchase(packageIdentifier) {
