@@ -26,7 +26,7 @@ Google同步在瀏覽器/hosted desktop可執行，原生App授權入口停用�
 
 ## 官網獨立發布
 
-官網影片/字幕/英文產品圖以PR54單獨發布：https://github.com/dropout-tech/waddle/pull/54 。本地107項測試通過，安全檢查通過。已合併main：1a50f3a2db0bd053040abefcf2959c4c3525cd68。最終provider與live狀態依另一份release紀錄；不能只依merge宣稱上線。
+官網影片/字幕/英文產品圖以PR54單獨發布：https://github.com/dropout-tech/waddle/pull/54 。本地107項測試通過，安全檢查通過。已合併main：1a50f3a2db0bd053040abefcf2959c4c3525cd68。Zeabur deployment 6556365786 成功，正式站107項檢查通過，五個素材hash相符，已確認上線。詳見2026-09-21-marketing-live.md。
 
 ## 必要部署順序
 

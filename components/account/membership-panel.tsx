@@ -92,7 +92,7 @@ export function MembershipPanel() {
    {!loaded&&<p role="status">{en?'Checking membership…':'正在確認會員狀態…'}</p>}
    {pro&&<p>{en?'Access until':'權益至'} {new Date(expires!).toLocaleDateString(en?'en-US':'zh-TW')}</p>}
    <p className="text-sm text-muted-foreground">{en?'Free keeps your tasks, calendar, notes, whiteboard and focus tools. Pro is planned for more shared partners and group scheduling.':'免費版保留任務、日曆、記事本、白板與專注工具。Pro 規劃提供更多共享夥伴及多人約時間額度。'}</p>
-   <p className="font-medium">NT$149 {en?'/ month':'／月'} · NT$1,290 {en?'/ year, billed yearly':'／年，一次收取年費'}</p>
+   {offers.length===0&&<p className="font-medium">NT$149 {en?'/ month':'／月'} · NT$1,290 {en?'/ year, billed yearly':'／年，一次收取年費'}</p>}
    {offers.length===0&&<p className="text-sm">{en?'Subscriptions are not available here yet. Creating an account will not charge you.':'目前此處尚未開放訂閱，建立帳號不會收費。'}</p>}
    {offers.filter(o=>o.period==='monthly'||o.period==='annual').map(offer=><Button key={offer.identifier} disabled={busy} onClick={()=>storeAction('purchase',offer.identifier)} className="mr-2">{offer.period==='annual'?(en?'Annual':'年繳'):(en?'Monthly':'月繳')} · {offer.localizedPrice}</Button>)}
    {offers.length>0&&<p className="text-sm text-muted-foreground">{en?'Payment is charged to your store account. Subscriptions renew automatically unless cancelled before renewal. The store shows the final price and billing date.':'費用由商店帳號收取，訂閱會自動續訂，請在續訂前取消。最終金額與扣款日期以商店確認畫面為準。'}</p>}
