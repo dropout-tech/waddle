@@ -1,15 +1,70 @@
+---
+name: Huddle — public poster and warm ceramic workspace
+description: Public marketing uses the approved desk poster; the signed-in workspace retains its warm ceramic system.
+colors:
+  marketing-paper: "#f6f3e9"
+  marketing-ink: "#292b24"
+  marketing-yellow: "#edc747"
+  marketing-orange: "#cf5731"
+  marketing-hover: "#474a3d"
+  film-paper: "#f3df7d"
+  film-ink: "#25231e"
+typography:
+  marketing-display-zh:
+    fontFamily: "Noto Sans TC, sans-serif"
+    fontSize: "clamp(36px, 5.9vw, 86px)"
+    fontWeight: 900
+    lineHeight: 1.16
+    letterSpacing: "-0.04em"
+  marketing-display-en:
+    fontFamily: "Barlow Condensed, sans-serif"
+    fontSize: "clamp(54px, 7.4vw, 106px)"
+    fontWeight: 800
+    lineHeight: 0.92
+    letterSpacing: "-0.015em"
+rounded:
+  marketing-control: "4px"
+  marketing-capture: "10px"
+  film-screen: "12px"
+components:
+  marketing-button-primary:
+    backgroundColor: "{colors.marketing-ink}"
+    textColor: "{colors.marketing-paper}"
+    rounded: "{rounded.marketing-control}"
+    padding: "12px 23px"
+  marketing-button-primary-hover:
+    backgroundColor: "{colors.marketing-hover}"
+---
+
 # Design
 
-從 [app/globals.css](app/globals.css) 與目前實裝萃取。所有顏色為 OKLCH。
+## Overview
 
-## Theme
+**Creative North Star: "把日常工作印成一張有手感的桌邊海報"**
 
+公開官網以暖黃紙面、厚重墨字、手繪桌邊物件與真實產品截圖，表現一個人整理一天的節奏。這是使用者已選定的獨立展覽海報世界；最終視覺依據為 `.impeccable/mocks/user-approved-poster.png`，direction contract 位於 `app/layout.tsx` 的首個 body template（seed `58f78b58`）。
+
+**The Scope Rule.** 海報系統只適用公開 marketing 與影片展示；不改寫登入後 app、auth 表單或其他既有介面的 warm ceramic 規則。下方 YAML 的 marketing／film token 僅屬公開展示，app 色票仍以 `app/globals.css` 與 `lib/palette.ts` 為準。
+
+**Key Characteristics:**
+- 公開官網：黃色海報、粗墨字、真實產品證據。
+- 工作介面：暖米陶瓷、低壓力、舒適密度。
+- 插畫承接情緒，功能與可用性由產品畫面和文字說明。
+
+### App：既有主題（保留）
 **雙模式，淺色為主**。淺色是 warm cream paper（陶瓷釉色背景），dark 是 warm charcoal（不是 pure black，也帶 chroma 0.015）。沒有 pure `#fff` 或 `#000`——所有中性色都偏 warm hue 85（暖米）或 55（暖灰褐）。
 
 物理場景：一個人在桌邊、桌燈或自然光下，打開筆電寫今天的計畫；不是會議室、不是辦公室、不是凌晨的 SRE 螢幕。所以淺色是預設。
 
-## Color Strategy
+## Colors
 
+### Public marketing
+
+Primary：暖黃用於主海報；墨色用於標題與實心 CTA。Secondary：橘色只作品牌句點與清晰焦點提示。Neutral：奶油紙面承接長文與章節。影片區使用自己的淡黃紙面與深墨色，並未與主頁色值合併。
+
+**The Surface Rule.** 大色面負責章節節奏，產品截圖保留 app 原本的陶瓷色票；不要把截圖染成海報配色。
+
+### App：既有配色（保留）
 **Restrained + 多功能 accent**：以暖米中性色佔 75-85% 表面，搭配 4 個工作色（赤陶、鼠尾草、玫瑰粉、低彩度藍）以角色分配。每個 workspace 有自己的色票，但任何單一畫面中色彩出現次數受控（≤ 30% 表面有飽和色）。
 
 **可執行來源**：色票的程式碼真身在 `lib/palette.ts`（workspace 色、選擇器預設、urgency 五階、舊色遷移對照表）——新增顏色一律從這裡出，不要散寫 hex。資料驅動的顏色（workspace／任務／時段）在深色模式下經 `toDarkDisplayColor()`（OKLCH 降亮度、壓彩度）自動調校，渲染端統一走 `useDisplayColor()`。
@@ -55,14 +110,28 @@
 
 ## Typography
 
+### Public marketing
+
+中文海報標題使用 Noto Sans TC 900；英文使用 Barlow Condensed 800，hero 大寫且較緊密。Hero 傾斜（rotate -1.4deg、skew -2deg）是印刷海報語氣，段落仍使用全站 sans。正文多為 14–15px、1.8–1.95 行高；章節中文標題為 34–56px，英文為 42–67px。影片標題沿用正文 sans，28–52px、1.15 行高、650 字重設定。
+
+**The Language Rule.** 中英文各自調整字級、行高與換行，不把英文斷行原封套給中文；繁中 hero 在逗號後保留換行機會。
+
+### App：既有字體（保留）
 - **Sans**: `Noto Sans TC`, `Geist`, system-ui — 中文優先，配上 Geist 拉丁字體做混排。Noto Sans TC 帶有圓潤的襯線收尾，符合「溫柔陶瓷感」。
 - **Mono**: `Geist Mono`, `JetBrains Mono` — 計時器、數字 KPI。
 - **Scale**: 至少 1.25 倍級比；標題字重 600，body 400-500。
 - **Line length**: body 段落 65-75ch 上限。
 - **禁用**：gradient text、過粗 ExtraBold (≥800) 用於 body、襯線英文字（會與整體無襯線基調衝突）。
 
-## Layout & Spacing
+## Layout
 
+### Public marketing
+
+頁首最大寬度 1440px；正文段落以 1220–1320px 容器和約 5–6% 邊距排列。Hero 中央真實日曆截圖放進深色螢幕框，桌燈與植物屬背景插畫。白板段落採不對稱雙欄，價格採兩個平面欄位；不以重複卡片承載所有章節。
+
+760px 以下導覽換到第二列，白板、下載和 FAQ 改單欄；390px 以下價格與專注段落也改單欄。1000px 以下收斂間距，1500px 以上 hero 加高。影片另在 640px 以下將標題與說明垂直排列。這些是實裝 breakpoint，不是 app 全域斷點。
+
+### App：既有版面（保留）
 - **三欄式桌面**：左 task panel / 中 calendar / 右 reports。可摺疊。
 - **手機**：底欄 tab + bottom sheet（vaul）。桌面的 right drawer 在手機變 bottom sheet（≥ 90vh 高度）。
 - **Radius**: `--radius: 0.75rem`，整體基調偏圓但不過分；`xl` 用於 modal / sheet，`sm` 用於 chip / tag。
@@ -74,22 +143,43 @@
 - 卡片只在「真的是獨立物件」時才用（任務卡、會議卡）。Sidebar 區塊、報告區塊用區域留白和細邊界，不套卡片。
 - **絕對禁用**：nested cards、side-stripe accent border > 1px、glassmorphism 預設、hero-metric template（big number + label + gradient）、相同尺寸的 icon-heading-text 卡片 grid。
 
-## Elevation & Surface
+## Elevation & Depth
 
+### Public marketing
+
+紙面章節平坦，以空白和細分隔線區分。陰影僅用於螢幕與產品截圖：hero 螢幕為 `0 12px 30px -18px #292b2480`，白板截圖為 `0 17px 40px -24px #292b2455`，影片為 `0 14px 36px -24px #25231e`。
+
+### App：既有表面（保留）
 - 沒有重 shadow。淺色模式用極淺 shadow + warm border 表現層次（`shadow-sm` 居多）。
 - Sheet / modal 用 backdrop blur 6-8px + 暗化 background 至 oklch(0/0.25)，避免重黑遮罩。
 - Dark mode 用「往上提一階明度」表達 elevation（card 比 background 亮 ~4%），而不是 shadow。
 - Auth 卡片等「陶瓷物件」用 `--shadow-ceramic`（雙層暖炭極淺陰影，globals.css）表現手感，不要疊到一般卡片上。
 
-## Motion
+## Shapes
 
+公開官網控制元件採小圓角；白板截圖與影片螢幕使用較柔和的圓角。Hero 螢幕上緣為 24px、深色框 9px，手機降為 15px、6px。價格是帶頂線的平面欄位，FAQ 是可展開的水平列。
+
+App 繼續使用既有 `--radius: 0.75rem` 與陶瓷表面規則，不能將海報控制元件的小圓角套入工作面板。
+
+## Components
+
+### Public marketing：既有實裝
+
+- 導覽：奶油紙面，44px 導覽連結，hover 底線；手機登入控制目前為 40px 高，其餘 CTA 44–48px。這是目前實裝記錄，44px 仍為產品觸控目標基準。
+- CTA：墨底紙色文字，小圓角，hover 改稍淺墨色；可見鍵盤焦點使用 3px 橘色 outline、5px offset。
+- 白板切換：兩個真實產品截圖，共用 tabpanel；選取狀態為墨底紙字，支援左右方向鍵。
+- FAQ：原生 details/summary，展開箭頭旋轉；不依賴動態高度動畫。
+- 影片：16:9 原生 video，點擊播放、預設靜音，不自動播放；提供重播、音訊切換、下載、繁中／英文字幕與文字摘要。插畫魔法轉場明確註記不是拍照辨識。
+- Motion：海報傾斜屬靜態造型。官網 `prefers-reduced-motion` 關閉 transition／animation，影片由使用者主動播放。
+
+### App：既有動畫（保留）
 - **Easing**：預設 `ease-out-quart` 或 `cubic-bezier(0.22, 1, 0.36, 1)`（ease-out-expo）。**禁止** spring / bounce / elastic — 違反「不催促」原則。
 - **Duration**：UI 反饋 150-200ms，過場 300-400ms，emphasis 600ms 上限。
 - **`prefers-reduced-motion`**：必須降級為 opacity-only 或 instant。
 - 動畫只用於 `transform`、`opacity`、`filter`，**不要** animate `width`、`height`、`top`、`left`。
 - 手機手勢（swipe / drag bottom sheet）的 release 動畫用 vaul 預設曲線（已內建）。
 
-## Components (現有實裝)
+### App：既有元件（保留）
 
 ### 白板與內容編輯（2026-09-16）
 
@@ -118,14 +208,22 @@
 | Command Palette | cmdk + ModalShell | ⌘K 召喚；搜任務、切視圖、快速動作；桌面鍵盤入口 |
 | Date/Time Field | 自製（components/ui/date-time-field.tsx） | 桌面 popover 月曆＋15 分時間下拉、中文顯示格式；手機保留原生 input（iOS 滾輪較佳） |
 
-## Iconography
+### App：既有圖示（保留）
 
 - Lucide React 為基準（已含於 shadcn）。
 - 線條 1.5-2px，圓角 cap。
 - **企鵝吉祥物 Huddle** 是手繪風格，出現在 onboarding、empty state、PNG 匯出浮水印；不要在功能性 icon 位置使用吉祥物。
 
-## Anti-patterns Specific to Huddle
+## Do's and Don'ts
 
+### Public marketing
+
+- **Do** 使用真實產品截圖與明示的示範資料，保留清楚可辨識的產品介面。
+- **Do** 讓桌邊插畫、粗字與紙面形成品牌，讓操作證據負責說明功能。
+- **Don't** 將官網海報色票與字重套入登入後 app。
+- **Don't** 將情境影片的魔法解讀為尚未實裝的 AI／辨識功能。
+
+### App：既有禁區（保留）
 - ❌ 紅色驚嘆號 / 紅色「逾期」標籤 — 用赤陶飽和度遞增表達 urgency
 - ❌ "You're behind on X tasks" 的 UX 文案 — 用「還有 X 件可以慢慢做」之類
 - ❌ Streak 斷掉的焦慮提示 — 不要做 streak 紅 X，做 streak 圖也要溫柔

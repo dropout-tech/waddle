@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalPage, LegalSection } from '@/components/legal/legal-page'
 
-export const metadata: Metadata = { title: '服務條款與使用說明｜Huddle', alternates: { canonical: '/terms' } }
+export const metadata: Metadata = { title: '服務條款與使用說明｜Huddle', alternates: { canonical: '/terms', languages: { 'zh-TW': '/terms', en: '/en/terms' } } }
 export default function TermsPage() {
-  return <LegalPage title="服務條款與使用說明" intro="了解 Huddle 提供什麼、如何使用，以及你的內容與帳號如何管理。">
+  return <LegalPage page="terms" title="服務條款與使用說明" intro="了解 Huddle 提供什麼、如何使用，以及你的內容與帳號如何管理。">
     <LegalSection title="Huddle 提供的服務"><p>Huddle 是整理任務、行程、專注計時、筆記與白板的個人工作空間。網頁版與桌面版使用同一個帳號同步資料；登入、讀取雲端內容與同步需要網路。桌面測試版的安裝與支援平台以官網下載區說明為準。</p></LegalSection>
     <LegalSection title="帳號與使用安全"><p>請提供你有權使用的登入資料，妥善保管密碼與驗證連結。請勿使用他人的帳號、嘗試存取未授權的內容、散布惡意程式，或干擾服務運作。若你尚未具備獨立締約的能力，請由法定代理人協助了解並使用服務。</p></LegalSection>
     <LegalSection title="你的內容與分享"><p>你建立或上傳的任務、筆記與圖片，其權利不會因使用 Huddle 而轉移。為呈現、儲存、同步與執行你主動啟用的分享，服務需要處理這些內容。請只上傳有權使用的資料，並在分享前確認對象與範圍；不要分享他人的機密或侵害他人權利的內容。</p></LegalSection>

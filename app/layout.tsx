@@ -102,6 +102,14 @@ export default function RootLayout({
       <body
         className={`${geist.variable} ${geistMono.variable} ${notoSansTC.variable} font-sans antialiased`}
       >
+        <template dangerouslySetInnerHTML={{ __html: `<!--
+THESIS: Huddle makes a personal working day tangible as a hand-printed desk poster.
+OWN-WORLD: Mustard paper, cream margins, ink-black heavy type, hand-drawn desk objects and real product captures. Applies only to public marketing.
+STORY: Recognize scattered tasks, see them organized beside a calendar, try the workspace or download Mac beta.
+FIRST VIEWPORT: Cream navigation, large centered black headline on yellow, actions below, actual calendar in a central dark monitor framed by plant and lamp.
+FORM: User-approved independent exhibition poster; challenger brand identity; seed 58f78b58. The user's supplied composition is final authority.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->` }} />
         {/* Opt-in dark mode: defaults to light (the product's light-first
             stance) and only switches when the user explicitly toggles it, so
             no dark-OS surprise. `attribute="class"` writes `.dark` on <html>,

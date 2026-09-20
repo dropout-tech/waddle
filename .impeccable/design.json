@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-20T10:00:14.158888+00:00",
+  "title": "Design System: Huddle public marketing",
+  "extensions": {
+    "scope": "Public marketing only; app tokens remain in app/globals.css and lib/palette.ts.",
+    "sources": [
+      "components/marketing/marketing-page.module.css",
+      "components/marketing/feature-film.module.css"
+    ],
+    "shadows": [
+      {
+        "name": "hero-monitor",
+        "value": "0 12px 30px -18px #292b2480",
+        "purpose": "Hero product capture"
+      },
+      {
+        "name": "board-capture",
+        "value": "0 17px 40px -24px #292b2455",
+        "purpose": "Whiteboard product capture"
+      },
+      {
+        "name": "film-screen",
+        "value": "0 14px 36px -24px #25231e",
+        "purpose": "Video screen"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "narrow-phone",
+        "value": "390px"
+      },
+      {
+        "name": "film-mobile",
+        "value": "640px"
+      },
+      {
+        "name": "marketing-mobile",
+        "value": "760px"
+      },
+      {
+        "name": "compact-desktop",
+        "value": "1000px"
+      },
+      {
+        "name": "wide-desktop",
+        "value": "1500px"
+      }
+    ],
+    "motion": [
+      {
+        "name": "reduced-motion",
+        "value": "transition: none; animation: none; scroll-behavior: auto",
+        "purpose": "Marketing reduced-motion override; video remains user initiated"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Marketing primary action",
+      "kind": "button",
+      "refersTo": "marketing-button-primary",
+      "description": "Ink action on paper, with visible keyboard focus.",
+      "html": "<button class=\"primary\">免費開始使用 →</button>",
+      "css": ".primary{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 23px;background:#292b24;color:#f6f3e9;border:0;border-radius:4px;font:600 15px sans-serif}.primary:hover{background:#474a3d}.primary:focus-visible{outline:3px solid #cf5731;outline-offset:5px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "把日常工作印成一張有手感的桌邊海報",
+    "overview": "公開官網以暖黃紙面、厚重墨字、手繪桌邊物件與真實產品截圖，表現一個人整理一天的節奏。這是使用者已選定的獨立展覽海報世界；最終視覺依據為 `.impeccable/mocks/user-approved-poster.png`，direction contract 位於 `app/layout.tsx` 的首個 body template（seed `58f78b58`）。",
+    "keyCharacteristics": [
+      "公開官網：黃色海報、粗墨字、真實產品證據。",
+      "工作介面：暖米陶瓷、低壓力、舒適密度。",
+      "插畫承接情緒，功能與可用性由產品畫面和文字說明。"
+    ],
+    "rules": [
+      {
+        "name": "The Scope Rule.",
+        "body": "海報系統只適用公開 marketing 與影片展示；不改寫登入後 app、auth 表單或其他既有介面的 warm ceramic 規則。下方 YAML 的 marketing／film token 僅屬公開展示，app 色票仍以 `app/globals.css` 與 `lib/palette.ts` 為準。",
+        "section": "overview"
+      },
+      {
+        "name": "The Surface Rule.",
+        "body": "大色面負責章節節奏，產品截圖保留 app 原本的陶瓷色票；不要把截圖染成海報配色。",
+        "section": "colors"
+      },
+      {
+        "name": "The Language Rule.",
+        "body": "中英文各自調整字級、行高與換行，不把英文斷行原封套給中文；繁中 hero 在逗號後保留換行機會。",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "**Do** 使用真實產品截圖與明示的示範資料，保留清楚可辨識的產品介面。",
+      "**Do** 讓桌邊插畫、粗字與紙面形成品牌，讓操作證據負責說明功能。"
+    ],
+    "donts": [
+      "**Don't** 將官網海報色票與字重套入登入後 app。",
+      "**Don't** 將情境影片的魔法解讀為尚未實裝的 AI／辨識功能。"
+    ]
+  }
+}

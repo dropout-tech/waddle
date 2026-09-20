@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { LegalPage, LegalSection } from '@/components/legal/legal-page'
-export const metadata: Metadata = { title: '資料與隱私說明｜Huddle', alternates: { canonical: '/privacy' } }
+export const metadata: Metadata = { title: '資料與隱私說明｜Huddle', alternates: { canonical: '/privacy', languages: { 'zh-TW': '/privacy', en: '/en/privacy' } } }
 export default function PrivacyPage() {
-  return <LegalPage title="資料與隱私說明" intro="這份說明整理目前版本使用的資料、用途，以及你可以進行的管理操作。">
+  return <LegalPage page="privacy" title="資料與隱私說明" intro="這份說明整理目前版本使用的資料、用途，以及你可以進行的管理操作。">
     <LegalSection title="帳號與你建立的內容"><p>Huddle 使用電子郵件、帳號識別資訊及登入驗證資料來識別使用者。你建立的任務、行程、專注紀錄、筆記、白板、上傳圖片與偏好設定，會用於提供工作空間、儲存、跨裝置同步及你啟用的分享功能。</p><p>你可以選擇不建立帳號並瀏覽官網；若不提供登入所需資料，就無法使用需要帳號的雲端工作空間。工作內容由你自行決定是否輸入。</p></LegalSection>
     <LegalSection title="服務供應商與裝置儲存"><p>帳號驗證、應用資料與上傳檔案使用 Supabase，網站運行於 Zeabur。選用 Google 或 Apple 登入時，對應供應商會參與驗證。瀏覽器與桌面程式會保存登入狀態、部分設定與必要快取；桌面版連接相同的線上服務。</p><p>使用服務時，連線與系統運作也涉及網路及裝置相關技術資訊。雲端供應商可能跨地區處理資料；本頁不宣稱資料僅儲存在台灣，或所有紀錄都會在刪除帳號後立即清除。</p></LegalSection>
     <LegalSection title="分享範圍"><p>使用分享功能前，請確認接收對象與分享範圍。個人工作內容不會因下載桌面版而自動公開至官網；官網展示採用示意內容。你主動提供給他人的內容，可能由接收者另行保存。</p></LegalSection>
