@@ -7,17 +7,18 @@ import { createClient } from '@/lib/supabase/client'
 /** Opt-in, foreground-only synchronization. Server always reads authoritative data. */
 export function GoogleCalendarAutoSync({revision}:{revision:string}){
  const {user}=useAuth()
+ const uid=user?.id
  useEffect(()=>{
-  if(!user||Capacitor.isNativePlatform())return
+  if(!uid||Capacitor.isNativePlatform())return
   const client=createClient();let stopped=false,running=false
   const enabled=()=>{
    if(stopped||document.visibilityState!=='visible')return false
-   try{return localStorage.getItem(`huddle-google-auto:${user.id}`)==='true'}catch{return false}
+   try{return localStorage.getItem(`huddle-google-auto:${uid}`)==='true'}catch{return false}
   }
   const invoke=async(action:'status'|'sync')=>{
    if(!enabled())return null
    const {data:{session}}=await client.auth.getSession()
-   if(!enabled()||session?.user.id!==user.id)return null
+   if(!enabled()||session?.user.id!==uid)return null
    // Pin this wake to its original account, even if the SDK session changes.
    return client.functions.invoke('google-calendar',{body:{action},headers:{Authorization:`Bearer ${session.access_token}`}})
   }
@@ -39,6 +40,6 @@ export function GoogleCalendarAutoSync({revision}:{revision:string}){
   const delay=setTimeout(safeRun,3000),timer=setInterval(safeRun,60000)
   document.addEventListener('visibilitychange',safeRun);window.addEventListener('huddle-google-sync-preference',safeRun)
   return()=>{stopped=true;clearTimeout(delay);clearInterval(timer);document.removeEventListener('visibilitychange',safeRun);window.removeEventListener('huddle-google-sync-preference',safeRun)}
- },[user?.id,revision])
+ },[uid,revision])
  return null
 }
