@@ -25,3 +25,7 @@ Capacitor's local shell does not imply all features work offline. Huddle still r
 
 - https://developer.android.com/google/play/requirements/target-sdk (current API36 requirement)
 - Capacitor 8.3.4 generated Android template and installed package versions (actual project settings)
+
+## Additional SDK diagnostic
+
+Checked Spotlight for `android.jar`, user/system Android SDK directories, Homebrew share, and `ANDROID_HOME` / `ANDROID_SDK_ROOT`; no existing SDK found. The official Mac ARM command-line tools download (build 15859902) requires agreement to the Android Software Development Kit License Agreement before downloading. No agreement was accepted and no SDK was installed. Once the owner authorizes that agreement, install only command-line tools, API 36 platform and required build-tools in `/tmp/huddle-android-sdk`, then run the existing Gradle wrapper using that isolated SDK. This is the concrete blocker before APK build verification; no signing or store submission is needed for a debug build.
