@@ -30,11 +30,11 @@ export function createClient() {
       },
     })
   } else {
-    // Web: default behaviour — session in localStorage, detectSessionInUrl true
-    // so the /auth/callback page can finish the OAuth round-trip.
+    // /auth/callback owns its one-use PKCE exchange. Other routes retain URL
+    // detection (including password recovery / email auth links).
     client = createBrowserClient<Database>(url, anonKey, { auth: {
       flowType: 'pkce',
-      detectSessionInUrl: !(isDesktop() || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('desktop') === '1')),
+      detectSessionInUrl: !(isDesktop() || (typeof window !== 'undefined' && window.location.pathname === '/auth/callback')),
     } })
   }
 
