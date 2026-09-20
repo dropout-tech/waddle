@@ -18,6 +18,8 @@ Deno.serve(async(req)=>{
   // Never pretend an auth-row deletion revokes Sign in with Apple.
   if(user.identities?.some(identity=>identity.provider==='apple'))return json({error:'apple_reauthorization_required'},409)
   const uid=user.id,storage=admin.storage.from('notebook-images')
+  const {error:markerError}=await admin.rpc('begin_account_deletion',{p_user_id:uid})
+  if(markerError)throw Error('deletion_guard_unavailable')
   // Snapshot all pages before removals: deleting while using offsets skips files.
   // Names are single segments from Storage; reject traversal/foreign prefixes.
   const files:string[]=[],folders=[uid],seen=new Set<string>()

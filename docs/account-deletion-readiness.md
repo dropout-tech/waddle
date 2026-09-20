@@ -6,6 +6,13 @@ Google Calendar refresh token revocation is best effort before deleting the auth
 
 Apple-linked accounts currently return `409 apple_reauthorization_required` before any destruction. Existing system does not retain the Apple refresh token or perform fresh native Apple authorization/token revocation. This is an explicit launch blocker for Apple deletion; do not claim App Store deletion compliance until reauthorization/revocation UI is implemented and tested. Existing deletion button safely displays an error and leaves the account signed in, but should be extended with a specific localized reauthorization action.
 
-The storage double-check reduces upload races but is not a global deletion lock. A future deletion state must deny all writes before cleanup for a full concurrency guarantee. Already issued JWT lifetime and cached public-image URLs also need to be considered in the release verification. Subscription cancellation is separate from deleting Huddle data; do not promise automatic store cancellation.
+A service-only deletion marker now denies notebook-image INSERT/UPDATE through restrictive RLS before cleanup. The guard checks the verified auth UID and existing auth user, so an old JWT cannot insert after auth deletion cascades the marker. Row locks coordinate uploads already authorized when deletion begins. This guards storage writes, not all application tables. Already issued JWT lifetime and cached public-image URLs also need to be considered in the release verification. Subscription cancellation is separate from deleting Huddle data; do not promise automatic store cancellation.
 
 Verified with `node --test scripts/tests/delete-account.test.mjs`: real handler under mocked SDK, missing/invalid JWT, exact user prefix, capped pagination/nested folders, traversal rejection, storage errors, Apple precondition, Google ordering, auth errors and auth deletion last. No remote accounts or files touched.
+
+
+## Deployment order and retry
+
+Apply `20260920184344_account_deletion_write_guard.sql` **before** deploying the updated delete function. `begin_account_deletion` is service-only; a missing RPC fails closed before cleanup. The marker persists if cleanup fails, preventing further image changes while allowing authenticated deletion retries. Apple reauthorization is checked before marking. Marker cannot be removed by the client; support recovery requires explicit review if the user abandons deletion.
+
+`bash scripts/tests/deletion-database.sh` verifies actual restrictive PostgreSQL policies: normal own upload allowed, marking blocks insert/update, stale JWT cannot insert after auth deletion, and client cannot mark an account. The marker RPC locks the auth row FOR UPDATE; policy checks lock it FOR KEY SHARE so in-flight authorized Storage transactions finish before cleanup starts. Ten mocked handler scenarios verify the marker is required before destructive steps.
