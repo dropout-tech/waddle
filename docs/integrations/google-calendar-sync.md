@@ -53,3 +53,41 @@ worker 從權威資料讀取，完整分頁；讀取失敗不能當成「所有�
 - Token/testing：https://developers.google.com/identity/protocols/oauth2
 - 建立事件：https://developers.google.com/workspace/calendar/api/guides/create-events
 - Supabase Edge auth：https://supabase.com/docs/guides/functions/auth
+
+## 2026-09-21 本機實作與上線交接
+
+已實作 `supabase/functions/google-calendar`、伺服器專用 connection／一次性 OAuth state／event mapping 表，以及實際本機 PostgreSQL 與 Google API mock 驗證。這不代表已在 Google 或正式 Supabase 啟用。
+
+第一版可使用的邊界：單向、每人一個帳號與獨立 Huddle 日曆。連結前選本人工作區及 IANA 時區；同步過去 30 天至未來 365 天的已排程任務（含重複與排除日期）和本人主辦／已接受會議。先前同步過的較早事件保留並繼續對帳；取消排程、封存、刪除及 cascade 刪除會移除遠端對應事件。完成任務不會刪除歷史。未排程待辦、其他人的共享覆蓋、time blocks、Google 私人行程不在匯出範圍。DST 不存在或重複的無 offset 任務時間會停止並提示，不能猜測時刻。
+
+同步由登入使用者呼叫，支持手動與開啟 App 時觸發；尚無關閉 App 後的獨立背景 worker，沒有一分鐘 SLA。每次最多處理 80 筆或 40 秒，回傳 `partial` 與剩餘筆數，後續呼叫沿持久化游標接續；只有完整跑完且沒有衝突才更新成功時間。沒有資料庫讀取失敗即刪光的路徑。mapping 不依賴 source FK，因此來源刪除不會丟失待刪除遠端識別。Google 事件 ID 可重試且穩定；回應遺失後按同一 ID 查回。
+
+### 呼叫契約
+
+所有動作為帶有效 Huddle JWT 的 `google-calendar` Edge Function POST：
+
+- `status`：`configured`, `connected`, `status`, `last_synced_at`, `error`, `calendar_id`, `time_zone`, `workspace_ids`, `range`, `mode`。不返回任何 token。
+- `start`：必填 `time_zone`、非空本人 `workspace_ids`；回傳 `url`。授權不改現有 Google 登入。
+- `finish`：callback 取得 `code`, `state` 後，由登入 client 傳入。state 綁本人及原 JWT session、十分鐘、一用即失效、PKCE S256。回傳 pending，尚未輸出行程。
+- `sync`：回傳 `status`, `processed`, `changed`, `conflicts`, `remaining`, `from`, `to`。Google 端修改／刪除為 `conflict`；只有使用者明確操作才傳 `resolve_conflicts:true` 以 Huddle 覆蓋／重建。
+- `disconnect`：移除本機憑證及 mapping，預設保留遠端日曆。`revoked:false` 表示 Google 撤銷請求未確認成功，需引導至 Google 帳號移除應用存取權。
+
+OAuth callback 是 `/settings/google-calendar/callback`，需和起始 Huddle session 相同。原生另開瀏覽器的跨 session 返回尚未完成，不能宣称 iOS／Android OAuth 已驗收；先支援同一登入瀏覽器。重新連結／改帳號先解除連結，保留的舊 Google 日曆不會被自動接管。
+
+### 正式設定（服務端 secret，不放 NEXT_PUBLIC 或 Git）
+
+- `GOOGLE_CALENDAR_CLIENT_ID`、`GOOGLE_CALENDAR_CLIENT_SECRET`：Google Cloud Web OAuth client。
+- `GOOGLE_CALENDAR_REDIRECT_URI`：精確 HTTPS callback URL；同一值加入 Google 的授權 redirect URI。
+- `GOOGLE_CALENDAR_TOKEN_KEY`：隨機 32 bytes 的 base64url AES-GCM 金鑰，妥善保管；輪替前需有重加密或重新授權計畫。
+- 部署 `20260920182257_google_calendar_sync.sql` 及 `google-calendar` Function；依部署平台 JWT 模式確認 gateway 允許由 handler 的 `getUser` 驗證有效 session JWT。
+- 啟用 Calendar API、scope `calendar.app.created`，Google OAuth 品牌／網域／政策公開並完成需要的審查。
+
+建立 Google 次要日曆沒有可使用的插入冪等鍵。若建立請求後回應遺失，保留 `calendar_creation_uncertain`，停止自動重建，避免一次重試建立多個日曆；由操作人確認 Google 日曆後清理／解除連結。正式測試須覆蓋此狀況。
+
+### 已跑驗證及未驗證
+
+- `node scripts/test/google-calendar-core-verify.mjs`：4,823 assertions，包含與既有 recurrence 的 4,800 日期比對、加密／篡改／owner 綁定、跨日與 24:00、DST、英文無關的來源範圍及歷史保留。
+- `node scripts/test/google-calendar-handler-verify.mjs`：17 mock scenarios，涵蓋未授權、不同 user/session/state、OAuth 一次性、secret 不回傳、穩定 ID 回應遺失、Google 修改衝突、來源刪除、讀取失敗不刪除、重新授權、互斥、撤銷失敗、日曆建立不確定及 85 筆分批接續。
+- `python3 scripts/test/google-calendar-db-verify.py`：13 本機 SQL assertions，匿名／authenticated 無權讀憑證與呼叫 server RPC、本人資料／已接受會議、跨 generation claim 拒絕、互斥、來源刪除保留 mapping、解除連結清理。
+- `npx --yes deno check --no-lock supabase/functions/google-calendar/index.ts`：型別檢查通過。
+- 尚未做：正式 migration／Function 部署、Google 真實授權與隔離日曆新增修改刪除、網域審查、所有原生平台返回、遠端 Supabase advisors。這些列為上線驗收，不以 mock 取代。
