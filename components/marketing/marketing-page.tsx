@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Barlow_Condensed, Noto_Sans_TC } from 'next/font/google'
-import { ArrowDown, ArrowRight, CalendarDays, CheckSquare2, ChevronDown, Download, NotebookPen, Play, Timer } from 'lucide-react'
+import { ArrowDown, ArrowRight, CalendarDays, CalendarClock, Users, CheckSquare2, ChevronDown, Download, NotebookPen, Play, Timer } from 'lucide-react'
 import { setLang } from '@/lib/i18n'
 import { FeatureFilm } from './feature-film'
 import styles from './marketing-page.module.css'
@@ -19,6 +19,7 @@ const copy = {
     headline: '慢慢搖擺，把事情做完。', sub: '任務、行程、白板。把腦中的大小事，放進同一張工作桌。',
     watch: '看企鵝變個魔法', desktop: '下載 Mac 測試版', sample: '實際產品畫面・內容為示範資料',
     pillars: [['事情，先記下來。', '任務分進工作區，今天想做的事一眼看見。'], ['時間，留給重要的事。', '把任務拖進行事曆，為工作與休息留一格。'], ['想法，也有地方放。', '白板直接寫，記事本慢慢整理，線索不再散落。']],
+    moreTitle: '一起安排，也留住想法。', moreIntro: '自己的步調，和彼此的時間，都能好好放下。', planned: '規劃中・尚未開放', more: [['共享日曆', '用邀請連結與夥伴互看行事曆，把對方開放的行程疊加顯示，安排事情時多一點默契。'], ['約交集時間', '希望一起找出彼此都有空的時段，減少來回詢問。這項功能正在規劃，尚未提供自動比對或預約。'], ['記事本', '把靈感寫成筆記，用文字格式、檢查清單與圖片整理內容。從零散念頭到完整計畫，留下可以接著寫的地方。']],
     boardTitle: '想法先放下，\n順序慢慢來。', boardBody: '還沒想清楚也沒關係。在白板上直接寫字、放連結、加入檢查清單。需要更多空間時，打開內頁，沿用記事本的編輯工具。',
     boardTabs: ['自由整理', '打開內頁'], boardAlt: ['Huddle 白板：文字與檢查清單放在自由畫布上', 'Huddle 白板內頁：以記事本編輯器延伸內容'],
     boardNote: '白板與內頁都是目前可用的功能；示範內容不會存入你的帳號。',
@@ -40,8 +41,9 @@ const copy = {
   en: {
     nav: ['Features', 'Plans', 'Download', 'Support'], login: 'Log in', start: 'Start for free',
     headline: 'Find your rhythm.\nMake things happen.', sub: 'Tasks, calendars and a whiteboard. One workspace for everything on your mind.',
-    watch: 'A little penguin magic', desktop: 'Download the Mac beta', sample: 'Actual product interface · demonstration content in Chinese',
+    watch: 'A little penguin magic', desktop: 'Download the Mac beta', sample: 'Actual product interface · demonstration content',
     pillars: [['Get it out of your head.', 'Organize tasks in workspaces and see what matters today.'], ['Make room for what matters.', 'Drag tasks onto your calendar. Leave time for work and a break.'], ['Give ideas a place to grow.', 'Write on the whiteboard, explore in your notebook, and keep the thread.']],
+    moreTitle: 'Make plans together. Keep your ideas close.', moreIntro: 'Room for your own rhythm, and the time you share with others.', planned: 'Planned · Not available yet', more: [['Shared calendars', 'Invite someone with a link and view the calendar entries they choose to share alongside your own. Make plans with a clearer picture of each other’s day.'], ['Find a time together', 'We’re planning a way to find times when everyone is available, with less back-and-forth. Automatic availability matching and booking are not available yet.'], ['Notebooks', 'Develop your ideas with formatted text, checklists and images. Keep passing thoughts and detailed plans in a place you can return to.']],
     boardTitle: 'Put the idea down.\nFind the shape later.', boardBody: 'You don’t need a finished thought to begin. Write directly on the whiteboard, add links and checklists, then open an item to develop it with the notebook editor.',
     boardTabs: ['The whiteboard', 'Inside an item'], boardAlt: ['Huddle whiteboard showing text and a checklist on a freeform canvas', 'A whiteboard item opened in the Huddle notebook editor'],
     boardNote: 'Both views show available features. Demonstration content is not added to your account.',
@@ -87,7 +89,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
           <div className={styles.heroActions}><Link href="/signup" onClick={() => setLang(en ? 'en' : 'zh-TW')} className={styles.primary}>{t.start}<ArrowRight size={19} aria-hidden="true" /></Link><a href="#feature-film" className={styles.watch}><Play size={16} aria-hidden="true" />{t.watch}</a></div>
         </div>
         <figure className={styles.heroProduct}>
-          <div className={styles.monitor}><Image src="/marketing/workspace-demo.png" width={1440} height={1000} alt={en ? 'Huddle tasks beside a daily calendar, using demonstration data' : 'Huddle 任務清單與每日行事曆並列，使用示範資料'} priority sizes="(max-width: 600px) 95vw, 74vw" /></div>
+          <div className={styles.monitor}><Image src={`/marketing/workspace-demo${en ? '-en' : ''}.png`} width={1440} height={1000} alt={en ? 'Huddle tasks beside a daily calendar, using demonstration data' : 'Huddle 任務清單與每日行事曆並列，使用示範資料'} priority sizes="(max-width: 600px) 95vw, 74vw" /></div>
           <figcaption>{t.sample}</figcaption>
         </figure>
       </section>
@@ -96,9 +98,14 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
         {[CheckSquare2, CalendarDays, NotebookPen].map((Icon, i) => <article key={i}><Icon size={32} strokeWidth={1.7} aria-hidden="true" /><div><h2>{t.pillars[i][0]}</h2><p>{t.pillars[i][1]}</p></div></article>)}
       </section>
 
+      <section className={styles.moreFeatures} aria-labelledby="more-title">
+        <div className={styles.sectionIntro}><h2 id="more-title">{t.moreTitle}</h2><p>{t.moreIntro}</p></div>
+        <div className={styles.featureRows}>{[Users, CalendarClock, NotebookPen].map((Icon, i) => <article key={t.more[i][0]}><Icon size={30} strokeWidth={1.6} aria-hidden="true" /><div><h3>{t.more[i][0]}</h3>{i === 1 && <span className={styles.planned}>{t.planned}</span>}</div><p>{t.more[i][1]}</p></article>)}</div>
+      </section>
+
       <section className={styles.whiteboard} aria-labelledby="board-title">
         <div className={styles.chapterCopy}><h2 id="board-title">{t.boardTitle}</h2><p>{t.boardBody}</p><div className={styles.tabs} role="tablist" aria-label={en ? 'Whiteboard views' : '白板畫面'}>{t.boardTabs.map((label, i) => <button key={label} id={`board-tab-${i}`} type="button" role="tab" aria-selected={boardView === i} aria-controls="board-panel" tabIndex={boardView === i ? 0 : -1} onClick={() => setBoardView(i)} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const next = 1 - i; setBoardView(next); document.getElementById(`board-tab-${next}`)?.focus() } }}>{label}</button>)}</div></div>
-        <figure role="tabpanel" id="board-panel" aria-labelledby={`board-tab-${boardView}`} className={styles.boardFigure}><Image src={boardView === 0 ? '/marketing/whiteboard-demo.png' : '/marketing/whiteboard-detail-demo.png'} width={1440} height={1000} alt={t.boardAlt[boardView]} sizes="(max-width: 760px) 92vw, 60vw" /><figcaption>{t.boardNote}</figcaption></figure>
+        <figure role="tabpanel" id="board-panel" aria-labelledby={`board-tab-${boardView}`} className={styles.boardFigure}><Image src={`/marketing/${boardView === 0 ? 'whiteboard-demo' : 'whiteboard-detail-demo'}${en ? '-en' : ''}.png`} width={1440} height={1000} alt={t.boardAlt[boardView]} sizes="(max-width: 760px) 92vw, 60vw" /><figcaption>{t.boardNote}</figcaption></figure>
       </section>
 
       <div id="feature-film" className={styles.film}><FeatureFilm locale={locale} /></div>
