@@ -4,7 +4,7 @@ import { FeatureFilm } from '@/components/marketing/feature-film'
 
 export const metadata: Metadata = {
   title: 'Huddle 功能短片｜完整預覽',
-  description: '觀看 Huddle 的 24 秒情境短片，了解任務、行程、專注與筆記如何陪你整理一天。',
+  description: '觀看 Huddle 的 18 秒情境短片，了解任務、行程、專注與筆記如何陪你整理一天。',
   robots: { index: false, follow: false },
 }
 

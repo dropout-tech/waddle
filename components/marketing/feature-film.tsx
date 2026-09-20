@@ -4,11 +4,12 @@ import { useId, useRef, useState } from 'react'
 import { Download, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react'
 import styles from './feature-film.module.css'
 
-const FILM = '/marketing/feature-film/huddle-feature-film.mp4'
 
 /** Public, click-to-play media. Native controls remain the primary player UI. */
 export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
   const en = locale === 'en'
+  const film = `/marketing/feature-film/huddle-feature-film${en ? '-en' : ''}.mp4`
+  const poster = `/marketing/feature-film/poster${en ? '-en' : ''}.jpg`
   const copy = en ? {
     title: ['Give your scattered ideas', 'a place in your day.'],
     intro: ['From a passing thought to a task done.', 'See how Huddle helps you make room for your day.'],
@@ -20,7 +21,7 @@ export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
     paragraphs: [
       'Sticky notes surround a calendar. The Huddle penguin waves its magic, bringing them into a task list. This illustrates organizing ideas; it does not represent photographing or automatically recognizing notes.',
       'Drag a task into a time slot, then move it when plans change. Check off one task and start a focus timer to make room for what comes next.',
-      'Features shown: task organization, drag-and-drop scheduling, rescheduling, task completion, and a focus timer. The film illustrates the Chinese interface with English captions. There is no dialogue; the music carries no instructions.',
+      'Features shown: task organization, drag-and-drop scheduling, rescheduling, task completion, and a focus timer. The film shows an illustrated English interface with English captions. There is no dialogue; the music carries no instructions.',
     ],
   } : {
     title: ['把散落的想法，', '留給今天的自己。'], intro: ['從一個念頭，到一件做完的事。', '用一小段時間，看看 Huddle 如何陪你整理一天。'],
@@ -63,6 +64,7 @@ export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
         <figure className={styles.figure}>
           <div className={styles.screen}>
             <video
+              key={locale}
               ref={videoRef}
               controls
               muted={muted}
@@ -71,7 +73,7 @@ export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
               preload="metadata"
               width={1920}
               height={1480}
-              poster="/marketing/feature-film/poster.jpg"
+              poster={poster}
               aria-label={copy.label}
               aria-describedby={`${id}-description ${id}-notice`}
               onError={() => setFailed(true)}
@@ -79,7 +81,7 @@ export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
               onPause={() => setPlaying(false)}
               onEnded={() => setPlaying(false)}
             >
-              <source src={FILM} type="video/mp4" onError={() => setFailed(true)} />
+              <source src={film} type="video/mp4" onError={() => setFailed(true)} />
               <track kind="captions" src="/marketing/feature-film/captions.vtt" srcLang="zh-TW" label="繁體中文" default={!en} />
               <track kind="captions" src="/marketing/feature-film/captions.en.vtt" srcLang="en" label="English" default={en} />
               {copy.fallback}
@@ -103,7 +105,7 @@ export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
           }}>
             {muted ? <Volume2 size={16} aria-hidden="true" /> : <VolumeX size={16} aria-hidden="true" />}{muted ? copy.unmute : copy.mute}
           </button>
-          <a href={FILM} download="huddle-feature-film.mp4"><Download size={16} aria-hidden="true" />{copy.download}</a>
+          <a href={film} download={`huddle-feature-film${en ? '-en' : ''}.mp4`}><Download size={16} aria-hidden="true" />{copy.download}</a>
         </div>
         {failed && <p className={styles.error} role="status">{copy.error}</p>}
         <details className={styles.transcript}>

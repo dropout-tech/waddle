@@ -4,7 +4,7 @@ import { FeatureFilm } from '@/components/marketing/feature-film'
 
 export const metadata: Metadata = {
   title: 'Huddle feature film | Full preview',
-  description: 'A 24-second story about organizing tasks, making time, and finding focus with Huddle.',
+  description: 'A 18-second story about organizing tasks, making time, and finding focus with Huddle.',
   robots: { index: false, follow: false },
 }
 

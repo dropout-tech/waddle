@@ -20,7 +20,7 @@ try {
     const section = page.locator('section').filter({ has: video })
     const track = video.locator('track[default]')
     check(`${path}: correct default captions are available`, await track.getAttribute('src') === `/marketing/feature-film/captions${en ? '.en' : ''}.vtt` && await track.getAttribute('srclang') === (en ? 'en' : 'zh-TW') && await track.getAttribute('kind') === 'captions' && await track.getAttribute('default') !== null)
-    check(`${path}: download links to the MP4`, await section.getByRole('link', { name: labels.download }).getAttribute('href') === '/marketing/feature-film/huddle-feature-film.mp4')
+    check(`${path}: download links to the MP4`, await section.getByRole('link', { name: labels.download }).getAttribute('href') === `/marketing/feature-film/huddle-feature-film${en ? '-en' : ''}.mp4`)
     const play = section.getByRole('button', { name: labels.play, exact: true })
     await play.focus()
     check(`${path}: play button receives keyboard focus`, await play.evaluate(el => document.activeElement === el))
