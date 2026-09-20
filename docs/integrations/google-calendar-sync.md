@@ -91,3 +91,7 @@ OAuth callback 是 `/settings/google-calendar/callback`，需和起始 Huddle se
 - `python3 scripts/test/google-calendar-db-verify.py`：13 本機 SQL assertions，匿名／authenticated 無權讀憑證與呼叫 server RPC、本人資料／已接受會議、跨 generation claim 拒絕、互斥、來源刪除保留 mapping、解除連結清理。
 - `npx --yes deno check --no-lock supabase/functions/google-calendar/index.ts`：型別檢查通過。
 - 尚未做：正式 migration／Function 部署、Google 真實授權與隔離日曆新增修改刪除、網域審查、所有原生平台返回、遠端 Supabase advisors。這些列為上線驗收，不以 mock 取代。
+
+### 前景自動同步
+
+設定頁可勾選此裝置開啟 Huddle 時自動同步（預設關閉、每帳號獨立）。在主畫面可見時每分鐘檢查，資料變更後短暫延遲檢查，每次最多三批；遇衝突／重新授權／建立日曆未確認即停止自動處理。每次呼叫重驗當前帳號與勾選狀態，固定相符 JWT。App 關閉或背景不執行，後台 worker 尚未提供。12 項 mock effect 驗證通過。

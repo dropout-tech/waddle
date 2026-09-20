@@ -31,7 +31,7 @@
 - 購買後authenticated reconciliation及known entitlement定期校準queue/worker。
 - 推薦碼/RPC、唯一綁定、雙方pending獎勵、名額/驗證/重試檢查；正式商店優惠兌換仍未配置。
 - 約交集已完成的站內與Email準備，另加伺服器每月/每場方案額度，預設關閉。
-- Google專屬日曆OAuth、加密token、工作區選擇、分批手動同步/更新/刪除、外部修改衝突、取消連結。第一版不是双向或關App仍背景同步。
+- Google專屬日曆OAuth、加密token、工作區選擇、分批手動同步/更新/刪除、外部修改衝突、取消連結。另有預設關閉、可選擇的前景自動同步；第一版不是雙向或關 App 仍背景同步。
 - Android實際專案、API36、Capacitor原生同步。沒有已簽章APK/AAB或真機通過的宣稱。
 - 官網影片字幕、活潑企鵝、英文成片與真實英文產品圖；發布狀態另見部署紀錄。
 

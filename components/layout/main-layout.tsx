@@ -8,6 +8,7 @@ import { FullScreenTaskView } from '@/components/task-panel/full-screen-task-vie
 import { FocusBoardMobile } from '@/components/task-panel/focus-board-mobile'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
 import { MeetingDialog } from '@/components/meetings/meeting-dialog'
+import { GoogleCalendarAutoSync } from '@/components/integrations/google-calendar-auto-sync'
 import { useMeetingInvitations } from '@/hooks/use-meeting-invitations'
 import { CalendarExportModal } from '@/components/calendar/calendar-export-modal'
 import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ListChecks, CalendarDays, Sparkles, ChevronLeft, ChevronRight, Focus } from 'lucide-react'
@@ -375,7 +376,7 @@ export function MainLayout({
     if (task.id.startsWith('meeting:')) { setMeetingInviteId(task.id.slice(8,44)); setMeetingsOpen(true); return }
     onSelectTask(task, occurrenceDate)
   }
-  const meetingDialog = <MeetingDialog open={meetingsOpen} onOpenChange={setMeetingsOpen} controller={meetingController} peers={sharePeers} tasks={allTasks} timeBlocks={timeBlocks} initialDate={selectedDate} inviteId={meetingInviteId}/>
+  const meetingDialog = <><GoogleCalendarAutoSync revision={JSON.stringify(allTasks.map(task=>[task.id,task.updatedAt,task.scheduledDate,task.scheduledStartTime,task.scheduledEndTime]))+JSON.stringify(meetingController.meetings)}/><MeetingDialog open={meetingsOpen} onOpenChange={setMeetingsOpen} controller={meetingController} peers={sharePeers} tasks={allTasks} timeBlocks={timeBlocks} initialDate={selectedDate} inviteId={meetingInviteId}/></>
 
 
   // Filter tasks for selected date (local date — must match toDateString used elsewhere)
