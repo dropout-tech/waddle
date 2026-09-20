@@ -70,7 +70,7 @@ export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
               playsInline
               preload="metadata"
               width={1920}
-              height={1080}
+              height={1480}
               poster="/marketing/feature-film/poster.jpg"
               aria-label={copy.label}
               aria-describedby={`${id}-description ${id}-notice`}
