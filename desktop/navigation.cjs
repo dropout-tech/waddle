@@ -6,6 +6,7 @@ function windowOpenPolicy(raw, allowedOrigin, preload) {
       action: 'allow',
       overrideBrowserWindowOptions: {
         autoHideMenuBar: true,
+        ...(target.pathname === '/floating-host.html' ? { alwaysOnTop: true, title: 'Huddle' } : {}),
         webPreferences: {
           preload,
           contextIsolation: true,
