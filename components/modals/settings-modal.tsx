@@ -45,6 +45,7 @@ import {
   collectMeetings,
   type ReminderLead,
 } from '@/lib/meeting-reminder'
+import { DesktopNotificationSettings } from './desktop-notification-settings'
 import { requestReminderPermission, syncMeetingReminders } from '@/lib/notifications'
 import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 import { PICKER_COLOR_HEXES, WORKSPACE_COLORS } from '@/lib/palette'
@@ -733,6 +734,8 @@ export function SettingsModal({
               />
             </label>
 
+            <DesktopNotificationSettings />
+
             {/* Meeting reminder lead time */}
             <div className="space-y-2">
               <div>
@@ -758,7 +761,7 @@ export function SettingsModal({
                         // gesture. requestReminderPermission branches per platform.
                         const granted = await requestReminderPermission()
                         if (!granted) {
-                          alert(t('通知權限被拒，請在系統設定中允許 Huddle 顯示通知後再試'))
+                          alert(window.huddleDesktop?.isDesktop ? (lang === 'en' ? 'Enable Desktop system notifications above, then allow Huddle in system notification settings.' : '請先開啟上方「桌面系統通知」，並在系統通知設定允許 Huddle。') : t('通知權限被拒，請在系統設定中允許 Huddle 顯示通知後再試'))
                           return
                         }
                       }
