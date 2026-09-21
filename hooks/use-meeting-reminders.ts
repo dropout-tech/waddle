@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useAuth } from '@/components/auth/auth-provider'
 import type { Workspace } from '@/lib/types'
 import {
   collectMeetings,
@@ -31,6 +32,8 @@ import { t } from '@/lib/i18n'
  * - We haven't already fired for this meeting (deduped via localStorage)
  */
 export function useMeetingReminders(workspaces: Workspace[]) {
+  const { user } = useAuth()
+  const sourceAccount = user?.id ?? null
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -100,7 +103,7 @@ export function useMeetingReminders(workspaces: Workspace[]) {
           if (inFlight.has(reminderId) || (attempts.get(reminderId) || 0) >= 3) continue
           inFlight.add(reminderId)
           attempts.set(reminderId, (attempts.get(reminderId) || 0) + 1)
-          void notifyDesktop({ kind: 'meeting', id: reminderId, title: t('會議提醒 · {title}', { title: safeTitle }), body: bodyLines.join(' ') }).then(sent => {
+          void notifyDesktop({ kind: 'meeting', expectedAccount: sourceAccount, id: reminderId, title: t('會議提醒 · {title}', { title: safeTitle }), body: bodyLines.join(' ') }).then(sent => {
             if (sent && !disposed) {
               const latest = getFiredRemindersAndPrune()
               latest.add(reminderId)
@@ -148,5 +151,5 @@ export function useMeetingReminders(workspaces: Workspace[]) {
     check()
     const id = window.setInterval(check, 30 * 1000)
     return () => { disposed = true; window.clearInterval(id) }
-  }, [workspaces])
+  }, [workspaces, sourceAccount])
 }
