@@ -40,3 +40,15 @@ test('native failure returns false and long fields are bounded',async()=>{
  bridge.showNotification=async()=>{throw Error('IPC unavailable')}
  assert.equal(await api.notifyDesktop(payload),false)
 })
+test('stale meeting closure cannot send previous-account content after auth changes',async()=>{
+  const {api,calls}=setup()
+  api.setDesktopNotificationAccount('A');api.setDesktopNotificationsEnabled(true)
+  const fromA={kind:'meeting',id:'A-meeting',title:'Private A',body:'A details',expectedAccount:'A'}
+  assert.equal(await api.notifyDesktop(fromA),true)
+  api.setDesktopNotificationAccount('B')
+  assert.equal(await api.notifyDesktop(fromA),false)
+  assert.equal(await api.notifyDesktop({...fromA,expectedAccount:undefined}),false)
+  assert.equal(await api.notifyDesktop({...fromA,expectedAccount:'B',title:'B meeting',body:'B details'}),true)
+  const sent=calls.filter(x=>typeof x==='object')
+  assert.equal(sent.length,2);assert.equal(sent[1].title,'B meeting')
+})

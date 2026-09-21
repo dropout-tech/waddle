@@ -16,8 +16,9 @@ export function setDesktopNotificationsEnabled(enabled: boolean) {
   localStorage.setItem(DESKTOP_NOTIFICATIONS_KEY, enabled ? '1' : '0')
   if (!enabled) void window.huddleDesktop?.clearNotifications?.().catch(() => {})
 }
-export async function notifyDesktop(payload: { kind: 'meeting' | 'focus' | 'water' | 'test'; id: string; title: string; body: string; silent?: boolean; startedAt?: number }) {
+export async function notifyDesktop(payload: { kind: 'meeting' | 'focus' | 'water' | 'test'; id: string; title: string; body: string; silent?: boolean; startedAt?: number; expectedAccount?: string | null }) {
   if (!desktopNotificationsEnabled() || !activeAccount) return false
+  if (payload.kind === 'meeting' && payload.expectedAccount !== activeAccount) return false
   if (payload.kind === 'focus' && (!payload.startedAt || payload.startedAt < earliestFocusStart)) return false
   try {
     const result = await window.huddleDesktop!.showNotification!({ ...payload, id: payload.id.slice(0, 200), title: payload.title.slice(0, 160), body: payload.body.slice(0, 500) })
