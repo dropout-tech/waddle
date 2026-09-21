@@ -763,3 +763,53 @@
   height: 0;
   pointer-events: none;
 }
+
+/* Existing macOS Electron builds use hiddenInset: the native window controls
+   occupy the web viewport. Detect their existing preload before first paint,
+   reserving a drag strip without changing browser/Capacitor or popup layouts. */
+html[data-desktop-titlebar='mac'] {
+  --desktop-titlebar-height: 48px;
+  scroll-padding-top: var(--desktop-titlebar-height);
+}
+
+html[data-desktop-titlebar='mac'] body {
+  padding-top: var(--desktop-titlebar-height);
+}
+
+html[data-desktop-titlebar='mac'] body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto;
+  height: var(--desktop-titlebar-height);
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+  z-index: 1000;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+/* Keep the SPA inside the remaining viewport; simply padding its header would
+   cut off the bottom calendar controls and create a second document scrollbar. */
+html[data-desktop-titlebar='mac'] :is(.h-screen, .h-\[100dvh\]:not([class~="sm:h-[90dvh]"])) {
+  height: calc(100dvh - var(--desktop-titlebar-height));
+}
+html[data-desktop-titlebar='mac'] .min-h-screen {
+  min-height: calc(100dvh - var(--desktop-titlebar-height));
+}
+
+/* Portaled overlays and fixed controls do not inherit the body's padding. */
+html[data-desktop-titlebar='mac'] .fixed:is(.inset-0, .inset-y-0, .top-0) {
+  top: var(--desktop-titlebar-height);
+}
+html[data-desktop-titlebar='mac'] .fixed.inset-y-0 {
+  height: auto;
+}
+html[data-desktop-titlebar='mac'] .fixed.top-3 {
+  top: calc(var(--desktop-titlebar-height) + 0.75rem);
+}
+html[data-desktop-titlebar='mac'] .fixed.top-4 {
+  top: calc(var(--desktop-titlebar-height) + 1rem);
+}
+html[data-desktop-titlebar='mac'] .fixed.top-\[50\%\] {
+  top: calc(50% + var(--desktop-titlebar-height) / 2);
+}
