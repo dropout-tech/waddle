@@ -34,18 +34,19 @@
 
 Web → `HuddleWidgets` 原生 plugin → app-private Room／DataStore snapshot → Glance render。Widget 操作 → 原生交易與 outbox → 登入有效時同步 → 回傳 canonical revision → Web 更新。
 
-- 共用 envelope：schemaVersion、accountId、sessionEpoch、revision、generatedAt、locale、timeZone、privacyMode、各模組安全摘要。命名與 iOS 最終共用規格統一後再落碼。
+- 共用 envelope：schemaVersion、accountId、accountEpoch、revision、generatedAt、locale、timeZone、privacyMode、各模組安全摘要。命名與 iOS 最終共用規格統一後再落碼。
 - 每個 widget instance 儲存它的類型、固定資源 ID、顯示偏好；重新配置可換筆記／白板，刪除小工具只刪設定，不刪使用者內容。
 - 首版資料刷新以 App 同步完成及原生操作觸發為主；離線顯示最後更新時間。背景雲端更新是另一步，需受控原生使用者 session 管理，不能把 service key 或 refresh token 放在 widget payload、intent、日誌。
-- 原生 action 必須含 actionId、accountId、sessionEpoch、resourceId、expectedRevision；本機先去重，再服務端冪等。伺服器拒絕權限／資源已刪除時回復畫面並提示，不能永久假勾選成功。
+- 原生 action 必須含 actionId、accountId、accountEpoch、resourceId、expectedRevision；本機先去重，再服務端冪等。伺服器拒絕權限／資源已刪除時回復畫面並提示，不能永久假勾選成功。
 - 帳號切換／登出先撤銷操作、清掉 snapshot、outbox、縮圖與通知，再顯示「開啟 Huddle 登入」；舊帳號排程不可寫新帳號。取消分享／刪除筆記同步時刪相關快取。
 - Android 內部 widget 用 explicit immutable PendingIntent 指定 MainActivity 與允許目的地；共用深連結規格建議 `huddle://open/calendar?date=...`、`/notebook?id=...`、`/whiteboard?id=...`、`/focus`、`/water`。只接受已知參數並驗證資源權限，不接受任意 URL。冷啟動／登入後保留目的地。
 
 ## 計時、提醒與更新策略
 
-- 不用每秒網路请求或每秒 WorkManager 更新 widget。一般 snapshot 事件驅動；官方 updatePeriodMillis 最短 30 分鐘，WorkManager 週期工作最短 15 分鐘且不是準時保證。參考 [Glance 更新](https://developer.android.com/develop/ui/compose/glance/glance-app-widget)。
+- 不用每秒網路請求或每秒 WorkManager 更新 widget。一般 snapshot 事件驅動；官方 updatePeriodMillis 最短 30 分鐘，WorkManager 週期工作最短 15 分鐘且不是準時保證。參考 [Glance 更新](https://developer.android.com/develop/ui/compose/glance/glance-app-widget)。
 - 專注以持久化結束時間／暫停餘時及 monotonic clock 基準運算；通知使用系統 Chronometer 倒數。需要 widget 秒數時驗證 RemoteViews Chronometer 的 host 相容性；不支援則顯示結束時間與分鐘級摘要，不用假秒數。
 - 暫停／停止取消舊鬧鐘；重新開機、換時區、調整時鐘後重建狀態與提醒，完成紀錄按 sessionId 去重。
+- 既有 `lib/notifications/index.ts` 的 `syncMeetingReminders` 會清除所有待送通知；加入喝水／專注前，必須先改為依 reminder kind 命名與取消，避免功能互相刪掉排程。
 - 喝水採非精準提醒、安靜時段、稍後五分鐘；不要為一般喝水提醒索取精準鬧鐘權限。專注結束若需精準通知，在 Android 對應版本檢查可否排 exact alarm，清楚說明權限用途，拒絕後提供可能延遲的替代。Android 13+ 另處理通知權限。參考 [AlarmManager](https://developer.android.com/develop/background-work/services/alarms)。
 - 倒數本身不需要長駐 foreground service。只有真正符合系統服務類型且有使用者可見長工作才評估使用；不可濫用 dataSync／mediaPlayback 來保活。背景啟動受限制，widget 點擊例外也非無限常駐許可。參考 [前景服務限制](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start)。
 
@@ -61,7 +62,7 @@ Web → `HuddleWidgets` 原生 plugin → app-private Room／DataStore snapshot 
 
 - API 24／26／31／33／36 分層測試；至少 Pixel 手機、實際支援鎖屏 widgets 的設備、Samsung 實機各一。OEM 沒有入口時教學／替代功能正確。
 - 程序被殺、重啟、離線、Doze、通知拒絕、精準鬧鐘拒絕、大字體、英文長標題、系統時區/DST、widget 重新調尺寸。
-- 快速連點不重複加水／勾選；兩個 widget 指同筆記一致；登出與帳號切換不殘留文字／缩圖；舊 PendingIntent 失效；鎖屏不可看到私密內容。
+- 快速連點不重複加水／勾選；兩個 widget 指同筆記一致；登出與帳號切換不殘留文字／縮圖；舊 PendingIntent 失效；鎖屏不可看到私密內容。
 - Native unit tests 覆蓋狀態機／snapshot版本／冪等／accountEpoch；instrumentation 驗證 widget receivers、route 冷啟動與通知。最後生成已簽署 APK/AAB，在 Play internal testing 實機安裝，才能標記 Android 小工具完成。
 
 商業方案：先保持這五項基本小工具免費，讓桌面與手機資料入口一致；多版型／多組個人化可後續討論。此為建議，沒有改動現有付費權限或已確定 Pro 價格。
