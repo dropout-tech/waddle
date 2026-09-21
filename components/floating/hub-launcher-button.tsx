@@ -12,6 +12,8 @@
  * 不如不顯示，那些環境仍有記事本/白板的 ⇱ 退回普通小視窗）。
  */
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { toast } from 'sonner'
+import { isDesktop } from '@/lib/platform'
 import { PictureInPicture2 } from 'lucide-react'
 import {
   closeFloatingHub, getHubServerState, getHubState, hubAvailable, openFloatingHub, subscribeHub,
@@ -28,7 +30,7 @@ export function HubLauncherButton({ className }: { className?: string }) {
 
   if (!available) return null
   const isOpen = hub.window !== null
-  const text = isOpen ? t('收回懸浮小視窗') : t('懸浮小視窗（永遠置頂）')
+  const text = isOpen ? t('收回懸浮小視窗') : t(isDesktop() ? '懸浮小視窗' : '懸浮小視窗（永遠置頂）')
 
   return (
     <button
@@ -37,7 +39,9 @@ export function HubLauncherButton({ className }: { className?: string }) {
       onClick={() => {
         // requestWindow 必須在點擊手勢的同一個 tick 發出。
         if (isOpen) closeFloatingHub()
-        else void openFloatingHub(getHubState().tab)
+        else void openFloatingHub(getHubState().tab).then(opened => {
+          if (!opened) toast.error(t('無法開啟懸浮視窗，請重新載入後再試'))
+        })
       }}
       aria-label={text}
       title={text}
