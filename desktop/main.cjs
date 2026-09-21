@@ -1,10 +1,11 @@
-const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron')
+const { app, BrowserWindow, Menu, shell, ipcMain, Notification } = require('electron')
 const path = require('node:path')
 
 const PRODUCTION_URL = 'https://waddle.zeabur.app'
 const appUrl = process.env.HUDDLE_APP_URL || PRODUCTION_URL
 const allowedOrigin = new URL(appUrl).origin
 const { createOAuth } = require('./oauth.cjs')
+const { createNotifications } = require('./notifications.cjs')
 const { windowOpenPolicy } = require('./navigation.cjs')
 let win
 let oauth
@@ -49,6 +50,8 @@ function createWindow(targetUrl = appUrl) {
       nodeIntegration: false,
       sandbox: true,
       spellcheck: true,
+      // Keep opted-in reminders and wall-clock timer checks alive while minimized.
+      backgroundThrottling: false,
     },
   })
 
@@ -86,6 +89,7 @@ const template = [
 
 app.whenReady().then(() => {
   if (!locked) return
+  if (process.platform === 'win32') app.setAppUserModelId('com.lazylazy.huddle.desktop')
   app.setAsDefaultProtocolClient('huddle-desktop')
   oauth = createOAuth({ file: path.join(app.getPath('userData'), 'pending-oauth.json'), origin: allowedOrigin, openExternal: url => shell.openExternal(url) })
   for (const [channel, handler] of Object.entries({
@@ -96,6 +100,12 @@ app.whenReady().then(() => {
     if (!trusted(event)) throw new Error('Untrusted OAuth caller')
     return handler(arg)
   })
+  const notifications = createNotifications({ Notification, trusted, focus: () => {
+    if (win && !win.isDestroyed()) { win.restore(); win.show(); win.focus() }
+  } })
+  ipcMain.handle('desktop-notification-clear', event => notifications.clear(event))
+  ipcMain.handle('desktop-notification-status', event => notifications.status(event))
+  ipcMain.handle('desktop-notification-show', (event, payload) => notifications.show(event, payload))
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
   createWindow()
   const initial = pendingUrl || process.argv.find(value => value.startsWith('huddle-desktop://'))

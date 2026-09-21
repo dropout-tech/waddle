@@ -615,6 +615,6 @@ export default function Page() {
   }
 
   return (
-    <HuddlePage />
+    <HuddlePage key={session.user.id} />
   )
 }

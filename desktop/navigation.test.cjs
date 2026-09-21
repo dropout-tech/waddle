@@ -13,3 +13,10 @@ test('cross-origin, deceptive host, script and malformed popouts are denied', ()
     assert.equal(windowOpenPolicy(url,'https://waddle.zeabur.app','preload').action,'deny')
   }
 })
+test('only the same-origin floating host is always on top; arbitrary blank windows remain denied', () => {
+  const origin = 'https://waddle.zeabur.app'
+  assert.equal(windowOpenPolicy(origin + '/floating-host.html', origin, 'preload').overrideBrowserWindowOptions.alwaysOnTop, true)
+  assert.equal(windowOpenPolicy(origin + '/about', origin, 'preload').overrideBrowserWindowOptions.alwaysOnTop, undefined)
+  assert.equal(windowOpenPolicy('https://evil.test/floating-host.html', origin, 'preload').action, 'deny')
+  assert.equal(windowOpenPolicy('about:blank', origin, 'preload').action, 'deny')
+})

@@ -24,6 +24,7 @@ export interface HubState {
   noteId?: string
 }
 
+let opening: Promise<Window | null> | null = null
 let state: HubState = { window: null, tab: 'timer' }
 const listeners = new Set<() => void>()
 function emit() {
@@ -68,7 +69,9 @@ export async function openFloatingHub(tab: HubTab, opts?: { noteId?: string }): 
     try { existing.focus() } catch {}
     return true
   }
-  const w = await openPipWindow(SIZES[tab])
+  const request = opening ?? (opening = openPipWindow(SIZES[tab]))
+  const w = await request
+  if (opening === request) opening = null
   if (!w) return false
   state = { window: w, tab, noteId: opts?.noteId ?? state.noteId }
   emit()

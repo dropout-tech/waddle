@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useAuth } from '@/components/auth/auth-provider'
 import type { Workspace } from '@/lib/types'
 import {
   collectMeetings,
@@ -12,6 +13,7 @@ import {
 import { detectMeetingProvider } from '@/lib/meeting-utils'
 import { isNative } from '@/lib/platform'
 import { syncMeetingReminders } from '@/lib/notifications'
+import { desktopNotificationsEnabled, notifyDesktop } from '@/lib/desktop-notifications'
 import { t } from '@/lib/i18n'
 
 /**
@@ -30,6 +32,8 @@ import { t } from '@/lib/i18n'
  * - We haven't already fired for this meeting (deduped via localStorage)
  */
 export function useMeetingReminders(workspaces: Workspace[]) {
+  const { user } = useAuth()
+  const sourceAccount = user?.id ?? null
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -42,12 +46,15 @@ export function useMeetingReminders(workspaces: Workspace[]) {
     }
 
     // Web: poll every 30s and fire a browser Notification while the tab is open.
-    if (!('Notification' in window)) return
+    if (!window.huddleDesktop?.showNotification && !('Notification' in window)) return
 
+    const inFlight = new Set<string>()
+    const attempts = new Map<string, number>()
+    let disposed = false
     const check = () => {
       const lead = getReminderLead()
       if (lead === null) return
-      if (Notification.permission !== 'granted') return
+      if (window.huddleDesktop?.showNotification ? !desktopNotificationsEnabled() : Notification.permission !== 'granted') return
 
       const meetings = collectMeetings(workspaces)
       if (meetings.length === 0) return
@@ -92,7 +99,19 @@ export function useMeetingReminders(workspaces: Workspace[]) {
         const provider = detectMeetingProvider(m.meetingUrl)
         const openable = !!m.meetingUrl && provider !== null
 
-        try {
+        if (window.huddleDesktop?.showNotification) {
+          if (inFlight.has(reminderId) || (attempts.get(reminderId) || 0) >= 3) continue
+          inFlight.add(reminderId)
+          attempts.set(reminderId, (attempts.get(reminderId) || 0) + 1)
+          void notifyDesktop({ kind: 'meeting', expectedAccount: sourceAccount, id: reminderId, title: t('會議提醒 · {title}', { title: safeTitle }), body: bodyLines.join(' ') }).then(sent => {
+            if (sent && !disposed) {
+              const latest = getFiredRemindersAndPrune()
+              latest.add(reminderId)
+              persistFiredReminders(latest)
+            }
+          }).finally(() => inFlight.delete(reminderId))
+          continue
+        } else try {
           const n = new Notification(t('會議提醒 · {title}', { title: safeTitle }), {
             body: bodyLines.join('\n'),
             // Tag dedupes within the OS notification center — re-firing
@@ -131,6 +150,6 @@ export function useMeetingReminders(workspaces: Workspace[]) {
     // seconds of delay.
     check()
     const id = window.setInterval(check, 30 * 1000)
-    return () => window.clearInterval(id)
-  }, [workspaces])
+    return () => { disposed = true; window.clearInterval(id) }
+  }, [workspaces, sourceAccount])
 }

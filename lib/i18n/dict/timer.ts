@@ -113,6 +113,8 @@ export const dict: Record<string, string> = {
   '計時器': 'Timer',
   '還沒有進行中的計時': 'Nothing is being timed yet',
   '懸浮小視窗（永遠置頂）': 'Floating window (always on top)',
+  '懸浮小視窗': 'Floating window',
+  '無法開啟懸浮視窗，請重新載入後再試': 'Could not open the floating window. Reload and try again.',
   '收回懸浮小視窗': 'Close the floating window',
   '彈出成便條紙（懸浮在最上層）': 'Pop out as a sticky note (always on top)',
 

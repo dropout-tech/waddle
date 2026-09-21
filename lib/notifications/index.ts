@@ -6,6 +6,7 @@
 // app is backgrounded or closed — the genuine native capability that makes the
 // iOS build more than a wrapped website (App Store Guideline 4.2).
 
+import { desktopNotificationsEnabled } from '@/lib/desktop-notifications'
 import { isNative } from '@/lib/platform'
 import {
   ensureNotificationPermission,
@@ -35,6 +36,7 @@ const trim = (s: string, max: number) => s.replace(/\s+/g, ' ').trim().slice(0, 
  * user gesture (the settings toggle).
  */
 export async function requestReminderPermission(): Promise<boolean> {
+  if (typeof window !== 'undefined' && window.huddleDesktop?.isDesktop) return desktopNotificationsEnabled()
   if (isNative()) {
     const { LocalNotifications } = await import('@capacitor/local-notifications')
     const res = await LocalNotifications.requestPermissions()

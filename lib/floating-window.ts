@@ -19,7 +19,7 @@
  * 應先用 `canFloat()` 擋掉。
  */
 
-import { isNative } from './platform'
+import { isDesktop, isNative } from './platform'
 
 /** Chrome 的 Document PiP 進入點，尚未進 TypeScript 的 lib.dom。 */
 interface DocumentPictureInPicture {
@@ -41,7 +41,7 @@ function pipApi(): DocumentPictureInPicture | null {
 
 /** 這個瀏覽器支不支援「永遠置頂」的懸浮視窗。 */
 export function supportsPip(): boolean {
-  return pipApi() !== null
+  return isDesktop() || pipApi() !== null
 }
 
 /**
@@ -142,6 +142,34 @@ export function mirrorStylesInto(target: Window): () => void {
  * 不支援時回傳 null，由呼叫端退回 `openPopupWindow`。
  */
 export async function openPipWindow(opts: { width: number; height: number }): Promise<Window | null> {
+  // Electron exposes Document PiP, but its blank child is not a usable native
+  // window. Use a same-origin host so React keeps sharing the main timer state.
+  if (isDesktop()) {
+    const child = openPopupWindow('/floating-host.html', { ...opts, name: 'huddle-floating-hub' })
+    if (!child) return null
+    return await new Promise<Window | null>((resolve) => {
+      const deadline = Date.now() + 12000
+      const poll = () => {
+        try {
+          if (child.closed) return resolve(null)
+          if (child.document.documentElement.dataset.huddleFloatingHost === 'ready') {
+            const closeChild = () => { try { child.close() } catch {} }
+            // A portal depends on this renderer. Do not leave an inert panel
+            // behind when either document reloads or the main window closes.
+            window.addEventListener('pagehide', closeChild, { once: true })
+            child.addEventListener('pagehide', () => {
+              window.removeEventListener('pagehide', closeChild)
+              closeChild()
+            }, { once: true })
+            return resolve(child)
+          }
+        } catch { /* Wait for same-origin navigation to finish. */ }
+        if (Date.now() >= deadline) { try { child.close() } catch {} return resolve(null) }
+        setTimeout(poll, 50)
+      }
+      poll()
+    })
+  }
   const api = pipApi()
   if (!api) return null
   try {
