@@ -11,8 +11,8 @@ import styles from './marketing-page.module.css'
 
 const display = Noto_Sans_TC({ weight: '900', subsets: ['latin'], display: 'swap', preload: false, variable: '--poster-zh' })
 const condensed = Barlow_Condensed({ weight: '800', subsets: ['latin'], display: 'swap', variable: '--poster-en' })
-const release = 'https://github.com/dropout-tech/waddle/releases/tag/v0.1.1-beta.1'
-const download = (arch: string) => `https://github.com/dropout-tech/waddle/releases/download/v0.1.1-beta.1/Huddle-0.1.1-mac-${arch}.dmg`
+const release = 'https://github.com/dropout-tech/waddle/releases/tag/v0.1.2-beta.1'
+const download = (arch: string) => `https://github.com/dropout-tech/waddle/releases/download/v0.1.2-beta.1/Huddle-0.1.2-mac-${arch}.dmg`
 const copy = {
   zh: {
     nav: ['功能', '方案', '下載', '使用協助'], login: '登入', start: '免費開始使用',
@@ -28,7 +28,7 @@ const copy = {
     free: '免費版', freeBody: '任務、行程、專注計時、記事本與白板。同一個帳號，在不同裝置查看與同步。',
     soon: '準備中', month: '／月', year: 'NT$1,290／年', proBody: '這是已規劃的台灣價格。付費功能與額度會在正式開放前說明，目前沒有訂閱或付款按鈕。',
     downloadTitle: '在你的桌面，\n留個位置。', downloadBody: 'Huddle 的獨立視窗，陪你開始每一天。安裝後使用原本的帳號登入，與網頁版共用資料。',
-    downloadNote: 'v0.1.1 測試版・需要網路・尚未完成 Apple 公證。Windows 版尚未提供。舊版請重新下載安裝。', release: '版本紀錄與安裝說明',
+    downloadNote: 'v0.1.2 測試版・需要網路・尚未完成 Apple 公證。Windows 版尚未提供。舊版請重新下載安裝。', release: '版本紀錄與安裝說明',
     faqTitle: '你可能想知道', questions: [
       ['可以免費使用嗎？', '可以。目前核心功能免費開放，註冊帳號不會自動收費。Pro 尚未開放購買，正式推出前會公布完整功能與計費方式。'],
       ['桌面版需要網路嗎？', '需要。登入、讀取雲端內容與同步都需要網路。桌面版讓你用獨立視窗開啟 Huddle，並非完全離線版本。'],
@@ -52,7 +52,7 @@ const copy = {
     free: 'Free', freeBody: 'Tasks, calendars, focus timers, notebooks and the whiteboard. Use one account to view and sync your work across devices.',
     soon: 'Coming later', month: ' / month', year: 'NT$1,290 / year', proBody: 'These are planned Taiwan prices in New Taiwan dollars. Paid features and limits will be announced before launch. Subscriptions and payments are not enabled.',
     downloadTitle: 'A place\non your desktop.', downloadBody: 'Open Huddle in its own window at the start of your day. Sign in with your existing account to use the same data as the web app.',
-    downloadNote: 'v0.1.1 beta · Internet required · Not yet notarized by Apple. No Windows installer is available yet. Download and reinstall to update an older version.', release: 'Release notes and installation guide',
+    downloadNote: 'v0.1.2 beta · Internet required · Not yet notarized by Apple. No Windows installer is available yet. Download and reinstall to update an older version.', release: 'Release notes and installation guide',
     faqTitle: 'A few things to know', questions: [
       ['Can I use Huddle for free?', 'Yes. Core features are currently free, and creating an account does not start a paid subscription. Pro is not yet available; complete features and billing details will be published before launch.'],
       ['Does the desktop app need internet access?', 'Yes. Signing in, reading cloud content and syncing require an internet connection. The desktop app gives Huddle its own window; it is not a fully offline version.'],
