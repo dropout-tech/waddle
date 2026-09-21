@@ -21,6 +21,7 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore,
 } from 'react'
+import { notifyDesktop } from '@/lib/desktop-notifications'
 import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
 import {
@@ -937,6 +938,7 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
             clearInterval(intervalRef.current)
             intervalRef.current = null
           }
+          void notifyDesktop({ kind: 'focus', id: `${session.startedAt.toISOString()}:${session.phase}`, title: t(session.phase === 'work' ? '這段專注完成了' : '休息結束'), body: 'Huddle', startedAt: session.startedAt.getTime(), silent: prefs.sound === 'silent' })
           playTimerSound(prefs.sound)
           setTimeLeft(0)
           if (session.phase === 'work') {

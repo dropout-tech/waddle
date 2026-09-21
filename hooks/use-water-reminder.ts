@@ -1,5 +1,7 @@
 'use client'
 
+import { notifyDesktop } from '@/lib/desktop-notifications'
+import { t } from '@/lib/i18n'
 import { useCallback, useEffect, useState } from 'react'
 import {
   DEFAULT_WATER_INTERVAL,
@@ -45,6 +47,7 @@ export function useWaterReminder() {
       const due = getWaterNextDueAt()
       if (due === null) return
       if (Date.now() >= due) {
+        void notifyDesktop({ kind: 'water', id: String(due), title: t('喝水提醒'), body: t('該喝水囉') })
         setIsOpen((prev) => prev || true)
       }
     }

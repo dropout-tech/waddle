@@ -20,6 +20,9 @@ declare global {
       isDesktop: boolean
       beginOAuth: () => Promise<string>
       openOAuth: (url: string) => Promise<void>
+      clearNotifications?: () => Promise<void>
+      notificationStatus?: () => Promise<{ supported: boolean; permission: 'unknown'; lastError: string | null }>
+      showNotification?: (payload: { kind: 'meeting' | 'focus' | 'water' | 'test'; id: string; title: string; body: string; silent?: boolean }) => Promise<{ status: string }>
       cancelOAuth: () => Promise<void>
     }
   }

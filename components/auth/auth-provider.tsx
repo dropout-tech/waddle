@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { isNative } from '@/lib/platform'
+import { setDesktopNotificationAccount } from '@/lib/desktop-notifications'
 import { DeepLinkHandler } from './deep-link-handler'
 
 // Client-side auth state shared across the app. Replaces the deleted server
@@ -37,12 +38,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return
+      setDesktopNotificationAccount(data.session?.user.id ?? null)
       setSession(data.session)
       setLoading(false)
     })
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return
+      setDesktopNotificationAccount(nextSession?.user.id ?? null)
       setSession(nextSession)
       setLoading(false)
     })
