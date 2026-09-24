@@ -49,6 +49,8 @@ interface CalendarPanelProps {
   onOpenReport?: () => void
   onOpenGrowth?: () => void
   onOpenSettings?: () => void
+  onOpenMeetings?: () => void
+  pendingMeetingCount?: number
   onOpenSharing?: () => void
   onOpenOverdueReview?: () => void
   onOpenExport?: () => void
@@ -98,6 +100,8 @@ export function CalendarPanel({
   onOpenReport,
   onOpenGrowth,
   onOpenSettings,
+  onOpenMeetings,
+  pendingMeetingCount,
   onOpenSharing,
   onOpenOverdueReview,
   onOpenExport,
@@ -193,6 +197,8 @@ export function CalendarPanel({
         onOpenReport={onOpenReport}
         onOpenGrowth={onOpenGrowth}
         onOpenSettings={onOpenSettings}
+        onOpenMeetings={onOpenMeetings}
+        pendingMeetingCount={pendingMeetingCount}
         onOpenSharing={onOpenSharing}
         onOpenOverdueReview={onOpenOverdueReview}
         onOpenExport={onOpenExport}
@@ -213,7 +219,7 @@ export function CalendarPanel({
           hourHeight={hourHeight}
           dayViewDays={dayViewDays}
           onTaskSelect={onTaskSelect}
-          onToggleComplete={onToggleComplete}
+          onToggleComplete={(id) => { if (!id.startsWith('meeting:')) onToggleComplete?.(id) }}
           onCreateTask={onCreateTask}
           onCreateTimeBlock={onCreateTimeBlock}
           onOpenCreateTask={onOpenCreateTask}
@@ -240,7 +246,7 @@ export function CalendarPanel({
           hourHeight={hourHeight}
           weekViewDays={weekViewDays}
           onTaskSelect={onTaskSelect}
-          onToggleComplete={onToggleComplete}
+          onToggleComplete={(id) => { if (!id.startsWith('meeting:')) onToggleComplete?.(id) }}
           onCreateTask={onCreateTask}
           onCreateTimeBlock={onCreateTimeBlock}
           onOpenCreateTask={onOpenCreateTask}
@@ -261,7 +267,7 @@ export function CalendarPanel({
           tasks={allTasks}
           timeBlocks={timeBlocks}
           onTaskSelect={onTaskSelect}
-          onToggleComplete={onToggleComplete}
+          onToggleComplete={(id) => { if (!id.startsWith('meeting:')) onToggleComplete?.(id) }}
           onDateSelect={(date) => {
             onDateChange(date)
             // Desktop: clicking a day drills into it. Mobile: tapping a day

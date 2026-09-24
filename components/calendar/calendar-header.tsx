@@ -43,6 +43,8 @@ interface CalendarHeaderProps {
   onOpenReport?: () => void
   onOpenGrowth?: () => void
   onOpenSettings?: () => void
+  onOpenMeetings?: () => void
+  pendingMeetingCount?: number
   onOpenSharing?: () => void
   onOpenOverdueReview?: () => void
   /** Open the "export schedule as PNG" modal. Lives in the calendar header
@@ -77,6 +79,8 @@ export function CalendarHeader({
   onOpenReport,
   onOpenGrowth,
   onOpenSettings,
+  onOpenMeetings,
+  pendingMeetingCount = 0,
   onOpenSharing,
   onOpenOverdueReview,
   onOpenExport,
@@ -346,6 +350,7 @@ export function CalendarHeader({
                     <NotebookPen className="w-4 h-4" />
                     <span>{t('記事本')}</span>
                   </button>
+                  {onOpenMeetings && <button type="button" onClick={() => { setOverflowOpen(false); onOpenMeetings() }} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60"><Users className="h-4 w-4"/><span>{lang === 'en' ? 'Find a time' : '約交集時間'}</span>{pendingMeetingCount > 0 && <span className="rounded-full bg-primary px-1.5 text-primary-foreground">{pendingMeetingCount}</span>}</button>}
                   {onOpenSharing && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenSharing() }}
@@ -504,6 +509,7 @@ export function CalendarHeader({
           <UndoRedoButtons className="mr-1" />
           {/* 常駐的懸浮小視窗啟動鈕——不必先開計時（不支援 PiP 的環境自動不顯示） */}
           <HubLauncherButton />
+          {onOpenMeetings && <button type="button" onClick={onOpenMeetings} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><Users className="h-3.5 w-3.5"/>{lang === 'en' ? 'Find a time' : '約交集時間'}{pendingMeetingCount > 0 && <span className="rounded-full bg-primary px-1.5 text-primary-foreground">{pendingMeetingCount}</span>}</button>}
           <button
             type="button"
             data-tour="notebook-entry"

@@ -1,0 +1,8 @@
+import {test} from 'node:test'
+import assert from 'node:assert/strict'
+import {createReconcileHandler} from '../../supabase/functions/billing-reconcile/core.mjs'
+const id='e33d985b-4bcb-456f-9658-9cc1085185ab'
+function setup(overrides={}) {let saved; const handler=createReconcileHandler({configured:true,entitlementId:'pro',authenticate:async()=>({id}),fetchSubscriber:async userId=>{assert.equal(userId,id);return {request_date_ms:1,subscriber:{entitlements:{},subscriptions:{}}}},persist:async(...args)=>{saved=args},eventId:()=> 'test',...overrides});return {handler,saved:()=>saved}}
+test('JWT identity wins over body and only authority persisted',async()=>{const s=setup();const r=await s.handler(new Request('https://local',{method:'POST',body:JSON.stringify({user_id:'attacker',expires_at:'2099'})}));assert.equal(r.status,200);assert.equal(s.saved()[1][0].user_id,id);assert.equal(s.saved()[1][0].expires_at,null)})
+for(const [name,overrides,status] of [['unconfigured',{configured:false},503],['invalid JWT',{authenticate:async()=>null},401],['anonymous',{authenticate:async()=>({id,is_anonymous:true})},401],['provider failure',{fetchSubscriber:async()=>{throw Error()}},503],['database failure',{persist:async()=>{throw Error()}},503]])test(name,async()=>{assert.equal((await setup(overrides).handler(new Request('https://local',{method:'POST'}))).status,status)})
+test('CORS and method boundary',async()=>{const s=setup();assert.equal((await s.handler(new Request('https://local',{method:'OPTIONS'}))).status,204);assert.equal((await s.handler(new Request('https://local'))).status,405)})

@@ -28,18 +28,27 @@ import { useI18n } from '@/lib/i18n/react'
 export function DeleteAccountButton() {
   const router = useRouter()
   const [deleting, setDeleting] = useState(false)
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
 
   async function handleDelete() {
     setDeleting(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' })
-      if (error) throw error
+      const { data, error } = await supabase.functions.invoke('delete-account', { method: 'POST' })
+      if (error) {
+        const detail = await error.context?.json?.().catch(() => null)
+        if (detail?.error === 'apple_reauthorization_required') {
+          toast.error(lang === 'en' ? 'Apple account deletion requires renewed Apple authorization. This flow is not available yet; your account has not been deleted.' : 'Apple 帳號刪除需要重新取得 Apple 授權；此流程尚未開放，帳號尚未刪除。')
+          setDeleting(false)
+          return
+        }
+        throw error
+      }
+      if (data?.google_revoked === false) toast.warning(lang === 'en' ? 'Account deleted. Please also remove Huddle access in Google Account security settings.' : '帳號已刪除，請另至 Google 帳號安全性設定移除 Huddle 的存取權。')
       await supabase.auth.signOut()
       router.replace('/login')
-    } catch (e) {
-      console.error('[delete-account] failed', e)
+    } catch {
+      // Do not log provider responses or account credentials.
       toast.error(t('刪除帳號失敗，請稍後再試'))
       setDeleting(false)
     }
@@ -63,7 +72,7 @@ export function DeleteAccountButton() {
         <AlertDialogHeader>
           <AlertDialogTitle>{t('確定要刪除帳號嗎？')}</AlertDialogTitle>
           <AlertDialogDescription>
-            {t('這會永久刪除你的帳號與所有資料（任務、行程、日記、設定），無法復原。')}
+            {t('這會永久刪除你的帳號與所有資料（任務、行程、日記、設定），無法復原。')} {lang === 'en' ? 'Store subscriptions must be cancelled separately. Existing Google Calendar copies remain.' : '商店訂閱須另行取消；Google Calendar 上既有的行程副本將保留。'}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

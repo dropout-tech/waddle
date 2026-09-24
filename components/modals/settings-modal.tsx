@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import Link from 'next/link'
 import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2, Globe2, Link2, Copy, Share2, RefreshCw, Users, Loader2, Type } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -438,6 +439,11 @@ export function SettingsModal({
         {/* Content */}
         <div className="p-5 space-y-6 flex-1 min-h-0 md:flex-initial md:min-h-[unset] md:max-h-[60vh] overflow-y-auto pb-[max(env(safe-area-inset-bottom),1.25rem)] md:pb-5">
           {activeTab === 'general' && (<>
+          <div className="space-y-3 border-b pb-5">
+            <h3 className="font-medium">{lang==='en'?'Account & integrations':'帳號與整合'}</h3>
+            <Link href="/account" className="flex min-h-11 items-center justify-between rounded-md px-3 hover:bg-secondary">{lang==='en'?'Membership & referrals':'會員方案與推薦'}<ChevronRight className="h-4 w-4" aria-hidden="true"/></Link>
+            <Link href="/settings/google-calendar" className="flex min-h-11 items-center justify-between rounded-md px-3 hover:bg-secondary">Google Calendar<ChevronRight className="h-4 w-4" aria-hidden="true"/></Link>
+          </div>
           {/* Language — device-level preference, kept at the top since it
               affects every other label on this screen. Option text is not
               translated: each option is shown in its own language. */}

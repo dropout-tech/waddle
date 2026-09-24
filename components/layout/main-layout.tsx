@@ -7,6 +7,9 @@ import { TaskPanel } from '@/components/task-panel/task-panel'
 import { FullScreenTaskView } from '@/components/task-panel/full-screen-task-view'
 import { FocusBoardMobile } from '@/components/task-panel/focus-board-mobile'
 import { CalendarPanel } from '@/components/calendar/calendar-panel'
+import { MeetingDialog } from '@/components/meetings/meeting-dialog'
+import { GoogleCalendarAutoSync } from '@/components/integrations/google-calendar-auto-sync'
+import { useMeetingInvitations } from '@/hooks/use-meeting-invitations'
 import { CalendarExportModal } from '@/components/calendar/calendar-export-modal'
 import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ListChecks, CalendarDays, Sparkles, ChevronLeft, ChevronRight, Focus } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
@@ -365,6 +368,16 @@ export function MainLayout({
   }, [workspaces])
 
   const allTasks = getAllTasks()
+  const meetingController = useMeetingInvitations(selectedDate)
+  const [meetingsOpen, setMeetingsOpen] = useState(false)
+  const [meetingInviteId, setMeetingInviteId] = useState<string>()
+  const calendarTasks = [...allTasks, ...meetingController.calendarTasks]
+  const selectCalendarTask = (task: Task, occurrenceDate?: string) => {
+    if (task.id.startsWith('meeting:')) { setMeetingInviteId(task.id.slice(8,44)); setMeetingsOpen(true); return }
+    onSelectTask(task, occurrenceDate)
+  }
+  const meetingDialog = <><GoogleCalendarAutoSync revision={JSON.stringify(allTasks.map(task=>[task.id,task.updatedAt,task.scheduledDate,task.scheduledStartTime,task.scheduledEndTime]))+JSON.stringify(meetingController.meetings)}/><MeetingDialog open={meetingsOpen} onOpenChange={setMeetingsOpen} controller={meetingController} peers={sharePeers} tasks={allTasks} timeBlocks={timeBlocks} initialDate={selectedDate} inviteId={meetingInviteId}/></>
+
 
   // Filter tasks for selected date (local date — must match toDateString used elsewhere)
   const dateString = toDateString(selectedDate)
@@ -376,7 +389,7 @@ export function MainLayout({
       !task.isCompleted
   )
 
-  const scheduledTasks = allTasks.filter(
+  const scheduledTasks = calendarTasks.filter(
     (task) =>
       task.scheduledDate === dateString &&
       task.scheduledStartTime &&
@@ -441,6 +454,7 @@ export function MainLayout({
         className="flex flex-col h-[100dvh] bg-background overflow-hidden relative"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
+        {meetingDialog}
         <FocusScratchpad
           isOpen={mobileScratchpadOpen}
           onOpenChange={setMobileScratchpadOpen}
@@ -593,7 +607,7 @@ export function MainLayout({
                 viewMode={viewMode}
                 pendingTasks={pendingTasks}
                 scheduledTasks={scheduledTasks}
-                allTasks={allTasks}
+                allTasks={calendarTasks}
                 timeBlocks={timeBlocks}
                 slotTypes={slotTypes}
                 workspaces={workspaces}
@@ -606,14 +620,14 @@ export function MainLayout({
                 onZoomChange={setZoomLevel}
                 onDateChange={setSelectedDate}
                 onViewModeChange={setViewMode}
-                onTaskSelect={onSelectTask}
+                onTaskSelect={selectCalendarTask}
                 onToggleComplete={onToggleComplete}
                 onCreateTask={onCreateCalendarTask}
                 onCreatePendingTask={onCreatePendingTask}
                 onCreateTimeBlock={onCreateCalendarTimeBlock}
                 onOpenCreateTask={onOpenCreateTask}
-                onRescheduleTask={onRescheduleTask}
-                onUnscheduleTask={onUnscheduleTask}
+                onRescheduleTask={(id, start, end) => { if (!id.startsWith('meeting:')) onRescheduleTask?.(id, start, end) }}
+                onUnscheduleTask={(id, date) => { if (!id.startsWith('meeting:')) onUnscheduleTask?.(id, date) }}
                 onUpdateTimeBlock={onUpdateTimeBlock}
                 onDeleteTimeBlock={onDeleteTimeBlock}
                 onTimeBlockSelect={onTimeBlockSelect}
@@ -625,6 +639,8 @@ export function MainLayout({
                 onOpenOverdueReview={onOpenOverdueReview}
                 onOpenExport={() => setExportModalOpen(true)}
                 leftPanelOpen={true}
+                onOpenMeetings={() => setMeetingsOpen(true)}
+                pendingMeetingCount={meetingController.pendingCount}
                 peerEvents={peerEvents}
                 sharePeers={sharePeers}
                 visiblePeers={visiblePeers}
@@ -775,6 +791,7 @@ export function MainLayout({
   // ─── DESKTOP LAYOUT ────────────────────────────────────────────
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden relative">
+      {meetingDialog}
       {/* Focus Scratchpad - Pull down from top */}
       <FocusScratchpad
         scratchpadByDate={scratchpadByDate ?? {}}
@@ -931,7 +948,7 @@ export function MainLayout({
                   viewMode={viewMode}
                   pendingTasks={pendingTasks}
                   scheduledTasks={scheduledTasks}
-                  allTasks={allTasks}
+                  allTasks={calendarTasks}
                   timeBlocks={timeBlocks}
                   slotTypes={slotTypes}
                   workspaces={workspaces}
@@ -944,14 +961,14 @@ export function MainLayout({
                   onZoomChange={setZoomLevel}
                   onDateChange={setSelectedDate}
                   onViewModeChange={setViewMode}
-                  onTaskSelect={onSelectTask}
+                  onTaskSelect={selectCalendarTask}
                   onToggleComplete={onToggleComplete}
                   onCreateTask={onCreateCalendarTask}
                   onCreatePendingTask={onCreatePendingTask}
                   onCreateTimeBlock={onCreateCalendarTimeBlock}
                   onOpenCreateTask={onOpenCreateTask}
-                  onRescheduleTask={onRescheduleTask}
-                  onUnscheduleTask={onUnscheduleTask}
+                  onRescheduleTask={(id, start, end) => { if (!id.startsWith('meeting:')) onRescheduleTask?.(id, start, end) }}
+                  onUnscheduleTask={(id, date) => { if (!id.startsWith('meeting:')) onUnscheduleTask?.(id, date) }}
                   onUpdateTimeBlock={onUpdateTimeBlock}
                   onDeleteTimeBlock={onDeleteTimeBlock}
                   onTimeBlockSelect={onTimeBlockSelect}
@@ -963,7 +980,9 @@ export function MainLayout({
                   onOpenOverdueReview={onOpenOverdueReview}
                   onOpenExport={() => setExportModalOpen(true)}
                   leftPanelOpen={isLeftPanelOpen}
-                  peerEvents={peerEvents}
+                  onOpenMeetings={() => setMeetingsOpen(true)}
+                pendingMeetingCount={meetingController.pendingCount}
+                peerEvents={peerEvents}
                   sharePeers={sharePeers}
                   visiblePeers={visiblePeers}
                   onTogglePeerVisible={togglePeerVisible}

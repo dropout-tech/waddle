@@ -22,10 +22,14 @@
     "desktop:dev": "HUDDLE_APP_URL=http://localhost:3000 electron .",
     "desktop:dist": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --win",
     "desktop:dist:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac",
-    "desktop:dist:win": "electron-builder --win"
+    "desktop:dist:win": "electron-builder --win",
+    "cap:sync:android": "pnpm build:cap && cap sync android",
+    "cap:open:android": "cap open android",
+    "cap:run:android": "pnpm cap:sync:android && cap run android"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
+    "@capacitor/android": "8.3.4",
     "@capacitor/app": "^8.1.0",
     "@capacitor/browser": "^8.0.3",
     "@capacitor/core": "^8.3.4",

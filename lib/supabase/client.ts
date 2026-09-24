@@ -34,7 +34,7 @@ export function createClient() {
     // detection (including password recovery / email auth links).
     client = createBrowserClient<Database>(url, anonKey, { auth: {
       flowType: 'pkce',
-      detectSessionInUrl: !(isDesktop() || (typeof window !== 'undefined' && window.location.pathname === '/auth/callback')),
+      detectSessionInUrl: !(isDesktop() || (typeof window !== 'undefined' && ['/auth/callback', '/settings/google-calendar/callback', '/settings/google-calendar/callback/'].includes(window.location.pathname))),
     } })
   }
 
