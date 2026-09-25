@@ -6,7 +6,7 @@
 
 ## 上線前
 
-依序套用 `supabase/migrations/20260925090000_daily_check_ins.sql` 和 `supabase/migrations/20260925100000_check_in_points.sql`，再發布前端。此次只在可丟棄的本機資料庫驗證，未套用正式 migration、未推送、未部署。
+依序套用 `supabase/migrations/20260925090000_daily_check_ins.sql` 和 `supabase/migrations/20260925100000_check_in_points.sql`，再發布前端。2026-09-25 已完成正式 migration、PR #64 合併與 Zeabur 發布。
 
 第二份 migration 會撤銷前端直接新增簽到的權限；舊版前端簽到會失敗，部署時需協調資料庫與前端更新並讓舊頁面重新載入。不將舊自動腳印轉成簽到，也不補發歷史簽到積分；當天舊版簽到可按新按鈕領取一次。
 
@@ -17,7 +17,7 @@
 - `points_accounts.total_points` 保存累積總分，與帳本同步更新，並建立排序索引供未來排行使用。僅能讀取自己的分數；尚未公開排行榜或其他使用者資料。
 - `claim_daily_check_in()` 採用 `auth.uid()` 與資料庫台北日期；簽到、記錄及總分在同一交易完成，唯一鍵防止並行或重試重複加分。
 - `get_daily_check_in_status()` 返回自己的簽到狀態、當日分數與累積總分。前端不能指定日期、帳號或金額。
-- 此版直接修訂尚未部署的第二份 migration；若曾在本機套用舊版，需重建可丟棄測試資料庫。不能將重跑 migration 當成已部署資料庫的升級方法。
+- 此版發布前修訂第二份 migration，並已套用正式資料庫；若曾在本機套用開發中的舊版，需重建可丟棄測試資料庫。不能將重跑 migration 當成已部署資料庫的升級方法。
 - 未來更改每日給分規則需同步更新兩個 RPC；已記錄分數保留，不以新規則重算。
 
 ## 驗證
@@ -39,4 +39,16 @@ Use case: identity-preserve. Create a wide transparent illustration of THREE pos
 
 ## 本次結果
 
-TypeScript 通過；上述 UI 測試與本機 PostgreSQL 測試全部通過。本次異動檔案 ESLint 無錯誤或警告；設計 detector 無 finding。桌機、390px 手機及深色截圖留在 `docs/reports/daily-check-in-shots/`。正式 Supabase REST 與正式站行為仍需發布時驗證。
+TypeScript 通過；上述 UI 測試與本機 PostgreSQL 測試全部通過。本次異動檔案 ESLint 無錯誤或警告；設計 detector 無 finding。桌機、390px 手機及深色截圖留在 `docs/reports/daily-check-in-shots/`。正式 Supabase REST 與正式網頁已驗證，詳見下方發布紀錄。
+
+
+## 正式發布紀錄（2026-09-25）
+
+- PR：https://github.com/dropout-tech/waddle/pull/64，已合併。
+- 正式 merge SHA：`a2e210dd4ab1319f769a141e3d6a51b5ddbfe3a2`。
+- 發布使用最新 main 的獨立目錄 `/tmp/huddle-daily-check-in-release`，只帶入本次三筆提交；其他本機 WIP 保留。
+- 正式站：https://waddle.zeabur.app，Zeabur GitHub deployment `6656984050`，狀態 success，SHA 與 merge 相符。非正式主機的 Vercel integration 仍回報 failure。
+- 透過有權限的 Supabase 帳號在 SQL Editor 單一交易套用兩份 migration，並登錄 `20260925090000`、`20260925100000`。三表皆啟用 RLS；authenticated 皆無直接 INSERT 權限。
+- 測試帳號正式 RPC：簽到前 0 分、簽到後 1 分、重試仍為 1 分；此筆測試帳號簽到保留，未改動一般使用者歷史資料。
+- 正式網頁使用真實 API、無 request mock，已驗證新入口、持久化 1 分、已簽到按鈕停用、Huddle 圖片成功載入、無兌換文案、桌機與 390px 手機無溢出、無 JavaScript 錯誤。第一次登入等待逾時，調整等待頁面載入方式後重試通過。
+- 截圖：`docs/reports/daily-check-in-shots/production-desktop.png`、`production-mobile.png`。
