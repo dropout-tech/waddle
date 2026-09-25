@@ -42,6 +42,8 @@ const copy = {
     saved: '站內邀請已建立。',
     emailSent: 'Email 已寄送。',
     emailPending: 'Email 尚未確認寄出，請查看寄送狀態；站內邀請仍然有效。',
+    sharingRequired:
+      '選擇的夥伴尚未開放行程。請先請對方到「設定 → 共享」開放要比對的行程類別，再尋找共同空檔。',
     failure:
       '無法完成操作，請重試。若共享範圍不足或連線失敗，系統不會將未知時間當成空檔。',
     changed: '這個時段已變更，請重新尋找共同空檔。',
@@ -86,6 +88,8 @@ const copy = {
     emailSent: 'Email sent.',
     emailPending:
       'Email delivery is not confirmed. Check its status; the in-app invitation is still available.',
+    sharingRequired:
+      'A selected partner has not shared any calendars yet. Ask them to enable calendar categories in Settings → Sharing, then search again.',
     failure:
       'Unable to complete this action. Please retry. Missing sharing permissions or failed requests are never treated as free time.',
     changed: 'This time is no longer available. Please search again.',
@@ -219,8 +223,13 @@ export function MeetingPanel({
         setSlots(found)
         setSelected(null)
       }
-    } catch {
-      if (current === generation.current) setMessage(t.failure)
+    } catch (error) {
+      if (current === generation.current)
+        setMessage(
+          error instanceof Error && error.message === 'sharing_required'
+            ? t.sharingRequired
+            : t.failure,
+        )
     } finally {
       setBusy(false)
     }
@@ -249,7 +258,9 @@ export function MeetingPanel({
       setMessage(
         error instanceof Error && error.message === 'changed'
           ? t.changed
-          : t.failure,
+          : error instanceof Error && error.message === 'sharing_required'
+            ? t.sharingRequired
+            : t.failure,
       )
       if (error instanceof Error && error.message === 'changed') {
         setSlots(null)
