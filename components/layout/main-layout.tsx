@@ -525,7 +525,7 @@ export function MainLayout({
                   ) : (
                     <>
                       <HuddleFootprints className="h-4 w-5 gap-0.5" />
-                      <span className="text-sm font-semibold">{t('成長旅程')}</span>
+                      <span className="text-sm font-semibold">{t('每日簽到')}</span>
                     </>
                   )}
                 </div>
@@ -543,10 +543,7 @@ export function MainLayout({
                 ) : focusMode === 'report' ? (
                   <ReportDashboard workspaces={workspaces} onClose={() => setFocusMode('none')} />
                 ) : (
-                  <GrowthJourneyDashboard
-                    workspaces={workspaces}
-                    scratchpadByDate={scratchpadByDate ?? {}}
-                  />
+                  <GrowthJourneyDashboard />
                 )}
               </div>
             </div>
@@ -888,7 +885,7 @@ export function MainLayout({
                     ) : (
                       <>
                         <HuddleFootprints className="h-4 w-5 gap-0.5" />
-                        <span className="text-sm font-semibold">{t('成長旅程')}</span>
+                        <span className="text-sm font-semibold">{t('每日簽到')}</span>
                       </>
                     )}
                   </div>
@@ -917,10 +914,7 @@ export function MainLayout({
                       />
                     </div>
                   ) : (
-                    <GrowthJourneyDashboard
-                      workspaces={workspaces}
-                      scratchpadByDate={scratchpadByDate ?? {}}
-                    />
+                    <GrowthJourneyDashboard />
                   )}
                 </div>
               </div>
