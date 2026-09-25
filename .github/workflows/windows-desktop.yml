@@ -3,6 +3,11 @@ on:
   push:
     branches: [codex/windows-desktop-release]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Upload the verified installer to the matching beta release
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -46,3 +51,26 @@ jobs:
           name: windows-smoke-evidence
           path: release/desktop/windows-smoke.png
           if-no-files-found: ignore
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: huddle-windows-x64
+          path: windows-release
+      - name: Publish verified Windows installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="v${version}-beta.1"
+          gh release view "$tag"
+          cd windows-release
+          sha256sum --check WINDOWS-SHA256SUMS.txt
+          gh release upload "$tag" "Huddle-${version}-win-x64.exe" WINDOWS-SHA256SUMS.txt --clobber
