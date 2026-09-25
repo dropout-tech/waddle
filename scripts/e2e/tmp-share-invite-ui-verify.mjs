@@ -1,6 +1,6 @@
+#!/usr/bin/env node
 // Historical probe: use an isolated test project; may write/delete test data.
 if (!process.env.E2E_SECONDARY_EMAIL || !process.env.E2E_SECONDARY_PASSWORD) throw new Error('Set E2E_SECONDARY_EMAIL and E2E_SECONDARY_PASSWORD for an isolated test account');
-#!/usr/bin/env node
 /**
  * P1 acceptance: calendar-sharing invite flow through the real UI.
  * A (e2e account) mints an invite in Settings→共享; B (dedicated share-test

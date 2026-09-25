@@ -1,6 +1,6 @@
+#!/usr/bin/env node
 // Historical probe: use an isolated test project; may write/delete test data.
 if (!process.env.E2E_SECONDARY_EMAIL || !process.env.E2E_SECONDARY_PASSWORD) throw new Error('Set E2E_SECONDARY_EMAIL and E2E_SECONDARY_PASSWORD for an isolated test account');
-#!/usr/bin/env node
 /**
  * Verify the "seed built-in slot type on grant" flow end-to-end against the
  * live DB, replicating exactly what useCalendarSharing.setGrant now does:

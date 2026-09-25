@@ -1,6 +1,6 @@
+#!/usr/bin/env node
 // Historical probe: use an isolated test project; may write/delete test data.
 if (!process.env.E2E_SECONDARY_EMAIL || !process.env.E2E_SECONDARY_PASSWORD) throw new Error('Set E2E_SECONDARY_EMAIL and E2E_SECONDARY_PASSWORD for an isolated test account');
-#!/usr/bin/env node
 /**
  * P2 self-test: verify the get_shared_calendar RPC field mapping used by
  * hooks/use-calendar-sharing.ts against the live database (deterministic,

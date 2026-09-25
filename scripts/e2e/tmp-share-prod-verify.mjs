@@ -1,6 +1,6 @@
+#!/usr/bin/env node
 // Historical probe: use an isolated test project; may write/delete test data.
 if (!process.env.E2E_SECONDARY_EMAIL || !process.env.E2E_SECONDARY_PASSWORD) throw new Error('Set E2E_SECONDARY_EMAIL and E2E_SECONDARY_PASSWORD for an isolated test account');
-#!/usr/bin/env node
 /**
  * Production acceptance for calendar sharing (post-deploy).
  * Lean but real: A generates+revokes an invite through the prod UI; a grant
