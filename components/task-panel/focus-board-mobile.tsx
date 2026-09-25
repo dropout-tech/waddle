@@ -1,5 +1,6 @@
 "use client";
 
+import { AssignmentInbox } from "@/components/meetings/assignment-inbox";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,7 @@ export function FocusBoardMobile({
         <ArrowLeft className="size-4" />
         {t("返回")}
       </button>
+      <AssignmentInbox />
       <FocusBoard {...props} todayStr={today} />
     </section>
   );
