@@ -194,6 +194,16 @@ try {
       }
       if (url.pathname.includes('/rpc/')) {
         requests.push({ name, body })
+        if (
+          name === 'huddle_operations' &&
+          ['self', 'announcements'].includes(body.p_action)
+        )
+          return route.fulfill({
+            json:
+              body.p_action === 'announcements'
+                ? []
+                : { is_admin: false, days_remaining: 30, status: 'active' },
+          })
         if (name === 'get_share_peers') return paged(peers)
         if (name === 'get_meeting_invitation_by_request')
           return route.fulfill({
@@ -612,6 +622,15 @@ try {
           0 && (await dialog.getByRole('status').innerText()).length > 0,
       )
     }
+    failure = 'grant'
+    await search()
+    await dialog.getByRole('status').waitFor()
+    check(
+      `${locale}: missing grants explain how partners enable sharing`,
+      (await dialog.getByRole('status').innerText()).includes(
+        en ? 'Settings → Sharing' : '設定 → 共享',
+      ),
+    )
     check(
       `${locale}: desktop dialog has no horizontal overflow`,
       await page.evaluate(

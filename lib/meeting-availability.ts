@@ -29,10 +29,11 @@ function dateKey(value: string) {
     throw new Error('invalid_date')
   return date
 }
-function minutes(value: string) {
+function minutes(value: string, allowDayEnd = false) {
   if (!/^\d{2}:\d{2}(:\d{2})?$/.test(value))
     throw new Error('invalid_busy_time')
   const [h, m, s = 0] = value.split(':').map(Number)
+  if (allowDayEnd && h === 24 && m === 0 && s === 0) return 1440
   if (h > 23 || m > 59 || s > 59) throw new Error('invalid_busy_time')
   return h * 60 + m + s / 60
 }
@@ -94,7 +95,7 @@ export function findCommonSlots(options: AvailabilityOptions): CommonSlot[] {
       if (!task.scheduledStartTime || !task.scheduledEndTime)
         throw new Error('incomplete_busy_time')
       const a = minutes(task.scheduledStartTime),
-        b = minutes(task.scheduledEndTime)
+        b = minutes(task.scheduledEndTime, true)
       intervals.push([+atMinute(day, a), +atMinute(day, b <= a ? b + 1440 : b)])
     }
     for (const block of timeBlocks) {
@@ -102,7 +103,7 @@ export function findCommonSlots(options: AvailabilityOptions): CommonSlot[] {
         throw new Error('unsupported_time_block_recurrence')
       if (block.date !== toDateString(day)) continue
       const a = minutes(block.startTime),
-        b = minutes(block.endTime)
+        b = minutes(block.endTime, true)
       intervals.push([+atMinute(day, a), +atMinute(day, b <= a ? b + 1440 : b)])
     }
   }
