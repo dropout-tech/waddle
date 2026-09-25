@@ -10,7 +10,7 @@ const errors=[]
 page.on('pageerror', e=>errors.push(e.message))
 let saved=false, writes=0, failWrite=false, failRead=false
 let serverDate='2026-09-25'
-const status=()=>({check_in_date:serverDate,checked_in:saved,available_points:saved?1:0,ranking_points:saved?1:0,daily_points:1})
+const status=()=>({check_in_date:serverDate,checked_in:saved,total_points:saved?1:0,daily_points:1})
 await context.route('**/rest/v1/**', async route => {
  const req=route.request(), url=new URL(req.url())
  if(url.pathname.endsWith('/rpc/get_daily_check_in_status')) {
@@ -50,8 +50,8 @@ try {
  await section.getByRole('button',{name:'今天已簽到'}).waitFor()
  assert(await section.getByRole('button',{name:'今天已簽到'}).isDisabled())
  assert.equal(writes,2)
- await section.getByText('可用積分 1 分',{exact:true}).waitFor()
- await section.getByText('排名累積分 1 分',{exact:true}).waitFor()
+ await section.getByText('累積分數 1 分',{exact:true}).waitFor()
+ assert.equal(await section.getByText(/兌換|可用積分/).count(),0)
  await page.setViewportSize({width:390,height:844})
  await page.getByRole('heading',{name:'每日簽到',exact:true}).waitFor()
  await section.getByRole('button',{name:'今天已簽到'}).waitFor()

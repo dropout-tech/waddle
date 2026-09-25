@@ -10,23 +10,23 @@
 
 第二份 migration 會撤銷前端直接新增簽到的權限；舊版前端簽到會失敗，部署時需協調資料庫與前端更新並讓舊頁面重新載入。不將舊自動腳印轉成簽到，也不補發歷史簽到積分；當天舊版簽到可按新按鈕領取一次。
 
-## 積分帳本
+## 純累積分數
 
-- `points_ledger` 保存使用者、唯一來源鍵、類型、可用積分異動、排名異動、簽到日期、說明及時間。已入帳記錄不覆寫；修正應新增 adjustment 反向記錄。
-- `points_accounts` 是同步更新的帳本彙總，保存可用積分和排名累積分，後者有排序索引，供未來排名使用。兩者不可為負數。
-- `claim_daily_check_in()` 只採用 `auth.uid()` 與資料庫台北日期；簽到、帳本及彙總在同一交易完成。每日唯一鍵與來源唯一鍵防止並行或重試重複加分。
-- `get_daily_check_in_status()` 返回自己的簽到狀態、當日分數、可用積分與排名分。前端不能修改帳本、彙總或直接補簽。
-- 未來 redemption 扣可用積分、ranking_delta 必須為 0；refund 也不增加排名。可信任服務只能新增帳本，trigger 鎖住帳戶列更新餘額，餘額不足整筆交易回滾。
-- 尚未提供兌換流程、公開排行榜、服務定價或兌換承諾。未來兌換服務須加入訂單唯一鍵、退款對應及服務履約流程；目前只有資料基礎與權限保護。
-- 未來更改每日給分規則需同步更新兩個 RPC 的預設值；舊帳本金額保留，不以新規則重算。
+- 每天簽到固定 1 分，只累積分數供未來排行使用，沒有可用餘額、扣分、兌換或退款功能，也不代表金錢或服務權益。
+- `points_ledger` 只保存正數的 daily_check_in 記錄：使用者、唯一來源鍵、分數、簽到日期、說明及時間。前端和 service_role 皆沒有直接新增、修改、刪除記錄的權限。
+- `points_accounts.total_points` 保存累積總分，與帳本同步更新，並建立排序索引供未來排行使用。僅能讀取自己的分數；尚未公開排行榜或其他使用者資料。
+- `claim_daily_check_in()` 採用 `auth.uid()` 與資料庫台北日期；簽到、記錄及總分在同一交易完成，唯一鍵防止並行或重試重複加分。
+- `get_daily_check_in_status()` 返回自己的簽到狀態、當日分數與累積總分。前端不能指定日期、帳號或金額。
+- 此版直接修訂尚未部署的第二份 migration；若曾在本機套用舊版，需重建可丟棄測試資料庫。不能將重跑 migration 當成已部署資料庫的升級方法。
+- 未來更改每日給分規則需同步更新兩個 RPC；已記錄分數保留，不以新規則重算。
 
 ## 驗證
 
 - `pnpm type-check`。
 - `pnpm exec eslint components/growth/growth-journey-dashboard.tsx hooks/use-daily-check-in.ts components/layout/main-layout.tsx components/calendar/calendar-header.tsx lib/i18n/dict/growth.ts lib/supabase/database.types.ts`。
 - `node scripts/e2e/daily-check-in-verify.mjs`：本機 3168 dev server 與既有測試帳號，資料庫流量全數攔截；檢查自動寫入為零、儲存失敗重試、簽到後鎖定、重新進入、讀取失敗重試、跨日、英文、桌機/手機與深色畫面。另驗證積分顯示、RPC 不帶日期/金額、台北跨日。這不代表正式資料庫已驗證。
-- `scripts/tests/check-in-points.sql`：在空白的本機 `huddle_points_test` 資料庫執行，驗證兩份 migration、首次給分、重複請求、舊紀錄不補分、帳號隔離、偽造寫入拒絕、兌換不減排名、餘額不足、帳本寫入失敗整筆回滾與匿名權限。
-- `python3 scripts/tests/check-in-points-concurrency.py`：接著在本機 `/tmp` socket、55438 port 執行；12 次同時簽到只加一次分，並行兌換不超扣。測試 fixture 僅用一次，重跑需重建空白資料庫。
+- `scripts/tests/check-in-points.sql`：在空白的本機 `huddle_points_test` 資料庫執行，驗證兩份 migration、首次給分、重複請求、舊紀錄不補分、帳號隔離、偽造寫入拒絕、分數只能為正數、不含可用餘額欄位、帳本寫入失敗整筆回滾與匿名權限。
+- `python3 scripts/tests/check-in-points-concurrency.py`：接著在本機 `/tmp` socket、55438 port 執行；12 次同時簽到只加一次分。測試 fixture 僅用一次，重跑需重建空白資料庫。
 - 最初 `scripts/tests/daily-check-ins.sql` 僅驗證第一份 migration 的舊權限；最新版本以 points 測試為準。
 
 ## 插畫

@@ -24,9 +24,9 @@ set role authenticated;
 set request.jwt.claim.sub='00000000-0000-0000-0000-000000000001';
 do $$ declare s record; begin
  select * into s from public.get_daily_check_in_status();
- if s.available_points <> 0 or s.checked_in then raise exception 'history awarded points'; end if;
+ if s.total_points <> 0 or s.checked_in then raise exception 'history awarded points'; end if;
  select * into s from public.claim_daily_check_in();
- if s.available_points <> 1 or s.ranking_points <> 1 or not s.checked_in then raise exception 'incorrect first reward'; end if;
+ if s.total_points <> 1 or not s.checked_in then raise exception 'incorrect first reward'; end if;
  if s.check_in_date <> (statement_timestamp() at time zone 'Asia/Taipei')::date then raise exception 'wrong server day'; end if;
  perform public.claim_daily_check_in();
  if (select count(*) from public.points_ledger) <> 1 then raise exception 'duplicate reward'; end if;
@@ -39,7 +39,7 @@ do $$ declare s record; begin
   raise exception 'client can forge points';
  exception when insufficient_privilege then null; end;
  begin
-  update public.points_accounts set available_points=999;
+  update public.points_accounts set total_points=999;
   raise exception 'client can update balance';
  exception when insufficient_privilege then null; end;
 end $$;
@@ -48,29 +48,17 @@ do $$ begin
  if (select count(*) from public.points_ledger) <> 0 or (select count(*) from public.points_accounts) <> 0 then raise exception 'cross-account read'; end if;
 end $$;
 reset role;
--- Simulated future trusted service inserts exercise balance/ranking invariants.
-set role service_role;
-insert into public.points_ledger(user_id,kind,source_key,points_delta,ranking_delta,description)
- values('00000000-0000-0000-0000-000000000001','adjustment','test-bonus',4,4,'test award'),
- ('00000000-0000-0000-0000-000000000001','redemption','test-order',-2,0,'test redemption');
+-- The published interface has no spendable balance or debit events.
 do $$ begin
- if not exists(select from public.points_accounts where available_points=3 and ranking_points=5) then raise exception 'redemption changed rank'; end if;
+ if exists(select from information_schema.columns where table_schema='public' and table_name='points_accounts' and column_name='available_points') then raise exception 'spendable balance retained'; end if;
  begin
-  insert into public.points_ledger(user_id,kind,source_key,points_delta,description)
-   values('00000000-0000-0000-0000-000000000001','redemption','overdraft',-99,'must fail');
-  raise exception 'overdraft accepted';
+  insert into public.points_ledger(user_id,kind,source_key,points_delta,check_in_date,description)
+   values('00000000-0000-0000-0000-000000000001','daily_check_in','negative',-1,'2020-01-01','must fail');
+  raise exception 'negative score accepted';
  exception when check_violation then null; end;
- begin
-  delete from public.points_ledger;
-  raise exception 'ledger mutable';
- exception when insufficient_privilege then null; end;
- begin
-  insert into public.points_ledger(user_id,kind,source_key,points_delta,description)
-   values('00000000-0000-0000-0000-000000000001','refund','test-order',2,'duplicate key');
-  raise exception 'duplicate source accepted';
- exception when unique_violation then null; end;
+ if has_table_privilege('service_role','public.points_ledger','insert') then raise exception 'unnecessary service write access'; end if;
+ if has_table_privilege('authenticated','public.points_ledger','delete') then raise exception 'ledger mutable'; end if;
 end $$;
-reset role;
 -- A ledger failure must roll back the check-in itself.
 create function public.test_fail_award() returns trigger language plpgsql as $$ begin
  if new.user_id='00000000-0000-0000-0000-000000000003' then raise exception 'injected failure' using errcode='23514'; end if;
@@ -96,4 +84,4 @@ do $$ begin
  begin perform public.claim_daily_check_in(); raise exception 'null identity accepted'; exception when insufficient_privilege then null; end;
 end $$;
 reset role;
-select 'PASS: rewards, history, duplicate, RLS, server date, redemption, overdraft, immutable ledger, atomic rollback, privileges' as result;
+select 'PASS: rewards, history, duplicate, RLS, server date, positive-only score, immutable ledger, atomic rollback, privileges' as result;

@@ -1,10 +1,9 @@
 // English dictionary fragment for Huddle's gentle growth journey.
 export const dict: Record<string, string> = {
-  "可用積分 {n} 分": "Available points: {n}",
+  '累積分數 {n} 分': 'Total score: {n}',
+  '每天一小步，慢慢累積。分數將作為未來排行的依據。': 'Small steps add up. Your score will count toward future rankings.',
   "今日簽到積分已入帳": "Today’s check-in points are saved",
   "每日簽到可獲得 {n} 分": "Earn {n} point(s) with your daily check-in",
-  "排名累積分 {n} 分": "Ranking points: {n}",
-  "積分先慢慢存起來，未來可用於服務兌換；兌換與排行榜尚未開放。": "Save points for future services. Redemption and rankings are not available yet.",
   "每日以台北時間 00:00 更新。": "A new day starts at 00:00 Taipei time.",
 
   "每日簽到": "Daily check-in",
