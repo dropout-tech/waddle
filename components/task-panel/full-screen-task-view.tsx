@@ -1,5 +1,6 @@
 'use client'
 
+import { AssignmentInbox } from "@/components/meetings/assignment-inbox"
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -452,6 +453,7 @@ export function FullScreenTaskView({
 
         {effectiveTab === 'overview' && (
           <div className="p-6">
+            <AssignmentInbox />
             {/* Stats Grid */}
             <div className="grid grid-cols-5 gap-4 mb-8">
               <div className="p-4 rounded-xl bg-card border border-border">

@@ -52,7 +52,36 @@ AI 金鑰只放 Edge Function secrets。輸入最多 200,000 bytes，模型输�
 ## 本次驗證結果（2026-09-25）
 
 - 通過：TypeScript、新增前端檔案 ESLint、網頁 production build、Capacitor static build。
-- 通過：Deno Edge Function type check 與 4 項 contract tests。
+- 通過：Deno Edge Function type check 與 7 項 contract tests。
 - 通過：獨立 PostgreSQL 整合測試（包含 8 個並行請求搶最後 1 次額度）。
 - 通過：桌面及 390px 瀏覽器操作驗證（資料／AI 為 mock）。
 - 未驗證：真實模型回應品質、正式 Supabase migration／Edge Function 部署、實機 App 行為。尚無 OPENAI_API_KEY 本機設定，沒有呼叫付費 AI。
+
+## 與會者與任務指派（後續版本，尚未部署）
+
+此節取代前述「負責人僅為備註」的限制。會議基本資料新增時間（台北）、與會者姓名、團隊、人工確認的轉寫別名，以及自己／既有共享夥伴的帳號對應。不查詢陌生人信箱、不把團隊或相近姓名自動合併成個人。
+
+- AI 輸出 `ownerParticipantId`、`ownerEvidence`、`assignmentConfidence`、`assignmentReason`。實際 prompt 在 `supabase/functions/meeting-import/prompt.ts`。
+- 檢查 ownerEvidence 是任務 source 中的原文，且有唯一對應的姓名／已確認別名；缺少依據、未知說話者、別名重複時，降為未確認。
+- 使用者可勾選「明確指派給我時自動建立」（預設開啟）。模型結果保存、20 次額度扣用與自己的任務建立在同一交易內完成。
+- 人工 checklist 可分別選自己／共享夥伴／不指派。未指派保存草稿，不建立任務；指派自己直接建立；對夥伴只建立待接受邀請。
+- AI 不會自行送出他人指派。只有使用者確認 checklist 才送出，且伺服器重新驗證共享關係。
+- 指派收件匣出現在桌面任務「總覽」、手機重點頁，另有使用者選單「待接受指派」與 `/assignments`。
+- 收件者看到指派人、任務、日期與該項原文，選擇自己的分類並接受後才建立任務。拒絕不建立。對方無完整逐字稿讀取權限。
+- 接受／拒絕為不可逆終態；重送不新增，已拒絕項目保留歷史，本版不支援改派或撤回。
+- 收件匣最多載入最早 100 筆待接受項目及最近 20 筆已回覆項目；回覆後刷新會繼續帶入其餘待接受項目。每 30 秒及視窗取得焦點時更新。
+- 舊版紀錄沒有與會資料，不會推定為自己；可人工指派。
+
+### 部署順序
+
+先套用 `20260925081959_meeting_imports.sql`，再套用 `20260925083539_meeting_assignments.sql`。第二份依賴已存在的 `0016_calendar_sharing.sql`。更新 Edge Function 與前端後，跑兩個測試帳號的實際接受／拒絕流程。不要套用本工作區其他未發佈 migration。
+
+### 逐字稿語意驗收
+
+本次使用提供的真實逐字稿做對話模型初步整理，另以程式驗證 12 項人工審閱候選的原文引用與「缺名單時零自動指派」規則。真實內容與輸出僅存於忽略版控的 `.codex/artifacts/meeting-evaluation/`，不提交私人會議內容。
+
+這不是實際部署模型端到端測試：會議日期、名單／別名與上傳者身份尚待使用者確認，且未設定 AI 金鑰。真實模型品質仍待上述資訊與金鑰就緒後驗證。
+
+額外驗證：`npx deno run --node-modules-dir=none --allow-read scripts/tests/meeting-transcript-eval.mts <逐字稿檔案> <審閱後預期JSON>`。此工具檢查輸入長度、原文引用、未知身份禁止自動指派，不會呼叫模型。
+
+本版追加驗證已通過：與會者／時間輸入、自動建立本人任務的顯示、他人指派、未指派清單保存後再派給自己、20 次額度阻擋、接受／拒絕與失敗重試、重開紀錄及手機版。SQL 驗證另包含 5 個並行接受只建立 1 個任務、非收件者禁止回覆、錯誤分類禁止接受及未確認歸屬不自動建立。網頁與 Capacitor build 皆通過；以上仍是本機資料庫與模擬 API 測試。
