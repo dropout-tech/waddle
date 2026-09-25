@@ -7,7 +7,7 @@ import type { Membership } from '@/lib/operations/types'
 import { Gift } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { LogOut, Mail, User, Loader2, Moon, Sun } from 'lucide-react'
+import { LogOut, Mail, User, Loader2, Moon, Sun, FileText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
@@ -162,6 +162,15 @@ export function UserMenu({ className }: UserMenuProps = {}) {
           <div className="border-t border-border" />
 
           <Link href="/membership" role="menuitem" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60" onClick={() => setOpen(false)}><Gift className="h-4 w-4" />會員與推薦</Link>
+          <button
+            onClick={() => { setOpen(false); router.push('/meetings') }}
+            className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+            role="menuitem"
+          >
+            <FileText className="w-4 h-4" />
+            <span>會議轉任務</span>
+          </button>
+
           <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
             className={cn(
