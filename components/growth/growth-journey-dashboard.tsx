@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { useDailyCheckIn } from '@/hooks/use-daily-check-in'
-import { parseDateString, toDateString } from '@/lib/calendar-utils'
+import { parseDateString } from '@/lib/calendar-utils'
+import { checkInDate } from '@/lib/daily-check-in'
 import { useI18n } from '@/lib/i18n/react'
 
 const encouragements = [
@@ -21,9 +22,9 @@ const encouragements = [
 export function GrowthJourneyDashboard() {
   const { user, loading } = useAuth()
   const { t } = useI18n()
-  const [today, setToday] = useState(() => toDateString(new Date()))
+  const [today, setToday] = useState(() => checkInDate())
   useEffect(() => {
-    const refresh = () => setToday(toDateString(new Date()))
+    const refresh = () => setToday(checkInDate())
     const timer = window.setInterval(refresh, 1000)
     window.addEventListener('focus', refresh)
     document.addEventListener('visibilitychange', refresh)
@@ -37,30 +38,30 @@ export function GrowthJourneyDashboard() {
   if (loading) return <p role="status" className="py-16 text-center text-muted-foreground">{t('正在讀取簽到紀錄…')}</p>
   if (!user) return <p className="py-16 text-center text-muted-foreground">{t('登入後，就能保存每天的簽到。')}</p>
   // Remount on account/date changes so late responses cannot cross either boundary.
-  return <DailyCheckIn key={`${user.id}:${today}`} userId={user.id} today={today} />
+  return <DailyCheckIn key={`${user.id}:${today}`} today={today} />
 }
 
-function DailyCheckIn({ userId, today }: { userId: string; today: string }) {
+function DailyCheckIn({ today }: { today: string }) {
   const { t, lang } = useI18n()
-  const { checkedIn, isLoading, isSaving, error, reload, checkIn } = useDailyCheckIn(userId, today)
-  const date = parseDateString(today)
+  const { status, checkedIn, isLoading, isSaving, error, reload, checkIn } = useDailyCheckIn(today)
+  const date = parseDateString(status?.check_in_date ?? today)
   const dateLabel = new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : 'zh-TW', {
     month: 'long', day: 'numeric', weekday: 'long',
   }).format(date)
   const quote = encouragements[Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000) % encouragements.length]
 
   return (
-    <section aria-labelledby="daily-check-in-title" className="mx-auto flex w-full max-w-2xl flex-col items-center px-2 pb-12 pt-5 text-center sm:px-8 sm:pt-10">
+    <section aria-labelledby="daily-check-in-title" className="mx-auto flex w-full max-w-2xl flex-col items-center px-2 pb-28 pt-5 text-center sm:px-8 sm:pt-6">
       <h1 id="daily-check-in-title" className="text-2xl font-semibold tracking-tight">{t('每日簽到')}</h1>
-      <time dateTime={today} className="mt-3 text-sm text-muted-foreground">{dateLabel}</time>
+      <time dateTime={status?.check_in_date ?? today} className="mt-3 text-sm text-muted-foreground">{dateLabel}</time>
       <Image
         src="/growth/check-in-penguins.png"
         alt={t('三隻陪你慢慢前進的小企鵝')}
         width={1792} height={896}
-        className="my-7 h-auto w-full max-w-md sm:my-9"
+        className="my-5 h-auto w-full max-w-sm sm:my-6"
         priority
       />
-      <div role="status" aria-live="polite" className="min-h-24">
+      <div role="status" aria-live="polite" className="min-h-20">
         <h2 className="text-xl font-semibold leading-relaxed text-balance sm:text-2xl">
           {t(checkedIn ? '今天也有好好出現，真好。' : quote)}
         </h2>
@@ -84,6 +85,17 @@ function DailyCheckIn({ userId, today }: { userId: string; today: string }) {
           {error === 'read' && <button type="button" onClick={() => void reload()} className="mt-1 min-h-11 rounded-lg px-4 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{t('重新讀取')}</button>}
         </div>
       )}
+      {status && !isLoading && error !== 'read' && (
+        <div className="mt-5 space-y-3 text-sm" aria-live="polite">
+          <p className="text-muted-foreground">{t(checkedIn ? '今日簽到積分已入帳' : '每日簽到可獲得 {n} 分', { n: status.daily_points })}</p>
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+            <p className="font-medium">{t('可用積分 {n} 分', { n: status.available_points })}</p>
+            <p className="text-muted-foreground">{t('排名累積分 {n} 分', { n: status.ranking_points })}</p>
+          </div>
+        </div>
+      )}
+      <p className="mt-5 max-w-sm text-xs leading-6 text-muted-foreground">{t('積分先慢慢存起來，未來可用於服務兌換；兌換與排行榜尚未開放。')}</p>
+      <p className="mt-1 text-xs leading-6 text-muted-foreground">{t('每日以台北時間 00:00 更新。')}</p>
       <p className="mt-7 text-sm leading-6 text-muted-foreground">{t('偶爾停一下也沒關係，小企鵝一直都在。')}</p>
     </section>
   )

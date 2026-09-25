@@ -559,7 +559,7 @@ export function CalendarHeader({
               {onOpenGrowth && (
                 <DropdownMenuItem onSelect={onOpenGrowth} className="gap-2.5 rounded-lg py-2 text-xs">
                   <HuddleFootprints className="h-3.5 w-4 gap-0.5" />
-                  {t('成長')}
+                  {t('每日簽到')}
                 </DropdownMenuItem>
               )}
               {onOpenExport && (

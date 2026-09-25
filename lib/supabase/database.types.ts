@@ -1,3 +1,4 @@
+import type { CheckInStatus } from '@/lib/daily-check-in'
 // Database types matching supabase/migrations/0001_initial_schema.sql.
 // Regenerate from your Supabase project with:
 //   npx supabase gen types typescript --project-id <YOUR_PROJECT_ID> > lib/supabase/database.types.ts
@@ -573,6 +574,14 @@ export type Database = {
       calendar_share_invites: Tbl<CalendarShareInvitesRow, CalendarShareInvitesInsert>
       calendar_shares: Tbl<CalendarSharesRow, CalendarSharesInsert>
       calendar_share_grants: Tbl<CalendarShareGrantsRow, CalendarShareGrantsInsert>
+      points_accounts: Tbl<
+        { user_id: string; available_points: number; ranking_points: number; updated_at: string },
+        { user_id: string; available_points?: number; ranking_points?: number; updated_at?: string }
+      >
+      points_ledger: Tbl<
+        { id: string; user_id: string; kind: string; source_key: string; points_delta: number; ranking_delta: number; check_in_date: string | null; description: string; created_at: string },
+        { id?: string; user_id: string; kind: string; source_key: string; points_delta: number; ranking_delta?: number; check_in_date?: string | null; description: string; created_at?: string }
+      >
       daily_check_ins: Tbl<
         { user_id: string; check_in_date: string; created_at: string },
         { user_id: string; check_in_date: string; created_at?: string }
@@ -587,6 +596,8 @@ export type Database = {
     // Hand-written (supabase gen would rewrite this whole file); keep in sync
     // with supabase/migrations/0016_calendar_sharing.sql if it changes.
     Functions: {
+      get_daily_check_in_status: { Args: Record<PropertyKey, never>; Returns: CheckInStatus[] }
+      claim_daily_check_in: { Args: Record<PropertyKey, never>; Returns: CheckInStatus[] }
       create_share_invite: {
         Args: Record<PropertyKey, never>
         /** Raw invite token, returned exactly once (only its hash is stored). */

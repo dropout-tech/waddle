@@ -9,14 +9,19 @@ const page = await context.newPage()
 const errors=[]
 page.on('pageerror', e=>errors.push(e.message))
 let saved=false, writes=0, failWrite=false, failRead=false
+let serverDate='2026-09-25'
+const status=()=>({check_in_date:serverDate,checked_in:saved,available_points:saved?1:0,ranking_points:saved?1:0,daily_points:1})
 await context.route('**/rest/v1/**', async route => {
  const req=route.request(), url=new URL(req.url())
- if(url.pathname.endsWith('/daily_check_ins')) {
-  if(req.method()==='GET') return route.fulfill({status:failRead?503:200, json:failRead?{message:'test unavailable'}:saved?{check_in_date:'2026-09-25'}:null})
+ if(url.pathname.endsWith('/rpc/get_daily_check_in_status')) {
+  return route.fulfill({status:failRead?503:200,json:failRead?{message:'test unavailable'}:status()})
+ }
+ if(url.pathname.endsWith('/rpc/claim_daily_check_in')) {
+  assert.deepEqual(req.postDataJSON() ?? {}, {})
   writes++
   if(failWrite) return route.fulfill({status:503,json:{message:'test unavailable'}})
   saved=true
-  return route.fulfill({status:201,body:''})
+  return route.fulfill({status:200,json:status()})
  }
  return route.fulfill({status:200,json:[]})
 })
@@ -29,7 +34,7 @@ try {
  await page.locator('button[type=submit]').click()
  await page.waitForURL(u=>!u.pathname.includes('/login'),{timeout:60000})
  await page.getByRole('button',{name:'更多工具',exact:true}).click({timeout:60000})
- await page.getByRole('menuitem',{name:'成長',exact:true}).click()
+ await page.getByRole('menuitem',{name:'每日簽到',exact:true}).click()
  const section=page.getByRole('region',{name:'每日簽到'})
  await section.getByRole('button',{name:'簽到，開始今天'}).waitFor()
  await section.locator('img').evaluate(img=>img.decode())
@@ -45,6 +50,8 @@ try {
  await section.getByRole('button',{name:'今天已簽到'}).waitFor()
  assert(await section.getByRole('button',{name:'今天已簽到'}).isDisabled())
  assert.equal(writes,2)
+ await section.getByText('可用積分 1 分',{exact:true}).waitFor()
+ await section.getByText('排名累積分 1 分',{exact:true}).waitFor()
  await page.setViewportSize({width:390,height:844})
  await page.getByRole('heading',{name:'每日簽到',exact:true}).waitFor()
  await section.getByRole('button',{name:'今天已簽到'}).waitFor()
@@ -53,7 +60,7 @@ try {
  await page.setViewportSize({width:1280,height:850})
  await page.getByRole('button',{name:'返回日曆',exact:true}).click()
  await page.getByRole('button',{name:'更多工具',exact:true}).click()
- await page.getByRole('menuitem',{name:'成長',exact:true}).click()
+ await page.getByRole('menuitem',{name:'每日簽到',exact:true}).click()
  await section.getByRole('button',{name:'今天已簽到'}).waitFor()
  assert.equal(writes,2)
  saved=false; failRead=true
@@ -66,6 +73,7 @@ try {
  await page.emulateMedia({colorScheme:'dark'})
  await page.evaluate(()=>{document.documentElement.classList.add('dark')})
  await page.screenshot({path:'docs/reports/daily-check-in-shots/dark.png'})
+ serverDate='2026-09-26'
  await page.clock.setFixedTime(new Date('2026-09-26T12:00:00+08:00'))
  await page.waitForFunction(()=>document.querySelector('time[datetime="2026-09-26"]'))
  await section.getByRole('button',{name:'簽到，開始今天'}).waitFor()
@@ -73,9 +81,9 @@ try {
  await page.evaluate(()=>localStorage.setItem('waddle-language-v1','en'))
  await page.reload()
  await page.getByRole('button',{name:'More tools',exact:true}).click()
- await page.getByRole('menuitem',{name:'Growth',exact:true}).click()
+ await page.getByRole('menuitem',{name:'Daily check-in',exact:true}).click()
  await page.getByRole('button',{name:'Check in for today',exact:true}).waitFor()
  assert.equal(await page.getByRole('region',{name:'Daily check-in'}).innerText().then(s=>/[一-鿿]/.test(s)),false)
  assert.deepEqual(errors,[])
- console.log('PASS: no automatic writes, save failure/retry, one check-in, re-entry persistence, read error/retry, desktop/mobile overflow, dark preview; no page errors. All DB traffic mocked.')
+ console.log('PASS: no automatic writes, save failure/retry, one check-in, re-entry persistence, read error/retry, point balances, server RPC payload, Taipei rollover, English, desktop/mobile overflow, dark preview; no page errors. All DB traffic mocked.')
 } finally {await browser.close()}
