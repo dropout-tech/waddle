@@ -17,7 +17,7 @@ const copy = {
   zh: {
     nav: ['功能', '方案', '下載', '使用協助'], login: '登入', start: '免費開始使用',
     headline: '慢慢搖擺，把事情做完。', sub: '任務、行程、白板。把腦中的大小事，放進同一張工作桌。',
-    watch: '看企鵝變個魔法', desktop: '下載 Mac 測試版', sample: '實際產品畫面・內容為示範資料',
+    watch: '看企鵝變個魔法', desktop: '下載桌面測試版', sample: '實際產品畫面・內容為示範資料',
     pillars: [['事情，先記下來。', '任務分進工作區，今天想做的事一眼看見。'], ['時間，留給重要的事。', '把任務拖進行事曆，為工作與休息留一格。'], ['想法，也有地方放。', '白板直接寫，記事本慢慢整理，線索不再散落。']],
     moreTitle: '一起安排，也留住想法。', moreIntro: '自己的步調，和彼此的時間，都能好好放下。', planned: '規劃中・尚未開放', more: [['共享日曆', '用邀請連結與夥伴互看行事曆，把對方開放的行程疊加顯示，安排事情時多一點默契。'], ['約交集時間', '希望一起找出彼此都有空的時段，減少來回詢問。這項功能正在規劃，尚未提供自動比對或預約。'], ['記事本', '把靈感寫成筆記，用文字格式、檢查清單與圖片整理內容。從零散念頭到完整計畫，留下可以接著寫的地方。']],
     boardTitle: '想法先放下，\n順序慢慢來。', boardBody: '還沒想清楚也沒關係。在白板上直接寫字、放連結、加入檢查清單。需要更多空間時，打開內頁，沿用記事本的編輯工具。',
@@ -28,7 +28,7 @@ const copy = {
     free: '免費版', freeBody: '任務、行程、專注計時、記事本與白板。同一個帳號，在不同裝置查看與同步。',
     soon: '準備中', month: '／月', year: 'NT$1,290／年', proBody: '這是已規劃的台灣價格。付費功能與額度會在正式開放前說明，目前沒有訂閱或付款按鈕。',
     downloadTitle: '在你的桌面，\n留個位置。', downloadBody: 'Huddle 的獨立視窗，陪你開始每一天。安裝後使用原本的帳號登入，與網頁版共用資料。',
-    downloadNote: 'v0.1.2 測試版・需要網路・尚未完成 Apple 公證。Windows 版尚未提供。舊版請重新下載安裝。', release: '版本紀錄與安裝說明',
+    downloadNote: 'v0.1.2 測試版・需要網路・尚未完成 Apple 公證。Windows x64 測試版未簽署，安裝時可能顯示安全提示。舊版請重新下載安裝。', release: '版本紀錄與安裝說明',
     faqTitle: '你可能想知道', questions: [
       ['可以免費使用嗎？', '可以。目前核心功能免費開放，註冊帳號不會自動收費。Pro 尚未開放購買，正式推出前會公布完整功能與計費方式。'],
       ['桌面版需要網路嗎？', '需要。登入、讀取雲端內容與同步都需要網路。桌面版讓你用獨立視窗開啟 Huddle，並非完全離線版本。'],
@@ -41,7 +41,7 @@ const copy = {
   en: {
     nav: ['Features', 'Plans', 'Download', 'Support'], login: 'Log in', start: 'Start for free',
     headline: 'Find your rhythm.\nMake things happen.', sub: 'Tasks, calendars and a whiteboard. One workspace for everything on your mind.',
-    watch: 'A little penguin magic', desktop: 'Download the Mac beta', sample: 'Actual product interface · demonstration content',
+    watch: 'A little penguin magic', desktop: 'Download the desktop beta', sample: 'Actual product interface · demonstration content',
     pillars: [['Get it out of your head.', 'Organize tasks in workspaces and see what matters today.'], ['Make room for what matters.', 'Drag tasks onto your calendar. Leave time for work and a break.'], ['Give ideas a place to grow.', 'Write on the whiteboard, explore in your notebook, and keep the thread.']],
     moreTitle: 'Make plans together. Keep your ideas close.', moreIntro: 'Room for your own rhythm, and the time you share with others.', planned: 'Planned · Not available yet', more: [['Shared calendars', 'Invite someone with a link and view the calendar entries they choose to share alongside your own. Make plans with a clearer picture of each other’s day.'], ['Find a time together', 'We’re planning a way to find times when everyone is available, with less back-and-forth. Automatic availability matching and booking are not available yet.'], ['Notebooks', 'Develop your ideas with formatted text, checklists and images. Keep passing thoughts and detailed plans in a place you can return to.']],
     boardTitle: 'Put the idea down.\nFind the shape later.', boardBody: 'You don’t need a finished thought to begin. Write directly on the whiteboard, add links and checklists, then open an item to develop it with the notebook editor.',
@@ -52,7 +52,7 @@ const copy = {
     free: 'Free', freeBody: 'Tasks, calendars, focus timers, notebooks and the whiteboard. Use one account to view and sync your work across devices.',
     soon: 'Coming later', month: ' / month', year: 'NT$1,290 / year', proBody: 'These are planned Taiwan prices in New Taiwan dollars. Paid features and limits will be announced before launch. Subscriptions and payments are not enabled.',
     downloadTitle: 'A place\non your desktop.', downloadBody: 'Open Huddle in its own window at the start of your day. Sign in with your existing account to use the same data as the web app.',
-    downloadNote: 'v0.1.2 beta · Internet required · Not yet notarized by Apple. No Windows installer is available yet. Download and reinstall to update an older version.', release: 'Release notes and installation guide',
+    downloadNote: 'v0.1.2 beta · Internet required · Not yet notarized by Apple. Windows x64 beta is unsigned and may show a security warning. Download and reinstall to update an older version.', release: 'Release notes and installation guide',
     faqTitle: 'A few things to know', questions: [
       ['Can I use Huddle for free?', 'Yes. Core features are currently free, and creating an account does not start a paid subscription. Pro is not yet available; complete features and billing details will be published before launch.'],
       ['Does the desktop app need internet access?', 'Yes. Signing in, reading cloud content and syncing require an internet connection. The desktop app gives Huddle its own window; it is not a fully offline version.'],
@@ -114,7 +114,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
 
       <section id="pricing" className={styles.pricing} aria-labelledby="pricing-title"><div className={styles.sectionIntro}><h2 id="pricing-title">{t.priceTitle}</h2><p>{t.priceIntro}</p></div><div className={styles.plans}><article><h3>{t.free}</h3><p className={styles.price}>NT$0</p><p>{t.freeBody}</p><Link href="/signup" onClick={() => setLang(en ? 'en' : 'zh-TW')} className={styles.primary}>{t.start}<ArrowRight size={18} aria-hidden="true" /></Link></article><article className={styles.pro}><h3>Pro <span>{t.soon}</span></h3><p className={styles.price}>NT$149<small>{t.month}</small></p><p className={styles.annual}>{t.year}</p><p>{t.proBody}</p></article></div></section>
 
-      <section id="download" className={styles.download} aria-labelledby="download-title"><div><h2 id="download-title">{t.downloadTitle}</h2><p>{t.downloadBody}</p></div><div className={styles.downloadOptions}><a href={download('arm64')}><span>Mac · Apple Silicon</span><Download size={22} aria-hidden="true" /></a><a href={download('x64')}><span>Mac · Intel</span><Download size={22} aria-hidden="true" /></a><p>{t.downloadNote}</p><a href={release} className={styles.releaseLink}>{t.release}<ArrowRight size={17} aria-hidden="true" /></a></div></section>
+      <section id="download" className={styles.download} aria-labelledby="download-title"><div><h2 id="download-title">{t.downloadTitle}</h2><p>{t.downloadBody}</p></div><div className={styles.downloadOptions}><a href={download('arm64')}><span>Mac · Apple Silicon</span><Download size={22} aria-hidden="true" /></a><a href={download('x64')}><span>Mac · Intel</span><Download size={22} aria-hidden="true" /></a><a href="https://github.com/dropout-tech/waddle/releases/download/v0.1.2-beta.1/Huddle-0.1.2-win-x64.exe"><span>Windows · x64</span><Download size={22} aria-hidden="true" /></a><p>{t.downloadNote}</p><a href={release} className={styles.releaseLink}>{t.release}<ArrowRight size={17} aria-hidden="true" /></a></div></section>
 
       <section className={styles.faq} aria-labelledby="faq-title"><h2 id="faq-title">{t.faqTitle}</h2><div>{t.questions.map(([q, a]) => <details key={q}><summary>{q}<ChevronDown size={20} aria-hidden="true" /></summary><p>{a}</p></details>)}</div></section>
       <footer className={styles.footer}><div><Link href={`${base}/about`} className={styles.brand}>Huddle.</Link><p>{t.footerLine}</p></div><nav aria-label={en ? 'Service information' : '服務資訊'}>{['terms', 'privacy', 'refunds', 'support'].map((path, i) => <Link href={`${base}/${path}`} key={path}>{t.legal[i]}</Link>)}<a href="#top">{t.all}<ArrowDown className={styles.up} size={15} aria-hidden="true" /></a></nav></footer>
