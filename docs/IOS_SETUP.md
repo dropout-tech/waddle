@@ -4,7 +4,7 @@
 
 架構：一套 Next.js codebase → `BUILD_TARGET=capacitor` 產出離線靜態檔 `out/` → 包進 Capacitor iOS 殼。web 版照常用 `next build`。web 與 iOS **共用同一個 Supabase 專案/DB**。
 
-> 識別碼集中在 [lib/native-config.ts](../lib/native-config.ts) 與 [capacitor.config.ts](../capacitor.config.ts)。目前 `appId` 是佔位 `com.huddle.app`、URL scheme `huddle`。**換成你自己的反向網域時，這兩個檔 + Xcode + 各主控台要一起改。**
+> 識別碼集中在 [lib/native-config.ts](../lib/native-config.ts) 與 [capacitor.config.ts](../capacitor.config.ts)。目前 `appId` 是 `com.lazylazy.huddle`（2026-07-12 定案的個人專案 ID，非公司網域）、URL scheme `huddle`。**之後要換成別的反向網域時，這兩個檔 + Xcode + 各主控台要一起改。**
 
 ---
 
@@ -34,7 +34,7 @@ pnpm cap:open           # 用 Xcode 開啟
 
 在 Xcode 開啟後（`App` target）：
 
-1. **Signing & Capabilities → Team**：選你的 Apple Developer team；確認 Bundle Identifier = `com.huddle.app`（或你改的）。
+1. **Signing & Capabilities → Team**：選你的 Apple Developer team；確認 Bundle Identifier = `com.lazylazy.huddle`（或你改的）。
 2. **+ Capability** 加入：
    - **Sign in with Apple**
    - **Push Notifications**（本地通知雖不需 APNs，但加上不會錯；若只用本地通知可略）
@@ -87,7 +87,7 @@ supabase functions deploy delete-account
 
 ## 5. Apple Developer 主控台（Sign in with Apple，4.8 必需）
 
-1. **Identifiers → App IDs**：用 `com.huddle.app` 建立，勾選 **Sign in with Apple**。
+1. **Identifiers → App IDs**：用 `com.lazylazy.huddle` 建立，勾選 **Sign in with Apple**。
 2. **Identifiers → Services IDs**：建立一個 Services ID（例如 `com.huddle.signin`），設定回呼網域與 return URL 指向 Supabase 的 callback。把這個 Services ID 填回 `lib/native-config.ts` 的 `APPLE_SERVICES_ID` 與 Supabase Apple provider。
 3. **Keys**：建立一把 **Sign in with Apple** key，下載 `.p8`，記下 Key ID，填到 Supabase Apple provider。
 
