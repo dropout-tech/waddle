@@ -3,6 +3,7 @@ import {
   taskSelection,
   validateResult,
   taipeiMonth,
+  meetingWeekday,
 } from "./contract.ts";
 const assert = (v: unknown) => {
   if (!v) throw new Error("Assertion failed");
@@ -167,6 +168,43 @@ Deno.test(
   },
 );
 
+Deno.test("dueDate earlier than the meeting date is stripped, not trusted", () => {
+  const result = {
+    summary: "摘要",
+    decisions: [],
+    questions: [],
+    tasks: [
+      {
+        title: "交設計稿",
+        owner: "",
+        dueDate: "2026-09-25",
+        source: "這週五前交設計稿",
+      },
+      {
+        title: "跟供應商確認報價",
+        owner: "",
+        dueDate: "2026-09-23",
+        source: "記得週三要跟供應商確認報價",
+      },
+      {
+        title: "提交報告",
+        owner: "",
+        dueDate: "2026-09-28",
+        source: "下週一前提交報告",
+      },
+    ],
+  };
+  const transcript =
+    "這週五前交設計稿。記得週三要跟供應商確認報價。下週一前提交報告。";
+  const out = validateResult(result, transcript, [], "2026-09-26").tasks;
+  assert(out[0].dueDate === "", "past Friday should be stripped");
+  assert(out[1].dueDate === "", "past Wednesday should be stripped");
+  assert(out[2].dueDate === "2026-09-28", "next Monday stays intact");
+});
+Deno.test("meetingWeekday reports the Taipei calendar weekday", () => {
+  assert(meetingWeekday("2026-09-26") === "星期六");
+  assert(meetingWeekday("2026-09-28") === "星期一");
+});
 Deno.test('A participant called 我 is not a reliable speaker label',()=>{
  const p={id:crypto.randomUUID(),name:'我',organization:'',aliases:[],userId:crypto.randomUUID()};
  const source='我會再檢查一次薪資。';

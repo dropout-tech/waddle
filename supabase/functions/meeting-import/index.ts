@@ -7,6 +7,8 @@ import {
   outputSchema,
   validateResult,
   taipeiMonth,
+  meetingWeekday,
+  meetingWeekDates,
 } from "./contract.ts";
 
 const cors = {
@@ -230,6 +232,8 @@ Deno.serve(async (req) => {
             content: JSON.stringify({
               title: input.title,
               meetingDate: input.meetingDate,
+              meetingWeekday: meetingWeekday(input.meetingDate),
+              ...meetingWeekDates(input.meetingDate),
               transcript: input.transcript,
               meetingTime: input.context.meetingTime,
               participants: input.context.participants.map(
@@ -248,6 +252,7 @@ Deno.serve(async (req) => {
       JSON.parse(completion.choices[0].message.content),
       input.transcript,
       input.context.participants,
+      input.meetingDate,
     );
     const { data: meeting, error: saveError } = await admin.rpc(
       "finish_meeting_import_v2",
