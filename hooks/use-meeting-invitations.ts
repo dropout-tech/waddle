@@ -241,7 +241,7 @@ export function useMeetingInvitations(
           !peer ||
           !grants.some((g) => g.share_id === peer.share_id && g.owner_id === id)
         )
-          throw new Error('availability')
+          throw new Error('sharing_required')
         const shared = await collectPages(
           (a, b) =>
             supabase
