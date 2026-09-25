@@ -4,6 +4,7 @@ import { Suspense, useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { pendingMeetingPath } from '@/lib/auth/meeting-return'
 import { createClient } from '@/lib/supabase/client'
 import { DesktopLoginPending } from '@/components/auth/desktop-login-pending'
 import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
@@ -101,7 +102,7 @@ function LoginForm() {
       return
     }
 
-    router.push('/')
+    router.push(pendingMeetingPath() || '/')
     router.refresh()
   }
 
