@@ -320,4 +320,6 @@ export const dict: Record<string, string> = {
   "這個分類還沒有任務": "No tasks in this category yet",
   "將「{name}」標為未完成": "Mark {name} incomplete",
   "完成「{name}」": "Complete {name}",
+  "離開編輯區自動儲存，Esc 取消": "Changes save when you leave the editor. Esc to cancel.",
+  "重試": "Retry",
 }

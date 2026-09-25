@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -257,7 +257,12 @@ function ProgressCard({
   const editable = !!onSetFocusBoard;
   const field =
     "min-h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  const submitting = useRef(false);
+  const cancelled = useRef(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   function edit(target: "all" | "status" | "remarks" = "all") {
+    cancelled.current = false;
+    setSaveFailed(false);
     setMode(card.status?.mode === "task" ? "task" : "text");
     setTaskId(linked?.id ?? "");
     setText(
@@ -268,6 +273,38 @@ function ProgressCard({
     setRemarks(card.remarks ?? "");
     setEditing(target);
   }
+  async function save() {
+    if (!editing || cancelled.current || submitting.current || saving) return;
+    if (editing !== "remarks" && mode === "task" && !taskId) return;
+    const statusChanged = editing !== "remarks" && (
+      mode === "task"
+        ? card.status?.mode !== "task" || card.status.taskId !== taskId
+        : card.status?.mode === "task" || text.trim() !== (statusText ?? "")
+    );
+    const remarksChanged = editing !== "status" && remarks.trim() !== (card.remarks ?? "");
+    if (!statusChanged && !remarksChanged) {
+      setEditing(null);
+      return;
+    }
+    submitting.current = true;
+    setSaveFailed(false);
+    try {
+      await onUpdate({
+        ...(statusChanged ? { status: mode === "task"
+          ? { mode: "task" as const, taskId, updatedAt: new Date().toISOString() }
+          : { mode: "text" as const, text: text.trim(), updatedAt: new Date().toISOString() }
+        } : {}),
+        ...(remarksChanged ? { remarks: remarks.trim() } : {}),
+      });
+      setEditing(null);
+    } catch {
+      setSaveFailed(true);
+      toast.error(t("儲存失敗，請重試"));
+    } finally {
+      submitting.current = false;
+    }
+  }
+
   return (
     <article
       data-focus-card={category.id}
@@ -308,33 +345,23 @@ function ProgressCard({
             if (e.key === "Escape" && !isImeComposing(e)) {
               e.preventDefault();
               e.stopPropagation();
-              if (!saving) setEditing(null);
+              if (!saving && !submitting.current) {
+                cancelled.current = true;
+                setEditing(null);
+              }
             }
           }}
-          onSubmit={async (e) => {
-            e.preventDefault();
-            try {
-              await onUpdate({
-                ...(editing !== "remarks" ? { status:
-                  mode === "task"
-                    ? {
-                        mode: "task",
-                        taskId,
-                        updatedAt: new Date().toISOString(),
-                      }
-                    : {
-                        mode: "text",
-                        text: text.trim(),
-                        updatedAt: new Date().toISOString(),
-                      } } : {}),
-                ...(editing !== "status" ? { remarks: remarks.trim() } : {}),
-              });
-              setEditing(null);
-            } catch {
-              toast.error(t("儲存失敗，請重試"));
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+              void save();
             }
+          }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
           }}
         >
+          <fieldset disabled={saving} className="min-w-0 space-y-3">
           {editing !== "remarks" && <>
           <label className="block space-y-1 text-sm">
             <span>{t("目前狀態")}</span>
@@ -391,22 +418,25 @@ function ProgressCard({
               maxLength={10000}
             />
           </label>}
-          <div className="flex gap-2">
-            <button
-              disabled={saving || (editing !== "remarks" && mode === "task" && !taskId)}
-              className="min-h-11 rounded-lg bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50"
-            >
-              {t(saving ? "儲存中…" : "儲存")}
-            </button>
+          <div className="flex items-center gap-2">
+            <p role="status" className="text-xs text-muted-foreground">
+              {t(saving ? "儲存中…" : saveFailed ? "儲存失敗，請重試" : "離開編輯區自動儲存，Esc 取消")}
+            </p>
+            {saveFailed && <button type="submit" className="min-h-11 rounded-lg px-3 text-sm text-primary hover:bg-muted">
+              {t("重試")}
+            </button>}
             <button
               type="button"
-              disabled={saving}
-              onClick={() => setEditing(null)}
+              onClick={() => {
+                cancelled.current = true;
+                setEditing(null);
+              }}
               className="min-h-11 rounded-lg px-4 text-sm hover:bg-muted"
             >
               {t("取消")}
             </button>
           </div>
+          </fieldset>
         </form>
       ) : (
         <div className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
