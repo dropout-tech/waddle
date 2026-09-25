@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
+import { pendingMeetingPath } from '@/lib/auth/meeting-return'
 import { createClient } from '@/lib/supabase/client'
 import { PENDING_SHARE_INVITE_KEY } from '@/hooks/use-calendar-sharing'
 
@@ -45,7 +46,7 @@ function Callback() {
       // token doesn't survive the OAuth round-trip, so it was stashed in
       // sessionStorage before leaving for the provider.
       const pendingInvite = window.sessionStorage.getItem(PENDING_SHARE_INVITE_KEY)
-      router.replace(pendingInvite ? '/share/invite' : next)
+      router.replace(pendingMeetingPath() || (pendingInvite ? '/share/invite' : next))
     }
 
     finish()
