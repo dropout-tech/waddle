@@ -86,7 +86,7 @@ export function isPeerVisible(visiblePeers: Record<string, boolean>, peerId: str
   return visiblePeers[peerId] ?? true
 }
 
-type SharedCalendarRow = {
+export type SharedCalendarRow = {
   source: 'task' | 'time_block'
   id: string
   event_date: string
@@ -111,7 +111,7 @@ function toHHmm(time: string | null): string | undefined {
   return time.slice(0, 5)
 }
 
-function mapSharedRows(
+export function mapSharedRows(
   rows: SharedCalendarRow[],
   peer: { peerId: string; peerName: string },
   typeLabels: Record<string, string>,

@@ -1,0 +1,301 @@
+/* Operate surface: inherit Huddle's ceramic workspace tokens. The account
+   ledger and campaign forms lead; public marketing typography stays separate. */
+.shell {
+  height: 100dvh;
+  overflow-y: auto;
+  background: var(--background);
+  color: var(--foreground);
+  padding: max(24px, env(safe-area-inset-top))
+    max(20px, calc((100vw - 1200px) / 2)) max(60px, env(safe-area-inset-bottom));
+  font-size: 15px;
+}
+.header {
+  margin-bottom: 28px;
+}
+.back {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  font-size: 14px;
+}
+.heading {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+.heading h1 {
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+.heading p {
+  color: var(--muted-foreground);
+  margin-top: 8px;
+  line-height: 1.7;
+  max-width: 65ch;
+}
+.shell button,
+.button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  cursor: pointer;
+  font-weight: 500;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+.shell button:hover,
+.button:hover {
+  filter: brightness(0.96);
+}
+.shell button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.shell button:focus-visible,
+.shell a:focus-visible,
+.shell input:focus-visible,
+.shell select:focus-visible,
+.shell textarea:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.shell .primary {
+  background: var(--foreground);
+  color: var(--background);
+}
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 18px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.nav button[aria-current='page'] {
+  background: var(--foreground);
+  color: var(--background);
+}
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 24px;
+  min-width: 0;
+}
+.panel h2,
+.sectionTitle {
+  font-size: 21px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.panel h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.panel p {
+  line-height: 1.7;
+}
+.muted {
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+.form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+}
+.field small {
+  color: var(--muted-foreground);
+  line-height: 1.6;
+}
+.shell input:not([type='checkbox']),
+.shell select,
+.shell textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--foreground);
+  font-size: 16px;
+}
+.shell input[type='checkbox'] {
+  width: 19px;
+  height: 19px;
+  accent-color: var(--primary);
+  flex: 0 0 auto;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+.full {
+  grid-column: 1/-1;
+}
+.loading,
+.empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 0;
+  color: var(--muted-foreground);
+  line-height: 1.7;
+}
+.error,
+.message {
+  padding: 14px 18px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.error {
+  background: var(--secondary);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+.message {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.tableWrap {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  text-align: left;
+}
+.table th {
+  font-weight: 500;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.table th,
+.table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.table th:first-child,
+.table td:first-child {
+  padding-left: 0;
+}
+.table td {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.table code {
+  white-space: nowrap;
+}
+.table td small {
+  display: block;
+  color: var(--muted-foreground);
+  margin-top: 5px;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  margin: 24px 0 32px;
+}
+.stats dt {
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.stats dd {
+  font-size: 28px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-top: 8px;
+}
+.code {
+  font-size: 22px;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+  margin: 18px 0;
+}
+.rank {
+  list-style: none;
+  margin-top: 16px;
+}
+.rank li {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.rank li[data-self='true'] {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.detail {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 700px) {
+  .shell {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .grid,
+  .form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+  .panel {
+    padding: 18px;
+  }
+  .nav {
+    gap: 6px;
+  }
+  .nav button {
+    padding: 10px 12px;
+  }
+}

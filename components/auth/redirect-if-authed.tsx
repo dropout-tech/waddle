@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from './auth-provider'
+import { pendingMeetingPath } from '@/lib/auth/meeting-return'
 import { PENDING_SHARE_INVITE_KEY } from '@/hooks/use-calendar-sharing'
 
 /**
@@ -11,7 +12,7 @@ import { PENDING_SHARE_INVITE_KEY } from '@/hooks/use-calendar-sharing'
  * "if (user && pathname === '/login') redirect('/')" on the client.
  *
  * This effect races the login form's own post-submit navigation (both fire
- * on the same session change), so it must honor a stashed share invite too —
+ * on the same session change), so it must honor stashed meeting and share invites —
  * otherwise it wins the race and strands the user on "/" with the invite
  * still pending in sessionStorage.
  */
@@ -21,10 +22,9 @@ export function RedirectIfAuthed() {
 
   useEffect(() => {
     if (!loading && session) {
-      const pendingInvite =
-        typeof window !== 'undefined' &&
-        window.sessionStorage.getItem(PENDING_SHARE_INVITE_KEY)
-      router.replace(pendingInvite ? '/share/invite' : '/')
+      let pendingInvite: string | null = null
+      try { pendingInvite = window.sessionStorage.getItem(PENDING_SHARE_INVITE_KEY) } catch { /* Storage can be unavailable in private browsers. */ }
+      router.replace(pendingMeetingPath() || (pendingInvite ? '/share/invite' : '/'))
     }
   }, [loading, session, router])
 

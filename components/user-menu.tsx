@@ -1,6 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { operations } from '@/lib/operations/client'
+import type { Membership } from '@/lib/operations/types'
+import { Gift } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { LogOut, Mail, User, Loader2, Moon, Sun } from 'lucide-react'
@@ -28,6 +32,7 @@ interface UserMenuProps {
 export function UserMenu({ className }: UserMenuProps = {}) {
   const router = useRouter()
   const [session, setSession] = useState<SessionInfo | null>(null)
+  const [publicAlias, setPublicAlias] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -58,6 +63,9 @@ export function UserMenu({ className }: UserMenuProps = {}) {
       })
     })
 
+    operations<Membership>('self').then(data => {
+      if (!cancelled) setPublicAlias(data.member.alias)
+    }).catch(() => { /* Retain incumbent account menu until operations is enabled. */ })
     return () => { cancelled = true }
   }, [])
 
@@ -85,7 +93,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
 
   if (!session) return null
 
-  const initials = (session.displayName || '?').slice(0, 1).toUpperCase()
+  const initials = (publicAlias || session.displayName || '?').slice(0, 1).toUpperCase()
 
   return (
     <div ref={ref} className={className ?? 'fixed top-3 right-3 z-50'}>
@@ -142,7 +150,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
               )}
               <div className="flex flex-col min-w-0">
                 <span className="text-sm font-medium text-foreground truncate">
-                  {session.displayName}
+                  {publicAlias || session.displayName}
                 </span>
                 <span className="text-xs text-muted-foreground truncate flex items-center gap-1">
                   <Mail className="w-3 h-3" />
@@ -155,6 +163,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
 
           <div className="border-t border-border" />
 
+          <Link href="/membership" role="menuitem" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60" onClick={() => setOpen(false)}><Gift className="h-4 w-4" />會員與推薦</Link>
           <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
             className={cn(

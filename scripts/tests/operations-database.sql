@@ -1,0 +1,165 @@
+\set ON_ERROR_STOP on
+create role anon;
+create role authenticated;
+create role service_role bypassrls;
+create schema auth;
+create table auth.users(id uuid primary key, email text, created_at timestamptz default now(), email_confirmed_at timestamptz default now(), phone_confirmed_at timestamptz);
+create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+grant usage on schema auth to authenticated;
+grant execute on function auth.uid() to authenticated;
+create table public.profiles(id uuid primary key,display_name text);
+create table public.tasks(id uuid primary key default gen_random_uuid(),user_id uuid references auth.users, title text);
+create table public.time_blocks(id uuid primary key default gen_random_uuid(),user_id uuid references auth.users);
+alter table public.tasks enable row level security;
+create policy own_tasks on public.tasks for all to authenticated using (user_id=auth.uid()) with check(user_id=auth.uid());
+grant all on public.tasks to authenticated;
+\ir ../../supabase/migrations/20260920082633_billing_entitlements.sql
+\ir ../../supabase/migrations/20260925075939_operations_referrals.sql
+create function public.assert_ok(ok boolean, msg text) returns void language plpgsql as $$ begin if not coalesce(ok,false) then raise exception 'FAILED: %',msg; end if; raise notice 'PASS: %',msg; end $$;
+create function public.expect_error(action text, payload jsonb, fragment text) returns void language plpgsql as $$ begin
+  begin perform public.huddle_operations(action,payload); exception when others then
+    if position(fragment in sqlerrm)>0 then raise notice 'PASS: rejected % (%)',action,fragment; return; end if; raise;
+  end;
+  raise exception 'FAILED: expected rejection of %',action;
+end $$;
+insert into auth.users(id,email) values
+ ('00000000-0000-4000-8000-000000000001','lazy@dreamcube.tw'),
+ ('00000000-0000-4000-8000-000000000002','referrer@example.invalid'),
+ ('00000000-0000-4000-8000-000000000003','friend@example.invalid'),
+ ('00000000-0000-4000-8000-000000000004','second@example.invalid'),
+ ('00000000-0000-4000-8000-000000000005','unverified@example.invalid');
+update auth.users set email_confirmed_at=null where id='00000000-0000-4000-8000-000000000005';
+
+set role authenticated;
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000002';
+select public.assert_ok((public.huddle_operations('self')->>'admin')::boolean=false,'member is not administrator');
+select public.expect_error('admin_overview','{}','沒有營運後台權限');
+select public.expect_error('redeem','{"code":"TEST30"}','暫停');
+select public.assert_ok(public.huddle_operations('generate')->>'code'=public.huddle_operations('generate')->>'code','stable personal referral code');
+select public.huddle_operations('profile','{"alias":"小企鵝","visible":true}');
+select public.expect_error('profile','{"alias":"test@example.com"}','化名');
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
+select public.huddle_operations('admin_settings','{"gifts_enabled":true,"trial_enabled":true,"trial_days":14,"coupons_enabled":true,"referrals_enabled":true,"referral_days":30,"friend_days":30,"annual_reward_cap":60,"leaderboard_enabled":true}');
+select public.huddle_operations('admin_coupon',jsonb_build_object('code','TEST30','name','Test campaign','days',30,'audience','all','max_uses',1,'starts_at',now()-interval '1 day','expires_at',now()+interval '10 days'));
+reset role;
+select set_config('ops.test.code',(select referral_code from huddle_ops.members where user_id='00000000-0000-4000-8000-000000000002'),false);
+set role authenticated;
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000002';
+select public.expect_error('refer',jsonb_build_object('code',current_setting('ops.test.code')),'不能推薦自己');
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000003';
+select public.huddle_operations('self');
+select public.huddle_operations('refer',jsonb_build_object('code',current_setting('ops.test.code')));
+select public.huddle_operations('refer',jsonb_build_object('code',current_setting('ops.test.code')));
+select public.assert_ok(jsonb_array_length(public.huddle_operations('leaderboard'))=1,'only opted-in referrer is publicly ranked');
+select public.assert_ok(not (public.huddle_operations('leaderboard')::text like '%example.invalid%'),'ranking never leaks emails');
+reset role;
+select public.assert_ok((select count(*)=1 from huddle_ops.referrals),'repeat referral grants once');
+select public.assert_ok((select sum(days)=30 from huddle_ops.grants where user_id='00000000-0000-4000-8000-000000000003'),'friend gets 30 total, including trial');
+select public.assert_ok((select sum(days)=30 from huddle_ops.grants where user_id='00000000-0000-4000-8000-000000000002'),'referrer gets 30 days');
+set role authenticated;
+select public.expect_error('redeem','{"code":"TEST30"}','不能與');
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000004';
+select public.huddle_operations('redeem','{"code":"TEST30"}');
+select public.huddle_operations('redeem','{"code":"TEST30"}');
+select public.huddle_operations('refer',jsonb_build_object('code',current_setting('ops.test.code')));
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000002';
+select public.expect_error('redeem','{"code":"TEST30"}','名額已滿');
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000005';
+select public.expect_error('generate','{}','完成帳號驗證');
+reset role;
+select public.assert_ok((select count(*)=1 from huddle_ops.redemptions),'one redemption per member');
+select public.assert_ok((select sum(days)=30 from huddle_ops.grants where user_id='00000000-0000-4000-8000-000000000004'),'coupon prevents extra friend giveaway');
+select public.assert_ok((select sum(days)=60 from huddle_ops.grants where user_id='00000000-0000-4000-8000-000000000002'),'two friends earn 60 days');
+select public.assert_ok(not has_table_privilege('authenticated','huddle_ops.admin_emails','INSERT'),'members cannot grant admin status');
+select public.assert_ok(not has_function_privilege('anon','public.huddle_operations(text,jsonb)','EXECUTE'),'anonymous callers cannot invoke operations');
+select public.assert_ok(not has_function_privilege('authenticated','huddle_ops.give_days(uuid,integer,text,text,text)','EXECUTE'),'internal grant writer is inaccessible');
+set role authenticated;
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
+select public.huddle_operations('admin_grant','{"user_id":"00000000-0000-4000-8000-000000000002","days":10,"reason":"客服補發","request_id":"00000000-0000-4000-8000-000000000010"}');
+select public.huddle_operations('admin_grant','{"user_id":"00000000-0000-4000-8000-000000000002","days":10,"reason":"客服補發","request_id":"00000000-0000-4000-8000-000000000010"}');
+reset role;
+select public.assert_ok((select sum(days)=70 from huddle_ops.grants where user_id='00000000-0000-4000-8000-000000000002'),'manual grant retry is idempotent');
+insert into public.billing_entitlements values('00000000-0000-4000-8000-000000000002','pro',now()+interval '365 days',1);
+select public.assert_ok((select min(starts_at)>=now()+interval '364 days' from huddle_ops.grants where user_id='00000000-0000-4000-8000-000000000002'),'gifts deferred behind paid coverage');
+set role authenticated;
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000002';
+insert into public.tasks(user_id,title) values(auth.uid(),'Activity test');
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
+select public.assert_ok((public.huddle_operations('admin_overview')->>'dau')::int=1,'actual task activity counted');
+select public.huddle_operations('admin_suspend','{"user_id":"00000000-0000-4000-8000-000000000002","suspended":true,"reason":"停用測試"}');
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000002';
+select public.expect_error('self','{}','帳號已停用');
+select public.assert_ok((select count(*)=0 from public.tasks),'suspension restricts existing task RLS');
+reset role;
+select public.assert_ok((select count(*)>0 from huddle_ops.audit),'admin and reward audit recorded');
+select public.assert_ok((select bool_and(relrowsecurity) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='huddle_ops' and c.relkind='r'),'RLS on every operations table');
+insert into auth.users(id,email) values('00000000-0000-4000-8000-000000000006','third@example.invalid');
+set role authenticated;
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
+select public.huddle_operations('admin_suspend','{"user_id":"00000000-0000-4000-8000-000000000002","suspended":false,"reason":"恢復測試"}');
+select public.assert_ok(jsonb_array_length(public.huddle_operations('admin_members'))=6,'admin member listing');
+select public.assert_ok(jsonb_array_length(public.huddle_operations('admin_coupons'))=1,'admin coupon listing');
+select public.assert_ok(jsonb_array_length(public.huddle_operations('admin_referrals'))=2,'admin referral listing');
+select public.assert_ok(jsonb_array_length(public.huddle_operations('admin_billing'))=1,'admin billing snapshot listing');
+select public.assert_ok(jsonb_array_length(public.huddle_operations('admin_audit'))>0,'admin audit listing');
+select public.assert_ok(jsonb_array_length(public.huddle_operations('admin_analytics'))>0,'cohort analytics');
+select public.huddle_operations('admin_announcement',jsonb_build_object('title','測試公告','body','維護訊息','kind','maintenance','starts_at',now()-interval '1 day','expires_at',now()+interval '1 day','enabled',true));
+select public.assert_ok(jsonb_array_length(public.huddle_operations('announcements'))=1,'published announcement readable');
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000006';
+select public.huddle_operations('refer',jsonb_build_object('code',current_setting('ops.test.code')));
+reset role;
+select public.assert_ok((select sum(reward_days)=60 from huddle_ops.referrals),'annual reward cap enforced');
+select set_config('ops.test.grant',(select id::text from huddle_ops.grants where source='manual' limit 1),false);
+set role authenticated;
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
+select public.huddle_operations('admin_revoke',jsonb_build_object('id',current_setting('ops.test.grant'),'reason','撤銷測試'));
+select public.assert_ok(jsonb_array_length(public.huddle_operations('admin_member','{"user_id":"00000000-0000-4000-8000-000000000002"}')->'grants')=3,'member grant history survives revocation');
+reset role;
+select public.assert_ok((select count(*)=1 from huddle_ops.grants where revoked_at is not null),'revocation recorded');
+select public.assert_ok((select extract(epoch from(max(expires_at)-min(starts_at)))/86400 between 59.99 and 60.01 from huddle_ops.grants where user_id='00000000-0000-4000-8000-000000000002' and revoked_at is null),'revocation removes unused days from expiry');
+update public.billing_entitlements set expires_at=null where user_id='00000000-0000-4000-8000-000000000002';
+select public.assert_ok((select max(expires_at) between now()+interval '59 days' and now()+interval '61 days' from huddle_ops.grants where user_id='00000000-0000-4000-8000-000000000002' and revoked_at is null),'paid revocation does not leave a year-long free gap');
+-- Additional new users for concurrent quota and same-user retry checks.
+insert into auth.users(id,email) values
+ ('00000000-0000-4000-8000-000000000007','concurrent-a@example.invalid'),
+ ('00000000-0000-4000-8000-000000000008','concurrent-b@example.invalid');
+set role authenticated;
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
+select public.huddle_operations('admin_coupon',jsonb_build_object('code','LASTONE','name','Last slot','days',10,'audience','all','max_uses',1,'starts_at',now()-interval '1 day','expires_at',now()+interval '1 day'));
+select public.huddle_operations('admin_update_coupon',jsonb_build_object('id',(public.huddle_operations('admin_coupons')->0)->>'id','name','Edited last slot','days',10,'audience','all','max_uses',1,'starts_at',now()-interval '1 day','expires_at',now()+interval '1 day','stackable',false));
+select public.assert_ok(jsonb_array_length(public.huddle_operations('admin_redemptions',jsonb_build_object('id',(public.huddle_operations('admin_coupons')->1)->>'id')))=1,'coupon redemption detail');
+reset role;
+select set_config('ops.test.zero_referral',(select id::text from huddle_ops.referrals where referred_id='00000000-0000-4000-8000-000000000006'),false);
+set role authenticated;
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
+select public.huddle_operations('admin_referral',jsonb_build_object('id',current_setting('ops.test.zero_referral'),'reason','異常推薦撤銷測試'));
+reset role;
+select public.assert_ok((select status='revoked' from huddle_ops.referrals where id=current_setting('ops.test.zero_referral')::uuid),'admin can remove capped zero-day referral from leaderboard');
+select public.assert_ok((select count(*)=0 from huddle_ops.grants where user_id='00000000-0000-4000-8000-000000000006' and revoked_at is null),'invalid referral also revokes friend gift');
+insert into auth.users(id,email) values('00000000-0000-4000-8000-000000000009','target@example.invalid');
+set role authenticated;
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
+select public.huddle_operations('admin_coupon',jsonb_build_object('code','TARGETONLY','name','Targeted offer','days',10,'audience','specific','target_user_id','00000000-0000-4000-8000-000000000009','max_uses',1,'starts_at',now()-interval '1 day','expires_at',now()+interval '1 day'));
+reset role;
+delete from auth.users where id='00000000-0000-4000-8000-000000000009';
+select public.assert_ok((select target_user_id is null from huddle_ops.coupons where code='TARGETONLY'),'account deletion preserves campaign audit without blocking deletion');
+set role authenticated;
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
+select public.expect_error('redeem','{"code":"TARGETONLY"}','不適用');
+reset role;
+
+-- Exact verified email allowlist, independent of client metadata or stale JWTs.
+insert into auth.users(id,email) values ('00000000-0000-4000-8000-000000000020','lazydragon0247@gmail.com');
+set role authenticated;
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000020';
+select public.assert_ok((public.huddle_operations('self')->>'admin')::boolean,'second approved email is administrator');
+reset role;
+update auth.users set email_confirmed_at=null,phone_confirmed_at=now() where id='00000000-0000-4000-8000-000000000020';
+set role authenticated;
+select public.expect_error('admin_overview','{}','沒有營運後台權限');
+reset role;
+update auth.users set email='other@example.invalid',email_confirmed_at=now() where id='00000000-0000-4000-8000-000000000020';
+set role authenticated;
+select public.expect_error('admin_overview','{}','沒有營運後台權限');
+reset role;
+select public.assert_ok((select count(*)=2 from huddle_ops.admin_emails),'only two emails are allowed');
