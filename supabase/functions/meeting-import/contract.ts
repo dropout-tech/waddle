@@ -54,6 +54,28 @@ export const taskSelection = z.object({
     .min(1)
     .max(20),
 });
+// The model must never do weekday/date arithmetic itself — it only
+// classifies what kind of deadline the transcript expresses. The actual
+// YYYY-MM-DD is always computed deterministically in resolveDue(), anchored
+// on meetingDate. This replaced an approach where the model was asked to
+// compute dueDate directly (even with a this-week/next-week lookup table
+// handed to it): gpt-4.1-mini was still unreliable, e.g. turning an
+// unambiguous "下週一" into a date a full week too late.
+export const dueSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("none") }),
+  // Only for a literal calendar date written in the transcript itself.
+  z.object({ kind: z.literal("date"), date }),
+  // "明天"=1, "後天"=2, ...
+  z.object({ kind: z.literal("relative_days"), days: z.number().int().min(0).max(60) }),
+  // 1=週一 ... 7=週日. week:"this" for "這週X"/bare "週X"/"禮拜X";
+  // week:"next" for an explicit "下週X".
+  z.object({
+    kind: z.literal("weekday"),
+    weekday: z.number().int().min(1).max(7),
+    week: z.enum(["this", "next"]),
+  }),
+]);
+export type Due = z.infer<typeof dueSchema>;
 export const resultSchema = z.object({
   summary: z.string().min(1).max(8000),
   decisions: z.array(z.string().min(1).max(1000)).max(30),
@@ -63,7 +85,7 @@ export const resultSchema = z.object({
       z.object({
         title: z.string().min(1).max(200),
         owner: z.string().max(100),
-        dueDate: z.union([date, z.literal("")]),
+        due: dueSchema,
         source: z.string().min(1).max(2000),
         ownerParticipantId: z.string().default(""),
         ownerEvidence: z.string().max(2000).default(""),
@@ -90,7 +112,44 @@ export const outputSchema = {
         properties: {
           title: { type: "string" },
           owner: { type: "string" },
-          dueDate: { type: "string" },
+          due: {
+            anyOf: [
+              {
+                type: "object",
+                additionalProperties: false,
+                properties: { kind: { type: "string", enum: ["none"] } },
+                required: ["kind"],
+              },
+              {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  kind: { type: "string", enum: ["date"] },
+                  date: { type: "string" },
+                },
+                required: ["kind", "date"],
+              },
+              {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  kind: { type: "string", enum: ["relative_days"] },
+                  days: { type: "integer" },
+                },
+                required: ["kind", "days"],
+              },
+              {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  kind: { type: "string", enum: ["weekday"] },
+                  weekday: { type: "integer" },
+                  week: { type: "string", enum: ["this", "next"] },
+                },
+                required: ["kind", "weekday", "week"],
+              },
+            ],
+          },
           source: { type: "string" },
           ownerParticipantId: { type: "string" },
           ownerEvidence: { type: "string" },
@@ -103,7 +162,7 @@ export const outputSchema = {
         required: [
           "title",
           "owner",
-          "dueDate",
+          "due",
           "source",
           "ownerParticipantId",
           "ownerEvidence",
@@ -121,18 +180,22 @@ export function validateResult(
   participants: Participant[] = [],
   meetingDate = "",
 ) {
-  const result = resultSchema.parse(raw);
+  const parsed = resultSchema.parse(raw);
+  // The model only classifies what kind of deadline was said (a literal
+  // date, N relative days, or a weekday in "this"/"next" week) — the actual
+  // YYYY-MM-DD is always computed here, deterministically, never by the
+  // model. External shape (result.tasks[].dueDate as a plain string) is
+  // unchanged so the frontend/DB contract stays compatible.
+  const result = {
+    ...parsed,
+    tasks: parsed.tasks.map(({ due, ...task }) => ({
+      ...task,
+      dueDate: resolveDue(due, meetingDate),
+    })),
+  };
   // Never attach invented evidence to an executable task.
   if (result.tasks.some((task) => !transcript.includes(task.source)))
     throw new Error("INVALID_SOURCE");
-  // The model sometimes resolves a relative weekday against the wrong
-  // reference point and lands before the meeting itself; never let that
-  // reach the user as a due date that has already "passed".
-  if (meetingDate) {
-    for (const task of result.tasks) {
-      if (task.dueDate && task.dueDate < meetingDate) task.dueDate = "";
-    }
-  }
   for (const task of result.tasks) {
     const person = participants.find((p) => p.id === task.ownerParticipantId);
     const names = person ? [person.name, ...person.aliases] : [];
@@ -197,4 +260,34 @@ export function meetingWeekDates(
     );
   }
   return { thisWeek, nextWeek };
+}
+// Deterministically turns the model's structured `due` classification into
+// a YYYY-MM-DD string (or "" when there is none). The model never computes
+// a date itself: "weekday"+week:"this" is auto-corrected forward to next
+// week when that weekday has already passed within meetingDate's own week,
+// matching how a person reading "週三" on a Saturday would mean next
+// Wednesday; week:"next" always means the week after meetingDate's week,
+// unconditionally. A final backstop refuses to return any date earlier
+// than meetingDate, whatever the classification was.
+export function resolveDue(due: Due, meetingDate: string): string {
+  if (!meetingDate) return "";
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  let resolved = "";
+  if (due.kind === "date") {
+    resolved = due.date;
+  } else if (due.kind === "relative_days") {
+    const base = new Date(meetingDate + "T00:00:00Z");
+    resolved = fmt(new Date(base.getTime() + due.days * 86400000));
+  } else if (due.kind === "weekday") {
+    const { thisWeek, nextWeek } = meetingWeekDates(meetingDate);
+    const label = `週${MONDAY_LABELS[due.weekday - 1]}`;
+    resolved =
+      due.week === "next"
+        ? nextWeek[label]
+        : thisWeek[label] < meetingDate
+          ? nextWeek[label]
+          : thisWeek[label];
+  }
+  // Hard backstop: never surface a due date earlier than the meeting date.
+  return resolved && resolved >= meetingDate ? resolved : "";
 }

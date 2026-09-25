@@ -8,7 +8,6 @@ import {
   validateResult,
   taipeiMonth,
   meetingWeekday,
-  meetingWeekDates,
 } from "./contract.ts";
 
 const cors = {
@@ -233,7 +232,6 @@ Deno.serve(async (req) => {
               title: input.title,
               meetingDate: input.meetingDate,
               meetingWeekday: meetingWeekday(input.meetingDate),
-              ...meetingWeekDates(input.meetingDate),
               transcript: input.transcript,
               meetingTime: input.context.meetingTime,
               participants: input.context.participants.map(
