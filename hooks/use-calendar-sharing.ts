@@ -203,9 +203,13 @@ export function useCalendarSharing(active: boolean = true) {
   }, [])
 
   const refresh = useCallback(async () => {
+    // Read-only refresh (RLS scopes every query below), so the locally stored
+    // session is enough — getUser() would add a network round trip that holds
+    // the auth lock and delays these reads on every app start.
     const {
-      data: { user },
-    } = await supabase.auth.getUser()
+      data: { session },
+    } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user) {
       setLoading(false)
       return

@@ -328,20 +328,46 @@ export function useWaddleData(): UseWaddleData {
         myVersion !== loadVersionRef.current ||
         (!initial && mutationSeqRef.current !== mutationsAtStart)
 
-      const { data: { user } } = await supabase.auth.getUser()
+      // All seven startup reads are independent of each other for an existing
+      // account, so they start together with the getUser() round trip instead
+      // of after it (the local session already knows the user id). Startup
+      // then waits for the slowest single response rather than three serial
+      // round trips (getUser → workspaces → the rest). getUser() stays the
+      // authority: if it disagrees with the local session, or there is no
+      // user, the speculative reads are discarded exactly as before.
+      const readAll = (userId: string) => Promise.all([
+        supabase.from('workspaces').select('*').order('sort_order', { ascending: true }),
+        supabase.from('categories').select('*').order('sort_order', { ascending: true }),
+        supabase.from('tasks').select('*').order('sort_order', { ascending: true }),
+        supabase.from('time_blocks').select('*').order('date', { ascending: true }),
+        supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
+        supabase.from('slot_types').select('*').order('sort_order', { ascending: true }),
+        supabase.from('scratchpad_items').select('*').order('created_at', { ascending: false }),
+      ])
+      const { data: { session: localSession } } = await supabase.auth.getSession()
+      const localUserId = localSession?.user.id ?? null
+      // Passing the (already refreshed) access token makes getUser() skip the
+      // auth lock; without it the lock is held for the whole network call and
+      // every table read below queues behind it, re-serialising startup.
+      const [{ data: { user } }, speculativeReads] = await Promise.all([
+        localSession ? supabase.auth.getUser(localSession.access_token) : supabase.auth.getUser(),
+        localUserId ? readAll(localUserId) : Promise.resolve(null),
+      ])
       if (!user) {
         if (initial && !isStale()) setIsLoading(false)
         return
       }
       userIdRef.current = user.id
 
-      let { data: wsRows } = await supabase
-        .from('workspaces')
-        .select('*')
-        .order('sort_order', { ascending: true })
+      let reads = speculativeReads && localUserId === user.id
+        ? speculativeReads
+        : await readAll(user.id)
+      let wsRows = reads[0].data
 
       // Seed only on the very first mount — on a refetch we can safely
       // assume workspaces already exist (user has been using the app).
+      // First-run seeding must finish before the data is used: discard the
+      // (empty) speculative reads and read everything again afterwards.
       if (initial && (!wsRows || wsRows.length === 0)) {
         try {
           await seedUserData(user.id, user.email ?? '', supabase)
@@ -351,31 +377,19 @@ export function useWaddleData(): UseWaddleData {
           if (!isStale()) setIsLoading(false)
           return
         }
-        const re = await supabase
-          .from('workspaces')
-          .select('*')
-          .order('sort_order', { ascending: true })
-        wsRows = re.data
+        reads = await readAll(user.id)
+        wsRows = reads[0].data
       }
 
-      // Workspace creation/first-run seeding must finish before these reads.
-      // The remaining datasets are independent: fetch them together so startup
-      // waits for the slowest response instead of six network round trips.
       const [
+        ,
         { data: catRows },
         { data: taskRows },
         { data: tbRows },
         { data: settingsRow },
         { data: slotTypeRows },
         { data: scratchRows },
-      ] = await Promise.all([
-        supabase.from('categories').select('*').order('sort_order', { ascending: true }),
-        supabase.from('tasks').select('*').order('sort_order', { ascending: true }),
-        supabase.from('time_blocks').select('*').order('date', { ascending: true }),
-        supabase.from('user_settings').select('*').eq('user_id', user.id).maybeSingle(),
-        supabase.from('slot_types').select('*').order('sort_order', { ascending: true }),
-        supabase.from('scratchpad_items').select('*').order('created_at', { ascending: false }),
-      ])
+      ] = reads
 
       const wsById = new Map(wsRows?.map((w) => [w.id, w]) ?? [])
       const catById = new Map(catRows?.map((c) => [c.id, c]) ?? [])
