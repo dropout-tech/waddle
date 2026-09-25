@@ -1,10 +1,10 @@
-# 約交集與邀請 — 實作與上線準備
+# 約交集與邀請 — 實作與部署紀錄
 
 ## 實作範圍
 
 新的 RPC-only 邀請資料模型，與既有 `calendar_shares` 配對相接。僅既有共享日曆夥伴可被邀請；一次 1–10 人（重複選取去重，禁止自邀）。主辦人自動 accepted，其餘 pending，可接受、暫定、婉拒；主辦人可取消。邀請不自動寫入 Google Calendar，也不代表 Google OAuth Calendar 權限整合。
 
-待部署 migration：`supabase/migrations/20260920173447_meeting_invitations.sql`，由 Supabase CLI `migration new` 建立。**本次沒有套用遠端資料庫、部署 Edge Function、或寄送任何真實 Email。**
+Migration：`supabase/migrations/20260920173447_meeting_invitations.sql`，已於 2026-09-25 套用正式資料庫並登記 migration history；Edge Function 已部署。Email 寄件設定尚未完成，沒有寄送真實 Email。最新狀態見文末部署驗收。
 
 ## API
 
@@ -72,7 +72,7 @@ Email 連結可經過登入返回指定邀請。回傳路徑限定 UUID，不接
 3. 在伺服器設定 Resend 金鑰與寄件環境變數，部署 Email Edge Function。
 4. 發布前端並以指定測試帳號驗證邀請、Email 連結、回覆、取消與重試；真實寄信測試需指定收件者。
 
-目前本機實作與整合驗收完成；正式資料庫、寄信服務與發布尚未執行。
+以上為原始啟用順序；2026-09-25 已執行資料庫、Edge Function 與前端發布，寄信設定仍待補齊。
 
 
 ## 2026-09-25 整合驗收
@@ -88,4 +88,19 @@ Email 連結可經過登入返回指定邀請。回傳路徑限定 UUID，不接
 - Email handler：9 組 mock 測試通過。
 - TypeScript 與 production build 通過；變更檔案 ESLint 無 error，既有檔案仍有 12 項 warning。
 
-限制：只涵蓋已共享資料；未整合外部日曆；帶 recurrenceRule 的時間區塊會停止計算並提示失敗，不會當作空閒。查詢／送出之間沒有時段鎖定。正式 migration、寄件網域與金鑰、Edge Function 發布及真實帳號測試屬後續上線工作。
+限制：只涵蓋已共享資料；未整合外部日曆；帶 recurrenceRule 的時間區塊會停止計算並提示失敗，不會當作空閒。查詢／送出之間沒有時段鎖定。此段記錄部署前驗收；正式部署進度見下方。
+
+## 2026-09-25 正式部署驗收
+
+- 隔離 release worktree 整合最新 main，保留桌面 OAuth 與其他並行功能；合併 PR [#66](https://github.com/dropout-tech/waddle/pull/66) 與 [#69](https://github.com/dropout-tech/waddle/pull/69)。最終程式 merge SHA：`01f2e34330af65b93ff6b618bd976e2ad64e3f8d`。
+- 正式 Supabase 已套用 migration，三張表 RLS 與禁止 client 直讀／直寫均驗證；七個 public RPC 為 invoker，匿名無執行權。Security Advisor：0 errors；既有 10 warnings 未因本次任意變更。
+- 真實登入驗證：列表與忙碌查詢成功、直接讀表 403、匿名 RPC 401；Edge Function 接受現有登入 JWT，拒絕無權限邀請 403。
+- 正式資料庫交易內測試建立、同 request 重試／恢復、接受、忙碌時段、取消，全數通過後 ROLLBACK；未留測試帳號或邀請，未寄出 Email。
+- 最後修正支援合法結束時間 `24:00`；夥伴尚未開放行程類別時，明確提示到「設定 → 共享」設定，不把未知資料當成空閒。
+- 最終本機驗收：67 項空檔／ICS、62 項中英文桌面／手機 mock UI、目標 ESLint 與 production build 通過；先前 9 項 Email handler、9 項 OAuth 回歸及本機 PostgreSQL 驗證通過。
+- Email Edge Function 與 `APP_SITE_URL=https://waddle.zeabur.app` 已部署；仍缺 `RESEND_API_KEY` 與 `MEETING_EMAIL_FROM`。真實寄信與送達尚未驗收。
+- 目前登入帳號的所選夥伴尚未授權任何行程類別，實際找交集會停止並要求共享設定；未替使用者變更共享權限。
+- Zeabur 最終部署 `6657412577` 成功，正式 SHA `2bba8a5b512927bb5d70cca031ac1159b1d9d20b`（包含上述 merge 與後續 Windows CI 更新）。原 `01f2e34` 部署被較新 main 取代；已驗證祖先關係及 provider production success。
+- GitHub 的 Vercel preview 失敗不代表正式 Zeabur 部署失敗；未宣稱全部外部 checks 通過。
+- 正式瀏覽器已確認日曆「約交集時間」入口、邀請頁載入，並實際查詢看到新版「選擇的夥伴尚未開放行程」提示。未進行真實邀請寄送。
+- PR #69 Cursor Security Reviewer 通過。官網介紹仍有「約交集時間規劃中」舊文案，屬待同步的行銷文案；登入後功能已開放。
