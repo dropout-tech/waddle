@@ -9,11 +9,5 @@ claim = "set role authenticated; set request.jwt.claim.sub='00000000-0000-0000-0
 with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
     list(pool.map(sql, [claim] * 12))
 assert sql("select count(*) from points_ledger where user_id='00000000-0000-0000-0000-000000000004'").stdout.strip() == '1'
-assert sql("select available_points || ',' || ranking_points from points_accounts where user_id='00000000-0000-0000-0000-000000000004'").stdout.strip() == '1,1'
-def redeem(n):
-    return sql("set role service_role; insert into points_ledger(user_id,kind,source_key,points_delta,description) values('00000000-0000-0000-0000-000000000004','redemption','concurrent-%s',-1,'test');" % n, check=False)
-with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-    results=list(pool.map(redeem, range(2)))
-assert sum(r.returncode == 0 for r in results) == 1
-assert sql("select available_points || ',' || ranking_points from points_accounts where user_id='00000000-0000-0000-0000-000000000004'").stdout.strip() == '0,1'
-print('PASS: 12 concurrent claims award once; concurrent redemptions cannot overspend; ranking preserved.')
+assert sql("select total_points from points_accounts where user_id='00000000-0000-0000-0000-000000000004'").stdout.strip() == '1'
+print('PASS: 12 concurrent claims award exactly one score event and one cumulative point.')

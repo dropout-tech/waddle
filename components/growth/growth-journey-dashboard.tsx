@@ -88,13 +88,10 @@ function DailyCheckIn({ today }: { today: string }) {
       {status && !isLoading && error !== 'read' && (
         <div className="mt-5 space-y-3 text-sm" aria-live="polite">
           <p className="text-muted-foreground">{t(checkedIn ? '今日簽到積分已入帳' : '每日簽到可獲得 {n} 分', { n: status.daily_points })}</p>
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
-            <p className="font-medium">{t('可用積分 {n} 分', { n: status.available_points })}</p>
-            <p className="text-muted-foreground">{t('排名累積分 {n} 分', { n: status.ranking_points })}</p>
-          </div>
+          <p className="font-medium">{t('累積分數 {n} 分', { n: status.total_points })}</p>
         </div>
       )}
-      <p className="mt-5 max-w-sm text-xs leading-6 text-muted-foreground">{t('積分先慢慢存起來，未來可用於服務兌換；兌換與排行榜尚未開放。')}</p>
+      <p className="mt-5 max-w-sm text-xs leading-6 text-muted-foreground">{t('每天一小步，慢慢累積。分數將作為未來排行的依據。')}</p>
       <p className="mt-1 text-xs leading-6 text-muted-foreground">{t('每日以台北時間 00:00 更新。')}</p>
       <p className="mt-7 text-sm leading-6 text-muted-foreground">{t('偶爾停一下也沒關係，小企鵝一直都在。')}</p>
     </section>

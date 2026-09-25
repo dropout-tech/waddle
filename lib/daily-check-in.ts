@@ -8,7 +8,6 @@ export function checkInDate(now = new Date()): string {
 export interface CheckInStatus {
   check_in_date: string
   checked_in: boolean
-  available_points: number
-  ranking_points: number
+  total_points: number
   daily_points: number
 }
