@@ -13,6 +13,7 @@ import {
   type MeetingList,
   type MeetingTaskDraft,
 } from "@/lib/meeting-import";
+import { useI18n } from "@/lib/i18n/react";
 
 const field =
   "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -20,6 +21,7 @@ const button =
   "min-h-11 rounded-lg px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed";
 
 export function MeetingWorkspace({ userId }: { userId: string }) {
+  const { t } = useI18n();
   const [categories, setCategories] = useState<{ id: string; label: string }[]>(
     [],
   );
@@ -88,7 +90,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
       })
       .catch(() => {
         if (active.current)
-          setError("暫時無法讀取共享夥伴，仍可使用未指派 checklist。");
+          setError(t("暫時無法讀取共享夥伴，仍可使用未指派 checklist。"));
       });
     const client = createClient();
     Promise.all([
@@ -109,7 +111,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
         const current = await client.auth.getSession();
         if (!active.current || current.data.session?.user.id !== userId) return;
         if (workspaces.error || folders.error) {
-          setError("無法讀取任務分類，請重新開啟此頁。");
+          setError(t("無法讀取任務分類，請重新開啟此頁。"));
           return;
         }
         setCategories(
@@ -121,12 +123,12 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
         );
       })
       .catch(() => {
-        if (active.current) setError("無法讀取任務分類，請重新開啟此頁。");
+        if (active.current) setError(t("無法讀取任務分類，請重新開啟此頁。"));
       });
 
     refresh().catch((e) => {
       if (active.current) {
-        setError(e.message);
+        setError(t(e.message));
         setLoading(false);
       }
     });
@@ -193,11 +195,11 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
       select(meeting);
       if (meeting.status === "failed") {
         request.current = null;
-        setError("這次整理未成功，沒有扣除次數。請再試一次。");
+        setError(t("這次整理未成功，沒有扣除次數。請再試一次。"));
       } else if (meeting.status === "pending")
-        setNotice("仍在整理中，完成後會自動更新。");
+        setNotice(t("仍在整理中，完成後會自動更新。"));
       else {
-        setNotice("會議紀錄已儲存。請確認下方任務後再加入。");
+        setNotice(t("會議紀錄已儲存。請確認下方任務後再加入。"));
         setTitle("");
         setTranscript("");
         request.current = null;
@@ -205,7 +207,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
       await refresh();
     } catch (e) {
       if (active.current) {
-        setError(e instanceof Error ? e.message : "整理未完成");
+        setError(t(e instanceof Error ? e.message : "整理未完成"));
         await refresh().catch(() => {});
       }
     } finally {
@@ -239,7 +241,9 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
       setSelected({ ...selected, imported_tasks: importedTasks, checklist });
       setChecked([]);
       setNotice(
-        "已儲存 checklist：指派給自己的直接加入，其他人的指派等待對方接受。",
+        t(
+          "已儲存 checklist：指派給自己的直接加入，其他人的指派等待對方接受。",
+        ),
       );
       const latest = await refresh();
       if (active.current) {
@@ -248,7 +252,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
       }
     } catch (e) {
       if (active.current)
-        setError(e instanceof Error ? e.message : "任務未能建立");
+        setError(t(e instanceof Error ? e.message : "任務未能建立"));
     } finally {
       actionLock.current = false;
       if (active.current) setBusy(false);
@@ -258,13 +262,13 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
     if (!file) return;
     setError("");
     if (!/\.(txt|md|srt|vtt)$/i.test(file.name) || file.size > 160000) {
-      setError("請選擇 160 KB 以內的 TXT、MD、SRT 或 VTT 文字檔。");
+      setError(t("請選擇 160 KB 以內的 TXT、MD、SRT 或 VTT 文字檔。"));
       return;
     }
     const text = await file.text();
     if (!active.current) return;
     if (text.length > 40000 || text.includes("\u0000")) {
-      setError("請提供 40,000 字元以內的純文字內容。");
+      setError(t("請提供 40,000 字元以內的純文字內容。"));
       return;
     }
     setTranscript(text);
@@ -283,22 +287,25 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
           className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft size={16} />
-          返回工作面板
+          {t("返回工作面板")}
         </Link>
         <header className="mb-8 mt-5 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold">會議轉任務</h1>
+            <h1 className="text-3xl font-semibold">{t("會議轉任務")}</h1>
             <p className="mt-3 max-w-prose text-muted-foreground">
-              貼上逐字稿或會議筆記，整理重點，留下接下來要做的事。
+              {t("貼上逐字稿或會議筆記，整理重點，留下接下來要做的事。")}
             </p>
           </div>
           <p className="text-sm text-muted-foreground" aria-live="polite">
             {list
-              ? `本月已用 ${list.used} / 20 次${list.pending ? ` · ${list.pending} 份處理中` : ""}`
+              ? t("本月已用 {used} / 20 次", { used: list.used }) +
+                (list.pending
+                  ? t(" · {pending} 份處理中", { pending: list.pending })
+                  : "")
               : loading
-                ? "正在讀取額度…"
-                : "額度暫時無法讀取"}
-            <span className="mt-1 block text-xs">每月 1 日重置 · 台北時間</span>
+                ? t("正在讀取額度…")
+                : t("額度暫時無法讀取")}
+            <span className="mt-1 block text-xs">{t("每月 1 日重置 · 台北時間")}</span>
           </p>
         </header>
         {error && (
@@ -313,21 +320,23 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
         )}
         {list && !list.enabled && (
           <p className="mb-5 text-sm text-muted-foreground">
-            AI 整理尚未啟用。已有會議紀錄仍可查看與建立任務。
+            {t("AI 整理尚未啟用。已有會議紀錄仍可查看與建立任務。")}
           </p>
         )}
         {list && available === 0 && (
           <p className="mb-5 text-sm text-muted-foreground">
             {list.used >= 20
-              ? "本月 20 次已用完，下個月 1 日（台北時間）會重新開放。已整理的紀錄仍可建立任務。"
-              : "剩餘額度正在處理中，完成後會更新。"}
+              ? t(
+                  "本月 20 次已用完，下個月 1 日（台北時間）會重新開放。已整理的紀錄仍可建立任務。",
+                )
+              : t("剩餘額度正在處理中，完成後會更新。")}
           </p>
         )}
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_260px]">
           <section className="min-w-0">
             <details open={!selected || selected.status !== "succeeded"}>
               <summary className="mb-5 min-h-11 cursor-pointer py-2 text-sm font-medium">
-                {selected ? "整理另一份會議" : "新增會議紀錄"}
+                {selected ? t("整理另一份會議") : t("新增會議紀錄")}
               </summary>
               <form
                 onSubmit={(e) => {
@@ -338,19 +347,19 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
               >
                 <div className="grid gap-4 sm:grid-cols-[1fr_180px]">
                   <label className="space-y-2 text-sm font-medium">
-                    <span>會議名稱</span>
+                    <span>{t("會議名稱")}</span>
                     <input
                       className={field}
                       value={title}
                       maxLength={160}
                       required
                       disabled={busy}
-                      placeholder="例如：網站改版討論"
+                      placeholder={t("例如：網站改版討論")}
                       onChange={(e) => setTitle(e.target.value)}
                     />
                   </label>
                   <label className="space-y-2 text-sm font-medium">
-                    <span>會議日期</span>
+                    <span>{t("會議日期")}</span>
                     <input
                       className={field}
                       type="date"
@@ -362,7 +371,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                   </label>
                 </div>
                 <label className="block space-y-2 text-sm">
-                  會議時間（台北時間，可留空）
+                  {t("會議時間（台北時間，可留空）")}
                   <input
                     type="time"
                     className={field}
@@ -379,7 +388,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                   disabled={busy}
                 />
                 <label className="block space-y-2 text-sm">
-                  自己的任務加入哪個分類
+                  {t("自己的任務加入哪個分類")}
                   <select
                     className={field}
                     value={target}
@@ -400,12 +409,12 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                     disabled={busy || !target}
                     onChange={(e) => setAutoSelf(e.target.checked)}
                   />
-                  有明確依據、指派給「我」的任務，整理完成後直接建立
+                  {t("有明確依據、指派給「我」的任務，整理完成後直接建立")}
                 </label>
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <label htmlFor="transcript" className="text-sm font-medium">
-                      逐字稿／會議筆記
+                      {t("逐字稿／會議筆記")}
                     </label>
                     <button
                       type="button"
@@ -414,7 +423,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                       className={`${button} inline-flex items-center gap-2 hover:bg-muted`}
                     >
                       <Upload size={16} />
-                      匯入文字檔
+                      {t("匯入文字檔")}
                     </button>
                   </div>
                   <input
@@ -422,7 +431,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                     type="file"
                     accept=".txt,.md,.srt,.vtt"
                     className="hidden"
-                    aria-label="選擇逐字稿文字檔"
+                    aria-label={t("選擇逐字稿文字檔")}
                     onChange={(e) => {
                       void loadFile(e.target.files?.[0]);
                       e.target.value = "";
@@ -436,12 +445,15 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                     maxLength={40000}
                     required
                     disabled={busy}
-                    placeholder="把會議內容貼在這裡。保留說話者、日期與原句，可以讓任務更清楚。"
+                    placeholder={t(
+                      "把會議內容貼在這裡。保留說話者、日期與原句，可以讓任務更清楚。",
+                    )}
                     onChange={(e) => setTranscript(e.target.value)}
                   />
                   <p className="mt-2 text-right text-xs text-muted-foreground">
-                    {transcript.length.toLocaleString()} / 40,000 字元 · 至少 20
-                    字元
+                    {t("{count} / 40,000 字元 · 至少 20 字元", {
+                      count: transcript.length.toLocaleString(),
+                    })}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-4">
@@ -461,51 +473,54 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                     ) : (
                       <FileText size={16} />
                     )}
-                    整理紀錄與任務
+                    {t("整理紀錄與任務")}
                   </button>
                   <p className="text-xs text-muted-foreground">
-                    成功整理扣 1 次；確認與建立任務不另扣次。
+                    {t("成功整理扣 1 次；確認與建立任務不另扣次。")}
                   </p>
                 </div>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  送出後，文字會交由 AI
-                  服務整理，並儲存在你的帳號中。本功能不接收錄音檔。
+                  {t(
+                    "送出後，文字會交由 AI 服務整理，並儲存在你的帳號中。本功能不接收錄音檔。",
+                  )}
                 </p>
               </form>
             </details>
             {selected && (
               <section
                 className="mt-10 border-t border-border pt-8"
-                aria-label="整理結果"
+                aria-label={t("整理結果")}
               >
                 <h2 className="text-xl font-semibold">{selected.title}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {selected.meeting_date} ·{" "}
-                  {selected.status === "succeeded"
-                    ? "紀錄已儲存"
-                    : selected.status === "failed" || expired
-                      ? "整理未完成，未扣次"
-                      : "正在整理"}
+                  {t(
+                    selected.status === "succeeded"
+                      ? "紀錄已儲存"
+                      : selected.status === "failed" || expired
+                        ? "整理未完成，未扣次"
+                        : "正在整理",
+                  )}
                 </p>
                 {selected.context && <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  {selected.context.meetingTime ? `時間：${selected.context.meetingTime}（台北） · ` : ''}
-                  與會者：{selected.context.participants.map(p=>`${p.name}${p.organization ? `（${p.organization}）` : ''}`).join('、') || '未提供'}
+                  {selected.context.meetingTime ? t('時間：{time}（台北） · ', { time: selected.context.meetingTime }) : ''}
+                  {t('與會者：{list}', { list: selected.context.participants.map(p=>`${p.name}${p.organization ? `（${p.organization}）` : ''}`).join('、') || t('未提供') })}
                 </p>}
                 {pending && !expired && (
                   <p role="status" className="mt-5">
-                    正在整理重點與任務，請稍候。離開此頁仍可從最近紀錄查看結果。
+                    {t("正在整理重點與任務，請稍候。離開此頁仍可從最近紀錄查看結果。")}
                   </p>
                 )}
                 {selected.result && (
                   <>
-                    <h3 className="mb-3 mt-6 font-medium">會議摘要</h3>
+                    <h3 className="mb-3 mt-6 font-medium">{t("會議摘要")}</h3>
                     <p className="whitespace-pre-wrap break-words leading-relaxed">
                       {selected.result.summary}
                     </p>
                     {(
                       [
-                        ["決議", selected.result.decisions],
-                        ["待確認事項", selected.result.questions],
+                        [t("決議"), selected.result.decisions],
+                        [t("待確認事項"), selected.result.questions],
                       ] as const
                     ).map(
                       ([heading, items]) =>
@@ -523,19 +538,19 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                         ),
                     )}
                     <h3 className="mb-2 mt-8 font-medium">
-                      確認接下來要做的事
+                      {t("確認接下來要做的事")}
                     </h3>
                     <p className="mb-5 text-sm text-muted-foreground">
-                      核對原文後，選擇指派給自己、共享夥伴或不指派。對方接受前，不會加入對方的任務清單。
+                      {t("核對原文後，選擇指派給自己、共享夥伴或不指派。對方接受前，不會加入對方的任務清單。")}
                     </p>
                     {drafts.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
-                        這份紀錄沒有明確待辦，已保留會議摘要。
+                        {t("這份紀錄沒有明確待辦，已保留會議摘要。")}
                       </p>
                     ) : (
                       <>
                         <label className="mb-5 block space-y-2 text-sm">
-                          <span>加入哪個分類</span>
+                          <span>{t("加入哪個分類")}</span>
                           <select
                             className={field}
                             value={target}
@@ -551,7 +566,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                         </label>
                         {!categories.length && (
                           <p className="mb-4 text-sm">
-                            請先回工作面板建立可用分類。
+                            {t("請先回工作面板建立可用分類。")}
                           </p>
                         )}
                         <div className="divide-y divide-border">
@@ -563,16 +578,18 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                               !!selected.imported_tasks[String(index)] ||
                               !!assignment;
                             const statusLabel = assignment
-                              ? {
-                                  pending: "已送出，等待接受",
-                                  accepted: "對方已接受",
-                                  rejected: "對方已拒絕",
-                                }[assignment.status]
-                              : "已加入自己的任務";
+                              ? t(
+                                  {
+                                    pending: "已送出，等待接受",
+                                    accepted: "對方已接受",
+                                    rejected: "對方已拒絕",
+                                  }[assignment.status],
+                                )
+                              : t("已加入自己的任務");
                             const update = (patch: Partial<MeetingTaskDraft>) =>
                               setDrafts((prev) =>
-                                prev.map((t, i) =>
-                                  i === index ? { ...t, ...patch } : t,
+                                prev.map((draft, i) =>
+                                  i === index ? { ...draft, ...patch } : draft,
                                 ),
                               );
                             return (
@@ -581,7 +598,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                                   <label className="flex min-h-11 min-w-11 items-center justify-center">
                                     <input
                                       type="checkbox"
-                                      aria-label={`選取任務 ${index + 1}`}
+                                      aria-label={t("選取任務 {n}", { n: index + 1 })}
                                       className="h-5 w-5 accent-primary"
                                       disabled={busy || imported}
                                       checked={checked.includes(index)}
@@ -597,7 +614,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                                   <div className="min-w-0 flex-1 space-y-3">
                                     <label className="block space-y-1 text-sm">
                                       <span>
-                                        {imported ? statusLabel : "任務名稱"}
+                                        {imported ? statusLabel : t("任務名稱")}
                                       </span>
                                       <input
                                         className={field}
@@ -611,9 +628,9 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                                     </label>
                                     <div className="grid gap-3 sm:grid-cols-2">
                                       <label className="space-y-1 text-sm">
-                                        <span>指派給</span>
+                                        <span>{t("指派給")}</span>
                                         <select
-                                          aria-label={`任務 ${index+1} 指派給`}
+                                          aria-label={t("任務 {n} 指派給", { n: index + 1 })}
                                           className={field}
                                           value={task.assigneeId || ""}
                                           disabled={busy || imported}
@@ -624,22 +641,22 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                                           }
                                         >
                                           <option value="">
-                                            不指派，保留 checklist
+                                            {t("不指派，保留 checklist")}
                                           </option>
-                                          <option value={userId}>我</option>
+                                          <option value={userId}>{t("我")}</option>
                                           {peers.map((peer) => (
                                             <option
                                               key={peer.peer_id}
                                               value={peer.peer_id}
                                             >
-                                              {peer.display_name || "共享夥伴"}{" "}
+                                              {peer.display_name || t("共享夥伴")}{" "}
                                               · {peer.peer_id.slice(0, 8)}
                                             </option>
                                           ))}
                                         </select>
                                       </label>
                                       <label className="space-y-1 text-sm">
-                                        <span>期限</span>
+                                        <span>{t("期限")}</span>
                                         <input
                                           type="date"
                                           className={field}
@@ -653,14 +670,14 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                                     </div>
                                     <p className="text-xs text-muted-foreground">
                                       {task.owner
-                                        ? `原文提及：${task.owner}。`
+                                        ? t("原文提及：{owner}。", { owner: task.owner })
                                         : ""}
                                       {task.assignmentReason ||
-                                        "負責人待確認，請自行選擇。"}
+                                        t("負責人待確認，請自行選擇。")}
                                     </p>
                                     <details className="text-sm text-muted-foreground">
                                       <summary className="min-h-11 cursor-pointer py-2">
-                                        查看來源原文
+                                        {t("查看來源原文")}
                                       </summary>
                                       <p className="whitespace-pre-wrap break-words leading-relaxed">
                                         {task.source}
@@ -686,7 +703,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                           }
                           onClick={() => void importTasks()}
                         >
-                          儲存並處理 {checked.length} 個待辦
+                          {t("儲存並處理 {count} 個待辦", { count: checked.length })}
                         </button>
                       </>
                     )}
@@ -697,25 +714,25 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
           </section>
           <aside className="min-w-0 border-t border-border pt-6 lg:border-t-0 lg:pt-0">
             <div className="flex items-center justify-between">
-              <h2 className="font-medium">最近紀錄</h2>
+              <h2 className="font-medium">{t("最近紀錄")}</h2>
               <button
                 type="button"
                 className={`${button} hover:bg-muted`}
                 disabled={busy}
                 onClick={() => {
                   setError("");
-                  void refresh().catch((e) => setError(e.message));
+                  void refresh().catch((e) => setError(t(e.message)));
                 }}
               >
-                重新整理
+                {t("重新整理")}
               </button>
             </div>
             <p className="mb-4 text-xs text-muted-foreground">
-              最近 50 份 · 查看紀錄不扣次
+              {t("最近 50 份 · 查看紀錄不扣次")}
             </p>
             {list?.meetings.length === 0 && (
               <p className="text-sm leading-relaxed text-muted-foreground">
-                第一份會議紀錄，從貼上文字開始。
+                {t("第一份會議紀錄，從貼上文字開始。")}
               </p>
             )}
             <ul className="space-y-1">
@@ -730,12 +747,14 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                     <span className="block truncate">{m.title}</span>
                     <span className="mt-1 block text-xs text-muted-foreground">
                       {m.meeting_date} ·{" "}
-                      {m.status === "succeeded"
-                        ? "已整理"
-                        : m.status === "failed" ||
-                            Date.parse(m.created_at) <= observedAt - 300000
-                          ? "未完成"
-                          : "處理中"}
+                      {t(
+                        m.status === "succeeded"
+                          ? "已整理"
+                          : m.status === "failed" ||
+                              Date.parse(m.created_at) <= observedAt - 300000
+                            ? "未完成"
+                            : "處理中",
+                      )}
                     </span>
                   </button>
                 </li>
