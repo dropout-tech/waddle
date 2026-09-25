@@ -165,6 +165,33 @@ try {
     'A fourteen-day range is supported',
     find({ ...options, to: '2026-10-04' }).length === 154,
   )
+  check(
+    '24:00 end blocks the rest of its local day',
+    !contains(find({ ...options, tasks: [task('11:00', '24:00')] }), '11:00') &&
+      contains(find({ ...options, tasks: [task('11:00', '24:00')] }), '10:30'),
+  )
+  check(
+    'Previous-day 24:00 end does not spill into tomorrow',
+    contains(
+      find({
+        ...options,
+        tasks: [task('11:00', '24:00:00', { scheduledDate: '2026-09-20' })],
+      }),
+      '09:00',
+    ),
+  )
+  check(
+    'Time blocks support PostgreSQL 24:00:00 ends',
+    find({
+      ...options,
+      timeBlocks: [{ date, startTime: '09:00', endTime: '24:00:00' }],
+    }).length === 0,
+  )
+  assert.throws(
+    () => find({ ...options, tasks: [task('11:00', '24:01:00')] }),
+    /invalid_busy_time/,
+  )
+  check('24:01 remains invalid', true)
   for (const [label, patch, error] of [
     ['Fifteen-day ranges fail', { to: '2026-10-05' }, /invalid_range/],
     ['Reversed ranges fail', { to: '2026-09-20' }, /invalid_range/],
