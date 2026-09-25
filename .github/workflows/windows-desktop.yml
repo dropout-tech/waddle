@@ -1,0 +1,48 @@
+name: Windows desktop beta
+on:
+  push:
+    branches: [codex/windows-desktop-release]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node --test desktop/*.test.cjs
+      - run: pnpm desktop:dist:win --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Install and verify packaged app
+        shell: pwsh
+        run: |
+          $installer = Get-Item release/desktop/Huddle-*-win-x64.exe
+          $installDir = Join-Path $env:RUNNER_TEMP 'Huddle-installed'
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
+          node scripts/tests/windows-desktop-smoke.cjs "$installDir/Huddle.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged app smoke test failed' }
+          Get-FileHash $installer.FullName -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $($installer.Name)" } | Set-Content release/desktop/WINDOWS-SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: huddle-windows-x64
+          path: |
+            release/desktop/*.exe
+            release/desktop/WINDOWS-SHA256SUMS.txt
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-smoke-evidence
+          path: release/desktop/windows-smoke.png
+          if-no-files-found: ignore
