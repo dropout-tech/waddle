@@ -8,7 +8,7 @@
 
 每日簽到與每日 +1 分已透過 PR #64 發布，正式 merge 為 `a2e210dd4ab1319f769a141e3d6a51b5ddbfe3a2`；Zeabur deployment `6656984050` 成功，正式 Supabase 前兩份 migration 與測試帳號簽到已驗證。
 
-排行榜與註冊日期為本次追加功能：需先套用 `20260925120000_check_in_leaderboard.sql`，再發布前端。本機驗證通過；目前正式資料庫管理分頁連線逾時、Supabase connector 無專案權限，因此追加功能尚未上線。
+排行榜與註冊日期為本次追加功能：需先套用 `20260925120000_check_in_leaderboard.sql`，再發布前端。本機驗證通過；目前正式資料庫管理分頁連線逾時、Supabase connector 無專案權限、本機管理 token 回覆 401，因此追加功能尚未上線。
 
 第二份 migration 會撤銷前端直接新增簽到的權限；舊版前端簽到會失敗，部署時需協調資料庫與前端更新並讓舊頁面重新載入。不將舊自動腳印轉成簽到，也不補發歷史簽到積分；當天舊版簽到可按新按鈕領取一次。
 
@@ -53,4 +53,4 @@ Use case: identity-preserve. Create a wide transparent illustration of THREE pos
 
 ## 本次結果
 
-TypeScript、production build、UI 測試與本機 PostgreSQL 測試通過。ESLint 無錯誤；user-menu 原有 mounted effect 有一則警告。設計 detector 無 finding，桌機與 390px 手機排行榜截圖已檢視。追加功能的正式 migration、部署與正式站驗證尚待管理連線恢復。
+TypeScript、UI 測試與本機 PostgreSQL 測試通過。整合 main 前 production build 通過；整合最新 main 後重跑 build 遭 Google Fonts 下載連線失敗，需待網路恢復後再次確認。ESLint 無錯誤；user-menu 原有 mounted effect 有一則警告。設計 detector 無 finding，桌機與 390px 手機排行榜截圖已檢視。追加功能的正式 migration、部署與正式站驗證尚待管理連線恢復。
