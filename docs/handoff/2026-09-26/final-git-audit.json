@@ -1,0 +1,61 @@
+{
+  "verified_before_documenting_this_audit": true,
+  "worktrees": [
+    {
+      "path": "/Users/lazylazy/Desktop/琢奧科技/v0-task-management-ui",
+      "clean": true,
+      "status": ""
+    },
+    {
+      "path": "/private/tmp/huddle-commerce-sharing",
+      "clean": true,
+      "status": ""
+    },
+    {
+      "path": "/private/tmp/huddle-daily-check-in-release",
+      "clean": true,
+      "status": ""
+    },
+    {
+      "path": "/private/tmp/huddle-focus-inline-release",
+      "clean": true,
+      "status": ""
+    },
+    {
+      "path": "/private/tmp/huddle-leaderboard",
+      "clean": true,
+      "status": ""
+    },
+    {
+      "path": "/private/tmp/huddle-meeting-integration",
+      "clean": true,
+      "status": ""
+    },
+    {
+      "path": "/private/tmp/huddle-meeting-release",
+      "clean": true,
+      "status": ""
+    },
+    {
+      "path": "/private/tmp/huddle-transcript-release",
+      "clean": true,
+      "status": ""
+    },
+    {
+      "path": "/Users/lazylazy/.codex/worktrees/huddle-mobile-widgets",
+      "clean": true,
+      "status": ""
+    },
+    {
+      "path": "/Users/lazylazy/.codex/worktrees/huddle-operations-referrals/v0-task-management-ui",
+      "clean": true,
+      "status": ""
+    },
+    {
+      "path": "/Users/lazylazy/.codex/worktrees/huddle-windows-release/v0-task-management-ui",
+      "clean": true,
+      "status": ""
+    }
+  ],
+  "unpublished_commits": 0
+}

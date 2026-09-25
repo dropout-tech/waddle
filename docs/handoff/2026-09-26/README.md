@@ -75,3 +75,9 @@
 6. 每次完成留下 commit → push → main SHA → Zeabur部署 → migration/function → 真實行為，各項分別證明。
 
 本次只保存與整理，未開啟商業活動、未寄信、未補寫正式資料；既有半成品都有明確位置和下一步，並未把它們宣稱成已完工。
+
+## 本輪保存驗收
+
+完成快照及交接文件推送後，逐一檢查 11 個仍存在的 worktree，全部 git status 乾淨，沒有未推送 commit（細節 final-git-audit.json；該稽核檔自己的新增另以最終文件 commit 保存）。不存在的 prunable worktree 對應 commit 仍由分支保留，未刪分支或歷史。
+
+原工作目錄的 PIMI PDF 與 Huddle 無關，已原樣移至 `專案產出文件/PIMI/PIMI-3D預覽與實品一致性評估-2026-09-17.pdf`；SHA256與實際路徑記在 snapshot 分支的 excluded-files.md。套件、快取、安裝包與原機密鑰仍忽略，不屬於未提交產品功能。
