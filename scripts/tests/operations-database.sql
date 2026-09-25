@@ -23,13 +23,13 @@ create function public.expect_error(action text, payload jsonb, fragment text) r
   raise exception 'FAILED: expected rejection of %',action;
 end $$;
 insert into auth.users(id,email) values
- ('00000000-0000-4000-8000-000000000001','admin@example.invalid'),
+ ('00000000-0000-4000-8000-000000000001','lazy@dreamcube.tw'),
  ('00000000-0000-4000-8000-000000000002','referrer@example.invalid'),
  ('00000000-0000-4000-8000-000000000003','friend@example.invalid'),
  ('00000000-0000-4000-8000-000000000004','second@example.invalid'),
  ('00000000-0000-4000-8000-000000000005','unverified@example.invalid');
 update auth.users set email_confirmed_at=null where id='00000000-0000-4000-8000-000000000005';
-insert into huddle_ops.admins(user_id) values('00000000-0000-4000-8000-000000000001');
+
 set role authenticated;
 set request.jwt.claim.sub='00000000-0000-4000-8000-000000000002';
 select public.assert_ok((public.huddle_operations('self')->>'admin')::boolean=false,'member is not administrator');
@@ -70,7 +70,7 @@ reset role;
 select public.assert_ok((select count(*)=1 from huddle_ops.redemptions),'one redemption per member');
 select public.assert_ok((select sum(days)=30 from huddle_ops.grants where user_id='00000000-0000-4000-8000-000000000004'),'coupon prevents extra friend giveaway');
 select public.assert_ok((select sum(days)=60 from huddle_ops.grants where user_id='00000000-0000-4000-8000-000000000002'),'two friends earn 60 days');
-select public.assert_ok(not has_table_privilege('authenticated','huddle_ops.admins','INSERT'),'members cannot grant admin status');
+select public.assert_ok(not has_table_privilege('authenticated','huddle_ops.admin_emails','INSERT'),'members cannot grant admin status');
 select public.assert_ok(not has_function_privilege('anon','public.huddle_operations(text,jsonb)','EXECUTE'),'anonymous callers cannot invoke operations');
 select public.assert_ok(not has_function_privilege('authenticated','huddle_ops.give_days(uuid,integer,text,text,text)','EXECUTE'),'internal grant writer is inaccessible');
 set role authenticated;
@@ -147,3 +147,19 @@ set role authenticated;
 set request.jwt.claim.sub='00000000-0000-4000-8000-000000000001';
 select public.expect_error('redeem','{"code":"TARGETONLY"}','不適用');
 reset role;
+
+-- Exact verified email allowlist, independent of client metadata or stale JWTs.
+insert into auth.users(id,email) values ('00000000-0000-4000-8000-000000000020','lazydragon0247@gmail.com');
+set role authenticated;
+set request.jwt.claim.sub='00000000-0000-4000-8000-000000000020';
+select public.assert_ok((public.huddle_operations('self')->>'admin')::boolean,'second approved email is administrator');
+reset role;
+update auth.users set email_confirmed_at=null,phone_confirmed_at=now() where id='00000000-0000-4000-8000-000000000020';
+set role authenticated;
+select public.expect_error('admin_overview','{}','沒有營運後台權限');
+reset role;
+update auth.users set email='other@example.invalid',email_confirmed_at=now() where id='00000000-0000-4000-8000-000000000020';
+set role authenticated;
+select public.expect_error('admin_overview','{}','沒有營運後台權限');
+reset role;
+select public.assert_ok((select count(*)=2 from huddle_ops.admin_emails),'only two emails are allowed');

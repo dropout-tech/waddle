@@ -5,29 +5,12 @@
 ## 啟用前
 
 1. 先於隔離環境套用既有 `20260920082633_billing_entitlements.sql`，再套用 `20260925075939_operations_referrals.sql`。後者建立非公開 `huddle_ops` schema、帶驗證的 RPC、帳號停用限制，以及不儲存任務內容的活動統計。
-2. 由專案擁有者在受信任的 SQL 管理介面，為已確認的 Huddle 帳號授予後台權限。不要將 service-role key 或管理員 Email allowlist 放進瀏覽器程式。請先確認使用者提供的管理員 Email，不能從測試帳號推定擁有者。
-3. 用一般帳號驗證無法呼叫管理操作，再用管理員登入 `/admin`。
+2. 管理員僅限 `lazy@dreamcube.tw` 與 `lazydragon0247@gmail.com`。每次後台 RPC 都在伺服器查詢 `auth.users` 的目前 Email 與驗證狀態；帳號完成 Email 驗證後即可使用，改成其他 Email 時立即失去資格。前端或 user metadata 無法授權。
+3. 用一般帳號驗證無法呼叫管理操作，再用上述管理員登入 `/admin`。
 4. 在「活動設定」自行開啟新戶體驗、手動贈送、優惠兌換、推薦獎勵及站內提醒。贈送／促銷相關開關預設全關；排行榜總開關預設開，但每位會員預設不公開。
-5. 發布前需另行完成 migration、實際管理員授權、站台部署與真實新帳號驗收。本分支未修改正式資料，未開啟扣款。
+5. 發布需完成 migration、站台部署與線上驗收；正式購買仍停用。
 
-管理員授權範例（替換已確認的 Email，要求恰好一筆已驗證帳號；只在受信任 SQL 管理介面執行）：
-
-```sql
-do $$
-declare selected_user uuid;
-begin
-  select id into strict selected_user from auth.users
-  where lower(email) = lower('REPLACE_WITH_CONFIRMED_ADMIN_EMAIL')
-    and email_confirmed_at is not null;
-  insert into huddle_ops.admins(user_id) values(selected_user)
-    on conflict do nothing;
-  insert into huddle_ops.audit(actor_id, action, target, detail)
-    values(null, 'bootstrap_admin', selected_user::text,
-           '{"reason":"owner-approved initial administrator"}');
-end $$;
-```
-
-一般會員的 `user_metadata` 或前端路由無法授權管理員；每次管理 RPC 都查詢管理員表，撤銷權限不需要等待 JWT 過期。
+允許名單位於不公開的 `huddle_ops.admin_emails`，一般會員無法讀寫，資料表約束也限制只能填上述兩個 Email。尚未註冊的指定 Email，日後註冊並完成驗證即可取得管理資格。
 
 ## 日常操作
 

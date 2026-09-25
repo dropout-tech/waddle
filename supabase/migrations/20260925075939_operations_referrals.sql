@@ -5,10 +5,10 @@ revoke all on schema huddle_ops from public, anon, authenticated;
 grant usage on schema huddle_ops to authenticated;
 alter default privileges in schema huddle_ops revoke execute on functions from public;
 
-create table huddle_ops.admins (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  created_at timestamptz not null default now()
+create table huddle_ops.admin_emails (
+  email text primary key check(email in ('lazy@dreamcube.tw','lazydragon0247@gmail.com'))
 );
+insert into huddle_ops.admin_emails(email) values ('lazy@dreamcube.tw'),('lazydragon0247@gmail.com');
 create table huddle_ops.settings (
   id boolean primary key default true check(id),
   launched_at timestamptz not null default now(),
@@ -190,7 +190,8 @@ begin
   if u is null or not exists(select 1 from auth.users where id=u and (email_confirmed_at is not null or phone_confirmed_at is not null)) then
     raise exception '請先完成帳號驗證並重新登入' using errcode='42501';
   end if;
-  select exists(select 1 from huddle_ops.admins where user_id=u) into admin;
+  select exists(select 1 from auth.users a join huddle_ops.admin_emails e on e.email=lower(a.email)
+    where a.id=u and a.email_confirmed_at is not null) into admin;
   if not huddle_ops.access_allowed() then raise exception '帳號已停用，請聯絡客服' using errcode='42501'; end if;
   select * into s from huddle_ops.settings where id=true;
   select created_at into user_created from auth.users where id=u;
