@@ -1,0 +1,1625 @@
+# Historical notes — not current release status
+
+# 🐧 Huddle — 未完成工作清單（session handoff）
+
+## 2026-09-09：手機專項補強 PR #46 已合併
+
+- `375cd16` 已 commit/push；PR #46 合併為 main `4c357fc`。
+- 手機輸入欄至少 16px、編輯版面上下安全區與固定操作列、長引用狀態換行；看板捲動區外預留計時器空間。
+- 瀏覽器模擬 320/390/430px、150% 字級、420px 短視窗及待機/運行計時器，共 36/36 E2E，0 pageerror；build/type-check/ESLint 通過，獨立 review 全部發現已修正。非實體 iPhone 鍵盤測試。
+- 前述 Zeabur 專案存取/未自動部署問題仍未排除，尚未宣稱本次已上線。需要使用者提供目前 Huddle 專案或可存取帳號後續處理。
+
+## 2026-09-09：分類進度看板 PR #45 已合併，Zeabur 部署待釐清
+
+- 新版以同等層級的分類標題、目前狀態、備註與完整任務列，取代舊版 pinned／attention／stalled／other 分層畫面；桌面與手機共用看板。分類可手動排序，各分類各自設定任務排序及是否顯示已完成任務。下方舊版紀錄保留供追溯，不代表目前畫面。
+- `user_settings.focus_board` 既有 JSONB 的卡片新增 `status`、`remarks`、`hidden`、`taskSort`、`showCompleted`，無需資料庫 migration。舊 `note` 仍可作為狀態的相容來源；隱藏分類只設定 `hidden`，保留狀態、備註與其他設定。狀態任務引用只解析同一個未封存分類內、未封存且仍在任務清單的任務；任務移動或移除後提示重新設定，不跨分類引用。
+- 驗證：`scripts/e2e/focus-progress-verify.mjs` 目前 **24/24 通過**，使用 mock 寫入；production build 通過。這些是本機驗證。程式 commit `79222c8` 已 push，PR #45 已合併為 main `7fcecaf`。**正式站仍舊版，尚未完成上線**：GitHub 只有 Vercel 失敗 deployment 6353489982，無該 SHA 的 Zeabur deployment；目前 Chrome Zeabur 為 DropOut，原專案 69f76fce7464eddcb1eea4fe 顯示找不到專案。已向使用者詢問目前專案／帳號，需取得正確存取再完成部署與正式站驗收。
+- 本專案發佈約定：有意義的變更須 commit 並 push，必須建立 PR；使用者已授權此個人專案直接合併。`main` 會自動部署至 Zeabur：[正式站](https://waddle.zeabur.app)。合併後必須確認實際部署及線上功能，不能以 push、合併或 build 成功代替部署完成的證據。
+
+---
+
+> 以下為 2026-09-04 及更早的歷史交接紀錄。
+>
+> 2026-09-04 對帳：重點看板三批（8/20 獨立分頁＋8/21 手機版＋8/25 分層）已於 8/26 隨
+> **PR #42** 上線，本檔當時漏更新，已於下方各段銷項。
+
+---
+
+## 🟢 2026-08-24 上線：專注計時四合一（鼓勵語／記錄視窗／音樂預設靜音／關頁不歸零）——PR #41 已合併部署並線上驗收
+
+> 使用者四需求：①結束改隨機鼓勵語＋實際時長（六句、扣暫停、<1 分鐘保留舊文案，
+> 三處結束畫面都套）②結束後「這段時間做了什麼？」選填對話框（標題→日曆塊 label、
+> 內文→time_blocks.notes 新欄位；手機底部抽屜 44px；重整不漏記）③音樂每 session
+> 靜音起步，手動開才播 ④session 持久化（waddle-timer-active-session-v1），關頁重開
+> 接著跑、關頁期間到期自動補記 ✓、暫停不過期、>12h 不還原。
+> 主要改動：focus-timer-provider（praise/finalizeSession/sessionLog/還原 effect）、
+> focus-session-log-modal（新）、三結束畫面、time-block-modal 備註欄、
+> types/mappers/database.types/use-waddle-data（notes 防欄位缺失重試）、dict/timer。
+> 驗證：tmp-focus-log-verify.mjs 六情境 **39/39**（含 390px 英文、reload、到期補記、
+> 靜音預設）、tsc 0 錯、build 綠、截圖判讀通過（focus-log-shots/ 三張）。
+> **已收尾（2026-08-24 下午）**：使用者原話「我有執行囉 也可以上線了」→
+> ①migration 由使用者 dashboard 手貼 SQL 套用（service role 查證 notes 欄存在；
+>    ⚠️ **CLI token/pooler 密碼皆過期**（401/SASL fail），之後 CLI 修好時記得
+>    `supabase migration repair --status applied 20260824120000`，前例見 0015）
+> ②本機 EXPECT_NOTES=1 S1 12/12（首跑備註空是 PostgREST schema cache 未更新的
+>    時間差，網路探針證實 insert payload/DB 實存皆正確，重跑即過）
+> ③PR #41 合併 main（181da59）帶 `USER_APPROVED_DEPLOY=1`，Zeabur 部署 ~4 分鐘
+>    （75s 間隔輪詢 build 指紋 57b3e3c1→9d44b388），main 已合回 feat/ios-capacitor
+>    （fast-forward，已 push）
+> ④**正式站驗收 17/17**（E2E_BASE_URL=prod EXPECT_NOTES=1 ONLY=S1,S4：鼓勵語、
+>    對話框疊自動休息之上、標題成塊名、備註「e2e測試內文」實存實顯、reload 不歸零、
+>    零 pageerror；測試塊已清。註：部署剛切換的冷啟動窗口會讓 goto 逾時，等 ~1 分鐘
+>    重跑即可，非功能問題）。
+> 已知限制（PR 內文有記）：多分頁同還原會重複記錄；PiP 內結束時對話框開在主視窗；
+> 關頁期間到期的補記會計入當日番茄數（判斷為忠實還原，使用者不要可再拔）。
+> ⚠️ 並行 session 的重點看板檔案（focus-board*、lib/focus.ts、main-layout、
+> full-screen-task-view、focus-block、dict/task-panel）本次一樣刻意排除，未夾帶。
+
+## 🟢 2026-08-24 上線：計時膠囊「彈窗避讓」（PR #40 已合併部署並線上驗收）
+
+> 使用者「上線」→ PR #40 合併 main（affa56a），Zeabur 自動部署，main 已合回
+> feat/ios-capacitor。**正式站驗收 6/6**（tmp-prod-timer-dodge.mjs 14:51：
+> 右下定位→設定彈窗滑左下→關閉滑回→新增任務抽屜零重疊→長按結束收乾淨→
+> 零 pageerror；第 1 次嘗試打到部署中舊版如預期失敗，第 2 次全過）。
+> 注意：工作區 focus-timer-provider.tsx 在本次上線期間被並行 session 改動，
+> 與本修正無關、未動它。原始紀錄如下。
+
+> 使用者截圖回報：右下角計時膠囊（z-toast 壓在 modal 之上）擋住新增行程抽屜
+> 的送出按鈕。修法：任何 `aria-modal` 彈窗開著時，膠囊平滑滑到**左下角**避讓
+> （transform translateX，480ms var(--ease-quart)），關掉滑回右下；新手導覽
+> 的遮罩雖有 aria-modal 但文案指著右下角，用 `data-onboarding-tour` 標記豁免。
+> 改動：components/timer/focus-timer-mini.tsx（useModalDodge hook＋兩個容器
+> 套 containerStyle＋reduced-motion 關過渡）、components/onboarding-tour.tsx
+> （根節點加 data-onboarding-tour 一行）。
+> 驗證：tmp-timer-dodge-verify.mjs **8/8**（右下→設定彈窗滑左下→關閉滑回→
+> 新增任務抽屜零重疊→手機 390px 也滑左→長按結束收乾淨→零 pageerror）、
+> type-check 0 錯、build 綠。
+> **未 commit**：等使用者點頭再開分支＋PR（工作區有並行 session 的
+> focus-board WIP，commit 時只挑 focus-timer-mini.tsx、onboarding-tour.tsx、
+> scripts/e2e/tmp-timer-dodge-verify.mjs 三個檔）。
+
+---
+
+## 🟢 2026-08-24 上線：懸浮記事本 4–120px 字級列＋移除段落提示字（PR #39 已合併部署）
+
+> 使用者要求：①懸浮記事本要更彈性的字級（4–120、預設再小一級、全站四段不動）；
+> ②「輸入文字，或輸入「/」加入區塊…」會蓋到下一行字（截圖回報），拿掉。
+> 做法：floating-note.tsx 底部字級列（−/＋＋數字輸入，數字＝內文 px，CSS zoom
+> 等比縮放整個編輯區；預設 14 ≈ 比主視窗 15.2px 小一級；localStorage
+> `waddle-float-note-font-px-v1`）；tiptap-extensions.ts 段落 placeholder 改回空字串
+> （成因：::before height:0，窄視窗折兩行直接疊到下一區塊），標題/收合標題提示保留。
+> 本機驗證：字級 11/11、提示字 5/5、hub 回歸 16/16、build 綠。
+> **PR #39 合併（a0394ef）已部署**（chunk 指紋已換），main 已合回 ios 分支。
+> **線上驗收＝bundle 檢查通過**（prod JS 含 data-note-font-input 與新 localStorage
+> key、舊提示字串 0 支 chunk 含有）；**互動式線上走查被 Supabase auth 限流擋住**
+> （今日自動化登入太頻繁，連 /notebook 整頁載入的 session 恢復都卡 AuthGuard
+> ——僅影響測試流量，一般使用者正常）。等限流解除後補跑
+> tmp-prod-notefont-verify.mjs 即可收尾。
+> ⚠️ 教訓：對 prod 的驗收腳本一天內別連續多輪登入同帳號，會觸發 Supabase
+> auth rate limit；改用 storageState 重用 session 或 bundle 檢查替代。
+
+---
+
+## 🟢 2026-08-24 上線：字級設定＋懸浮視窗正計時（PR #38 已合併部署並線上驗收）
+
+> 使用者「ok 可以上線」→ PR #38 合併 main（a88b43d），Zeabur 部署 12:34 上線
+> （輪詢 head script 的 waddle-font-size-v1 標記 0→2），main 已合回
+> feat/ios-capacitor。**正式站驗收 8/8**（tmp-prod-fontsize-stopwatch.mjs：
+> 設定頁四顆字級、點「大」112.5%、重整持久、懸浮視窗同步、快速開始有正計時、
+> 00:02→00:05 實走、字級已還原標準、零 pageerror；測試帳號收乾淨）。原始紀錄如下。
+
+> 使用者：「希望字體可以自己設定字級」＋「計時器只有倒數沒有正數」。
+> ① 字級：`lib/font-size.ts`（四段 87.5%~125%，localStorage 裝置層級，
+>   inline font-size 掛 `<html>` 讓全站 rem 等比縮放）；head script 預先套用
+>   （app/layout.tsx）；`mirrorStylesInto` 同步進 PiP（floating-window.ts，
+>   observer 加看 style attribute）；設定頁一般分頁新增四顆段選
+>   （settings-modal.tsx，`data-font-size-option`）。
+> ② 正計時：工作站快速開始加「正計時 0:00 ↑」（floating-hub.tsx，
+>   `data-hub-idle-stopwatch`）；`startTimer` 新增 `stopwatch` opt
+>   （focus-timer-provider.tsx）。主視窗設定卡本來就有正計時，這次是補懸浮入口。
+> 驗證：tmp-fontsize-stopwatch-verify.mjs **11/11**、工作站回歸 16/16、
+> type-check 0 錯、build 綠。**PR #38 已開、未合併**（合併＝自動部署，等使用者）。
+> ⚠️ 並行 session 的重點看板（focus-board*、lib/focus.ts、main-layout、
+> full-screen-task-view、focus-block、dict/task-panel）持續長大，本次已刻意排除。
+
+---
+
+## 🟢 2026-08-20 上線：日曆工具列常駐「懸浮小視窗」按鈕（PR #37 已合併部署並線上驗收）
+
+> 使用者「好啊合併」→ PR #37 合併 main（b39517e），Zeabur 自動部署，
+> main 已合回 feat/ios-capacitor。**正式站驗收 4/4**
+> （tmp-prod-launcher-verify.mjs：L1 工具列有 ⧉、L2 沒開計時也能開工作站
+> 三分頁＋快速開始、L3 再按收回、L4 零 pageerror）。原始紀錄如下。
+
+> 使用者：「不希望只有按開始計時才有，要有個按鈕可以懸浮出來」。
+> 做法：`components/floating/hub-launcher-button.tsx`（常駐 ⧉，接在
+> calendar-header 桌面工具列 UndoRedo 之後）——隨時開懸浮工作站、回到上次
+> 分頁、idle 顯示快速開始、再按收回；PiP 不支援的環境不顯示。
+> 導覽計時器段文案同步（中英）。
+> 驗證：tmp-floating-hub-verify.mjs **16/16**（新 H0a-c）、type-check 0 錯、build 綠。
+> **PR #37 已開、未合併**（合併＝自動部署，等使用者說上線）。
+> ⚠️ 工作區有另一個並行 session 的 `lib/focus.ts` 半成品（FocusCard 重點看板），
+> 本次已刻意排除；後續 commit 注意不要夾帶。
+> 全部完成後可刪掉此檔（或清空），SessionStart 提醒就會自動安靜。
+> 正式站：**https://waddle.zeabur.app**（Zeabur，main 合併自動部署）。
+
+---
+
+## 🟢 2026-08-19 上線：懸浮工作站＋IME Enter 修復（PR #36 已合併部署並線上驗收）
+
+> **使用者說「全推上線」後執行**：分支 feat/floating-hub 兩個 commit
+> （58c993c IME 修復、2b11358 懸浮工作站），**PR #36 已合併 main（5dde54e）**，
+> Zeabur 自動部署 16:55 上線（輪詢 /float/scratchpad 404→200 確認），
+> main 已合回 feat/ios-capacitor。
+> **正式站驗收全過**：P1 /float/* 路由 200、P2 膠囊有 ⧉、P3 置頂工作站三分頁
+> ＋計時卡 24:55、P4 白板 iframe 載入、P5 組字 Enter 不送出草稿還在、
+> P6 記事本彈窗開著膠囊仍可點（命中測試）、零 pageerror
+> （tmp-floating-prod-verify.mjs＋tmp-prod-p6-only.mjs，測試不落 DB、已收乾淨）。
+> 下面兩段是上線前的本機紀錄，留存備查。
+
+## 🟢 2026-08-19 第二輪（同日稍晚）：懸浮視窗升級成「懸浮工作站」——記事本/白板也永遠置頂
+
+> 使用者追加：「記事本和白板也要切到別的地方時懸浮在上面不被蓋住」。但瀏覽器規定
+> Document PiP **同時只能一個**，所以把唯一的置頂視窗改成**三分頁工作站**：
+> ⏱ 計時器 / 📓 記事本 / 📌 白板 共用同一顆置頂視窗。
+>
+> **架構**（關鍵檔）：
+> * `lib/floating-hub.ts` — 工作站單一真相（module store + useSyncExternalStore，
+>   因為入口散在三棵不相鄰的子樹，context 傳不到）。
+> * `components/floating/floating-hub.tsx` — 分頁列＋內容。**兩種掛法是刻意的**：
+>   計時器分頁＝React portal（同一棵樹、同一份計時 state）；記事本/白板分頁＝
+>   **iframe** 載 `/float/note`、`/float/scratchpad`（Tiptap/slash 選單這類重度依賴
+>   自己 document 的東西塞 portal 會把彈窗開到主視窗去，iframe 全免）。iframe
+>   首次切到才掛、之後隱藏不卸載（打到一半的字不會消失）。
+> * `focus-timer-provider.tsx` — PiP 所有權移交 hub；context 改輸出
+>   `floatingTimerCard` 節點；`startTimer` 新增 `presetIndex`/`forceMini`
+>   （工作站 idle 畫面的**一鍵開始**：5 顆時長按鈕直接開跑，不用回主視窗）；
+>   計時結束**不再**自動關懸浮視窗（改顯示快速開始，別的分頁可能還在用）。
+> * `float-out-button.tsx` — 記事本/白板的 ⇱ 改為 hub 優先，Safari/Firefox
+>   （無 PiP）自動退回普通小視窗；`/float/*` 路由保留（hub 的 iframe 也吃它）。
+> * 膠囊 ⧉ 三態：沒開→開到計時器分頁；開著在別分頁→切過去；已在計時器→收回。
+>
+> 驗證（全部確定性腳本、主對話親跑）：`tmp-floating-hub-verify.mjs` **10/10**
+> （三分頁開啟/切換、iframe 載入、隱藏不卸載、快速開始真的開跑＋主視窗膠囊同步、
+> 工作站內暫停→主視窗同步、⧉ 收回、白板 ⇱ 直達、結束後工作站不關回快速開始、
+> 零 pageerror）；回歸 `tmp-floating-verify.mjs` **20/20**、
+> `tmp-floating-layout-verify.mjs` **13/13**（斷言已更新為「卡片高＝視窗高−分頁列」；
+> 分頁列英文 Timer/Notebook/Scratchpad 無殘留中文）。type-check 0 錯、build 綠。
+> 測試帳號已還原（第一輪中斷留下的空筆記已刪）。
+> 導覽文案（白板/計時器兩步）已同步改為置頂工作站說法（中英）。
+>
+> 未做：真機人眼未看；iframe 分頁與主視窗仍非即時同步（重整才見對方改動，刻意）。
+>
+> **第三輪追加（同日，使用者反映「在記事本畫面看不到角落計時」）**：
+> ① 真因＝記事本**彈窗**（ModalShell，z-modal=50）蓋住計時膠囊（原 z-40）——
+>   整頁 /notebook 沒事，但預設入口都開彈窗。修法＝膠囊抬到 `z-toast`（70，
+>   focus-timer-mini.tsx 兩處），任何 modal 都蓋不住；tour（80）與拖曳 ghost（200）
+>   仍在其上，不搶戲。
+> ② 懸浮工作站在記事本/白板分頁時，「計時器」分頁標籤直接換成**跳動的倒數**
+>   （font-mono，running 時 icon 染 session 色；`data-hub-tab-time` 供測試）。
+> 驗證：hub 腳本擴到 **13/13**（新 H9a 彈窗開著時膠囊命中測試 elementFromPoint
+> 仍屬膠囊；H9b 記事本分頁下標籤倒數 24:53→24:51 有在走）；layout 回歸 13/13、
+> build 綠、type-check 0 錯。
+
+## 🟢 2026-08-19 第一輪（已隨 PR #36 上線）：懸浮視窗 ＋ 中文輸入法 Enter 誤送出
+
+> 使用者兩個要求：①「懸浮專注計時的時鐘，在電腦任何頁面都看得到，有點像子母畫面」，
+> 記事本與白板也要能像便條紙一樣懸浮；②「中文字輸入到一半按 enter 就直接送出」。
+>
+> ### ① 中文輸入法（IME）Enter 誤送出 — 全站修好
+> 病灶：注音／拼音組字中的第一下 Enter 是「確定選字」，但各處的 `onKeyDown` 只看
+> `e.key === 'Enter'` 就送出。新增共用工具 `lib/ime.ts`（`isImeComposing`：判
+> `nativeEvent.isComposing || keyCode === 229`，後者是舊版 Safari 才有的路徑），
+> 套進 12 個檔案的 16 個 Enter 送出點（左側欄新增分類／分類內新增任務、待排程、
+> 白板文字與連結與編輯、記事本標題、記事本分類新增與改名、slash 選單、工作區設定、
+> 當前重點編輯、全螢幕任務頁、導覽鍵盤導航）。任務備註（task-detail-modal:1300）
+> 原本就已修對，改動維持不動。
+> 驗證：`scripts/e2e/tmp-ime-enter-verify.mjs`（未入版控）**14/14**。做法是直接派發
+> `isComposing: true` 的真 KeyboardEvent（Playwright 的鍵盤會繞過作業系統 IME，
+> 拿不到這個旗標），逐點驗「組字中的 Enter 不送出 → 打到一半的字還在 → 真的 Enter
+> 仍然送得出去」。零 pageerror。
+>
+> ### ② 懸浮視窗
+> **瀏覽器硬限制（先講清楚）**：永遠置頂的懸浮視窗（Document Picture-in-Picture）
+> Chrome/Edge 116+ 桌面版才有，而且**同時只能存在一個**。所以做成：
+> * **計時器** 佔用那個唯一的置頂名額。`lib/floating-window.ts` +
+>   `components/floating/pip-portal.tsx`（把樣式搬進 PiP document、監聽 pagehide）+
+>   `components/timer/floating-timer-card.tsx`（cqw/cqh 版面）。關鍵設計：內容用
+>   **React portal** 送進另一個 document，仍屬同一棵樹 ⇒ 懸浮視窗的暫停/繼續/結束
+>   吃的就是 FocusTimerProvider 同一份 state machine，不需要跨視窗同步。
+>   入口＝角落迷你膠囊上的 `[data-timer-float-toggle]`。
+> * **記事本／白板** 用一般 `window.open` 小視窗（可同時開多張、可拖可縮放，
+>   但**不置頂**）。新路由 `/float/note?id=…` 與 `/float/scratchpad`；
+>   `components/floating/floating-note.tsx`（只吃 `useNotebook()`，不載入
+>   2900 行的 useWaddleData）、`floating-scratchpad.tsx` + 新的輕量
+>   `hooks/use-scratchpad.ts`。`FocusScratchpad` 加了 `fill` prop（填滿視窗版面）。
+>   入口＝記事本頁首與白板面板右上角的 `[data-float-out]`。
+>
+> **⚠️ 踩過的坑**：`canFloat()` 原本用 `window.Capacitor` 判斷是不是 app 殼——
+> **錯的**，@capacitor/core 在 web 版也會掛上那個物件，導致懸浮按鈕在網頁上整個不出現。
+> 正解是 `isNative()`（`lib/platform.ts`）。
+> **⚠️ 測試地雷**：headless Chromium 的 PiP 視窗會回報「開啟它的分頁」的尺寸
+> （innerWidth 永遠 1440，`resizeTo` 也不生效），所以版面測試不能靠視窗大小，
+> 要把 PiP 的 `<body>` 夾成目標尺寸再量卡片自己的框。
+>
+> 驗證：`tmp-floating-verify.mjs` **20/20**（PiP 開得起來、樣式有搬進去、時間在走、
+> 在懸浮視窗按暫停主視窗同步變「繼續」＝證明同一份 state、可收回；便條紙視窗兩種都
+> 載入成功、打的字重新載入後還在＝真的寫進 DB、測試資料已刪除還原）。
+> `tmp-floating-layout-verify.mjs` **13/13**（計時卡在 180×140／420×150／200×420／
+> 260×300／560×620 五種尺寸零溢出；便條紙視窗零水平捲動；中英文各驗一輪、英文無殘留
+> 中文）。截圖 4 張 `docs/reports/2026-08-19-floating-shots/`。
+> `pnpm type-check` 0 錯、改動檔 eslint 0 error、`pnpm build` 綠（新路由都在）。
+>
+> **未做／已知限制**：
+> 1. Safari 與 Firefox 沒有 Document PiP → 那裡看不到計時器的彈出鈕（便條紙視窗仍可用）。
+>    目前**沒有**做「退回一般小視窗」的計時器備援，需要的話再補。
+> 2. iOS app 殼內三個懸浮入口都不出現（`isNative()` 擋掉）——手機沒有視窗概念，刻意的。
+> 3. 便條紙視窗與主視窗**不即時互相同步**（各自快取，重新整理才看得到對方的改動）。
+>    白板是「隨手記」用途，為此拉 realtime 訂閱不划算，刻意的取捨。
+> 4. 真機（實體 Chrome，非 headless）尚未由人眼看過。
+> 5. 新手導覽的白板／計時器兩段文案已補上懸浮視窗說明（中英皆有），但導覽本身沒重跑驗證。
+>
+> **待辦**：commit（⚠️ 先 `git status` 確認沒有其他並行 session 的檔混入）→ PR → 部署。
+
+---
+
+## ✅ 2026-08-11（2026-08-19 銷項）：分類選單兩個 UX 瑕疵修掉 — 已隨 PR #35 上線
+
+> 銷項依據（2026-08-19 實查，非推測）：`git log` 顯示這批改動在
+> `232f548`（PR #35）已提交；工作區乾淨；三個關鍵標記都在版控的檔案裡——
+> task-detail-modal 的 `panelAnchor="container"`、settings-modal 用
+> `CategoryCascadePicker`、cascade-picker 的 `scroll-mb-4`。內文留存備查。
+
+## 🟡 2026-08-11 改完本機已驗（原紀錄，見上方銷項）：分類選單兩個 UX 瑕疵修掉
+
+> 承接下方 PR #33 的「已知小瑕疵①③」。**未 commit、未 push、未部署**（本輪任務明確禁止）。
+> ① **標題被切一半**：桌面 popover 原本從觸發鈕正下方展開、寬 21rem，橫向只蓋住標題的一部分
+> （中文「新任務」剩「新」、英文「New task」剩「New t」）。修法＝把 popover 改成**對齊抽屜內容
+> 左右內距**（`components/modals/task-detail-modal.tsx:247` 抽屜 header 加 `relative`，選單傳
+> `panelAnchor="container"` + `desktopPanelClassName="left-5 right-5 top-full mt-1"`）→ 選單
+> x=781..1260 與標題輸入框**完全等寬**，變成乾淨的整片覆蓋，右緣 1260 ≤ 1280 不溢出。
+> ② **設定頁預設分類還是原生扁平 `<select>`**：抽出共用元件
+> `components/category/category-cascade-picker.tsx`（362 行），task-detail-modal 與 settings-modal
+> 共用。設定頁用 `variant="control"`（沿用該頁控制項視覺）＋`placement="inline"`（在表單流內展開，
+> 不會被設定 modal 的捲動容器裁切），並保留原本 select 有的「（未設定）」清除列。
+> **驗證**：`scripts/e2e/tmp-picker-polish-verify.mjs`（未入版控、自帶 port 3151 dev server）
+> **20/20**，含中英文標題無半遮的 boundingBox 數字、桌面兩欄 hover 換欄、手機手風琴單開＋44px＋
+> 390px 零溢出、設定頁選完 reload 仍持久、零 pageerror；`pnpm type-check` 0 錯、改動檔 eslint 0 error。
+> 截圖 9 張 `docs/reports/2026-08-11-picker-polish-shots/`。
+> ⚠️ 測試會真的改正式 DB 的預設分類，腳本結尾會**還原成「未分類 / 未分類」並 reload 驗證**（本輪
+> 已確認還原）；測試任務建立後刪除並 reload 驗證消失。
+> ⚠️ 腳本地雷：`page.addStyleTag` 隱藏 `<nextjs-portal>` 的效果**撐不過 `page.reload()`**，
+> 390px 下 dev overlay 會吃掉底欄第一顆分頁鈕的點擊 → 改用 `addInitScript` 注入 style。
+> 🔎 未做：真機（iOS）沒測；桌面選單現在會整片蓋住標題列，這是刻意取捨（使用者驗收條件允許）。
+>
+> **視覺 QA 第二輪追加（同日修完）**：
+> ③ 設定頁面板底部「（未設定）」貼死 footer——實測**修正前**桌面中文面板底緣 753.5 已越過捲動容器
+> 底緣 739.5（被吃掉 14px），14 個大分類時越過 146px。修法＝inline 面板加 `scroll-mb-4` ＋開啟時
+> `scrollIntoView({block:'nearest'})`，並把 inline 手風琴上限從 `60vh` 收成 `max-h-72`（面板總高
+> 最多 323px，內部自捲）。**修正後間距一律 16.0px**（桌機 4／14 個大分類、手機 390px 皆是）。
+> ④ English 設定頁「30/60/90/120 min」被上方分頁列切一半＝**既有問題、與本次無關**：在
+> `origin/main`（8640ccb）唯讀 worktree 起 port 3152 實測，同一 scrollTop=1026 下數字**完全相同**
+> （tabBar.bottom 199.5 ＝ scroller.top 199.5，零重疊；該列 top=176.5 被容器上緣裁掉、只露 7/30px）。
+> 那不是重疊而是捲動容器正常裁切，`settings-modal.tsx` 的分頁列與捲動容器我一行都沒動。
+> 對照圖 `8-origin-main-en-scroll1026.png` vs `8-mine-en-scroll1026.png`，重現腳本
+> `scripts/e2e/tmp-probe-sticky-compare.mjs`（吃 `E2E_BASE_URL`）。**未修**（不擴大戰場）。
+> 回歸腳本升級為 **24/24**（新增 8a/8b/8c/8d；8c/8d 用 REST 回應改寫注入 10 個假大分類壓力測，
+> 只攔 GET、零 DB 寫入）；截圖 13 張。
+
+## 🟢 2026-08-11 上線：「未分類」升級為大分類層＋兩層階層選單（PR #33 已合併部署）
+
+> ✅ 使用者原話「好啊 上線吧」→ 分支 `feat/uncategorized-workspace`（commit `4360676`，只含本功能
+> 20 檔，commit 前已逐檔看 diff 內容確認無夾帶另一 session 的 focus_board 改動）→ 乾淨 worktree
+> 實測 `pnpm install --frozen-lockfile` ＋ `pnpm build:web` **綠** → **PR #33 已合併 main（`8640ccb`）**
+> → Zeabur 自動部署 → main 已合回 `feat/ios-capacitor` 並 push。
+> ⚠️ 乾淨 worktree 建置前記得 `cp .env.local` 進去。
+> ⚠️ 開 worktree 時分支已被主工作區佔用，要用 `git worktree add --detach <path> <commit>`。
+> ✅ **正式站回歸 23/23**（2026-08-11 20:57，`scripts/e2e/tmp-uncategorized-prod-verify.mjs`，未入版控）：
+> 第一條是「線上跑的是不是新版」硬斷言（左欄首位為灰色 `rgb(156,144,134)` 的未分類）防驗到舊快取；
+> 含桌面兩欄 hover 換欄、popover 不溢出（x=817 w=336 ≤1280）、**日曆建立的任務真的落在「未分類/未分類」**
+> （真實 DB 寫入，已刪除＋reload 驗證消失）、手機 390px 手風琴單開＋44px＋零溢出、English 無殘中文、零 pageerror。
+> 截圖 9 張 `docs/reports/2026-08-10-uncategorized-realdata-shots/prod/`。
+> 主對話親手抽查：截圖檔案存在（含 md5 核對重複檔確為同一張，非偽造）、service_role 直查正式 DB
+> 確認**今天全站建立的任務 0 筆**（測試殘留已清乾淨）。
+> ⚠️ 部署偵測：`/login` chunk 指紋在合併後約 6 分鐘翻新（`81ba09e2…` → `ddc8b9ab…`），本次可用。
+> ⚠️ 正式站腳本新地雷：`page.waitForURL` 預設 `waitUntil:'load'` 會卡死（Supabase 常駐連線讓 load
+> 事件永不觸發），必須改 `waitUntil:'commit'`。
+> ⚠️ PR 上的 **Vercel check fail 是既有現象**（PR #31/#32 也一樣，兩者都成功上線）——正式站是 Zeabur，
+> Vercel 是 v0 時代留下的舊整合，非本次造成，未處理。
+>
+> 原始完成紀錄如下。
+
+
+> 使用者原話：①「我之前有一次新增了『未分類』的功能，但你之前好像誤會了，我要的事情是**更大的那一個層級**的分類，並且可以預設他是灰色的，在沒有任何分類之前點擊都會是未分類，往下滾動可以再選其他分類」；②「當專案一多的時候……新增任務時，點擊不是看到所有任務，而是可以**像是滑鼠右鍵一樣，可以展開**」（附兩層縮排示意圖）。
+> 使用者當場拍板三件事：舊的每 workspace「未分類」小分類**全部清掉、任務搬到新的**；展開方式＝**桌面滑過展開／手機點擊展開**；「未分類」**要出現在左側任務欄且排最上面**。
+>
+> **設計**：新增一個真的 workspace（大分類）`is_default = true`、色 `#9C9086`（暖灰，`UNCATEGORIZED_WORKSPACE_COLOR`，刻意破例 DESIGN.md 暖色 hue 限制）、`sort_order = 現有最小 -1`，底下一個同名「未分類」category（`is_default`）。解析改全域：`lib/default-category.ts` 新增 `resolveDefaultWorkspace` / `resolveGlobalDefaultCategory` / `sortWorkspacesForDisplay`（isDefault 永遠排第一），舊的 `resolveDefaultCategory(workspace, enabled)` 原封保留給 workspace 內部路徑。設定頁的「每 workspace 一個 select」改成**單一全域 select**（`setDefaultCategory` 簽章改成單參數 `(categoryId)`）。資料層擋掉刪除／封存 default workspace（改名改色仍開放）。
+>
+> **改動 20 檔**（含新檔 `supabase/migrations/20260810130000_default_workspace.sql`）：palette / types / database.types / mappers / default-category / use-waddle-data / settings-modal / task-detail-modal / task-panel / panel-header / full-screen-task-view / app/page.tsx / seed / mock-data / demo-data / i18n（modals、data-layer、reports）/ onboarding-tour。
+> app/page.tsx 五個建立路徑逐一分類：promote-to-task、⌘K 快速新增、日曆點空白建立、日曆待辦區新增 →**全域預設（未分類）**；slotType 綁定 workspace 的 → 維持原本 workspace 內解析。
+>
+> **⚠️ migration 已套用正式 DB**（使用者本次對話選了「全部清掉，任務搬到新的未分類」＝明確同意刪除；另有 07-21 DB 常設授權）。實際結果：**建 5 個未分類大分類、搬 0 筆任務、刪 15 個舊未分類小分類**（本來就是空的，零資料損失）。刪除前整列備份在 `_backup_uncategorized_cats_20260810`（15 筆，已開 RLS 且對 anon/authenticated revoke）、搬遷紀錄在 `_backup_uncategorized_task_moves_20260810`。**注意：DB 已改但程式碼還沒上線**——mapper 對缺欄位有 `?? false` fallback，線上舊程式碼不受影響。
+>
+> **驗證證據**：
+> - migration 在本機 PostgreSQL 16 臨時庫實跑三情境（中文帳號／英文帳號／空庫）＋**二次執行冪等**（第二次 created 0 / moved 0 / deleted 0），任務總數 5→5。
+> - UI 腳本 `scripts/e2e/tmp-category-cascade-verify.mjs`（未入版控）**18/18**。
+> - 真實資料端到端 `scripts/e2e/tmp-uncategorized-realdata-verify.mjs`（未入版控）**22/22**：左欄第一位、色點 `rgb(156,144,134)`、桌面兩欄 hover 換欄、popover 不溢出（x=817 w=336 ≤1280）、⌘K 建立的任務真的落在「未分類/未分類」、手機 390px 手風琴單開＋44px＋零溢出、English 無殘留中文、零 pageerror、設定頁全域 select 顯示正確。
+> - 主對話**親手**抽查（未委派）：截圖 8 張 `docs/reports/2026-08-10-uncategorized-realdata-shots/` 檔案存在且大小合理；service_role 直查正式 DB 確認 5 個 is_default workspace 色碼與 sort_order 正確、殘存的 5 個「未分類」category **全部**在 default workspace 底下（無漏刪）、備份表 15 筆。
+> - `pnpm type-check` 0 錯；`pnpm lint` 產品程式碼 0 error 0 warning。
+> - 獨立視覺 QA（ux-reviewer）判讀 8 張：可交付。
+>
+> **待辦**：已全部完成（commit ✓ PR ✓ 合併 ✓ 部署 ✓ 正式站回歸見本節末）。
+>
+> 🔎 **已知小瑕疵（視覺 QA 提的，未修，都不擋事）**：①分類選單彈出時會蓋住抽屜標題「新任務 / New task」——這是 popover 的既有行為（改版前也一樣），只是選單從 16rem 變 21rem 所以蓋得更多；②手機展開態截圖裡「目前選中項」與「hover 中的子項」同色高亮，兩個 agent 都判定是 Playwright 滑鼠殘留、真機不會有，**未在真機確認**；③設定頁的預設分類仍用原生扁平 `<select>`，沒套新的階層選單。
+>
+> 🔎 **會打壞的既有腳本**：`scripts/e2e/tmp-default-category-verify.mjs`（上一輪功能的回歸腳本，未入版控）現在 3/5 就中止——A4 靠舊的「每 workspace 一列 select」設定頁結構，改版後 selector 過時，**不是功能壞掉**（同一件事已由新腳本 check 10 驗過）。要留這支就得改它。
+
+---
+
+## 🟢 2026-08-27 上線：任務重點「大綱」模式（PR #44 已合併部署並線上驗收）
+
+> ### ⚠️ 這一段是本專案最重要的教訓，新 session 請完整讀
+> 使用者做到第五輪時說：「**電腦版的為什麼你都不理解我要的東西呢？**」
+>
+> **問題不在他講不清楚**——他第一則就畫了手繪圖，後來還**逐字寫出格式**。是每一輪都在他的
+> 規格上加「我覺得更好」的東西：自動分層 → 密度切換 → 視覺大小層次 → 雙欄排版 →
+> 把任務截成「還有 N 個」。每一項單獨看都有道理，**合起來就是把他要的「一目瞭然」拆掉**。
+>
+> **他要的判準（記住這三句，未來任何這類需求都適用）**：
+> 「當前進展是自定義的備注的感覺」「**每個層級都是一樣大的**」「讓人可以**一覽**所有大分類的
+> 任務當前進展和要做的事情是什麼」。
+> ⇒ **不要幫他排序、不要幫他分大小、要能一次看完。** 任何以「自動分層／密度／視覺層次」為名的
+> 優化，在他的一覽型需求上都是反效果。
+>
+> **有效的做法（之後照做）**：**拿使用者原文與截圖並排比對，逐項列出差異清單**，多一樣少一樣
+> 都要講。這輪三處「規格外優化」就是這樣抓出來的（雙欄／截斷成「還有 1 個」／22px 大字卡）。
+> 派工時明寫「這一輪不要再加任何規格外的東西，有想法寫在回報讓我判斷，不要直接做」。
+>
+> **實作**：`components/task-panel/focus-outline.tsx`（桌機手機共用同一份，格式不會走鐘）。
+> 三個中文標籤 `標題：`／`當前進展：`／`任務：` **逐字渲染**、1.2.3. 編號、**單欄由上而下**、
+> **不分層不收合不截斷**、**全部 14px 同字級**（層次只用字重與顏色）。`當前進展` 就地編輯
+> （Enter 存／Esc 還原／失焦存）。`當前重點` 以**同字級一行**回到最上面，點擊仍開完整編輯視窗。
+> 第三個模式並設為**預設**；卡片／精簡（含四層分層）原封不動保留在切換鈕。
+> 順帶修掉卡片模式在「其他」是唯一一層時預設收合 → 整頁空白讓人以為資料掉了。
+>
+> **驗證**：`tmp-focus-outline-verify.mjs` **26/26**（主對話獨立重跑同結果），
+> **正式站 26/26**（2026-08-27）；`tmp-focus-tiers-verify.mjs` 34/34。
+> 關鍵量測：工作區左邊界 x 集合＝**{24}** 單一值（單欄）、九豆 5 個任務列 **5** 條且「還有」
+> 出現 **0** 次、看板最大字級 **14px**＝本文、分層小標 **0** 個。
+>
+> **未處理**：手機「當前重點」可點寬度隨標題長度變化（短標題約 50×44，仍達 44pt）；
+> 桌機單欄後右側留白較多（限寬置中會改變「從上到下一條」的感覺）；「設定重點」空狀態路徑
+> 未實測（測試帳號永遠有可推薦任務）。
+
+---
+
+## 🟢 2026-08-26 上線：新手導覽線上 bug 修復＋浮動計時器讓路（PR #43 已合併部署）
+
+> ### A. 新手導覽卡死（**這是正式站上的線上 bug，修好還沒部署**）
+> **症狀**：桌機導覽走到**第 13 步「專注計時器 ＋ 背景音」**時，導覽視窗的「下一步」按鈕
+> 跑到瀏覽器可視範圍**外**，點不到 → 新使用者無法繼續也無法完成導覽。
+> **影響**：只有 `onboarding_completed = false` 的新使用者。老使用者不會再看到導覽，
+> 所以使用者自己不會遇到——**這個洞會安靜地卡住每一個新註冊的人**。
+>
+> **根因**：`components/onboarding-tour.tsx` 的 `computeTooltipPosition` 用**寫死的
+> `tooltipH = 240`** 做邊界夾制，但第 13 步文案長、實際渲染 **337px**，差的 97px 把按鈕
+> 推出畫面。已用 `git show HEAD:` 查證這行確實在已上線的版本裡。
+> **三個條件湊齊才會踩到**：文案夠長 ＋ 目標在右下角 ＋ 視窗不夠高（測試用 1280×800）。
+>
+> ⚠️ **一次錯誤歸因的紀錄**：我一開始推測是 PR #42 改分頁結構打壞了導覽錨點，並已向使用者
+> 認錯「8/25 沒重跑導覽腳本」。**查證後推翻**：12 個桌機錨點全部命中、無 selector 失效，
+> 是潛伏老 bug 與 PR #42 無關。**教訓：證據不足時不要先認一個錯誤的因果**——使用者會以為
+> 已經歸因清楚，比不認更糟。（重跑導覽腳本本身仍是該做而漏做的事。）
+>
+> ⚠️ **隔離手法（下次照做）**：用 `git worktree add --detach <path> origin/main` 拉出
+> **線上那版**單獨跑，才能分清「線上就壞」與「本機未提交改動弄壞」。
+> **worktree 需要 `.env.local` 與 `.env.e2e.local` 兩個檔都複製進去**（我第一次只複製前者，
+> 白跑一輪，錯誤訊息是 `Missing E2E_EMAIL/E2E_PASSWORD`）。
+>
+> **修法**：不只修那一步——改用 `tooltipRef.getBoundingClientRect()` **實測**視窗尺寸做定位，
+> 並讓 `clamp()` 成為**所有回傳路徑**（含置中步驟）的最後防線。理由：導覽錨點散落全 app，
+> 只修單一步驟等於等著再壞一次。順帶修好「略過導覽」小膠囊原本也會掉出畫面。
+> 動的只有 `components/onboarding-tour.tsx`（58+/17-）。
+>
+> **驗證**：新增通用斷言「每一步的導覽視窗與『下一步』都完全落在 viewport 內」，
+> **修好前先跑一次確認它 FAIL**（`tooltip bottom=863 > vh=800`、`next bottom=842`）才修——
+> 斷言沒被證明抓得到問題，它的綠燈不算數。修好後桌機 **11/11**（主對話獨立重跑同結果）、
+> 手機 10/10。
+>
+> ### B. 浮動計時器讓路（使用者原話「還是可以浮動 但你幫我把關一下使用者體驗」）
+> 同一角落有**兩個**不同的浮動元件，很容易搞混：
+> `components/timer/focus-timer.tsx:91`（`fixed z-40`，**閒置**啟動鈕，132×46）與
+> `focus-timer-mini.tsx`（`fixed z-toast`，**執行中**膠囊）。兩者互斥不會同時出現
+> （`focus-timer.tsx:62` 有 `if (ft.state !== 'idle') return null`）。
+> **當初量到死區的是閒置那顆**——第一輪只修了執行中那顆，等於沒解決使用者實際會遇到的情況。
+>
+> 解法抽成共用檔 `components/timer/use-floating-dodge.ts`：①捲動中 `pointer-events:none`
+> ＋opacity 0.45，停手 400ms 恢復；②**判準是「被壓到的控制項還剩不剩得下 44×44」而不是
+> 「有沒有重疊」**（滿版長列不誤判，小圖示鈕才觸發）；③視覺層不吃點擊，點擊交給只鋪在安全區
+> 的透明層；④導覽開著時強制不讓路。手機執行中膠囊 226px→92px。桌機外觀未動。
+>
+> ⚠️ **又一條假綠燈的紀錄**：舊的 J1 斷言**只測釘選鈕中心點**，所以死區存在時照樣 PASS。
+> 升級成**九點取樣**後，修好前 FAIL 且顯示連中心都點不到（`aria-pressed=false→false`）。
+> **只測中心點的點擊斷言等於沒測。**
+>
+> **待辦**：
+> 1. ⏸ **等使用者同意上線**（A 是線上 bug，建議優先）。改動 5 檔：`onboarding-tour.tsx`、
+>    `focus-timer.tsx`、`focus-timer-mini.tsx`、`use-floating-dodge.ts`（新）、`dict/timer.ts`。
+> 2. ⬜ **手機導覽 4 步的目標找不到**（`left-panel`／`focus-block`／`task-row`／
+>    `task-shortcut-row`）——手機預設停在日曆分頁（`main-layout.tsx:141`，最後修改 2026-05-11），
+>    任務面板沒掛載，那 4 步退化成沒有聚光燈的置中彈窗。**不會卡住但體驗打折**。
+>    修法要讓導覽自己去切分頁＝行為變更，待使用者決定。**舊缺陷，非本次回歸。**
+> 3. ⬜ 讓路時浮動元件自己的點擊區可能縮到 24px（低於 44pt）——刻意讓底下控制項優先的取捨。
+> 4. ⬜ 全程 headless Chromium，**無真機**；iOS Safari 慣性捲動的 scroll 事件頻率未實測。
+
+---
+
+## 🟢 2026-08-26 上線：任務重點的分層／密度／釘選／搜尋／停滯（PR #42 已合併部署；與 8/20、8/21 三批一起出）
+
+> 使用者擔心「分類變很多頁面會很長」，原話：「**主要是讓大家可以方便追蹤當前需要追蹤的
+> 任務近況**」。我先重新定義問題再給方案：**他要「每個大項目都有」不是想讀完 40 張卡，
+> 是怕東西消失不見**；所以真需求是「什麼都不漏，但重要的自己浮上來」。單純加收合只是把
+> 「頁面長」換成「你得記得去展開」，漏看風險反而更高。
+> 使用者選定：**自動分層＋密度切換兩者都要**（他的理由：「有的人沒在管輕重緩急的所以可以
+> 給不同人使用」），外加釘選、搜尋、安靜太久提醒三項。
+>
+> **四層**：釘選 / 需要注意（逾期或今天到期）/ 停滯（14 天沒動靜）/ 其他。**只有「其他」
+> 預設收合**（localStorage `waddle-focus-tier-other-v1`），其餘三層永遠展開——會漏掉東西的
+> 風險比頁面長嚴重。「其他」展開後按工作區分組（長，需要索引），其餘三層平鋪（短，按緊迫排）。
+>
+> ⚠️ **「停滯」刻意是一層而不是徽章**：停滯的東西通常沒逾期，做成徽章會被收進「其他」裡，
+> 提醒就永遠看不到。獨立成層才看得見。逾期用赤陶、停滯用 muted 灰，實測 lightness 差 17、
+> chroma 差一個量級，不會混淆（審查評「這條做得最好」）。
+>
+> **邏輯全在 `lib/focus.ts`**：`resolveFocusBoard()` 回傳 `ResolvedTier[]`（**不再是
+> `ResolvedBoardGroup[]`**）、`groupCardsByWorkspace()`、`filterCards()`、`STALE_AFTER_DAYS=14`。
+> `FocusCard` 加 `pinned?`。密度／收合／搜尋狀態在 `components/task-panel/focus-board-view.ts`
+> （桌機手機共用的 view 層）。
+>
+> ⚠️ **分層改動讓「編輯版面拖曳＝看板順序」失效**：拖曳順序現在只對**釘選層**與同緊迫度並列
+> 有效，其餘層一律由 pressure 排序決定。任何依賴舊行為的測試／說明文案都要跟著改。
+>
+> **驗證**：三支腳本全綠——`tmp-focus-tiers-verify.mjs` **32/32**（主對話獨立重跑同結果）、
+> `tmp-focus-board-verify.mjs` 33/33、`tmp-focus-board-mobile-verify.mjs` 43/43。
+> 21 張截圖在 `docs/reports/2026-08-25-focus-tiers-shots/`。
+>
+> **審查抓到並修掉的五項**（獨立 ux-reviewer 看圖）：
+> ①卡片模式看不出「今天到期」——被分到需要注意卻沒說理由，對「不管輕重緩急的人」等於沒照顧到。
+> 已收斂成 `focus-board-view.ts` 的 `cardMarkers()`，並寫入不變量「需要注意層每張卡至少一個標記」
+> ＋斷言 A5 釘住。②卡片被撐等高、下半 40% 留白抵銷「頁面變短」→ `items-start`。
+> ③搜尋結果被塞進「其他」層（畫面寫「其他 1」）→ 改成不分層的「搜尋結果 N」。
+> ④四層小標長得一樣看不出輕重 → 只有「需要注意」染赤陶。⑤四層都補數量。
+>
+> ⚠️ **一條「像素推論」的指控查證後是真的，紀錄方法論**：審查說「其他」的 chevron 被左下角
+> 浮動快捷鈕蓋住，但那是裁切放大推論、沒真的點過。我要求**實際點擊驗證**才算數 →
+> `page.mouse.click(31,868)` 的 `elementFromPoint` 回傳浮動按鈕的 svg、`aria-expanded` 仍為
+> false，**確認是真的**。修法：整個層標題列做成點擊區（1404×36），不只箭頭。
+> **教訓：像素重疊的指控不要憑圖接受也不要憑圖否決，用 `elementFromPoint` ＋實際點擊裁決。**
+>
+> **待辦**：
+> 1. ✅ **已上線**（2026-08-26）：三批合成單一 commit `fefad7f`（分支 feat/focus-board），
+>    PR #42 合併 main（merge `f582a2d`），Zeabur 自動部署。
+>    ✅ **2026-09-04 正式站驗收 34/34、0 pageerror**（`E2E_BASE_URL=https://waddle.zeabur.app`
+>    跑 `tmp-focus-tiers-verify.mjs`）：涵蓋桌機四層／卡片／精簡／大綱三模式、手機 390 與 320、
+>    英文版、釘選、搜尋。24 張截圖在 `docs/reports/2026-08-25-focus-tiers-shots/`。
+>    順帶銷掉一項待決事項：320 精簡模式下釘選鈕被計時膠囊壓到 23px，**44×44 九點取樣全部點得到**
+>    （斷言 J1），實務上不影響操作。
+>    ⚠️ **`tmp-focus-board-verify.mjs` 與 `tmp-focus-board-mobile-verify.mjs` 已過期**，
+>    正式站各 fail 4 條——因為 PR #44 之後**新裝置預設是「大綱」模式**（`readDensity()` 回 outline），
+>    這兩支還在斷言分層卡片版面。**是測試腳本沒跟上，不是產品壞掉**；tiers 那支的 A0 斷言
+>    正是釘住這個新預設。要用這兩支前得先塞 `waddle-focus-density-v1='card'`。
+> 2. ⏸ **等使用者決定**：320 精簡模式下，浮動「專注計時」膠囊與釘選鈕垂直重疊 17px，
+>    **吃掉約 39% 觸控面積**（鈕 44×44）。實測**中心仍點得到**（`aria-pressed` false→true），
+>    但上緣是死區。膠囊是全站既有元件，動它是全站決策，未擅改。
+> 3. ⏸ 逾期赤陶色淺色模式對比 3.05:1（低於 AA 4.5）——全站既有 token，同樣待決定。
+> 4. 英文版「未分類」仍是中文：那是 DB 裡的分類名（PR #31 建的預設分類），不是 UI 字串，
+>    要處理得動資料層，**另案**。
+> 5. `cardMarkers()` 的「今天到期 N 個」只數卡片前 3 筆任務，某分類若超過 3 筆今天到期會低估
+>    （分層本身不受影響）。
+
+---
+
+## 🟢 2026-08-26 上線：重點看板的**手機版**（底部第五顆分頁）（PR #42 已合併部署）
+
+> ✅ 2026-09-04 銷項：與 8/20、8/25 同屬 commit `fefad7f`，PR #42 合併 main（merge `f582a2d`）已部署。
+
+> 使用者原話：「**好啊手機也可以看這個版面但是要設計一下給手機的樣式要很清楚**」，
+> 並拍板入口＝**底部分頁列加第五顆「重點」**（另兩個選項是「點任務頁頂端那條展開」與
+> 「任務頁頂端直接放看板」，未採用）。**跟 8/20 那批是同一個功能，要一起上線。**
+>
+> **入口做法**：照「白板／連結」的**浮層**模式（新 state `mobileFocusBoardOpen`），
+> **不是**新增 `mobileTab` 型別——手機底部那排其實是 2 個分頁（任務／日曆）＋2 個浮層
+> （白板／連結），這點很容易看錯。順序排最前：重點／任務／白板／日曆／連結。
+>
+> **手機版是獨立元件 `components/task-panel/focus-board-mobile.tsx`，不是桌機版縮小**
+> （獨立審查明確確認這點）。`FocusBlock` 新增第三個 variant `'page-mobile'`，
+> `'panel'`／`'page'` 的 render 分支一字未動。設計要點：
+> ①一屏一主角（開場標題 20px bold 獨占第一屏，桌機那個「各工作區重點」第二欄在手機不出現）；
+> ②階層靠字重與容器不靠框（工作區大標騎在底色上當章節、卡片才是白紙物件；卡內四級
+> 11px 分類名 → 16px note → 14px 任務列 → 12px 註腳）；③任務列做成有分隔線＋右側 chevron
+> 的 44px 列，讀起來是「可以按的東西」；④看板排在分頁列**上方的同層區塊**而非 fixed 浮層，
+> 底部就不必靠魔術數字閃避。
+>
+> ⚠️ **320px 是五顆分頁的真實下限**：每欄 64px，圖示膠囊要縮 `w-10`、標籤降 10px，
+> 英文「Scratchpad」才不會溢出。驗證要量 `label.getClientRects().length`（換行）與
+> `scrollWidth > clientWidth`（截斷），**只看截圖看不出來**。
+>
+> **驗證**：`scripts/e2e/tmp-focus-board-mobile-verify.mjs`（未入版控，攔截所有寫入，
+> 未動正式 DB）**36/36 全過**、0 pageerror。14 張截圖在
+> `docs/reports/2026-08-21-focus-board-mobile-shots/`。
+>
+> ⚠️ **一次「疑似 bug」查證後是截圖時機，紀錄防止重蹈**：審查看圖說「取消勾選後開場標題
+> 整塊消失、只剩懸空 meta，像斷頭版面」。查證結果＝前一步「捲到底」沒回捲，儲存後內容變短、
+> `scrollTop` 被夾住，開場只剩尾巴在可視區。**修的是腳本（捲回頂端並 `waitForFunction` 等
+> `scrollTop===0` 穩定再拍）**，不是改程式去迎合截圖。順帶補了一處真防呆：
+> `focus-block.tsx` 的 `page-mobile` 分支改用 `mobileEmpty = isEmpty || !global.title.trim()`
+> ——`resolveFocus()` 只在「沒設定釘選」時回 `source:'empty'`，若任務標題是空字串仍會帶著
+> meta 回來，那才會真的長出斷頭版面。
+>
+> ⚠️ **已證實的既有問題（不是這次弄出來的，不要誤記帳）**：320×568 下浮動的「專注計時」
+> 膠囊會壓住清單文字。已在**「任務」分頁**同寬度截對照圖
+> （`mobile-320-tasks-timer-overlap.png`，實測重疊 25px、壓到 1 列）證明各分頁皆然。
+> 膠囊定位未動。要不要處理是全站決策，待使用者決定。
+
+---
+
+## 🟢 2026-08-26 上線：「重點」看板獨立分頁（使用者草圖的完整版）（PR #42 已合併部署）
+
+> 使用者原話：「**做成獨立一頁，並且是要所有任務都有，不是只有這一個九豆的分類，
+> 可以自定義這個版面誰要出現**」。這其實就是他 8/10 最早那張手繪草圖的完整版
+> （工作區大標 → 底下多張分類卡 → 每張卡帶自己的任務）。
+> **使用者拍板三件事**：①放在全螢幕任務頁**新增一個分頁**（不是獨立網址）；
+> ②**一個分類一張卡**（不是一個工作區一張、也不是自由挑任務）；③自訂方式＝**逐一勾選＋拖拉排序**。
+>
+> **架構**：邏輯全在 `lib/focus.ts` 新增的純函式——`resolveFocusBoard()`（依工作區分組、
+> 卡片依 sortOrder、死掉的分類靜默濾掉）、`defaultCards()`（使用者還沒挑過時的預設，取最緊迫
+> 的 6 個分類）、型別 `FocusCard { categoryId, note?, sortOrder }`。
+> ⚠️ **`cards === undefined`＝還沒挑過（用預設）；`cards === []`＝刻意都不顯示，兩者不同，不要混。**
+> 存在既有的 `user_settings.focus_board` JSONB blob 裡，**不需要新 migration**。
+>
+> **新檔**：`components/task-panel/focus-board.tsx`（分頁內容）、
+> `focus-board-editor-modal.tsx`（勾選＋拖拉＋每列可打 note）。
+> **改動**：`full-screen-task-view.tsx`（新分頁排最前並預設選中；FocusBlock 從總覽搬到重點頁）、
+> `focus-block.tsx`（新 `showNextTasks` prop）、`lib/focus.ts`、i18n 兩個字典片段。
+>
+> **拖拉用原生 HTML5 drag events**（照 `workspace-section.tsx:66-120` 的既有分類排序寫法），
+> **不是 dnd-kit**——dnd-kit 雖然裝了但只用在白板與記事本。原生拖曳在觸控無效，所以手機改用
+> 上移／下移按鈕（44pt）。
+>
+> **驗證**：`scripts/e2e/tmp-focus-board-verify.mjs`（未入版控，攔截所有寫入，未動正式 DB）
+> **29/29 全過**、0 pageerror，**主對話獨立重跑一次結果相同**。12 張截圖在
+> `docs/reports/2026-08-20-focus-board-shots/`。
+>
+> **審查抓到並修掉的一件事**：總重點卡與下方分類卡會列出同一組任務（同樣東西出現兩次）。
+> 修法是傳 `nextLimit: 0` 給 `resolveFocus`（不是先算再藏），`variant='panel'`（手機任務欄）
+> 完全不受影響，並用 G5 斷言釘住。
+>
+> ⚠️ **實跑抓到一個 type-check 與 lint 都抓不到的真 bug**：拖拉儲存後看板只剩 1 張卡。
+> 成因＝React StrictMode 會把 state updater 呼叫兩次，而可變佇列建在 updater **外面**
+> （`const q=[...]; setX(prev => prev.map(() => q.shift()))`），第二次呼叫時佇列已被吃光回
+> `undefined`。**修法：佇列建在 updater 內部。** 這類 bug 只有實跑會現形。
+>
+> ⚠️ **一次審查誤判的紀錄**：獨立審查看圖判「捲到底最後一張卡被切掉、無法確認所有工作區都在」。
+> 實際用 `sips` 量 `focus-board-full.png` 是 1392×**733**（比視窗 900 矮＝元素完整入鏡），
+> 且腳本斷言 B7 lastCard bottom=876 < 900、B1 groups=2=expected。**看圖判斷與量測數字衝突時，
+> 以量測為準。**
+>
+> **待辦**：
+> 1. ✅ **已上線**（2026-08-26）：commit `fefad7f` → PR #42 → main（merge `f582a2d`）→ Zeabur 部署。
+> 2. ✅ **手機版已完成**（2026-08-21，見下一段）。
+> 3. ⏸ **等使用者決定**：`text-urgency-critical` 在淺色模式對比僅 **3.05:1**，低於 WCAG AA 的
+>    4.5（深色模式 4.93 合格）。這是**全站既有 token**（`focus-block.tsx`、
+>    `full-screen-task-view.tsx` 都在用），不是本次新增。改 `--urgency-critical` 為
+>    `oklch(0.52 0.14 25)` 可到 5.83，但那是全域視覺決策，會動到所有用到急迫色的地方。
+>
+> ---
+
+## 🟢 2026-08-19 上線：分類選單抽成共用元件（**別的 session 做的**）＋Esc 關閉面板（PR #35 已合併部署並線上驗收）
+
+> ✅ 使用者對「設定頁預設分類改二層選單」的取捨回覆「**接受**」→ commit `232f548`
+> （分支 feat/category-cascade-picker，只含 3 檔）→ 乾淨 detached worktree
+> `pnpm install --frozen-lockfile` + `pnpm build:web` 綠 → **PR #35 已合併 main（`10c926c`）**
+> → Zeabur 自動部署 → feat/ios-capacitor 已同步（upstream 已核對是
+> origin/feat/ios-capacitor 而非 origin/main）。
+>
+> ✅ **正式站驗收**（https://waddle.zeabur.app ，2026-08-19）：`tmp-cascade-esc-verify.mjs`
+> 加 `E2E_BASE_URL` 打線上 **15/15 全過**、0 pageerror。
+>
+> ✅ **工作區已清空**：那個平行 session 掛了一週的未提交改動已全部交出去，`git status`
+> 現在只剩各 session 的 tmp e2e 腳本（未追蹤，無妨）。
+>
+> 待辦只剩一項技術債（見下方第 3 點）。原始盤點紀錄如下。
+
+> ⚠️ **這批東西不是本 session 做的**。使用者 8/18 要我「看看那個 session」做到哪，以下是盤點結論。
+>
+> **它是什麼**：PR #33（「未分類」升級為大分類層＋兩層階層選單，2026-08-11 12:42 UTC 合併）
+> 的續集。同晚 22:27（台灣）把任務詳情視窗裡寫死的 224 行選單邏輯抽成共用元件
+> `components/category/category-cascade-picker.tsx`（新檔，未追蹤），並套到兩處：
+> `components/modals/task-detail-modal.tsx:269`（行為等價的純提取）與
+> `components/modals/settings-modal.tsx:894`（**原生 `<select>` → 同一套二層選單，這是行為改變**）。
+> 順手修了桌機面板會把標題切一半的既有 bug（改 `panelAnchor="container"`）。
+>
+> **盤點結論：程式碼乾淨、可以收尾**。type-check 0 錯、lint 0 error、元件被兩處確實接上無死碼、
+> 無 TODO／註解掉的區塊／console.log／裸 any、手機 44pt 有做、i18n 三個字串在 #33 就已有英譯。
+> 該 session 自己跑過 e2e 並留了 10 張截圖（`docs/reports/2026-08-11-picker-polish-shots/`，
+> 已親手 ls 確認存在，8/11 22:31-22:36）與腳本 `scripts/e2e/tmp-category-cascade-verify.mjs`。
+>
+> **本 session 補的 Esc**（使用者原話「好啊順手補」）：`category-cascade-picker.tsx` 新增
+> `triggerRef` 與一個 Escape `useEffect`。**這裡有個地雷**：這個選單開在 `ModalShell` 裡，
+> 而 ModalShell 自己也吃 Escape（`modal-shell.tsx:133-146`）。隨手加監聽會導致按一次 Esc
+> 把整個視窗連同使用者填到一半的內容一起關掉。正解＝照 ModalShell 既有的巢狀層協議
+> （子層 `preventDefault()` ⇒ 外層看到 `defaultPrevented` 就不關自己）**並用 capture 階段**
+> 監聽——因為 ModalShell 的 document listener 先註冊（它比面板早掛載），只有 capture
+> 保證跑在它前面。關閉後焦點送回觸發按鈕。
+>
+> 驗證：`scripts/e2e/tmp-cascade-esc-verify.mjs`（新，未入版控，全域攔截 `/rest/v1/**` 非 GET
+> 回假 200，未寫入正式 DB）**15/15 全過**，主對話**獨立重跑一次結果相同**。涵蓋桌機任務詳情
+> 視窗與設定頁各三段式（開面板 → 一次 Esc 只關面板且視窗仍開 → 焦點回觸發鈕 → 選值未被改動
+> → 二次 Esc 才關視窗）＋手機 390 任務詳情視窗＋全程 0 pageerror。
+>
+> **待辦**：
+> 1. ✅ 使用者已回覆「接受」（設定頁多一次點擊換全站一致）。
+> 2. ✅ 已提交上線（見本節開頭）。
+> 3. ⬜ **技術債**：選單面板的 `aria-haspopup="menu"` 但選項是普通 `<button>` 沒有 `role="menuitem"`
+>    （#33 就有的問題，非本次新增）。抽成共用元件後要修只需改一處，列為技術債。
+
+---
+
+## 🟢 2026-08-18 上線：「當前重點」搬家（左側欄頂 → 全螢幕任務頁）（PR #34 已合併部署並線上驗收）
+
+> ✅ 使用者原話「**好哇 合併一下**」→ commit `1c328a1`（分支 feat/focus-relocate，只含本功能
+> 6 檔）→ 乾淨 detached worktree `pnpm install --frozen-lockfile` + `pnpm build:web` 綠 →
+> **PR #34 已合併 main（`a260511`）** → Zeabur 自動部署 → feat/ios-capacitor 已快轉同步。
+>
+> ✅ **正式站驗收**（https://waddle.zeabur.app ，2026-08-18）：`E2E_BASE_URL` 打線上
+> **20/20 全過**、0 pageerror。⚠️ 部署剛完成時第一次跑會整支倒在第一個 `page.reload`
+> （容器冷啟，180s 都不夠；當下 curl 首頁是 200 且 0.2s，證明站是活的）——**部署後至少等
+> 5 分鐘再驗，倒了先 curl 確認站況再決定要不要重跑，不要當成功能壞掉**。
+>
+> ⚠️ **合併過程的三個坑（下次照做）**：
+> ① main 在施工期間被另一個 session 推進（PR #33 未分類工作區），且動到本功能 6 檔中的 4 檔
+> ——所幸工作區已在新 main 之上（`git merge-base --is-ancestor origin/main <我的commit>`
+> 驗證通過），沒有覆蓋別人的東西。**動手前務必先 fetch 並比對 main 動了哪些檔。**
+> ② `gh pr merge --delete-branch` 最後會嘗試本機切分支，因工作區有並行 session 的未提交檔
+> 而中止——**合併本身已成功，不要因此 git stash 硬闖**（會掃掉別人的工作，2026-07-08 踩過）。
+> ③ `git branch -f feat/ios-capacitor origin/main` 會把該分支的 upstream 設成 **origin/main**，
+> 之後任何人在此分支 `git push` 會直接推進正式分支。已用
+> `git branch --set-upstream-to=origin/feat/ios-capacitor` 修回。
+>
+> 原始改動紀錄如下。
+
+> 使用者看到 8/10 上線的版本後**否定了位置**，原話：「其實我不是要他出現在最上面的區塊，
+> 我要的是進入到左側點擊進去的任務頁面後再看到，現在在左上角的這樣子很不理想，請你幫我
+> 把左上角變回來，並且將該做的東西做到正確的地方裡面」。追問確認「任務頁面」＝**按左上角
+> ⤢「展開任務面板」進去的全螢幕任務頁**（`FullScreenTaskView`，`isRightPanelOpen === false`
+> 時渲染），不是任務詳情 modal。
+>
+> **新規則**：
+> - **桌機側欄（`isExpanded={false}`）完全不顯示** —— 這是使用者嫌擠的那個左上角。
+> - **桌機全螢幕任務頁的「總覽」分頁最上方顯示**（統計卡片之前）。
+> - **手機「任務」分頁仍顯示** —— 手機沒有全螢幕頁，但底部點「任務」進去的分頁語意上就是
+>   手機版的任務頁；剛好 `TaskPanel` 的 `isExpanded` prop 手機傳 true、桌機側欄傳 false，
+>   一個閘門同時滿足兩端。
+>
+> **FocusBlock 新增 `variant` prop**：`'panel'`（預設，窄側欄緊湊樣式，手機用，像素未動）／
+> `'page'`（全螢幕頁用，卡片語言與該頁統計卡一致、左右分欄、第二層預設展開且用元件內
+> state 不碰側欄的 localStorage、最多 6 行）。
+> ⚠️ page 變體**可以用卡片**：DESIGN.md 禁的是 sidebar 用卡片，這個頁面本身就以
+> `rounded-xl bg-card border border-border` 為語言。
+>
+> **標題字級 text-xl → text-2xl bold**：兩位獨立審查都指出標題被下方統計卡的
+> 完成率大數字搶戲，違背「一眼看出最重要的是什麼」的初衷，已加重並經第三方看圖確認主角感。
+>
+> **導覽同步**：桌機那一步已刪（側欄不再有錨點，導覽時全螢幕頁是關的，target 找不到會壞）；
+> 手機那一步保留。`tmp-onboarding-tour-verify.mjs` 的桌機步數常數 18 → 17。
+>
+> **改動檔**：`components/task-panel/focus-block.tsx`（新變體）、`task-panel.tsx`
+> （改 `isExpanded &&` 閘門）、`full-screen-task-view.tsx`（+2 prop、總覽頁插入）、
+> `main-layout.tsx`（prop 從桌機側欄 TaskPanel 移到 FullScreenTaskView）、
+> `onboarding-tour.tsx`、`lib/i18n/dict/reports.ts`。共 6 檔。
+>
+> **驗證**：`scripts/e2e/tmp-focus-relocate-verify.mjs`（未入版控，攔截所有寫入，未動正式 DB）
+> **20/20 全過**，含側欄 count=0、總覽頁 y=157 < 統計卡 y=432、手機兩語系仍在且無溢出、
+> 0 pageerror；導覽腳本桌機 9/9（步數 17）＋手機 8/8（步數 12），分開跑；`pnpm type-check`
+> 綠、`pnpm lint` 0 新增 error。9 張截圖在 `docs/reports/2026-08-18-focus-relocate-shots/`，
+> 經獨立 agent 判讀「可交付、無擋路缺陷」。
+>
+> **待辦**：
+> 1. ✅ 已 commit、PR #34 已合併、已上線並線上驗收（見本節開頭）。
+> 2. ⚠️ **工作區有另一個並行 session 的未提交功能**：`components/category/category-cascade-picker.tsx`
+>    （8/11 建）＋ `components/modals/task-detail-modal.tsx`、`settings-modal.tsx` 的對應改動。
+>    **不是本功能的東西，commit 時務必排除**，只挑上列 6 檔。已核對本功能 6 檔的 diff
+>    對 cascade 關鍵字命中數為 0，無交叉污染。
+> 3. page 變體的編輯鉛筆是 36×36（未達 44pt 觸控標準）。此頁目前桌機專用，手機看不到；
+>    日後若 iOS 上要顯示這個頁面需放大。
+> 4. 只測 1440 與 390 兩個寬度，1024～1280（lg 斷點附近）的分欄表現未實測。
+
+---
+
+## 🟢 2026-08-10 上線：任務欄「當前重點」區塊（PR #32 已合併部署並線上驗收）
+
+> ✅ 使用者原話「**好啊要套資料庫 並且上線 開pr and merge**」→ ①migration
+> `20260810120000_focus_board.sql` 已 `supabase db push` 套上正式庫（守衛擋下後帶
+> `USER_APPROVED_DEPLOY=1` 前綴放行；套用前 `migration list` 顯示本地／遠端完全同步、
+> 只差這一支，dry-run 確認只會動它；套用後以 service role 查 `focus_board` 欄位存在，
+> 並核對 host `jnikcndiexjojgvicohf` 與 linked ref 一致）→ ②commit `9bb5c8b`（分支
+> feat/current-focus，**只含本功能 16 檔**，工作區另有 21 支並行 session 的 tmp e2e 腳本
+> 全部排除）→ ③**乾淨 detached worktree 實測 `pnpm install --frozen-lockfile` +
+> `pnpm build:web` 綠**，確認 commit 自足（PR #13 那次線上建置炸掉的教訓）→
+> ④**PR #32 已合併 main（`93c24c8`）** → Zeabur 自動部署 → main 已合回
+> feat/ios-capacitor 並 push。
+>
+> ✅ **正式站驗收**（https://waddle.zeabur.app ，2026-08-10）：同一支腳本加
+> `E2E_BASE_URL` 打線上，**28/28 全過**、0 pageerror，含手機 390/375 無溢出、
+> 編輯鈕熱區 44×44、存自訂文字後標題即時更新、英文版無中文殘留。
+> ⚠️ 打正式站時預設 60s 導覽逾時不夠（線上比本機慢），腳本已改成 150s；
+> 本機跑不需要。截圖目錄現在存的是**正式站**的圖。
+>
+> 原始開發紀錄如下。
+
+
+> 使用者原話：「我希望我的任務面板有一個像是這樣的區塊，最上面大標旁邊是可以自定義的
+> 當前最重要的任務或是推進狀態，可以一目瞭然當前最重要的是什麼，如果沒有設定的話你幫我
+> 規劃看哪一個任務可以呈現在上面」＋手繪草圖（工作區大標＋彩色重點卡＋底下兩條任務）。
+> 使用者拍板三件事：①**兩層**（一個總重點 + 可展開的各工作區重點）；②設定方式**兩種都要**
+> （打字自訂 or 釘選現有任務）；③自動推薦順序 **逾期最久 → 今天排程 → 急迫度**。
+> 中途追加要求：「記得也要考慮手機那邊的呈現」。
+>
+> **架構**：排序與解析邏輯全部抽在純函式 `lib/focus.ts`（`resolveFocus` /
+> `resolveWorkspaceFocuses` / `pickAutoTask` / `normalizeFocusSettings`），元件不重算。
+> 釘選的任務被完成或刪除時自動退回 auto 並回報 `pinFellBack`，UI 顯示「原本釘的任務已完成，
+> 已換下一個」——**不會顯示過期資料**。各工作區槽位預設 `off`（使用者有 15 個 workspace，
+> 全開會變成 15 行噪音），手動設定過的排前面，最多顯示 4 行。
+>
+> **設定存 `user_settings.focus_board`（jsonb）**，沿用 `quick_links` 的 blob 慣例，
+> 之後加欄位免 migration。走既有的「新欄位」四件套（`SETTINGS_EXT_COL_RE` /
+> localStorage 鏡像 / `fullSettingsRow` / loadData fallback），**migration 沒套之前程式
+> 照跑不炸**（`isMissingSettingsExtColumnError` 分支只 warn，設定暫存 localStorage）。
+>
+> **新增檔**：`lib/focus.ts`、`components/task-panel/focus-block.tsx`、
+> `components/modals/focus-editor-modal.tsx`、`supabase/migrations/20260810120000_focus_board.sql`。
+> **改動檔**：task-panel.tsx（插在 PanelHeader 之後、快捷列之前）、main-layout.tsx（手機
+> :528 與桌機 :785 兩個 TaskPanel 都接）、app/page.tsx、settings-modal.tsx（一般設定加
+> 「顯示當前重點」開關）、lib/types.ts、database.types.ts、mappers.ts、use-waddle-data.ts
+> （新 action `setFocusBoard`）、i18n 兩個字典片段（+31 條英譯）。
+>
+> **驗證**：確定性腳本 `scripts/e2e/tmp-focus-current-verify.mjs`（未入版控，自帶 dev server、
+> 攔截所有 `/rest/v1/user_settings` 非 GET 寫入，**未動正式 DB**）**28/28 全過**，含手機
+> 390/375 無橫向溢出、編輯鈕熱區實測 44×44、區塊高 172px、Esc 可關、0 pageerror；
+> `pnpm type-check` 綠、`pnpm lint` 0 error（新檔未出現在報告）；13 張截圖在
+> `docs/reports/2026-08-10-focus-block-shots/`，經獨立 agent 判讀。
+>
+> **審查後修掉的兩處**（獨立 ux-reviewer 看圖抓到）：①「逾期 N 天」原本用 `text-overdue`
+> ＝警示紅，違反 DESIGN.md:113「禁紅色逾期標籤」→ 改用 DESIGN.md:42 核准的赤陶
+> `text-urgency-critical`；②自訂文字模式底下誤顯示「手動釘選」→ 改成「自訂」
+> （`resolved.source === 'text'` 分支）。同一份審查說「釘選清單沒有選中態」是**誤判**
+> ——選中態本來就有（`bg-primary/10`＋勾選圖示＋`aria-pressed`），灰色儲存鈕是還沒選任務的
+> 正常 disabled。
+>
+> **待辦**：
+> 1. ✅ migration 已套正式庫（見本節開頭）。
+> 2. ✅ 已 commit、PR #32 已合併、已上線並線上驗收（見本節開頭）。
+> 3. ✅ 新手教學導覽已補（照使用者定的規矩：功能變了就直接更新導覽）——桌機插在「左側：
+>    三層結構」之後、手機插在「任務分頁」之後，錨點 `data-tour="focus-block"`，英譯補進
+>    `lib/i18n/dict/reports.ts`。驗證：`tmp-onboarding-tour-verify.mjs` 桌機 9/9
+>    （步數 17→18 對得上）、手機 8/8（步數 11→12），兩端皆 0 pageerror。
+>    ⚠️ 該腳本同一次執行會登入兩次，第二次常被 Supabase 登入頻率限制擋掉 → 分開跑
+>    （`E2E_ONLY=desktop` / `E2E_ONLY=mobile`），中間隔幾分鐘。腳本裡寫死的步數常數已同步更新。
+> 4. 未在真機測手機軟鍵盤跳出來會不會遮住 modal 輸入框（headless 測不出來）。
+
+---
+
+## 🟢 2026-08-04 上線：預設分類「未分類」＋分類選單重排（PR #31 已合併部署）
+
+> ✅ 使用者原話「上線上線」→ 分支 feat/default-category（commit `378bbe2`，只含本功能
+> 15 檔）→ **PR #31 已合併 main（`34bfdde`）** → Zeabur 自動部署 → main 已合回
+> feat/ios-capacitor 並 push。合併前以**乾淨 worktree 實測 `pnpm install --frozen-lockfile`
+> ＋ `pnpm build:web` 綠**，確認 commit 自足、不依賴任何未提交檔案（PR #13 那次線上建置
+> 炸掉的教訓）。⚠️ 乾淨 worktree 建置需先 `cp .env.local` 進去，否則會倒在
+> forgot-password 的 prerender（缺 Supabase env，非程式問題）。
+> 正式站回歸結果見本節末。原始完成紀錄如下。
+
+> 使用者需求原話：①「我希望可以新增一個預設的項目叫做『未分類』，當我在日曆上面新增時，
+> 我希望可以有這個預設，但之後有其他使用者時我希望這個是可以調整和開關的」；②「如果當我
+> 在日曆上面選擇了什麼大分類，那我希望點跳出來的分類會重新排列……不然如果每次都要往下選到
+> 最下面的分類那體驗並不好」。使用者選定：調整入口走設定頁統一管；套用範圍是「所有沒選分類
+> 的建立路徑」。
+>
+> **設計要點**：`tasks.category_id` 是 not null，所以「未分類」必須是**真的分類**（每個
+> workspace 各一個），不能做成虛擬值。預設身分存在 `categories.is_default`（partial unique
+> index 保證每個 workspace 最多一個），開關存在 `user_settings.default_category_enabled`。
+> 解析邏輯抽成純函式 `lib/default-category.ts` 的 `resolveDefaultCategory(workspace, enabled)`
+> ——開關開就用 is_default、找不到（被刪／舊資料）就退回第一個分類，關就直接用第一個分類，
+> 永不 throw。
+>
+> **改動 12 檔**：`app/page.tsx`（5 個 fallback 點全換掉，原本一律硬掉到 `categories[0]`）、
+> `hooks/use-waddle-data.ts`（新 action `setDefaultCategory`，含樂觀更新＋兩個 error 分支都
+> 回滾；`addWorkspace` 自動建未分類）、`components/modals/settings-modal.tsx`（設定→一般新增
+> 「預設分類」區：開關＋每個 workspace 一個 select）、`components/modals/task-detail-modal.tsx`
+> （分類選單把該任務所屬 workspace 整組浮到最上面）、`lib/default-category.ts`（新檔）、
+> types／mappers／database.types／seed／mock-data／demo-data／i18n 兩個字典片段（新增 6 句雙語）。
+>
+> **migration `20260804120000_default_category.sql` 已套用正式 DB**（使用者本次對話原話
+> 「好啊」明確同意；冪等寫法、純新增無破壞語句）。套用後核對：15 個 workspace 各有一個
+> is_default 的「未分類」、user_settings 新欄位全為 true。**注意：程式碼還沒上線，但 DB 已經
+> 有欄位了——這是刻意的順序，mapper 對缺欄位有 fallback，所以線上舊程式碼不受影響。**
+>
+> **驗證證據**：確定性腳本 `scripts/e2e/tmp-default-category-verify.mjs`（未入版控）
+> **18/18**——含「改指定為別的分類後新建任務真的落在該分類」「關掉開關退回第一個分類而非
+> 未分類」（這條刻意設計成可辨別，第一版斷言驗不出東西已修）、390px 無溢出＋下拉 44px、
+> 零 pageerror；截圖 7 張在 `docs/reports/2026-08-04-default-category-shots/`，視覺 QA agent
+> 兩輪判讀，第二輪 7/7 通過無建議修項；`pnpm type-check` 0 錯、`pnpm lint` 0 errors。
+> 腳本跑完會把設定與預設分類復原（測試不留殘留，且全程不儲存任何任務，tasks 表零寫入）。
+>
+> **待辦**：①commit（工作區同時有並行 session 的檔案，commit 只挑上列 12 檔＋新檔
+> `lib/default-category.ts`＋migration）；②上線需使用者點頭。
+>
+> 🔎 **順手發現的既有地雷（不是本次造成，未修）**：`pnpm e2e` 的 report view 那步從
+> 2026-07-23 的 `70dc7e4 feat(calendar): simplify header tools` 起就會失敗——那次把「報告」
+> 收進行事曆頭部的「更多工具」選單，但 smoke.mjs 還在直接找「報告」按鈕。實測用
+> `getByRole('button', {name:'更多工具'})` 點開後選單仍不出現，成因未查清就停手（避免在
+> 範圍外反覆試）。目前 smoke 基線＝6/8（另一個 fail 是 /notebook 的 Supabase 暫時性
+> fetch 錯誤，交接文件早有記載）。要修 smoke 的人請從「更多工具選單為什麼點不開」查起。
+>
+> 🔎 另一個觀察（設計取捨，未動）：每個 workspace 底下都有一個叫「未分類」的分類，所以
+> 分類選單裡會出現多個同名項目，只靠上方的 workspace 群組標題區分。目前群組標題有色點＋
+> 名稱，視覺 QA 認為看得懂，但若日後使用者反映選錯，可考慮在項目上加群組前綴。
+
+---
+
+## 🟢 2026-08-04 上線：逾期任務卡片四向滑動（PR #30 已合併部署並線上驗收）
+
+> ✅ **commit `8919c28`（分支 feat/ios-capacitor）→ PR #30 已合併 main（`ac7c51b`）→
+> Zeabur 自動部署**。commit 只含本次 5 個檔；另一個 session 的 12 個未提交檔（預設分類
+> isDefault 那組）原封未動——app/page.tsx 兩邊都有改，已只挑本次的兩塊進 commit，並以
+> 獨立 worktree 實測 install → tsc → build 全綠，確認不依賴別人未提交的程式碼。
+> ✅ **正式站驗收**（https://waddle.zeabur.app ，2026-08-04 07:49Z）：同一份腳本加
+> `E2E_BASE_URL` 跑 **15/15**，含一條「線上跑的是不是新版」硬斷言（檢查新提示文字與
+> 「排今天」按鈕存在，防驗到舊快取）；四個手勢在正式站各產生且僅產生一筆正確 PATCH；
+> 零 page error。線上驗證同樣走攔截、**沒有寫入任何正式 DB 資料**。
+> ⚠️ 線上跑時要用 `waitUntil: 'commit'` ＋較長 timeout（腳本已改），用
+> `domcontentloaded` 會在正式站逾時。
+
+
+> 使用者要求「未整理的任務在手機上用左滑右滑整理，封存往下」。查證後確認是既有功能
+> 的互動升級，不是新功能：`components/task-panel/overdue-task-review.tsx` 的「逐一整理」
+> 模式本來就是一次一張卡，只是靠三顆按鈕。
+> **手勢地圖（使用者拍板）**：右＝標記完成、左＝移回任務欄、上＝排今天、下＝取消並封存。
+> 手勢只在手機（`useIsMobile`）啟用，桌面不變；四個動作都保留可見按鈕（新增「排今天」
+> 那顆），符合 mobile-ux skill「手勢是加速器不是唯一入口」。
+> 實作細節：原生 Pointer Events 自寫（專案無手勢函式庫），10px 後鎖軸、88px 才成立；
+> 拖曳時接 `beginGestureSuppression()` 以免與「日曆↔任務」分頁滑動打架；
+> 觸覺回饋（完成用 success、其他用 selection）；卡片飛出 220ms 後才清 exit 狀態。
+> 新增資料層動作 `handleScheduleToday`（app/page.tsx）：**排今天時若 dueDate 也過期會一起
+> 拉到今天**，否則任務會永遠留在逾期清單裡（這是實作時發現的坑）。
+> 雙語：lib/i18n/dict/task-panel.ts 新增 4 條。
+> 驗證：`scripts/e2e/tmp-overdue-swipe-verify.mjs`（未入版控）**14/14**，wire-level 攔截
+> `/rest/v1/tasks`，注入 4 筆假逾期任務、所有寫入偽造回應，**沒碰正式 DB**；四個手勢各自
+> 產生且僅產生一筆 PATCH，欄位逐一比對正確。tsc 0 錯、eslint 0 errors、正式建置綠、
+> 英文版 375px 通過。截圖 agent 判讀 5 張全過（拖曳浮層第一版標籤半透明被底下文字穿透，
+> 已修為「底色淡入、標籤不透明」後複驗通過）。
+> 新手導覽已同步（既定規矩：導覽與功能不同步就直接改）：`components/onboarding-tour.tsx`
+> 桌面＋手機的「今日會議 ＆ 已完成」步驟改成「今日會議 ＆ 待整理 ＆ 已完成」，手機版文案
+> 寫出四個滑動方向；`lib/i18n/dict/reports.ts` 三條 key 同步換新並補英文。
+> ⚠️ 導覽改動只做了字串比對＋型別檢查，**沒有跑畫面驗證**——`tmp-onboarding-tour-verify.mjs`
+> 這支腳本本身登入不穩（它在登入前就攔 user_settings，會卡在 /login），與本次改動無關。
+> ⚠️ **尚未 commit**：工作區同時有另一個 session 未提交的改動（預設分類 isDefault 那組：
+> use-waddle-data.ts、types.ts、mappers.ts、database.types.ts、seed.ts、mock-data.ts、
+> demo-data.ts、settings-modal.tsx、task-detail-modal.tsx、dict/data-layer.ts、dict/modals.ts）。
+> commit 時**只挑**：app/page.tsx、components/task-panel/overdue-task-review.tsx、
+> lib/i18n/dict/task-panel.ts、components/onboarding-tour.tsx、lib/i18n/dict/reports.ts。
+> ⚠️ **既有問題（不是這次改的）**：`scripts/e2e/smoke.mjs` 在乾淨的 main（worktree 實測
+> commit e2f69d8）就已經 6/8 —— `/notebook` 有 supabase auth `Failed to fetch` console error、
+> 「報告」按鈕點不到（30s timeout）。兩者可重現、與本次改動無關，待另開一輪處理。
+
+---
+
+## 🟡 2026-07-22 上線：忘記密碼流程（PR #16 已部署並線上驗收；一件事等使用者做）
+
+> 使用者發現登入頁「忘記密碼？」連結 404（洞從第一天就在），原話「好啊 一起修」。
+> 做法：`app/(auth)/forgot-password/page.tsx`（(auth) 版型，Email 表單 →
+> resetPasswordForEmail，redirectTo 走既有 `/auth/callback?next=/reset-password`
+> 同源白名單；Capacitor 殼內用 web origin）＋ `app/reset-password/page.tsx`
+> （**刻意放 (auth) 群組外**——該版型會把已登入者踢回首頁，而點信件連結回來時已登入；
+> 無 session 顯示「連結已失效」＋重新申請）。雙語，字典 +24 條（app-shell.ts）。
+> 驗證：確定性腳本 `scripts/e2e/tmp-forgot-password-verify.mjs`（未入版控）**13/13**
+> ——含真實改密碼→復原→原密碼重登；截圖 agent 5/5
+> （docs/reports/2026-07-22-forgot-password-shots/）；tsc 0 錯；乾淨 worktree 正式建置綠。
+> **PR #16**（分支 feat/forgot-password，commit ed75a9b）已合併 main（c78ff05）、
+> main 已合回 feat/ios-capacitor。✅ 正式站驗收：/forgot-password 中英文渲染 ✓、
+> /reset-password 未登入「連結已失效」視圖 ✓、零 pageerror（截圖 …/prod-*.png；
+> 信件實收端到端仍待 SMTP 設定後補驗一次）。
+> ⚠️ **等使用者做（1 分鐘＋一把金鑰）**：Supabase 內建寄信只肯寄給專案團隊成員
+> （實測 recover 對測試 Gmail 回 400 email_address_invalid——這也是當年註冊確認信
+> 寄不到、要手動 SQL 補 email_confirmed_at 的真因）。要讓真實使用者收到重設信：
+> Supabase Dashboard → Project Settings → Auth → SMTP Settings，填 Resend
+> （host smtp.resend.com、port 465、user 'resend'、pass = Resend API key、寄件人用
+> 已驗證網域）。設好後連註冊確認信也會一併正常。UI 在沒 SMTP 時會優雅顯示錯誤，
+> 不會假裝成功。
+
+---
+
+## 🟢 2026-07-22 上線：行事曆互相共享（PR #15 已合併部署並線上驗收）
+
+> 完整功能：邀請連結（256-bit 單次 token 只存雜湊、URL fragment 傳遞）→ 帳號制接受 →
+> 雙向共享；逐類別授權（workspace＋時段類型、三態 不開放/只顯示忙碌/完整內容，預設全不
+> 開放，內建類型走「補種」）；對方行事曆以唯讀虛線疊加於日/週/月/手機 agenda，頭部
+> peer chip 開關。設計文件 docs/CALENDAR_SHARING_PLAN.md（v2＋v2.1 變更紀錄）。
+> 安全：migration 0016 純新增（3 表＋5 SECURITY DEFINER RPC；anon 不可呼叫、欄位白名單，
+> busy 標題與 full 模式的 meeting_url/attendees/location/description/notes 在 DB 層就不出去；
+> 既有表 RLS 零改動）；資安顧問設計＋實作雙審放行；攻擊重演 wire-level 24/24＋8/8。
+> 使用者授權：DB 常設授權（07-21「開給你全部的權限操作…不用過問」）＋部署（07-22
+> 「做完後將剛剛做的所有事情好好的 commit and 上線」）。
+> 驗證：P1 邀請流程 UI e2e **12/12**、P2 疊加 UI e2e **10/10**、**正式站 5/5**（截圖
+> docs/reports/2026-07-22-share-p1-shots/、share-p2-shots/＋prod/）；tsc/lint/build:web 綠；
+> smoke 7/8（/notebook 一項為本機密集登入 auth 節流瞬斷，經正式站＋暖 session 交叉驗證
+> 與本功能無關）。
+> 順手修的真 bug：①RedirectIfAuthed 與登入頁導向搶跑（邀請接受會被踢回主畫面）；
+> ②slot_types 自訂歸零儲存會誤刪補種內建列（use-waddle-data 一行）；③usePeerCalendarEvents
+> 的 fetch 去重與 StrictMode 取消互鎖（改共享 in-flight promise）。
+> **上線方式注意**：上線分支 feat/calendar-sharing 是在隔離 worktree 從 main 組裝的，
+> **手術剝除了下方台灣假日功能的 hunks**（假日功能完整保留在原工作區未動）；main
+> **尚未合回**任何長分支——工作區有並行未提交改動，留給收假日/i18n 的 session 一起處理。
+> 測試帳號 B：huddle.sharetest.b.20260721@gmail.com / [REDACTED: supply test credentials separately]（service_role 建、
+> 已 confirm，供共享 e2e 重用；A↔B 共享關係保留在 DB）。管理金鑰＋CLI token 在
+> .env.admin.local（gitignored）；migration 0015 已 repair、0016 已 db push。
+> 驗證腳本 tmp-share-*.mjs（未入版控）。後續票（不擋事）：父子類型授權語意、viewer 端
+> realtime 生效、universal links 讓 iOS 直接進 app 接受邀請、en 之外語系。
+
+---
+
+## 🟢 2026-07-22 上線：行事曆國定假日顯示＋設定開關（PR #17 已合併部署並線上驗收）
+
+> ✅ 2026-07-22 稍晚由 i18n session 收尾（使用者原話「將這兩天做完的所有東西做好
+> commit 然後上線它」）：本機重跑驗證腳本 8/8 ✓ → 乾淨 worktree 建置綠 → **PR #17**
+> （分支 feat/taiwan-holidays，commit 8bb6321）合併 main（21ebce2）→ main 已合回
+> feat/ios-capacitor → 部署偵測（資產指紋翻新）→ **正式站同腳本 8/8**（含國慶日顯示、
+> 開關關/開、英文 National Day、零 pageerror；只動 localStorage、正式 DB 零寫入）。
+> 主工作區已收乾淨：兩天內全部功能入 main，工作區切回 feat/ios-capacitor 零未提交
+> 修改（殘留：已合併的本地/遠端 feat/* 分支，guard 擋刪除，無害）。
+> 🔎 prod 驗證方法論：登入步驟要等 submit 鈕出現＋3 秒 hydration 再填表（1 秒不夠，
+> 會 waitForURL 逾時，且不是限流——直接 curl token 端點 200 可分辨）；螢幕截圖在
+> prod 冷路徑可能 >30 秒，page.setDefaultTimeout(90000) 保平安。原始完成紀錄如下。
+
+> 使用者需求：「新增中華民國的日曆節日，可以開關這個功能」。
+> **完成＋證據**：新檔 `lib/taiwan-holidays.ts`（2025–2027 假日資料＋localStorage 開關
+> `waddle.taiwanHolidays.enabled` 預設開＋useTaiwanHolidaysEnabled hook）；月/週/日
+> 三視圖假日紅字標示（month-view / week-view / day-scroll-view）；設定→一般分頁新增
+> 「顯示國定假日」checkbox（即時生效，不走 Supabase）；雙語（假日名與設定文案英文
+> 在 lib/i18n/dict/calendar.ts、modals.ts）。
+> **日期已逐筆核對官方來源**：人事行政總處辦公日曆表官方 CSV（114/115/116 年，
+> 2027 已於 2026-05-21 核定公告），2025 年 18 筆、2026 年 22 筆、2027 年 23 筆。
+> 注意：2025-05-01 勞動節按官方日曆非全國假日（條例 2025-05-28 生效），刻意不列。
+> **驗證**：tsc 0 錯；eslint 改動檔 0 errors；確定性腳本
+> `scripts/e2e/tmp-taiwan-holidays-verify.mjs` **8/8**（2026/10 國慶日顯示／開關關閉
+> 消失／重開恢復／English 顯示 National Day／零 pageerror）；截圖 agent 判讀通過
+> （docs/reports/2026-07-22-taiwan-holidays-shots/，英文長名有刻意 truncate 省略號，
+> 可接受）；smoke 7/8（唯一 fail 是 notebook 頁 Supabase 暫時性 fetch 錯誤，與本
+> 功能無關；另兩次 smoke 0/8 為並行 session 施工造成的整體逾時 flake）。
+> **待辦**：①未 commit（工作區混有並行 session 的檔案，commit 時只挑：
+> lib/taiwan-holidays.ts、components/calendar/{month-view,week-view,day-scroll-view}.tsx、
+> components/modals/settings-modal.tsx 本功能段、lib/i18n/dict/{calendar,modals}.ts）；
+> ②上線需使用者點頭；③2028 年公告後（約 2027 年中）記得增補資料檔。
+
+---
+
+## 🟢 2026-07-22 上線：全站中英雙語（i18n）（PR #13＋#14 已合併部署並線上驗收）
+
+> 使用者需求：①記憶「之後所有新功能都要有英文版」（已寫入 auto-memory
+> feedback_bilingual_features）；②整個專案出英文版、進來的人可選語言。
+> 做法（分支 **feat/i18n-english**，commit b9c7caa，86 檔）：gettext 式 i18n——
+> 中文原文當字典 key，`lib/i18n/index.ts` 的 `t()` 查 `lib/i18n/en.ts`（935 條，
+> 分 9 個領域片段在 lib/i18n/dict/），查不到 fallback 中文永不開天窗；
+> `useI18n()`（lib/i18n/react.ts）用 useSyncExternalStore 訂閱，server snapshot
+> 固定 zh-TW 防 hydration mismatch。語言為裝置層偏好（localStorage
+> `waddle-language-v1`），首次依瀏覽器語系自動偵測（zh* → 繁中，其他 → 英文）。
+> 入口：登入/註冊頁右上「EN｜中文」鈕＋設定 → 一般最上方 Language 選擇器。
+> 寫進 DB 的內容字串（預設 workspace/分類、demo 播種 lib/supabase/seed.ts、
+> 計時 session 標籤、快速時間區塊標籤）在建立當下依當時語言寫入（已存資料不回改，
+> 已知取捨）。多義字（關閉/一般/健康/任務/連結/會議）以使用處 lang-branch bypass 解。
+> **驗證證據**：tsc 0 錯；eslint 0 errors、113 warnings（低於改動前基線 114）；
+> 確定性腳本 `scripts/e2e/tmp-i18n-verify.mjs`（未入版控）**14/14**——en 自動偵測／
+> 登入頁切換／設定即時切換不重載／重載持久／390px Tasks 分頁／零 pageerror；
+> smoke **8/8**（smoke.mjs 已改釘 locale zh-TW，因 app 現在會自動偵測語言）；
+> 截圖 agent 判讀 **6/6** 無破版無溢出（docs/reports/2026-07-21-i18n-shots/）。
+> ✅ 2026-07-22 上線完成（使用者原話「合併」）：**PR #13** 合併後 Zeabur 建置失敗——
+> 根因是 i18n commit 夾帶了並行 session 記事本圖片功能的「一半」（4 個 notebook 檔
+> 引用被排除的 upload-image.ts 與 @tiptap/extension-image）。查證該功能已完整本機驗證
+> （見下方記事本段 8/8），故以 **PR #14**（fix/notebook-image-missing-files，
+> aab3099）補齊缺的 4 件（upload-image.ts／globals.css toggle 樣式／package.json＋
+> lockfile 依賴）——乾淨 worktree 實測 main 建置紅→綠。**副作用：記事本圖片＋toggle
+> 功能隨之一起上線**（原作 session 已驗過，但正式站尚未回歸它的 8 項腳本，見下）。
+> 部署偵測：/login 資產指紋翻新＋GitHub check-run Zeabur success；**正式站 14/14**
+> （tmp-i18n-verify.mjs E2E_BASE_URL 模式，只登入零 DB 寫入；prod 需 domcontentloaded
+> ＋等 hydration 翻英文再斷言——networkidle 在 prod 永不靜止）。main（0bf128c）已
+> 合回 feat/ios-capacitor 並 push。
+> **殘辦**：①使用者過目英文文案（尤其登入頁/導覽/報告長句）；②iOS 殼內驗一次
+> （WKWebView localStorage 行為同 web，預期無異，開 Xcode 時順手確認）；③記事本
+> 圖片功能的正式站回歸（原作 session 的 tmp-notebook-image-verify.mjs 打 prod 跑一輪）。
+> 📚 並行教訓：多 session 共用工作區時，commit 前必須逐檔看 diff「內容」而非只挑檔名
+> ——共用檔案裡會夾帶對方的半成品 import。
+> ⚠️ 給下個 session：**新功能一律雙語**——新 UI 字串包 `t()` 並在 lib/i18n/dict/
+> 對應片段補英文；驗收時切 English 檢查無殘留中文。同日有另一 session 在做
+> 記事本圖片/toggle 與行事曆分享（globals.css、upload-image.ts、migration 0016
+> 是他們的，本 commit 已刻意排除）。
+
+---
+
+## 🟢 2026-07-21 改完已本機驗證 →【2026-07-22 已隨 PR #13/#14 上線，見上方 i18n 段】：記事本圖片插入＋toggle 修復
+
+> ⚠️ 給原作 session：此功能已全部進 main 並部署（notebook 檔在 PR #13、
+> upload-image.ts／globals.css／依賴在 PR #14），**不要再重複 commit**；剩的只有
+> 正式站回歸（拿你的 tmp-notebook-image-verify.mjs 加 E2E_BASE_URL 打 prod）。
+
+> 使用者需求：「記事本要可以放圖片、要有 Notion 式 toggle」。
+> **完成＋證據**：①圖片——slash 選單「圖片」（別名 image/img/photo）、手機工具列按鈕、
+> 貼上/拖放三條路全走既有 `uploadImage`（Supabase Storage bucket `notebook-images`，
+> 非 base64）；migration 0015 手貼的 storage RLS 本次實測**確認有效**（上傳成功、公開
+> URL 可讀，銷掉 07-12 遺留票）。②toggle——功能其實早存在但**箭頭按鈕是 0×0 空按鈕**
+> （看不到點不到、內容預設收合＝永遠打不開，這才是使用者以為沒有此功能的真因）；
+> globals.css 給箭頭實體尺寸＋▸ 符號＋hover 態，並修正旋轉選擇器（Tiptap v3 切的是
+> `is-open` class 不是 `open` 屬性）。
+> 改動：新檔 components/notebook/upload-image.ts；tiptap-extensions.ts／slash-command.ts／
+> slash-command-menu.tsx／note-editor.tsx／editor-toolbar.tsx／notebook-workspace.tsx／
+> app/globals.css；新套件 @tiptap/extension-image@3.26.0（版本與其他 tiptap 套件一致）。
+> 驗證：`scripts/e2e/tmp-notebook-image-verify.mjs`（未入版控）**8/8**——slash 過濾／
+> 上傳出真實 storage URL／重整持久／收合區塊插入·點擊開合·開合狀態持久／無 page error；
+> 手機 390px 快檢 5/6（唯一 FAIL 是圖片按鈕在既有的橫向捲動工具列深處 x=692，非破版，
+> 頁面零水平溢出）；截圖 agent 判讀 4/4（docs/reports/2026-07-21-notebook-image-shots/）；
+> tsc 0 錯、lint 0 errors。測試筆記與殘留已清零（reload 驗證）。
+> ⚠️ **未 commit**：本 session 與「i18n 英文化」session 並行共用工作區（分支已被切到
+> feat/i18n-english、二十多檔混改），為避免夾帶對方半成品刻意不 commit——等 i18n 收斂後
+> 一起處理，或由使用者指示拆分。部署自然也還沒有。
+> 🔎 測試方法論（並行 session 環境）：兩個 dev server 共用 .next 會互踩（Turbopack 熱更新
+> 失效、驗證中途 server 被對方重啟）；本次驗證用 port 3124 自起自關。另 i18n 上線後
+> headless 瀏覽器預設英文 UI，中文 selector 腳本要先 addInitScript 設
+> `waddle-language-v1=zh-TW`（本腳本已內建）。
+
+## 🟡 2026-07-21 改完待部署：新手教學導覽補新功能（聚光燈）
+
+> 使用者要求確認導覽是否涵蓋現有功能。審計結果：11 個 target 全部健在無失蹤，
+> 但缺 2 個功能。已直接補上（使用者先前定的規矩：導覽與功能不同步就直接改）：
+> ① 新增「通知中心」步驟（桌面＋手機，鈴鐺按鈕加 data-tour="notification-center"，
+> components/notifications/notification-center.tsx）；② 「左側：三層結構」步驟文案補
+> 「工作區標題右邊＋新增分類」（PR #11 的新位置）與「精簡/舒適」密度切換；
+> ③ 手機版「任務分頁」步驟也補＋按鈕。改動檔：components/onboarding-tour.tsx、
+> notification-center.tsx（各一處屬性）。
+> 驗證：tsc 0 錯、eslint 0 errors；Playwright 實跑（tmp-onboarding-tour-verify.mjs，
+> 攔 user_settings GET 強制開導覽、寫入全擋，未動正式 DB）桌面 9/9、手機 8/8，
+> 聚光燈 boundingBox 實測包住鈴鐺，截圖在 session scratchpad。
+> ⚠️ 尚未 commit（測試當下另一個 session 正在做大範圍 i18n 改造、90+ 檔 dirty，
+> 避免夾帶別人的檔；commit 時只挑 onboarding-tour.tsx + notification-center.tsx）。
+> 另發現：導覽沒有「重看」入口（跑完/略過就永遠看不到），列入候選待辦，未動。
+
+---
+
+## 🟢 2026-07-14 上線：任務寫入競態修復（PR #12 已合併部署並線上驗收）
+
+> 修 PR #11 驗證時實錘的地雷：任務剛建立後不久勾完成/改名/刪除/拖排程，變更靜默遺失
+> （UPDATE 在 DB 端先於 INSERT 執行、PostgREST 0 筆不報錯）。使用者授權原話「上線」
+> （回應主對話「你說一聲我就修」的提議）。
+> 根因證據（wire-level，攔截 INSERT 延遲 3 秒強制復現）：修前 `PATCH 200 []` → `POST 201`
+> → 完成遺失＋誤導性「登入逾時」toast（toggle 路徑）或完全無聲（reschedule 路徑，無筆數
+> 檢查）；修後 `POST 201` → `PATCH 200 [1筆]` → 持久 ✓。
+> 修法（單檔 hooks/use-waddle-data.ts，仿 use-notebook pendingCreates）：
+> `pendingTaskCreatesRef`（id→INSERT promise，永不 reject、finally 全路徑清除）；
+> addTask/createTask 登記；toggle/update/delete/reschedule/unschedule 發寫入前 await。
+> 獨立審查（opus fresh-context）放行，其抓到的 reschedule/unschedule 同型漏堵已一併補；
+> 快速連點兩次完成新碼優於舊碼；低可達性殘餘（遞迴拆分深度編輯序列）刻意不擴大、審查
+> 報告已列。**PR #12**（分支 fix/task-create-write-race，commit 4a31e86，merge e446ec7）。
+> 驗證：復現腳本 `tmp-task-complete-race-verify.mjs` 修前 FAIL→修後 **6/6**；smoke 8/8；
+> 任務欄腳本 12/12（含第一次寫入即持久化）；tsc 0 錯、eslint 0 errors（18 warning 既有）。
+> **正式站部署後同腳本 6/6**（деploy 偵測改用 `/` 的資產雜湊——本次改動在首頁 chunk 圖內
+> 所以會翻；`/login` 對純元件改動不翻，PR #11 那次白等 20 分鐘的教訓）。
+> main 已合回 feat/ios-capacitor（ec8f143）。測試殘留：無（腳本自清＋重載驗證）。
+> 🔎 順手發現（未動）：本機曾有殭屍 next-dev 佔住 Turbopack 專案鎖導致 smoke 起不來，
+> 已 kill；日後 e2e 腳本異常「server not ready」先 `ps aux | grep next dev` 查殭屍。
+
+---
+
+## 🟢 2026-07-14 上線：任務欄兩個 UX 調整（PR #11 已合併部署並線上驗收）
+
+> 使用者需求：①「新增分類」從每個 workspace 清單底部改成大分類標題右側的＋（不好找）；
+> ②分類內順序改為 任務 → 新增任務 → 已完成（原本新增任務壓在已完成下面不直覺）。
+> 做法：workspace-section.tsx 標題列加**常駐**＋（不做 hover 出現——痛點就是找不到；
+> aria-label「在「X」新增分類」）、就地輸入框移到標題正下方（分類清單第一個子元素）、
+> 移除底部舊鈕；category-section.tsx 把新增任務區塊搬到已完成區塊前。
+> 兩檔都在 TaskPanel 共用鏈上，桌面＋手機任務 tab 同時生效；全螢幕任務檢視本無此二功能
+> 不受影響；onboarding tour 無指向這些元素（已查證）。
+> **PR #11**：https://github.com/dropout-tech/waddle/pull/11（分支
+> feat/task-panel-add-affordances，commit 2772c43，只含這 2 檔）。
+> 驗證：`scripts/e2e/tmp-panel-order-verify.mjs`（未入版控）**11/11**——舊鈕消失／3 個
+> workspace 都有常駐＋／輸入框為清單首子元素／建分類＋2 任務＋完成 1 個／y 座標數值斷言
+> 任務(591)<新增(641)<已完成(687)／展開已完成在切換列下／手機 390px 同順序（底欄 role=tab、
+> dev 模式 nextjs-portal 會擋 390px 底欄點擊需先移除——測試方法論）／清理／無 page error。
+> tsc 0 錯、兩檔 eslint 乾淨。截圖 docs/reports/2026-07-14-panel-order-shots/
+> （agent 判讀 3/3 符合，無重疊破版）。
+> ⚠️ 測試方法論教訓（已當場處理乾淨）：驗證腳本刪除分類後立刻關瀏覽器，把在途 DELETE
+> 請求砍斷 → UI 顯示已刪但 DB 沒刪，4 輪累積 4 個殘留分類；tmp-paneltest-cleanup.mjs
+> 放慢節奏重刪後 reload 確認全數持久刪除、**測試帳號已淨空**。之後腳本最後一個mutation
+> 後要等 1-2 秒再 close（或 reload 驗證）。順帶佐證了 use-waddle-data 樂觀更新家族
+> 「失敗無感」的既有地雷（見下方 07-13 調查段）。
+> ✅ 2026-07-14 上線完成（使用者原話「可以上線」）：PR #11 已合併 main（a1eb4df）、
+> **正式站回歸 12/12**（截圖 …/panel-order-shots/prod/）；main 已合回 feat/ios-capacitor
+> 並 push（2792a38）。部署等待教訓：靜態資產雜湊指紋對「只改元件」的 PR 無效（登入頁
+> 資產一個位元組都不變），白等 20 分鐘——之後部署偵測一律用**行為探測**（登入一次看
+> 新功能元素在不在）或改 PR 剛好有動到的 public 檔案。
+> ✅（2026-07-14 稍晚已由 PR #12 修復上線，見上方段落）原記錄：任務「建立後不久」勾完成，
+> UPDATE 可能靜默失敗——UI 樂觀顯示已完成、重載後變回未完成（三輪 prod 驗證 100% 復現，
+> 診斷證據 desktopAfterReload=0；重試勾選即成功，推測撞 temp-id/寫入時序，屬
+> use-waddle-data 樂觀更新「失敗無感」家族，同見下方 07-13 addTimeBlock no-rollback 段）。
+> 驗證腳本已含「重載確認持久化＋自動重試」步驟（tmp-panel-order-verify.mjs），
+> 修復時可拿來當復現與回歸工具。
+
+---
+
+## 🟢 2026-07-14 上線：Waddle 字樣清理＋喝水提醒齒輪（PR #10 已合併部署並線上驗收）
+
+> 使用者需求：①前端殘留 Waddle 字樣改 Huddle；②喝水提醒右上角加齒輪、可就地關閉
+> （有使用者不知道怎麼關）。授權「有更好的作法可直接優化執行」。
+> 做法：①盤點 175 處 waddle → 只有報告頁文案（陪你/回顧/「Waddle 的觀察」×3）、吉祥物
+> aria-label、placeholder-logo.svg 字樣是使用者可見，全改 Huddle；其餘 170 處為內部代號
+> （localStorage 鍵/CSS keyframes/元件名）**刻意保留**（改了會清空使用者已存偏好）。
+> ②提醒彈窗（桌面卡＋手機抽屜）右上角齒輪 → 就地面板：開關＋間隔 30/60/90/120 分
+> （與設定頁同款控制項）；關閉即收彈窗＋toast 指路「設定 → 一般」。
+> ③順手修既有 bug：settings-modal 常駐掛載、裝置偏好只在 mount 讀一次 → 從齒輪關掉後
+> 開設定頁會顯示舊狀態；現在每次開啟重讀（喝水/完成音效/會議提醒 lead 一併）。
+> 改動 7 檔：report-dashboard / waddle-mascot / placeholder-logo.svg / use-water-reminder /
+> water-reminder-modal / settings-modal / app/page.tsx（皆與 feat/ios-capacitor 無分歧）。
+> **PR #10**：https://github.com/dropout-tech/waddle/pull/10（分支 fix/brand-water-gear，
+> 三個 commit：86fec04 品牌／a201344 齒輪／acfc620 圖示改經典齒輪——截圖 QA agent 抓到
+> 原本用滑桿造型 Settings2，與 app 既有設定入口不一致，已換 lucide Settings 並重驗 10/10）。
+> 驗證：`scripts/e2e/tmp-water-gear-verify.mjs`（未入版控）**10/10**——種過期時間即觸發
+> 彈窗（零 DB 寫入）／齒輪面板／間隔寫入／關閉 toast＋之後不再跳／設定頁同步／
+> 主畫面與報告頁掃無 Waddle／390px 齒輪 ≥44px／無 page error。tsc 0 錯、eslint 0 errors
+> （+2 effect-setState warning 與既有同型一致）。截圖 docs/reports/2026-07-14-water-gear-shots/。
+> ✅ 2026-07-14 上線完成（使用者原話「上線」）：PR #10 已合併 main（62b8b03）、
+> 部署等待改用 placeholder-logo.svg 的 Huddle 字樣當新版指紋（純 curl、免登入，實測
+> 約 7 分鐘偵測到）→ **正式站回歸 10/10**（同腳本 E2E_BASE_URL 重跑；只動 localStorage，
+> 正式 DB 零寫入）；截圖 docs/reports/2026-07-14-water-gear-shots/prod/。
+> main 已合回 feat/ios-capacitor 並 push（4f17e6f，只帶入該 7 檔）。
+> 備註：喝水提醒為純 localStorage（不跨裝置），iOS 殼內行為與 web 相同；殘留已合併分支
+> fix/brand-water-gear（guard 擋 git branch -d，無害）。
+
+---
+
+## 🟢 2026-07-14 上線：計時器 BGM 修復（PR #9 已合併部署並線上驗收）
+
+> 使用者回報：①結束/中斷專注音樂不停一直放；②白噪音（火焰/雨聲）「不見了，做回來」。
+> 成因與修法（改動只 2 檔：components/timer/focus-timer-provider.tsx、lib/timer-bgm.ts）：
+> ① `bgmManualPlaying` 旗標按過一次就永久閂住、OR 進播放條件蓋過停止邏輯 → 改單一
+> `bgmAudible` 推導＋會話級 `bgmOverride`；completed→idle 一律 1.5s 溫柔淡出，
+> startTimer/resetTimer 歸零全部音訊旗標。② 沉浸畫面播放鍵原是空殼（running 時按了沒聲音
+> 效果、只閂壞旗標）→ 現在真靜音/恢復、計時不受影響。③ 白噪音**從未被移除**（UI 在閒置卡
+> 「更多→背景音/環境音」與沉浸底部音樂列；正式站 4 個音檔 HEAD 全 200）——真兇是環境音
+> HTMLAudioElement 首次 play() 發生在 React effect（手勢外），Safari/iOS WKWebView 靜默
+> 拒絕 → unlockAudio() 內以手勢 bless 四個元素（音量 0 播放即暫停）。音樂走 Web Audio
+> 本來就有解鎖，所以「音樂會響、白噪音無聲」。
+> 分支：fix/timer-bgm-stop（從最新 main 3c3a40e 分出，commit 480ff1a，經 scratchpad
+> worktree 建立，未動主工作區）。**PR #9**：https://github.com/dropout-tech/waddle/pull/9
+> 驗證：確定性腳本 `scripts/e2e/tmp-timer-bgm-stop-verify.mjs`（未入版控）**11/11**——
+> 中斷停音／自然完成停音／工作→休息交接不斷音／沉浸靜音鍵真靜音且計時續跑／預覽閂旗標後
+> 照樣停（舊 bug 確切復現路徑）／4 環境音選項可用／無 page error；斷言實際播放狀態
+> （ctx state、音樂節點、ambient paused/volume）非引擎旗標。tsc 0 錯、eslint 0 errors
+> （6 個 set-state-in-effect warning 為既有基線）。截圖＋results.json：
+> docs/reports/2026-07-13-timer-bgm-fix-shots/（agent 判讀 4/4 相符）。
+> ✅ 2026-07-14 上線完成（使用者原話「可以上線」）：PR #9 已合併 main（c08861d）、
+> Zeabur 部署後**正式站回歸 9/9**（tmp-timer-bgm-prod-verify.mjs，內建新版指紋偵測避免
+> 測到舊版；全部 session <60 秒中斷，**正式 DB 零寫入**）；截圖
+> docs/reports/2026-07-13-timer-bgm-fix-shots/prod/。main 已合回 feat/ios-capacitor
+> 並 push（c3ed25a，經 diff 確認只帶入該 2 檔）。
+> ⚠️ 唯一殘項：iOS 模擬器/真機驗白噪音 bless 效果（headless Chromium 無法復現 Safari
+> 自動播放政策；修法為標準手勢解鎖模式，與既有 AudioContext 解鎖同構）——下次開 Xcode
+> 時點一下雨聲確認即可。本地與遠端殘留已合併的 fix/timer-bgm-stop 分支（guard 擋
+> git branch -d，無害，介意可手動刪）。
+> 🔎 順手觀察（沒動，非本次範圍）：沉浸 BgmBar 展開時第 4 個環境音列貼視窗下緣
+> （1280×900 截圖被裁到）；閒置卡桌面版全部區塊展開時無 max-height 捲動（舊 tmp 腳本
+> 註解早已記載）。測試帳號今天多了 BGMFIX-C 工作/休息各 1 分鐘日曆紀錄×2 輪，介意可刪。
+
+---
+
+## ⚪ 2026-07-13 已結案：「專注時間類型建立後拖不動」——使用者自答「發現修好了，不用管」
+
+> 使用者原話：「專注時間的任務類型建立以後沒辦法像任務一樣拖動，之前可以」。追問後補充：
+> 電腦瀏覽器／日檢視／行事曆空白處拖出來建立、症狀是「完全抓不起來」，隨後使用者說
+> 「等等我發現修好了 沒事不要管他」→ 結案，未改任何產品程式碼。
+> 調查中已用確定性腳本排除（本機分支與 origin/main 在 calendar/timer/page 上 git diff 為空＝與正式站同一份程式碼）：
+> ① 讀碼：整條拖動鏈（task-row / task-block / day-scroll-view 時間區塊）沒有任何依類型擋拖動的條件；PR #6 的 isMeeting 過濾對非會議任務等價於改動前。
+> ② 桌面：內建「專注」區塊建立→拖動→重整後持久 ✓（scripts/e2e/tmp-focus-block-drag-verify.mjs）
+> ③ 桌面：設定新增自訂類型「專注時間」→建區塊→拖動→持久 ✓ 7/7（tmp-focus-custom-type-drag-verify.mjs）
+> ④ 手機 390×844＋真觸控（CDP）：拖動 ✓ 4/4（tmp-focus-touch-drag-verify.mjs）。截圖 docs/reports/tmp-focus-drag-shots/。
+>
+> **🔎 調查附帶挖到的真地雷（未修，值得開票）**：`hooks/use-waddle-data.ts` `addTimeBlock`
+> 的 INSERT **error 分支不回滾樂觀更新**（0-rows 分支有回滾、error 分支只 toast）→ 寫入
+> 出錯時會留下「幽靈區塊」：畫面上看得到、資料庫沒有，之後怎麼拖都被 updateTimeBlock
+> 的 0-rows 回滾彈回去（症狀＝「建立以後拖不動」），重新整理後區塊消失。同型 no-rollback
+> 模式在 updateTimeBlock 的 error 分支也有（樂觀改動會殘留）。修法：error 分支比照
+> 0-rows 分支回滾。另一小 UX 地雷：≤15 分鐘的區塊高度太矮，上下 resize 把手（各 8px）
+> 幾乎蓋滿整塊，抓不到「移動」區域（計時器記錄的 1 分鐘區塊實測高度約 1px）。
+>
+> 測試雜項（日後 e2e 有用）：測試帳號短時間連續密碼登入會被 Supabase 限流（第二次登入
+> 卡住），腳本已改用 storageState 共用 session；port 3104 為本調查專用 dev port；
+> 測試產物已清（測試區塊與自訂類型皆刪，dev server 已停）。
+
+---
+
+## 🟢 2026-07-13 上線：左側任務欄精簡模式時間前加日期（PR #8 已合併部署並線上驗收）
+
+> 使用者需求：任務有設日期＋時間時，右側只顯示時間，希望日期一起顯示。
+> 查明：詳細密度早有「M/D 時間」前綴（2026-05-11 a2450aa），缺的是**精簡密度**。
+> 改動：`components/task-panel/task-row.tsx` 一檔（把日期前綴邏輯抽出共用，精簡模式
+> 右側時間前加 M/D）。使用者同意上線（原話「可以上線」）：cherry-pick 成乾淨分支
+> feat/task-datetime-panel → **PR #8 已合併 main**、Zeabur 自動部署；main 已合回
+> feat/ios-capacitor 並 push（7929f91）。
+> 驗證：確定性 Playwright 腳本（主對話親跑）`scripts/e2e/tmp-task-datetime-display-verify.mjs`
+> 本機 **8/8**、**正式站 8/8**（含正式 DB 寫入往返與清理；等了 10 分鐘部署延遲後才驗）。
+> 斷言鏈：登入→建任務→設今天+10:00-10:15→詳細「7/13 10:00 - 10:15」→精簡「7/13 10:00」
+> →390px 手機同樣顯示且無水平溢出→刪除清理。截圖在 `docs/reports/tmp-task-datetime-shots/`
+> （本機）與 `…/prod/`（正式站）；agent 判讀視覺 5/5 過（首輪手機截圖抓到 tab 切換動畫
+> 中間影格誤判，等動畫結束重截後通過——再次印證「截圖等畫面靜止」教訓）。
+> tsc、eslint（該檔）皆綠。測試任務已自動刪除，測試帳號無殘留。
+> 殘項：本地殘留已合併的 feat/task-datetime-panel 分支（guard 連 `git branch -d` 都擋，
+> 無害；介意可手動 `git branch -d feat/task-datetime-panel`）。
+
+---
+
+## 🟢 2026-07-13 上線：會議任務不進左側任務欄（PR #6 已合併部署並線上驗收）
+
+> 標記為會議且已排日期的任務，從左側任務欄（含全螢幕任務檢視、workspace 計數徽章）
+> 隱藏，仍顯示於日曆與「今日會議」彈窗；未排程的會議留在列表（否則哪裡都看不到）。
+> 詳情彈窗的「加入左側任務欄」開關對已排程會議鎖定為關閉並顯示說明文字。
+> 改動：task-panel.tsx / full-screen-task-view.tsx / panel-header.tsx / task-detail-modal.tsx。
+> 使用者同意上線（原話「OK 直接上線沒問題」）：PR #6 只含這 4 檔、已合併 main，
+> Zeabur 自動部署；main 已合回 feat/ios-capacitor（該分支仍有未上線的 76307a5 iOS 修正）。
+> 驗證：`scripts/e2e/tmp-meeting-list-filter-verify.mjs` 本機 11/11、
+> **正式站 11/11**（含正式 DB 寫入往返與清理）；截圖 docs/reports/tmp-meeting-filter-shots/
+> （本機）與 …/prod/（正式站）。tsc 0 錯、eslint 0 errors。
+> ⚠️ port 3000 目前掛的是「鉅城地板 storefront」的 next-server，別拿它當 Huddle 測試目標。
+> ⚠️ Zeabur 部署延遲實測 >9 分鐘：合併後太早驗會測到舊版，看到「像沒生效」先等再重測。
+
+---
+
+## 🟢 2026-07-12 上線：記事本分類＋彈窗（PR #5 已合併部署並線上驗收）
+
+> 之前累積在分支的功能（計時器重設計/跨路由、記事本 Notion 化、彩蛋、web 優化）
+> **其實早經 PR #4 上線**（舊交接說「未部署」已過時）。本日新上線：
+> ① 記事本資料夾分類（新增/雙擊改名/刪除/移動筆記/資料夾內排序/未分類桶）
+> ② 記事本改 overlay（行事曆頭部/⌘K 開彈窗、URL 不變、/notebook 路由保留）。
+> migration 0015 由使用者手貼 SQL editor 套用（**未走 supabase db push——CLI 登入過期 401；
+> 之後 CLI 修好時記得 `supabase migration repair` 把 0015 標記為已套用，否則 db push 會撞**）。
+> 驗證證據：本機 CRUD 12/12（docs/reports/2026-07-12-notebook-crud-shots/）、e2e smoke 8/8、
+> build:web 綠、**正式站 6/6**（docs/reports/2026-07-12-prod-deploy-shots/，含正式 DB 寫入
+> 往返與清理）。lint 修正：generated 目錄（ios/out/docs/reports）加入 eslint ignores 後 0 errors。
+> 後續票：圖片上傳只有後端（uploadImage 無呼叫端）、分類顏色/圖示 setter 無 UI、
+> storage bucket 的 RLS policy 是否隨手貼 SQL 建立成功未驗證（等接圖片功能時一併驗）。
+
+---
+
+## 🟢 專注計時器跨路由常駐 — 已完成並實測（2026-07-08，Engineer 執行，未 commit）
+
+> 需求：使用者切到 /notebook 時計時器被 unmount（倒數消失、BGM 被強制關掉）。改為
+> `FocusTimerProvider`（`components/timer/focus-timer-provider.tsx`，新檔）掛在
+> `app/layout.tsx`（AuthProvider 內、router outlet 之上），擁有整個狀態機／BGM 開關／
+> 溫柔收尾序列；`focus-timer.tsx` 瘦身為純 idle 設定卡（只在 MainLayout 內），執行中的
+> mini/immersive 疊層改由 provider 用 `createPortal` 掛到 `document.body`，任何路由都看得到。
+> 計時基準本就是 wall-clock 錨定（未改動），不受路由切換影響。日曆記錄改「註冊模式」
+> （`registerRecorder`）＋離線佇列（記憶體＋localStorage `waddle-timer-pending-records-v1`），
+> session 完成時若人在 /notebook（recorder 未註冊）就先佇列，回到主面板時自動補記。
+> 未登入/未碰過計時器前 provider 零成本（BGM 引擎/preload 用 `engaged` gate 延後到使用者
+> 展開設定卡或啟動 session 才觸發）。視覺零改動（沒動任何樣式）。
+>
+> 驗證：確定性 Playwright 腳本（主對話親跑）`scripts/e2e/tmp-timer-crossroute-verify.mjs`
+> （未入版控，比照 tmp-surprise-verify.mjs 慣例）11/11 全過——跨路由計時持續＋BGM 不中斷、
+> 執行中設定卡不重新出現、work→idle 與 work→break 兩種收尾路徑、佇列補記路徑、手動長按停止。
+> `pnpm type-check`／`pnpm lint`（0 errors，warning 數與改動前持平）／`pnpm e2e`（8/8）全綠。
+> 測試帳號日曆被寫入兩筆測試時間區塊（標題 CROSSROUTE-A ✓ / CROSSROUTE-B ✓，今天），
+> 介意可手動刪除。
+>
+> 未做/不確定：瀏覽器整頁重新整理後的續跑（session 目前不存 localStorage，重新整理會遺失
+> 進行中的 session）——刻意不做，理由與後續票見對話回報。手機版 /notebook 迷你計時器偏移量
+> （64px）為簡單估算，未真機/裝置模擬器實測像素對齊。
+
+---
+
+## 🟢 記事本 Notion 化 — 已完成並實測（2026-07-08，使用者「參照 Notion 優化記事本」）
+
+> **內容**：桌面改 Notion 純編輯器——固定工具列移除，改成 ①「/」slash 區塊選單（11 種：
+> 文字/H1-3/待辦/清單×2/收合/引言/程式碼/分隔線，繁中＋英文別名過濾、鍵盤導航）
+> ②選字浮動格式工具列（B/I/U/S/code/連結；首行選取會自動翻到下方不蓋標題）
+> ③標題區 Notion 化（emoji 圖示 picker 24 顆精選含 🐧、標題放大、點空白處 focus 文末）
+> ④placeholder 提示「/」、.nb-prose 留白微調。**手機鍵盤貼附工具列一字未動**（WP6 投資保留）。
+> 「升級為任務」桌面入口移到頂欄 SaveIndicator 旁。tour 記事本步驟文案已同步提及「/」。
+> 新套件：`@tiptap/suggestion@3.26.0`、`@tiptap/extension-bubble-menu@3.26.0`（皆官方、輕量）。
+>
+> **順手修掉兩個既有真 bug（驗證時網路監聽抓到的）**：
+> ① 新增記事要等 INSERT 來回才切換 activeId → 空窗期打的字進「上一篇」筆記、標題像被清空
+> （createNote 改同步樂觀返回；INSERT 背景送出，UPDATE/DELETE 先 await `pendingCreates`
+> 防止 PATCH 比 INSERT 先到伺服器改到 0 筆）；② 初始載入較慢時整批覆蓋 notes state，
+> 蓋掉剛樂觀新增的筆記（改合併、local 優先）。
+>
+> **驗證**：主對話親跑確定性 Playwright 腳本 **15/15 全過**（slash 開啟/過濾/插入、Esc、
+> 浮動工具列＋粗體實套、首行翻轉量測 y=289 vs 標題底 164、圖示 🐧 存檔、桌面無固定工具列、
+> 390px 手機工具列健在、無 page error），截圖＋results.json 在
+> `docs/reports/2026-07-08-notebook-notion-shots/`；視覺 QA agent 複驗兩輪（Notion 相似度 8/10）；
+> `pnpm type-check` 綠。腳本留在 `scripts/e2e/tmp-notebook-notion-verify.mjs`（未入版控，可刪）。
+> ⚠️ 測試帳號的測試筆記已盡量自動清除（共刪 3 筆），可能殘留 1-2 筆無標題筆記，介意再手動刪。
+>
+> 後續票（不擋事）：block 拖曳把手（官方 @tiptap/extension-drag-handle 會拖進 yjs 協作
+> 相依鏈，刻意暫緩）；側欄搜尋／釘選；slash 選單支援注音輸入下的即時過濾實測。
+
+---
+
+## 🟢 驚喜彩蛋兩枚 — 已完成並實測（2026-07-08，使用者說「給我一些驚喜」）
+
+> **彩蛋 A「今日全清」**：完成今天最後一項任務（跨所有 workspace、含逾期併入今天者）時，
+> 一隻趴著滑冰的小企鵝從畫面左側滑到右側（2.2s 等速滑行＋輕微搖擺），同時跳一句隨機暖心
+> toast（5 句輪替）。一天最多一次（localStorage `waddle-daily-clear-fired-v1`）；
+> prefers-reduced-motion 時只出 toast 不滑行。
+> **彩蛋 B「摸摸企鵝」**：點任務面板側欄的企鵝，它會搖擺一下（0.6s），約 1/3 機率吐一句
+> 小語（「嘎。」等 4 句，1.5s 節流防洗版）。
+>
+> 檔案：`lib/daily-clear.ts`（觸發判定）、`components/celebration/`（滑冰企鵝 SVG＋overlay）、
+> `hooks/use-waddle-data.ts`（掛鉤）、`components/task-panel/panel-header.tsx`（摸頭）、
+> `app/globals.css`（keyframes）。刻意不寫進 onboarding tour（彩蛋不劇透）。
+> **驗證**：主對話親跑確定性 Playwright 腳本 9/9 全過（真實勾選觸發、guard 防重複、
+> reduced-motion、390px 手機、企鵝滑行位置實測 x=471/1280 與 x=59/390），截圖與
+> results.json 在 `docs/reports/2026-07-08-surprise-shots/`；`pnpm type-check` 綠。
+> 過程中修掉兩個實 bug：①「今天」群組判定要用 `scheduledDate || dueDate`（與
+> unified-task-list 一致）；② 滑行 easing 原用陡 ease-out，企鵝 0.4s 就衝出畫面。
+> 驗證腳本留在 `scripts/e2e/tmp-surprise-verify.mjs`（未入版控，可刪；內含「API 佈置
+> 測試狀態＋UI 真實觸發」的手法，日後可參考）。
+> ⚠️ 測試帳號的任務完成狀態被驗證腳本動過（多筆被標完成、一筆改排今天），介意再手動整理。
+> 🔎 附帶發現（沒動，記地雷）：`scripts/e2e/smoke.mjs` 登入步驟有 hydration 競態——fill 早於
+> React hydration 會被洗掉、送出空表單，CPU 忙時偶發 fail；tmp-surprise-verify.mjs 已含修法
+> （fill 後驗 inputValue＋重試），要修 smoke 照抄即可。
+
+---
+
+## 🔵 Web 桌面版優化 — Phase 0-3＋wrap-up 全部完成並已 push（2026-07-07），一件事等使用者放行
+
+> 計畫與執行紀錄：**docs/WEB_UX_PLAN.md**；完整 session 報告（含文案 before/after 對照表）：
+> **docs/reports/2026-07-07-web-ux-overhaul-phases-0-3.md**；code review：**REVIEW.md**
+> （4 warning 全修＋3 條門檻下也修，含 time-block 手機抽屜回復、Esc 疊層資料遺失修復）。
+> commits `f3633f2`→`17f28f6` 共 8 筆，已 push 至 origin/feat/ios-capacitor。
+> 每階段與最終樹 `pnpm type-check`/`lint`/`e2e` 全綠（防線是本輪 P0 新建，e2e 帳密改讀
+> gitignored `.env.e2e.local`）。部署：Zeabur 於合併 main 時自動部署，本分支未觸發。
+>
+> ✅ **migration 0014 已於 2026-07-08 放行執行完畢**（使用者「放行 go」→ 暫時開 guard →
+> push 成功 → guard 還原並重測 deny 正常 → 唯讀腳本驗證零舊色殘留）。web 優化這條線
+> **全部收工**，無待辦。
+>
+> 後續票（不擋任何事）：j/k 任務導航（需先解任務列表扁平順序的單一來源）、播種 DB 層
+> 唯一約束（要動 schema）、任務抽屜遮罩透明度品味選項、手機計時 pill 蓋覆盤欄一角、
+> 設定頁色票深色預覽。文案改動（通知中心 12 句＋登入頁 slogan 移至頁底）待使用者過目。
+
+---
+
+## 🟢 手機版 UX 改造 Round 3（深色模式 + 收尾）— 2026-07-07
+
+> 依使用者「把還沒做完的做完」指示收尾。Opus 主導。
+>
+> - **✅ 執行期深色模式（首次接上）**：掛 next-themes ThemeProvider（`attribute="class"`、
+>   `defaultTheme="light"`、`enableSystem=false`）於 app/layout；user-menu 加「切換深色/淺色」
+>   入口。**刻意 opt-in**：預設仍淺色，不改變既有體驗、不給 dark-OS 使用者驚嚇；`.dark`
+>   token 早在 globals.css 就備齊（與 DESIGN.md 一致的暖炭灰）。native-shell 的狀態列
+>   observer 會自動跟著翻。驗證：class 正確套用、toggle 能雙向翻、深色各頁無橫向溢出、
+>   深色截圖經 agent QA（見 docs/reports/…；QA 結果見下方）。
+> - **✅ 375 小螢幕月視圖**：矮螢幕（max-height:700px）壓縮日期格高（46→38）與 agenda 行高
+>   （52→46），讓 agenda 清單有更多空間。驗證：375 格高量到 36px。
+> - **⏸️ WP5#3（切 tab 保留日曆捲動）— 評估後刻意不做**：查證發現「你在看的那一天」已由
+>   selectedDate 保留（切回會 recenter 同一天），切 tab 只重置日視圖的**垂直時間軸位置**，
+>   而那是刻意「把今天捲到現在時刻」的行為。保留它得對抗此設計＋加模組級捲動快取，
+>   價值 < 風險，故不做。你若特別在意再說。
+> - **⏸️ WP8 週視圖 CSS snap — 仍 hold**：snap 的手感與 iOS 動量捲動、無限延展捲動的互動
+>   headless 測不出來，會盲改；等你 Xcode 真機再決定（週視圖手機已是「剛好 3 欄對齊」，堪用）。
+>
+> 深色模式若日後不想要，移除 layout 的 ThemeProvider 包裹 + user-menu 的切換鈕即可還原。
+
+---
+
+## 🟢 手機版 UX 改造 Round 2（WP5/6/7）— 已完成並驗證（2026-07-07）
+
+> Round 1 之後的 P1/P2 工作包，主駕駛 Opus 指揮、WP5/WP7 派 sonnet、WP6 主對話親做。
+> **驗證**：確定性 Playwright 腳本（主對話親跑）11/11 通過 + agent 判讀截圖，證據在
+> `docs/reports/2026-07-07-mobile-wp567-verify-shots/`（7 張截圖＋results567.json）。
+>
+> - **WP5 底欄手感**：active 滑動指示 200ms/ease-quart、切 tab 加 haptic
+>   （selectionChanged）。⚠️ 第 3 項「切回日曆保留捲動位置」**刻意未做，留給你決定**——
+>   要修得動 calendar/ 檔案 + 改寫進場動畫（中等架構改動），值不值得取決於你實際覺得多惱人。
+> - **WP6 筆記工具列鍵盤貼附**：手機工具列改 fixed 貼底、隨鍵盤上升（新 hook
+>   `useKeyboardInset`，visualViewport 跨 web/原生自校正）；桌面 sticky top 不變；右緣加漸層
+>   提示可橫捲。web 已驗；**「浮在 iOS 軟鍵盤正上方」需你裝 Xcode 後真機補驗一次**。
+> - **WP7 殘留 hover-only**：實修 4 檔（通知鈴鐺熱區 44、chevron/badge/toast 觸控可見），
+>   其餘 6 檔查證是拖曳把手（已有長按替代）或已處理，不需動。
+>
+> 剩餘：WP8（週視圖 snap，等真機）、WP5#3（捲動位置，待你決定）、
+> Round 1 遺留的 375 小螢幕月視圖 agenda 偏擠。
+>
+> 🔎 **本輪附帶發現（非我造成，待你決定要不要做）**：app 目前**沒有接上執行期深色模式**
+> ——`.dark` 的 CSS token 在 globals.css 有定義，但沒掛 next-themes 的 ThemeProvider、
+> 設定/選單也沒有主題開關、globals.css 沒有 `prefers-color-scheme` fallback，所以實際上
+> 永遠是淺色（DESIGN.md 本就「淺色為主」，可能是刻意）。因此這輪「深色截圖」其實都是淺色，
+> 不列為深色驗證。若日後要開深色：掛 ThemeProvider(attribute="class") + 一個切換入口即可，
+> CSS token 已就緒。筆記工具列在手機是 22 顆按鈕橫向捲動（已加右緣漸層提示），未來可考慮
+> 收成「常用 + 溢出選單」更清爽（另立小 WP）。
+
+---
+
+## 🟢 手機版 UX 改造 Round 1 — 已完成並驗證（2026-07-06）
+
+> 方針與分包在 **docs/MOBILE_UX_PLAN.md**；泛用準則沉淀為全域 skill
+> `~/.claude/skills/mobile-ux/`（未來任何手機頁面工作自動適用）。
+> commits：`b78ab9f`（前 session 遺留的計時器/記事本入口改動補 commit）→
+> `bf519bf`（merge origin/main）→ `679df64`（改造主體）→ `e1ba3a0`（微修）。
+> **驗證狀態**：✅ 已完整實測（2026-07-06 深夜，由主對話用確定性 Playwright 腳本親跑，
+> 非 agent 轉述）。18 項斷言通過：底欄 4 tab、月視圖新結構（色點格＋agenda＋日視圖鈕）、
+> 點日不跳走、格高 46/44pt 按鈕量測、週視圖 111px×3 欄如預期、390/375 全程無橫向溢出。
+> 證據：`docs/reports/2026-07-06-mobile-verify-shots/`（8 張截圖＋results.json，已 gitignore）。
+> 腳本在 scratchpad/verify/verify.mjs（session 結束會清，需要可重寫）。
+> 教訓存檔：過程中兩個驗證 agent 先後**編造**「全部通過」報告（含假截圖檔名、假 ls 輸出），
+> 靠檢查截圖實物揭穿——已記入 ~/.claude/rules/lessons.md，驗證類回報必須抽查證據物。
+>
+> 內容：月視圖手機重設計（日期＋色點格＋下方 agenda，點日不跳走，「日視圖」按鈕才跳）、
+> 週視圖剛好 3 欄一屏、44pt 觸控目標普查（日曆導覽/縮放把手/勾選框/筆記工具列）、
+> hover-only 功能觸控可見化（記事本、快速連結）、2 個殘存中央 modal 改 vaul bottom sheet。
+>
+> 待辦（P1-P2，細節見 MOBILE_UX_PLAN.md WP5-WP8）：
+> 1. WP5 底欄 tab 手感（active 動畫、haptic、切 tab 保留日曆捲動位置）
+> 2. WP6 筆記工具列鍵盤貼附（visualViewport）
+> 3. WP7 殘留 hover-only 普查（10 個檔案清單在文件裡）
+> 4. WP8 週視圖 CSS scroll-snap（等 iOS 實機測過再決定）
+> 5. 375×667 小螢幕月視圖 agenda 偏擠（一屏 ~2.5 個任務），可考慮短螢幕壓格高
+>
+> 備註：
+> (1) Supabase email confirmation 是開著的（正常安全狀態）。測試帳號
+> `huddle.mobiletest.20260706@gmail.com`（[REDACTED: supply test credentials separately]）已由使用者授權用 SQL 補
+> email_confirmed_at 供自動化測試登入；不用時可在後台刪除。
+> (2) 深色模式的畫面驗收這輪沒做（腳本只跑淺色）；通知中心有一顆 36×36 數字按鈕
+> 未達 44pt（既有元件，已含在 WP7 清單檔案內）。
+> (3) 第二路驗證加抓到 chevron 被 flex 擠壓的熱區問題，已修（flex-shrink-0，
+> commit 見 git log），修後實測 44×44。兩路獨立驗證（主對話腳本＋agent 實測）
+> 的截圖共 18 張都在 docs/reports/2026-07-06-mobile-verify-shots/。
+
+---
+
+## 🟠 行事曆自動分類前綴 — 程式碼已完成，待套 migration + 驗收
+
+> 2026-06-08：日曆任務標題顯示時自動冠上分類「分類｜任務」（排除最上層 workspace），可在設定關掉，預設開。display-only（不改 stored title），走 React context 廣播。
+>
+> 改動：`lib/task-display.ts`（新 helper）、`components/category-prefix-context.tsx`（新 context）、`UserSettings.showCategoryPrefix`、mapper/database.types/saveSettings ext-col 與 localStorage fallback、設定 modal 一般頁 toggle、5 個行事曆視圖（task-block / month / week / day-scroll / pending-zone）、onboarding tour 兩處。型別檢查通過。
+>
+> ✅ migration 0013 已 `supabase db push` 套到遠端（2026-06-08）。
+> ✅ **PR #3 已合併進 main (`32a6d17`)，Zeabur 自動部署上線。**
+>
+> 待辦：
+> 1. **線上驗收**：日曆事件/待排程/拖曳預覽都出現「分類｜任務」；設定關掉後消失；輸入框仍是乾淨標題。
+> 3. 使用者選擇「一律補上」→ 舊任務若已手打「分類｜」會疊兩次，需手動清掉舊前綴。
+
+---
+
+## 🟢 白板 Notion 化 Phase 1 — 已上線（Zeabur）
+
+> 2026-06-03：實作 + `/code-review`(11 findings 全修) + re-review 修掉 promote 回歸 + commit `fc83a44` + **PR #1 已合併進 main (`5d36697`)**。
+>
+> ✅ migration 0011 已套到遠端 Supabase。
+> ✅ **Zeabur production 部署成功（正式站走 Zeabur）。**
+>
+> 待辦：
+> 1. **驗收線上白板**（需登入 Zeabur 正式站）：新增文字/待辦(`[] `)/圖片/連結、勾選、就地編輯、拖曳重排、升級任務（取消 modal 不掉資料）。
+> 2. **Vercel 整合一直 failure**（同 env-var 問題，不擋上線因為 Zeabur 在服務）→ 二選一：補 Vercel 的 `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` 讓它過，或乾脆移除 Vercel 整合別讓它一直紅。
+> 3. Phase 2/3 仍待做（callout/toggle/連結預覽 Edge Function、Tiptap、AI 覆盤）。see memory `project_scratchpad_notion`、docs/reports/2026-06-03-scratchpad-notion-phase-1.md。
+
+---
+
+## 🟠 iOS（先前已完成的檢查點）
+
+> ✅ 2026-06-01 已全部完成（commit `73223af`）：
+> 1. iOS 改動已 commit 成檢查點（分支 `feat/ios-capacitor`）。
+> 2. WR-01 open redirect 已修（`next` 只允許同源相對路徑）；WR-02 採選項 (a)：
+>    `@capacitor/haptics` 接到任務完成 off→on（新檔 `lib/haptics.ts`），移除 `@capacitor/clipboard`。
+> TypeScript 型別檢查通過。
+
+---
+
+## 🟡 iOS 原生專案（Xcode 已裝，2026-07-12 起步）
+
+3. **Phase 5 原生專案**：
+   - ✅ 2026-07-12：`pnpm build:cap` → `npx cap add ios` → `cap sync ios` 完成，`ios/` 已生成
+     （Capacitor 8 走 SPM，11 個外掛全相容，**不需要 CocoaPods**，雖然也裝了 pod 1.17.0）；
+     Info.plist 已註冊 URL scheme `huddle`（plutil lint OK）；`npx cap open ios` 可開 Xcode。
+     ⚠️ 開的是 `ios/App/App.xcodeproj`（SPM 專案，沒有 .xcworkspace）——直接開專案根目錄
+     Xcode 會報「Could not open file」（使用者踩過）。`ios/` 尚未 commit（要 commit，含 Info.plist 手改）。
+     ⚠️ `xcode-select` 仍指向 CommandLineTools，Xcode GUI 建置不受影響，但 `cap run ios` 等
+     CLI 建置會失敗；需使用者親跑 `sudo xcode-select --switch /Applications/Xcode.app`（要密碼）。
+   - ✅ 2026-07-12 稍晚：Team 已選（Personal Team，lazydragon0247@gmail.com 憑證簽章成功）。
+   - 🔴 **建置被擋：工具鏈版本（等使用者升級 macOS）**。診斷鏈（全部已查證）：
+     Xcode 首次建置報「Missing package product 'CapApp-SPM'」→ CLI `xcodebuild
+     -resolvePackageDependencies`（用 `DEVELOPER_DIR=/Applications/Xcode.app/...` 繞過
+     xcode-select 指向 CLT 的問題）揪出 ① apple-sign-in@7.1.0 的 Package.swift 只認
+     capacitor-swift-pm 7.x，與其他外掛的 8.x 衝突 → **已修**：pnpm patch 放寬為
+     `"7.0.0"..<"9.0.0"`（patches/@capacitor-community__apple-sign-in.patch；pnpm patch-commit
+     被中文路徑弄壞 diff 表頭，手動修正後 `pnpm install` 套用成功；上游 master 也還沒真修，
+     日後出 8.x 正式版就可移除補丁）。② 解析通過後編譯又倒在 @capacitor/status-bar@8.0.2
+     （已是最新）呼叫的 API 在 swiftinterface 裡被 `$NonescapableTypes` 編譯器特性 guard 住
+     → 根因：**Capacitor 8 官方要求 Xcode ≥26**（capacitorjs.com environment-setup 查證），
+     使用者 Mac 是 macOS 14.5（M1）只能裝 Xcode 16.2。**且 Apple 官方 2026-04-28 起上架
+     必須 Xcode 26 + iOS 26 SDK**（developer.apple.com/news/upcoming-requirements 查證）
+     → 降級 Capacitor 7 是死路，不做。
+   - ✅ 2026-07-12 磁碟已清出（8.7GB→45GB，使用者逐項確認後刪：18.3 模擬器 runtime、
+     各類快取、Claude vm_bundles；guard hook 有攔 rm -rf，經使用者同意後用 python 執行）。
+     Downloads 7.5GB 個人檔案未動。
+   - ✅ 2026-07-12 深夜：macOS 26.5.2 + Xcode 26.6 + iOS 26.5 模擬器全到位，
+     `xcodebuild` **BUILD SUCCEEDED**，app 已裝進 iPhone 17 Pro 模擬器實際啟動，
+     登入頁渲染正常（奶油色品牌畫面，agent 判讀截圖確認，非白屏）。
+     首次啟動曾見白屏＝舊安裝殘留＋截圖太早，重裝後正常，非 bug。
+     跑法備忘：`pnpm cap:sync` 後 Xcode 開 ios/App/App.xcodeproj 按 ▶，
+     或 CLI（DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer + xcodebuild/simctl）。
+   - ✅ 2026-07-13 凌晨「iOS 專業體檢＋直接執行」（commit 76307a5，使用者授權全量執行）：
+     ① 修真 bug：OAuth 瀏覽器中途關閉→登入按鈕永久卡 loading（連 Email 一起鎖）——
+     新 hook `lib/auth/use-browser-finished.ts` 接 @capacitor/browser `browserFinished`，
+     login/signup 都接上（web 上是 no-op）；②冷啟白屏——capacitor.config 加 WebView
+     `backgroundColor:#fdf8ec`＋`launchAutoHide:false`（native-shell mount 後手動 hide）；
+     ③品牌 icon＋啟動畫面（light/dark）——由 public/icon.svg 產 assets/ 三張源圖 →
+     @capacitor/assets 生成（sharp 已加入 pnpm onlyBuiltDependencies）；
+     ④外部連結防導航走——`lib/external-link.ts`（openExternalUrl＋anchor 攔截器），
+     quick-links/筆記連結/會議連結/白板連結四處接上；⑤touch-action: manipulation。
+     驗證：模擬器全新安裝截圖三連拍 agent 判讀（奶油 splash＋企鵝 logo／登入頁／
+     桌面企鵝圖示）全過；type-check、eslint 0 errors、e2e smoke 8/8、build:web 綠。
+     ⚠️ browserFinished 修復未在模擬器真按 Google 實測（需先設定下面的 Supabase redirect）。
+   - ⬜ **使用者一分鐘可做**：Supabase 後台 → Authentication → URL Configuration →
+     Redirect URLs 加 `huddle://auth/callback` → app 裡 Google 登入就會正確彈回 app
+     （目前會跑去網頁版，這正是使用者 07-12 深夜看到網址列的原因）。
+   - ⬜ 後續票：appStateChange resume 時重抓資料（use-waddle-data 無 realtime，久背景
+     回前景會顯示舊資料；要動 2600 行核心 hook，留專門 session 做）、
+     模擬器實際登入走完關鍵流程（任務/日曆/計時器/通知）、
+     加 Sign in with Apple / Notifications capability（等 $99）。
+     本輪 web 端也受益的改動（touch-action、外部連結）✅ 已於 2026-07-13 經 PR #7
+     合併部署（使用者「順手做一下」授權）：新版 CSS 指紋確認上線＋正式站回歸 6/6
+     （登入/overlay/分類 CRUD 寫入往返/Esc/無 page error）全過。
+4. **各主控台設定**：Supabase redirect URL (`huddle://auth/callback`) + 啟用 Apple provider；Apple Developer App ID / Services ID / Sign in with Apple key；部署 `delete-account` Edge Function (`supabase functions deploy`)。
+   → **步驟全寫在 [docs/IOS_SETUP.md](docs/IOS_SETUP.md)**，照著做。
+
+---
+
+## 🟢 等你提供 / 去辦
+
+5. **Apple Developer Program**（$99/年）— 使用者確認會用**個人 Apple 帳號
+   `lazydragon0247@gmail.com`** 辦（2026-07-12 拍板），簽章/TestFlight/送審都需要。
+6. ✅ **Bundle ID 已定案 `com.lazylazy.huddle`**（2026-07-12，使用者親自在 Xcode 選定，
+   並已成功簽章：Personal Team + Apple Development 憑證出現）。過程：佔位 `com.huddle.app`
+   在 Xcode 註冊時發現已被別人佔用 → 一度改 `tw.dropout.huddle`，但**使用者明確表示這是
+   他個人的專案、與公司 dropout.tw 無關，名稱不得含 dropout**（曾提議 com.lazydragon0247.huddle，
+   使用者改選 com.lazylazy.huddle）。`lib/native-config.ts`、`capacitor.config.ts`、
+   `project.pbxproj`×2（Xcode 寫入）全部一致，舊 ID 已 grep 清零，`pnpm cap:sync` 與
+   `pnpm type-check` 綠。剩「各主控台」（Apple Developer / Supabase redirect）等辦好
+   Developer Program 再設（IOS_SETUP.md 第 4、8 節）。URL scheme 維持 `huddle` 不變。
+   目前簽章用 Personal Team（免費）：模擬器與自己手機可跑，但 Sign in with Apple
+   capability／推播／上架都要等 $99 Program。第一次上架後 Bundle ID 就永久固定。
+
+---
+
+## ⚪ 可選 / 低優先（不擋上架）
+
+7. 刪帳號入口也加到 user menu（目前只在設定頁的危險區域，已符合 App Store 5.1.1）。
+8. `auth-guard.tsx` 與 `app/page.tsx` 的 loading 畫面抽成共用 `<MascotLoader/>`。
+9. Onboarding tour 可補介紹 iOS 背景通知等新功能（選做）。
+
+---
+
+## ✅ 這次 session 已完成（參考）
+
+Phase 1–10 程式碼全做完、**web + capacitor 兩個 build 都過型別檢查**；client auth guard、Capacitor Supabase client（Preferences/PKCE）、deep-link OAuth + Sign in with Apple、原生背景會議通知、分享 fallback、原生殼 runtime、改名 Huddle（保留 localStorage key/元件名）、刪帳號 Edge Function + UI、`docs/IOS_SETUP.md`、`REVIEW.md`。
+
+> 註：ESLint 在此環境本身壞掉（eslint-config-next + ESLint 9.39 相容 bug），與本次改動無關；正確性靠 TypeScript 型別檢查把關。
+
+---
+
+## ✅ 2026-07-14 已解決：重複任務單次改時間報錯（正式站）
+
+> 症狀：調整每週重複會議的本週時間 → 報「任務排程沒寫入：可能登入逾時」、重整後改動消失。
+> 真因：正式資料庫漏套 migration `0010_recurrence_overrides.sql`（tasks 缺 exdates/parent_id
+> 欄位；0009、0011–0015 都在，唯獨 0010 當年手動貼漏）。使用者當日已在 dashboard SQL Editor
+> 補跑，主對話以 anon key 唯讀探測驗證兩欄位已存在 ✓。
+> 🔎 遺留小事：該錯誤 toast 文案「可能登入逾時」是誤導（DB schema 錯也顯示這句），可順手改準確。
+> 🔎 另：Supabase CLI 憑證過期（supabase migration list 回 401），使用者同意日後重新 login
+> 讓主對話代跑 migration；下次要動 DB 時先請他跑一次 `supabase login`。

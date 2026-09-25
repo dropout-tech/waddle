@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import {
   CheckCircle2,
   Circle,
+  ChevronDown,
+  ChevronUp,
   LayoutGrid,
   List,
   Pencil,
@@ -45,6 +47,7 @@ export function FocusBoard(props: FocusBoardProps) {
     }
   });
   const [saving, setSaving] = useState(false);
+  const [taskViews, setTaskViews] = useState<Record<string, "preview" | "expanded" | "collapsed">>({});
   const cards = focus.cards ?? defaultCards(workspaces, todayStr);
   const entries = cards
     .filter((c) => !c.hidden)
@@ -91,11 +94,22 @@ export function FocusBoard(props: FocusBoardProps) {
     <div data-testid="focus-board" className="min-w-0">
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <h2 className="mr-auto text-xl font-semibold">{t("當前重點")}</h2>
+        <div className="flex gap-1">
+          <button type="button" onClick={() => setTaskViews(Object.fromEntries(cards.map(c => [c.categoryId, "expanded"]))) } className="min-h-11 rounded-lg px-3 text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">{t("全部展開")}</button>
+          <button type="button" onClick={() => setTaskViews(Object.fromEntries(cards.map(c => [c.categoryId, "collapsed"]))) } className="min-h-11 rounded-lg px-3 text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">{t("全部收起")}</button>
+        </div>
         <input
           aria-label={t("搜尋分類或任務")}
           placeholder={t("搜尋分類或任務")}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            // Search includes every task, so matching tasks beyond the preview
+            // must be visible. Clearing search restores the compact default.
+            setTaskViews(e.target.value.trim()
+              ? Object.fromEntries(cards.map(c => [c.categoryId, "expanded"]))
+              : {});
+          }}
           className="h-11 min-w-0 flex-1 basis-48 rounded-lg border border-border bg-card px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
         <div className="flex shrink-0 gap-1">
@@ -143,7 +157,7 @@ export function FocusBoard(props: FocusBoardProps) {
       )}
       <div
         className={cn(
-          "grid items-start gap-5",
+          "grid items-start gap-3",
           layout === "card" &&
             "grid-cols-[repeat(auto-fit,minmax(min(100%,26rem),1fr))]",
         )}
@@ -156,6 +170,8 @@ export function FocusBoard(props: FocusBoardProps) {
             workspace={workspace}
             category={category}
             saving={saving}
+            taskView={taskViews[category.id] ?? "preview"}
+            onTaskViewChange={(value) => setTaskViews(previous => ({ ...previous, [category.id]: value }))}
             onUpdate={(patch) => update(category.id, patch)}
           />
         ))}
@@ -184,12 +200,16 @@ function ProgressCard({
   onToggleComplete,
   onAddTask,
   onSetFocusBoard,
+  taskView,
+  onTaskViewChange,
 }: FocusBoardProps & {
   card: FocusCard;
   workspace: Workspace;
   category: Workspace["categories"][number];
   saving: boolean;
   onUpdate: (patch: Partial<FocusCard>) => Promise<void>;
+  taskView: "preview" | "expanded" | "collapsed";
+  onTaskViewChange: (value: "preview" | "expanded" | "collapsed") => void;
 }) {
   const { t } = useI18n();
   const displayColor = useDisplayColor();
@@ -288,7 +308,7 @@ function ProgressCard({
   return (
     <article
       data-focus-card={category.id}
-      className="min-w-0 rounded-xl border border-border bg-card p-5 sm:p-6"
+      className="min-w-0 rounded-xl border border-border bg-card p-3 sm:p-4"
     >
       <div className="flex items-start gap-3">
         <span
@@ -298,7 +318,7 @@ function ProgressCard({
         <div className="min-w-0 flex-1">
           <h3
             data-focus-card-title
-            className="break-words text-2xl font-semibold leading-snug"
+            className="break-words text-lg font-semibold leading-snug"
           >
             {category.name}
           </h3>
@@ -319,7 +339,7 @@ function ProgressCard({
       </div>
       {editing ? (
         <form
-          className="mt-5 space-y-3"
+          className="mt-3 space-y-3"
           onKeyDown={(e) => {
             if (e.key === "Enter" && isImeComposing(e)) e.preventDefault();
             if (e.key === "Escape" && !isImeComposing(e)) {
@@ -419,7 +439,7 @@ function ProgressCard({
           </fieldset>
         </form>
       ) : (
-        <div className="mt-5 space-y-4">
+        <div className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
           <div className="min-w-0 [overflow-wrap:anywhere]">
             <p className="mb-1 text-xs font-medium text-muted-foreground">
               {t("目前狀態")}
@@ -500,14 +520,15 @@ function ProgressCard({
           </div>
         </div>
       )}
-      <div className="mt-5 border-t border-border pt-4">
+      <div className="mt-2 border-t border-border pt-1">
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-          <p>
+          <button type="button" aria-label={t(taskView === "collapsed" ? "展開「{name}」任務" : "收起「{name}」任務", { name: category.name })} aria-expanded={taskView !== "collapsed"} onClick={() => onTaskViewChange(taskView === "collapsed" ? "preview" : "collapsed")} className="flex min-h-11 items-center gap-1 rounded-md px-1 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
+            {taskView === "collapsed" ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}
             {t("任務")}{" "}
             <span className="ml-1 text-muted-foreground">
               {done} / {tasks.length} {t("已完成")}
             </span>
-          </p>
+          </button>
           {editable && (
             <select
               aria-label={t("「{name}」任務排序", { name: category.name })}
@@ -527,6 +548,7 @@ function ProgressCard({
             </select>
           )}
         </div>
+        {taskView !== "collapsed" && <>
         {editable && (
           <label className="mt-1 flex min-h-11 items-center gap-2 text-xs text-muted-foreground">
             <input
@@ -542,9 +564,9 @@ function ProgressCard({
             {t("顯示已完成任務")}
           </label>
         )}
-        <ul className="mt-2 divide-y divide-border/50">
-          {sorted.map((task) => (
-            <li key={task.id} className="flex min-w-0 items-center gap-1 py-1">
+        <ul className="divide-y divide-border/50">
+          {(taskView === "expanded" ? sorted : sorted.slice(0, 4)).map((task) => (
+            <li key={task.id} className="flex min-w-0 items-center gap-1">
               <button
                 aria-label={t(
                   task.isCompleted
@@ -564,7 +586,7 @@ function ProgressCard({
               </button>
               <button
                 onClick={() => onSelectTask(task)}
-                className="min-h-11 min-w-0 flex-1 rounded-lg px-1 py-2 text-left hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
+                className="min-h-11 min-w-0 flex-1 rounded-lg px-1 py-1 text-left hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span
                   className={cn(
@@ -574,10 +596,7 @@ function ProgressCard({
                 >
                   {task.title}
                 </span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  {t(task.isCompleted ? "已完成" : "待辦")}
-                  {task.dueDate ? ` · ${task.dueDate}` : ""}
-                </span>
+                {task.dueDate && <span className="text-xs text-muted-foreground">{task.dueDate}</span>}
               </button>
               {editable && (
                 <button
@@ -608,11 +627,13 @@ function ProgressCard({
             </li>
           ))}
         </ul>
+        {sorted.length > 4 && <button type="button" aria-expanded={taskView === "expanded"} onClick={() => onTaskViewChange(taskView === "expanded" ? "preview" : "expanded")} className="min-h-11 w-full rounded-md px-2 text-sm text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">{taskView === "expanded" ? t("只顯示 4 個任務") : t("展開其餘 {count} 個任務", { count: sorted.length - 4 })}</button>}
         {sorted.length === 0 && (
           <p className="py-4 text-sm text-muted-foreground">
             {t(tasks.length ? "目前沒有待辦任務" : "這個分類還沒有任務")}
           </p>
         )}
+        </>}
       </div>
     </article>
   );

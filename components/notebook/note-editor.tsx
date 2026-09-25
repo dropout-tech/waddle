@@ -17,6 +17,9 @@ const TITLE_DEBOUNCE_MS = 500
 
 interface NoteEditorProps {
   note: NotebookNote
+  readOnly?: boolean
+  immediateTitleChanges?: boolean
+  elevatedMenus?: boolean
   onTitleChange: (title: string) => void
   onContentChange: (content: TiptapDoc) => void
   onIconChange?: (icon: string | undefined) => void
@@ -34,7 +37,7 @@ export interface NoteEditorHandle {
 }
 
 export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor(
-  { note, onTitleChange, onContentChange, onIconChange, onPromote, uploadImage },
+  { note, onTitleChange, onContentChange, onIconChange, onPromote, uploadImage, readOnly = false, immediateTitleChanges = false, elevatedMenus = false },
   ref,
 ) {
   const isMobile = useIsMobile()
@@ -47,6 +50,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   const editor = useEditor({
     extensions: notebookExtensions(uploadImage),
+    editable: !readOnly,
     content: note.content ?? EMPTY_DOC,
     // Tiptap SSR guard: render only on the client to avoid hydration mismatch.
     immediatelyRender: false,
@@ -56,6 +60,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       // into the content JSON). Non-image paste/drop falls through untouched
       // by returning false, so text/HTML/internal-node drag stays default.
       handlePaste: (view, event) => {
+        if (readOnly) return false
         const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
           f.type.startsWith('image/'),
         )
@@ -65,6 +70,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         return true
       },
       handleDrop: (view, event) => {
+        if (readOnly) return false
         const files = Array.from(event.dataTransfer?.files ?? []).filter((f) =>
           f.type.startsWith('image/'),
         )
@@ -76,10 +82,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       },
     },
     onUpdate: ({ editor }) => {
-      if (applyingRef.current) return
+      if (applyingRef.current || readOnly) return
       onContentChange(editor.getJSON() as TiptapDoc)
     },
   })
+
+  useEffect(() => { editor?.setEditable(!readOnly, false) }, [editor, readOnly])
 
   useImperativeHandle(
     ref,
@@ -116,12 +124,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   const commitTitle = (value: string) => {
     clearTimeout(titleTimer.current)
-    onTitleChange(value)
+    if (!readOnly) onTitleChange(value)
   }
 
   const handleTitleChange = (value: string) => {
     setTitle(value)
     clearTimeout(titleTimer.current)
+    if (immediateTitleChanges) { onTitleChange(value); return }
     titleTimer.current = setTimeout(() => onTitleChange(value), TITLE_DEBOUNCE_MS)
   }
 
@@ -129,8 +138,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   return (
     <div className="flex h-full flex-col">
-      <EditorToolbar editor={editor} onPromote={onPromote} uploadImage={uploadImage} />
-      {!isMobile && <SelectionToolbar editor={editor} />}
+      {!readOnly && <EditorToolbar editor={editor} onPromote={onPromote} uploadImage={uploadImage} />}
+      {!readOnly && !isMobile && <SelectionToolbar editor={editor} />}
       <div
         className="flex-1 overflow-y-auto"
         // Click the blank space below/around the document (not the title
@@ -145,8 +154,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         {/* Extra bottom padding on mobile so the last lines clear the
             keyboard-docked toolbar (fixed, ~52px + home-indicator safe area). */}
         <div className="mx-auto w-full max-w-[46rem] px-6 py-8 md:px-10 max-md:pb-[calc(env(safe-area-inset-bottom)+72px)]">
-          <NoteIconPicker icon={note.icon} onChange={onIconChange} />
+          {!readOnly && <NoteIconPicker icon={note.icon} onChange={onIconChange} elevated={elevatedMenus} />}
           <input
+            readOnly={readOnly}
+            aria-label={t('標題')}
             value={title}
             onChange={(e) => handleTitleChange(e.target.value)}
             onBlur={(e) => commitTitle(e.target.value)}

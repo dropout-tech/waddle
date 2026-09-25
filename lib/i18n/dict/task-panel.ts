@@ -281,6 +281,12 @@ export const dict: Record<string, string> = {
   'Enter 存檔・Esc 取消・點別處也會存': 'Enter to save · Esc to cancel · clicking away saves too',
 
   // Category progress board
+  "全部展開": "Expand all",
+  "全部收起": "Collapse all",
+  "展開「{name}」任務": "Expand tasks in {name}",
+  "收起「{name}」任務": "Collapse tasks in {name}",
+  "只顯示 4 個任務": "Show only 4 tasks",
+  "展開其餘 {count} 個任務": "Show {count} more tasks",
   "編輯「{name}」目前狀態": "Edit current status for {name}",
   "編輯「{name}」備註": "Edit notes for {name}",
   "開啟原任務": "Open linked task",

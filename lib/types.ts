@@ -5,12 +5,10 @@ import type { FocusSettings } from './focus'
 // Scratchpad (Focus Capture) Types
 export interface ScratchpadItem {
   id: string
-  // Phase 1 block types. heading/divider/callout/toggle/rich_text are deferred
-  // (they belong to a vertical-document layout, not the card grid); the DB
-  // column is `text`, so future phases can widen this without a migration.
+  // Board object type; rich notebook content lives in metadata.document.
   type: 'text' | 'image' | 'link' | 'todo'
   content: string // text content, image data URL, or link URL
-  title?: string // for links
+  title?: string // object/detail title, or link label
   isChecked?: boolean // for todos
   sortOrder: number
   parentId?: string // reserved: toggles/nesting (schema forward-compat)

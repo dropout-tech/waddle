@@ -1,0 +1,3 @@
+{
+  "patch": "diff --git a/next-env.d.ts b/next-env.d.ts\nindex c4b7818..9edff1c 100644\n--- a/next-env.d.ts\n+++ b/next-env.d.ts\n@@ -1,6 +1,6 @@\n /// <reference types=\"next\" />\n /// <reference types=\"next/image-types/global\" />\n-import \"./.next/dev/types/routes.d.ts\";\n+import \"./.next/types/routes.d.ts\";\n \n // NOTE: This file should not be edited\n // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.\n"
+}

@@ -91,8 +91,8 @@ const NAME = Object.fromEntries(CATS.map((c) => [c.id, c.name]))
  * Tasks per category. Order here is the order they must be numbered in — the
  * urgency ladder below is descending, and none of them are scheduled, so
  * lib/focus.ts's ranking keeps them in this exact sequence.
- * 九豆 carries FIVE open tasks: the tiered modes cap a card at 3, so this is
- * what proves 大綱 lifts the cap instead of printing 「還有 2 個」.
+ * 九豆 carries FIVE open tasks: the compact board shows four by default, so
+ * this category exercises both the per-card and board-wide expand/collapse paths.
  */
 const TASKS = [
   { cat: CATS[0].id, title: '接上藍新金流的定期扣款', urgency: 9 },
@@ -271,11 +271,32 @@ try {
   await statusInput.fill('推動金流物流')
   await statusInput.press('Enter'); await sleep(300)
   check('All six categories share the same heading hierarchy', await board.locator('h3').count() === 6)
-  check('All five tasks are visible, no truncated summaries', await card.locator('li').count() === 5 && await page.locator('[data-focus-tier]').count() === 0)
+  check('Compact cards show four tasks by default', await card.locator('li').count() === 4)
+  const expandNineBean = card.getByRole('button', { name: '展開其餘 1 個任務' })
+  await expandNineBean.click(); await sleep(250)
+  check('A category can expand past the four-task preview', await card.locator('li').count() === 5)
+  await card.getByRole('button', { name: '只顯示 4 個任務' }).click(); await sleep(250)
+  check('A category can return to the four-task preview', await card.locator('li').count() === 4)
+  await board.getByRole('button', { name: '全部展開' }).click(); await sleep(250)
+  check('Expand all reveals every task in every category', await card.locator('li').count() === 5 && await board.getByRole('button', { name: '全部收起' }).isVisible())
+  await board.getByRole('button', { name: '全部收起' }).click(); await sleep(250)
+  check('Collapse all hides every task list', await card.locator('li').count() === 0 && await card.getByRole('button', { name: '展開「九豆」任務' }).getAttribute('aria-expanded') === 'false')
+  await card.getByRole('button', { name: '展開「九豆」任務' }).click(); await sleep(250)
+  check('A collapsed category reopens in the four-task preview', await card.locator('li').count() === 4)
+  const search = board.getByRole('textbox', { name: '搜尋分類或任務' })
+  await search.fill('請設計師重畫外箱'); await sleep(250)
+  check('Search reveals a matching task beyond the four-task preview', await card.getByText('請設計師重畫外箱', { exact: true }).isVisible() && await card.locator('li').count() === 5)
+  await search.fill(''); await sleep(250)
+  check('Clearing search restores the four-task preview', await card.locator('li').count() === 4)
   check('Legacy status preserved', await card.getByText('推動金流物流', { exact: true }).isVisible())
-  await card.getByRole('button', { name: '編輯「九豆」狀態與備註' }).click()
+  await card.getByRole('button', { name: '編輯「九豆」目前狀態' }).click()
+  check('Clicking the displayed status opens its editor directly', await card.getByRole('textbox', { name: '自訂狀態' }).isVisible())
   check('Status editor needs no save button', await card.getByRole('button', { name: '儲存', exact: true }).count() === 0)
   await card.getByRole('textbox', { name: '自訂狀態' }).fill('等待物流商回覆')
+  await board.getByRole('heading', { name: '當前重點' }).click()
+  await sleep(300)
+  await card.getByRole('button', { name: '編輯「九豆」備註' }).click()
+  check('Clicking the displayed remarks opens its editor directly', await card.getByRole('textbox', { name: '備註' }).isVisible())
   await card.getByRole('textbox', { name: '備註' }).fill('週五追蹤報價\n尚未建立任務')
   await board.getByRole('heading', { name: '當前重點' }).click()
   await sleep(500)
@@ -283,6 +304,11 @@ try {
   check('Custom status creates no task by default', !writes.some((w) => w.table === 'tasks' && w.method === 'POST'))
   await page.reload(); await sleep(2000); await openBoard(page)
   check('Settings survive normalization and reload', await card.getByText('等待物流商回覆', { exact: true }).isVisible())
+  await card.getByRole('button', { name: '編輯「九豆」備註' }).click()
+  check('Clicking the displayed remarks opens the same inline editor', await card.getByRole('textbox', { name: '備註' }).isVisible())
+  await card.getByRole('textbox', { name: '備註' }).fill('這段不應該被儲存')
+  await card.getByRole('button', { name: '取消', exact: true }).click()
+  check('Cancelling direct remarks editing preserves the saved value', storedFocus.cards[0].remarks === '週五追蹤報價\n尚未建立任務' && await card.getByText('週五追蹤報價\n尚未建立任務', { exact: true }).isVisible())
   failCreate = true
   await card.getByRole('button', { name: '將此狀態新增為任務' }).click(); await sleep(600)
   check('Failed conversion keeps custom status and allows retry', await card.getByRole('button', { name: '將此狀態新增為任務' }).isEnabled() && await card.getByText('等待物流商回覆', { exact: true }).isVisible())
@@ -293,6 +319,7 @@ try {
   check('Task status stores reference, not a duplicate task', storedFocus.cards[0].status.taskId === taskRows[1].id)
   await card.getByRole('button', { name: '完成「談好宅配的到府取件費率」', exact: true }).click(); await sleep(500)
   check('Completing original task updates the status and progress', await card.getByText('1 / 6 已完成', { exact: true }).isVisible())
+  await card.getByRole('button', { name: '展開其餘 1 個任務' }).click(); await sleep(250)
   await card.getByRole('checkbox', { name: '顯示已完成任務' }).check(); await sleep(400)
   check('Completed task can remain visible', await card.getByRole('button', { name: '將「談好宅配的到府取件費率」標為未完成' }).isVisible())
   await card.getByRole('combobox', { name: '「九豆」任務排序' }).selectOption('created'); await sleep(400)
@@ -307,7 +334,7 @@ try {
   await modal.getByRole('button', { name: '下移「九豆」' }).click()
   await modal.getByRole('button', { name: '儲存', exact: true }).click(); await sleep(400)
   check('Card ordering is honored without automatic tiers', await board.locator('h3').first().innerText() === 'Nova air')
-  await card.getByRole('button', { name: '編輯「九豆」狀態與備註' }).click()
+  await card.getByRole('button', { name: '編輯「九豆」目前狀態' }).click()
   await card.getByRole('combobox', { name: '選擇狀態任務' }).selectOption(taskRows[0].id)
   failSave = true
   await board.getByRole('heading', { name: '當前重點' }).click(); await sleep(500)
