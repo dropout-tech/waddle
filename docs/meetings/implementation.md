@@ -77,7 +77,7 @@ Email 連結可經過登入返回指定邀請。回傳路徑限定 UUID，不接
 
 ## 2026-09-25 整合驗收
 
-從 `382c21c` 獨立移植到目前工作分支基底 `a907da0`，未攜入舊分支的會員方案、官網或 Google Calendar 設定。日曆保留桌面入口與手機更多選單入口。
+從 `382c21c` 獨立移植到目前工作分支基底 `a907da0`，未攜入舊分支的會員方案、官網或 Google Calendar 設定。日曆保留桌面入口與手機更多選單入口。接回工作目錄後，再以包含 AI 會議紀錄 `fca91ce` 的整合提交 `fa1bfc6` 重跑 TypeScript、production build 與 60 項瀏覽器驗收，全部通過；`/meetings` 與 `/meetings/invitations` 皆成功建置。
 
 - 邀請路徑改為 `/meetings/invitations?invite=<uuid>`；Email、登入後返回與測試同步更新。保留正在開發的 `/meetings` 錄音／文字會議紀錄頁。
 - 讀取自己的任務、時間區塊與夥伴共享行程時保留秒數，避免資料映射提前截斷，將仍被占用的時段列為可用。
