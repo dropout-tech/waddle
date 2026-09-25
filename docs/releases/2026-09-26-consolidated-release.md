@@ -32,7 +32,7 @@ HANDOFF 備份、PIMI PDF、tmp 驗收／清理腳本不屬於產品發布；保
 
 ## 驗收與待補
 
-已通過 TypeScript、7 個 widget model 測試、隔離 PostgreSQL 每日簽到與排行榜測試（同分、前50、榜外本人、零分、匿名、RLS、授權）。本機 Next.js build 通過。
+已通過 TypeScript、7 個 widget model 測試、隔離 PostgreSQL 每日簽到與排行榜測試（同分、前50、榜外本人、零分、匿名、RLS、授權）。本機 Next.js build 通過。追加 UI 驗收通過：本人註冊日期、排行榜更新與錯誤重試、簽到失敗重試、跨日、英文、390px／桌機與暗色；資料庫請求全部 mock，沒有正式簽到寫入。小工具預覽 390px／1280px、11 種切換、尺寸、無水平溢出與無 JS 錯誤通過。跨日測試固定起始日期，避免隨真實日期失效。
 
 正式環境 backend blocker：Mac 鎖定，Supabase 管理頁不能操作；現有 management token 無效、connector 不含此專案。已請使用者解鎖。未執行正式資料修補、未寄測試邀請。
 

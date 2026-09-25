@@ -6,6 +6,8 @@ const env = Object.fromEntries(readFileSync('.env.e2e.local', 'utf8').split('\n'
 const browser = await chromium.launch()
 const context = await browser.newContext({ viewport: {width:1280,height:850}, locale:'zh-TW' })
 const page = await context.newPage()
+// Keep the midnight transition deterministic regardless of the machine date.
+await page.clock.setFixedTime(new Date('2026-09-25T12:00:00+08:00'))
 const errors=[]
 page.on('pageerror', e=>errors.push(e.message))
 let saved=false, writes=0, failWrite=false, failRead=false
