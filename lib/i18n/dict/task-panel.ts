@@ -281,6 +281,9 @@ export const dict: Record<string, string> = {
   'Enter 存檔・Esc 取消・點別處也會存': 'Enter to save · Esc to cancel · clicking away saves too',
 
   // Category progress board
+  "編輯「{name}」目前狀態": "Edit current status for {name}",
+  "編輯「{name}」備註": "Edit notes for {name}",
+  "開啟原任務": "Open linked task",
   "「{name}」任務排序": "Task order for {name}",
   "上移「{name}」": "Move {name} up",
   "下移「{name}」": "Move {name} down",
@@ -311,4 +314,6 @@ export const dict: Record<string, string> = {
   "這個分類還沒有任務": "No tasks in this category yet",
   "將「{name}」標為未完成": "Mark {name} incomplete",
   "完成「{name}」": "Complete {name}",
+  "離開編輯區自動儲存，Esc 取消": "Changes save when you leave the editor. Esc to cancel.",
+  "重試": "Retry",
 }

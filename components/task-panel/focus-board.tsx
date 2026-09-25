@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -193,7 +193,7 @@ function ProgressCard({
 }) {
   const { t } = useI18n();
   const displayColor = useDisplayColor();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState<"all" | "status" | "remarks" | null>(null);
   const [text, setText] = useState("");
   const [remarks, setRemarks] = useState("");
   const [mode, setMode] = useState<"text" | "task">("text");
@@ -237,7 +237,12 @@ function ProgressCard({
   const editable = !!onSetFocusBoard;
   const field =
     "min-h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-  function edit() {
+  const submitting = useRef(false);
+  const cancelled = useRef(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  function edit(target: "all" | "status" | "remarks" = "all") {
+    cancelled.current = false;
+    setSaveFailed(false);
     setMode(card.status?.mode === "task" ? "task" : "text");
     setTaskId(linked?.id ?? "");
     setText(
@@ -246,8 +251,40 @@ function ProgressCard({
         : (card.note ?? ""),
     );
     setRemarks(card.remarks ?? "");
-    setEditing(true);
+    setEditing(target);
   }
+  async function save() {
+    if (!editing || cancelled.current || submitting.current || saving) return;
+    if (editing !== "remarks" && mode === "task" && !taskId) return;
+    const statusChanged = editing !== "remarks" && (
+      mode === "task"
+        ? card.status?.mode !== "task" || card.status.taskId !== taskId
+        : card.status?.mode === "task" || text.trim() !== (statusText ?? "")
+    );
+    const remarksChanged = editing !== "status" && remarks.trim() !== (card.remarks ?? "");
+    if (!statusChanged && !remarksChanged) {
+      setEditing(null);
+      return;
+    }
+    submitting.current = true;
+    setSaveFailed(false);
+    try {
+      await onUpdate({
+        ...(statusChanged ? { status: mode === "task"
+          ? { mode: "task" as const, taskId, updatedAt: new Date().toISOString() }
+          : { mode: "text" as const, text: text.trim(), updatedAt: new Date().toISOString() }
+        } : {}),
+        ...(remarksChanged ? { remarks: remarks.trim() } : {}),
+      });
+      setEditing(null);
+    } catch {
+      setSaveFailed(true);
+      toast.error(t("儲存失敗，請重試"));
+    } finally {
+      submitting.current = false;
+    }
+  }
+
   return (
     <article
       data-focus-card={category.id}
@@ -273,7 +310,7 @@ function ProgressCard({
           <button
             aria-label={t("編輯「{name}」狀態與備註", { name: category.name })}
             disabled={saving}
-            onClick={edit}
+            onClick={() => edit()}
             className="-mr-2 -mt-2 flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Pencil className="size-4" />
@@ -285,31 +322,27 @@ function ProgressCard({
           className="mt-5 space-y-3"
           onKeyDown={(e) => {
             if (e.key === "Enter" && isImeComposing(e)) e.preventDefault();
-          }}
-          onSubmit={async (e) => {
-            e.preventDefault();
-            try {
-              await onUpdate({
-                status:
-                  mode === "task"
-                    ? {
-                        mode: "task",
-                        taskId,
-                        updatedAt: new Date().toISOString(),
-                      }
-                    : {
-                        mode: "text",
-                        text: text.trim(),
-                        updatedAt: new Date().toISOString(),
-                      },
-                remarks: remarks.trim(),
-              });
-              setEditing(false);
-            } catch {
-              toast.error(t("儲存失敗，請重試"));
+            if (e.key === "Escape" && !isImeComposing(e)) {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!saving && !submitting.current) {
+                cancelled.current = true;
+                setEditing(null);
+              }
             }
           }}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+              void save();
+            }
+          }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
         >
+          <fieldset disabled={saving} className="min-w-0 space-y-3">
+          {editing !== "remarks" && <>
           <label className="block space-y-1 text-sm">
             <span>{t("目前狀態")}</span>
             <select
@@ -325,6 +358,7 @@ function ProgressCard({
             <>
               <input
                 aria-label={t("自訂狀態")}
+                autoFocus
                 className={field}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -337,6 +371,7 @@ function ProgressCard({
           ) : (
             <select
               aria-label={t("選擇狀態任務")}
+              autoFocus
               required
               className={field}
               value={taskId}
@@ -351,40 +386,50 @@ function ProgressCard({
               ))}
             </select>
           )}
-          <label className="block space-y-1 text-sm">
+          </>}
+          {editing !== "status" && <label className="block space-y-1 text-sm">
             <span>{t("備註")}</span>
             <textarea
               className={field}
+              autoFocus={editing === "remarks"}
               rows={3}
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               maxLength={10000}
             />
-          </label>
-          <div className="flex gap-2">
-            <button
-              disabled={saving || (mode === "task" && !taskId)}
-              className="min-h-11 rounded-lg bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50"
-            >
-              {t(saving ? "儲存中…" : "儲存")}
-            </button>
+          </label>}
+          <div className="flex items-center gap-2">
+            <p role="status" className="text-xs text-muted-foreground">
+              {t(saving ? "儲存中…" : saveFailed ? "儲存失敗，請重試" : "離開編輯區自動儲存，Esc 取消")}
+            </p>
+            {saveFailed && <button type="submit" className="min-h-11 rounded-lg px-3 text-sm text-primary hover:bg-muted">
+              {t("重試")}
+            </button>}
             <button
               type="button"
-              disabled={saving}
-              onClick={() => setEditing(false)}
+              onClick={() => {
+                cancelled.current = true;
+                setEditing(null);
+              }}
               className="min-h-11 rounded-lg px-4 text-sm hover:bg-muted"
             >
               {t("取消")}
             </button>
           </div>
+          </fieldset>
         </form>
       ) : (
         <div className="mt-5 space-y-4">
-          <div>
+          <div className="min-w-0 [overflow-wrap:anywhere]">
             <p className="mb-1 text-xs font-medium text-muted-foreground">
               {t("目前狀態")}
             </p>
-            {linked ? (
+            {editable ? (
+              <button type="button" disabled={saving} onClick={() => edit("status")} aria-label={t("編輯「{name}」目前狀態", { name: category.name })} className="min-h-11 w-full min-w-0 rounded-md px-1 py-1 text-left text-sm whitespace-pre-wrap break-words hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
+                {linked && <Target className="mr-1.5 inline size-4" />}
+                {statusText || t(card.status?.mode === "task" ? "原任務已移動或移除，請重新設定狀態" : "尚未設定狀態")}
+              </button>
+            ) : linked ? (
               <button
                 onClick={() => onSelectTask(linked)}
                 className="min-h-11 w-full min-w-0 max-w-full break-words text-left text-base font-medium leading-relaxed hover:underline"
@@ -407,6 +452,7 @@ function ProgressCard({
                   )}
               </p>
             )}
+            {editable && linked && <button type="button" onClick={() => onSelectTask(linked)} className="min-h-11 rounded-md px-2 text-xs text-primary hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">{t("開啟原任務")}</button>}
             {editable &&
               statusText &&
               card.status?.mode !== "task" &&
@@ -442,13 +488,15 @@ function ProgressCard({
                 </button>
               )}
           </div>
-          <div>
+          <div className="min-w-0 [overflow-wrap:anywhere]">
             <p className="mb-1 text-xs font-medium text-muted-foreground">
               {t("備註")}
             </p>
-            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">
+            {editable ? <button type="button" disabled={saving} onClick={() => edit("remarks")} aria-label={t("編輯「{name}」備註", { name: category.name })} className="min-h-11 w-full min-w-0 rounded-md px-1 py-1 text-left text-sm whitespace-pre-wrap break-words text-muted-foreground hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
               {card.remarks || t("尚無備註")}
-            </p>
+            </button> : <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">
+              {card.remarks || t("尚無備註")}
+            </p>}
           </div>
         </div>
       )}
