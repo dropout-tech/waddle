@@ -21,6 +21,7 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore,
 } from 'react'
+import { useAuth } from '@/components/auth/auth-provider'
 import { notifyDesktop } from '@/lib/desktop-notifications'
 import { createPortal } from 'react-dom'
 import { usePathname } from 'next/navigation'
@@ -213,10 +214,10 @@ const MAX_PENDING_QUEUE = 20
 // effect below, next to pendingQueueRef's own load).
 const SESSION_LOG_PENDING_KEY = 'waddle-timer-pending-log-v1'
 
-function loadPendingQueue(): PendingCalendarRecord[] {
+function loadPendingQueue(key: string): PendingCalendarRecord[] {
   if (typeof window === 'undefined') return []
   try {
-    const raw = window.localStorage.getItem(PENDING_QUEUE_KEY)
+    const raw = window.localStorage.getItem(key)
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -241,11 +242,11 @@ function isPendingCalendarRecord(r: unknown): r is PendingCalendarRecord {
     && typeof o.label === 'string' && typeof o.color === 'string'
     && (o.notes === undefined || typeof o.notes === 'string')
 }
-function savePendingQueue(records: PendingCalendarRecord[]) {
+function savePendingQueue(records: PendingCalendarRecord[], key: string) {
   if (typeof window === 'undefined') return
   try {
-    if (records.length === 0) window.localStorage.removeItem(PENDING_QUEUE_KEY)
-    else window.localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(records.slice(-MAX_PENDING_QUEUE)))
+    if (records.length === 0) window.localStorage.removeItem(key)
+    else window.localStorage.setItem(key, JSON.stringify(records.slice(-MAX_PENDING_QUEUE)))
   } catch {}
 }
 
@@ -332,6 +333,9 @@ function buildExpiredWhileClosedRecord(s: TimerSession): PendingCalendarRecord {
 // ── Context surface consumed by the idle setup card (focus-timer.tsx) ──
 export interface FocusTimerContextValue {
   state: TimerState
+  pauseTimer: () => void
+  resumeTimer: () => void
+  stopTimer: () => void
   session: TimerSession | null
   displayTime: number
 
@@ -387,6 +391,16 @@ export function useFocusTimer(): FocusTimerContextValue {
 const NOTEBOOK_MOBILE_MINI_BOTTOM_PX = 64
 
 export function FocusTimerProvider({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return null
+  return <AccountFocusTimer key={user?.id ?? 'guest'} accountId={user?.id ?? 'guest'}>{children}</AccountFocusTimer>
+}
+
+function AccountFocusTimer({ children, accountId }: { children: React.ReactNode; accountId: string }) {
+  // Legacy unscoped records stay untouched: never assign an unknown owner's record to a new account.
+  const activeSessionKey = `${ACTIVE_SESSION_KEY}:${accountId}`
+  const pendingQueueKey = `${PENDING_QUEUE_KEY}:${accountId}`
+  const pendingLogKey = `${SESSION_LOG_PENDING_KEY}:${accountId}`
   const isMobile = useIsMobile()
   const pathname = usePathname()
   const { t } = useI18n()
@@ -658,27 +672,27 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
   // record itself was already safe to write, just missing its title/notes,
   // so it's treated as a plain completed focus session and queued normally).
   useEffect(() => {
-    const queue = loadPendingQueue()
+    const queue = loadPendingQueue(pendingQueueKey)
     let merged = queue
     if (typeof window !== 'undefined') {
       try {
-        const raw = window.localStorage.getItem(SESSION_LOG_PENDING_KEY)
+        const raw = window.localStorage.getItem(pendingLogKey)
         if (raw) {
           const parsed = JSON.parse(raw)
           if (isPendingCalendarRecord(parsed)) merged = [...merged, parsed]
         }
       } catch {}
-      try { window.localStorage.removeItem(SESSION_LOG_PENDING_KEY) } catch {}
+      try { window.localStorage.removeItem(pendingLogKey) } catch {}
     }
     pendingQueueRef.current = merged
-    if (merged.length !== queue.length) savePendingQueue(merged)
+    if (merged.length !== queue.length) savePendingQueue(merged, pendingQueueKey)
   }, [])
 
   const flushPendingQueue = useCallback((fn: RecorderFn) => {
     if (pendingQueueRef.current.length === 0) return
     const queue = pendingQueueRef.current
     pendingQueueRef.current = []
-    savePendingQueue([])
+    savePendingQueue([], pendingQueueKey)
     for (const r of queue) fn(r.date, r.startTime, r.endTime, r.type, r.label, r.color, r.notes)
   }, [])
 
@@ -699,7 +713,7 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
       recorderRef.current(record.date, record.startTime, record.endTime, record.type, record.label, record.color, record.notes)
     } else {
       pendingQueueRef.current = [...pendingQueueRef.current, record]
-      savePendingQueue(pendingQueueRef.current)
+      savePendingQueue(pendingQueueRef.current, pendingQueueKey)
     }
   }, [])
 
@@ -716,9 +730,9 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (typeof window === 'undefined') return
     let raw: string | null = null
-    try { raw = window.localStorage.getItem(ACTIVE_SESSION_KEY) } catch {}
+    try { raw = window.localStorage.getItem(activeSessionKey) } catch {}
     if (!raw) return
-    try { window.localStorage.removeItem(ACTIVE_SESSION_KEY) } catch {}
+    try { window.localStorage.removeItem(activeSessionKey) } catch {}
     const restored = parsePersistedSession(raw)
     if (!restored) return // malformed/tampered — discard
     if (Date.now() - restored.startedAt.getTime() > ACTIVE_SESSION_MAX_AGE_MS) return // zombie session — discard
@@ -769,7 +783,7 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     if (typeof window === 'undefined') return
     if ((state === 'running' || state === 'paused') && session) {
       try {
-        window.localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify({
+        window.localStorage.setItem(activeSessionKey, JSON.stringify({
           mode: session.mode,
           phase: session.phase,
           startedAt: session.startedAt.toISOString(),
@@ -782,7 +796,7 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
         }))
       } catch {}
     } else {
-      try { window.localStorage.removeItem(ACTIVE_SESSION_KEY) } catch {}
+      try { window.localStorage.removeItem(activeSessionKey) } catch {}
     }
   }, [state, session])
 
@@ -802,7 +816,7 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     const focusedSeconds = focusedSecondsOf(s)
     setSessionLog({ record, completed, focusedSeconds })
     if (typeof window !== 'undefined') {
-      try { window.localStorage.setItem(SESSION_LOG_PENDING_KEY, JSON.stringify(record)) } catch {}
+      try { window.localStorage.setItem(pendingLogKey, JSON.stringify(record)) } catch {}
     }
   }, [commitRecord])
 
@@ -826,7 +840,7 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     }
     commitRecord(finalRecord)
     if (typeof window !== 'undefined') {
-      try { window.localStorage.removeItem(SESSION_LOG_PENDING_KEY) } catch {}
+      try { window.localStorage.removeItem(pendingLogKey) } catch {}
     }
     setSessionLog(null)
   }, [sessionLog, commitRecord])
@@ -1021,13 +1035,14 @@ export function FocusTimerProvider({ children }: { children: React.ReactNode }) 
     bgmManualPlaying, setBgmManualPlaying,
     prefs, setPrefs,
     unavailableSrcs,
-    startTimer,
+    startTimer, pauseTimer, resumeTimer,
+    stopTimer: () => { if (session) beginCompletion(session, 'manual', 'idle', false, COMPLETION_HOLD_MANUAL_MS) },
     registerRecorder,
     floatingTimerCard,
   }), [
     state, session, displayTime, isExpanded, mode, selectedPreset, customMinutes,
     useCustom, focusType, customLabel, showSettings, showBgmSettings, bgmManualPlaying,
-    prefs, unavailableSrcs, startTimer, registerRecorder, floatingTimerCard,
+    prefs, unavailableSrcs, startTimer, pauseTimer, resumeTimer, beginCompletion, registerRecorder, floatingTimerCard,
   ])
 
   let overlay: React.ReactNode = null

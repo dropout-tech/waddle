@@ -5,6 +5,9 @@ import type { Session, User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import { isNative } from '@/lib/platform'
 import { setDesktopNotificationAccount } from '@/lib/desktop-notifications'
+import { clearWidgetReminders } from '@/lib/widgets/reminders'
+import { setWidgetAccount } from '@/lib/widgets/native'
+import { WidgetLinks } from '@/components/widgets/widget-links'
 import { DeepLinkHandler } from './deep-link-handler'
 
 // Client-side auth state shared across the app. Replaces the deleted server
@@ -39,6 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return
       setDesktopNotificationAccount(data.session?.user.id ?? null)
+      void setWidgetAccount(data.session?.user.id ?? null).catch(() => {})
+      void clearWidgetReminders(data.session?.user.id ?? null).catch(() => {})
       setSession(data.session)
       setLoading(false)
     })
@@ -46,6 +51,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return
       setDesktopNotificationAccount(nextSession?.user.id ?? null)
+      if (_event !== 'TOKEN_REFRESHED') {
+        void setWidgetAccount(nextSession?.user.id ?? null).catch(() => {})
+        void clearWidgetReminders(nextSession?.user.id ?? null).catch(() => {})
+      }
       setSession(nextSession)
       setLoading(false)
     })
@@ -77,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{ session, user: session?.user ?? null, loading }}>
       <DeepLinkHandler />
+      <WidgetLinks />
       {children}
     </AuthContext.Provider>
   )

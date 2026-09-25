@@ -674,19 +674,21 @@ export function useWaddleData(): UseWaddleData {
     }
     document.addEventListener('visibilitychange', tryRefetch)
     window.addEventListener('focus', tryRefetch)
-    let importRefreshTimer: ReturnType<typeof setTimeout> | undefined
-    const afterImport = () => {
-      clearTimeout(importRefreshTimer)
-      if (pendingWritesRef.current > 0) { importRefreshTimer = setTimeout(afterImport, 300); return }
+    let externalRefreshTimer: ReturnType<typeof setTimeout> | undefined
+    const afterExternalWrite = () => {
+      clearTimeout(externalRefreshTimer)
+      if (pendingWritesRef.current > 0) { externalRefreshTimer = setTimeout(afterExternalWrite, 300); return }
       lastRefetchRef.current = 0
       tryRefetch()
     }
-    window.addEventListener('huddle:tasks-imported', afterImport)
+    window.addEventListener('huddle:tasks-imported', afterExternalWrite)
+    window.addEventListener('huddle-widget-synced', afterExternalWrite)
     return () => {
       document.removeEventListener('visibilitychange', tryRefetch)
       window.removeEventListener('focus', tryRefetch)
-      window.removeEventListener('huddle:tasks-imported', afterImport)
-      clearTimeout(importRefreshTimer)
+      window.removeEventListener('huddle:tasks-imported', afterExternalWrite)
+      window.removeEventListener('huddle-widget-synced', afterExternalWrite)
+      clearTimeout(externalRefreshTimer)
     }
   }, [loadData, isLoading])
 

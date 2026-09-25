@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import { CheckInLeaderboard } from './check-in-leaderboard'
 import { useEffect, useState } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
@@ -91,9 +92,10 @@ function DailyCheckIn({ today }: { today: string }) {
           <p className="font-medium">{t('累積分數 {n} 分', { n: status.total_points })}</p>
         </div>
       )}
-      <p className="mt-5 max-w-sm text-xs leading-6 text-muted-foreground">{t('每天一小步，慢慢累積。分數將作為未來排行的依據。')}</p>
+      <p className="mt-5 max-w-sm text-xs leading-6 text-muted-foreground">{t('每天一小步，慢慢累積，也看見彼此的努力。')}</p>
       <p className="mt-1 text-xs leading-6 text-muted-foreground">{t('每日以台北時間 00:00 更新。')}</p>
       <p className="mt-7 text-sm leading-6 text-muted-foreground">{t('偶爾停一下也沒關係，小企鵝一直都在。')}</p>
+      <CheckInLeaderboard score={status?.total_points} />
     </section>
   )
 }

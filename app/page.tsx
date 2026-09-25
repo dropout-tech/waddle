@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Toaster } from 'sonner'
+import { WidgetSync } from '@/components/widgets/widget-sync'
 import { MainLayout } from '@/components/layout/main-layout'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
 import { TimeBlockModal } from '@/components/modals/time-block-modal'
@@ -471,6 +472,7 @@ function HuddlePage() {
     <ErrorBoundary>
       <CategoryPrefixProvider value={settings.showCategoryPrefix ?? true}>
       <NotebookOverlayProvider>
+      {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} />}
       <MainLayout
         workspaces={workspaces}
         timeBlocks={timeBlocks}
