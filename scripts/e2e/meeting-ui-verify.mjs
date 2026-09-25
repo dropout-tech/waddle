@@ -86,7 +86,7 @@ try {
           to: 'To date (up to 14 days)',
           end: 'Day ends at',
           title: 'Meeting title',
-          send: 'Create invitation and send email',
+          send: 'Create in-app invitation',
           slots: 'Common times',
           accept: 'Accept',
           tentative: 'Tentative',
@@ -103,7 +103,7 @@ try {
           to: '結束日期（最多 14 天）',
           end: '每天結束時間',
           title: '會議名稱',
-          send: '建立邀請並寄送 Email',
+          send: '建立站內邀請',
           slots: '共同空檔',
           accept: '接受',
           tentative: '暫定',
@@ -130,6 +130,16 @@ try {
       failure = '',
       emailFails = true,
       createResponseLost = true
+    let inbox = ['invitation', 'response', 'cancellation'].map((kind, i) => ({
+      id: id(800 + i),
+      meeting_id: id(20),
+      kind,
+      response: kind === 'response' ? 'accepted' : null,
+      title: `Notice ${kind}`,
+      actor_name: 'Alex',
+      created_at: user.created_at,
+    }))
+    let readFails = false
     const requests = [],
       emails = [],
       unexpected = [],
@@ -194,6 +204,19 @@ try {
       }
       if (url.pathname.includes('/rpc/')) {
         requests.push({ name, body })
+        if (name === 'get_meeting_notifications')
+          return route.fulfill({
+            json: { items: inbox, unread_count: inbox.length },
+          })
+        if (name === 'read_meeting_notification') {
+          if (readFails)
+            return route.fulfill({
+              status: 500,
+              json: { message: 'Mock read failure' },
+            })
+          inbox = inbox.filter((n) => n.id !== body.p_id)
+          return route.fulfill({ json: null })
+        }
         if (
           name === 'huddle_operations' &&
           ['self', 'announcements'].includes(body.p_action)
@@ -531,9 +554,8 @@ try {
         created[0].body.p_start === instant('10:30'),
     )
     check(
-      `${locale}: failed email does not claim it was sent`,
-      (await dialog.getByRole('status').innerText()).includes(labels.pending) &&
-        emails.length === 1,
+      `${locale}: in-app create never sends email`,
+      emails.length === 0 && !(await dialog.innerText()).includes('Email'),
     )
     const lookups = requests.filter(
       (r) => r.name === 'get_meeting_invitation_by_request',
@@ -543,19 +565,6 @@ try {
       lookups.length === 2 &&
         lookups[0].body.p_request_id === lookups[1].body.p_request_id &&
         meetings.filter((m) => m.id === id(30)).length === 1,
-    )
-    emailFails = false
-    await dialog
-      .locator('#invite-' + id(30))
-      .getByRole('button', { name: labels.retry, exact: true })
-      .click()
-    await page.waitForTimeout(150)
-    check(
-      `${locale}: email retry updates confirmed delivery without recreating the meeting`,
-      meetings.find((m) => m.id === id(30)).email_status.sent === 1 &&
-        requests.filter((r) => r.name === 'create_meeting_invitation')
-          .length === 2 &&
-        emails.length === 2,
     )
     const incoming = dialog.locator('#invite-' + id(20))
     for (const [label, response] of [
@@ -683,6 +692,68 @@ try {
       `${locale}: untrusted pending return cannot redirect to an external URL`,
       new URL(page.url()).origin === new URL(base).origin &&
         new URL(page.url()).pathname === '/',
+    )
+    await page.waitForSelector('[data-tour="notification-center"]')
+    await page.locator('[data-tour="notification-center"]').click()
+    await page.waitForSelector('[data-meeting-notification]')
+    check(
+      `${locale}: bell includes invitation, response and cancellation`,
+      (await page.locator('[data-meeting-notification]').count()) === 3,
+    )
+    readFails = true
+    await page
+      .locator('[data-meeting-notification]')
+      .first()
+      .getByRole('button', {
+        name: en ? 'Mark as read' : '標為已讀',
+        exact: true,
+      })
+      .click()
+    await page.waitForTimeout(100)
+    check(
+      `${locale}: failed read keeps notification`,
+      (await page.locator('[data-meeting-notification]').count()) === 3,
+    )
+    readFails = false
+    await page
+      .locator('[data-meeting-notification]')
+      .first()
+      .getByRole('button', {
+        name: en ? 'Mark as read' : '標為已讀',
+        exact: true,
+      })
+      .click()
+    await page.waitForTimeout(100)
+    check(
+      `${locale}: mark read removes only own notification`,
+      inbox.length === 2 &&
+        (await page.locator('[data-meeting-notification]').count()) === 2,
+    )
+    await page.reload()
+    await page.waitForSelector('[data-tour="notification-center"]')
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.locator('[data-tour="notification-center"]').click()
+    await page.waitForSelector('[data-meeting-notification]')
+    check(
+      `${locale}: read survives reload and mobile shows remaining notifications`,
+      (await page.locator('[data-meeting-notification]').count()) === 2,
+    )
+    await page
+      .locator('[data-meeting-notification]')
+      .first()
+      .getByRole('button', {
+        name: en ? 'View invitation' : '查看邀請',
+        exact: true,
+      })
+      .click()
+    await page.waitForURL('**/meetings/invitations?invite=*')
+    check(
+      `${locale}: notification opens correct invitation`,
+      page.url().endsWith(`invite=${id(20)}`),
+    )
+    check(
+      `${locale}: create and cancel never invoke email service`,
+      emails.length === 0,
     )
     if (returnedToInvite)
       check(`${locale}: login returns to the safe invitation path`, true)
