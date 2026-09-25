@@ -1,0 +1,128 @@
+# 歷史待辦原文索引
+
+這是防遺漏搜尋結果，不代表每條仍未完成。README 狀態表優先；舊文件會互相矛盾。
+
+- `origin/main:docs/CALENDAR_SHARING_PLAN.md:171` —   重複任務為結構化四欄＋`exdates jsonb`。0016 已照此實作，尚未套用。
+- `origin/main:docs/IOS_SETUP.md:120` — - [ ] **Sign in with Apple** 已加（因為提供 Google 登入 → Guideline 4.8）。
+- `origin/main:docs/IOS_SETUP.md:121` — - [ ] **App 內刪除帳號** 已可用（Guideline 5.1.1(v)）。
+- `origin/main:docs/IOS_SETUP.md:122` — - [ ] **離線可開**（已離線打包，非套網站 → Guideline 4.2）。
+- `origin/main:docs/IOS_SETUP.md:123` — - [ ] **真原生功能**：本地背景通知、觸覺、啟動畫面、安全區。
+- `origin/main:docs/IOS_SETUP.md:124` — - [ ] **隱私政策 URL**（可放在 web 版的一個靜態頁）。
+- `origin/main:docs/IOS_SETUP.md:125` — - [ ] **App Privacy「nutrition labels」**：收集 Email（Supabase Auth）、使用者內容（任務/日記）。
+- `origin/main:docs/IOS_SETUP.md:126` — - [ ] 各尺寸**截圖**（用模擬器拍）。
+- `origin/main:docs/IOS_SETUP.md:127` — - [ ] App 圖示 / 啟動畫面（第 3 節）。
+- `origin/main:docs/WEB_UX_PLAN.md:157` —   **未完成移入後續票**：j/k 任務導航（需先解決任務列表扁平順序的單一來源）、播種防護的
+- `origin/main:docs/billing/launch-checklist.md:26` — 9. 補上有驗證的 server reconciliation（定時校準及使用者購買/恢復後同步，帳號來源只能驗 JWT 得到的 user.id）。RevenueCat retry 次數有限，不能只靠 webhook 保證永久一致；監控 401/503、失敗重試與同步延遲。此項尚未實作，因此目前不可開正式收費。
+- `origin/main:docs/design/2026-09-20-marketing-redesign.md:42` — - **產品證據**：截圖來自合成示範資料；白板頁籤切換真實產品視圖。價格與下載區保留功能、付款及 beta 限制，避免用插畫暗示尚未開放的能力。
+- `origin/main:docs/features/meeting-to-tasks.md:18` — - 5 分鐘未完成的工作視為失敗；舊工作不能事後覆寫。模型請求 90 秒 timeout。
+- `origin/main:docs/features/meeting-to-tasks.md:21` — - 任務草稿的手動修改保留在當前頁面；切換歷史紀錄或離開會放棄尚未建立的修改。
+- `origin/main:docs/features/meeting-to-tasks.md:31` — ## 上線設定（本次尚未部署）
+- `origin/main:docs/features/meeting-to-tasks.md:39` — 如果尚無金鑰，會議清單仍可查詢，生成控制停用並顯示「AI 整理尚未啟用」。
+- `origin/main:docs/features/meeting-to-tasks.md:60` — ## 與會者與任務指派（後續版本，尚未部署）
+- `origin/main:docs/legal/2026-09-20-release-readiness.md:9` — **目前不足以直接送正式訂閱審核。** 營運者身分、私人客服、個資申請管道及資料保存範圍尚未確認。這些不只是付費後才需要注意：免費服務已有個資蒐集，應優先補足。公開頁不放假 email、地址、統編、退款天數或保證核准標章。既有 GitHub Issues 只作公開技術回報，不能替代私人個資或帳務受理。
+- `origin/main:docs/legal/2026-09-20-release-readiness.md:20` — 官方來源：[消費者保護法](https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=J0170001)、[個人資料保護法](https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=I0050021)、[行政院消保會：網站能否不提供7日解除權](https://cpc.ey.gov.tw/Page/BC16ACF0BBB9CCC2/f8e15c56-0cbe-49ac-a7ba-2f41e1d9ca55)。本清單引用第3、8、18、19、19-2條；不要把尚未生效的其他修法內容當成現行義務。
+- `origin/main:docs/legal/2026-09-20-release-readiness.md:29` — - Huddle 尚未確認付費功能、商店商品與價格、同意與恢復畫面、沙盒測試、實際客服。這些必須完成，單有網頁不足以核准。
+- `origin/main:docs/legal/2026-09-20-release-readiness.md:58` — 3. 接入 SDK 後，更新 privacy 的訂閱識別/交易及 RevenueCat 資料處理。現階段不把尚未啟用購買寫成正在處理卡號。
+- `origin/main:docs/meetings/implementation.md:75` — 目前本機實作與整合驗收完成；正式資料庫、寄信服務與發布尚未執行。
+- `origin/main:docs/native/desktop-notifications.md:5` — 視窗開啟／最小化期間檢查；關閉視窗、完全退出、睡眠期間不保證通知。恢復後會議僅在尚未開始時提醒。桌面主視窗停用 background throttling，以保留背景輪詢與計時；不是常駐服務。
+- `origin/main:docs/native/desktop-notifications.md:9` — 系統能力可查但 OS 實際通知權限無法由目前 bridge 判定；設定文字及測試結果只說已交給系統，不保證已顯示。系統勿擾／專注模式、關閉通知均可能攔截。macOS 通知需使用適當簽署的發行版本；目前 unsigned beta 未完成真機 OS 通知驗證，不能宣稱該安裝包已通過。Windows 已設定 AppUserModelId，但尚未驗證 Windows 安裝與通知。
+- `origin/main:docs/native/mobile-widgets.md:17` — ## 尚未完成或不得視為已驗證
+- `origin/main:docs/native/mobile-widgets.md:23` — 3. iOS App Group `group.com.lazylazy.huddle`、extension bundle `com.lazylazy.huddle.widgets` 需開發者帳號註冊與簽署；尚未修改 Apple 帳號。
+- `origin/main:docs/native/mobile-widgets.md:25` — 5. Android 計時顯示最後快照的時間，尚需換成原生持續倒數／ongoing notification。Android 鎖定畫面不在本輪宣稱支援。
+- `origin/main:docs/native/mobile-widgets.md:26` — 6. 月曆目前是日期格＋安排標記；尚未實作示意圖的跨日色帶、原生月曆翻月與逐日清單切換。資料以 App 上次開啟快照為準，沒有背景雲端同步。
+- `origin/main:docs/native/mobile-widgets.md:28` — 8. 尚需完善每個 widget instance 的白板／記事本選取 UI、記事 checklist 直接勾選、Android 分類篩選、雙語、Dynamic Type／各 OEM 尺寸與暗色模式驗收。
+- `origin/main:docs/native/mobile-widgets.md:35` — 今日任務與日曆沿用 `taskOccursOnDate`，支援 recurrence/exdates；非重複未排程／到期未完成任務也可出現。小工具最多保留 20 筆任務與近期行程、8 則筆記、7 張每日白板，摘要上限 160 字。原生待同步佇列最多 50 筆。
+- `origin/main:docs/native/mobile-widgets.md:57` — - Finish review 已修正原生前三件事保留完成項目，以及專注記事取錯摘要的兩項問題；桌面與手機 Web viewport 的最終覆核通過；原生安裝與視覺驗收未完成。
+- `origin/main:docs/operations/README.md:13` — 允許名單位於不公開的 `huddle_ops.admin_emails`，一般會員無法讀寫，資料表約束也限制只能填上述兩個 Email。尚未註冊的指定 Email，日後註冊並完成驗證即可取得管理資格。
+- `origin/main:docs/operations/README.md:51` — - 一週留存：註冊滿 8 天，註冊後第 6–8 個台北日曆日有操作。分母不包含尚未滿天數的會員。
+- `origin/main:docs/operations/README.md:52` — - 目前不提供取消訂閱原因、金額營收、完整功能事件分析或外寄通知，因正式購買／相關事件尚未啟用。
+- `origin/main:docs/operations/README.md:77` — - 尚未 push／merge／套用正式 migration／授予正式管理員／部署。正式上線與完整金流不在以上通過項目中。
+- `origin/main:docs/releases/2026-09-20-desktop-site.md:8` — - 官網公布預定 Pro 方案：NT$149／月、NT$1,290／年；明確標示尚未開放購買。
+- `origin/main:docs/releases/2026-09-20-desktop-site.md:15` — 這是尚未使用 Developer ID 簽署及 Apple 公證的 macOS 測試版。尚未宣稱 Mac App Store / iOS App Store / Google Play 上架；Windows 安裝包也不在本次已驗證發布範圍。
+- `origin/main:docs/releases/2026-09-20-desktop-site.md:19` — ## 訂閱尚未啟用
+- `origin/main:docs/releases/2026-09-20-desktop-site.md:21` — 目前核心功能仍免費。沒有支付 UI 或自動扣款；production migration / Edge Function 尚未套用。仍需商店帳號與收款資料、商店商品、RevenueCat credentials、原生建置同步、訂閱 UI、後端定期校準與真實沙盒驗證。詳細順序見 `docs/billing/launch-checklist.md`。
+- `origin/main:docs/releases/2026-09-20-poster-bilingual-film.md:20` — Google 帳號實際授權與作業系統返回仍需使用者操作確認；測試為真實瀏覽器/SDK配合mock HTTP。商家法定名稱、地址、私人客服信箱、保存政策等尚待提供，不能宣稱金流送審完備。未啟用訂閱、未修改正式資料或資料庫。Mac beta 尚未公證、仍須網路；沒有 Windows 安裝檔。
+- `origin/main:docs/releases/2026-09-26-consolidated-release.md:15` — | Google 日曆單向同步 | 原碼已 push，保留 draft PR55 | 正式 OAuth、migration/function、真實授權與增改刪驗收未完成 |
+- `origin/main:docs/releases/2026-09-26-consolidated-release.md:16` — | 付款、推薦獎勵、額度、reconciliation | 原碼已 push，保留 draft PR55 | 商店商品、RevenueCat、優惠兌換、後端排程與驗收未完成，維持關閉 |
+- `origin/main:docs/releases/2026-09-26-consolidated-release.md:17` — | 帳號刪除強化 | 舊草稿 PR55 保留供後續逐項整合 | 與目前 main 有差異，不能整支覆蓋；Apple 重新驗證／完整刪除驗收未完成 |
+- `origin/main:docs/reports/2026-05-18-focus-timer-bgm-and-calendar-fixes.md:79` — - [low] `public/audio/` 仍是空的 — 使用者選了選項 B（CC0 由我挑選），但 Pixabay / Freepd 等 CDN 都需要 referrer / 已關站，自動下載失敗；最終走 README 指引手動下載路線，使用者尚未實際放入音檔
+- `origin/main:docs/reports/2026-05-18-uiux-audit.md:61` — > **Issue:** Inline JournalFocusView renders `bg-green-500/10 / bg-orange-500/10 / bg-blue-500/10` for `已完成 / 未完成 / 總任務數`. This is jarring against the muted journal surface and again uses non-warm pure Tailwind colors.
+- `origin/main:docs/reports/2026-05-18-uiux-audit.md:62` — > **Fix:** Replace with three text-only stats separated by `Separator` lines (no backgrounds), or one row: `已完成 N · 未完成 N · 總共 N` in `text-muted-foreground`. The journal is meant to feel like writing, not like reading a CI dashboard.
+- `origin/main:docs/reports/2026-06-03-scratchpad-notion-phase-1.md:22` —   - `components/scratchpad/focus-scratchpad.tsx`（重寫）：卡片 grid 版（`rectSortingStrategy` 拖曳）、text/image/link/todo 四型別、`[] `→待辦捷徑、就地編輯、勾選、升級任務鈕、時間戳。
+- `origin/main:docs/reports/2026-06-03-scratchpad-notion-phase-1.md:25` —   - `lib/types.ts` / `lib/supabase/database.types.ts`：`type` union 收斂為 `text|image|link|todo`，移除殘留 `scratchpad_type_enum`。
+- `origin/main:docs/reports/2026-06-03-scratchpad-notion-phase-1.md:50` — - [blocker] `supabase/migrations/0011_scratchpad_blocks.sql` 尚未套到遠端 Supabase — 套之前白板的新增/編輯/勾選/重排會在執行期失敗（前端已寫新欄位、DB 還沒有）。需 `supabase db push` 或 SQL editor 執行。
+- `origin/main:docs/reports/2026-06-03-scratchpad-notion-phase-1.md:51` — - [pending] 本批白板改動尚未 commit（等使用者指示）。
+- `codex/huddle-auth-site-redesign:docs/CALENDAR_SHARING_PLAN.md:171` —   重複任務為結構化四欄＋`exdates jsonb`。0016 已照此實作，尚未套用。
+- `codex/huddle-auth-site-redesign:docs/IOS_SETUP.md:120` — - [ ] **Sign in with Apple** 已加（因為提供 Google 登入 → Guideline 4.8）。
+- `codex/huddle-auth-site-redesign:docs/IOS_SETUP.md:121` — - [ ] **App 內刪除帳號** 已可用（Guideline 5.1.1(v)）。
+- `codex/huddle-auth-site-redesign:docs/IOS_SETUP.md:122` — - [ ] **離線可開**（已離線打包，非套網站 → Guideline 4.2）。
+- `codex/huddle-auth-site-redesign:docs/IOS_SETUP.md:123` — - [ ] **真原生功能**：本地背景通知、觸覺、啟動畫面、安全區。
+- `codex/huddle-auth-site-redesign:docs/IOS_SETUP.md:124` — - [ ] **隱私政策 URL**（可放在 web 版的一個靜態頁）。
+- `codex/huddle-auth-site-redesign:docs/IOS_SETUP.md:125` — - [ ] **App Privacy「nutrition labels」**：收集 Email（Supabase Auth）、使用者內容（任務/日記）。
+- `codex/huddle-auth-site-redesign:docs/IOS_SETUP.md:126` — - [ ] 各尺寸**截圖**（用模擬器拍）。
+- `codex/huddle-auth-site-redesign:docs/IOS_SETUP.md:127` — - [ ] App 圖示 / 啟動畫面（第 3 節）。
+- `codex/huddle-auth-site-redesign:docs/WEB_UX_PLAN.md:157` —   **未完成移入後續票**：j/k 任務導航（需先解決任務列表扁平順序的單一來源）、播種防護的
+- `codex/huddle-auth-site-redesign:docs/billing/launch-checklist.md:26` — 9. 補上有驗證的 server reconciliation（定時校準及使用者購買/恢復後同步，帳號來源只能驗 JWT 得到的 user.id）。RevenueCat retry 次數有限，不能只靠 webhook 保證永久一致；監控 401/503、失敗重試與同步延遲。此項尚未實作，因此目前不可開正式收費。
+- `codex/huddle-auth-site-redesign:docs/billing/plans-and-referrals.md:3` — 2026-09-21。價格已確認：NT$149／月、NT$1,290／年。下列功能額度與推薦受益對象是提案，尚未套用、公布或收費；推薦人／新朋友／雙方受益仍待使用者回答。不得把此草案當成正式條款。
+- `codex/huddle-auth-site-redesign:docs/billing/plans-and-referrals.md:14` — | 共享日曆夥伴 | 最多 2 人 | 最多 20 人 | 共享已存在；額度尚未實作 |
+- `codex/huddle-auth-site-redesign:docs/billing/plans-and-referrals.md:55` — 實作驗收：同時兌換同碼、重試、大小寫／空白、過期活動、4 次上限、自推、已驗證／未驗證、月繳／年繳、取消續訂／退款、換帳號／恢復購買、商店兌換失敗／中斷、跨平台、重複／亂序通知、到期降級與舊帳號權益。尚未建立 migration 或改變任何人的方案。
+- `codex/huddle-auth-site-redesign:docs/billing/referral-backend-readiness.md:17` — Remaining before enabling: official store offer allocation/redemption and transaction correlation, rewards audit/reversal events, deletion/re-registration abuse policy and retention, rate limiting, user terms and campaign dates. No store code issuance or active reward is implemented. Keep disabled until these are complete; do not represent pending months as active Pro.
+- `codex/huddle-auth-site-redesign:docs/billing/referral-backend-readiness.md:19` — Reconciliation complements the existing webhook after purchase/restore. A scheduled reconciliation worker is implemented below; deployment, scheduler activation and monitoring still remain. Production recurring-only snapshot deliberately does not support sandbox or nonrecurring promotional offers; test those with an isolated staging policy before launch. All existing required RevenueCat server settings apply. `billing-reconcile` requires Supabase user authentication unlike external webhook.
+- `codex/huddle-auth-site-redesign:docs/design/2026-09-20-marketing-redesign.md:42` — - **產品證據**：截圖來自合成示範資料；白板頁籤切換真實產品視圖。價格與下載區保留功能、付款及 beta 限制，避免用插畫暗示尚未開放的能力。
+- `codex/huddle-auth-site-redesign:docs/integrations/google-calendar-sync.md:3` — 2026-09-21。使用者要求同步到 Google Calendar；已詢問單向／雙向，尚未收到回答。本稿先以 Huddle → Google Calendar 為建議第一版，雙向不視為已確認。這是整合規格，不是已完成的串接；沒有存取或改動真實 Google 日曆。
+- `codex/huddle-auth-site-redesign:docs/integrations/google-calendar-sync.md:71` — - `finish`：callback 取得 `code`, `state` 後，由登入 client 傳入。state 綁本人及原 JWT session、十分鐘、一用即失效、PKCE S256。回傳 pending，尚未輸出行程。
+- `codex/huddle-auth-site-redesign:docs/integrations/google-calendar-sync.md:75` — OAuth callback 是 `/settings/google-calendar/callback`，需和起始 Huddle session 相同。原生另開瀏覽器的跨 session 返回尚未完成，不能宣称 iOS／Android OAuth 已驗收；先支援同一登入瀏覽器。重新連結／改帳號先解除連結，保留的舊 Google 日曆不會被自動接管。
+- `codex/huddle-auth-site-redesign:docs/integrations/google-calendar-sync.md:93` — - 尚未做：正式 migration／Function 部署、Google 真實授權與隔離日曆新增修改刪除、網域審查、所有原生平台返回、遠端 Supabase advisors。這些列為上線驗收，不以 mock 取代。
+- `codex/huddle-auth-site-redesign:docs/integrations/google-calendar-sync.md:97` — 設定頁可勾選此裝置開啟 Huddle 時自動同步（預設關閉、每帳號獨立）。在主畫面可見時每分鐘檢查，資料變更後短暫延遲檢查，每次最多三批；遇衝突／重新授權／建立日曆未確認即停止自動處理。每次呼叫重驗當前帳號與勾選狀態，固定相符 JWT。App 關閉或背景不執行，後台 worker 尚未提供。12 項 mock effect 驗證通過。
+- `codex/huddle-auth-site-redesign:docs/legal/2026-09-20-release-readiness.md:9` — **目前不足以直接送正式訂閱審核。** 營運者身分、私人客服、個資申請管道及資料保存範圍尚未確認。這些不只是付費後才需要注意：免費服務已有個資蒐集，應優先補足。公開頁不放假 email、地址、統編、退款天數或保證核准標章。既有 GitHub Issues 只作公開技術回報，不能替代私人個資或帳務受理。
+- `codex/huddle-auth-site-redesign:docs/legal/2026-09-20-release-readiness.md:20` — 官方來源：[消費者保護法](https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=J0170001)、[個人資料保護法](https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=I0050021)、[行政院消保會：網站能否不提供7日解除權](https://cpc.ey.gov.tw/Page/BC16ACF0BBB9CCC2/f8e15c56-0cbe-49ac-a7ba-2f41e1d9ca55)。本清單引用第3、8、18、19、19-2條；不要把尚未生效的其他修法內容當成現行義務。
+- `codex/huddle-auth-site-redesign:docs/legal/2026-09-20-release-readiness.md:29` — - Huddle 尚未確認付費功能、商店商品與價格、同意與恢復畫面、沙盒測試、實際客服。這些必須完成，單有網頁不足以核准。
+- `codex/huddle-auth-site-redesign:docs/legal/2026-09-20-release-readiness.md:58` — 3. 接入 SDK 後，更新 privacy 的訂閱識別/交易及 RevenueCat 資料處理。現階段不把尚未啟用購買寫成正在處理卡號。
+- `codex/huddle-auth-site-redesign:docs/meetings/implementation.md:75` — 目前僅本機版本完成；上述正式資料庫、寄信服務與發布尚未執行。
+- `codex/huddle-auth-site-redesign:docs/native/android-widgets-plan.md:3` — 更新：2026-09-21。狀態：研究與實作規格，尚未開發／打包／上架。配合 iPhone 版提供同一組五項核心能力，但遵守 Android 實際可用介面，不承諾每台手機都有鎖屏小工具。
+- `codex/huddle-auth-site-redesign:docs/native/desktop-notifications.md:5` — 視窗開啟／最小化期間檢查；關閉視窗、完全退出、睡眠期間不保證通知。恢復後會議僅在尚未開始時提醒。桌面主視窗停用 background throttling，以保留背景輪詢與計時；不是常駐服務。
+- `codex/huddle-auth-site-redesign:docs/native/desktop-notifications.md:9` — 系統能力可查但 OS 實際通知權限無法由目前 bridge 判定；設定文字及測試結果只說已交給系統，不保證已顯示。系統勿擾／專注模式、關閉通知均可能攔截。macOS 通知需使用適當簽署的發行版本；目前 unsigned beta 未完成真機 OS 通知驗證，不能宣稱該安裝包已通過。Windows 已設定 AppUserModelId，但尚未驗證 Windows 安裝與通知。
+- `codex/huddle-auth-site-redesign:docs/native/ios-widgets-plan.md:3` — 日期：2026-09-21。狀態：規劃完成，尚未實作、簽署或上架。此文件不變更免費／Pro 的權益；先讓使用者可從小工具使用原本已有權限的內容。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-20-desktop-site.md:8` — - 官網公布預定 Pro 方案：NT$149／月、NT$1,290／年；明確標示尚未開放購買。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-20-desktop-site.md:15` — 這是尚未使用 Developer ID 簽署及 Apple 公證的 macOS 測試版。尚未宣稱 Mac App Store / iOS App Store / Google Play 上架；Windows 安裝包也不在本次已驗證發布範圍。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-20-desktop-site.md:19` — ## 訂閱尚未啟用
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-20-desktop-site.md:21` — 目前核心功能仍免費。沒有支付 UI 或自動扣款；production migration / Edge Function 尚未套用。仍需商店帳號與收款資料、商店商品、RevenueCat credentials、原生建置同步、訂閱 UI、後端定期校準與真實沙盒驗證。詳細順序見 `docs/billing/launch-checklist.md`。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-20-poster-bilingual-film.md:20` — Google 帳號實際授權與作業系統返回仍需使用者操作確認；測試為真實瀏覽器/SDK配合mock HTTP。商家法定名稱、地址、私人客服信箱、保存政策等尚待提供，不能宣稱金流送審完備。未啟用訂閱、未修改正式資料或資料庫。Mac beta 尚未公證、仍須網路；沒有 Windows 安裝檔。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-desktop-floating-reminders-live.md:12` — 限制：Mac installer 尚未完成正式簽署／公證與 OS 通知顯示實测；Windows 未提供安裝檔。退出或關閉視窗無提醒；恢復的舊專注計時不發桌面通知。完整界線見 docs/native/desktop-notifications.md。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-implementation-status.md:13` — - 刪帳清理本人圖片、Google撤銷結果提示、刪除期間及過期帳號JWT上傳限制；Apple重授權流程未完成，明確阻止誤刪並提示。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-implementation-status.md:21` — ## 尚未啟用與明確阻擋
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:7` — 本週優先完成 Web 更新與原生測試版，商店公開日期以帳號資格、實機驗證及審查結果為準，不能承諾本週必定通過。若 Google Play 是 2023-11-13 之後建立的個人帳號且尚未完成封閉測試，須至少 12 位測試者連續加入 14 天，之後再申請正式發布權限；本週新開始無法完成此門檻。[Google 官方測試要求](https://support.google.com/googleplay/android-developer/answer/14151465?hl=en)
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:9` — 首發售價沿用已同意的 NT$149／月、NT$1,290／年。免費可用與付費開通分別驗收；商店與伺服器權益未完成真實沙盒驗證前不開購買。不要把本機完成寫成正式已上線。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:13` — | 項目 | 本次證據 | 尚需完成 / 驗收 |
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:16` — | iOS 原生專案 | `ios/App/App.xcodeproj` 已存在；app ID `com.lazylazy.huddle` 與 `lib/native-config.ts`、Capacitor 一致；本機 Xcode 26.6 | Archive/簽章/真機/TestFlight/商店 app record 未驗證。`docs/IOS_SETUP.md` 中 com.huddle.app、尚未建立 iOS 的敘述已過時，不可照抄 |
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:33` — - 定位：免費讓個人完整整理生活；Pro 提供更多協作容量。保留任務、排程、專注、記事本、白板等基本價值，不用未完成的路線圖撐價格。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:36` — - 用 15% 商店費率作情境時：月繳扣商店費後 NT$126.65、年繳 NT$1,096.50；用 30% 情境時是 NT$104.30、NT$903。以上尚未扣稅、退款、RevenueCat、雲端、Email 與客服成本，不是淨利。Apple 費率依參與方案與交易条件；Google 自動續訂標準 service fee 為 15%。[Apple 合約](https://developer.apple.com/support/terms/apple-developer-program-license-agreement/)／[Google 費率](https://support.google.com/googleplay/android-developer/answer/112622?hl=en)
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:44` — - [ ] 確認 Apple Developer / App Store Connect 可操作角色及付費合約、收款、稅務、正式 app record。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:45` — - [ ] 確認 Google Play 帳號類型、建立日期、生產發布權限；新個人帳號立即安排合法真實封閉測試。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:46` — - [ ] 確認營運者公開資料、客服信箱、寄件網域；金鑰放平台 secrets，不放聊天或 repo。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:47` — - [ ] 確認正式 Supabase project、Google Cloud OAuth client、RevenueCat project 與商店商品對應。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:51` — - [ ] Web build + 原生 static export 分別通過；不把 Web build 結果代替 iOS/Android。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:52` — - [ ] DB migration 在 staging 執行並驗 RLS、資料升級、回復步驟；正式環境不 reset。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:53` — - [ ] 推薦 self/repeat/concurrency/cap/expiry；商店優惠不重扣；月/年/既有訂閱分別測。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:54` — - [ ] 原生購買、pending、取消、恢復、退款、到期、換帳號、跨裝置、重複/亂序 webhook 及校準。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:55` — - [ ] Google OAuth cancellation/retry、斷線、撤銷、重複同步、刪除事件與時區；實機 Google/Apple 登入。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:56` — - [ ] 刪帳號涵蓋資料、檔案、provider tokens，保留依法必須保留資料時於隱私頁說明。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:57` — - [ ] 真機繁中/英文、深連結、通知拒絕、慢網路與重開 app；截圖不能帶真實個資。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:61` — - [ ] App 名稱/副標題/描述/keywords 繁中與英文；未上線功能標示規劃，不寫已可用。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:62` — - [ ] 實際 iPhone/iPad（如支援）與 Android screenshots、icon、分類、年齡分級、support/privacy URLs。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:63` — - [ ] App Privacy / Google Data safety / ads declaration（依真實 SDK）/ content rating / app access。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:64` — - [ ] Review demo account 或完整 demo mode，含 Google/Apple 以外可供審核登入的操作資料，正式 backend 可用。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:65` — - [ ] 訂閱價格、期間、自動續訂、取消、恢復購買、terms/privacy 連結及推薦活動 review notes。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:66` — - [ ] TestFlight / Play internal或closed實測，記錄 build number、版本、測試者與結果，再提交 production。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:70` — - [ ] 記錄 local commit → remote push → main merge → provider部署 → production UI 的每一份證據。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:71` — - [ ] 每項 feature gate 只在相依服務已驗證時開啟；退款、權益、寄信失敗及 OAuth錯誤有可見監控。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-launch-readiness.md:72` — - [ ] 先小量推出，出錯可回退前端或關閉新購買；不因回退刪除已建立資料與有效權益。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-week-launch-plan.md:11` — 不要把尚未做好的雲端容量、版本還原、Google雙向同步、團隊管理拿來收費。若本週原生金流驗證未完成，先開免費版，保留明確「訂閱準備中」。真正可售Pro必須先完成方案權限、購買/恢復/退款/續訂/帳號轉移實測及客服接手。
+- `codex/huddle-auth-site-redesign:docs/releases/2026-09-21-week-launch-plan.md:28` — ## 本次已實作，尚需正式啟用
+- `codex/huddle-auth-site-redesign:docs/reports/2026-05-18-focus-timer-bgm-and-calendar-fixes.md:79` — - [low] `public/audio/` 仍是空的 — 使用者選了選項 B（CC0 由我挑選），但 Pixabay / Freepd 等 CDN 都需要 referrer / 已關站，自動下載失敗；最終走 README 指引手動下載路線，使用者尚未實際放入音檔
+- `codex/huddle-auth-site-redesign:docs/reports/2026-05-18-uiux-audit.md:61` — > **Issue:** Inline JournalFocusView renders `bg-green-500/10 / bg-orange-500/10 / bg-blue-500/10` for `已完成 / 未完成 / 總任務數`. This is jarring against the muted journal surface and again uses non-warm pure Tailwind colors.
+- `codex/huddle-auth-site-redesign:docs/reports/2026-05-18-uiux-audit.md:62` — > **Fix:** Replace with three text-only stats separated by `Separator` lines (no backgrounds), or one row: `已完成 N · 未完成 N · 總共 N` in `text-muted-foreground`. The journal is meant to feel like writing, not like reading a CI dashboard.
+- `codex/huddle-auth-site-redesign:docs/reports/2026-06-03-scratchpad-notion-phase-1.md:22` —   - `components/scratchpad/focus-scratchpad.tsx`（重寫）：卡片 grid 版（`rectSortingStrategy` 拖曳）、text/image/link/todo 四型別、`[] `→待辦捷徑、就地編輯、勾選、升級任務鈕、時間戳。
+- `codex/huddle-auth-site-redesign:docs/reports/2026-06-03-scratchpad-notion-phase-1.md:25` —   - `lib/types.ts` / `lib/supabase/database.types.ts`：`type` union 收斂為 `text|image|link|todo`，移除殘留 `scratchpad_type_enum`。
+- `codex/huddle-auth-site-redesign:docs/reports/2026-06-03-scratchpad-notion-phase-1.md:50` — - [blocker] `supabase/migrations/0011_scratchpad_blocks.sql` 尚未套到遠端 Supabase — 套之前白板的新增/編輯/勾選/重排會在執行期失敗（前端已寫新欄位、DB 還沒有）。需 `supabase db push` 或 SQL editor 執行。
+- `codex/huddle-auth-site-redesign:docs/reports/2026-06-03-scratchpad-notion-phase-1.md:51` — - [pending] 本批白板改動尚未 commit（等使用者指示）。

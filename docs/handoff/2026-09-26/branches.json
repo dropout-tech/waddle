@@ -1,0 +1,450 @@
+[
+  {
+    "branch": "codex/canvas-inline-edit",
+    "sha": "e33d985b4bcb356fd6589cc1085185abc8b9c15e",
+    "upstream": "origin/codex/canvas-inline-edit",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/check-in-leaderboard",
+    "sha": "4b7797e91d9b62b86c40b3b215dd1587e7ab1daf",
+    "upstream": "origin/codex/check-in-leaderboard",
+    "ancestor_of_main": false,
+    "patch_unique_to_main": 2,
+    "note": "review individually; patch difference does not imply unfinished feature"
+  },
+  {
+    "branch": "codex/commerce-challenges-flow",
+    "sha": "ce224e2cab419282d173b3a663f3f4f3111f00c3",
+    "upstream": "origin/codex/commerce-challenges-flow",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/commerce-fast-load",
+    "sha": "8e362205fcb519965c84cd6042185f8d538f63fb",
+    "upstream": "origin/codex/commerce-fast-load",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/commerce-modules-options",
+    "sha": "560c432a5c2b13942813f5ff8dbfbbc626a27bc2",
+    "upstream": "origin/codex/commerce-modules-options",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/commerce-technical-obstacles",
+    "sha": "f12152314913431f23584f29a2f4321820f166fb",
+    "upstream": "origin/codex/commerce-technical-obstacles",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/consolidated-release-20260926",
+    "sha": "4cf79a0a748cb8515b871133465d8b044f3d2abb",
+    "upstream": "origin/codex/consolidated-release-20260926",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/daily-check-in-release",
+    "sha": "7d6e5defd93ceed5fd24fbf8ae366edc7493f765",
+    "upstream": "origin/codex/daily-check-in-release",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/desktop-floating-window-fix",
+    "sha": "ac9b506ac4452885fc36518a6e130de9fe324372",
+    "upstream": "origin/codex/desktop-floating-window-fix",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/desktop-release-20260920",
+    "sha": "cce2b257cdd6758c47be32c402ff8b4efc89977f",
+    "upstream": "origin/codex/desktop-release-20260920",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/focus-compact-inline",
+    "sha": "3b4cfc86516767139ab0e12c336e6d831d30aebc",
+    "upstream": "origin/codex/focus-compact-inline",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/focus-inline-autosave-release",
+    "sha": "7ca4b761805c66111c2c7bff9cac41c634b2d3c3",
+    "upstream": "origin/codex/focus-inline-autosave-release",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/focus-mobile-qa",
+    "sha": "375cd16b11c997f899b8f965be4c22e000b40fd9",
+    "upstream": "origin/codex/focus-mobile-qa",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/focus-progress-board",
+    "sha": "79222c81c63445db06387055055d41dcf8ebe1a2",
+    "upstream": "origin/codex/focus-progress-board",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/handoff-status-20260926",
+    "sha": "ff4176f35f050345a4dad7784c0992d1867ee217",
+    "upstream": "origin/main",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/handoff-wip-snapshot-20260926",
+    "sha": "8a98151fe161c61db9046d0e6adbfb9b567cda24",
+    "upstream": "origin/codex/handoff-wip-snapshot-20260926",
+    "ancestor_of_main": false,
+    "patch_unique_to_main": 11,
+    "note": "historical snapshot; do not merge"
+  },
+  {
+    "branch": "codex/huddle-auth-site-redesign",
+    "sha": "037f1e7ee312a57102b2d1e895e29287a181f73e",
+    "upstream": "origin/codex/huddle-auth-site-redesign",
+    "ancestor_of_main": false,
+    "patch_unique_to_main": 36,
+    "note": "review individually; patch difference does not imply unfinished feature"
+  },
+  {
+    "branch": "codex/huddle-desktop-site",
+    "sha": "6b2400ea902b61b5451f1a4a6506e75efd04a580",
+    "upstream": "origin/codex/huddle-desktop-site",
+    "ancestor_of_main": false,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/huddle-marketing-launch-week",
+    "sha": "6dd8e7974ff9889c3e7864030312a7b1359c2f89",
+    "upstream": "origin/codex/huddle-marketing-launch-week",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/huddle-operations-referrals",
+    "sha": "6c6db96e1b8bb81b03bce63f9a7002c4c6a719a7",
+    "upstream": "origin/codex/huddle-operations-referrals",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/mac-titlebar-hotfix",
+    "sha": "974ee19213c0a5997f4e8a3f4578ad231084934f",
+    "upstream": "origin/codex/mac-titlebar-hotfix",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/meeting-availability-integration",
+    "sha": "58767dcf59bc4fda8f7c17840dbf6e2bd87dd2be",
+    "upstream": "",
+    "ancestor_of_main": false,
+    "patch_unique_to_main": 2,
+    "note": "review individually; patch difference does not imply unfinished feature"
+  },
+  {
+    "branch": "codex/meeting-availability-release",
+    "sha": "730e953f59d7537b9cfffaff85cafbfc578533bb",
+    "upstream": "origin/codex/meeting-availability-release",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/meeting-availability-release-polish",
+    "sha": "a0afadf00498b1114a950f4ea25acdd902fead23",
+    "upstream": "origin/codex/meeting-availability-release-polish",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/meeting-in-app-notifications",
+    "sha": "5353185bef29b2c02c265f0f7e6c33868bb3927a",
+    "upstream": "origin/codex/meeting-in-app-notifications",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/meeting-task-release",
+    "sha": "08c98d75cb53196042d4d2d60b46f174b1e16d4a",
+    "upstream": "origin/codex/meeting-task-release",
+    "ancestor_of_main": false,
+    "patch_unique_to_main": 1,
+    "note": "review individually; patch difference does not imply unfinished feature"
+  },
+  {
+    "branch": "codex/mobile-widgets",
+    "sha": "d0b6ed01dca1196a4b0de9bab40f07548e1fe2ca",
+    "upstream": "origin/main",
+    "ancestor_of_main": false,
+    "patch_unique_to_main": 1,
+    "note": "review individually; patch difference does not imply unfinished feature"
+  },
+  {
+    "branch": "codex/scratchpad-free-canvas",
+    "sha": "fc9c149f0f9801af5c4ad1eded1bf5a169bfcc75",
+    "upstream": "origin/codex/scratchpad-free-canvas",
+    "ancestor_of_main": false,
+    "patch_unique_to_main": 9,
+    "note": "review individually; patch difference does not imply unfinished feature"
+  },
+  {
+    "branch": "codex/startup-parallel",
+    "sha": "5a073a5967e2752f6fd43b46d19cd1180ed62347",
+    "upstream": "origin/codex/startup-parallel",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/temporary-commerce-presentation",
+    "sha": "9ea34629520eb0266d9d23a8c7f2fa06b6e90df1",
+    "upstream": "origin/codex/temporary-commerce-presentation",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "codex/windows-desktop-release",
+    "sha": "4891b523c955f1651d7e74c768504f4f12053858",
+    "upstream": "origin/codex/windows-desktop-release",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/calendar-sharing",
+    "sha": "bf45873db41cd770655c69c5ce4778f2d4b700e3",
+    "upstream": "origin/feat/calendar-sharing",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/category-cascade-picker",
+    "sha": "232f54874a123b615634f5771bfa741032219d1e",
+    "upstream": "origin/feat/category-cascade-picker",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/default-category",
+    "sha": "378bbe2a88f2cbbcf43648c377dc1a05ec224b1a",
+    "upstream": "origin/feat/default-category",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/floating-hub",
+    "sha": "2b113588869b7a699bc2f85b53747e0a201abee0",
+    "upstream": "origin/feat/floating-hub",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/focus-board",
+    "sha": "fefad7f12fd14b6d3695bd13a899d202e8045d32",
+    "upstream": "origin/feat/focus-board",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/focus-outline",
+    "sha": "f4d41dd3abcd61c16a63866d0e056d41cf82c8d5",
+    "upstream": "origin/feat/focus-outline",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/focus-relocate",
+    "sha": "1c328a1dedf518a9cf40361ef7cb9b560d67272a",
+    "upstream": "origin/feat/focus-relocate",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/focus-session-log",
+    "sha": "99165f107a184ba46b987de96747b112b2744093",
+    "upstream": "origin/feat/focus-session-log",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/fontsize-stopwatch",
+    "sha": "4400db439679166d86d999d124e52be26d8300c1",
+    "upstream": "origin/feat/fontsize-stopwatch",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/forgot-password",
+    "sha": "ed75a9b954dd45ba00cac9ac633efd37335c7712",
+    "upstream": "origin/feat/forgot-password",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/hub-launcher",
+    "sha": "776b4d1f2dc31cd3e930d35404e4211567591fef",
+    "upstream": "origin/feat/hub-launcher",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/i18n-english",
+    "sha": "b9c7caa964cb0994f1dc16585e6fd4b4f20ea809",
+    "upstream": "origin/feat/i18n-english",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/ios-capacitor",
+    "sha": "5107240709670139b3f380852cfeaeaa394ba206",
+    "upstream": "origin/feat/ios-capacitor",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/note-font-flex",
+    "sha": "57e5b5d774660afb7fa50b154fe824836bc8750a",
+    "upstream": "origin/feat/note-font-flex",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/taiwan-holidays",
+    "sha": "8bb6321f33d0ab1b51aa7f3639fa933ea05ca87c",
+    "upstream": "origin/feat/taiwan-holidays",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/task-panel-add-affordances",
+    "sha": "2772c43429a9fe91cee964ec5d1cc7aac25a17d6",
+    "upstream": "origin/feat/task-panel-add-affordances",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/timer-dodge",
+    "sha": "afdf869d75bc35141d52bd8fcb6ce788005f0241",
+    "upstream": "origin/feat/timer-dodge",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "feat/uncategorized-workspace",
+    "sha": "4360676fa1c2bb8fe1e0d5dab2c1fbaa7b1e8b1d",
+    "upstream": "origin/feat/uncategorized-workspace",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "fix/brand-water-gear",
+    "sha": "acfc6205a81be25072f0b205253e6533e8077ba7",
+    "upstream": "origin/fix/brand-water-gear",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "fix/meeting-hidden-from-task-list",
+    "sha": "6d858d1765170f2d5e98da6efbc9cc92ce0eac1a",
+    "upstream": "origin/fix/meeting-hidden-from-task-list",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "fix/notebook-image-missing-files",
+    "sha": "aab3099fdfe2c805ae7cf4042cc58aab4de1d9cd",
+    "upstream": "origin/fix/notebook-image-missing-files",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "fix/task-create-write-race",
+    "sha": "4a31e862003bd6ae97764c13f6d1f65861703c40",
+    "upstream": "origin/fix/task-create-write-race",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "fix/timer-bgm-stop",
+    "sha": "480ff1a82c47dfa1c3a99f470222dbd74886d6a4",
+    "upstream": "origin/fix/timer-bgm-stop",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "fix/tour-viewport-and-timer-dodge",
+    "sha": "d9aa741d6dabee3075137d38027c900123184088",
+    "upstream": "origin/fix/tour-viewport-and-timer-dodge",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  },
+  {
+    "branch": "main",
+    "sha": "5107240709670139b3f380852cfeaeaa394ba206",
+    "upstream": "origin/main",
+    "ancestor_of_main": true,
+    "patch_unique_to_main": 0,
+    "note": "main contains equivalent code"
+  }
+]

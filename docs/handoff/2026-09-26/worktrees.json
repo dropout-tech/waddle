@@ -1,0 +1,181 @@
+[
+  {
+    "path": "/Users/lazylazy/Desktop/琢奧科技/v0-task-management-ui",
+    "exists": true,
+    "git_metadata": [
+      "HEAD ff4176f35f050345a4dad7784c0992d1867ee217",
+      "branch refs/heads/codex/handoff-status-20260926"
+    ],
+    "status_at_audit": "?? docs/handoff/\n"
+  },
+  {
+    "path": "/private/tmp/huddle-auth-site-redesign",
+    "exists": false,
+    "git_metadata": [
+      "HEAD 037f1e7ee312a57102b2d1e895e29287a181f73e",
+      "branch refs/heads/codex/huddle-auth-site-redesign",
+      "prunable gitdir file points to non-existent location"
+    ],
+    "status_at_audit": "directory missing; commit retained in branch"
+  },
+  {
+    "path": "/private/tmp/huddle-canvas-inline-20260916",
+    "exists": false,
+    "git_metadata": [
+      "HEAD e33d985b4bcb356fd6589cc1085185abc8b9c15e",
+      "branch refs/heads/codex/canvas-inline-edit",
+      "prunable gitdir file points to non-existent location"
+    ],
+    "status_at_audit": "directory missing; commit retained in branch"
+  },
+  {
+    "path": "/private/tmp/huddle-commerce-sharing",
+    "exists": true,
+    "git_metadata": [
+      "HEAD 8e362205fcb519965c84cd6042185f8d538f63fb",
+      "branch refs/heads/codex/commerce-fast-load"
+    ],
+    "status_at_audit": ""
+  },
+  {
+    "path": "/private/tmp/huddle-daily-check-in-release",
+    "exists": true,
+    "git_metadata": [
+      "HEAD 7d6e5defd93ceed5fd24fbf8ae366edc7493f765",
+      "branch refs/heads/codex/daily-check-in-release"
+    ],
+    "status_at_audit": ""
+  },
+  {
+    "path": "/private/tmp/huddle-desktop-floating-fix",
+    "exists": false,
+    "git_metadata": [
+      "HEAD ac9b506ac4452885fc36518a6e130de9fe324372",
+      "branch refs/heads/codex/desktop-floating-window-fix",
+      "prunable gitdir file points to non-existent location"
+    ],
+    "status_at_audit": "directory missing; commit retained in branch"
+  },
+  {
+    "path": "/private/tmp/huddle-desktop-release-20260920",
+    "exists": false,
+    "git_metadata": [
+      "HEAD cce2b257cdd6758c47be32c402ff8b4efc89977f",
+      "branch refs/heads/codex/desktop-release-20260920",
+      "prunable gitdir file points to non-existent location"
+    ],
+    "status_at_audit": "directory missing; commit retained in branch"
+  },
+  {
+    "path": "/private/tmp/huddle-focus-compact-20260914",
+    "exists": false,
+    "git_metadata": [
+      "HEAD 3b4cfc86516767139ab0e12c336e6d831d30aebc",
+      "branch refs/heads/codex/focus-compact-inline",
+      "prunable gitdir file points to non-existent location"
+    ],
+    "status_at_audit": "directory missing; commit retained in branch"
+  },
+  {
+    "path": "/private/tmp/huddle-focus-inline-release",
+    "exists": true,
+    "git_metadata": [
+      "HEAD 7ca4b761805c66111c2c7bff9cac41c634b2d3c3",
+      "branch refs/heads/codex/focus-inline-autosave-release"
+    ],
+    "status_at_audit": ""
+  },
+  {
+    "path": "/private/tmp/huddle-leaderboard",
+    "exists": true,
+    "git_metadata": [
+      "HEAD 4b7797e91d9b62b86c40b3b215dd1587e7ab1daf",
+      "branch refs/heads/codex/check-in-leaderboard"
+    ],
+    "status_at_audit": ""
+  },
+  {
+    "path": "/private/tmp/huddle-mac-titlebar-hotfix",
+    "exists": false,
+    "git_metadata": [
+      "HEAD 974ee19213c0a5997f4e8a3f4578ad231084934f",
+      "branch refs/heads/codex/mac-titlebar-hotfix",
+      "prunable gitdir file points to non-existent location"
+    ],
+    "status_at_audit": "directory missing; commit retained in branch"
+  },
+  {
+    "path": "/private/tmp/huddle-marketing-launch-week",
+    "exists": false,
+    "git_metadata": [
+      "HEAD 6dd8e7974ff9889c3e7864030312a7b1359c2f89",
+      "branch refs/heads/codex/huddle-marketing-launch-week",
+      "prunable gitdir file points to non-existent location"
+    ],
+    "status_at_audit": "directory missing; commit retained in branch"
+  },
+  {
+    "path": "/private/tmp/huddle-meeting-integration",
+    "exists": true,
+    "git_metadata": [
+      "HEAD fa1bfc6b96587aa68b715a068e7d63469364643a",
+      "detached"
+    ],
+    "status_at_audit": ""
+  },
+  {
+    "path": "/private/tmp/huddle-meeting-release",
+    "exists": true,
+    "git_metadata": [
+      "HEAD 4cf79a0a748cb8515b871133465d8b044f3d2abb",
+      "branch refs/heads/codex/consolidated-release-20260926"
+    ],
+    "status_at_audit": ""
+  },
+  {
+    "path": "/private/tmp/huddle-startup-20260920",
+    "exists": false,
+    "git_metadata": [
+      "HEAD 5a073a5967e2752f6fd43b46d19cd1180ed62347",
+      "branch refs/heads/codex/startup-parallel",
+      "prunable gitdir file points to non-existent location"
+    ],
+    "status_at_audit": "directory missing; commit retained in branch"
+  },
+  {
+    "path": "/private/tmp/huddle-transcript-release",
+    "exists": true,
+    "git_metadata": [
+      "HEAD 08c98d75cb53196042d4d2d60b46f174b1e16d4a",
+      "branch refs/heads/codex/meeting-task-release"
+    ],
+    "status_at_audit": ""
+  },
+  {
+    "path": "/Users/lazylazy/.codex/worktrees/huddle-mobile-widgets",
+    "exists": true,
+    "git_metadata": [
+      "HEAD d0b6ed01dca1196a4b0de9bab40f07548e1fe2ca",
+      "branch refs/heads/codex/mobile-widgets"
+    ],
+    "status_at_audit": ""
+  },
+  {
+    "path": "/Users/lazylazy/.codex/worktrees/huddle-operations-referrals/v0-task-management-ui",
+    "exists": true,
+    "git_metadata": [
+      "HEAD 6c6db96e1b8bb81b03bce63f9a7002c4c6a719a7",
+      "branch refs/heads/codex/huddle-operations-referrals"
+    ],
+    "status_at_audit": ""
+  },
+  {
+    "path": "/Users/lazylazy/.codex/worktrees/huddle-windows-release/v0-task-management-ui",
+    "exists": true,
+    "git_metadata": [
+      "HEAD 4891b523c955f1651d7e74c768504f4f12053858",
+      "branch refs/heads/codex/windows-desktop-release"
+    ],
+    "status_at_audit": ""
+  }
+]
