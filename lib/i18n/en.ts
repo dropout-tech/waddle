@@ -8,6 +8,7 @@ import { dict as misc } from './dict/misc'
 import { dict as reports } from './dict/reports'
 import { dict as dataLayer } from './dict/data-layer'
 import { dict as growth } from './dict/growth'
+import { dict as operations } from './dict/operations'
 
 // Merged English dictionary. Keys are the Traditional Chinese source strings
 // (see lib/i18n/index.ts). Split by feature area purely to keep files
@@ -24,6 +25,7 @@ export const en: Record<string, string> = {
   ...reports,
   ...dataLayer,
   ...growth,
+  ...operations,
   // Whiteboard canvas controls.
   "手寫筆記": "Handwritten note",
   "請選擇圖片檔案。": "Please choose an image file.",
