@@ -9,6 +9,7 @@ import {
   type ReactElement,
 } from 'react'
 import styles from './operations.module.css'
+import { useI18n } from '@/lib/i18n/react'
 export { styles }
 export function Shell({
   title,
@@ -21,11 +22,12 @@ export function Shell({
   children: ReactNode
   aside?: ReactNode
 }) {
+  const { t } = useI18n()
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
         <Link href="/" className={styles.back}>
-          <ArrowLeft size={17} /> 回工作空間
+          <ArrowLeft size={17} /> {t('回工作空間')}
         </Link>
         <div className={styles.heading}>
           <div>
@@ -62,9 +64,10 @@ export function Feedback({
   )
 }
 export function Loading() {
+  const { t } = useI18n()
   return (
     <p className={styles.loading} role="status">
-      <Loader2 size={18} className="animate-spin" /> 正在讀取資料…
+      <Loader2 size={18} className="animate-spin" /> {t('正在讀取資料…')}
     </p>
   )
 }

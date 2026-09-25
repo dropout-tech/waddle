@@ -51,10 +51,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
   if (suspendedUser === session.user.id) return (
     <main className="flex h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-      <h1 className="text-xl font-semibold">帳號已停用</h1>
-      <p>如有疑問，請聯絡客服。你的資料未因停用而刪除。</p>
-      <a href="/support" className="min-h-11 underline">聯絡客服</a>
-      <button className="min-h-11 rounded-lg bg-secondary px-4" onClick={() => void createClient().auth.signOut()}>登出</button>
+      <h1 className="text-xl font-semibold">{t('帳號已停用')}</h1>
+      <p>{t('如有疑問，請聯絡客服。你的資料未因停用而刪除。')}</p>
+      <a href="/support" className="min-h-11 underline">{t('聯絡客服')}</a>
+      <button className="min-h-11 rounded-lg bg-secondary px-4" onClick={() => void createClient().auth.signOut()}>{t('登出')}</button>
     </main>
   )
   return <>{children}</>
