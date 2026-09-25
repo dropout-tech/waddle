@@ -30,6 +30,7 @@ import type {
   Audit,
 } from '@/lib/operations/types'
 import { Shell, Feedback, Field, Loading, Empty, Pager, styles } from './shared'
+import { useI18n } from '@/lib/i18n/react'
 
 type Tab =
   | 'overview'
@@ -68,6 +69,7 @@ export function AdminPage() {
   )
 }
 function AdminContent() {
+  const { t } = useI18n()
   const { user } = useAuth()
   const [allowed, setAllowed] = useState<boolean | null>(null)
   const [tab, setTab] = useState<Tab>('overview')
@@ -120,11 +122,11 @@ function AdminContent() {
       setRows(list)
     } catch (e) {
       if (seq === serial.current)
-        setError(e instanceof Error ? e.message : '載入失敗')
+        setError(e instanceof Error ? e.message : t('載入失敗'))
     } finally {
       if (seq === serial.current) setLoading(false)
     }
-  }, [tab, offset, query])
+  }, [tab, offset, query, t])
   useEffect(() => {
     setAllowed(null)
     setRows([])
@@ -138,7 +140,7 @@ function AdminContent() {
   async function act(
     action: string,
     payload: Record<string, unknown>,
-    success = '已儲存'
+    success = t('已儲存')
   ) {
     if (busy) return false
     setBusy(true)
@@ -150,16 +152,16 @@ function AdminContent() {
       await load()
       return true
     } catch (e) {
-      setError(e instanceof Error ? e.message : '操作失敗，請重試')
+      setError(e instanceof Error ? e.message : t('操作失敗，請重試'))
       return false
     } finally {
       setBusy(false)
     }
   }
-  function switchTab(t: Tab) {
-    if (t === tab) return
+  function switchTab(next: Tab) {
+    if (next === tab) return
     setLoading(true)
-    setTab(t)
+    setTab(next)
     setOffset(0)
     setSelected(null)
     setDetail(null)
@@ -182,7 +184,7 @@ function AdminContent() {
       if (seq === detailSerial.current) setDetail(d)
     } catch (e) {
       if (seq === detailSerial.current)
-        setError(e instanceof Error ? e.message : '無法讀取會員')
+        setError(e instanceof Error ? e.message : t('無法讀取會員'))
     }
   }
   async function viewCoupon(c: Coupon) {
@@ -200,7 +202,7 @@ function AdminContent() {
       }
     } catch (e) {
       if (seq === detailSerial.current) {
-        setError(e instanceof Error ? e.message : '無法讀取兌換紀錄')
+        setError(e instanceof Error ? e.message : t('無法讀取兌換紀錄'))
         setRedemptionState('error')
       }
     }
@@ -226,7 +228,7 @@ function AdminContent() {
       await act(
         editCoupon ? 'admin_update_coupon' : 'admin_coupon',
         data,
-        '優惠碼已儲存，可複製連結分享'
+        t('優惠碼已儲存，可複製連結分享')
       )
     ) {
       form.reset()
@@ -247,7 +249,7 @@ function AdminContent() {
           reason: f.get('reason'),
           request_id: requestId.current,
         },
-        '使用時間已贈送'
+        t('使用時間已贈送')
       )
     ) {
       requestId.current = crypto.randomUUID()
@@ -258,9 +260,9 @@ function AdminContent() {
   async function copy(value: string) {
     try {
       await navigator.clipboard.writeText(value)
-      setMessage('已複製')
+      setMessage(t('已複製'))
     } catch {
-      setError('無法自動複製，請手動選取優惠碼複製。')
+      setError(t('無法自動複製，請手動選取優惠碼複製。'))
     }
   }
   const table = (head: string[], body: ReactNode) => (
@@ -279,31 +281,31 @@ function AdminContent() {
   )
   return (
     <Shell
-      title="營運後台"
-      intro="看看大家如何使用 Huddle，為每一次邀請與贈送留下清楚的紀錄。"
+      title={t('營運後台')}
+      intro={t('看看大家如何使用 Huddle，為每一次邀請與贈送留下清楚的紀錄。')}
       aside={
         <Link href="/membership" className={styles.button}>
-          我的會員頁
+          {t('我的會員頁')}
         </Link>
       }
     >
       <Feedback error={error} message={message} />
       {allowed === false ? (
         <section className={styles.panel}>
-          <h2>此帳號沒有後台權限</h2>
-          <p>請使用已授權的管理員帳號登入。一般會員的資料不會在這裡公開。</p>
+          <h2>{t('此帳號沒有後台權限')}</h2>
+          <p>{t('請使用已授權的管理員帳號登入。一般會員的資料不會在這裡公開。')}</p>
         </section>
       ) : (
         <>
           {allowed && (
-            <nav className={styles.nav} aria-label="營運功能">
+            <nav className={styles.nav} aria-label={t('營運功能')}>
               {tabs.map(([id, label]) => (
                 <button
                   key={id}
                   aria-current={tab === id ? 'page' : undefined}
                   onClick={() => switchTab(id)}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </nav>
@@ -311,7 +313,7 @@ function AdminContent() {
           {loading ? (
             <Loading />
           ) : !allowed ? (
-            <button onClick={() => void load()}>重新載入</button>
+            <button onClick={() => void load()}>{t('重新載入')}</button>
           ) : (
             <>
               {tab === 'announcements' && <AdminAnnouncements />}
@@ -319,54 +321,60 @@ function AdminContent() {
               {tab === 'overview' && overview && (
                 <>
                   <dl className={styles.stats}>
-                    {[
-                      ['會員總數', overview.members],
-                      ['近 30 天新註冊', overview.new_30],
-                      ['付費權益有效', overview.paid],
-                      ['贈送／體驗有效', overview.gifted],
-                      ['今日活躍', overview.dau],
-                      ['近 7 天活躍', overview.wau],
-                      ['近 30 天活躍', overview.mau],
-                      ['有效推薦', overview.referrals],
-                    ].map(([label, value]) => (
+                    {(
+                      [
+                        ['會員總數', overview.members],
+                        ['近 30 天新註冊', overview.new_30],
+                        ['付費權益有效', overview.paid],
+                        ['贈送／體驗有效', overview.gifted],
+                        ['今日活躍', overview.dau],
+                        ['近 7 天活躍', overview.wau],
+                        ['近 30 天活躍', overview.mau],
+                        ['有效推薦', overview.referrals],
+                      ] as const
+                    ).map(([label, value]) => (
                       <div key={label}>
-                        <dt>{label}</dt>
+                        <dt>{t(label)}</dt>
                         <dd>{value}</dd>
                       </div>
                     ))}
                   </dl>
                   <section className={styles.panel}>
-                    <h2>體驗與推廣</h2>
+                    <h2>{t('體驗與推廣')}</h2>
                     <p>
-                      優惠碼兌換 {overview.redemptions} 次。已結束新戶體驗{' '}
-                      {overview.ended_trials} 人，其中目前具有付費權益{' '}
-                      {overview.converted_trials} 人。
+                      {t('優惠碼兌換 {count} 次。已結束新戶體驗 {ended} 人，其中目前具有付費權益 {converted} 人。', {
+                        count: overview.redemptions,
+                        ended: overview.ended_trials,
+                        converted: overview.converted_trials,
+                      })}
                     </p>
                     <p className={styles.muted}>
                       {overview.ended_trials
-                        ? `到期體驗會員目前付費比例：${((overview.converted_trials / overview.ended_trials) * 100).toFixed(1)}%。`
-                        : '尚無到期樣本，暫不計算比例。'}
-                      此比例不是歷史首次付費轉換率；完整訂單金流尚未啟用。
+                        ? t('到期體驗會員目前付費比例：{rate}%。', {
+                            rate: ((overview.converted_trials / overview.ended_trials) * 100).toFixed(1),
+                          })
+                        : t('尚無到期樣本，暫不計算比例。')}
+                      {t('此比例不是歷史首次付費轉換率；完整訂單金流尚未啟用。')}
                     </p>
                     <div className={styles.actions}>
                       <button onClick={() => switchTab('coupons')}>
-                        查看優惠碼成效
+                        {t('查看優惠碼成效')}
                       </button>
                       <button onClick={() => switchTab('settings')}>
-                        調整活動開關
+                        {t('調整活動開關')}
                       </button>
                     </div>
                   </section>
                   <p className={styles.muted}>
-                    活躍指當天有新增或修改任務／排程，單純登入不計入。統計以台北日期計算，自本功能啟用後開始收集，不回填私人任務內容。
+                    {t('活躍指當天有新增或修改任務／排程，單純登入不計入。統計以台北日期計算，自本功能啟用後開始收集，不回填私人任務內容。')}
                   </p>
                 </>
               )}
               {tab === 'settings' && settings && (
                 <section className={styles.panel}>
-                  <h2>活動與贈送設定</h2>
+                  <h2>{t('活動與贈送設定')}</h2>
                   <p className={styles.muted}>
-                    每個活動可以獨立開關。關閉只停止新的領取，已獲得的使用時間保留。數值調整只適用於之後的獎勵。
+                    {t('每個活動可以獨立開關。關閉只停止新的領取，已獲得的使用時間保留。數值調整只適用於之後的獎勵。')}
                   </p>
                   <form
                     className={`${styles.form} mt-6`}
@@ -396,7 +404,7 @@ function AdminContent() {
                             })
                           }
                         />
-                        {label}
+                        {t(label)}
                       </label>
                     ))}
                     <div className={styles.full} />
@@ -414,7 +422,7 @@ function AdminContent() {
                         ],
                       ] as const
                     ).map(([key, label, min, max]) => (
-                      <Field key={key} label={label}>
+                      <Field key={key} label={t(label)}>
                         <input
                           type="number"
                           required
@@ -432,7 +440,7 @@ function AdminContent() {
                     ))}
                     <div className={styles.full}>
                       <button disabled={busy} className={styles.primary}>
-                        儲存活動設定
+                        {t('儲存活動設定')}
                       </button>
                     </div>
                   </form>
@@ -440,7 +448,7 @@ function AdminContent() {
               )}
               {tab === 'members' && (
                 <section className={styles.panel}>
-                  <h2>會員管理</h2>
+                  <h2>{t('會員管理')}</h2>
                   <form
                     className={styles.actions}
                     onSubmit={(e) => {
@@ -449,44 +457,44 @@ function AdminContent() {
                       setQuery(search)
                     }}
                   >
-                    <Field label="搜尋化名或 Email">
+                    <Field label={t('搜尋化名或 Email')}>
                       <input
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         maxLength={100}
                       />
                     </Field>
-                    <button>搜尋會員</button>
+                    <button>{t('搜尋會員')}</button>
                   </form>
                   {rows.length ? (
                     table(
-                      ['會員', '註冊／最近活躍', '權益', '推薦', '操作'],
+                      [t('會員'), t('註冊／最近活躍'), t('權益'), t('推薦'), t('操作')],
                       (rows as Member[]).map((m) => (
                         <tr key={m.id}>
                           <td>
-                            {m.alias || '尚未設定化名'}
+                            {m.alias || t('尚未設定化名')}
                             <small>{m.email}</small>
-                            {m.suspended && <small>帳號已停用</small>}
+                            {m.suspended && <small>{t('帳號已停用')}</small>}
                           </td>
                           <td>
                             {dateLabel(m.created_at)}
-                            <small>活躍：{dateLabel(m.last_active)}</small>
+                            <small>{t('活躍：{date}', { date: dateLabel(m.last_active) })}</small>
                           </td>
                           <td>
-                            付費：{dateLabel(m.paid_until)}
-                            <small>贈送：{dateLabel(m.gift_until)}</small>
+                            {t('付費：{date}', { date: dateLabel(m.paid_until) })}
+                            <small>{t('贈送：{date}', { date: dateLabel(m.gift_until) })}</small>
                           </td>
-                          <td>{m.referrals} 人</td>
+                          <td>{t('{count} 人', { count: m.referrals })}</td>
                           <td>
                             <button onClick={() => void viewMember(m)}>
-                              查看會員
+                              {t('查看會員')}
                             </button>
                           </td>
                         </tr>
                       ))
                     )
                   ) : (
-                    <Empty>沒有符合條件的會員。</Empty>
+                    <Empty>{t('沒有符合條件的會員。')}</Empty>
                   )}
                   <Pager
                     offset={offset}
@@ -495,10 +503,12 @@ function AdminContent() {
                   />
                   {selected && (
                     <div className={styles.detail}>
-                      <h3>{selected.alias || selected.email} 的會員紀錄</h3>
+                      <h3>{t('{name} 的會員紀錄', { name: selected.alias || selected.email })}</h3>
                       <p className={styles.muted}>
-                        會員 ID：{selected.id} · 推薦來源：
-                        {detail?.referrer || '無'}
+                        {t('會員 ID：{id} · 推薦來源：{referrer}', {
+                          id: selected.id,
+                          referrer: detail?.referrer || t('無'),
+                        })}
                       </p>
                       {!detail ? (
                         <Loading />
@@ -508,7 +518,7 @@ function AdminContent() {
                             className={`${styles.form} mt-5`}
                             onSubmit={grantSubmit}
                           >
-                            <Field label="贈送天數">
+                            <Field label={t('贈送天數')}>
                               <input
                                 name="days"
                                 type="number"
@@ -518,12 +528,12 @@ function AdminContent() {
                                 required
                               />
                             </Field>
-                            <Field label="贈送／補發原因">
+                            <Field label={t('贈送／補發原因')}>
                               <input
                                 name="reason"
                                 minLength={2}
                                 maxLength={500}
-                                placeholder="例如：協助補發活動獎勵"
+                                placeholder={t('例如：協助補發活動獎勵')}
                                 required
                               />
                             </Field>
@@ -532,11 +542,11 @@ function AdminContent() {
                                 className={styles.primary}
                                 disabled={busy || !settings?.gifts_enabled}
                               >
-                                贈送使用時間
+                                {t('贈送使用時間')}
                               </button>
                               {!settings?.gifts_enabled && (
                                 <p className={styles.muted}>
-                                  請先至活動設定開啟手動贈送。
+                                  {t('請先至活動設定開啟手動贈送。')}
                                 </p>
                               )}
                             </div>
@@ -561,8 +571,8 @@ function AdminContent() {
                             <Field
                               label={
                                 selected.suspended
-                                  ? '恢復帳號原因'
-                                  : '停用帳號原因'
+                                  ? t('恢復帳號原因')
+                                  : t('停用帳號原因')
                               }
                             >
                               <input
@@ -573,7 +583,7 @@ function AdminContent() {
                               />
                             </Field>
                             <button disabled={busy}>
-                              {selected.suspended ? '恢復帳號' : '停用帳號'}
+                              {selected.suspended ? t('恢復帳號') : t('停用帳號')}
                             </button>
                           </form>
                           <GrantTable
@@ -584,7 +594,7 @@ function AdminContent() {
                                 await act(
                                   'admin_revoke',
                                   { id, reason },
-                                  '贈送已撤銷'
+                                  t('贈送已撤銷')
                                 )
                               )
                                 await viewMember(selected)
@@ -600,27 +610,26 @@ function AdminContent() {
                 <>
                   <section className={styles.panel}>
                     <h2>
-                      {editCoupon ? `編輯 ${editCoupon.code}` : '建立優惠碼'}
+                      {editCoupon ? t('編輯 {code}', { code: editCoupon.code }) : t('建立優惠碼')}
                     </h2>
                     <p className={styles.muted}>
-                      已兌換的獎勵不隨編輯改變。新戶指註冊 7
-                      天內；不可疊加會阻擋仍有效的活動與推薦體驗。
+                      {t('已兌換的獎勵不隨編輯改變。新戶指註冊 7 天內；不可疊加會阻擋仍有效的活動與推薦體驗。')}
                     </p>
                     <form
                       key={editCoupon?.id || 'new'}
                       className={`${styles.form} mt-5`}
                       onSubmit={couponSubmit}
                     >
-                      <Field label="活動名稱">
+                      <Field label={t('活動名稱')}>
                         <input
                           name="name"
                           maxLength={80}
                           defaultValue={editCoupon?.name}
                           required
-                          placeholder="第一批體驗朋友"
+                          placeholder={t('第一批體驗朋友')}
                         />
                       </Field>
-                      <Field label="優惠碼" hint="4–32 碼英數、底線或連字號。">
+                      <Field label={t('優惠碼')} hint={t('4–32 碼英數、底線或連字號。')}>
                         <input
                           name="code"
                           required
@@ -631,7 +640,7 @@ function AdminContent() {
                           placeholder="FRIENDS60"
                         />
                       </Field>
-                      <Field label="贈送天數">
+                      <Field label={t('贈送天數')}>
                         <input
                           name="days"
                           type="number"
@@ -641,7 +650,7 @@ function AdminContent() {
                           required
                         />
                       </Field>
-                      <Field label="總兌換名額">
+                      <Field label={t('總兌換名額')}>
                         <input
                           name="max_uses"
                           type="number"
@@ -651,7 +660,7 @@ function AdminContent() {
                           required
                         />
                       </Field>
-                      <Field label="開始時間（你的裝置時區）">
+                      <Field label={t('開始時間（你的裝置時區）')}>
                         <input
                           name="starts_at"
                           type="datetime-local"
@@ -661,7 +670,7 @@ function AdminContent() {
                           required
                         />
                       </Field>
-                      <Field label="兌換截止（你的裝置時區）">
+                      <Field label={t('兌換截止（你的裝置時區）')}>
                         <input
                           name="expires_at"
                           type="datetime-local"
@@ -672,7 +681,7 @@ function AdminContent() {
                           required
                         />
                       </Field>
-                      <Field label="適用對象">
+                      <Field label={t('適用對象')}>
                         <select
                           name="audience"
                           value={audience}
@@ -680,15 +689,15 @@ function AdminContent() {
                         >
                           {Object.entries(audiences).map(([v, label]) => (
                             <option key={v} value={v}>
-                              {label}
+                              {t(label)}
                             </option>
                           ))}
                         </select>
                       </Field>
                       {audience === 'specific' && (
                         <Field
-                          label="指定會員 ID"
-                          hint="在會員詳細資料中複製。"
+                          label={t('指定會員 ID')}
+                          hint={t('在會員詳細資料中複製。')}
                         >
                           <input
                             name="target_user_id"
@@ -704,9 +713,9 @@ function AdminContent() {
                           type="checkbox"
                           defaultChecked={editCoupon?.stackable}
                         />
-                        允許與其他活動體驗疊加
+                        {t('允許與其他活動體驗疊加')}
                       </label>
-                      <Field label="內部備註">
+                      <Field label={t('內部備註')}>
                         <input
                           name="notes"
                           maxLength={500}
@@ -715,7 +724,7 @@ function AdminContent() {
                       </Field>
                       <div className={`${styles.actions} ${styles.full}`}>
                         <button className={styles.primary} disabled={busy}>
-                          {editCoupon ? '儲存優惠碼' : '建立優惠碼'}
+                          {editCoupon ? t('儲存優惠碼') : t('建立優惠碼')}
                         </button>
                         {editCoupon && (
                           <button
@@ -725,41 +734,41 @@ function AdminContent() {
                               setAudience('all')
                             }}
                           >
-                            取消編輯
+                            {t('取消編輯')}
                           </button>
                         )}
                       </div>
                     </form>
                   </section>
                   <section className={styles.panel}>
-                    <h2>優惠碼與成效</h2>
+                    <h2>{t('優惠碼與成效')}</h2>
                     {!settings?.coupons_enabled && (
                       <p className={styles.muted}>
-                        目前總開關為關閉：可以建立與編輯優惠碼，會員暫時無法兌換。
+                        {t('目前總開關為關閉：可以建立與編輯優惠碼，會員暫時無法兌換。')}
                       </p>
                     )}
                     {rows.length ? (
                       table(
-                        ['活動', '兌換狀態', '成效', '操作'],
+                        [t('活動'), t('兌換狀態'), t('成效'), t('操作')],
                         (rows as Coupon[]).map((c) => (
                           <tr key={c.id}>
                             <td>
                               {c.name}
                               <small>
-                                <code>{c.code}</code> · {c.days} 天
+                                <code>{c.code}</code> · {t('{days} 天', { days: c.days })}
                               </small>
-                              <small>{audiences[c.audience]}</small>
+                              <small>{t(audiences[c.audience])}</small>
                             </td>
                             <td>
-                              {c.enabled ? '啟用' : '停用'} · {c.used}/
+                              {c.enabled ? t('啟用') : t('停用')} · {c.used}/
                               {c.max_uses}
-                              <small>開始 {dateLabel(c.starts_at)}</small>
-                              <small>截止 {dateLabel(c.expires_at)}</small>
+                              <small>{t('開始 {date}', { date: dateLabel(c.starts_at) })}</small>
+                              <small>{t('兌換截止 {date}', { date: dateLabel(c.expires_at) })}</small>
                             </td>
                             <td>
-                              兌換後近 7 天活躍 {c.active} 人
+                              {t('兌換後近 7 天活躍 {count} 人', { count: c.active })}
                               <small>
-                                兌換後有付費更新且權益有效 {c.paid} 人
+                                {t('兌換後有付費更新且權益有效 {count} 人', { count: c.paid })}
                               </small>
                             </td>
                             <td>
@@ -769,7 +778,7 @@ function AdminContent() {
                                     copy(enrollmentLink('coupon', c.code))
                                   }
                                 >
-                                  複製連結
+                                  {t('複製連結')}
                                 </button>
                                 <button
                                   onClick={() => {
@@ -781,7 +790,7 @@ function AdminContent() {
                                     })
                                   }}
                                 >
-                                  編輯
+                                  {t('編輯')}
                                 </button>
                                 <button
                                   disabled={busy}
@@ -792,10 +801,10 @@ function AdminContent() {
                                     })
                                   }
                                 >
-                                  {c.enabled ? '停用' : '啟用'}
+                                  {c.enabled ? t('停用') : t('啟用')}
                                 </button>
                                 <button onClick={() => void viewCoupon(c)}>
-                                  兌換紀錄
+                                  {t('兌換紀錄')}
                                 </button>
                               </div>
                             </td>
@@ -804,7 +813,7 @@ function AdminContent() {
                       )
                     ) : (
                       <Empty>
-                        還沒有優惠碼。可以先建立一組，再開啟活動分享。
+                        {t('還沒有優惠碼。可以先建立一組，再開啟活動分享。')}
                       </Empty>
                     )}
                     <Pager
@@ -814,28 +823,28 @@ function AdminContent() {
                     />
                     {couponDetail && (
                       <div className={styles.detail}>
-                        <h3>{couponDetail.name} 的兌換紀錄</h3>
+                        <h3>{t('{name} 的兌換紀錄', { name: couponDetail.name })}</h3>
                         {redemptionState === 'loading' ? (
                           <Loading />
                         ) : redemptionState === 'error' ? (
                           <button onClick={() => void viewCoupon(couponDetail)}>
-                            重新讀取兌換紀錄
+                            {t('重新讀取兌換紀錄')}
                           </button>
                         ) : redemptions.length ? (
                           table(
-                            ['會員', 'Email', '兌換時間'],
+                            [t('會員'), 'Email', t('兌換時間')],
                             redemptions.map((r) => (
                               <tr key={r.user_id}>
-                                <td>{r.alias || '未設定'}</td>
+                                <td>{r.alias || t('未設定')}</td>
                                 <td>{r.email}</td>
                                 <td>{dateLabel(r.created_at)}</td>
                               </tr>
                             ))
                           )
                         ) : (
-                          <Empty>尚無兌換紀錄。</Empty>
+                          <Empty>{t('尚無兌換紀錄。')}</Empty>
                         )}
-                        <p className={styles.muted}>顯示最近 50 筆。</p>
+                        <p className={styles.muted}>{t('顯示最近 50 筆。')}</p>
                       </div>
                     )}
                   </section>
@@ -843,25 +852,24 @@ function AdminContent() {
               )}
               {tab === 'referrals' && (
                 <section className={styles.panel}>
-                  <h2>推薦與獎勵紀錄</h2>
+                  <h2>{t('推薦與獎勵紀錄')}</h2>
                   <p className={styles.muted}>
-                    同一位新會員只會計算一次。到達年度上限後仍記錄有效推薦，獎勵天數為
-                    0。
+                    {t('同一位新會員只會計算一次。到達年度上限後仍記錄有效推薦，獎勵天數為 0。')}
                   </p>
                   {rows.length ? (
                     table(
-                      ['推薦人', '新會員', '獎勵', '時間', '狀態', '操作'],
+                      [t('推薦人'), t('新會員'), t('獎勵'), t('時間'), t('狀態'), t('操作')],
                       (rows as Referral[]).map((r) => (
                         <tr key={r.id}>
                           <td>{r.referrer}</td>
                           <td>{r.friend}</td>
-                          <td>{r.reward_days} 天</td>
+                          <td>{t('{days} 天', { days: r.reward_days })}</td>
                           <td>{dateLabel(r.created_at)}</td>
-                          <td>{r.status === 'valid' ? '有效' : '已撤銷'}</td>
+                          <td>{r.status === 'valid' ? t('有效') : t('已撤銷')}</td>
                           <td>
                             {r.status === 'valid' && (
                               <button onClick={() => setReferralToRevoke(r)}>
-                                撤銷推薦
+                                {t('撤銷推薦')}
                               </button>
                             )}
                           </td>
@@ -869,7 +877,7 @@ function AdminContent() {
                       ))
                     )
                   ) : (
-                    <Empty>還沒有推薦紀錄。</Empty>
+                    <Empty>{t('還沒有推薦紀錄。')}</Empty>
                   )}
                   <Pager
                     offset={offset}
@@ -888,14 +896,17 @@ function AdminContent() {
                             id: referralToRevoke.id,
                             reason: data.get('reason'),
                           },
-                          '推薦及相關贈送已撤銷'
+                          t('推薦及相關贈送已撤銷')
                         ).then((ok) => {
                           if (ok) setReferralToRevoke(null)
                         })
                       }}
                     >
                       <Field
-                        label={`撤銷 ${referralToRevoke.referrer} 推薦 ${referralToRevoke.friend} 的原因`}
+                        label={t('撤銷 {referrer} 推薦 {friend} 的原因', {
+                          referrer: referralToRevoke.referrer,
+                          friend: referralToRevoke.friend,
+                        })}
                       >
                         <input
                           name="reason"
@@ -904,35 +915,35 @@ function AdminContent() {
                           maxLength={500}
                         />
                       </Field>
-                      <button disabled={busy}>確認撤銷推薦</button>
+                      <button disabled={busy}>{t('確認撤銷推薦')}</button>
                       <button
                         type="button"
                         onClick={() => setReferralToRevoke(null)}
                       >
-                        取消
+                        {t('取消')}
                       </button>
                       <p className={styles.muted}>
-                        此操作會移除排行榜計數並撤銷雙方相關推薦贈送，保留其他已付費或活動權益。
+                        {t('此操作會移除排行榜計數並撤銷雙方相關推薦贈送，保留其他已付費或活動權益。')}
                       </p>
                     </form>
                   )}
                   <p className={styles.muted}>
-                    如需補發或撤銷，請到會員管理開啟推薦人的贈送紀錄，填寫原因後操作。
+                    {t('如需補發或撤銷，請到會員管理開啟推薦人的贈送紀錄，填寫原因後操作。')}
                   </p>
                 </section>
               )}
               {tab === 'billing' && (
                 <section className={styles.panel}>
-                  <h2>訂單與訂閱</h2>
+                  <h2>{t('訂單與訂閱')}</h2>
                   <p>
-                    目前尚未啟用購買。此頁顯示金流同步的權益紀錄，不把贈送時間計為營收。
+                    {t('目前尚未啟用購買。此頁顯示金流同步的權益紀錄，不把贈送時間計為營收。')}
                   </p>
                   <p className={styles.muted}>
-                    訂單金額、付款失敗、退款與下一次扣款日需接上正式金流後才能提供，目前不會以推算數字替代。
+                    {t('訂單金額、付款失敗、退款與下一次扣款日需接上正式金流後才能提供，目前不會以推算數字替代。')}
                   </p>
                   {rows.length ? (
                     table(
-                      ['會員', '方案', '付費權益到期', '金流更新時間'],
+                      [t('會員'), t('方案'), t('付費權益到期'), t('金流更新時間')],
                       (rows as Billing[]).map((b) => (
                         <tr key={b.user_id}>
                           <td>{b.email}</td>
@@ -947,7 +958,7 @@ function AdminContent() {
                       ))
                     )
                   ) : (
-                    <Empty>尚無金流權益紀錄。</Empty>
+                    <Empty>{t('尚無金流權益紀錄。')}</Empty>
                   )}
                   <Pager
                     offset={offset}
@@ -958,24 +969,24 @@ function AdminContent() {
               )}
               {tab === 'audit' && (
                 <section className={styles.panel}>
-                  <h2>操作紀錄</h2>
+                  <h2>{t('操作紀錄')}</h2>
                   <p className={styles.muted}>
-                    保留操作者、對象、原因與時間。會員的任務與筆記內容不會記入。
+                    {t('保留操作者、對象、原因與時間。會員的任務與筆記內容不會記入。')}
                   </p>
                   {rows.length ? (
                     table(
-                      ['台北時間', '操作', '對象', '內容'],
+                      [t('台北時間'), t('操作'), t('對象'), t('內容')],
                       (rows as Audit[]).map((a) => (
                         <tr key={a.id}>
                           <td>{dateLabel(a.created_at)}</td>
                           <td>
-                            {auditLabel[a.action] || a.action}
-                            <small>操作者：{a.actor_id}</small>
+                            {t(auditLabel[a.action] || a.action)}
+                            <small>{t('操作者：{id}', { id: a.actor_id })}</small>
                           </td>
-                          <td>{a.target || '全站設定'}</td>
+                          <td>{a.target || t('全站設定')}</td>
                           <td>
                             <details>
-                              <summary>查看紀錄</summary>
+                              <summary>{t('查看紀錄')}</summary>
                               <pre className="max-w-sm whitespace-pre-wrap break-all text-xs">
                                 {JSON.stringify(a.detail, null, 2)}
                               </pre>
@@ -985,7 +996,7 @@ function AdminContent() {
                       ))
                     )
                   ) : (
-                    <Empty>尚無操作紀錄。</Empty>
+                    <Empty>{t('尚無操作紀錄。')}</Empty>
                   )}
                   <Pager
                     offset={offset}
@@ -1027,34 +1038,35 @@ function GrantTable({
   busy: boolean
   onRevoke: (id: string, reason: string) => Promise<void>
 }) {
+  const { t } = useI18n()
   const [id, setId] = useState('')
   const [reason, setReason] = useState('')
   return (
     <div className={styles.detail}>
-      <h3>贈送時間與操作</h3>
+      <h3>{t('贈送時間與操作')}</h3>
       {grants.length ? (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>來源</th>
-                <th>天數與期限</th>
-                <th>操作</th>
+                <th>{t('來源')}</th>
+                <th>{t('天數與期限')}</th>
+                <th>{t('操作')}</th>
               </tr>
             </thead>
             <tbody>
               {grants.map((g) => (
                 <tr key={g.id}>
                   <td>
-                    {sourceLabel[g.source]}
+                    {t(sourceLabel[g.source])}
                     <small>{g.reason}</small>
                   </td>
                   <td>
-                    {g.days} 天<small>{dateLabel(g.expires_at)}</small>
+                    {t('{days} 天', { days: g.days })}<small>{dateLabel(g.expires_at)}</small>
                   </td>
                   <td>
                     {g.revoked_at ? (
-                      '已撤銷'
+                      t('已撤銷')
                     ) : (
                       <button
                         onClick={() => {
@@ -1062,7 +1074,7 @@ function GrantTable({
                           setReason('')
                         }}
                       >
-                        撤銷這筆贈送
+                        {t('撤銷這筆贈送')}
                       </button>
                     )}
                   </td>
@@ -1072,7 +1084,7 @@ function GrantTable({
           </table>
         </div>
       ) : (
-        <Empty>尚無贈送紀錄。</Empty>
+        <Empty>{t('尚無贈送紀錄。')}</Empty>
       )}
       {id && (
         <form
@@ -1082,7 +1094,7 @@ function GrantTable({
             void onRevoke(id, reason).then(() => setId(''))
           }}
         >
-          <Field label="撤銷原因">
+          <Field label={t('撤銷原因')}>
             <input
               required
               minLength={2}
@@ -1091,9 +1103,9 @@ function GrantTable({
               onChange={(e) => setReason(e.target.value)}
             />
           </Field>
-          <button disabled={busy}>確認撤銷</button>
+          <button disabled={busy}>{t('確認撤銷')}</button>
           <button type="button" onClick={() => setId('')}>
-            取消
+            {t('取消')}
           </button>
         </form>
       )}

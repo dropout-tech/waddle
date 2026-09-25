@@ -127,6 +127,9 @@ export const dict: Record<string, string> = {
   '常用連結（最底下）': 'Quick links (at the very bottom)',
   '右上角：使用者選單': 'Top right: user menu',
   '✨ 你準備好了！': "✨ You're all set!",
+  '📅 每日簽到 ＆ 排行榜': '📅 Daily check-in & leaderboard',
+  '🗒️ 會議逐字稿 → 任務': '🗒️ Meeting transcript → tasks',
+  '📅 每日簽到 ＆ 會議轉任務': '📅 Daily check-in & meetings-to-tasks',
   '任務分頁': 'Tasks tab',
   '點任務 = 編輯，長按 = 拖到日曆': 'Tap a task to edit, long-press to drag to the calendar',
   '🤚 左右滑動': '🤚 Swipe left / right',
@@ -169,6 +172,12 @@ export const dict: Record<string, string> = {
   '點開有你的帳號資訊、深淺色切換與登出。桌面上按 ⌘K 隨時召喚指令面板（搜任務、切視圖、開記事本）；按 ? 看完整快捷鍵。':
     'Open it for your account info, light/dark mode toggle, and sign out. On desktop, press ⌘K anytime to summon the command palette (search tasks, switch views, open Notebook); press ? to see all keyboard shortcuts.',
   '最後一步：你想怎麼開始？': 'Last step: how do you want to start?',
+  '日曆頁工具列有「每日簽到」，記錄今天的心情與一句話，累積連續天數。想跟朋友比一比？到右上角使用者選單「會員與推薦」設定公開化名，就能上推薦排行榜。':
+    'The calendar toolbar has Daily check-in — log today\'s mood and a one-line note to build a streak. Want to compare with friends? Set a public alias under the user menu → Membership & referrals to join the referral leaderboard.',
+  '使用者選單「會議轉任務」：貼上會議逐字稿，Huddle 會幫你整理成待辦任務，自動抓出負責人與期限。指派給共享夥伴的任務，對方會在「待接受指派」收到通知。':
+    'User menu → Meetings to tasks: paste a meeting transcript and Huddle organizes it into to-do tasks, automatically picking out the owner and due date. Tasks assigned to a shared peer show up for them under Pending assignments.',
+  '日曆頁「⋯」選單裡有「每日簽到」，記錄心情累積連續天數；使用者選單裡有「會議轉任務」，貼上逐字稿自動整理成待辦任務。':
+    'The calendar page\'s "⋯" menu has Daily check-in to log your mood and build a streak; the user menu has Meetings to tasks — paste a transcript and it\'s organized into to-dos automatically.',
 
   // onboarding-tour.tsx — tour step bodies (mobile-only variants)
   '整合任務、時間排程、專注計時、日記反思的工作面板。慢慢搖擺，把事情做完。':

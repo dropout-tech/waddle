@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -49,6 +49,15 @@ export function FocusBoard(props: FocusBoardProps) {
   const [saving, setSaving] = useState(false);
   const [taskViews, setTaskViews] = useState<Record<string, "preview" | "expanded" | "collapsed">>({});
   const cards = focus.cards ?? defaultCards(workspaces, todayStr);
+  // `update()` below runs writes through a serial queue rather than
+  // dropping a second card's edit while the first is still saving, so it
+  // needs to read the *latest* cards/focus at the moment each queued write
+  // actually executes — not whatever was in scope when it was queued.
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
+  const focusRef = useRef(focus);
+  focusRef.current = focus;
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const entries = cards
     .filter((c) => !c.hidden)
     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -76,19 +85,30 @@ export function FocusBoard(props: FocusBoardProps) {
         ? [{ card, workspace, category }]
         : [];
     });
-  async function update(categoryId: string, patch: Partial<FocusCard>) {
-    if (!onSetFocusBoard || saving) return;
-    setSaving(true);
-    try {
-      await onSetFocusBoard({
-        ...focus,
-        cards: cards.map((c) =>
-          c.categoryId === categoryId ? { ...c, ...patch } : c,
-        ),
-      });
-    } finally {
-      setSaving(false);
-    }
+  // Serialize writes instead of dropping one when another card is mid-save.
+  // `focus_board` is a single JSONB blob, so every write must be built from
+  // the latest known cards (via the refs above) — never from a snapshot
+  // taken before an earlier queued write landed — or two cards edited close
+  // together would silently overwrite each other.
+  function update(categoryId: string, patch: Partial<FocusCard>) {
+    if (!onSetFocusBoard) return Promise.resolve();
+    const run = saveQueueRef.current.then(async () => {
+      setSaving(true);
+      try {
+        await onSetFocusBoard({
+          ...focusRef.current,
+          cards: cardsRef.current.map((c) =>
+            c.categoryId === categoryId ? { ...c, ...patch } : c,
+          ),
+        });
+      } finally {
+        setSaving(false);
+      }
+    });
+    // Keep the chain alive even if this write failed, so a later card's
+    // edit still gets its turn instead of being stuck behind a rejection.
+    saveQueueRef.current = run.catch(() => {});
+    return run;
   }
   return (
     <div data-testid="focus-board" className="min-w-0">
@@ -260,6 +280,79 @@ function ProgressCard({
   const submitting = useRef(false);
   const cancelled = useRef(false);
   const [saveFailed, setSaveFailed] = useState(false);
+
+  // Closing the tab or backgrounding the app (iOS Capacitor included) mid-edit
+  // must not silently lose the draft. localStorage is the reliable fallback —
+  // a best-effort network flush is attempted too, but it can be cut off.
+  const draftKey = `waddle-focus-draft-v1:${category.id}`;
+  function clearDraft() {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch {}
+  }
+  // Restore a draft left behind by an abrupt close, once per mount.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as {
+        editing?: "all" | "status" | "remarks";
+        mode?: "text" | "task";
+        taskId?: string;
+        text?: string;
+        remarks?: string;
+      };
+      if (!draft.editing) {
+        clearDraft();
+        return;
+      }
+      cancelled.current = false;
+      setSaveFailed(false);
+      setMode(draft.mode === "task" ? "task" : "text");
+      setTaskId(draft.taskId ?? "");
+      setText(draft.text ?? "");
+      setRemarks(draft.remarks ?? "");
+      setEditing(draft.editing);
+      toast.info(t("已還原上次未儲存的草稿，請確認後再送出"));
+    } catch {
+      clearDraft();
+    }
+    // Restore is a one-time mount check; draftKey is stable per instance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Persist the in-progress draft whenever the page is about to disappear.
+  // Refs (not effect deps) hold the latest values so we don't churn the
+  // listeners on every keystroke.
+  const draftSnapshot = { editing, mode, taskId, text, remarks };
+  const draftSnapshotRef = useRef(draftSnapshot);
+  draftSnapshotRef.current = draftSnapshot;
+  // `save` closes over this render's state; the listeners below are only
+  // attached once (stable deps), so without this ref they'd keep calling
+  // the mount-time `save` — which still sees `editing === null` — forever.
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  useEffect(() => {
+    function persistDraft() {
+      const snap = draftSnapshotRef.current;
+      if (!snap.editing || cancelled.current || submitting.current) return;
+      try {
+        localStorage.setItem(draftKey, JSON.stringify({ ...snap, ts: Date.now() }));
+      } catch {}
+      // Best-effort server flush; may not finish before the page is gone,
+      // but the localStorage copy above is the guaranteed fallback.
+      void saveRef.current();
+    }
+    function onVisibilityChange() {
+      if (document.visibilityState === "hidden") persistDraft();
+    }
+    window.addEventListener("pagehide", persistDraft);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", persistDraft);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
   function edit(target: "all" | "status" | "remarks" = "all") {
     cancelled.current = false;
     setSaveFailed(false);
@@ -274,7 +367,11 @@ function ProgressCard({
     setEditing(target);
   }
   async function save() {
-    if (!editing || cancelled.current || submitting.current || saving) return;
+    // Note: `saving` (the board-wide indicator) is intentionally NOT part of
+    // this guard. A card whose editor blurs/submits while another card is
+    // mid-save must still queue its write via onUpdate (see FocusBoard's
+    // serial queue) rather than being silently dropped here.
+    if (!editing || cancelled.current || submitting.current) return;
     if (editing !== "remarks" && mode === "task" && !taskId) return;
     const statusChanged = editing !== "remarks" && (
       mode === "task"
@@ -284,6 +381,7 @@ function ProgressCard({
     const remarksChanged = editing !== "status" && remarks.trim() !== (card.remarks ?? "");
     if (!statusChanged && !remarksChanged) {
       setEditing(null);
+      clearDraft();
       return;
     }
     submitting.current = true;
@@ -297,6 +395,7 @@ function ProgressCard({
         ...(remarksChanged ? { remarks: remarks.trim() } : {}),
       });
       setEditing(null);
+      clearDraft();
     } catch {
       setSaveFailed(true);
       toast.error(t("儲存失敗，請重試"));
@@ -348,6 +447,7 @@ function ProgressCard({
               if (!saving && !submitting.current) {
                 cancelled.current = true;
                 setEditing(null);
+                clearDraft();
               }
             }
           }}
@@ -430,6 +530,7 @@ function ProgressCard({
               onClick={() => {
                 cancelled.current = true;
                 setEditing(null);
+                clearDraft();
               }}
               className="min-h-11 rounded-lg px-4 text-sm hover:bg-muted"
             >

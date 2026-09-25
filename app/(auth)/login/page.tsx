@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, type FormEvent } from 'react'
+import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react'
@@ -75,6 +75,13 @@ function LoginForm() {
   )
   const oauthBusy = loading || googleLoading || appleLoading
 
+  // Warm the post-login destination while the user is still typing: the
+  // workspace route's JS is large, and fetching it only after the password is
+  // accepted put its whole download on the login → workspace critical path.
+  useEffect(() => {
+    router.prefetch(pendingMeetingPath() || '/')
+  }, [router])
+
   // Native: user closed the OAuth browser sheet without completing → unstick
   // the spinner (it otherwise waits for a deep link that never comes).
   useBrowserFinished(() => setGoogleLoading(false))
@@ -98,12 +105,12 @@ function LoginForm() {
     // normal post-login destination.
     if (window.sessionStorage.getItem(PENDING_SHARE_INVITE_KEY)) {
       router.push('/share/invite')
-      router.refresh()
       return
     }
 
+    // No router.refresh(): auth is client-side (see AuthGuard), so a refresh
+    // only re-fetched this route's payload in parallel with the navigation.
     router.push(pendingMeetingPath() || '/')
-    router.refresh()
   }
 
   async function handleGoogleLogin() {
@@ -197,8 +204,11 @@ function LoginForm() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">{t('密碼')}</Label>
+            {/* prefetch off: on a slow link the viewport prefetch of these
+                side routes queued ahead of the post-login route warmed below. */}
             <Link
               href="/forgot-password"
+              prefetch={false}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               {t('忘記密碼？')}
@@ -245,7 +255,7 @@ function LoginForm() {
 
       <p className="text-center text-sm text-muted-foreground mt-6">
         {t('還沒有帳號？')}{' '}
-        <Link href="/signup" className="text-foreground font-medium hover:underline">
+        <Link href="/signup" prefetch={false} className="text-foreground font-medium hover:underline">
           {t('建立帳號')}
         </Link>
       </p>

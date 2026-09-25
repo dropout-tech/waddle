@@ -48,7 +48,10 @@ export function UserMenu({ className }: UserMenuProps = {}) {
     const supabase = createClient()
     let cancelled = false
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    // Display-only (email, name, avatar): the locally stored session is
+    // enough, so skip the extra /auth/v1/user round trip on every load.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user
       if (cancelled || !user) return
       setSession({
         email: user.email ?? '',
@@ -163,14 +166,14 @@ export function UserMenu({ className }: UserMenuProps = {}) {
 
           <div className="border-t border-border" />
 
-          <Link href="/membership" role="menuitem" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60" onClick={() => setOpen(false)}><Gift className="h-4 w-4" />會員與推薦</Link>
+          <Link href="/membership" role="menuitem" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60" onClick={() => setOpen(false)}><Gift className="h-4 w-4" />{t('會員與推薦')}</Link>
           <button
             onClick={() => { setOpen(false); router.push('/meetings') }}
             className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
             role="menuitem"
           >
             <FileText className="w-4 h-4" />
-            <span>會議轉任務</span>
+            <span>{t('會議轉任務')}</span>
           </button>
 
           <button
@@ -179,7 +182,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
             role="menuitem"
           >
             <FileText className="w-4 h-4" />
-            <span>待接受指派</span>
+            <span>{t('待接受指派')}</span>
           </button>
 
           <button

@@ -7,6 +7,7 @@ import { completeDesktopOAuth } from '@/lib/auth/desktop-oauth'
 import { completeWebOAuth } from '@/lib/auth/web-oauth-callback'
 import { pendingMeetingPath } from '@/lib/auth/meeting-return'
 import { PENDING_SHARE_INVITE_KEY } from '@/hooks/use-calendar-sharing'
+import { useI18n } from '@/lib/i18n/react'
 
 // Client-side OAuth/PKCE callback. Replaces the former server route handler
 // (app/auth/callback/route.ts) so the page survives `output: 'export'` and
@@ -14,6 +15,7 @@ import { PENDING_SHARE_INVITE_KEY } from '@/hooks/use-calendar-sharing'
 //
 // The callback owns PKCE exchange; SDK URL auto-detection is disabled here.
 function Callback() {
+  const { t } = useI18n()
   const [failure, setFailure] = useState<string | null>(null)
   const [desktopLink, setDesktopLink] = useState<string | null>(null)
   const [desktopError, setDesktopError] = useState(false)
@@ -80,14 +82,14 @@ function Callback() {
   // A full document navigation releases a stuck SDK instance / navigator lock.
   // Client-side routing would retain the singleton that timed out.
   if (failure) return <div role="alert" className="min-h-screen flex flex-col gap-4 items-center justify-center p-6 text-center">
-    <h1 className="text-xl font-semibold">登入未完成</h1>
-    <p className="max-w-md text-muted-foreground">{failure}</p>
-    <a className="rounded-xl bg-primary text-primary-foreground px-6 py-3" href="/login">返回登入頁</a>
+    <h1 className="text-xl font-semibold">{t('登入未完成')}</h1>
+    <p className="max-w-md text-muted-foreground">{t(failure)}</p>
+    <a className="rounded-xl bg-primary text-primary-foreground px-6 py-3" href="/login">{t('返回登入頁')}</a>
   </div>
   if (desktopLink || desktopError) return <div className="min-h-screen flex flex-col gap-4 items-center justify-center p-6 text-center">
-    <h1 className="text-xl font-semibold">{desktopError ? '登入連結已失效' : '返回 Huddle 完成登入'}</h1>
-    <p>{desktopError ? '請回到桌面程式重新登入。' : '點擊下方按鈕，並允許瀏覽器開啟 Huddle。'}</p>
-    {desktopLink && <a className="rounded-xl bg-primary text-primary-foreground px-6 py-3" href={desktopLink}>開啟 Huddle</a>}
+    <h1 className="text-xl font-semibold">{desktopError ? t('登入連結已失效') : t('返回 Huddle 完成登入')}</h1>
+    <p>{desktopError ? t('請回到桌面程式重新登入。') : t('點擊下方按鈕，並允許瀏覽器開啟 Huddle。')}</p>
+    {desktopLink && <a className="rounded-xl bg-primary text-primary-foreground px-6 py-3" href={desktopLink}>{t('開啟 Huddle')}</a>}
   </div>
   return (
     <div className="min-h-screen flex items-center justify-center">

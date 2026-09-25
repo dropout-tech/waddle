@@ -322,4 +322,5 @@ export const dict: Record<string, string> = {
   "完成「{name}」": "Complete {name}",
   "離開編輯區自動儲存，Esc 取消": "Changes save when you leave the editor. Esc to cancel.",
   "重試": "Retry",
+  "已還原上次未儲存的草稿，請確認後再送出": "Restored your unsaved draft from last time. Please review before it saves.",
 }

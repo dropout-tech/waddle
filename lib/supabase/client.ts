@@ -1,5 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from './database.types'
 import { isNative, isDesktop } from '@/lib/platform'
 import { createCapacitorStorage } from './capacitor-storage'
@@ -19,8 +19,12 @@ export function createClient() {
   if (isNative()) {
     // Native (Capacitor) shell: persist the session in @capacitor/preferences,
     // use PKCE, and let the deep-link handler complete OAuth (so the client
-    // should NOT try to detect a code in the WebView's URL).
-    client = createBrowserClient<Database>(url, anonKey, {
+    // should NOT try to detect a code in the WebView's URL). Use supabase-js
+    // directly: @supabase/ssr's createBrowserClient always overrides
+    // `auth.storage` with document.cookie, which does not persist in the
+    // capacitor:// WKWebView — the PKCE verifier was lost and Google sign-in
+    // bounced back to the login page.
+    client = createSupabaseClient<Database>(url, anonKey, {
       auth: {
         storage: createCapacitorStorage(),
         persistSession: true,

@@ -7,6 +7,7 @@ import {
   outputSchema,
   validateResult,
   taipeiMonth,
+  meetingWeekday,
 } from "./contract.ts";
 
 const cors = {
@@ -37,6 +38,14 @@ Deno.serve(async (req) => {
   const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
     auth: { persistSession: false },
   });
+  // Service-role calls bypass RLS, so suspended accounts are refused up front
+  // (the write RPCs also re-check). Fails closed if the check itself errors.
+  const { data: allowed, error: accessError } = await admin.rpc(
+    "account_access_allowed",
+    { p_user: user.id },
+  );
+  if (accessError) return reply({ error: "DATABASE_ERROR" }, 503);
+  if (allowed !== true) return reply({ error: "ACCOUNT_SUSPENDED" }, 403);
   let claimedId: string | null = null;
   try {
     // Bound the actual stream, not just the client-supplied Content-Length.
@@ -125,6 +134,12 @@ Deno.serve(async (req) => {
         meetings: records.data,
         used,
         pending,
+        // Display-only mirror of the server-enforced quota. The actual limit
+        // lives in supabase/migrations/20260925081959_meeting_imports.sql
+        // (route_meeting_tasks, `>= 20`) — that RPC is the source of truth;
+        // this number and the MONTHLY_LIMIT message in lib/meeting-import.ts
+        // must be updated together if the quota ever changes. Not read from
+        // the DB here because RPC checks the count at insert time, not on read.
         limit: 20,
         month: taipeiMonth(),
         enabled: !!Deno.env.get("OPENAI_API_KEY"),
@@ -230,6 +245,7 @@ Deno.serve(async (req) => {
             content: JSON.stringify({
               title: input.title,
               meetingDate: input.meetingDate,
+              meetingWeekday: meetingWeekday(input.meetingDate),
               transcript: input.transcript,
               meetingTime: input.context.meetingTime,
               participants: input.context.participants.map(
@@ -248,6 +264,7 @@ Deno.serve(async (req) => {
       JSON.parse(completion.choices[0].message.content),
       input.transcript,
       input.context.participants,
+      input.meetingDate,
     );
     const { data: meeting, error: saveError } = await admin.rpc(
       "finish_meeting_import_v2",

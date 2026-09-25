@@ -1,3 +1,8 @@
+'use client'
 import { Suspense } from 'react'
 import { WidgetGallery } from '@/components/widgets/widget-gallery'
-export default function WidgetsPage() { return <Suspense fallback={<main>載入小工具…</main>}><WidgetGallery/></Suspense> }
+import { useI18n } from '@/lib/i18n/react'
+export default function WidgetsPage() {
+  const { t } = useI18n()
+  return <Suspense fallback={<main>{t('載入小工具…')}</main>}><WidgetGallery/></Suspense>
+}
