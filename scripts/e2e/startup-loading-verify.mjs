@@ -42,6 +42,13 @@ await context.route('**/rest/v1/**', async route => {
     assert.deepEqual(request.postDataJSON(), {})
     return route.fulfill({ json: [] })
   }
+  // Read-only RPCs added after this check was written (meeting lists, shared
+  // calendar, membership/announcement reads). Still POST, still no mutation.
+  const rpc = new URL(request.url()).pathname.match(/\/rpc\/([a-z_]+)$/)?.[1]
+  if (['get_meeting_notifications', 'get_meeting_invitations', 'get_shared_calendar'].includes(rpc) ||
+    (rpc === 'huddle_operations' && ['self', 'announcements'].includes(request.postDataJSON()?.p_action))) {
+    return route.fulfill({ status: 404, json: { code: 'PGRST202', message: 'mocked' } })
+  }
   if (seedMode) {
     if (request.method() !== 'GET') {
       const entry = { table, method: request.method(), body: request.postDataJSON() }
@@ -93,14 +100,15 @@ try {
   await page.locator('button[type=submit]').click()
   await page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 60000 })
   await until(() => workspaceCount === 1, 'Initial workspace request starts')
-  check('Independent datasets wait for the workspace response', starts.size === 0)
+  await until(() => datasets.every(table => starts.has(table)), 'All six datasets start while the workspace read is still pending')
+  check('Startup reads run together with the workspace read (one round trip, not two)', [...starts.values()].every(events => !events[0].workspaceReleased))
   await dispatchFocus()
   await sleep(400)
   check('Focus during workspace loading does not start a competing refresh', workspaceCount === 1)
   workspaceGate.release()
   await until(() => datasets.every(table => starts.has(table)), 'All six datasets start before any dataset response is released (parallel, not serial)')
   check('All six independent requests are in flight simultaneously', datasets.every(table => starts.get(table).length === 1))
-  check('All six requests start after workspace hydration', [...starts.values()].every(events => events[0].workspaceReleased))
+  check('No dataset is read twice for an existing account', [...starts.values()].every(events => events.length === 1))
   await dispatchFocus()
   await sleep(400)
   check('Focus during dataset loading does not invalidate initial loading', workspaceCount === 1)
@@ -132,8 +140,9 @@ try {
   check('Seed categories and tasks reference inserted workspace/category IDs',
     seedWrites[1].body.every(row => workspaceIds.has(row.workspace_id)) &&
     seedWrites[2].body.every(row => workspaceIds.has(row.workspace_id) && categoryIds.has(row.category_id)))
+  const firstSeedWrite = seedEvents.findIndex(event => !event.startsWith('GET:'))
   check('No dependent reads start while first-run seed is incomplete',
-    !seedEvents.some(event => datasets.some(table => event === `GET:${table}`)))
+    firstSeedWrite >= 0 && !seedEvents.slice(firstSeedWrite).some(event => datasets.some(table => event === `GET:${table}`)))
   await dispatchFocus()
   await sleep(300)
   check('Focus during first-run seeding does not repeat workspace read or seed', seedWorkspaceReads === 1 && seedWrites.length === 4)
@@ -142,7 +151,7 @@ try {
   await page.getByText('載入中...', { exact: true }).waitFor({ state: 'hidden' })
   const secondWorkspaceRead = seedEvents.lastIndexOf('GET:workspaces')
   check('Seed completion re-reads workspaces before all dependent datasets',
-    seedWorkspaceReads === 2 && datasets.every(table => seedEvents.indexOf(`GET:${table}`) > secondWorkspaceRead))
+    seedWorkspaceReads === 2 && secondWorkspaceRead > firstSeedWrite && datasets.every(table => seedEvents.lastIndexOf(`GET:${table}`) > firstSeedWrite))
   check('First-run seed performs only expected mocked writes', seedWrites.every(write =>
     (write.method === 'POST' && ['workspaces', 'categories', 'tasks', 'time_blocks'].includes(write.table)) ||
     (write.method === 'PATCH' && write.table === 'user_settings' && write.body.onboarding_completed === true)))

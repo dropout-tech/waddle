@@ -48,7 +48,10 @@ export function UserMenu({ className }: UserMenuProps = {}) {
     const supabase = createClient()
     let cancelled = false
 
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    // Display-only (email, name, avatar): the locally stored session is
+    // enough, so skip the extra /auth/v1/user round trip on every load.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user
       if (cancelled || !user) return
       setSession({
         email: user.email ?? '',
