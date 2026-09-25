@@ -573,6 +573,10 @@ export type Database = {
       calendar_share_invites: Tbl<CalendarShareInvitesRow, CalendarShareInvitesInsert>
       calendar_shares: Tbl<CalendarSharesRow, CalendarSharesInsert>
       calendar_share_grants: Tbl<CalendarShareGrantsRow, CalendarShareGrantsInsert>
+      daily_check_ins: Tbl<
+        { user_id: string; check_in_date: string; created_at: string },
+        { user_id: string; check_in_date: string; created_at?: string }
+      >
       growth_days: Tbl<GrowthDaysRow, GrowthDaysInsert>
       growth_achievements: Tbl<GrowthAchievementsRow, GrowthAchievementsInsert>
       growth_journeys: Tbl<GrowthJourneysRow, GrowthJourneysInsert>
