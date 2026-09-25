@@ -10,8 +10,10 @@ import { Field, Feedback, Loading, Empty, styles } from './shared'
 import { useAuth } from '@/components/auth/auth-provider'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { useI18n } from '@/lib/i18n/react'
 
 export function AdminAnnouncements() {
+  const { t } = useI18n()
   const [rows, setRows] = useState<Announcement[]>([])
   const [editing, setEditing] = useState<Announcement | null>(null)
   const [error, setError] = useState('')
@@ -52,9 +54,9 @@ export function AdminAnnouncements() {
       })
       setRows(await operations('admin_announcements'))
       setEditing(null)
-      setMessage('公告已儲存')
+      setMessage(t('公告已儲存'))
     } catch (e) {
-      setError(e instanceof Error ? e.message : '儲存失敗')
+      setError(e instanceof Error ? e.message : t('儲存失敗'))
     } finally {
       setBusy(false)
     }
@@ -63,16 +65,16 @@ export function AdminAnnouncements() {
     <>
       <Feedback error={error} message={message} />
       <section className={styles.panel}>
-        <h2>{editing ? '編輯公告' : '建立公告'}</h2>
+        <h2>{editing ? t('編輯公告') : t('建立公告')}</h2>
         <p className={styles.muted}>
-          公告顯示於已登入會員的工作空間。可以預先排程，也可以取消發布。到期提醒另外在活動設定開關。
+          {t('公告顯示於已登入會員的工作空間。可以預先排程，也可以取消發布。到期提醒另外在活動設定開關。')}
         </p>
         <form
           key={editing?.id || rows.length}
           className={`${styles.form} mt-5`}
           onSubmit={save}
         >
-          <Field label="公告標題">
+          <Field label={t('公告標題')}>
             <input
               name="title"
               required
@@ -80,14 +82,14 @@ export function AdminAnnouncements() {
               defaultValue={editing?.title}
             />
           </Field>
-          <Field label="公告類型">
+          <Field label={t('公告類型')}>
             <select name="kind" defaultValue={editing?.kind || 'notice'}>
-              <option value="notice">產品公告</option>
-              <option value="maintenance">維護通知</option>
+              <option value="notice">{t('產品公告')}</option>
+              <option value="maintenance">{t('維護通知')}</option>
             </select>
           </Field>
           <div className={styles.full}>
-            <Field label="公告內容">
+            <Field label={t('公告內容')}>
               <textarea
                 name="body"
                 required
@@ -97,7 +99,7 @@ export function AdminAnnouncements() {
               />
             </Field>
           </div>
-          <Field label="開始時間（裝置時區）">
+          <Field label={t('開始時間（裝置時區）')}>
             <input
               type="datetime-local"
               name="starts_at"
@@ -107,7 +109,7 @@ export function AdminAnnouncements() {
               )}
             />
           </Field>
-          <Field label="截止時間（裝置時區）">
+          <Field label={t('截止時間（裝置時區）')}>
             <input
               type="datetime-local"
               name="expires_at"
@@ -124,22 +126,22 @@ export function AdminAnnouncements() {
               name="enabled"
               defaultChecked={editing?.enabled}
             />
-            發布此公告
+            {t('發布此公告')}
           </label>
           <div className={`${styles.actions} ${styles.full}`}>
             <button disabled={busy} className={styles.primary}>
-              儲存公告
+              {t('儲存公告')}
             </button>
             {editing && (
               <button type="button" onClick={() => setEditing(null)}>
-                取消編輯
+                {t('取消編輯')}
               </button>
             )}
           </div>
         </form>
       </section>
       <section className={styles.panel}>
-        <h2>公告紀錄</h2>
+        <h2>{t('公告紀錄')}</h2>
         {loading ? (
           <Loading />
         ) : rows.length ? (
@@ -147,10 +149,10 @@ export function AdminAnnouncements() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>公告</th>
-                  <th>發布期間</th>
-                  <th>狀態</th>
-                  <th>操作</th>
+                  <th>{t('公告')}</th>
+                  <th>{t('發布期間')}</th>
+                  <th>{t('狀態')}</th>
+                  <th>{t('操作')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -162,11 +164,11 @@ export function AdminAnnouncements() {
                     </td>
                     <td>
                       {dateLabel(r.starts_at)}
-                      <small>至 {dateLabel(r.expires_at)}</small>
+                      <small>{t('至 {date}', { date: dateLabel(r.expires_at) })}</small>
                     </td>
-                    <td>{r.enabled ? '已設定發布' : '未發布'}</td>
+                    <td>{r.enabled ? t('已設定發布') : t('未發布')}</td>
                     <td>
-                      <button onClick={() => setEditing(r)}>編輯公告</button>
+                      <button onClick={() => setEditing(r)}>{t('編輯公告')}</button>
                     </td>
                   </tr>
                 ))}
@@ -174,7 +176,7 @@ export function AdminAnnouncements() {
             </table>
           </div>
         ) : (
-          <Empty>還沒有公告。</Empty>
+          <Empty>{t('還沒有公告。')}</Empty>
         )}
       </section>
     </>
@@ -187,6 +189,7 @@ function localDate(iso: string) {
     .slice(0, 16)
 }
 export function AdminAnalytics() {
+  const { t } = useI18n()
   const [rows, setRows] = useState<ChannelMetric[] | null>(null)
   const [error, setError] = useState('')
   useEffect(() => {
@@ -204,9 +207,9 @@ export function AdminAnalytics() {
   }, [])
   return (
     <section className={styles.panel}>
-      <h2>來源與留存分析</h2>
+      <h2>{t('來源與留存分析')}</h2>
       <p className={styles.muted}>
-        自營運功能啟用後的新會員。以已兌換優惠碼優先、其次有效推薦，其餘為自然註冊；後補優惠碼會更新來源分類。
+        {t('自營運功能啟用後的新會員。以已兌換優惠碼優先、其次有效推薦，其餘為自然註冊；後補優惠碼會更新來源分類。')}
       </p>
       <Feedback error={error} />
       {!rows && !error ? (
@@ -216,11 +219,11 @@ export function AdminAnalytics() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>來源</th>
-                <th>註冊</th>
-                <th>開始使用</th>
-                <th>一週留存</th>
-                <th>目前付費</th>
+                <th>{t('來源')}</th>
+                <th>{t('註冊')}</th>
+                <th>{t('開始使用')}</th>
+                <th>{t('一週留存')}</th>
+                <th>{t('目前付費')}</th>
               </tr>
             </thead>
             <tbody>
@@ -232,7 +235,7 @@ export function AdminAnalytics() {
                   <td>
                     {r.retention_eligible
                       ? `${r.retained}/${r.retention_eligible}（${Math.round((r.retained / r.retention_eligible) * 100)}%）`
-                      : '尚無足夠天數樣本'}
+                      : t('尚無足夠天數樣本')}
                   </td>
                   <td>{r.paid}</td>
                 </tr>
@@ -241,17 +244,17 @@ export function AdminAnalytics() {
           </table>
         </div>
       ) : (
-        <Empty>尚無啟用後的新會員資料。</Empty>
+        <Empty>{t('尚無啟用後的新會員資料。')}</Empty>
       )}
       <p className={`${styles.muted} mt-5`}>
-        開始使用：有任務或排程寫入紀錄。一週留存：註冊滿 8 天，且第 6–8
-        個日曆日有操作。付費欄為目前有效權益，不代表累積訂單或營收。
+        {t('開始使用：有任務或排程寫入紀錄。一週留存：註冊滿 8 天，且第 6–8 個日曆日有操作。付費欄為目前有效權益，不代表累積訂單或營收。')}
       </p>
     </section>
   )
 }
 /** In-app notices only: no email/OS notification is sent by this component. */
 export function OperationsNotices() {
+  const { t } = useI18n()
   const { user } = useAuth()
   const path = usePathname()
   const [notices, setNotices] = useState<{ id: string; text: string }[]>([])
@@ -280,7 +283,9 @@ export function OperationsNotices() {
           if (days >= 0 && days <= self.settings.reminder_days)
             result.push({
               id: 'expiry',
-              text: `你的贈送／體驗時間將於 ${dateLabel(self.pro_until)} 結束。可以在會員頁查看或兌換優惠。`,
+              text: t('你的贈送／體驗時間將於 {date} 結束。可以在會員頁查看或兌換優惠。', {
+                date: dateLabel(self.pro_until),
+              }),
             })
         }
         setNotices(result)
@@ -291,11 +296,11 @@ export function OperationsNotices() {
     return () => {
       active = false
     }
-  }, [user?.id, path])
+  }, [user?.id, path, t])
   if (!notices.length) return null
   return (
     <aside
-      aria-label="會員通知"
+      aria-label={t('會員通知')}
       className="fixed bottom-4 left-4 z-[70] max-h-[40vh] w-[min(400px,calc(100vw-32px))] overflow-y-auto rounded-xl border border-border bg-card p-4 text-sm shadow-lg"
     >
       {notices.map((n) => (
@@ -307,7 +312,7 @@ export function OperationsNotices() {
             className="min-h-11 underline"
             onClick={() => setNotices((v) => v.filter((x) => x.id !== n.id))}
           >
-            關閉通知
+            {t('關閉通知')}
           </button>
         </div>
       ))}
@@ -315,7 +320,7 @@ export function OperationsNotices() {
         className="inline-flex min-h-11 items-center underline"
         href="/membership"
       >
-        會員與推薦
+        {t('會員與推薦')}
       </Link>
     </aside>
   )
