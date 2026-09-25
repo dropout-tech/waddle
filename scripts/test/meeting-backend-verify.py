@@ -79,10 +79,50 @@ select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002'
 select public.assert_ok(jsonb_array_length(public.get_shared_meeting_busy(array['00000000-0000-0000-0000-000000000002']::uuid[],now(),now()+interval '7 days'))=1,'own private meeting remains busy');
 
 """
+  sql+='\nreset role;\n'
+  sql+=(root/'supabase/migrations/20260925155252_meeting_in_app_notifications.sql').read_text()
+  sql+=r"""
+
+set role anon;
+select public.expect_denied($q$select public.get_meeting_notifications()$q$);
+reset role; set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+select public.expect_denied($q$select * from public.meeting_notifications$q$);
+begin;
+select public.create_meeting_invitation('In-app only','','',now()+interval '3 days',now()+interval '3 days 1 hour','Asia/Taipei',array['00000000-0000-0000-0000-000000000002']::uuid[],'30000000-0000-0000-0000-000000000001') as appmid \gset
+select public.assert_ok(public.create_meeting_invitation('In-app only','','',now()+interval '3 days',now()+interval '3 days 1 hour','Asia/Taipei',array['00000000-0000-0000-0000-000000000002']::uuid[],'30000000-0000-0000-0000-000000000001')=:'appmid'::uuid,'in-app creation retry');
+select public.assert_ok(public.get_meeting_notifications()->>'unread_count'='0','no invitation notification to self');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
+select public.assert_ok(public.get_meeting_notifications()->>'unread_count'='1','one invitation notification');
+select public.get_meeting_notifications()->'items'->0->>'id' as nid \gset
+select public.read_meeting_notification(:'nid');
+select public.read_meeting_notification(:'nid');
+select public.assert_ok(public.get_meeting_notifications()->>'unread_count'='0','read idempotent and persistent');
+select public.respond_meeting_invitation(:'appmid','accepted');
+select public.respond_meeting_invitation(:'appmid','accepted');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);
+select public.assert_ok(public.get_meeting_notifications()->>'unread_count'='0','third party sees no notifications');
+select public.expect_denied(format('select public.read_meeting_notification(%L)',:'nid'));
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+select public.assert_ok(public.get_meeting_notifications()->>'unread_count'='1','same response retry no duplicate');
+select public.assert_ok(public.get_meeting_notifications()->'items'->0->>'response'='accepted','response snapshot');
+select public.cancel_meeting_invitation(:'appmid');
+select public.cancel_meeting_invitation(:'appmid');
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
+select public.assert_ok(public.get_meeting_notifications()->>'unread_count'='1','one cancellation');
+select public.assert_ok(public.get_meeting_notifications()->'items'->0->>'kind'='cancellation','cancellation notification');
+commit;
+reset role;
+select public.assert_ok((select count(*)=4 from public.meeting_email_outbox),'no new emails enqueued');
+select public.assert_ok((select count(*)=3 from public.meeting_notifications),'exactly invitation response cancellation');
+select public.assert_ok((select relrowsecurity from pg_class where oid='public.meeting_notifications'::regclass),'notification RLS enabled');
+select public.assert_ok(not has_table_privilege('authenticated','public.meeting_notifications','insert'),'client cannot forge notifications');
+
+"""
   run([pg/'psql','-h',sock,'-p','55487','-d','postgres','-v','ON_ERROR_STOP=1','-q'],input=sql,text=True,stdout=subprocess.DEVNULL)
   if '--advisors' in sys.argv:
    uri=f'postgresql://{getpass.getuser()}@localhost:55487/postgres?host={urllib.parse.quote(str(sock), safe="")}'
    result=subprocess.run(['supabase','db','advisors','--db-url',uri,'--type','security'],cwd=root,text=True,capture_output=True,timeout=45)
    print('LOCAL ADVISORS:',result.stdout,result.stderr)
-  print('PASS: local isolated Postgres migration, membership, anonymous denial, direct write denial, idempotency, responses, cancellation, free/busy privacy and email outbox.')
+  print('PASS: local isolated Postgres migration, membership, anonymous denial, direct write denial, idempotency, responses, cancellation, free/busy privacy and in-app notification isolation/read/idempotency/no new email queue.')
  finally: run([pg/'pg_ctl','-D',data,'-m','immediate','stop'],stdout=subprocess.DEVNULL)

@@ -25,7 +25,11 @@ type MeetingRPC = (
   name: string,
   args: Record<string, unknown>,
 ) => PromiseLike<{ data: unknown; error: { message: string } | null }>
-type CountedPage<T> = { data: T[] | null; count: number | null; error: unknown }
+type CountedPage<T> = {
+  data: T[] | null
+  count: number | null
+  error: unknown
+}
 async function collectPages<T>(
   fetchPage: (from: number, to: number) => PromiseLike<CountedPage<T>>,
   key: (row: T) => string,
@@ -147,22 +151,10 @@ export function useMeetingInvitations(
     if (r.error) throw r.error
     await refresh()
   }
-  const retryEmail = async (id: string) => {
-    const result = await supabase.functions.invoke('send-meeting-invitations', {
-      body: { meeting_id: id },
-    })
-    await refresh()
-    if (result.error || result.data?.failed > 0 || result.data?.pending > 0)
-      throw new Error('email_pending')
-  }
   const cancel = async (id: string) => {
     const r = await rpc('cancel_meeting_invitation', { p_meeting_id: id })
     if (r.error) throw r.error
-    try {
-      await retryEmail(id)
-    } finally {
-      await refresh()
-    }
+    await refresh()
   }
   const findSlots = async (
     search: MeetingSearch,
@@ -349,21 +341,9 @@ export function useMeetingInvitations(
     })
     if (result.error) throw result.error
     id = String(result.data)
-    let emailSent = false
-    try {
-      const send = await supabase.functions.invoke('send-meeting-invitations', {
-        body: { meeting_id: id },
-      })
-      emailSent =
-        !send.error &&
-        send.data?.sent > 0 &&
-        send.data?.failed === 0 &&
-        send.data?.pending === 0
-    } catch {
-      /* Invitation is already saved; never claim email success. */
-    }
     await refresh()
-    return { id, emailSent }
+    window.dispatchEvent(new Event('meeting-notifications-changed'))
+    return { id }
   }
   const pendingCount = meetings.filter(
     (m) =>
@@ -435,7 +415,6 @@ export function useMeetingInvitations(
     refresh,
     respond,
     cancel,
-    retryEmail,
     findSlots,
     create,
     pendingCount,

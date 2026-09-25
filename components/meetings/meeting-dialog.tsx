@@ -23,7 +23,7 @@ const copy = {
   zh: {
     heading: '約交集時間',
     scope:
-      '依對方已共享行程與共同邀請計算，未共享或外部日曆不包含；時間可能在寄出後變動。送出前會再次檢查。',
+      '依對方已共享行程與共同邀請計算，未共享或外部日曆不包含；時間可能在送出後變動。送出前會再次檢查。',
     people: '選擇共享夥伴',
     noPeers: '請先在共享設定與夥伴建立共享。',
     from: '開始日期',
@@ -37,11 +37,9 @@ const copy = {
     title: '會議名稱',
     description: '說明',
     location: '地點或視訊連結',
-    send: '建立邀請並寄送 Email',
+    send: '建立站內邀請',
     saving: '正在建立…',
     saved: '站內邀請已建立。',
-    emailSent: 'Email 已寄送。',
-    emailPending: 'Email 尚未確認寄出，請查看寄送狀態；站內邀請仍然有效。',
     sharingRequired:
       '選擇的夥伴尚未開放行程。請先請對方到「設定 → 共享」開放要比對的行程類別，再尋找共同空檔。',
     failure:
@@ -57,9 +55,7 @@ const copy = {
     cancelled: '已取消',
     cancel: '取消會議',
     ics: '下載行事曆檔',
-    email: 'Email 狀態',
     timezone: '時間以此裝置時區顯示',
-    retryEmail: '重試寄送 Email',
     minutes: '分鐘',
     slots: '共同空檔',
     loading: '正在載入邀請…',
@@ -82,12 +78,9 @@ const copy = {
     title: 'Meeting title',
     description: 'Description',
     location: 'Location or video link',
-    send: 'Create invitation and send email',
+    send: 'Create in-app invitation',
     saving: 'Creating…',
     saved: 'In-app invitation created.',
-    emailSent: 'Email sent.',
-    emailPending:
-      'Email delivery is not confirmed. Check its status; the in-app invitation is still available.',
     sharingRequired:
       'A selected partner has not shared any calendars yet. Ask them to enable calendar categories in Settings → Sharing, then search again.',
     failure:
@@ -103,9 +96,7 @@ const copy = {
     cancelled: 'Cancelled',
     cancel: 'Cancel meeting',
     ics: 'Download calendar file',
-    email: 'Email status',
     timezone: 'Times use this device’s time zone',
-    retryEmail: 'Retry email',
     minutes: 'minutes',
     slots: 'Common times',
     loading: 'Loading invitations…',
@@ -240,7 +231,7 @@ export function MeetingPanel({
     setMessage('')
     requestId.current ??= crypto.randomUUID()
     try {
-      const result = await controller.create(
+      await controller.create(
         search,
         selected,
         { ...fields, title: fields.title.trim() },
@@ -248,9 +239,7 @@ export function MeetingPanel({
         timeBlocks,
         requestId.current,
       )
-      setMessage(
-        `${t.saved} ${result.emailSent ? t.emailSent : t.emailPending}`,
-      )
+      setMessage(t.saved)
       setSelected(null)
       setSlots(null)
       requestId.current = null
@@ -524,17 +513,6 @@ export function MeetingPanel({
                   )
                   .join(' / ')}
               </p>
-              {organizer && (
-                <p className="text-xs text-muted-foreground">
-                  {t.email}:{' '}
-                  {m.email_status &&
-                  m.email_status.sent > 0 &&
-                  m.email_status.pending === 0 &&
-                  m.email_status.failed === 0
-                    ? t.emailSent
-                    : t.emailPending}
-                </p>
-              )}
               <div className="flex flex-wrap gap-2">
                 {m.status !== 'cancelled' &&
                   !organizer &&
@@ -563,16 +541,6 @@ export function MeetingPanel({
                     onClick={() => act(() => controller.cancel(m.id))}
                   >
                     {t.cancel}
-                  </Button>
-                )}
-                {organizer && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => act(() => controller.retryEmail(m.id))}
-                  >
-                    {t.retryEmail}
                   </Button>
                 )}
                 <Button variant="ghost" size="sm" onClick={() => download(m)}>
