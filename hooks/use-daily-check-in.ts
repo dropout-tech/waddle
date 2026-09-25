@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { toDateString } from '@/lib/calendar-utils'
+import { checkInDate, type CheckInStatus } from '@/lib/daily-check-in'
 
-/** The parent keys this hook's component by account and local calendar date. */
-export function useDailyCheckIn(userId: string, date: string) {
+/** The parent keys this hook's component by account and Taipei calendar date. */
+export function useDailyCheckIn(date: string) {
   const supabase = useMemo(() => createClient(), [])
-  const [checkedIn, setCheckedIn] = useState(false)
+  const [status, setStatus] = useState<CheckInStatus | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<'read' | 'write' | null>(null)
@@ -20,16 +20,15 @@ export function useDailyCheckIn(userId: string, date: string) {
     setIsLoading(true)
     setError(null)
     try {
-      const { data, error: readError } = await supabase.from('daily_check_ins')
-        .select('check_in_date').eq('user_id', userId).eq('check_in_date', date).maybeSingle()
+      const { data, error: readError } = await supabase.rpc('get_daily_check_in_status').single()
       if (readError) throw readError
-      if (id === request.current) setCheckedIn(Boolean(data))
+      if (id === request.current) setStatus(data)
     } catch {
       if (id === request.current) setError('read')
     } finally {
       if (id === request.current) setIsLoading(false)
     }
-  }, [date, supabase, userId])
+  }, [supabase])
 
   useEffect(() => {
     // Initial load and foreground refresh share the same request fencing.
@@ -48,19 +47,16 @@ export function useDailyCheckIn(userId: string, date: string) {
   }, [reload])
 
   const checkIn = async () => {
-    if (saving.current || isLoading || checkedIn || toDateString(new Date()) !== date) return
+    if (saving.current || isLoading || status?.checked_in || checkInDate() !== date) return
     saving.current = true
     setIsSaving(true)
     setError(null)
     const id = ++request.current
     try {
-      // The unique account/date key makes retries and simultaneous tabs idempotent.
-      const { error: writeError } = await supabase.from('daily_check_ins').upsert(
-        { user_id: userId, check_in_date: date },
-        { onConflict: 'user_id,check_in_date', ignoreDuplicates: true },
-      )
+      // Server computes the day and reward, and commits the check-in + ledger together.
+      const { data, error: writeError } = await supabase.rpc('claim_daily_check_in').single()
       if (writeError) throw writeError
-      if (id === request.current) setCheckedIn(true)
+      if (id === request.current) setStatus(data)
     } catch {
       if (id === request.current) setError('write')
     } finally {
@@ -69,5 +65,5 @@ export function useDailyCheckIn(userId: string, date: string) {
     }
   }
 
-  return { checkedIn, isLoading, isSaving, error, reload, checkIn }
+  return { status, checkedIn: status?.checked_in ?? false, isLoading, isSaving, error, reload, checkIn }
 }

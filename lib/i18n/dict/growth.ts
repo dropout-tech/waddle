@@ -1,5 +1,12 @@
 // English dictionary fragment for Huddle's gentle growth journey.
 export const dict: Record<string, string> = {
+  "可用積分 {n} 分": "Available points: {n}",
+  "今日簽到積分已入帳": "Today’s check-in points are saved",
+  "每日簽到可獲得 {n} 分": "Earn {n} point(s) with your daily check-in",
+  "排名累積分 {n} 分": "Ranking points: {n}",
+  "積分先慢慢存起來，未來可用於服務兌換；兌換與排行榜尚未開放。": "Save points for future services. Redemption and rankings are not available yet.",
+  "每日以台北時間 00:00 更新。": "A new day starts at 00:00 Taipei time.",
+
   "每日簽到": "Daily check-in",
   "只要願意開始，接下來就慢慢來。": "All it takes is a start. The rest can come gently.",
   "不用一下子做到很多，一小步也算數。": "You do not have to do it all. A small step counts.",
