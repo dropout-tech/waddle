@@ -8,12 +8,18 @@ public class HuddleWidgetsPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "HuddleWidgetsPlugin"
     public let jsName = "HuddleWidgets"
     public let pluginMethods: [CAPPluginMethod] = ["setAccount", "publish", "read", "acknowledge"].map { CAPPluginMethod(name:$0,returnType:CAPPluginReturnPromise) }
+    private var watchObserver: NSObjectProtocol?
+    override public func load() {
+        // A watch command was queued in the App Group: let WidgetSync process it now.
+        watchObserver=NotificationCenter.default.addObserver(forName:.huddleWatchCommand,object:nil,queue:.main){[weak self] _ in self?.bridge?.triggerWindowJSEvent(eventName:"huddle-widget-refresh")}
+    }
+    deinit {if let watchObserver {NotificationCenter.default.removeObserver(watchObserver)}}
     @objc func setAccount(_ call: CAPPluginCall) {
-        do { let epoch=try WidgetStore.setAccount(call.getString("accountId") ?? "");if #available(iOS 16.2, *) { Task { for a in Activity<FocusActivity>.activities where a.attributes.epoch != epoch { await a.end(nil,dismissalPolicy:.immediate) } } };WidgetCenter.shared.reloadAllTimelines();call.resolve(["epoch":epoch]) } catch {call.reject("無法開啟小工具共享空間，請檢查 App Group",nil,error)}
+        do { let epoch=try WidgetStore.setAccount(call.getString("accountId") ?? "");if #available(iOS 16.2, *) { Task { for a in Activity<FocusActivity>.activities where a.attributes.epoch != epoch { await a.end(nil,dismissalPolicy:.immediate) } } };WidgetCenter.shared.reloadAllTimelines();WatchBridge.shared.push();call.resolve(["epoch":epoch]) } catch {call.reject("無法開啟小工具共享空間，請檢查 App Group",nil,error)}
     }
     @objc func publish(_ call: CAPPluginCall) {
         guard let snapshot=call.getObject("snapshot") else {call.reject("缺少資料");return}
-        do {try WidgetStore.publish(snapshot);updateActivity(snapshot);WidgetCenter.shared.reloadAllTimelines();call.resolve()} catch {call.reject("小工具資料已過期",nil,error)}
+        do {try WidgetStore.publish(snapshot);updateActivity(snapshot);WidgetCenter.shared.reloadAllTimelines();WatchBridge.shared.push();call.resolve()} catch {call.reject("小工具資料已過期",nil,error)}
     }
     private func updateActivity(_ snapshot: [String:Any]) {
         guard #available(iOS 16.2, *), let focus=snapshot["focus"] as? [String:Any],let owner=snapshot["accountId"] as? String,let epoch=snapshot["epoch"] as? String else{return}
@@ -37,7 +43,9 @@ public class HuddleWidgetsPlugin: CAPPlugin, CAPBridgedPlugin {
             guard state["accountId"] as? String == call.getString("accountId"),state["epoch"] as? String == call.getString("epoch") else {return}
             let ids=Set(call.getArray("ids",String.self) ?? [])
             state["actions"]=(state["actions"] as? [[String:Any]] ?? []).filter{!ids.contains($0["id"] as? String ?? "")}
-        };WidgetCenter.shared.reloadAllTimelines();call.resolve()} catch {call.reject("無法確認同步",nil,error)}
+            // Apple Watch focus command (see WatchBridge) is acknowledged with the same call.
+            if let cmd=state["focusCommand"] as? [String:Any],ids.contains(cmd["id"] as? String ?? "") {state["focusCommand"]=nil}
+        };WidgetCenter.shared.reloadAllTimelines();WatchBridge.shared.push();call.resolve()} catch {call.reject("無法確認同步",nil,error)}
     }
 }
 class HuddleBridgeViewController: CAPBridgeViewController {

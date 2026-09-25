@@ -14,6 +14,8 @@ export interface WidgetSnapshot {
   days: { date: string; day: number; inMonth: boolean; count: number }[]
   focus: { mode?: 'pomodoro' | 'stopwatch'; state: string; title: string; endAt: number | null; seconds: number; note: string }
   water: { enabled: boolean; nextAt: number | null; count: number }
+  /** Today's daily check-in (Asia/Taipei day); optional so older native readers ignore it. */
+  checkIn?: { date: string; checkedIn: boolean; points: number }
 }
 export function plainText(doc: unknown, depth = 0): string {
   if (!doc || typeof doc !== 'object' || depth > 20) return ''
