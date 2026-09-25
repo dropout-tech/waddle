@@ -7,7 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1E8558A547F10BF9CA9BB8B1 /* HuddleWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA7E18F670F8436968B9F81 /* HuddleWidgets.swift */; };
+		26187E20E0BB7CA1B4F2B8C2 /* FocusActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C3DFCCF29B8CF5AB92E0D2 /* FocusActivity.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		4054581696231AFE80114F14 /* WidgetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D67F3981417FE8CCD971AD /* WidgetStore.swift */; };
+		4A3ACB9B48AB60DD5A27903E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9927E66813D216AEDF94613A /* Assets.xcassets */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
@@ -15,10 +19,44 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		7DA2B46A6231E3CF79475816 /* HuddleWidgetsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3606CF855FD16D79701250E5 /* HuddleWidgetsPlugin.swift */; };
+		7DBE0B63E7DAD39857150E13 /* FocusActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C3DFCCF29B8CF5AB92E0D2 /* FocusActivity.swift */; };
+		8ACBE0CA38D7A68EEC054948 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20210919ADFBE781B703E260 /* Foundation.framework */; };
+		B8609CAC6459542D6D5EA6BF /* WidgetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D67F3981417FE8CCD971AD /* WidgetStore.swift */; };
+		F518D87A52682BBA603CB1A2 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D3A507C9B179A3B32A68E868 /* SwiftUI.framework */; };
+		F5917789BDF40FB583042EC6 /* HuddleWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 551031DD182B5935BCCFC749 /* HuddleWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		FB646FF0B6C90A8402F78604 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28C53C00153F913D15DBED25 /* WidgetKit.framework */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		E2C8698B974FDDE9961DFFD4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1698E6B1D09E1AD2CCEB212C;
+			remoteInfo = HuddleWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B9D2377692A7F64D1C841D39 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				F5917789BDF40FB583042EC6 /* HuddleWidgets.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		20210919ADFBE781B703E260 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		28C53C00153F913D15DBED25 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/WidgetKit.framework; sourceTree = DEVELOPER_DIR; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		3606CF855FD16D79701250E5 /* HuddleWidgetsPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HuddleWidgetsPlugin.swift; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -27,10 +65,28 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		551031DD182B5935BCCFC749 /* HuddleWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HuddleWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		68D67F3981417FE8CCD971AD /* WidgetStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetStore.swift; sourceTree = "<group>"; };
+		90C3DFCCF29B8CF5AB92E0D2 /* FocusActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FocusActivity.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		9927E66813D216AEDF94613A /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BFA7E18F670F8436968B9F81 /* HuddleWidgets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HuddleWidgets.swift; sourceTree = "<group>"; };
+		C189947393C92E9EE3012F56 /* HuddleWidgets.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = HuddleWidgets.entitlements; sourceTree = "<group>"; };
+		D3A507C9B179A3B32A68E868 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/SwiftUI.framework; sourceTree = DEVELOPER_DIR; };
+		F30509A7AF44C3CD7E4C41F8 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		0E19D4662577B4B298D0AD53 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8ACBE0CA38D7A68EEC054948 /* Foundation.framework in Frameworks */,
+				FB646FF0B6C90A8402F78604 /* WidgetKit.framework in Frameworks */,
+				F518D87A52682BBA603CB1A2 /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3011FED79650016851F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -42,12 +98,25 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		0D27A38329A64FC00EA53481 /* WidgetShared */ = {
+			isa = PBXGroup;
+			children = (
+				68D67F3981417FE8CCD971AD /* WidgetStore.swift */,
+				90C3DFCCF29B8CF5AB92E0D2 /* FocusActivity.swift */,
+			);
+			name = WidgetShared;
+			path = WidgetShared;
+			sourceTree = "<group>";
+		};
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+				0D27A38329A64FC00EA53481 /* WidgetShared */,
+				746E01F2E794EC51314E2AC0 /* Frameworks */,
+				7C54CEB84759A6A7DA751760 /* HuddleWidgets */,
 			);
 			sourceTree = "<group>";
 		};
@@ -55,6 +124,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				551031DD182B5935BCCFC749 /* HuddleWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,13 +140,61 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				3606CF855FD16D79701250E5 /* HuddleWidgetsPlugin.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		746E01F2E794EC51314E2AC0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D1C99635A309A72521E879DA /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		7C54CEB84759A6A7DA751760 /* HuddleWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				BFA7E18F670F8436968B9F81 /* HuddleWidgets.swift */,
+				9927E66813D216AEDF94613A /* Assets.xcassets */,
+				F30509A7AF44C3CD7E4C41F8 /* Info.plist */,
+				C189947393C92E9EE3012F56 /* HuddleWidgets.entitlements */,
+			);
+			name = HuddleWidgets;
+			path = HuddleWidgets;
+			sourceTree = "<group>";
+		};
+		D1C99635A309A72521E879DA /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				20210919ADFBE781B703E260 /* Foundation.framework */,
+				28C53C00153F913D15DBED25 /* WidgetKit.framework */,
+				D3A507C9B179A3B32A68E868 /* SwiftUI.framework */,
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		1698E6B1D09E1AD2CCEB212C /* HuddleWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C427B5D5DA76A34E7F8DB5CB /* Build configuration list for PBXNativeTarget "HuddleWidgets" */;
+			buildPhases = (
+				C4E1409A5E9EC726B0F85CCD /* Sources */,
+				0E19D4662577B4B298D0AD53 /* Frameworks */,
+				953E3C87A2B6BF9752D79100 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HuddleWidgets;
+			productName = HuddleWidgets;
+			productReference = 551031DD182B5935BCCFC749 /* HuddleWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		504EC3031FED79650016851F /* App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 504EC3161FED79650016851F /* Build configuration list for PBXNativeTarget "App" */;
@@ -84,10 +202,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				B9D2377692A7F64D1C841D39 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				7460C9485DBEE0D8F415DC61 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -130,6 +250,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				1698E6B1D09E1AD2CCEB212C /* HuddleWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -148,6 +269,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		953E3C87A2B6BF9752D79100 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4A3ACB9B48AB60DD5A27903E /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -156,10 +285,32 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				4054581696231AFE80114F14 /* WidgetStore.swift in Sources */,
+				7DA2B46A6231E3CF79475816 /* HuddleWidgetsPlugin.swift in Sources */,
+				26187E20E0BB7CA1B4F2B8C2 /* FocusActivity.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C4E1409A5E9EC726B0F85CCD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1E8558A547F10BF9CA9BB8B1 /* HuddleWidgets.swift in Sources */,
+				B8609CAC6459542D6D5EA6BF /* WidgetStore.swift in Sources */,
+				7DBE0B63E7DAD39857150E13 /* FocusActivity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		7460C9485DBEE0D8F415DC61 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = HuddleWidgets;
+			target = 1698E6B1D09E1AD2CCEB212C /* HuddleWidgets */;
+			targetProxy = E2C8698B974FDDE9961DFFD4 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -181,6 +332,26 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		0CC3B92093A34E7EE5128F83 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = HuddleWidgets/HuddleWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HuddleWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lazylazy.huddle.widgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		504EC3141FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
@@ -295,6 +466,7 @@
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = PQZ8V7ZAXU;
@@ -318,6 +490,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = PQZ8V7ZAXU;
@@ -333,6 +506,27 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		9534E745490CA93C84F3EA95 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = HuddleWidgets/HuddleWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HuddleWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lazylazy.huddle.widgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
@@ -353,6 +547,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C427B5D5DA76A34E7F8DB5CB /* Build configuration list for PBXNativeTarget "HuddleWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9534E745490CA93C84F3EA95 /* Release */,
+				0CC3B92093A34E7EE5128F83 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

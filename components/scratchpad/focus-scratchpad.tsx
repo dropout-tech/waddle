@@ -12,6 +12,7 @@ import type { ScratchpadItem } from '@/lib/types'
 
 interface FocusScratchpadProps {
   className?: string
+  initialDate?: string
   isOpen?: boolean
   onOpenChange?: (open: boolean) => void
   hideTrigger?: boolean
@@ -70,13 +71,13 @@ function DailyWhiteboard({ items, ...props }: {
   return <ScratchpadCanvas {...props} items={visibleItems} />
 }
 
-export function FocusScratchpad({ className, isOpen, onOpenChange, hideTrigger, fill, scratchpadByDate, onAddItem, onUpdateItem, onDeleteItem, onClearDate }: FocusScratchpadProps) {
+export function FocusScratchpad({ initialDate, className, isOpen, onOpenChange, hideTrigger, fill, scratchpadByDate, onAddItem, onUpdateItem, onDeleteItem, onClearDate }: FocusScratchpadProps) {
   const { t, lang } = useI18n()
   const todayKey = toDateString(new Date())
   const [internalExpanded, setInternalExpanded] = useState(false)
   const isExpanded = isOpen !== undefined ? isOpen : internalExpanded
   const setIsExpanded = (next: boolean) => isOpen !== undefined ? onOpenChange?.(next) : setInternalExpanded(next)
-  const [selectedDate, setSelectedDate] = useState(todayKey)
+  const [selectedDate, setSelectedDate] = useState(initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate) ? initialDate : todayKey)
   const items = scratchpadByDate[selectedDate] ?? []
   const isToday = selectedDate === todayKey
   const dates = useMemo(() => Array.from(new Set([todayKey, ...Object.keys(scratchpadByDate).filter(date => scratchpadByDate[date]?.length)])).sort().reverse(), [todayKey, scratchpadByDate])

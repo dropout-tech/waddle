@@ -261,6 +261,21 @@ export function MainLayout({
   // Focus mode for journal/report (full screen view)
   const [focusMode, setFocusMode] = useState<'none' | 'journal' | 'report' | 'growth'>('none')
   
+  const widgetLaunchConsumed = useRef(false)
+  useEffect(() => {
+    if (widgetLaunchConsumed.current) return
+    widgetLaunchConsumed.current = true
+    const q = new URLSearchParams(window.location.search)
+    const kind = q.get('widget'), date = q.get('date'), id = q.get('task')
+    if (!kind) return
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) setSelectedDate(new Date(`${date}T12:00:00`))
+    if (kind === 'calendar' || kind === 'overview' || kind === 'agenda') { setMobileTab('calendar'); setViewMode(kind === 'calendar' ? 'month' : 'day') }
+    else if (kind === 'tasks' || kind === 'top-three') setMobileTab('tasks')
+    if (id) { const task = workspaces.flatMap(w => w.categories.flatMap(c => c.tasks)).find(t => t.id === id); if (task) onSelectTask(task) }
+    if (kind === 'new-task') onCreateCalendarTask?.(toDateString(new Date()))
+    window.history.replaceState(null, '', window.location.pathname)
+  }, [workspaces, onSelectTask, onCreateCalendarTask])
+
   // Calendar zoom level - controls hour height and visible time range
   // Zoom levels: 1 = compact (40px/hour), 2 = normal (60px/hour), 3 = expanded (80px/hour), 4 = detailed (100px/hour)
   const [zoomLevel, setZoomLevel] = useState(2)

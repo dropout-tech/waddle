@@ -17,7 +17,7 @@ import {
 import { t } from '@/lib/i18n'
 
 // iOS allows at most 64 pending local notifications; stay comfortably under.
-const MAX_SCHEDULED = 60
+const MAX_SCHEDULED = 48
 
 /** Stable positive 31-bit int from a reminder-id string (LocalNotifications needs integer ids). */
 function hashId(s: string): number {
@@ -63,7 +63,7 @@ async function ensureTapHandler() {
 
 /**
  * Reconcile scheduled native reminders with the current set of meetings.
- * Cancels all previously scheduled reminders and re-schedules the upcoming
+ * Cancels previously scheduled meeting reminders and re-schedules the upcoming
  * ones (future fire-times only, capped at MAX_SCHEDULED). No-op on web.
  */
 export async function syncMeetingReminders(
@@ -74,12 +74,12 @@ export async function syncMeetingReminders(
 
   const { LocalNotifications } = await import('@capacitor/local-notifications')
 
-  // Always clear what we previously scheduled (this app only uses local
-  // notifications for meeting reminders, so clearing all pending is safe).
+  // Reconcile only meetings; focus and water reminders have their own namespace.
   const pending = await LocalNotifications.getPending()
-  if (pending.notifications.length > 0) {
+  const meetingsOnly = pending.notifications.filter(n => n.extra?.kind === 'meeting')
+  if (meetingsOnly.length > 0) {
     await LocalNotifications.cancel({
-      notifications: pending.notifications.map((n) => ({ id: n.id })),
+      notifications: meetingsOnly.map((n) => ({ id: n.id })),
     })
   }
 

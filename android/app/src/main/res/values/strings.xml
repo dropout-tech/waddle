@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Huddle</string>
+    <string name="title_activity_main">Huddle</string>
+    <string name="package_name">com.lazylazy.huddle</string>
+    <string name="custom_url_scheme">com.lazylazy.huddle</string>
+</resources>
