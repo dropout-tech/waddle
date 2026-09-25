@@ -8,7 +8,7 @@
 
 每日簽到與每日 +1 分已透過 PR #64 發布，正式 merge 為 `a2e210dd4ab1319f769a141e3d6a51b5ddbfe3a2`；Zeabur deployment `6656984050` 成功，正式 Supabase 前兩份 migration 與測試帳號簽到已驗證。
 
-排行榜與註冊日期為本次追加功能：需先套用 `20260925120000_check_in_leaderboard.sql`，再發布前端。本機驗證通過；目前正式資料庫管理分頁連線逾時、Supabase connector 無專案權限，因此追加功能尚未上線。
+2026-09-26 整合更新：註冊日期可直接發布。排行榜程式先隨整合版推送，當 RPC 不存在時隱藏該區塊；套用 `20260925120000_check_in_leaderboard.sql` 後才會顯示。正式 migration 尚因 Mac 鎖定與管理連線權限卡住，詳見 `docs/releases/2026-09-26-consolidated-release.md`。
 
 第二份 migration 會撤銷前端直接新增簽到的權限；舊版前端簽到會失敗，部署時需協調資料庫與前端更新並讓舊頁面重新載入。不將舊自動腳印轉成簽到，也不補發歷史簽到積分；當天舊版簽到可按新按鈕領取一次。
 
