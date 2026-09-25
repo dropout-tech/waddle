@@ -1,6 +1,6 @@
 # Huddle 營運後台與會員推薦
 
-本次實作提供 `/admin` 與 `/membership`。會員選單包含「會員與推薦」，已授權管理員的會員頁會顯示後台入口。這份說明對應本分支程式；完成本機驗證不代表已部署正式站。
+本次實作提供 `/admin` 與 `/membership`。會員選單包含「會員與推薦」，已授權管理員的會員頁會顯示後台入口。正式資料庫已於 2026-09-25 套用本次 migration；網站部署證據另見發布紀錄。
 
 ## 啟用前
 
@@ -67,7 +67,7 @@ node scripts/e2e/operations-verify.mjs
 
 ## 本次驗證紀錄（2026-09-25）
 
-- PostgreSQL 本機隔離測試：45 項斷言通過，包括真正的兩個連線併發搶最後名額。
+- PostgreSQL 本機隔離測試：49 項斷言通過，包括真正的兩個連線併發搶最後名額。
 - Playwright：23 項檢查通過，Supabase 流量全部攔截；未寫入正式資料。
 - TypeScript 檢查通過。
 - Webpack 網頁建置與 Capacitor 靜態輸出皆通過：`pnpm exec next build --webpack`、`BUILD_TARGET=capacitor pnpm exec next build --webpack`。
@@ -75,3 +75,12 @@ node scripts/e2e/operations-verify.mjs
 - 變更範圍 ESLint：0 errors、10 warnings（React hook／effect／render purity 類提醒）；並非全專案零警告。
 - 介面獨立檢查：列出的對比、錯誤恢復、兌換紀錄狀態與字詞問題均已解決。桌機 1440 px、手機 390 px；測試截圖使用合成資料。
 - 尚未 push／merge／套用正式 migration／授予正式管理員／部署。正式上線與完整金流不在以上通過項目中。
+
+## 2026-09-25 發布前驗證
+
+- 正式 Supabase 已套用 billing_entitlements 與 operations_referrals，migration history 已登記。
+- 兩個指定管理員 Email 均已驗證；以 authenticated 角色測試兩者可讀後台，其餘已驗證帳號被拒絕。驗證產生的會員列均交易回滾。
+- 私有表 RLS 全開，允許名單不可由 authenticated 讀寫；促銷開關全關。
+- 更新前後帳號 5 筆、任務 312 筆、排程 133 筆一致。
+- 整合 main 的每日簽到功能後，資料庫 49 項斷言、23 項模擬 UI 檢查、TypeScript 與 webpack 正式建置通過。
+- 網站發布使用 Zeabur；GitHub 的 Vercel integration 失敗不代表 Zeabur 發布失敗，需另核對實際部署 SHA 與正式頁面。
