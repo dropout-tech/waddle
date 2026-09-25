@@ -5,6 +5,35 @@ export interface MeetingTaskDraft {
   owner: string;
   dueDate: string;
   source: string;
+  ownerParticipantId?: string;
+  ownerEvidence?: string;
+  assignmentConfidence?: "explicit" | "uncertain";
+  assignmentReason?: string;
+  assigneeId?: string;
+}
+export interface MeetingParticipant {
+  id: string;
+  name: string;
+  organization: string;
+  aliases: string[];
+  userId: string;
+}
+export interface MeetingPeer {
+  peer_id: string;
+  display_name: string | null;
+}
+export interface MeetingAssignment {
+  id: string;
+  sender_id: string;
+  sender_name: string;
+  title: string;
+  due_date: string | null;
+  source: string;
+  meeting_title: string;
+  meeting_date: string;
+  status: "pending" | "accepted" | "rejected";
+  task_id: string | null;
+  created_at: string;
 }
 export interface MeetingImport {
   id: string;
@@ -19,6 +48,19 @@ export interface MeetingImport {
     tasks: MeetingTaskDraft[];
   } | null;
   imported_tasks: Record<string, string>;
+  context?: {
+    meetingTime: string;
+    participants: MeetingParticipant[];
+    categoryId: string;
+    autoSelf: boolean;
+  };
+  checklist?: Record<string, MeetingTaskDraft>;
+  assignments?: {
+    id: string;
+    source_index: number;
+    recipient_id: string;
+    status: "pending" | "accepted" | "rejected";
+  }[];
 }
 export interface MeetingList {
   meetings: MeetingImport[];
@@ -29,6 +71,8 @@ export interface MeetingList {
   enabled: boolean;
 }
 const messages: Record<string, string> = {
+  INVALID_PARTICIPANTS: "與會者帳號重複或已無共享關係，請重新選擇。",
+  ASSIGNMENT_RESPONSE_FAILED: "未能處理指派，請確認共享關係與目標分類後重試。",
   MONTHLY_LIMIT: "本月已使用 20 次，下個月 1 日（台北時間）會重新開放。",
   RATE_LIMIT: "短時間內嘗試較多，請稍後再試。",
   REQUEST_CONFLICT: "這份內容已變更，請開始新的整理。",

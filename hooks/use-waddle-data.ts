@@ -683,9 +683,19 @@ export function useWaddleData(): UseWaddleData {
     }
     document.addEventListener('visibilitychange', tryRefetch)
     window.addEventListener('focus', tryRefetch)
+    let importRefreshTimer: ReturnType<typeof setTimeout> | undefined
+    const afterImport = () => {
+      clearTimeout(importRefreshTimer)
+      if (pendingWritesRef.current > 0) { importRefreshTimer = setTimeout(afterImport, 300); return }
+      lastRefetchRef.current = 0
+      tryRefetch()
+    }
+    window.addEventListener('huddle:tasks-imported', afterImport)
     return () => {
       document.removeEventListener('visibilitychange', tryRefetch)
       window.removeEventListener('focus', tryRefetch)
+      window.removeEventListener('huddle:tasks-imported', afterImport)
+      clearTimeout(importRefreshTimer)
     }
   }, [loadData])
 

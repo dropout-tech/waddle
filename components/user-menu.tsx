@@ -163,6 +163,15 @@ export function UserMenu({ className }: UserMenuProps = {}) {
           </button>
 
           <button
+            onClick={() => { setOpen(false); router.push('/assignments') }}
+            className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+            role="menuitem"
+          >
+            <FileText className="w-4 h-4" />
+            <span>待接受指派</span>
+          </button>
+
+          <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
             className={cn(
               'w-full flex items-center gap-2 px-4 py-2.5 text-sm',

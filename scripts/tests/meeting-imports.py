@@ -58,6 +58,56 @@ try:
  sql(f"update meeting_imports set month=(month-interval '1 month')::date where user_id='{other}';")
  assert json.loads(reserve(other)[1])['claimed']
  assert sql("select date_trunc('month',timestamptz '2026-09-30 16:00:00+00' at time zone 'Asia/Taipei')::date;")=='2026-10-01'
+ # Assignment flow is tested on the same isolated database, never real users.
+ sql("create table calendar_shares(id uuid default gen_random_uuid(),user_lo uuid,user_hi uuid,unique(user_lo,user_hi));")
+ sql((root/'supabase/migrations/20260925083539_meeting_assignments.sql').read_text())
+ sql(f"insert into calendar_shares(user_lo,user_hi) values(least('{u}'::uuid,'{other}'::uuid),greatest('{u}'::uuid,'{other}'::uuid));")
+ other_ws=str(uuid.uuid4()); other_cat=str(uuid.uuid4())
+ sql(f"insert into workspaces(id,user_id,name,color,icon) values('{other_ws}','{other}','Other','#aaa','x');insert into categories(id,user_id,workspace_id,name) values('{other_cat}','{other}','{other_ws}','Inbox');")
+ meeting,_=reserve()
+ multi={**result,'tasks':[result['tasks'][0],result['tasks'][0],result['tasks'][0]]}
+ sql(f"select finish_meeting_import('{u}','{meeting}',{q(json.dumps(multi))}::jsonb,'{{}}');")
+ choices=[{'index':0,'title':'Self work','owner':'Me','dueDate':'','assigneeId':u},{'index':1,'title':'Peer work','owner':'Peer','dueDate':'','assigneeId':other},{'index':2,'title':'Unassigned work','owner':'','dueDate':'','assigneeId':''}]
+ sql(f"select route_meeting_tasks('{u}','{meeting}','{cat}',{q(json.dumps(choices))}::jsonb);")
+ assert sql('select count(*) from tasks')=='2'
+ assert sql('select count(*) from meeting_task_assignments')=='1'
+ sql(f"select route_meeting_tasks('{u}','{meeting}','{cat}',{q(json.dumps(choices))}::jsonb);")
+ assert sql('select count(*) from tasks')=='2'
+ assignment=sql('select id from meeting_task_assignments')
+ assert 'ASSIGNMENT_NOT_FOUND' in sql(f"select respond_meeting_assignment('{u}','{assignment}',true,'{cat}');",True)
+ assert 'CATEGORY_NOT_FOUND' in sql(f"select respond_meeting_assignment('{other}','{assignment}',true,'{cat}');",True)
+ assert sql('select status from meeting_task_assignments')=='pending'
+ def accept(_):return sql(f"select respond_meeting_assignment('{other}','{assignment}',true,'{other_cat}');")
+ with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool: list(pool.map(accept,range(5)))
+ assert sql('select count(*) from tasks')=='3'
+ assert sql(f"select user_id from tasks where title='Peer work'")==other
+ sql(f"select respond_meeting_assignment('{other}','{assignment}',false,null);")
+ assert sql('select status from meeting_task_assignments')=='accepted'
+ choices[2]['assigneeId']=other
+ sql(f"select route_meeting_tasks('{u}','{meeting}',null,{q(json.dumps([choices[2]]))}::jsonb);")
+ rejected=sql("select id from meeting_task_assignments where source_index=2")
+ sql(f"select respond_meeting_assignment('{other}','{rejected}',false,null);")
+ assert sql(f"select status from meeting_task_assignments where id='{rejected}'")=='rejected'
+ assert sql('select count(*) from tasks')=='3'
+ stranger=str(uuid.uuid4());sql(f"insert into auth.users values('{stranger}');")
+ assert sql(f"set role authenticated;set request.jwt.claim.sub='{stranger}';select count(*) from meeting_task_assignments").splitlines()[-1]=='0'
+ assert 'permission denied' in sql(f"set role authenticated;select respond_meeting_assignment('{other}','{assignment}',true,'{other_cat}');",True)
+ assert 'permission denied' in sql("set role authenticated;update meeting_task_assignments set status='accepted';",True)
+ # Automatic self assignment shares the result/quota transaction.
+ auto_id=str(uuid.uuid4());person=str(uuid.uuid4())
+ context={'autoSelf':True,'categoryId':cat,'participants':[{'id':person,'userId':u}]}
+ sql(f"select reserve_meeting_import_v2('{u}','{auto_id}','Auto','2026-09-25','This is a real transcript with a clear task.',{q(json.dumps(context))}::jsonb);")
+ explicit={**result,'tasks':[{**result['tasks'][0],'ownerParticipantId':person,'assignmentConfidence':'explicit'}]}
+ sql(f"select finish_meeting_import_v2('{u}','{auto_id}',{q(json.dumps(explicit))}::jsonb,'{{}}');")
+ assert sql('select count(*) from tasks')=='4'
+ assert sql(f"select imported_tasks <> '{{}}'::jsonb from meeting_imports where id='{auto_id}'")=='t'
+ # Unknown ownership stays a checklist and never creates a task automatically.
+ unknown=str(uuid.uuid4())
+ sql(f"select reserve_meeting_import_v2('{u}','{unknown}','Unknown','2026-09-25','This is a real transcript with a clear task.',{q(json.dumps(context))}::jsonb);")
+ explicit['tasks'][0]['assignmentConfidence']='uncertain'
+ sql(f"select finish_meeting_import_v2('{u}','{unknown}',{q(json.dumps(explicit))}::jsonb,'{{}}');")
+ assert sql('select count(*) from tasks')=='4'
+ print('PASS: self/peer/unassigned routing, atomic acceptance, rejection, ownership, replay, RLS, explicit-only automatic self tasks')
  print('PASS: quota concurrency, replay, failure release, stale fencing, month reset, ownership/RLS, RPC grants, task validation and atomic deduplication')
 finally:
  subprocess.run([str(bin/'pg_ctl'),'-D',str(path/'data'),'stop','-m','immediate'],capture_output=True)

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ParticipantsEditor } from "./participants-editor";
+import type { MeetingParticipant, MeetingPeer } from "@/lib/meeting-import";
 import { ArrowLeft, FileText, Loader2, Upload } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toDateString } from "@/lib/calendar-utils";
@@ -21,6 +23,10 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
   const [categories, setCategories] = useState<{ id: string; label: string }[]>(
     [],
   );
+  const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
+  const [peers, setPeers] = useState<MeetingPeer[]>([]);
+  const [meetingTime, setMeetingTime] = useState("");
+  const [autoSelf, setAutoSelf] = useState(true);
   const [list, setList] = useState<MeetingList | null>(null);
   const [title, setTitle] = useState("");
   const [meetingDate, setMeetingDate] = useState(toDateString(new Date()));
@@ -41,15 +47,30 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
   const target = category || categories[0]?.id || "";
   const select = useCallback((meeting: MeetingImport) => {
     setSelected(meeting);
-    setDrafts(meeting.result?.tasks.map((t) => ({ ...t })) ?? []);
+    setDrafts(
+      meeting.result?.tasks.map((t, index) => ({
+        ...t,
+        assigneeId:
+          meeting.imported_tasks[String(index)] ? userId : t.assignmentConfidence === "explicit"
+            ? meeting.context?.participants.find(
+                (p) => p.id === t.ownerParticipantId,
+              )?.userId || ""
+            : "",
+        ...meeting.checklist?.[String(index)],
+      })) ?? [],
+    );
     setChecked(
       meeting.result?.tasks
         .map((_, i) => i)
-        .filter((i) => !meeting.imported_tasks[String(i)]) ?? [],
+        .filter(
+          (i) =>
+            !meeting.imported_tasks[String(i)] &&
+            !meeting.assignments?.some((a) => a.source_index === i),
+        ) ?? [],
     );
     setNotice("");
     setError("");
-  }, []);
+  }, [userId]);
   const refresh = useCallback(async () => {
     const next = await meetingRequest<MeetingList>(userId, { action: "list" });
     if (active.current) {
@@ -61,6 +82,14 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
   }, [userId]);
   useEffect(() => {
     active.current = true;
+    meetingRequest<{ peers: MeetingPeer[] }>(userId, { action: "directory" })
+      .then((data) => {
+        if (active.current) setPeers(data.peers);
+      })
+      .catch(() => {
+        if (active.current)
+          setError("暫時無法讀取共享夥伴，仍可使用未指派 checklist。");
+      });
     const client = createClient();
     Promise.all([
       client
@@ -140,6 +169,17 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
       title: title.trim(),
       meetingDate,
       transcript: transcript.trim(),
+      context: {
+        meetingTime,
+        participants: participants.map((p) => ({
+          ...p,
+          name: p.name.trim(),
+          organization: p.organization.trim(),
+          aliases: p.aliases.map((a) => a.trim()).filter(Boolean),
+        })),
+        categoryId: target,
+        autoSelf: autoSelf && !!target,
+      },
     };
     const fingerprint = JSON.stringify(payload);
     if (request.current?.fingerprint !== fingerprint)
@@ -180,8 +220,9 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
     setError("");
     setNotice("");
     try {
-      const { importedTasks } = await meetingRequest<{
+      const { importedTasks, checklist } = await meetingRequest<{
         importedTasks: Record<string, string>;
+        checklist: Record<string, MeetingTaskDraft>;
       }>(userId, {
         action: "import",
         id: selected.id,
@@ -191,13 +232,20 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
           title: drafts[index].title,
           owner: drafts[index].owner,
           dueDate: drafts[index].dueDate,
+          assigneeId: drafts[index].assigneeId || "",
         })),
       });
       if (!active.current) return;
-      setSelected({ ...selected, imported_tasks: importedTasks });
+      setSelected({ ...selected, imported_tasks: importedTasks, checklist });
       setChecked([]);
-      setNotice("已加入任務清單，可返回工作面板查看與安排。");
-      await refresh();
+      setNotice(
+        "已儲存 checklist：指派給自己的直接加入，其他人的指派等待對方接受。",
+      );
+      const latest = await refresh();
+      if (active.current) {
+        const updated = latest.meetings.find((m) => m.id === selected.id);
+        if (updated) setSelected(updated);
+      }
     } catch (e) {
       if (active.current)
         setError(e instanceof Error ? e.message : "任務未能建立");
@@ -313,6 +361,47 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                     />
                   </label>
                 </div>
+                <label className="block space-y-2 text-sm">
+                  會議時間（台北時間，可留空）
+                  <input
+                    type="time"
+                    className={field}
+                    value={meetingTime}
+                    disabled={busy}
+                    onChange={(e) => setMeetingTime(e.target.value)}
+                  />
+                </label>
+                <ParticipantsEditor
+                  participants={participants}
+                  peers={peers}
+                  userId={userId}
+                  onChange={setParticipants}
+                  disabled={busy}
+                />
+                <label className="block space-y-2 text-sm">
+                  自己的任務加入哪個分類
+                  <select
+                    className={field}
+                    value={target}
+                    onChange={(e) => setCategory(e.target.value)}
+                    disabled={busy}
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex min-h-11 items-center gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={autoSelf}
+                    disabled={busy || !target}
+                    onChange={(e) => setAutoSelf(e.target.checked)}
+                  />
+                  有明確依據、指派給「我」的任務，整理完成後直接建立
+                </label>
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <label htmlFor="transcript" className="text-sm font-medium">
@@ -398,6 +487,10 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                       ? "整理未完成，未扣次"
                       : "正在整理"}
                 </p>
+                {selected.context && <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  {selected.context.meetingTime ? `時間：${selected.context.meetingTime}（台北） · ` : ''}
+                  與會者：{selected.context.participants.map(p=>`${p.name}${p.organization ? `（${p.organization}）` : ''}`).join('、') || '未提供'}
+                </p>}
                 {pending && !expired && (
                   <p role="status" className="mt-5">
                     正在整理重點與任務，請稍候。離開此頁仍可從最近紀錄查看結果。
@@ -433,7 +526,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                       確認接下來要做的事
                     </h3>
                     <p className="mb-5 text-sm text-muted-foreground">
-                      核對期限與原文後再加入。負責人會存為文字備註，不會自動指派帳號。
+                      核對原文後，選擇指派給自己、共享夥伴或不指派。對方接受前，不會加入對方的任務清單。
                     </p>
                     {drafts.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
@@ -463,8 +556,19 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                         )}
                         <div className="divide-y divide-border">
                           {drafts.map((task, index) => {
+                            const assignment = selected.assignments?.find(
+                              (a) => a.source_index === index,
+                            );
                             const imported =
-                              !!selected.imported_tasks[String(index)];
+                              !!selected.imported_tasks[String(index)] ||
+                              !!assignment;
+                            const statusLabel = assignment
+                              ? {
+                                  pending: "已送出，等待接受",
+                                  accepted: "對方已接受",
+                                  rejected: "對方已拒絕",
+                                }[assignment.status]
+                              : "已加入自己的任務";
                             const update = (patch: Partial<MeetingTaskDraft>) =>
                               setDrafts((prev) =>
                                 prev.map((t, i) =>
@@ -493,7 +597,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                                   <div className="min-w-0 flex-1 space-y-3">
                                     <label className="block space-y-1 text-sm">
                                       <span>
-                                        {imported ? "已加入任務" : "任務名稱"}
+                                        {imported ? statusLabel : "任務名稱"}
                                       </span>
                                       <input
                                         className={field}
@@ -507,17 +611,32 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                                     </label>
                                     <div className="grid gap-3 sm:grid-cols-2">
                                       <label className="space-y-1 text-sm">
-                                        <span>負責人（備註）</span>
-                                        <input
+                                        <span>指派給</span>
+                                        <select
+                                          aria-label={`任務 ${index+1} 指派給`}
                                           className={field}
-                                          value={task.owner}
-                                          maxLength={100}
-                                          placeholder="待確認"
+                                          value={task.assigneeId || ""}
                                           disabled={busy || imported}
                                           onChange={(e) =>
-                                            update({ owner: e.target.value })
+                                            update({
+                                              assigneeId: e.target.value,
+                                            })
                                           }
-                                        />
+                                        >
+                                          <option value="">
+                                            不指派，保留 checklist
+                                          </option>
+                                          <option value={userId}>我</option>
+                                          {peers.map((peer) => (
+                                            <option
+                                              key={peer.peer_id}
+                                              value={peer.peer_id}
+                                            >
+                                              {peer.display_name || "共享夥伴"}{" "}
+                                              · {peer.peer_id.slice(0, 8)}
+                                            </option>
+                                          ))}
+                                        </select>
                                       </label>
                                       <label className="space-y-1 text-sm">
                                         <span>期限</span>
@@ -532,6 +651,13 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                                         />
                                       </label>
                                     </div>
+                                    <p className="text-xs text-muted-foreground">
+                                      {task.owner
+                                        ? `原文提及：${task.owner}。`
+                                        : ""}
+                                      {task.assignmentReason ||
+                                        "負責人待確認，請自行選擇。"}
+                                    </p>
                                     <details className="text-sm text-muted-foreground">
                                       <summary className="min-h-11 cursor-pointer py-2">
                                         查看來源原文
@@ -551,13 +677,16 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                           className={`${button} mt-4 bg-primary text-primary-foreground hover:opacity-90`}
                           disabled={
                             busy ||
-                            !target ||
+                            (checked.some(
+                              (i) => drafts[i].assigneeId === userId,
+                            ) &&
+                              !target) ||
                             !checked.length ||
                             checked.some((i) => !drafts[i].title.trim())
                           }
                           onClick={() => void importTasks()}
                         >
-                          確認並加入 {checked.length} 個任務
+                          儲存並處理 {checked.length} 個待辦
                         </button>
                       </>
                     )}
