@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes'
 import { LogOut, Mail, User, Loader2, Moon, Sun } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { AccountRegistrationDate } from '@/components/auth/account-registration-date'
 import { useI18n } from '@/lib/i18n/react'
 
 interface SessionInfo {
@@ -149,6 +150,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
                 </span>
               </div>
             </div>
+            <AccountRegistrationDate />
           </div>
 
           <div className="border-t border-border" />

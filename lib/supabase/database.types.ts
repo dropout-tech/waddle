@@ -1,4 +1,4 @@
-import type { CheckInStatus } from '@/lib/daily-check-in'
+import type { CheckInStatus, CheckInRanking } from '@/lib/daily-check-in'
 // Database types matching supabase/migrations/0001_initial_schema.sql.
 // Regenerate from your Supabase project with:
 //   npx supabase gen types typescript --project-id <YOUR_PROJECT_ID> > lib/supabase/database.types.ts
@@ -596,6 +596,7 @@ export type Database = {
     // Hand-written (supabase gen would rewrite this whole file); keep in sync
     // with supabase/migrations/0016_calendar_sharing.sql if it changes.
     Functions: {
+      get_check_in_leaderboard: { Args: Record<PropertyKey, never>; Returns: CheckInRanking[] }
       get_daily_check_in_status: { Args: Record<PropertyKey, never>; Returns: CheckInStatus[] }
       claim_daily_check_in: { Args: Record<PropertyKey, never>; Returns: CheckInStatus[] }
       create_share_invite: {

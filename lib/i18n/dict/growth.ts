@@ -1,5 +1,21 @@
 // English dictionary fragment for Huddle's gentle growth journey.
 export const dict: Record<string, string> = {
+  "累積分數排行榜": "Score leaderboard",
+  "顯示前 50 位小企鵝，相同分數並列。暱稱由系統匿名產生。": "The top 50 penguins. Equal scores share a rank. Aliases are generated anonymously.",
+  "正在讀取排行榜…": "Loading leaderboard…",
+  "排行榜暫時讀不到，請再試一次。": "The leaderboard could not be loaded. Please try again.",
+  "簽到後，就能留下你的第一個分數。": "Check in to earn your first point.",
+  "你的名次：第 {n} 名": "Your rank: {n}",
+  "{n} 分": "{n} points",
+  "排行榜正等著第一個小小的開始。": "The leaderboard is waiting for its first little step.",
+  "名次": "Rank",
+  "小企鵝": "Penguin",
+  "分數": "Score",
+  "企鵝 {id}": "Penguin {id}",
+  "（你）": "(you)",
+  "每天一小步，慢慢累積，也看見彼此的努力。": "Small steps add up. See how everyone is growing.",
+  "註冊日期": "Registration date",
+
   '累積分數 {n} 分': 'Total score: {n}',
   '每天一小步，慢慢累積。分數將作為未來排行的依據。': 'Small steps add up. Your score will count toward future rankings.',
   "今日簽到積分已入帳": "Today’s check-in points are saved",
