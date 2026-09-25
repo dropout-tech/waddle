@@ -379,7 +379,7 @@ export function CalendarHeader({
                       className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
                       <HuddleFootprints className="h-4 w-4 gap-0.5" />
-                      <span>{t('成長旅程')}</span>
+                      <span>{t('每日簽到')}</span>
                     </button>
                   )}
                   {onOpenExport && (
