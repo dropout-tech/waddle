@@ -674,9 +674,12 @@ export function useWaddleData(): UseWaddleData {
     }
     document.addEventListener('visibilitychange', tryRefetch)
     window.addEventListener('focus', tryRefetch)
+    const widgetRefresh = () => { void loadData({ initial: false }) }
+    window.addEventListener('huddle-widget-synced', widgetRefresh)
     return () => {
       document.removeEventListener('visibilitychange', tryRefetch)
       window.removeEventListener('focus', tryRefetch)
+      window.removeEventListener('huddle-widget-synced', widgetRefresh)
     }
   }, [loadData, isLoading])
 
