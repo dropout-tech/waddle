@@ -9,6 +9,7 @@ import { dict as reports } from './dict/reports'
 import { dict as dataLayer } from './dict/data-layer'
 import { dict as growth } from './dict/growth'
 import { dict as operations } from './dict/operations'
+import { dict as account } from './dict/account'
 
 // Merged English dictionary. Keys are the Traditional Chinese source strings
 // (see lib/i18n/index.ts). Split by feature area purely to keep files
@@ -25,6 +26,7 @@ export const en: Record<string, string> = {
   ...reports,
   ...dataLayer,
   ...growth,
+  ...account,
   ...operations,
   // Whiteboard canvas controls.
   "手寫筆記": "Handwritten note",
