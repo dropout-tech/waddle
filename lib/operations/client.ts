@@ -17,6 +17,17 @@ export async function operations<T>(
       )
     throw new Error(error.message)
   }
+  // Some refusals (e.g. rate-limited coupon attempts) are returned rather than
+  // raised so the server can persist them; surface them as errors here.
+  if (
+    result &&
+    typeof result === 'object' &&
+    !Array.isArray(result) &&
+    result.ok === false
+  )
+    throw new Error(
+      typeof result.error === 'string' ? result.error : '操作失敗，請再試一次'
+    )
   return result as T
 }
 export function dateLabel(value: string | null | undefined) {

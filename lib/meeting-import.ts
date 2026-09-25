@@ -78,6 +78,7 @@ const messages: Record<string, string> = {
   REQUEST_CONFLICT: "這份內容已變更，請開始新的整理。",
   AI_NOT_CONFIGURED: "AI 整理尚未啟用，請稍後再試。",
   UNAUTHORIZED: "登入已過期，請重新登入。",
+  ACCOUNT_SUSPENDED: "帳號已停用，請聯絡客服。",
   INPUT_TOO_LARGE: "文字太長了，請縮短至 40,000 字元以內。",
   INVALID_INPUT: "請確認標題、會議日期和逐字稿格式。",
   GENERATION_FAILED: "這次未能完成整理，沒有扣除次數。請重試。",
