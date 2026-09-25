@@ -125,6 +125,12 @@ Deno.serve(async (req) => {
         meetings: records.data,
         used,
         pending,
+        // Display-only mirror of the server-enforced quota. The actual limit
+        // lives in supabase/migrations/20260925081959_meeting_imports.sql
+        // (route_meeting_tasks, `>= 20`) — that RPC is the source of truth;
+        // this number and the MONTHLY_LIMIT message in lib/meeting-import.ts
+        // must be updated together if the quota ever changes. Not read from
+        // the DB here because RPC checks the count at insert time, not on read.
         limit: 20,
         month: taipeiMonth(),
         enabled: !!Deno.env.get("OPENAI_API_KEY"),
