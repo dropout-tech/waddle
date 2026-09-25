@@ -1,5 +1,7 @@
 # 約交集與邀請 — 實作與部署紀錄
 
+> 2026-09-26：會議邀請已改為站內通知；不再要求 Resend 設定。下方 Email 章節是舊版歷史設計，最新狀態見 `in-app-notifications-release-2026-09-26.md`。
+
 ## 實作範圍
 
 新的 RPC-only 邀請資料模型，與既有 `calendar_shares` 配對相接。僅既有共享日曆夥伴可被邀請；一次 1–10 人（重複選取去重，禁止自邀）。主辦人自動 accepted，其餘 pending，可接受、暫定、婉拒；主辦人可取消。邀請不自動寫入 Google Calendar，也不代表 Google OAuth Calendar 權限整合。
