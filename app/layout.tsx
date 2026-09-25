@@ -6,6 +6,8 @@ import { AuthProvider } from '@/components/auth/auth-provider'
 import { NativeShell } from '@/components/native/native-shell'
 import { ThemeProvider } from '@/components/theme-provider'
 import { FocusTimerProvider } from '@/components/timer/focus-timer-provider'
+import { OperationsNotices } from '@/components/operations/announcements'
+import { EnrollmentBridge } from '@/components/operations/enrollment-bridge'
 import { FloatingHub } from '@/components/floating/floating-hub'
 
 const geist = Geist({
@@ -123,6 +125,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         >
           <NativeShell />
           <AuthProvider>
+            <EnrollmentBridge />
+            <OperationsNotices />
             {/* Cross-route focus timer state — mounted above the router
                 outlet so a running session (and its BGM) survives
                 navigating to any route, not just while MainLayout happens

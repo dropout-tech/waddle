@@ -598,6 +598,8 @@ export type Database = {
     Functions: {
       get_daily_check_in_status: { Args: Record<PropertyKey, never>; Returns: CheckInStatus[] }
       claim_daily_check_in: { Args: Record<PropertyKey, never>; Returns: CheckInStatus[] }
+      huddle_operations: { Args: { p_action: string; p_data?: Json }; Returns: Json }
+
       create_share_invite: {
         Args: Record<PropertyKey, never>
         /** Raw invite token, returned exactly once (only its hash is stored). */
