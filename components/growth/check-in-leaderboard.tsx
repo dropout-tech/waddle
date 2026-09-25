@@ -11,6 +11,7 @@ export function CheckInLeaderboard({ score }: { score: number | undefined }) {
   const [rows, setRows] = useState<CheckInRanking[]>([])
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
+  const [unavailable, setUnavailable] = useState(false)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     let active = true
@@ -22,6 +23,8 @@ export function CheckInLeaderboard({ score }: { score: number | undefined }) {
       try {
         const { data, error } = await supabase.rpc('get_check_in_leaderboard')
         if (!active || id !== request) return
+        if (error?.code === 'PGRST202') { setUnavailable(true); return }
+        setUnavailable(false)
         if (error || !data) { setFailed(true); return }
         setRows(data)
       } catch { if (active && id === request) setFailed(true) }
@@ -33,6 +36,8 @@ export function CheckInLeaderboard({ score }: { score: number | undefined }) {
   }, [supabase, score, attempt])
   const own = rows.find(row => row.is_current_user)
   const leaders = rows.filter(row => row.in_top_50)
+  // Staged rollout: keep the existing growth page intact until the RPC is deployed.
+  if (unavailable) return null
   return (
     <section aria-labelledby="check-in-ranking-title" className="mt-10 w-full border-t border-border pt-7 text-left">
       <h2 id="check-in-ranking-title" className="text-lg font-semibold">{t('累積分數排行榜')}</h2>

@@ -12,7 +12,7 @@ export interface WidgetSnapshot {
   schemaVersion: 1; accountId: string; epoch: string; generatedAt: string; today: string; locale: string
   tasks: WidgetItem[]; agenda: WidgetItem[]; notes: WidgetItem[]; boards: WidgetItem[]
   days: { date: string; day: number; inMonth: boolean; count: number }[]
-  focus: { state: string; title: string; endAt: number | null; seconds: number; note: string }
+  focus: { mode?: 'pomodoro' | 'stopwatch'; state: string; title: string; endAt: number | null; seconds: number; note: string }
   water: { enabled: boolean; nextAt: number | null; count: number }
 }
 export function plainText(doc: unknown, depth = 0): string {

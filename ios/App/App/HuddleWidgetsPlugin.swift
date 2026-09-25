@@ -20,7 +20,8 @@ public class HuddleWidgetsPlugin: CAPPlugin, CAPBridgedPlugin {
         Task { @MainActor in
             let state=WidgetStore.read()
             guard state["accountId"] as? String == owner,state["epoch"] as? String == epoch else{return}
-            let running=focus["state"] as? String == "running",paused=focus["state"] as? String == "paused"
+            let countdown=focus["mode"] as? String == "pomodoro"
+            let running=countdown && focus["state"] as? String == "running",paused=countdown && focus["state"] as? String == "paused"
             for activity in Activity<FocusActivity>.activities where activity.attributes.accountId != owner || activity.attributes.epoch != epoch || (!running && !paused) {await activity.end(nil,dismissalPolicy:.immediate)}
             guard running || paused else{return}
             let seconds=focus["seconds"] as? Int ?? 0

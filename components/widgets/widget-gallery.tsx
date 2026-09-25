@@ -40,7 +40,7 @@ function GalleryFrame({data,onOpen,onComplete,onAction,live=false,onMode,childre
     <p className={styles.notice}>{live?'目前使用你的資料；內容編輯會儲存至原本的工作區。':'互動預覽 · 以下皆為示範資料，不會改動你的任務。'}</p>
     {children}
     {filter==='all'?<><div className={styles.composition}>{([{title:'月曆與今日任務',kinds:['overview']},{title:'隨手記・三個入口',kinds:['shortcuts','whiteboard','notebook']},{title:'專注記事與任務',kinds:['focus-note','tasks']}] as {title:string;kinds:WidgetKind[]}[]).map(group=><section className={styles.collection} key={group.title}><h2 className={styles.collectionTitle}>{group.title}</h2><div className={styles.stack}>{group.kinds.map(kind=><WidgetCard key={kind} kind={kind} data={data} size={size} onOpen={onOpen} onComplete={onComplete} onAction={onAction}/>)}</div></section>)}</div><h2 className={styles.moreTitle}>更多陪你安排日常的小工具</h2><div className={styles.grid}>{(['calendar','agenda','top-three','focus','water'] as WidgetKind[]).map(kind=><WidgetCard key={kind} kind={kind} data={data} size={size} onOpen={onOpen} onComplete={onComplete} onAction={onAction}/>)}</div></>:<div className={styles.grid}><WidgetCard kind={filter as WidgetKind} data={data} size={size} onOpen={onOpen} onComplete={onComplete} onAction={onAction}/></div>}
-    <p className={styles.hint}>這是小工具的互動預覽與設定入口。手機主畫面需要安裝含原生小工具的 Huddle App，再長按主畫面加入。內容更新受系統排程影響；筆記與白板的完整編輯會在 App 中開啟。鎖定畫面只顯示安全摘要。</p>
+    <p className={styles.hint}>這是小工具的互動預覽與設定入口。手機主畫面版本仍在開發與實機驗收中，目前尚未提供可安裝版本。內容更新受系統排程影響；筆記與白板的完整編輯會在 App 中開啟。鎖定畫面只顯示安全摘要。</p>
   </main>
 }
 function DemoGallery({onLive}:{onLive?:()=>void}) {
@@ -61,7 +61,9 @@ function LiveGallery({onDemo}:{onDemo:()=>void}) {
   const {user}=useAuth(), board=useWaddleData(), notebook=useNotebook(),timer=useFocusTimer(),water=useWaterReminder(),router=useRouter()
   const [boardDate,setBoardDate]=useState<string|undefined>(),[whiteboard,setWhiteboard]=useState(false),[noteId,setNoteId]=useState<string|null>(null),[message,setMessage]=useState('')
   const tasks=useMemo(()=>board.workspaces.filter(w=>!w.isArchived).flatMap(w=>w.categories.filter(c=>!c.isArchived).flatMap(c=>c.tasks)),[board.workspaces])
-  const data=makeSnapshot({accountId:user!.id,epoch:'',tasks,blocks:board.timeBlocks,boards:board.scratchpadByDate,notes:notebook.notes})
+  const today=new Date().toDateString()
+  const baseData=useMemo(()=>makeSnapshot({accountId:user!.id,epoch:'',tasks,blocks:board.timeBlocks,boards:board.scratchpadByDate,notes:notebook.notes}),[user!.id,tasks,board.timeBlocks,board.scratchpadByDate,notebook.notes,today])
+  const data={...baseData}
   data.focus={state:timer.state,title:timer.session?.label??'慢慢來，先專心一件事',seconds:timer.displayTime,endAt:null,note:focusNoteExcerpt(notebook.notes,data.today,timer.session?.label)}
   data.water={enabled:getWaterReminderEnabled(),nextAt:getWaterNextDueAt(),count:0}
   const open=(kind:WidgetKind,id?:string,date?:string)=>{
@@ -95,7 +97,7 @@ function LiveGallery({onDemo}:{onDemo:()=>void}) {
   return <GalleryFrame data={data} live onMode={onDemo} onOpen={open} onAction={action} onComplete={id=>void board.toggleTaskComplete(id)}>
     {isNative()&&<WidgetSync notes={notebook.notes} workspaces={board.workspaces} timeBlocks={board.timeBlocks} boards={board.scratchpadByDate}/>}
     <p role="status">{message}</p>
-    {isNative()&&<button className={styles.primary} onClick={()=>void enableWidgetReminders(user!.id).then(ok=>{setMessage(ok?'背景專注與喝水提醒已啟用':'尚未允許通知，請至系統設定開啟');window.dispatchEvent(new Event('focus'))})}>啟用背景提醒</button>}
+    {isNative()&&<button className={styles.primary} onClick={()=>void enableWidgetReminders(user!.id).then(ok=>{setMessage(ok?'背景專注與喝水提醒已啟用':'尚未允許通知，請至系統設定開啟');window.dispatchEvent(new Event('huddle-widget-refresh'))})}>啟用背景提醒</button>}
     {whiteboard&&<FocusScratchpad initialDate={boardDate} isOpen onOpenChange={setWhiteboard} scratchpadByDate={board.scratchpadByDate} onAddItem={board.addScratchpadItem} onUpdateItem={board.updateScratchpadItem} onDeleteItem={board.deleteScratchpadItem} onReorderItems={board.reorderScratchpadItems} onClearDate={board.clearScratchpadDate}/>}
     {note&&<section className={styles.detail}><button onClick={()=>setNoteId(null)}>返回小工具</button><span role="status">{notebook.saveStatus==='error'?'儲存失敗，請保留內容並重試':notebook.saveStatus==='saving'?'儲存中…':'記事本'}</span><NoteEditor note={note} onTitleChange={title=>notebook.renameNote(note.id,title)} onContentChange={content=>notebook.saveNoteContent(note.id,content)} uploadImage={notebook.uploadImage}/></section>}
   </GalleryFrame>
