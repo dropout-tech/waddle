@@ -82,6 +82,7 @@ function TaskBlockImpl({
   const showCategoryPrefix = useShowCategoryPrefix()
   const displayColor = useDisplayColor()
   const displayTitle = taskDisplayTitle(task, showCategoryPrefix)
+  const readOnlyMeeting = task.id.startsWith('meeting:')
   const occurrenceDate = date ?? task.scheduledDate
   if (!task.scheduledStartTime || !task.scheduledEndTime) return null
 
@@ -103,6 +104,7 @@ function TaskBlockImpl({
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
+    if (readOnlyMeeting) return
     if (!task.isCompleted) {
       setBurst(true)
       window.setTimeout(() => setBurst(false), 700)
@@ -129,7 +131,7 @@ function TaskBlockImpl({
     e: { clientX: number; clientY: number },
     dragType: TaskDragType,
   ) => {
-    if (!onDragStart) return
+    if (!onDragStart || readOnlyMeeting) return
     const blockEl = document.querySelector<HTMLElement>(`[data-task-block-id="${task.id}"]`)
     const blockRect = blockEl?.getBoundingClientRect()
     const offsetY = blockRect ? e.clientY - blockRect.top : 0
@@ -145,6 +147,7 @@ function TaskBlockImpl({
   }
 
   const handleBodyPointerDown = (e: React.PointerEvent) => {
+    if (readOnlyMeeting) { e.stopPropagation(); pressOrigin.current = { x: e.clientX, y: e.clientY, t: Date.now() }; return }
     if (!onDragStart) return
     if (e.button !== 0 && e.pointerType === 'mouse') return
     e.stopPropagation()
@@ -367,13 +370,13 @@ function TaskBlockImpl({
           block into the empty gap above it, for a 32px effective reach.
           Disabled on desktop (md:before:content-none) where hover reveals
           the thin 8px (h-2) handle instead. */}
-      <div
+      {!readOnlyMeeting && <div
         className="absolute top-0 left-0 right-0 h-6 md:h-2 z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity before:content-[''] before:absolute before:inset-x-0 before:-top-2 before:h-8 md:before:content-none"
         onPointerDown={handleResizeTopPointerDown}
         style={{ touchAction: 'none' }}
       >
         <div className="w-6 h-0.5 bg-white/60 rounded-full" />
-      </div>
+      </div>}
 
       {/* Block body — drag to move, click to open detail.
           Short blocks (≤45px ≈ 45-min @ default hourHeight) drop the time
@@ -393,12 +396,12 @@ function TaskBlockImpl({
         )}
         onPointerDown={handleBodyPointerDown}
         onPointerUp={handleBodyPointerUp}
-        style={{ touchAction: 'none' }}
+        style={{ touchAction: readOnlyMeeting ? 'pan-y' : 'none' }}
         title={`${displayTitle} · ${formatTime(task.scheduledStartTime!)}–${formatTime(task.scheduledEndTime!)}`}
       >
         {/* Top Row: Checkbox + Title */}
         <div className={cn('flex min-w-0', totalColumns > 1 ? 'items-start gap-1' : 'items-start gap-1.5')}>
-          <div className="relative flex-shrink-0">
+          <div className="relative flex-shrink-0" style={readOnlyMeeting ? { display: 'none' } : undefined}>
             <div
               role="checkbox"
               aria-checked={task.isCompleted}
@@ -518,20 +521,20 @@ function TaskBlockImpl({
       )}
 
       {/* Grip icon — shows on hover (desktop) / always (mobile) to teach draggability */}
-      <div className="absolute top-1/2 right-1 -translate-y-1/2 opacity-30 md:opacity-0 md:group-hover:opacity-40 transition-opacity pointer-events-none">
+      {!readOnlyMeeting && <div className="absolute top-1/2 right-1 -translate-y-1/2 opacity-30 md:opacity-0 md:group-hover:opacity-40 transition-opacity pointer-events-none">
         <GripVertical className="w-3 h-3 text-white" />
-      </div>
+      </div>}
 
       {/* Resize handle — BOTTOM. Same mobile sizing as TOP, mirrored: the
           invisible ::before extends 8px downward into the gap below the
           block instead of upward. */}
-      <div
+      {!readOnlyMeeting && <div
         className="absolute bottom-0 left-0 right-0 h-6 md:h-2 z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity before:content-[''] before:absolute before:inset-x-0 before:-bottom-2 before:h-8 md:before:content-none"
         onPointerDown={handleResizeBottomPointerDown}
         style={{ touchAction: 'none' }}
       >
         <div className="w-6 h-0.5 bg-white/60 rounded-full" />
-      </div>
+      </div>}
     </div>
   )
 }
