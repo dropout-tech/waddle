@@ -30,10 +30,16 @@ import { normalizePet, type PetSettings } from '@/lib/pet/types'
 // Aliased: this file uses `t` pervasively as the loop variable for "task"
 // (c.tasks.map((t) => ...)), so importing the translator as `t` would shadow it.
 import { t as translate, getLang } from '@/lib/i18n'
+import {
+  listAssignments,
+  toTaskAssignment,
+  ASSIGNMENTS_CHANGED_EVENT,
+} from '@/lib/assignments'
 import type {
   Workspace,
   Category,
   Task,
+  TaskAssignment,
   TimeBlock,
   UserSettings,
   ScratchpadItem,
@@ -53,6 +59,8 @@ import type {
 
 /** PGRST204 = "column not found in schema cache". 42703 = "undefined column". */
 const MISSING_COL_CODES = new Set(['PGRST204', '42703'])
+/** Accent for the synthetic "指派給我" group (assigned tasks aren't in my workspaces). */
+const ASSIGNED_WORKSPACE_COLOR = '#7C8DB5'
 
 /** 23505 = unique_violation. Task ids are client-generated UUIDs, so a
  * duplicate-key error on insert always means "this exact row was already
@@ -165,6 +173,8 @@ type ScratchpadUpdate = Database['public']['Tables']['scratchpad_items']['Update
 
 interface UseWaddleData {
   workspaces: Workspace[]
+  /** Tasks other people assigned to me (their rows; see migration 20260927120000). */
+  assignedTasks: Task[]
   timeBlocks: TimeBlock[]
   settings: UserSettings
   isLoading: boolean
@@ -246,6 +256,11 @@ interface UseWaddleData {
 export function useWaddleData(): UseWaddleData {
   const supabase = useMemo(() => createClient(), [])
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  // Tasks owned by someone else and assigned to me. Kept OUT of the
+  // workspace tree: their workspace/category ids belong to the assigner, and
+  // every workspace/category mutation path assumes ownership.
+  const [assignedTasks, setAssignedTasks] = useState<Task[]>([])
+  const assignedTasksRef = useRef<Task[]>([])
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([])
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
   // Latest pet + notifications, readable from callbacks without re-creating
@@ -406,12 +421,48 @@ export function useWaddleData(): UseWaddleData {
       const wsById = new Map(wsRows?.map((w) => [w.id, w]) ?? [])
       const catById = new Map(catRows?.map((c) => [c.id, c]) ?? [])
 
+      // Assignment decoration (migration 20260927120000). Only fetched when
+      // some row is actually assigned, so accounts not using the feature (and
+      // databases where the migration isn't applied yet — no assignee_id
+      // column in the rows) pay no extra round trip.
+      const assignmentById = new Map<string, TaskAssignment>()
+      if ((taskRows ?? []).some((r) => r.assignee_id || r.user_id !== user.id)) {
+        try {
+          for (const rec of await listAssignments()) assignmentById.set(rec.taskId, toTaskAssignment(rec))
+        } catch (err) {
+          console.warn('[assignments] list failed', err)
+        }
+      }
+      const fallbackAssignment = (row: NonNullable<typeof taskRows>[number], mine: boolean): TaskAssignment | undefined => {
+        if (!row.assignee_id || !row.assignment_status) return undefined
+        return {
+          role: mine ? 'assigner' : 'assignee',
+          peerId: mine ? row.assignee_id : row.user_id,
+          peerName: translate('Huddle 使用者'),
+          status: row.assignment_status,
+          returnNote: row.return_note ?? undefined,
+          organizationId: row.organization_id ?? undefined,
+          assignedAt: row.assigned_at ?? undefined,
+        }
+      }
+
       const tasksByCategory = new Map<string, Task[]>()
+      const builtAssigned: Task[] = []
       for (const t of taskRows ?? []) {
+        if (t.user_id !== user.id) {
+          // Visible only through tasks_select_assignee: assigned to me.
+          const assignment = assignmentById.get(t.id) ?? fallbackAssignment(t, false)
+          if (!assignment) continue
+          const task = rowToTask(t, translate('指派給我'), ASSIGNED_WORKSPACE_COLOR, translate('來自 {name}', { name: assignment.peerName }))
+          builtAssigned.push({ ...task, assignment })
+          continue
+        }
         const ws = wsById.get(t.workspace_id)
         const cat = catById.get(t.category_id)
         if (!ws || !cat) continue
         const task = rowToTask(t, ws.name, ws.color, cat.name)
+        const assignment = assignmentById.get(t.id) ?? fallbackAssignment(t, true)
+        if (assignment) task.assignment = assignment
         const arr = tasksByCategory.get(t.category_id) ?? []
         arr.push(task)
         tasksByCategory.set(t.category_id, arr)
@@ -671,6 +722,8 @@ export function useWaddleData(): UseWaddleData {
 
       if (isStale()) return
       setWorkspaces(builtWorkspaces)
+      assignedTasksRef.current = builtAssigned
+      setAssignedTasks(builtAssigned)
       setTimeBlocks(builtTimeBlocks)
       petRef.current = builtSettings.pet
       notificationsRef.current = builtSettings.notifications
@@ -722,7 +775,9 @@ export function useWaddleData(): UseWaddleData {
     }
     window.addEventListener('huddle:tasks-imported', afterExternalWrite)
     window.addEventListener('huddle-widget-synced', afterExternalWrite)
+    window.addEventListener(ASSIGNMENTS_CHANGED_EVENT, afterExternalWrite)
     return () => {
+      window.removeEventListener(ASSIGNMENTS_CHANGED_EVENT, afterExternalWrite)
       document.removeEventListener('visibilitychange', tryRefetch)
       window.removeEventListener('focus', tryRefetch)
       window.removeEventListener('huddle:tasks-imported', afterExternalWrite)
@@ -742,6 +797,45 @@ export function useWaddleData(): UseWaddleData {
     console.error(`[${op}]`, err)
     toast.error(translate('儲存失敗：{op}', { op: translate(op) }))
   }
+
+  // ─── Assigned-to-me tasks ────────────────────────────
+  // The assignee may only change these fields (DB trigger
+  // tasks_assignment_guard enforces the same whitelist); anything else in
+  // `updates` is dropped here instead of failing the whole write.
+  const isAssignedToMe = (taskId: string) => assignedTasksRef.current.some((x) => x.id === taskId)
+  // Stable (refs + supabase only) so it can sit in the mutation callbacks' deps.
+  const patchAssignedTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
+    const before = assignedTasksRef.current.find((x) => x.id === taskId)
+    if (!before) return
+    const allowed: Partial<Task> = {}
+    const row: Database['public']['Tables']['tasks']['Update'] = {}
+    if ('isCompleted' in updates && updates.isCompleted !== undefined) {
+      allowed.isCompleted = updates.isCompleted
+      row.is_completed = updates.isCompleted
+      allowed.completedAt = updates.isCompleted ? (updates.completedAt ?? new Date().toISOString()) : undefined
+      row.completed_at = allowed.completedAt ?? null
+    }
+    if ('actualMinutes' in updates) { allowed.actualMinutes = updates.actualMinutes; row.actual_minutes = updates.actualMinutes ?? null }
+    if ('scheduledDate' in updates) { allowed.scheduledDate = updates.scheduledDate; row.scheduled_date = updates.scheduledDate || null }
+    if ('scheduledStartTime' in updates) { allowed.scheduledStartTime = updates.scheduledStartTime; row.scheduled_start_time = updates.scheduledStartTime || null }
+    if ('scheduledEndTime' in updates) { allowed.scheduledEndTime = updates.scheduledEndTime; row.scheduled_end_time = updates.scheduledEndTime || null }
+    if (Object.keys(row).length === 0) return
+    const apply = (next: Task[]) => { assignedTasksRef.current = next; setAssignedTasks(next) }
+    apply(assignedTasksRef.current.map((x) => x.id === taskId ? { ...x, ...allowed, updatedAt: new Date().toISOString() } : x))
+    if (allowed.isCompleted && !before.isCompleted) { playTaskCompleteSound(); hapticTaskComplete() }
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
+    try {
+      const { data, error } = await supabase.from('tasks').update(row).eq('id', taskId).select('id')
+      if (error || !data || data.length === 0) {
+        // 0 rows = assignment was withdrawn/returned meanwhile.
+        apply(assignedTasksRef.current.map((x) => x.id === taskId ? before : x))
+        if (error) handleDbError('更新任務')(error)
+        else toast.error(translate('這個任務已被取消指派'))
+      }
+    } finally {
+      pendingWritesRef.current -= 1
+    }
+  }, [supabase])
 
   // ═════════════════════════════════════════════════════
   // Workspace mutations
@@ -1227,6 +1321,7 @@ export function useWaddleData(): UseWaddleData {
     targetDate?: string,
     recordUndo: boolean = true
   ) => {
+    if (isAssignedToMe(taskId)) return patchAssignedTask(taskId, updates)
     // Don't outrace this task's own INSERT (see pendingTaskCreatesRef).
     await pendingTaskCreatesRef.current[taskId]
     // Find the task in local state via ref so the callback doesn't need
@@ -1465,9 +1560,11 @@ export function useWaddleData(): UseWaddleData {
         pendingWritesRef.current -= 1
       }
     }
-  }, [supabase])
+  }, [supabase, patchAssignedTask])
 
   const toggleTaskComplete = useCallback(async (taskId: string, recordUndo: boolean = true) => {
+    const assigned = assignedTasksRef.current.find((x) => x.id === taskId)
+    if (assigned) return patchAssignedTask(taskId, { isCompleted: !assigned.isCompleted })
     // Capture the previous state so we can roll back on a silent failure.
     let previousCompleted: boolean | undefined
     let previousCompletedAt: string | undefined
@@ -1605,14 +1702,16 @@ export function useWaddleData(): UseWaddleData {
         redo: () => toggleTaskComplete(taskId, false),
       })
     }
-  }, [supabase])
+  }, [supabase, patchAssignedTask])
 
   const completeTasks = useCallback(async (
     taskIds: string[],
     nextValue: boolean = true,
     recordUndo: boolean = true,
   ) => {
-    const uniqueIds = [...new Set(taskIds)]
+    const assignedIds = taskIds.filter(isAssignedToMe)
+    for (const id of new Set(assignedIds)) void patchAssignedTask(id, { isCompleted: nextValue })
+    const uniqueIds = [...new Set(taskIds.filter((id) => !isAssignedToMe(id)))]
     if (uniqueIds.length === 0) return
 
     await Promise.all(uniqueIds.map((id) => pendingTaskCreatesRef.current[id]))
@@ -1675,9 +1774,14 @@ export function useWaddleData(): UseWaddleData {
     } finally {
       pendingWritesRef.current -= 1
     }
-  }, [supabase])
+  }, [supabase, patchAssignedTask])
 
   const deleteTask = useCallback(async (taskId: string, targetDate?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, recordUndo: boolean = true) => {
+    if (isAssignedToMe(taskId)) {
+      // No delete right for assignees (no RLS policy); returning is the way out.
+      toast.error(translate('被指派的任務無法刪除，可以改用「退回」'))
+      return
+    }
     // Don't outrace this task's own INSERT (see pendingTaskCreatesRef).
     await pendingTaskCreatesRef.current[taskId]
     // Find the task in local state via ref so this callback is stable.
@@ -1978,6 +2082,14 @@ export function useWaddleData(): UseWaddleData {
     targetDate?: string,
     recordUndo: boolean = true
   ) => {
+    const assigned = assignedTasksRef.current.find((x) => x.id === taskId)
+    if (assigned) {
+      return patchAssignedTask(taskId, {
+        scheduledDate: date ?? assigned.scheduledDate,
+        scheduledStartTime: startTime,
+        scheduledEndTime: endTime,
+      })
+    }
     // Don't outrace this task's own INSERT (see pendingTaskCreatesRef) —
     // "create a task inline → immediately drag it onto the calendar" would
     // otherwise lose the schedule silently (this UPDATE has no row-count
@@ -2225,7 +2337,7 @@ export function useWaddleData(): UseWaddleData {
         pendingWritesRef.current -= 1
       }
     }
-  }, [supabase])
+  }, [supabase, patchAssignedTask])
 
   const unscheduleTask = useCallback(async (
     taskId: string,
@@ -2236,6 +2348,9 @@ export function useWaddleData(): UseWaddleData {
     // future call sites can opt out of redundant recording when needed.
     _recordUndo: boolean = true
   ) => {
+    if (isAssignedToMe(taskId)) {
+      return patchAssignedTask(taskId, { scheduledStartTime: undefined, scheduledEndTime: undefined, scheduledDate: date ?? undefined })
+    }
     // Don't outrace this task's own INSERT (see pendingTaskCreatesRef).
     await pendingTaskCreatesRef.current[taskId]
     // Find the task via ref to stay decoupled from `workspaces`.
@@ -2436,7 +2551,7 @@ export function useWaddleData(): UseWaddleData {
         pendingWritesRef.current -= 1
       }
     }
-  }, [supabase])
+  }, [supabase, patchAssignedTask])
 
   // ═════════════════════════════════════════════════════
   // Time-block mutations
@@ -3222,6 +3337,7 @@ export function useWaddleData(): UseWaddleData {
 
   return {
     workspaces,
+    assignedTasks,
     timeBlocks,
     settings,
     isLoading,

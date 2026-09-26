@@ -3,6 +3,7 @@
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, Clock, Calendar, MessageSquare, Timer, AlertCircle, GripVertical, Trash2, Users } from 'lucide-react'
+import { TaskAssignmentChip } from '@/components/assignments/task-assign-section'
 import { cn, haptic } from '@/lib/utils'
 import type { Task } from '@/lib/types'
 import { getUrgencyColor, formatEstimatedTime } from '@/lib/task-utils'
@@ -535,6 +536,7 @@ function TaskRowImpl({
           >
             {displayTitle}
           </span>
+          <TaskAssignmentChip task={task} />
 
           {/* Time (if any) — prefixed with M/D when the task has a date */}
           {task.scheduledStartTime && (
@@ -670,6 +672,7 @@ function TaskRowImpl({
             )}>
               {displayTitle}
             </span>
+            <TaskAssignmentChip task={task} />
 
             {/* Status / Urgency badge */}
             <span

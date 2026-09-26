@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from './auth-provider'
 import { pendingMeetingPath } from '@/lib/auth/meeting-return'
 import { PENDING_SHARE_INVITE_KEY } from '@/hooks/use-calendar-sharing'
+import { pendingOrgInvitePath } from '@/lib/assignments'
 
 /**
  * Rendered inside the (auth) layout. Sends already-logged-in users away from
@@ -24,7 +25,7 @@ export function RedirectIfAuthed() {
     if (!loading && session) {
       let pendingInvite: string | null = null
       try { pendingInvite = window.sessionStorage.getItem(PENDING_SHARE_INVITE_KEY) } catch { /* Storage can be unavailable in private browsers. */ }
-      router.replace(pendingMeetingPath() || (pendingInvite ? '/share/invite' : '/'))
+      router.replace(pendingMeetingPath() || pendingOrgInvitePath() || (pendingInvite ? '/share/invite' : '/'))
     }
   }, [loading, session, router])
 

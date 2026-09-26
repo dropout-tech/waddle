@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils'
 import { AccountRegistrationDate } from '@/components/auth/account-registration-date'
 import { useI18n } from '@/lib/i18n/react'
 import { useStickyNotesToggle } from '@/components/sticky-notes/sticky-notes-provider'
+import { listAssignments } from '@/lib/assignments'
+import { Building2, ClipboardList } from 'lucide-react'
 
 interface SessionInfo {
   email: string
@@ -84,6 +86,19 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
     }).catch(() => { /* Retain incumbent account menu until operations is enabled. */ })
     return () => { cancelled = true }
   }, [])
+
+  // Assignment count (to-do assigned to me + my returned tasks). Fetched only
+  // when the menu opens, so closed-menu page loads cost nothing.
+  const [assignmentCount, setAssignmentCount] = useState(0)
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    listAssignments().then((rows) => {
+      if (cancelled) return
+      setAssignmentCount(rows.filter((a) => (a.role === 'assignee' && !a.isCompleted) || (a.role === 'assigner' && a.status === 'returned')).length)
+    }).catch(() => { /* feature not enabled yet — keep 0 */ })
+    return () => { cancelled = true }
+  }, [open])
 
   // Close on outside click
   useEffect(() => {
@@ -194,8 +209,21 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
             className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
             role="menuitem"
           >
-            <FileText className="w-4 h-4" />
-            <span>{t('待接受指派')}</span>
+            <ClipboardList className="w-4 h-4" />
+            <span className="flex-1 text-left">{t('指派任務')}</span>
+            {assignmentCount > 0 && (
+              <span data-testid="assignment-count" className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+                {assignmentCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => { setOpen(false); router.push('/org') }}
+            className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+            role="menuitem"
+          >
+            <Building2 className="w-4 h-4" />
+            <span>{t('組織')}</span>
           </button>
 
           <button

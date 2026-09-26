@@ -38,6 +38,7 @@ function HuddlePage() {
   const { t } = useI18n()
   const {
     workspaces,
+    assignedTasks,
     timeBlocks,
     settings,
     isLoading,
@@ -136,8 +137,10 @@ function HuddlePage() {
   const liveSelectedTask = useMemo<Task | null>(() => {
     if (!selectedTask) return null
     if (taskMode === 'create') return selectedTask
-    return findTaskById(workspaces, selectedTask.id) ?? selectedTask
-  }, [selectedTask, workspaces, taskMode])
+    return findTaskById(workspaces, selectedTask.id)
+      ?? assignedTasks.find((x) => x.id === selectedTask.id)
+      ?? selectedTask
+  }, [selectedTask, workspaces, assignedTasks, taskMode])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('general')
   const [isOverdueReviewOpen, setIsOverdueReviewOpen] = useState(false)
@@ -476,6 +479,7 @@ function HuddlePage() {
       {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} />}
       <MainLayout
         workspaces={workspaces}
+        assignedTasks={assignedTasks}
         timeBlocks={timeBlocks}
         slotTypes={activeSlotTypes}
         settings={settings}
