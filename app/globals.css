@@ -63,6 +63,13 @@
   --workspace-2: oklch(0.65 0.12 230);
   --workspace-3: oklch(0.7 0.12 155);
   --workspace-4: oklch(0.72 0.1 300);
+
+  /* Sticky note paper colors — warm hues only (25-155), matching the
+     "淡黃、淡綠、淡桃色便條紙" callout in DESIGN.md's widget-preview section. */
+  --sticky-yellow: oklch(0.93 0.05 95);
+  --sticky-sage: oklch(0.92 0.045 145);
+  --sticky-rose: oklch(0.91 0.05 25);
+  --sticky-cream: oklch(0.97 0.012 85);
   
   /* Calendar */
   --calendar-grid: oklch(0.94 0.008 85);
@@ -134,6 +141,12 @@
   --workspace-2: oklch(0.68 0.12 230);
   --workspace-3: oklch(0.72 0.12 155);
   --workspace-4: oklch(0.74 0.1 300);
+
+  /* Sticky notes — darker paper, still warm (never pure black/gray). */
+  --sticky-yellow: oklch(0.4 0.05 95);
+  --sticky-sage: oklch(0.38 0.045 145);
+  --sticky-rose: oklch(0.38 0.05 25);
+  --sticky-cream: oklch(0.3 0.02 85);
 
   --calendar-grid: oklch(0.28 0.015 55);
   --calendar-grid-subtle: oklch(0.24 0.012 55);
@@ -776,6 +789,35 @@
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/* ------------------------------------------------------------
+ * Sticky notes (便條紙) — freeform glass-pane overlay shown on every page.
+ * Cards reuse .nb-prose for their body text; this just adds the paper
+ * chrome (color, slight hand-drawn tilt, drag/resize affordances).
+ * ------------------------------------------------------------ */
+.sticky-note {
+  box-shadow: var(--shadow-ceramic);
+  border: 1px solid oklch(0.28 0.025 55 / 0.08);
+}
+.sticky-note[data-color='yellow'] { background: var(--sticky-yellow); }
+.sticky-note[data-color='sage']   { background: var(--sticky-sage); }
+.sticky-note[data-color='rose']   { background: var(--sticky-rose); }
+.sticky-note[data-color='cream']  { background: var(--sticky-cream); }
+
+.sticky-note .nb-prose {
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sticky-note { transition: transform 150ms var(--ease-quart), box-shadow 150ms var(--ease-quart); }
+}
+.sticky-note.is-dragging,
+.sticky-note.is-resizing {
+  box-shadow:
+    0 2px 4px oklch(0.28 0.025 55 / 0.08),
+    0 20px 44px -16px oklch(0.28 0.025 55 / 0.22);
 }
 
 /* Existing macOS Electron builds use hiddenInset: the native window controls
