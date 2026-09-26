@@ -100,7 +100,10 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
       {/* Backdrop — same z-stacking as scratchpad so the two never fight
           over the screen. Subtle blur + dark wash so the panel reads as
           a foreground surface. */}
-      {isExpanded && (
+      {/* Desktop only: on phones (hideTrigger) the sheet fills the screen
+          above the tab bar, and this full-viewport backdrop sat on top of
+          the tab bar - blurred and unclickable (owner report 2026-09-26). */}
+      {isExpanded && !hideTrigger && (
         <div
           className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-popover"
           onClick={() => setExpanded(false)}
@@ -149,6 +152,7 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
               the bottom tab bar (58 px). translate-y handles the slide. */}
         <div
           ref={panelRef}
+          data-sheet-above-tabbar={hideTrigger ? '' : undefined}
           className={cn(
             hideTrigger
               ? cn(
@@ -172,7 +176,7 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
                   // clear the status bar itself, and it ends above the tab
                   // bar, which is 58px + the home-indicator inset tall.
                   paddingTop: 'env(safe-area-inset-top)',
-                  bottom: 'calc(58px + env(safe-area-inset-bottom))',
+                  bottom: 'var(--sheet-bottom, calc(58px + env(safe-area-inset-bottom)))',
                   // Mirror of scratchpad's offset: translate-y-full only
                   // shifts by the element's own height. With top:0
                   // bottom:58 the height is (100dvh − 58), so a plain
