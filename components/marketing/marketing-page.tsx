@@ -64,6 +64,10 @@ const copy = {
   },
 } as const
 
+// Art-direction sample illustrations (public/art/), used only under html[data-art].
+const ART_PILLARS = ['feature-tasks', 'feature-calendar', 'empty-tasks']
+const ART_ROWS = ['feature-meeting', 'empty-calendar', 'empty-notes']
+
 export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
   const t = copy[locale]
   const en = locale === 'en'
@@ -82,7 +86,9 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       </header>
 
       <section className={styles.hero} aria-labelledby="hero-title">
-        <Image src="/marketing/hero-desk-art.webp" alt="" fill priority sizes="100vw" className={styles.heroArt} />
+        <Image src="/marketing/hero-desk-art.webp" alt="" fill priority sizes="100vw" className={`art-hide ${styles.heroArt}`} />
+        {/* Art-direction sample (html[data-art] only; lazy + display:none = never fetched otherwise) */}
+        <picture className={`art-only ${styles.artHero}`}><source media="(max-width: 760px)" srcSet="/art/hero-mobile.jpg" /><img src="/art/hero-desk.jpg" alt="" loading="lazy" /></picture>
         <div className={styles.heroCopy}>
           <h1 id="hero-title">{en ? t.headline : <>慢慢搖擺，<wbr />把事情做完。</>}</h1>
           <p>{t.sub}</p>
@@ -95,12 +101,12 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       </section>
 
       <section id="features" className={styles.pillars} aria-label={en ? 'What Huddle brings together' : 'Huddle 的三個重點'}>
-        {[CheckSquare2, CalendarDays, NotebookPen].map((Icon, i) => <article key={i}><Icon size={32} strokeWidth={1.7} aria-hidden="true" /><div><h2>{t.pillars[i][0]}</h2><p>{t.pillars[i][1]}</p></div></article>)}
+        {[CheckSquare2, CalendarDays, NotebookPen].map((Icon, i) => <article key={i}><Icon size={32} strokeWidth={1.7} aria-hidden="true" className="art-hide" /><img src={`/art/${ART_PILLARS[i]}.jpg`} alt="" loading="lazy" width={112} height={112} className={`art-only art-illus ${styles.artPillar}`} /><div><h2>{t.pillars[i][0]}</h2><p>{t.pillars[i][1]}</p></div></article>)}
       </section>
 
       <section className={styles.moreFeatures} aria-labelledby="more-title">
         <div className={styles.sectionIntro}><h2 id="more-title">{t.moreTitle}</h2><p>{t.moreIntro}</p></div>
-        <div className={styles.featureRows}>{[Users, CalendarClock, NotebookPen].map((Icon, i) => <article key={t.more[i][0]}><Icon size={30} strokeWidth={1.6} aria-hidden="true" /><div><h3>{t.more[i][0]}</h3></div><p>{t.more[i][1]}</p></article>)}</div>
+        <div className={styles.featureRows}>{[Users, CalendarClock, NotebookPen].map((Icon, i) => <article key={t.more[i][0]}><Icon size={30} strokeWidth={1.6} aria-hidden="true" className="art-hide" /><img src={`/art/${ART_ROWS[i]}.jpg`} alt="" loading="lazy" width={96} height={96} className={`art-only art-illus ${styles.artRow}`} /><div><h3>{t.more[i][0]}</h3></div><p>{t.more[i][1]}</p></article>)}</div>
       </section>
 
       <section className={styles.whiteboard} aria-labelledby="board-title">
@@ -110,7 +116,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
 
       <div id="feature-film" className={styles.film}><FeatureFilm locale={locale} /></div>
 
-      <section className={styles.focus} aria-labelledby="focus-title"><div className={styles.focusCopy}><Timer size={35} strokeWidth={1.6} aria-hidden="true" /><h2 id="focus-title">{t.focusTitle}</h2><p>{t.focusBody}</p><Link href="/login" onClick={() => setLang(en ? 'en' : 'zh-TW')} className={styles.textLink}>{t.focusAction}<ArrowRight size={20} aria-hidden="true" /></Link></div><div className={styles.focusVisual}><Image src="/huddle-mascot.png" width={420} height={420} alt={en ? 'Huddle penguin' : 'Huddle 企鵝'} sizes="(max-width: 760px) 55vw, 28vw" /><span className={styles.handNote}>{en ? 'A little at a time.' : '一步一步，也很好。'}</span></div></section>
+      <section className={styles.focus} aria-labelledby="focus-title"><div className={styles.focusCopy}><Timer size={35} strokeWidth={1.6} aria-hidden="true" /><h2 id="focus-title">{t.focusTitle}</h2><p>{t.focusBody}</p><Link href="/login" onClick={() => setLang(en ? 'en' : 'zh-TW')} className={styles.textLink}>{t.focusAction}<ArrowRight size={20} aria-hidden="true" /></Link></div><div className={styles.focusVisual}><Image src="/huddle-mascot.png" width={420} height={420} alt={en ? 'Huddle penguin' : 'Huddle 企鵝'} sizes="(max-width: 760px) 55vw, 28vw" className="art-hide" /><img src="/art/feature-focus.jpg" alt={en ? 'Huddle penguin holding a focus timer' : 'Huddle 企鵝抱著專注計時環'} loading="lazy" width={420} height={420} className={`art-only art-illus ${styles.artFocus}`} /><span className={styles.handNote}>{en ? 'A little at a time.' : '一步一步，也很好。'}</span></div></section>
 
       <section id="pricing" className={styles.pricing} aria-labelledby="pricing-title"><div className={styles.sectionIntro}><h2 id="pricing-title">{t.priceTitle}</h2><p>{t.priceIntro}</p></div><div className={styles.plans}><article><h3>{t.free}</h3><p className={styles.price}>NT$0</p><p>{t.freeBody}</p><Link href="/signup" onClick={() => setLang(en ? 'en' : 'zh-TW')} className={styles.primary}>{t.start}<ArrowRight size={18} aria-hidden="true" /></Link></article><article className={styles.pro}><h3>Pro <span>{t.soon}</span></h3><p className={styles.price}>NT$149<small>{t.month}</small></p><p className={styles.annual}>{t.year}</p><p>{t.proBody}</p></article></div></section>
 

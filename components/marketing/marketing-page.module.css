@@ -96,3 +96,38 @@
 .featureRows p { font-size: 15px; line-height: 1.9; margin: 0; max-width: 40em; }
 .planned { display: inline-block; font-size: 12px; line-height: 1.6; background: #e8dfc3; padding: 4px 8px; margin-top: 10px; }
 @media(max-width:760px) { .moreFeatures { padding: 55px 6% 0; } .featureRows article { grid-template-columns: 32px 1fr; gap: 12px 18px; padding: 24px 0; } .featureRows p { grid-column: 2; font-size: 14px; } .featureRows h3 { font-size: 21px; } }
+
+/* ── Art-direction SAMPLE (html[data-art]); see app/art-theme.css ───────── */
+.artHero { position: absolute; inset: 0; z-index: -1; }
+.artHero img { width: 100%; height: 100%; object-fit: cover; object-position: right center; display: block; }
+:global(html[data-art]) .hero { background: var(--paper); min-height: min(820px, 58vw); display: flex; align-items: center; padding: 40px 0 60px; }
+:global(html[data-art]) .heroCopy { width: 100%; max-width: 1320px; padding: 0 5%; text-align: left; }
+:global(html[data-art]) .hero h1 { max-width: 8.6em; margin: 0; transform: rotate(-1deg); word-break: keep-all; }
+:global(html[data-art]) .heroCopy > p { margin-left: 0; max-width: 24em; }
+:global(html[data-art]) .heroActions { justify-content: flex-start; }
+/* The illustration replaces the in-hero screenshot (real captures remain in the whiteboard chapter). */
+:global(html[data-art]) .heroProduct { display: none; }
+:global(html[data-art]) .english .hero h1 { max-width: 7em; }
+.artPillar { width: 112px; height: 112px; flex-shrink: 0; margin: -18px 0 -10px -10px; }
+.artRow { width: 96px; height: 96px; margin: -22px 0 0 -18px; }
+:global(html[data-art]) .featureRows article { grid-template-columns: 96px .8fr 1.2fr; }
+.artFocus { width: min(100%, 360px); height: auto; margin: auto; }
+@media(max-width:760px) {
+  /* mobile: art flows under the copy; its empty yellow top tucks behind the text */
+  :global(html[data-art]) .hero { min-height: 0; flex-direction: column; align-items: stretch; padding: 34px 0 0; background: #f4cc4c; }
+  .artHero { position: relative; inset: auto; order: 2; margin-top: -42vw; }
+  .artHero img { height: auto; }
+  :global(html[data-art]) .hero h1 { max-width: none; }
+  .artPillar { width: 84px; height: 84px; margin: -8px 0 0 -8px; }
+  :global(html[data-art]) .featureRows article { grid-template-columns: 64px 1fr; }
+  .artRow { width: 72px; height: 72px; margin: -14px 0 0 -12px; }
+}
+@media(max-width:1000px) and (min-width:761px) { :global(html[data-art]) .hero h1 { font-size: 46px; } }
+
+/* sketch: hand-drawn controls + handwritten display type on the poster */
+:global(html[data-art='sketch']) :is(.hero h1, .chapterCopy h2, .sectionIntro h2, .focus h2, .download h2, .faq > h2, .pillars h2, .featureRows h3, .plans h3) { font-family: var(--font-hand); font-weight: 700; letter-spacing: 0; }
+:global(html[data-art='sketch']) :is(.primary, .login, .tabs button) { border: 1.5px solid var(--ink); border-radius: var(--sketch-r-sm); box-shadow: 2px 3px 0 #292b2433; }
+:global(html[data-art='sketch']) .featureRows article { border-top: 0; background: var(--wavy) 0 0 / 120px 6px repeat-x; }
+:global(html[data-art='sketch']) .faq details { border-bottom: 0; background: var(--wavy) 0 100% / 120px 6px repeat-x; }
+@media(min-width:761px) { :global(html[data-art='sketch']) .pillars article + article { border-left: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='120'%3E%3Cpath d='M3 0 C 1.5 14 4.5 26 3 40 S 1.6 66 3.4 80 S 4.4 104 2.6 120' fill='none' stroke='%23292b24' stroke-opacity='.4' stroke-width='1.3'/%3E%3C/svg%3E") 0 0 / 6px 120px repeat-y; } }
+:global(html[data-art='sketch']) .boardFigure img { border: 1.5px solid var(--ink); border-radius: var(--sketch-r-md); box-shadow: 4px 5px 0 #292b2426; }

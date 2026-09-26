@@ -259,7 +259,9 @@ export function NoteList({
 
       {isFullyEmpty && !addingCategory ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
-          <FileText className="h-8 w-8 text-muted-foreground/40" />
+          <FileText className="art-hide h-8 w-8 text-muted-foreground/40" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/art/empty-notes.jpg" alt="" aria-hidden loading="lazy" width={180} height={180} className="art-only art-illus art-empty-illus art-list-illus" />
           <p className="text-xs text-muted-foreground">{t('還沒有記事')}</p>
           <button
             type="button"
