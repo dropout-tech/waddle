@@ -41,6 +41,7 @@
 .note { position: absolute; left: 0; top: 0; margin: -10px 0 0 -6px; font: 800 20px/1 system-ui, sans-serif; color: #292b24; text-shadow: 0 0 2px #f6f3e9, 0 0 2px #f6f3e9; }
 .roam[data-music] .roamInner { animation: nod .5s ease-in-out infinite alternate; }
 @keyframes nod { from { rotate: -5deg; } to { rotate: 6deg; translate: 0 2px; } }
+.crumb { position: absolute; left: 0; top: 0; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 2px; background: #cf5731; box-shadow: 0 0 0 1px #292b24; }
 .spark { color: #edc747; text-shadow: 0 0 1px #292b24, 0 0 1px #292b24; }
 .bonk { position: absolute; left: 0; top: 0; width: 34px; height: 34px; margin: -17px 0 0 -17px; }
 

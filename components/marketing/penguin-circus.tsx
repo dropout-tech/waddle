@@ -31,7 +31,7 @@ import { useEffect, useRef } from 'react'
 import { isDesktop, isNative } from '@/lib/platform'
 import styles from './penguin-circus.module.css'
 
-export const POSES = ['stand', 'slide', 'fly', 'wave', 'skate', 'sleep', 'carry', 'open', 'chomp', 'full', 'yawn', 'phone', 'flag', 'shades', 'splat', 'music'] as const
+export const POSES = ['stand', 'slide', 'fly', 'wave', 'skate', 'sleep', 'carry', 'happy', 'full', 'stretch', 'phone', 'flag', 'shades', 'splat', 'music'] as const
 type Pose = (typeof POSES)[number]
 const src = (p: Pose) => `/art/penguin/${p}.webp`
 const FACES_RIGHT = new Set<Pose>(['slide', 'fly', 'skate'])
@@ -174,7 +174,7 @@ export function HeroSwarm({ locale = 'zh' }: { locale?: Locale }) {
 
 /* ─────────────────────────── Roaming penguin ─────────────────────────── */
 
-type Stop = { el: HTMLElement; at: number[]; atM?: number[]; pose: Pose; motion?: string; nap: boolean }
+type Stop = { el: HTMLElement; at: number[]; atM?: number[]; pose: Pose; motion?: string; nap: boolean; priority: boolean }
 const parse = (v?: string) => (v ? v.trim().split(/\s+/).map(Number) : undefined)
 
 export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
@@ -205,7 +205,7 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
       const only = mobile() ? 'desktop' : 'mobile'
       stops = Array.from(document.querySelectorAll<HTMLElement>('[data-penguin-stop]')).filter(el => el.dataset.penguinOnly !== only).map(el => ({
         el, at: parse(el.dataset.penguinAt) ?? [0.5, 0.5], atM: parse(el.dataset.penguinAtM),
-        pose: (el.dataset.penguinPose as Pose) || 'stand', motion: el.dataset.penguinMotion, nap: el.dataset.penguinNap !== undefined,
+        pose: (el.dataset.penguinPose as Pose) || 'stand', motion: el.dataset.penguinMotion, nap: el.dataset.penguinNap !== undefined, priority: el.dataset.penguinPriority !== undefined,
       }))
     }
     collect()
@@ -318,10 +318,10 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
         { transform: `translate(${bx - 18}px,${by - 52}px) scale(1.05)`, opacity: 1, offset: 0.62 },
         { transform: `translate(${bx - 18}px,${by - 52}px) scale(1.7)`, opacity: 0 },
       ], { duration: 1150, easing: 'ease-out' }).finished.then(() => b.remove(), () => b.remove())
-      window.setTimeout(() => { holdPose('open', 650); hop(34, 380); say(w.eep) }, 720)
+      window.setTimeout(() => { holdPose('stand', 650); hop(34, 380); say(w.eep) }, 720)
     }
     const IDLES: Array<() => void> = [
-      () => holdPose('yawn', 1500),
+      () => holdPose('stretch', 1500),
       () => holdPose('phone', 2300),
       flagWave, cool, slip, scare,
     ]
@@ -352,7 +352,7 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
         }, 380)
       } else {
         hold.until = 0; busyUntil = performance.now() + 500
-        holdPose('open', 500); hop(24)
+        holdPose('happy', 700); hop(24)
       }
     }
     window.addEventListener('huddle:focus-mode', onFocusMode)
@@ -377,9 +377,10 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
     const gulp = () => {
       const now = performance.now()
       fat = Math.min(4, fat + 1); lastFed = now
-      holdPose('chomp', 620)
-      body.animate([{ transform: 'none' }, { transform: 'translateY(-18px) scale(1.06, .95)', offset: 0.4 }, { transform: 'none' }], { duration: 440, easing: 'ease-out' })
-      burst(x, y - S * 0.9)
+      holdPose('happy', 900)
+      crumbs(x, y - S * 0.5)
+      body.animate([{ transform: 'none' }, { transform: 'translateY(-20px) scale(1.06, .95)', offset: 0.4 }, { transform: 'none' }], { duration: 460, easing: 'ease-out' })
+      burst(x, y - S * 0.95)
       if (fat >= 4) {
         busyUntil = now + 5600
         window.setTimeout(() => { say(w.full); holdPose('full', 2300) }, 620)
@@ -387,13 +388,24 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
         window.setTimeout(() => { fat = 1; lastFed = performance.now() }, 5500)
       } else if (fat === 2 || Math.random() < 0.3) window.setTimeout(() => say(w.burp), 520)
     }
+    // the fish vanishes with a little puff of crumbs and sparkles (the penguin has no mouth)
+    const crumbs = (cx: number, cy: number) => {
+      for (let i = 0; i < 7; i++) {
+        const el = document.createElement('span'); el.className = styles.crumb; fx.appendChild(el)
+        const a = (i / 7) * Math.PI * 2, d = 16 + Math.random() * 16
+        el.animate([
+          { transform: `translate(${cx}px,${cy}px) scale(1)`, opacity: 1 },
+          { transform: `translate(${cx + Math.cos(a) * d}px,${cy + Math.sin(a) * d}px) scale(.4)`, opacity: 0 },
+        ], { duration: 380, easing: 'ease-out' }).finished.then(() => el.remove(), () => el.remove())
+      }
+    }
     const feed = (fromX: number, fromY: number) => {
       busyUntil = performance.now() + 1250
-      holdPose('open', 640)
+      holdPose('stand', 640)
       const el = document.createElement('div'); el.className = styles.fish
       el.innerHTML = '<svg viewBox="0 0 36 24" width="44" height="30" aria-hidden="true"><path d="M3 12c5-8 15-9 22-3l7-6v18l-7-6c-7 6-17 5-22-3z" fill="#cf5731" stroke="#292b24" stroke-width="2.4" stroke-linejoin="round"/><circle cx="10" cy="10.5" r="2" fill="#292b24"/></svg>'
       fx.appendChild(el)
-      const mx = x, my = y - S * 0.6, dx = mx - fromX, dy = my - fromY
+      const mx = x, my = y - S * 0.5, dx = mx - fromX, dy = my - fromY
       const peak = Math.max(110, Math.min(230, Math.hypot(dx, dy) * 0.45 + 90))
       // a click right on the penguin tosses the fish up and over, not in place
       const side = Math.abs(dx) < 50 ? (fromX > window.innerWidth / 2 ? -70 : 70) : 0
@@ -438,7 +450,8 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
         for (const s of stops) {
           const r = s.el.getBoundingClientRect()
           if (!r.height) continue
-          const d = Math.abs(anchor(s, r).y - vh * 0.52)
+          // priority stops (the hammock) win whenever they are fully on screen
+          const d = s.priority && r.top >= 0 && r.bottom <= vh ? -1 : Math.abs(anchor(s, r).y - vh * 0.52)
           if (d < bd) { bd = d; best = s }
         }
         active = best
@@ -614,7 +627,7 @@ export function FocusRing() {
 
 export function Hammock() {
   return (
-    <div className={styles.hammock} data-penguin-stop="hammock" data-penguin-at="0.5 0.78" data-penguin-pose="sleep" data-penguin-nap="" aria-hidden="true">
+    <div className={styles.hammock} data-penguin-stop="hammock" data-penguin-at="0.5 0.78" data-penguin-pose="sleep" data-penguin-nap="" data-penguin-priority="" aria-hidden="true">
       <div className={styles.hammockSwing}>
         <svg viewBox="0 0 190 96" preserveAspectRatio="none">
           <circle cx="6" cy="8" r="5" fill="none" stroke="#292b24" strokeWidth="3" />
