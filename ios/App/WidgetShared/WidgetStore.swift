@@ -4,6 +4,10 @@ import Darwin
 // Shared only by the app and its extension. No tokens or cloud credentials.
 enum WidgetStore {
     static let group = "group.com.lazylazy.huddle"
+    /// False when the App Group entitlement is missing (e.g. a free Personal
+    /// Team signing build) — then neither the app nor the widget can reach
+    /// the shared container and the widget can never receive data.
+    static var isAvailable: Bool { FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) != nil }
     static func transaction<T>(_ body: (inout [String: Any]) throws -> T) throws -> T {
         guard let root = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) else { throw NSError(domain: "HuddleWidgets", code: 1) }
         let lock = open(root.appendingPathComponent("widgets.lock").path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)

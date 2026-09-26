@@ -25,7 +25,7 @@ import { hapticSelection } from '@/lib/haptics'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, ScratchpadItem } from '@/lib/types'
 import { DEFAULT_FOCUS_SETTINGS, type FocusSettings } from '@/lib/focus'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
-import { Link2 } from 'lucide-react'
+import { Link2, Plus } from 'lucide-react'
 import { useI18n } from '@/lib/i18n/react'
 import { GrowthJourneyDashboard } from '@/components/growth/growth-journey-dashboard'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
@@ -131,6 +131,14 @@ export function MainLayout({
 }: MainLayoutProps) {
   const { t, lang } = useI18n()
   const isMobile = useIsMobile()
+  // The signed-in shell is a fixed one-screen app: lock document scrolling
+  // while it is mounted so only inner panels (time grid, lists) scroll and
+  // the header / tab bar can never be dragged. See html.app-shell-locked.
+  useEffect(() => {
+    const root = document.documentElement
+    root.classList.add('app-shell-locked')
+    return () => root.classList.remove('app-shell-locked')
+  }, [])
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day')
@@ -789,6 +797,27 @@ export function MainLayout({
             </nav>
           )
         })()}
+
+        {/* New-task FAB (calendar tab). Stacked above the focus-timer pill
+            (which sits at bottom: 78px + safe area, right-3) so the two
+            never overlap, and clear of the 60px tab bar. Uses the same
+            create flow as tapping empty calendar space: a task is created
+            on the date being viewed and opened in the task editor. */}
+        {focusMode === 'none' && mobileTab === 'calendar' && !mobileScratchpadOpen && !mobileLinksOpen && !mobileFocusBoardOpen && onCreateCalendarTask && (
+          <button
+            type="button"
+            data-tour="mobile-add-task"
+            onClick={() => {
+              hapticSelection()
+              onCreateCalendarTask(toDateString(selectedDate))
+            }}
+            aria-label={t('新增任務')}
+            className="fixed right-3 z-30 flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            style={{ bottom: 'calc(136px + env(safe-area-inset-bottom))' }}
+          >
+            <Plus className="w-6 h-6" aria-hidden="true" />
+          </button>
+        )}
 
         {/* Floating widgets — repositioned for mobile */}
         <FocusTimer

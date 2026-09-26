@@ -149,8 +149,8 @@ export const dict: Record<string, string> = {
     'The list on the left and the calendar on the right are **two views of the same data**. Changes on either side (complete, edit, delete) sync instantly — nothing gets duplicated.',
   "每一天上方那條是「待排程」（有日期沒時間）；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let's Play｜夏令營），一眼看出屬於哪個分類；不想要可在設定關掉。另外在「設定 → 共享」可以邀請夥伴互看行事曆，對方開放的行程會疊加顯示在這裡。":
     "The strip at the top of each day is Unscheduled (has a date, no time); the timeline below is for Scheduled tasks. Tasks on the calendar automatically get tagged with their category (e.g. Let's Play | Summer Camp) so you can tell at a glance — turn it off in Settings if you don't want it. You can also invite a partner in Settings → Sharing to see each other's calendars — whatever they share overlays right here.",
-  '把任務拖到時間軸 = 排時間。從時間軸拖回上方待排程 = 取消時間（日期保留）。每週循環的任務拖到別的時間時，Huddle 會問你：只改這一天、改這天與之後、還是改所有循環 — 像 Google 日曆一樣自由。':
-    'Drag a task onto the timeline to schedule it. Drag it back up to Unscheduled to clear the time (the date stays). Drag a recurring task to a new time and Huddle will ask: just this day, this day and after, or all occurrences — as flexible as Google Calendar.',
+  '把任務拖到時間軸 = 排時間。從時間軸拖回上方待排程 = 取消時間（日期保留）。在時間軸空白處點兩下，就直接在那個時段建立任務。每週循環的任務拖到別的時間時，Huddle 會問你：只改這一天、改這天與之後、還是改所有循環 — 像 Google 日曆一樣自由。':
+    'Drag a task onto the timeline to schedule it. Drag it back up to Unscheduled to clear the time (the date stays). Double-click an empty spot on the timeline to create a task right in that slot. Drag a recurring task to a new time and Huddle will ask: just this day, this day and after, or all occurrences — as flexible as Google Calendar.',
   '看細節用日、週計畫用週、看大局用月。試試看。': 'Day for the details, Week for planning, Month for the big picture. Give it a try.',
   '👉 點看看其他視圖': '👉 Try switching views',
   '挑日期範圍，產出乾淨的 PNG，適合分享到 LINE / IG / Slack。隱私模式可以只顯示時段顏色不洩漏內容。':
@@ -192,8 +192,12 @@ export const dict: Record<string, string> = {
     'Swipe left on the Tasks tab to switch to the calendar. Inside the calendar, swipe left or right to move between yesterday and tomorrow.',
   "上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let's Play｜夏令營）讓你一眼分辨，不想要可在設定關掉。每週循環的任務拖到別的時間時，Huddle 會問「只改這一天 / 之後也改 / 全部改」，像 Google 日曆一樣自由。想跟夥伴互看行事曆？「設定 → 共享」邀請對方就能疊加顯示。":
     "The top shows tasks with a date but no time; the timeline below is for tasks with a scheduled time. Tasks on the calendar automatically get tagged with their category (e.g. Let's Play | Summer Camp) so you can tell them apart at a glance — turn it off in Settings if you don't want it. Drag a recurring task to a new time and Huddle will ask just this day / this day and after / all occurrences — as flexible as Google Calendar. Want to share calendars with a partner? Settings → Sharing — send an invite and their events overlay here.",
-  '上方鈴鐺集中放 Huddle 要跟你說的事：已逾期、快到期、放太久沒動的任務。有事情時會出現數字小標，看完可以逐則關掉。':
-    "The bell up top gathers everything Huddle wants to tell you: overdue, due-soon, and untouched-for-too-long tasks. A number badge shows up when there's something to see, and you can dismiss each one once you've read it.",
+  '通知、帳號都在「⋯」': 'Notifications & account live in “⋯”',
+  '右上角「⋯」收著通知中心、帳號、共享對象與記事本等工具。有新通知時「⋯」會出現數字小標，點開選「通知」查看。':
+    'The “⋯” in the top right holds the notification center, your account, shared calendars, the notebook and more. When something new arrives, “⋯” shows a number badge — open it and pick Notifications.',
+  '＋ 新增任務': '＋ Add a task',
+  '日曆右下角的「＋」隨時新增任務；在時間軸空白處點兩下，也能直接在那個時段建立任務。':
+    'Tap the “＋” at the bottom right of the calendar to add a task anytime — or double-tap an empty spot on the timeline to create one right in that slot.',
   '任務 / 白板 / 日曆 / 連結。中間「白板」隨時記點子；最右邊「連結」放你常開的網址（Notion、Gmail 等等），點一下開新分頁。想寫長一點的筆記？日曆頁右上角「⋯」選單裡有「**記事本**」（Notion 式排版）。':
     'Tasks / Scratchpad / Calendar / Links. Scratchpad in the middle is for jotting ideas anytime; Links on the far right holds the URLs you open often (Notion, Gmail, etc.) — tap one to open it in a new tab. Want to write something longer? The ⋯ menu in the top right of the calendar page has **Notebook** (Notion-style formatting).',
   '右下角浮動小球是番茄鐘。點開可放大成沉浸模式、配 Lo-fi / 雨聲 / 咖啡店白噪音，結束時 Huddle 輕輕提醒。':

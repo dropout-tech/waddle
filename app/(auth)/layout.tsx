@@ -17,7 +17,7 @@ function LanguageToggle() {
       onClick={() => setLang(lang === 'en' ? 'zh-TW' : 'en')}
       aria-label={t('切換語言')}
       className={cn(
-        'fixed top-4 right-4 z-50 min-h-11 min-w-11 px-3.5 py-2 rounded-full',
+        'fixed top-[calc(1rem+env(safe-area-inset-top))] right-4 z-50 min-h-11 min-w-11 px-3.5 py-2 rounded-full',
         'bg-card/80 border border-border backdrop-blur-sm shadow-sm',
         'text-xs font-medium text-muted-foreground',
         'hover:bg-muted/60 hover:text-foreground transition-colors',
@@ -40,7 +40,7 @@ export default function AuthLayout({
     // card (logo anchors the top, nothing answers it below). The 2:3 flex
     // spacers lift the card slightly above center, and the slogan — moved
     // out of the cramped logo lockup — closes the composition at the bottom.
-    <main className="min-h-dvh w-full bg-gradient-to-br from-background via-background to-muted/40 flex flex-col items-center px-4">
+    <main className="min-h-dvh w-full bg-gradient-to-br from-background via-background to-muted/40 flex flex-col items-center px-4 pt-[env(safe-area-inset-top)]">
       <RedirectIfAuthed />
       <LanguageToggle />
       <div aria-hidden className="min-h-8 flex-[2]" />
@@ -55,7 +55,7 @@ export default function AuthLayout({
       <div aria-hidden className="min-h-6 flex-[3]" />
       {/* Full-strength muted token (no /70): the slogan must still clear
           WCAG AA on both cream and charcoal backgrounds. */}
-      <p className="pb-6 text-xs text-muted-foreground">{t('慢慢搖擺，把事情做完')}</p>
+      <p className="pb-[max(1.5rem,env(safe-area-inset-bottom))] text-xs text-muted-foreground">{t('慢慢搖擺，把事情做完')}</p>
     </main>
   )
 }

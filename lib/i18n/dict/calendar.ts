@@ -171,4 +171,8 @@ export const dict: Record<string, string> = {
   '共享行事曆顯示': 'Shared calendar visibility',
   '點擊隱藏 {name} 的行事曆': "Hide {name}'s calendar",
   '點擊顯示 {name} 的行事曆': "Show {name}'s calendar",
+  // ── calendar-header.tsx — mobile ⋯ menu (bell / account / peers) ──────
+  '更多（{n} 則通知）': 'More ({n} notifications)',
+  '帳號': 'Account',
+  '共享對象': 'Shared with',
 }

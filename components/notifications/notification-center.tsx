@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMeetingNotifications } from '@/hooks/use-meeting-notifications'
 import {
@@ -25,6 +25,14 @@ interface NotificationCenterProps {
   workspaces: Workspace[]
   onTaskClick?: (task: Task) => void
   onReviewOverdue?: () => void
+  /** Controlled open state — lets the mobile calendar header open the panel
+   *  from its ⋯ menu instead of a standalone bell. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Render only the panel (no bell button); pair with open/onOpenChange. */
+  hideTrigger?: boolean
+  /** Reports the badge count so a host button can show it. */
+  onCountChange?: (count: number, hasHighPriority: boolean) => void
 }
 
 interface Notification {
@@ -58,6 +66,10 @@ export function NotificationCenter({
   workspaces,
   onTaskClick,
   onReviewOverdue,
+  open,
+  onOpenChange,
+  hideTrigger = false,
+  onCountChange,
 }: NotificationCenterProps) {
   const { t, lang } = useI18n()
   const meetingInbox = useMeetingNotifications()
@@ -78,7 +90,12 @@ export function NotificationCenter({
       setReadingId(undefined)
     }
   }
-  const [isOpen, setIsOpen] = useState(false)
+  const [innerOpen, setInnerOpen] = useState(false)
+  const isOpen = open ?? innerOpen
+  const setIsOpen = (next: boolean) => {
+    if (onOpenChange) onOpenChange(next)
+    else setInnerOpen(next)
+  }
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
 
   // Gather all tasks from workspaces
@@ -295,6 +312,16 @@ export function NotificationCenter({
     (n) => n.priority === 'high',
   ).length
   const totalCount = notifications.length + meetingInbox.unreadCount
+  const hasHighPriority = highPriorityCount > 0
+  useEffect(() => {
+    onCountChange?.(totalCount, hasHighPriority)
+  }, [onCountChange, totalCount, hasHighPriority])
+  // Opened from outside (mobile ⋯ menu): refresh the meeting inbox the same
+  // way the bell click does.
+  const refreshInbox = meetingInbox.refresh
+  useEffect(() => {
+    if (hideTrigger && isOpen) void refreshInbox()
+  }, [hideTrigger, isOpen, refreshInbox])
 
   const dismissNotification = (id: string) => {
     setDismissedIds((prev) => new Set([...prev, id]))
@@ -332,6 +359,7 @@ export function NotificationCenter({
 
   return (
     <div className="relative">
+      {!hideTrigger && (<>
       {/* Notification Bell Button — visual size stays 36x36 (p-2 + w-5 h-5
           icon); on touch devices an invisible ::before extends the hit box
           to 44x44 without changing what's painted, same trick as the
@@ -367,6 +395,7 @@ export function NotificationCenter({
           </span>
         )}
       </button>
+      </>)}
 
       {/* Notification Dropdown */}
       {isOpen && (

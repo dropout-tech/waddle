@@ -460,10 +460,18 @@ export function DayScrollView({
 
   // Track if this is a click vs drag (for new-slot drag on empty grid)
   const mouseDownTime = useRef<number>(0)
+  // When a single click/tap opened the slot picker. A second press on the
+  // picker's backdrop within DOUBLE_TAP_MS near the same spot is the second
+  // half of a double-click / double-tap → create a task for that slot
+  // directly (same flow as the picker's 任務 option) instead of closing.
+  const slotPickerOpenedAt = useRef<number>(0)
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null)
 
   // Default duration for click-to-create (in minutes)
   const DEFAULT_DURATION = 30
+  // Double-click / double-tap on empty grid → create a task for that slot.
+  const DOUBLE_TAP_MS = 400
+  const DOUBLE_TAP_SLOP = 24 // px between the two presses
 
   // Threshold (px) to differentiate a click from a drag.
   const DRAG_THRESHOLD = 5
@@ -907,6 +915,7 @@ export function DayScrollView({
       // Anchor in viewport coords (clientX/Y), so the popover positioner can
       // flip above when there isn't room below.
       setPendingSlot({ date, startTime, endTime, anchorX: e.clientX, anchorY: e.clientY })
+      slotPickerOpenedAt.current = Date.now()
     } else if (dragStart.day === dragEnd.day && Math.abs(dragEnd.y - dragStart.y) > 15) {
       const minY = Math.min(dragStart.y, dragEnd.y)
       const maxY = Math.max(dragStart.y, dragEnd.y)
@@ -968,6 +977,7 @@ export function DayScrollView({
   // Resizable header height state - default to show pending tasks area
   const [headerHeight, setHeaderHeight] = useState(160)
   const HEADER_DATE_HEIGHT = 60
+  const HEADER_HANDLE_HEIGHT = 8 // resize handle (h-2) below the header row
   const HEADER_MIN = 100 // min: at least some space for pending tasks
   const HEADER_MAX = 360
   const isResizingHeader = useRef(false)
@@ -1082,27 +1092,37 @@ export function DayScrollView({
                       ...(isMobile ? { scrollSnapAlign: 'start' } : {}),
                     }}
                   >
-                    {/* Date label - fixed height */}
-                    <div className={cn(
-                      'px-3 py-2 text-center flex-shrink-0',
-                      isToday && 'bg-primary/10'
-                    )}>
-                      <div className="text-xs text-muted-foreground font-medium">
-                        {lang === 'en'
-                          ? format(date, 'M/d EEE')
-                          : `${date.getMonth() + 1}/${date.getDate()} 週${WEEKDAY_NAMES[weekdayIndex]}`}
+                    {/* Date label — fixed height for every column; the holiday
+                        name rides on the date line (truncated) so a holiday
+                        never makes its column taller than its neighbours. */}
+                    <div
+                      className={cn(
+                        'px-2 text-center flex-shrink-0 flex flex-col items-center justify-center overflow-hidden',
+                        isToday && 'bg-primary/10'
+                      )}
+                      style={{ height: `${HEADER_DATE_HEIGHT}px` }}
+                    >
+                      <div className="w-full flex items-center justify-center gap-1 min-w-0 text-xs leading-4 font-medium">
+                        <span className="text-muted-foreground flex-shrink-0">
+                          {lang === 'en'
+                            ? format(date, 'M/d EEE')
+                            : `${date.getMonth() + 1}/${date.getDate()} 週${WEEKDAY_NAMES[weekdayIndex]}`}
+                        </span>
+                        {holidayName && (
+                          <span
+                            className="min-w-0 truncate text-red-600 dark:text-red-400"
+                            title={translate(holidayName)}
+                          >
+                            {translate(holidayName)}
+                          </span>
+                        )}
                       </div>
                       <div className={cn(
-                        'text-2xl font-bold',
+                        'text-2xl leading-8 font-bold',
                         isToday ? 'text-primary' : holidayName ? 'text-red-600 dark:text-red-400' : 'text-foreground'
                       )}>
                         {date.getDate()}
                       </div>
-                      {holidayName && (
-                        <div className="text-[10px] leading-tight text-red-600 dark:text-red-400 truncate">
-                          {translate(holidayName)}
-                        </div>
-                      )}
                     </div>
                     {/* Pending/All-day tasks — also acts as drop zone for
                          scheduled tasks dragged here to clear their time. */}
@@ -1115,7 +1135,7 @@ export function DayScrollView({
                           ? 'bg-primary/15 ring-2 ring-primary/60 ring-inset'
                           : 'hover:bg-secondary/30'
                       )}
-                      style={{ minHeight: `${headerHeight - HEADER_DATE_HEIGHT}px` }}
+                      style={{ minHeight: `${headerHeight - HEADER_DATE_HEIGHT - HEADER_HANDLE_HEIGHT}px` }}
                       onClick={(e) => {
                         if ((e.target as HTMLElement).closest('button')) return
                         if (dragEndCooldown.current) return
@@ -1529,7 +1549,18 @@ export function DayScrollView({
           <>
           <div
             className="fixed inset-0 z-overlay"
-            onPointerDown={(e) => { e.stopPropagation(); setPendingSlot(null); setSelectedParent(null) }}
+            style={{ touchAction: 'manipulation' }}
+            data-slot-picker-backdrop
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              const isDoubleTap =
+                Date.now() - slotPickerOpenedAt.current < DOUBLE_TAP_MS &&
+                Math.hypot(e.clientX - pendingSlot.anchorX, e.clientY - pendingSlot.anchorY) < DOUBLE_TAP_SLOP
+              slotPickerOpenedAt.current = 0
+              setPendingSlot(null)
+              setSelectedParent(null)
+              if (isDoubleTap) onCreateTask?.(pendingSlot.date, pendingSlot.startTime, pendingSlot.endTime)
+            }}
           />
           <div
             ref={popoverRef}

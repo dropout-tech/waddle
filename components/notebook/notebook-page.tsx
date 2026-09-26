@@ -13,7 +13,7 @@ export function NotebookPage() {
   const router = useRouter()
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-background">
+    <div className="flex h-[100dvh] flex-col bg-background pt-[env(safe-area-inset-top)]">
       <NotebookWorkspace onExit={() => router.push('/')} exitVariant="back" />
     </div>
   )

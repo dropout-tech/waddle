@@ -22,7 +22,9 @@ import styles from './widgets.module.css'
 
 export function WidgetGallery() {
   const {user,loading}=useAuth(); const params=useSearchParams(); const [real,setReal]=useState(false)
-  useEffect(()=>{if(user && new URLSearchParams(location.search).has('open')) setReal(true)},[user])
+  // Signed-in users land on their own data (the demo is still one tap away
+  // via the mode toggle); anonymous visitors keep the demo shelf.
+  useEffect(()=>{if(user) setReal(true)},[user])
   if(loading) return <main className={styles.page}>載入中…</main>
   return real&&user ? <AuthGuard><LiveGallery key={`${user.id}:${params.toString()}`} onDemo={()=>setReal(false)}/></AuthGuard> : <DemoGallery onLive={user?()=>setReal(true):undefined}/>
 }
