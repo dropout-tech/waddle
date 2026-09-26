@@ -254,7 +254,9 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-              <PanelLeft className="h-10 w-10 text-muted-foreground/30" />
+              <PanelLeft className="art-hide h-10 w-10 text-muted-foreground/30" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/art/empty-notes.jpg" alt="" aria-hidden loading="lazy" width={220} height={220} className="art-only art-illus art-empty-illus" />
               <p className="text-sm text-muted-foreground">
                 {loading ? t('載入中…') : t('選一篇記事，或建立新的一篇')}
               </p>

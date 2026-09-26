@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Noto_Sans_TC } from 'next/font/google'
 import './globals.css'
+import './art-theme.css'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { NativeShell } from '@/components/native/native-shell'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -98,6 +99,14 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{if(window.huddleDesktop&&window.huddleDesktop.isDesktop&&window.huddleDesktop.platform==='darwin'&&!window.opener)document.documentElement.dataset.desktopTitlebar='mac';var m=window.matchMedia('(max-width:767px)').matches;document.documentElement.dataset.viewport=m?'mobile':'desktop';if(m)document.documentElement.classList.add('is-mobile');var f=localStorage.getItem('waddle-font-size-v1');var map={sm:'87.5%',lg:'112.5%',xl:'125%'};if(f&&map[f])document.documentElement.style.fontSize=map[f];}catch(e){}})();`,
+          }}
+        />
+        {/* Art-direction preview (sample only): ?art=paper|sketch sets
+            html[data-art] for this tab; ?art=off clears it. No param and no
+            stored choice = current production look, untouched. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var d=document.documentElement,k='huddle-art',p=new URLSearchParams(location.search).get('art');if(p==='paper'||p==='sketch')sessionStorage.setItem(k,p);else if(p==='off')sessionStorage.removeItem(k);var a=sessionStorage.getItem(k);if(a!=='paper'&&a!=='sketch')return;d.dataset.art=a;if(a==='sketch'){var l=document.createElement('link');l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&display=swap';document.head.appendChild(l);}}catch(e){}})();`,
           }}
         />
       </head>

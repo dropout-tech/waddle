@@ -40,10 +40,13 @@ export default function AuthLayout({
     // card (logo anchors the top, nothing answers it below). The 2:3 flex
     // spacers lift the card slightly above center, and the slogan — moved
     // out of the cramped logo lockup — closes the composition at the bottom.
-    <main className="min-h-dvh w-full bg-gradient-to-br from-background via-background to-muted/40 flex flex-col items-center px-4">
+    <main className="art-auth-main min-h-dvh w-full bg-gradient-to-br from-background via-background to-muted/40 flex flex-col items-center px-4">
+      {/* Art-direction sample only (html[data-art]); hidden + never fetched otherwise. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/art/login-scene.jpg" alt="" aria-hidden loading="lazy" className="art-only art-auth-scene" />
       <RedirectIfAuthed />
       <LanguageToggle />
-      <div aria-hidden className="min-h-8 flex-[2]" />
+      <div aria-hidden className="art-auth-top min-h-8 flex-[2]" />
       <div className="w-full max-w-md">
         {/* Brand — single-line lockup; the slogan lives at the page foot now. */}
         <div className="flex items-center justify-center gap-2.5 mb-8">
