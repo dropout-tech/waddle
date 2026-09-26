@@ -151,6 +151,20 @@ type NotebookCategoriesRow = {
   updated_at: string
 }
 
+type StickyNotesRow = {
+  id: string
+  user_id: string
+  content: Json | null
+  x: number
+  y: number
+  width: number
+  height: number
+  color: string
+  z_index: number
+  created_at: string
+  updated_at: string
+}
+
 type TimeBlocksRow = {
   id: string
   user_id: string
@@ -448,6 +462,19 @@ type NotebookCategoriesInsert = {
   updated_at?: string
 }
 
+type StickyNotesInsert = {
+  id?: string
+  user_id: string
+  content?: Json | null
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  color?: string
+  z_index?: number
+  updated_at?: string
+}
+
 type TimeBlocksInsert = {
   id?: string
   user_id: string
@@ -568,6 +595,7 @@ export type Database = {
       scratchpad_items: Tbl<ScratchpadItemsRow, ScratchpadItemsInsert>
       notebook_notes: Tbl<NotebookNotesRow, NotebookNotesInsert>
       notebook_categories: Tbl<NotebookCategoriesRow, NotebookCategoriesInsert>
+      sticky_notes: Tbl<StickyNotesRow, StickyNotesInsert>
       time_blocks: Tbl<TimeBlocksRow, TimeBlocksInsert>
       slot_types: Tbl<SlotTypesRow, SlotTypesInsert>
       user_settings: Tbl<UserSettingsRow, UserSettingsInsert>

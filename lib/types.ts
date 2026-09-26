@@ -37,6 +37,27 @@ export interface NotebookNote {
   updatedAt: string
 }
 
+// Sticky note colors — kept in the warm/brand palette (see DESIGN.md), never
+// a bare CSS color name mapped to a cool hue.
+export type StickyNoteColor = 'yellow' | 'sage' | 'rose' | 'cream'
+
+// Sticky note (便條紙) — a freeform note pinned to the viewport (like paper on
+// the screen's glass), shared across every page rather than scoped to one
+// route. Position is a % of the viewport so it never runs off-screen when the
+// window resizes; content reuses the notebook's Tiptap JSON shape.
+export interface StickyNote {
+  id: string
+  content: TiptapDoc | null
+  x: number // left edge, % of viewport width (0-100)
+  y: number // top edge, % of viewport height (0-100)
+  width: number // px
+  height: number // px
+  color: StickyNoteColor
+  zIndex: number
+  createdAt: string
+  updatedAt: string
+}
+
 // A notebook-only folder (independent of task workspaces/categories).
 export interface NotebookCategory {
   id: string
