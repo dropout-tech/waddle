@@ -38,6 +38,9 @@
 .fish svg { display: block; filter: drop-shadow(0 0 1.5px #f6f3e9); }
 .heart, .spark { position: absolute; left: 0; top: 0; margin: -12px 0 0 -8px; font: 800 22px/1 system-ui, sans-serif; color: #cf5731; text-shadow: 0 0 2px #f6f3e9; }
 .soap { position: absolute; left: 0; top: 0; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; border: 2px solid #292b24; background: radial-gradient(circle at 34% 32%, #fff 0 16%, #d8eef4aa 34%, #a9d7e533 100%); }
+.note { position: absolute; left: 0; top: 0; margin: -10px 0 0 -6px; font: 800 20px/1 system-ui, sans-serif; color: #292b24; text-shadow: 0 0 2px #f6f3e9, 0 0 2px #f6f3e9; }
+.roam[data-music] .roamInner { animation: nod .5s ease-in-out infinite alternate; }
+@keyframes nod { from { rotate: -5deg; } to { rotate: 6deg; translate: 0 2px; } }
 .spark { color: #edc747; text-shadow: 0 0 1px #292b24, 0 0 1px #292b24; }
 .bonk { position: absolute; left: 0; top: 0; width: 34px; height: 34px; margin: -17px 0 0 -17px; }
 

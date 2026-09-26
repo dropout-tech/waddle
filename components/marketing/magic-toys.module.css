@@ -47,3 +47,17 @@
 .checkStamp { padding: 4px 8px; border: 3px solid #cf5731; border-radius: 6px; background: #f6f3e9cc; color: #cf5731; font: 900 18px/1 var(--poster-zh, sans-serif); white-space: nowrap; }
 .legend { padding: 8px 18px; border-width: 5px; font-size: 34px; letter-spacing: .06em; }
 .pa { color: #292b24; font: 900 20px/1 var(--poster-en, sans-serif); white-space: nowrap; }
+
+/* whiteboard doodle: you draw, the penguin copies */
+.doodle { margin-top: 30px; }
+.papers { display: flex; gap: 18px; flex-wrap: wrap; }
+.paper { position: relative; margin: 0; }
+.paper figcaption { margin-top: 6px; font: 700 13px/1.2 var(--poster-zh, sans-serif); color: #54564a; text-align: center; }
+.canvas { display: block; width: 150px; height: 150px; background: #fbf9f2; border: 2px solid #292b24; border-radius: 6px; box-shadow: 3px 3px 0 #292b24; touch-action: none; cursor: crosshair; }
+.itsPaper .canvas { transform: rotate(2.5deg); cursor: default; }
+.artist { position: absolute; left: 0; top: 0; width: 46px; height: 46px; object-fit: contain; object-position: 50% 100%; opacity: 0; pointer-events: none; transition: opacity .2s; filter: drop-shadow(0 0 1.5px #f6f3e9); }
+.artist[data-on] { opacity: 1; }
+.verdict { position: absolute; right: -14px; top: -16px; padding: 5px 10px; background: #292b24; color: #edc747; border-radius: 4px; font: 800 15px/1.1 var(--poster-zh, sans-serif); white-space: nowrap; opacity: 0; pointer-events: none; }
+.verdict[data-on] { opacity: 1; }
+.ghostBtn { min-height: 48px; padding: 10px 16px; background: transparent; color: #292b24; border: 2px solid #292b24; border-radius: 4px; font: 800 15px/1.2 var(--poster-zh, sans-serif); cursor: pointer; }
+.ghostBtn:hover { background: #292b240d; }

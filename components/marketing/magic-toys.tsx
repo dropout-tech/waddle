@@ -63,6 +63,7 @@ function mk(parent: Element, cls: string, text?: string) {
 }
 const at = (x: number, y: number, extra = '') => `translate(${x}px,${y}px) translate(-50%,-50%) ${extra}`
 const cheer = () => window.dispatchEvent(new CustomEvent('huddle:cheer'))
+const focusMode = (on: boolean) => window.dispatchEvent(new CustomEvent('huddle:focus-mode', { detail: on }))
 const shake = (el: HTMLElement, amp: number, ms = 260) => { if (!reduced()) el.animate([{ transform: 'none' }, { transform: `translate(${amp}px,${-amp / 2}px)` }, { transform: `translate(${-amp}px,${amp / 2}px)` }, { transform: `translate(${amp / 2}px,0)` }, { transform: 'none' }], { duration: ms }) }
 async function fadeOut(els: Element[], ms = 380) { await Promise.all(els.map(e => mv(e, [{ opacity: 0 }], { duration: ms, easing: 'ease-in' }))); els.forEach(e => e.remove()) }
 async function intoView(stage: HTMLElement) {
@@ -117,6 +118,7 @@ const focus: Play = async (stage, t) => {
   const host = stage.parentElement as HTMLElement
   const time = host.querySelector<HTMLElement>('[data-ring-time]')
   host.setAttribute('data-toy-running', '')
+  focusMode(true) // headphones on
   const W = stage.clientWidth, H = stage.clientHeight, cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.44
   const shield = mk(stage, styles.shield)
   shield.style.width = shield.style.height = `${R * 2}px`
@@ -142,6 +144,7 @@ const focus: Play = async (stage, t) => {
     n.remove()
   }))
   await Promise.all([lap, bounce])
+  focusMode(false) // headphones off, fireworks
   // fireworks
   const colors = ['#cf5731', '#edc747', '#292b24', '#f6f3e9']
   const sparks: HTMLElement[] = []
@@ -277,6 +280,135 @@ export function CheckInToy({ locale = 'zh' }: { locale?: Locale }) {
       <div className={styles.toyRow}>
         <button type="button" className={styles.toyBtn} onClick={press}><Sparkles size={18} aria-hidden="true" />{t.btn.stamp}</button>
         <span className={styles.hint}>{t.checkinHint}</span>
+        <span className={styles.sr} role="status">{status}</span>
+      </div>
+    </div>
+  )
+}
+
+/* ── Whiteboard doodle: you draw, the penguin copies (badly) ── */
+
+const doodleCopy = {
+  zh: { title: '塗鴉紙：在這裡畫畫', copy: '換企鵝畫', clear: '清除', empty: '先畫點什麼吧', verdicts: ['神似！', '抽象派', '大師級', '有我的風格', '這是…貓？'], mine: '你的', its: '企鵝的' },
+  en: { title: 'Doodle pad: draw here', copy: 'Penguin’s turn', clear: 'Clear', empty: 'Draw something first', verdicts: ['Uncanny!', 'Abstract art', 'Masterpiece', 'My style', 'Is this… a cat?'], mine: 'Yours', its: 'Penguin’s' },
+} as const
+type Pt = { x: number; y: number }
+const PAPER = 150
+
+function prep(c: HTMLCanvasElement) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1)
+  c.width = PAPER * dpr; c.height = PAPER * dpr
+  const g = c.getContext('2d')!
+  g.setTransform(dpr, 0, 0, dpr, 0, 0)
+  g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = 3.2; g.strokeStyle = '#292b24'; g.fillStyle = '#292b24'
+  return g
+}
+
+export function DoodleToy({ locale = 'zh' }: { locale?: Locale }) {
+  const t = doodleCopy[locale]
+  const mine = useRef<HTMLCanvasElement>(null)
+  const its = useRef<HTMLCanvasElement>(null)
+  const bird = useRef<HTMLImageElement>(null)
+  const sign = useRef<HTMLSpanElement>(null)
+  const strokes = useRef<Pt[][]>([])
+  const idle = useRef(0)
+  const playing = useRef(false)
+  const copyRef = useRef<() => void>(() => {})
+  const [status, setStatus] = useState('')
+
+  const copyIt = async () => {
+    clearTimeout(idle.current)
+    const o = its.current, b = bird.current, s = sign.current
+    if (!o || !b || !s || playing.current) return
+    const all = strokes.current.filter(st => st.length)
+    if (!all.length) { setStatus(t.empty); return }
+    playing.current = true; setStatus('')
+    const g = prep(o)
+    s.removeAttribute('data-on')
+    // the penguin's "interpretation": a tilt, a squash and a shaky flipper
+    const tilt = rnd(-0.22, 0.22), sx = rnd(0.8, 1.15), sy = rnd(0.8, 1.1), c = PAPER / 2
+    const pts: { x: number; y: number; start: boolean }[] = []
+    all.forEach(st => st.forEach((p, i) => {
+      const k = pts.length, x = (p.x - c) * sx, y = (p.y - c) * sy
+      pts.push({ x: c + x * Math.cos(tilt) - y * Math.sin(tilt) + Math.sin(k * 0.9) * 1.6 + rnd(-1.1, 1.1), y: c + x * Math.sin(tilt) + y * Math.cos(tilt) + Math.cos(k * 0.7) * 1.6 + rnd(-1.1, 1.1), start: i === 0 })
+    }))
+    const seg = (i: number) => { if (!pts[i].start && i) { g.beginPath(); g.moveTo(pts[i - 1].x, pts[i - 1].y); g.lineTo(pts[i].x, pts[i].y); g.stroke() } else { g.beginPath(); g.arc(pts[i].x, pts[i].y, 1.4, 0, Math.PI * 2); g.fill() } }
+    const place = (p: Pt) => { b.style.transform = `translate(${(p.x / PAPER) * o.clientWidth - 6}px,${(p.y / PAPER) * o.clientHeight - 44}px)` }
+    b.setAttribute('data-on', '')
+    await new Promise<void>(res => {
+      if (reduced()) { pts.forEach((_, i) => seg(i)); place(pts[pts.length - 1]); return res() }
+      const D = Math.min(2600, Math.max(900, pts.length * 14)), t0 = performance.now()
+      let i = 0
+      const tick = (now: number) => {
+        const target = Math.min(pts.length, Math.ceil(((now - t0) / D) * pts.length))
+        for (; i < target; i++) seg(i)
+        place(pts[Math.max(0, i - 1)])
+        if (i < pts.length) requestAnimationFrame(tick); else res()
+      }
+      requestAnimationFrame(tick)
+    })
+    const v = t.verdicts[Math.floor(Math.random() * t.verdicts.length)]
+    s.textContent = v; s.setAttribute('data-on', '')
+    mv(s, [{ transform: 'translateY(8px) scale(.5) rotate(-12deg)', opacity: 0 }, { transform: 'translateY(0) scale(1) rotate(-5deg)', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(.2,1.5,.4,1)' })
+    setStatus(v); cheer()
+    playing.current = false
+  }
+  copyRef.current = copyIt
+
+  useEffect(() => {
+    const c = mine.current, o = its.current
+    if (!c || !o) return
+    const g = prep(c); prep(o)
+    let drawing: Pt[] | null = null
+    const pos = (e: PointerEvent): Pt => { const r = c.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * PAPER, y: ((e.clientY - r.top) / r.height) * PAPER } }
+    const down = (e: PointerEvent) => {
+      if (playing.current) return
+      e.preventDefault(); c.setPointerCapture(e.pointerId); clearTimeout(idle.current)
+      const p = pos(e); drawing = [p]; strokes.current.push(drawing)
+      g.beginPath(); g.arc(p.x, p.y, 1.4, 0, Math.PI * 2); g.fill()
+    }
+    const move = (e: PointerEvent) => {
+      if (!drawing) return
+      const p = pos(e), q = drawing[drawing.length - 1]
+      if (Math.hypot(p.x - q.x, p.y - q.y) < 1.5) return
+      drawing.push(p); g.beginPath(); g.moveTo(q.x, q.y); g.lineTo(p.x, p.y); g.stroke()
+    }
+    const up = () => {
+      if (!drawing) return
+      drawing = null
+      idle.current = window.setTimeout(() => copyRef.current(), 1100) // pen resting ~1s → penguin's turn
+    }
+    c.addEventListener('pointerdown', down); c.addEventListener('pointermove', move)
+    c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up)
+    return () => { clearTimeout(idle.current); c.removeEventListener('pointerdown', down); c.removeEventListener('pointermove', move); c.removeEventListener('pointerup', up); c.removeEventListener('pointercancel', up) }
+  }, [])
+
+  const clear = () => {
+    clearTimeout(idle.current)
+    if (playing.current) return
+    strokes.current = []
+    for (const c of [mine.current, its.current]) if (c) prep(c)
+    bird.current?.removeAttribute('data-on'); sign.current?.removeAttribute('data-on'); setStatus('')
+  }
+
+  return (
+    <div className={styles.doodle}>
+      <div className={styles.papers}>
+        <figure className={styles.paper}>
+          <canvas ref={mine} className={styles.canvas} aria-label={t.title} role="img" data-doodle="mine" />
+          <figcaption>{t.mine}</figcaption>
+        </figure>
+        <figure className={`${styles.paper} ${styles.itsPaper}`} aria-hidden="true">
+          <canvas ref={its} className={styles.canvas} data-doodle="its" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img ref={bird} className={styles.artist} src="/art/penguin/carry.webp" alt="" width={240} height={240} loading="lazy" />
+          <span ref={sign} className={styles.verdict} />
+          <figcaption>{t.its}</figcaption>
+        </figure>
+      </div>
+      <div className={styles.toyRow}>
+        <button type="button" className={styles.toyBtn} onClick={copyIt}><Sparkles size={18} aria-hidden="true" />{t.copy}</button>
+        <button type="button" className={styles.ghostBtn} onClick={clear}>{t.clear}</button>
         <span className={styles.sr} role="status">{status}</span>
       </div>
     </div>

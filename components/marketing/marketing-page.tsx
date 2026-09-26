@@ -8,7 +8,7 @@ import { ArrowDown, ArrowRight, ChevronDown, Download, Play } from 'lucide-react
 import { setLang } from '@/lib/i18n'
 import { brandQuote } from '@/lib/brand'
 import { FeatureFilm } from './feature-film'
-import { CheckInToy, ToyButton, ToyStage } from './magic-toys'
+import { CheckInToy, DoodleToy, ToyButton, ToyStage } from './magic-toys'
 import { FocusRing, FoldVignette, Hammock, HeroSwarm, RoamingPenguin, fishZoneClass, focusStageClass, headlineClass, posterStageClass } from './penguin-circus'
 import styles from './marketing-page.module.css'
 
@@ -159,7 +159,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       </section>
 
       <section className={styles.whiteboard} aria-labelledby="board-title">
-        <div className={styles.chapterCopy}><h2 id="board-title">{t.boardTitle}</h2><p>{t.boardBody}</p><div className={styles.tabs} data-penguin-stop="board" data-penguin-only="desktop" data-penguin-at="0 1 110 88" data-penguin-pose="slide" data-penguin-motion="pace" role="tablist" aria-label={en ? 'Whiteboard views' : '白板畫面'}>{t.boardTabs.map((label, i) => <button key={label} id={`board-tab-${i}`} type="button" role="tab" aria-selected={boardView === i} aria-controls="board-panel" tabIndex={boardView === i ? 0 : -1} onClick={() => setBoardView(i)} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const next = 1 - i; setBoardView(next); document.getElementById(`board-tab-${next}`)?.focus() } }}>{label}</button>)}</div></div>
+        <div className={styles.chapterCopy}><h2 id="board-title">{t.boardTitle}</h2><p>{t.boardBody}</p><div className={styles.tabs} data-penguin-stop="board" data-penguin-only="desktop" data-penguin-at="0 1 110 88" data-penguin-pose="slide" data-penguin-motion="pace" role="tablist" aria-label={en ? 'Whiteboard views' : '白板畫面'}>{t.boardTabs.map((label, i) => <button key={label} id={`board-tab-${i}`} type="button" role="tab" aria-selected={boardView === i} aria-controls="board-panel" tabIndex={boardView === i ? 0 : -1} onClick={() => setBoardView(i)} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const next = 1 - i; setBoardView(next); document.getElementById(`board-tab-${next}`)?.focus() } }}>{label}</button>)}</div><DoodleToy locale={locale} /></div>
         <figure role="tabpanel" id="board-panel" aria-labelledby={`board-tab-${boardView}`} className={styles.boardFigure}><Image src={`/marketing/${boardView === 0 ? 'whiteboard-demo' : 'whiteboard-detail-demo'}${en ? '-en' : ''}.png`} width={1440} height={1000} alt={t.boardAlt[boardView]} sizes="(max-width: 760px) 92vw, 64vw" /><figcaption>{t.boardNote}</figcaption></figure>
       </section>
 

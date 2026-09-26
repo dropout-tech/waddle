@@ -31,7 +31,7 @@ import { useEffect, useRef } from 'react'
 import { isDesktop, isNative } from '@/lib/platform'
 import styles from './penguin-circus.module.css'
 
-export const POSES = ['stand', 'slide', 'fly', 'wave', 'skate', 'sleep', 'carry', 'open', 'chomp', 'full', 'yawn', 'phone', 'flag', 'shades', 'splat'] as const
+export const POSES = ['stand', 'slide', 'fly', 'wave', 'skate', 'sleep', 'carry', 'open', 'chomp', 'full', 'yawn', 'phone', 'flag', 'shades', 'splat', 'music'] as const
 type Pose = (typeof POSES)[number]
 const src = (p: Pose) => `/art/penguin/${p}.webp`
 const FACES_RIGHT = new Set<Pose>(['slide', 'fly', 'skate'])
@@ -337,6 +337,25 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
       holdPose('flag', 1200); hop(26)
     }
     window.addEventListener('huddle:cheer', onCheer)
+    // focus toy: headphones on, eyes closed, nodding, notes float up
+    let notesTimer = 0
+    const onFocusMode = (e: Event) => {
+      const on = (e as CustomEvent).detail === true
+      window.clearInterval(notesTimer)
+      root.toggleAttribute('data-music', on)
+      if (on) {
+        busyUntil = performance.now() + 60000; holdPose('music', 60000)
+        notesTimer = window.setInterval(() => {
+          const n = document.createElement('span'); n.className = styles.note; n.textContent = Math.random() < 0.5 ? '♪' : '♫'; fx.appendChild(n)
+          const nx = x + (Math.random() - 0.3) * S * 0.6, ny = y - S * 0.95
+          n.animate([{ transform: `translate(${nx}px,${ny}px) scale(.5)`, opacity: 0 }, { transform: `translate(${nx + 10}px,${ny - 26}px) scale(1) rotate(-10deg)`, opacity: 1, offset: 0.3 }, { transform: `translate(${nx + 26}px,${ny - 64}px) scale(1) rotate(12deg)`, opacity: 0 }], { duration: 1300, easing: 'ease-out' }).finished.then(() => n.remove(), () => n.remove())
+        }, 380)
+      } else {
+        hold.until = 0; busyUntil = performance.now() + 500
+        holdPose('open', 500); hop(24)
+      }
+    }
+    window.addEventListener('huddle:focus-mode', onFocusMode)
     /* ── feeding (the main click reaction, 2026-09-26) ──
        A fish flies from the click point in an arc into the open beak; each
        fish makes the penguin rounder; the 4th one sits it down, full, for a
@@ -509,7 +528,7 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
       cancelAnimationFrame(raf); clearTimeout(fallback)
       window.removeEventListener(MERGED, wake); window.removeEventListener('resize', onResize)
       window.removeEventListener('pointermove', onMove); document.documentElement.removeEventListener('pointerleave', onLeave)
-      document.removeEventListener('click', onClick); window.removeEventListener('huddle:cheer', onCheer)
+      document.removeEventListener('click', onClick); window.removeEventListener('huddle:cheer', onCheer); window.removeEventListener('huddle:focus-mode', onFocusMode); window.clearInterval(notesTimer)
       fx.replaceChildren()
     }
   }, [locale])
