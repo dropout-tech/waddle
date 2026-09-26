@@ -18,8 +18,8 @@ export const dict: Record<string, string> = {
   // Onboarding tour copy (folded into the existing "使用者選單" step, since
   // the toggle itself lives inside a dropdown that's absent from the DOM
   // until opened — a spotlight can't target it).
-  '點開有你的帳號資訊、深淺色切換與登出，還有「📌 顯示便條紙」——開了會出現一片玻璃便條層，貼在畫面上、換頁也不會不見，可以拖曳、選顏色或刪除。桌面上按 ⌘K 隨時召喚指令面板（搜任務、切視圖、開記事本）；按 ? 看完整快捷鍵。':
-    'Opens your account info, light/dark toggle, sign-out, and "📌 Show sticky notes" — turning it on drops a glass layer of notes over the screen that stays put as you switch pages; drag them, pick a color, or delete them. On desktop, press ⌘K anytime for the command palette (search tasks, switch views, open the notebook); press ? for the full shortcut list.',
-  '日曆頁「⋯」選單裡有「每日簽到」，記錄心情累積連續天數；使用者選單裡有「會議轉任務」，貼上逐字稿自動整理成待辦任務。使用者選單裡也有「📌 顯示便條紙」，開了會出現一片玻璃便條層貼在畫面上，換頁也不會不見。':
-    'The calendar page\'s "⋯" menu has "Daily check-in" to log your mood and build a streak; the user menu has "Meeting to tasks" to turn a pasted transcript into to-dos automatically. The user menu also has "📌 Show sticky notes" — turning it on drops a glass layer of notes over the screen that stays put as you switch pages.',
+  '點開有你的帳號資訊、深淺色切換與登出。「📌 便條紙」開關現在也在上方工具列（記事本旁邊）就能直接點——開了會出現一片玻璃便條層，貼在畫面上、換頁也不會不見，可以拖曳、選顏色或刪除。桌面上按 ⌘K 隨時召喚指令面板（搜任務、切視圖、開記事本）；按 ? 看完整快捷鍵。':
+    'Opens your account info, light/dark toggle, and sign-out. The "📌 Sticky notes" toggle now also lives right in the toolbar above (next to the notebook) — turning it on drops a glass layer of notes over the screen that stays put as you switch pages; drag them, pick a color, or delete them. On desktop, press ⌘K anytime for the command palette (search tasks, switch views, open the notebook); press ? for the full shortcut list.',
+  '日曆頁「⋯」選單裡有「每日簽到」，記錄心情累積連續天數；使用者選單裡有「會議轉任務」，貼上逐字稿自動整理成待辦任務。「📌 便條紙」開關也在日曆工具列（記事本旁邊）或「⋯」選單裡就能直接點開，開了會出現一片玻璃便條層貼在畫面上，換頁也不會不見。':
+    'The calendar page\'s "⋯" menu has "Daily check-in" to log your mood and build a streak; the user menu has "Meeting to tasks" to turn a pasted transcript into to-dos automatically. The "📌 Sticky notes" toggle is also right there in the calendar toolbar (next to the notebook) or in the "⋯" menu — turning it on drops a glass layer of notes over the screen that stays put as you switch pages.',
 }
