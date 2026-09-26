@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, NotebookPen, BarChart3, Settings, Sparkles, MoreHorizontal, Download, Users, Bell, CircleUser, Eye, EyeOff } from 'lucide-react'
+import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, NotebookPen, BarChart3, Settings, Sparkles, MoreHorizontal, Download, Users, Bell, CircleUser, Eye, EyeOff, StickyNote as StickyNoteIcon, Plus } from 'lucide-react'
 import { UndoRedoButtons } from '@/components/undo-redo-buttons'
 import {
   DropdownMenu,
@@ -16,6 +16,7 @@ import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { UserMenu } from '@/components/user-menu'
 import { useNotebookOverlay } from '@/components/notebook/notebook-overlay-provider'
+import { useStickyNotesToggle } from '@/components/sticky-notes/sticky-notes-provider'
 import { isPeerVisible, type SharePeer } from '@/hooks/use-calendar-sharing'
 import { User as UserIcon } from 'lucide-react'
 import type { Workspace, Task } from '@/lib/types'
@@ -92,6 +93,7 @@ export function CalendarHeader({
   const isMobile = useIsMobile()
   const { t, lang } = useI18n()
   const { open: openNotebook } = useNotebookOverlay()
+  const stickyNotes = useStickyNotesToggle()
   const [overflowOpen, setOverflowOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
   const overflowRef = useRef<HTMLDivElement>(null)
@@ -446,6 +448,28 @@ export function CalendarHeader({
                     <NotebookPen className="w-4 h-4" />
                     <span>{t('記事本')}</span>
                   </button>
+                  <button
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={stickyNotes.enabled}
+                    data-tour="sticky-notes-toggle"
+                    onClick={() => stickyNotes.toggle()}
+                    className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                  >
+                    <StickyNoteIcon className="w-4 h-4" />
+                    <span>{stickyNotes.enabled ? t('隱藏便條紙') : t('顯示便條紙')}</span>
+                  </button>
+                  {stickyNotes.enabled && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { setOverflowOpen(false); stickyNotes.addNote() }}
+                      className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 pl-9 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{t('新增便條紙')}</span>
+                    </button>
+                  )}
                   {onOpenMeetings && <button type="button" onClick={() => { setOverflowOpen(false); onOpenMeetings() }} className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60"><Users className="h-4 w-4"/><span>{lang === 'en' ? 'Find a time' : '約交集'}</span>{pendingMeetingCount > 0 && <span className="rounded-full bg-primary px-1.5 text-primary-foreground">{pendingMeetingCount}</span>}</button>}
                   {onOpenSharing && (
                     <button
@@ -619,6 +643,32 @@ export function CalendarHeader({
             <NotebookPen className="w-3.5 h-3.5" aria-hidden="true" />
             {t('記事本')}
           </button>
+          <button
+            type="button"
+            data-tour="sticky-notes-toggle"
+            onClick={() => stickyNotes.toggle()}
+            aria-pressed={stickyNotes.enabled}
+            aria-label={stickyNotes.enabled ? t('隱藏便條紙') : t('顯示便條紙')}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              stickyNotes.enabled
+                ? 'bg-secondary text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+            )}
+          >
+            <StickyNoteIcon className="w-3.5 h-3.5" aria-hidden="true" />
+            {t('便條紙')}
+          </button>
+          {stickyNotes.enabled && (
+            <button
+              type="button"
+              onClick={() => stickyNotes.addNote()}
+              aria-label={t('新增便條紙')}
+              className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+          )}
           {onOpenSharing && (
             <button
               type="button"

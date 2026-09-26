@@ -29,9 +29,11 @@ const StickyNotesContext = createContext<StickyNotesContextValue | null>(null)
 
 /** Read/toggle the sticky-notes overlay from anywhere in the tree — the "顯示
  *  便條紙" switch and "新增便條紙" action live inside UserMenu (see
- *  components/user-menu.tsx), the most natural "top bar / user menu" home per
- *  the product decision, while the notes themselves render from this single
- *  provider mounted once at the root layout. Throws outside the provider so
+ *  components/user-menu.tsx) and, since 2026-09-27, also directly in the
+ *  calendar toolbar next to the notebook button (see
+ *  components/calendar/calendar-header.tsx) so it's discoverable without
+ *  opening the account menu — while the notes themselves render from this
+ *  single provider mounted once at the root layout. Throws outside the provider so
  *  a missing mount fails loudly instead of silently no-op-ing. */
 export function useStickyNotesToggle() {
   const ctx = useContext(StickyNotesContext)
