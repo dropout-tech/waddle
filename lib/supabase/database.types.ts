@@ -20,8 +20,10 @@ type ProfilesRow = {
   id: string
   display_name: string | null
   avatar_url: string | null
-  /** Opt-in public leaderboard name (migration 20260926130000). */
+  /** Deprecated 2026-09-27: nickname feature retired, column kept. */
   leaderboard_nickname?: string | null
+  /** Permanent public leaderboard serial (migration 20260927100000). */
+  penguin_number?: number
   created_at: string
   updated_at: string
 }
@@ -600,7 +602,6 @@ export type Database = {
     // with supabase/migrations/0016_calendar_sharing.sql if it changes.
     Functions: {
       get_check_in_leaderboard: { Args: Record<PropertyKey, never>; Returns: CheckInRanking[] }
-      set_leaderboard_nickname: { Args: { p_nickname: string | null }; Returns: string | null }
       get_daily_check_in_status: { Args: Record<PropertyKey, never>; Returns: CheckInStatus[] }
       claim_daily_check_in: { Args: Record<PropertyKey, never>; Returns: CheckInStatus[] }
       huddle_operations: { Args: { p_action: string; p_data?: Json }; Returns: Json }
