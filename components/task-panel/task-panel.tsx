@@ -325,6 +325,7 @@ export function TaskPanel({
               title={t('整理 {count} 個待處理任務', { count: overdueCount })}
             >
               <CalendarClock className="size-3 shrink-0" aria-hidden="true" />
+              <span className="hidden @[340px]/panel:inline @[500px]/panel:hidden">{t('整理')}</span>
               <span className="hidden @[500px]/panel:inline">{t('待整理')}</span>
               <span className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-overdue/12 px-1 text-[9px] font-semibold">
                 {overdueCount}
@@ -340,7 +341,8 @@ export function TaskPanel({
             title={t('已完成 {count} 項任務', { count: totalCompleted })}
           >
             <CheckCircle2 className="w-3 h-3 shrink-0 text-primary" />
-            <span className="hidden @[500px]/panel:inline">{t('已完成')}</span>
+            <span className="hidden @[340px]/panel:inline @[500px]/panel:hidden">{t('完成')}</span>
+              <span className="hidden @[500px]/panel:inline">{t('已完成')}</span>
             <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-primary/15 text-primary text-[9px] font-semibold">
               {totalCompleted}
             </span>
