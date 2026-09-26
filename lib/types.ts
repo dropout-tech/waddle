@@ -1,6 +1,7 @@
 // Waddle Type Definitions
 
 import type { FocusSettings } from './focus'
+import type { PetSettings } from './pet/types'
 
 // Scratchpad (Focus Capture) Types
 export interface ScratchpadItem {
@@ -272,6 +273,13 @@ export interface UserSettings {
    * migration (same trick as `quickLinks`). See lib/focus.ts.
    */
   focusBoard: FocusSettings
+  /**
+   * The user's penguin pet. Stored inside the `notifications` JSONB blob
+   * (key `pet`) — no migration. `null` = never adopted. Only mutated via
+   * the narrow `setPet` (saveSettings always writes the latest value back,
+   * so a stale settings-modal copy can't overwrite it). See lib/pet/types.ts.
+   */
+  pet: PetSettings | null
 }
 
 /**

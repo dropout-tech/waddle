@@ -31,6 +31,8 @@ import { GrowthJourneyDashboard } from '@/components/growth/growth-journey-dashb
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
 import type { RecurrenceChoice } from '@/components/modals/recurrence-choice-modal'
 import { useSoftKeyboard } from '@/hooks/use-soft-keyboard'
+import { PenguinPet } from '@/components/pet/penguin-pet'
+import type { PetSettings } from '@/lib/pet/types'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
@@ -68,6 +70,10 @@ interface MainLayoutProps {
   onSetQuickLinks?: (next: QuickLink[]) => void
   /** Narrow mutation for the 重點 board (separate from saveSettings). */
   onSetFocusBoard?: (next: FocusSettings) => Promise<void> | void
+  /** Penguin pet (components/pet). */
+  onSetPet?: (next: PetSettings) => Promise<void> | void
+  /** False until onboarding is done — the adoption card waits for the tour. */
+  petCanAdopt?: boolean
   // Scratchpad — DB-backed; per-date map plus narrow mutations.
   scratchpadByDate?: Record<string, ScratchpadItem[]>
   onAddScratchpadItem?: (date: string, item: ScratchpadItem) => void
@@ -122,6 +128,8 @@ export function MainLayout({
   onTimeBlockSelect,
   onSetQuickLinks,
   onSetFocusBoard,
+  onSetPet,
+  petCanAdopt = true,
   scratchpadByDate,
   onAddScratchpadItem,
   onUpdateScratchpadItem,
@@ -832,6 +840,21 @@ export function MainLayout({
           </button>
         )}
 
+        {/* Penguin pet — sits on the tab bar's top edge, left side (the
+            timer pill owns the right). Steps aside for overlay tabs and
+            full-screen views; the keyboard hides it via data-hide-on-keyboard. */}
+        {onSetPet && (
+          <PenguinPet
+            pet={settings?.pet ?? null}
+            onSetPet={onSetPet}
+            workspaces={workspaces}
+            isMobile
+            hidden={focusMode !== 'none' || mobileScratchpadOpen || mobileLinksOpen || mobileFocusBoardOpen}
+            canAdopt={petCanAdopt}
+            onOpenSettings={onOpenSettings}
+          />
+        )}
+
         {/* Floating widgets — repositioned for mobile */}
         <FocusTimer
           workspaces={workspaces}
@@ -1126,6 +1149,18 @@ export function MainLayout({
         links={settings?.quickLinks ?? []}
         onSave={onSetQuickLinks ?? (() => {})}
       />
+
+      {/* Penguin pet — bottom-left corner. */}
+      {onSetPet && (
+        <PenguinPet
+          pet={settings?.pet ?? null}
+          onSetPet={onSetPet}
+          workspaces={workspaces}
+          isMobile={false}
+          canAdopt={petCanAdopt}
+          onOpenSettings={onOpenSettings}
+        />
+      )}
 
       {/* Focus Timer - Floating Widget */}
       <FocusTimer

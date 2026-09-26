@@ -49,6 +49,8 @@ import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 import { PICKER_COLOR_HEXES, WORKSPACE_COLORS } from '@/lib/palette'
 import { resolveDefaultWorkspace, sortWorkspacesForDisplay } from '@/lib/default-category'
 import { CategoryCascadePicker } from '@/components/category/category-cascade-picker'
+import { PetSettingsSection } from '@/components/pet/pet-settings-section'
+import type { PetSettings } from '@/lib/pet/types'
 import {
   WATER_REMINDER_INTERVALS,
   type WaterReminderInterval,
@@ -92,6 +94,8 @@ interface SettingsModalProps {
   onSave: (settings: UserSettings, timeBlocks: TimeBlock[]) => void
   /** Sets the ONE global default category (null clears it). */
   onSetDefaultCategory: (categoryId: string | null) => Promise<void>
+  /** Penguin pet — saved immediately via the narrow setter, not the 儲存 draft. */
+  onSetPet?: (next: PetSettings) => Promise<void> | void
 }
 
 export type SettingsTab = 'general' | 'slotTypes' | 'notifications' | 'sharing'
@@ -156,6 +160,7 @@ export function SettingsModal({
   onClose,
   onSave,
   onSetDefaultCategory,
+  onSetPet,
 }: SettingsModalProps) {
   const { lang, setLang, t } = useI18n()
   const [localSettings, setLocalSettings] = useState<UserSettings>(settings)
@@ -491,6 +496,10 @@ export function SettingsModal({
               ))}
             </div>
           </div>
+
+          {/* 企鵝 — reads the live `settings.pet` (not localSettings): it saves
+              on every change through onSetPet, outside this modal's draft. */}
+          {onSetPet && <PetSettingsSection pet={settings.pet ?? null} onSetPet={onSetPet} />}
 
           {/* Calendar Time Range */}
           <div className="space-y-3">
