@@ -2,7 +2,7 @@
 
 import { openExternalUrl } from '@/lib/external-link'
 import { Pencil } from 'lucide-react'
-import { cn, isLightColor } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { detectMeetingProvider } from '@/lib/meeting-utils'
 import type { QuickLink } from '@/lib/types'
 import { useI18n } from '@/lib/i18n/react'
@@ -25,6 +25,16 @@ function openLink(url: string) {
   void openExternalUrl(url)
 }
 
+/**
+ * One tile on the 常用連結 grid.
+ *
+ * Visual language follows the app's paper theme (DESIGN.md, app/art-theme.css):
+ * a plain paper card with a thin ink hairline — no gradients. The user's
+ * chosen color survives only on the icon square, flattened and mixed toward
+ * the warm muted paper tone so saturated brand colors (FB blue, Gmail pink)
+ * sit quietly in the cream palette instead of shouting. Because the mix is
+ * against theme tokens, the same tile works in dark mode.
+ */
 export function QuickLinkCard({ link, onEdit }: QuickLinkCardProps) {
   const { t } = useI18n()
   // Fallback icon: first **grapheme** (full character) of the title so
@@ -33,70 +43,49 @@ export function QuickLinkCard({ link, onEdit }: QuickLinkCardProps) {
   const fallbackIcon = Array.from(link.title.trim())[0] ?? '🔗'
   const display = link.icon?.trim() || fallbackIcon
   const accent = link.color
-  const accentTextDark = accent ? isLightColor(accent) : true
 
   return (
-    <div className="relative group aspect-square">
+    <div className="relative group aspect-square" data-quick-link-card>
       <button
         type="button"
         onClick={() => openLink(link.url)}
         className={cn(
-          // Outer card. Slightly larger corner radius + soft shadow for
-          // depth. Subtle border that nearly disappears against the
-          // accent wash — the color does the visual heavy lifting.
           'relative flex flex-col items-center justify-center gap-2 w-full h-full',
-          'rounded-2xl border border-border/50 bg-card overflow-hidden',
-          // Smooth lift on hover. Shadow follows the accent color when
-          // present so the hover state feels "owned" by the card.
-          'transition-all duration-200 ease-out',
-          'hover:-translate-y-1 hover:border-foreground/20',
+          'rounded-2xl border border-border bg-card overflow-hidden',
+          'shadow-[0_1px_0_rgba(41,43,36,0.06)]',
+          'transition-[transform,border-color,box-shadow] duration-200 ease-out',
+          'hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-[0_3px_0_rgba(41,43,36,0.08)]',
           'active:scale-[0.97] active:translate-y-0',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
         )}
-        style={
-          accent
-            ? {
-                // Gentle gradient from accent at top to white at bottom.
-                // Layered radial-gradient adds a slight highlight at the
-                // top-center, mimicking soft top-down lighting.
-                backgroundImage: `
-                  radial-gradient(circle at 50% 0%, ${accent}40 0%, transparent 60%),
-                  linear-gradient(180deg, ${accent}1a 0%, transparent 100%)
-                `,
-              }
-            : undefined
-        }
         title={`${link.title}\n${link.url}`}
       >
-        {/* Icon disc — slightly oversized + subtle outer ring + inset
-            highlight. Reads as a glossy app-icon when a color is set,
-            falls back to a muted disc otherwise. */}
+        {/* Icon square — flat fill. With a user color: that color blended (sRGB, so
+            the hue stays true) ~1/3 into the muted paper tone plus a hairline in the color
+            itself, so the hue still identifies the link. Without: muted. */}
         <span
+          data-quick-link-icon
           className={cn(
-            'flex items-center justify-center w-11 h-11 rounded-xl',
-            'shadow-[0_2px_8px_-2px_rgba(0,0,0,0.15),inset_0_1px_0_rgba(255,255,255,0.25)]',
+            'flex items-center justify-center w-11 h-11 rounded-xl text-foreground',
             'transition-transform duration-200 group-hover:scale-105',
-            accent ? '' : 'bg-muted/80 text-foreground/80',
+            accent ? '' : 'bg-muted border border-border',
           )}
           style={
             accent
               ? {
-                  backgroundImage: `linear-gradient(140deg, ${accent} 0%, ${accent}d0 100%)`,
-                  color: accentTextDark ? 'rgba(31,31,31,0.92)' : '#fff',
+                  backgroundColor: `color-mix(in srgb, ${accent} 34%, var(--muted))`,
+                  border: `1px solid color-mix(in srgb, ${accent} 50%, var(--border))`,
                 }
               : undefined
           }
         >
-          {/* Icon text. Larger so emojis read clearly; tighter line
-              height so multi-character strings still center cleanly. */}
           <span className="text-base font-semibold leading-none">
             {display}
           </span>
         </span>
 
         {/* Title. Two-line clamp so longer names don't truncate too
-            aggressively. Letter-spacing nudged tight for that
-            "app-grid label" feel. */}
+            aggressively. */}
         <span
           className={cn(
             'px-2 text-center text-[11px] leading-tight tracking-tight font-medium',
@@ -115,23 +104,32 @@ export function QuickLinkCard({ link, onEdit }: QuickLinkCardProps) {
             onEdit(link)
           }}
           aria-label={t('編輯 {title}', { title: link.title })}
+          data-quick-link-edit
           className={cn(
-            'absolute top-1.5 right-1.5 flex items-center justify-center w-6 h-6 rounded-full',
-            // Touch devices get a >=44x44 hit box (visual disc stays w-6
-            // h-6 so it doesn't dominate the small card) — pointer is
-            // coarse there so there's no risk of stealing precise mouse
-            // clicks meant for the card underneath.
+            // The <button> is only the hit area: transparent, pinned to the
+            // card's top-right corner. The visible disc is the small inner
+            // span tucked into the corner so it never covers the icon
+            // (iPhone report 2026-09-26: the old visible 44px disc sat on
+            // top of 「雲端」「FB訊息」…). Touch keeps a 44x44 target.
+            'group/edit absolute top-0 right-0 flex items-start justify-end p-1 w-7 h-7 rounded-tr-2xl',
             '[@media(hover:none)]:w-11 [@media(hover:none)]:h-11',
-            'bg-card/95 backdrop-blur-sm border border-border shadow-sm text-muted-foreground',
-            // Hover-revealed on desktop, semi-visible on touch where
-            // hover is unreliable.
-            'opacity-0 group-hover:opacity-100',
-            'transition-opacity hover:text-foreground hover:bg-muted',
-            // Force visible on coarse pointers (touch).
-            '[@media(hover:none)]:opacity-80',
+            // Hover-revealed on desktop, always shown on touch.
+            'opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity',
+            'focus-visible:opacity-100 focus-visible:outline-none',
           )}
         >
-          <Pencil className="w-3 h-3 [@media(hover:none)]:w-3.5 [@media(hover:none)]:h-3.5" />
+          <span
+            aria-hidden="true"
+            data-quick-link-edit-disc
+            className={cn(
+              'flex items-center justify-center w-5 h-5 rounded-full',
+              'bg-card border border-border text-muted-foreground',
+              'transition-colors group-hover/edit:text-foreground group-hover/edit:bg-muted',
+              'group-focus-visible/edit:ring-2 group-focus-visible/edit:ring-ring',
+            )}
+          >
+            <Pencil className="w-2.5 h-2.5" />
+          </span>
         </button>
       )}
     </div>

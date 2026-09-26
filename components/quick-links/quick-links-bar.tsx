@@ -152,7 +152,7 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
           className={cn(
             hideTrigger
               ? cn(
-                  'fixed left-0 right-0 top-0 bottom-[58px]',
+                  'fixed left-0 right-0 top-0',
                   'bg-card border-b border-border shadow-2xl',
                   'transition-transform duration-300 ease-out',
                   isExpanded ? '' : 'pointer-events-none',
@@ -167,6 +167,12 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
           style={
             hideTrigger
               ? {
+                  // Safe areas: the iOS shell runs with contentInset
+                  // 'never' (capacitor.config.ts), so this fixed sheet must
+                  // clear the status bar itself, and it ends above the tab
+                  // bar, which is 58px + the home-indicator inset tall.
+                  paddingTop: 'env(safe-area-inset-top)',
+                  bottom: 'calc(58px + env(safe-area-inset-bottom))',
                   // Mirror of scratchpad's offset: translate-y-full only
                   // shifts by the element's own height. With top:0
                   // bottom:58 the height is (100dvh − 58), so a plain
@@ -174,7 +180,7 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
                   // the tab bar — pad the slide to fully hide.
                   transform: isExpanded
                     ? 'translateY(0)'
-                    : 'translateY(calc(100% + 58px))',
+                    : 'translateY(calc(100% + 58px + env(safe-area-inset-bottom)))',
                 }
               : undefined
           }

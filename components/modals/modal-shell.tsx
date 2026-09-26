@@ -191,6 +191,10 @@ export function ModalShell({
         aria-label={ariaLabel}
         className={cn(
           'relative z-modal flex h-[100dvh] w-full flex-col overflow-hidden bg-card',
+          // Mobile full-screen sheet: clear the iOS status bar / Dynamic
+          // Island (the app shell runs with contentInset 'never', so nothing
+          // native pads for us). Desktop cards/drawers don't need it.
+          'pt-[env(safe-area-inset-top)] md:pt-0',
           'motion-safe:ease-quart',
           variant === 'center' && [
             'md:h-auto md:max-h-[90dvh] md:mx-4 md:rounded-2xl md:border md:border-border md:shadow-2xl',

@@ -30,6 +30,7 @@ import { useI18n } from '@/lib/i18n/react'
 import { GrowthJourneyDashboard } from '@/components/growth/growth-journey-dashboard'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
 import type { RecurrenceChoice } from '@/components/modals/recurrence-choice-modal'
+import { useSoftKeyboard } from '@/hooks/use-soft-keyboard'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
@@ -65,7 +66,7 @@ interface MainLayoutProps {
   onTimeBlockSelect?: (block: TimeBlock) => void
   /** Narrow mutation for the quick-links bar (separate from saveSettings). */
   onSetQuickLinks?: (next: QuickLink[]) => void
-  /** Narrow mutation for the "當前重點" block (separate from saveSettings). */
+  /** Narrow mutation for the 重點 board (separate from saveSettings). */
   onSetFocusBoard?: (next: FocusSettings) => Promise<void> | void
   // Scratchpad — DB-backed; per-date map plus narrow mutations.
   scratchpadByDate?: Record<string, ScratchpadItem[]>
@@ -142,6 +143,16 @@ export function MainLayout({
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day')
+  // Phones open the calendar on 週 (owner request 2026-09-26); desktop keeps
+  // 日. Applied once, the first time we know we're on a phone, and only if
+  // nothing has moved the view off the initial 'day' yet — so a user's own
+  // pick in this session is never overridden. (View mode isn't persisted.)
+  const mobileDefaultViewAppliedRef = useRef(false)
+  useEffect(() => {
+    if (!isMobile || mobileDefaultViewAppliedRef.current) return
+    mobileDefaultViewAppliedRef.current = true
+    setViewMode((v) => (v === 'day' ? 'week' : v))
+  }, [isMobile])
   // Export-as-image modal — lives here because all the required data
   // (workspaces, timeBlocks, selectedDate, settings.calendarStartHour/EndHour)
   // is already in scope. Toggled by the export button in CalendarHeader.
@@ -160,6 +171,8 @@ export function MainLayout({
   // shape as 白板 / 連結: it takes over the content area while the bottom bar
   // stays put, so `mobileTab` is untouched and closing lands where you were.
   const [mobileFocusBoardOpen, setMobileFocusBoardOpen] = useState(false)
+  // Hides the tab bar / floating buttons while the soft keyboard is up.
+  useSoftKeyboard()
   // Mobile horizontal swipe between Tasks and Calendar tabs.
   // Lower thresholds than the desktop calendar swipe — phone gestures are
   // shorter and faster, and tab switching is binary (no chance of skipping
@@ -592,8 +605,6 @@ export function MainLayout({
                 workspaces={workspaces}
                 isExpanded={true}
                 keepCompletedTodayInList={settings?.keepCompletedTodayInList ?? true}
-                focusBoard={settings?.focusBoard}
-                onSetFocusBoard={onSetFocusBoard}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
                 onReorderCategories={onReorderCategories}
                 onToggleComplete={onToggleComplete}
@@ -749,6 +760,7 @@ export function MainLayout({
           const activeIndex = tabs.findIndex(t => t.active)
           return (
             <nav
+              data-hide-on-keyboard
               className="relative flex-shrink-0 grid grid-cols-5 border-t border-border/70 bg-card/95 backdrop-blur z-sticky pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_0_rgba(0,0,0,0.02)]"
               role="tablist"
               aria-label={t('主要分頁')}
@@ -807,6 +819,7 @@ export function MainLayout({
           <button
             type="button"
             data-tour="mobile-add-task"
+            data-hide-on-keyboard
             onClick={() => {
               hapticSelection()
               onCreateCalendarTask(toDateString(selectedDate))
