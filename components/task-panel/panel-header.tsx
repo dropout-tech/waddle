@@ -277,32 +277,38 @@ export function PanelHeader({
           </div>
         </div>
       ) : headerMode === 'compact' ? (
-        /* Wrap at the panel width, including when the user increases text size. */
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-3 whitespace-nowrap">
+        /* Container-query responsive (2026-09-26): this row used to
+           flex-wrap at the panel's own width, which meant the four control
+           icons got shoved onto their own second row whenever the task
+           panel was dragged narrow (~540px) — wasting a whole row on
+           nothing but icons. It's nowrap now: the date/pending group
+           shrinks and truncates instead, so the icon cluster always stays
+           on the same line, right-aligned, at any panel width. */
+        <div className="flex flex-nowrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden">
             {/* Compact date */}
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <div className="flex shrink-0 items-center justify-center w-8 h-8 rounded-lg bg-primary/10 border border-primary/20">
                 <span className="text-base font-bold text-primary tabular-nums">
                   {today.getDate()}
                 </span>
               </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold text-foreground">
+              <div className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-semibold text-foreground">
                   {today.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', { month: 'short' })}
                 </span>
-                <span className="text-[10px] text-muted-foreground -mt-0.5">
+                <span className="truncate text-[10px] text-muted-foreground -mt-0.5">
                   {today.toLocaleDateString(lang === 'en' ? 'en-US' : 'zh-TW', { weekday: 'short' })}
                 </span>
               </div>
             </div>
             {/* Pending count */}
-            <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-primary/10 text-primary">
+            <span className="shrink-0 whitespace-nowrap px-2 py-0.5 rounded-md text-xs font-semibold bg-primary/10 text-primary">
               {t('{count} 待辦', { count: totalPending })}
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             {/* Collapse one more level */}
             <button
               type="button"

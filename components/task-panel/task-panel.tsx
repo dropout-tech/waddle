@@ -277,9 +277,14 @@ export function TaskPanel({
         className
       )}
     >
-      {/* Left Column: Task List */}
+      {/* Left Column: Task List.
+          `@container/panel` establishes container-query context (sized by
+          THIS column's own width — i.e. the task panel's width when the
+          user drags it narrow — not the viewport) for PanelHeader's compact
+          row and the quick-access row below, both of which shrink their
+          text labels rather than wrap when the panel gets narrow. */}
       <div className={cn(
-        'flex flex-col h-full min-w-0',
+        'flex flex-col h-full min-w-0 @container/panel',
         isExpanded ? 'w-full md:w-[360px] md:border-r md:border-border' : 'flex-1'
       )}>
         {/* Header */}
@@ -296,12 +301,16 @@ export function TaskPanel({
           onToggleExpand={onToggleExpand}
         />
 
-        {/* Quick-access row: today's meetings (popover) + completed-tasks
-            drawer. Two parallel entry points kept on one row so the panel
-            header doesn't tower over the task list itself. */}
+        {/* Quick-access row: today's meetings (popover) + overdue review +
+            completed-tasks drawer. Container-query responsive (2026-09-26):
+            always nowrap now — below ~500px of PANEL width (not viewport)
+            each chip's text label hides (icon + count remain, with
+            aria-label/title kept so it's still announced/hoverable) so
+            "已完成" never gets shoved onto its own line when the panel is
+            dragged narrow. At >=500px all three keep their full labels. */}
         <div
           data-tour="task-shortcut-row"
-          className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border bg-card/50"
+          className="flex flex-nowrap items-center gap-1 @[500px]/panel:gap-2 px-3 py-2 border-b border-border bg-card/50 overflow-hidden"
         >
           <TodayMeetingsPopover
             workspaces={workspaces}
@@ -313,10 +322,11 @@ export function TaskPanel({
               onClick={onOpenOverdueReview}
               className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium text-overdue transition-colors hover:bg-overdue/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={t('整理 {count} 個待處理任務', { count: overdueCount })}
+              title={t('整理 {count} 個待處理任務', { count: overdueCount })}
             >
-              <CalendarClock className="size-3" aria-hidden="true" />
-              {t('待整理')}
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-overdue/12 px-1 text-[9px] font-semibold">
+              <CalendarClock className="size-3 shrink-0" aria-hidden="true" />
+              <span className="hidden @[500px]/panel:inline">{t('待整理')}</span>
+              <span className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-overdue/12 px-1 text-[9px] font-semibold">
                 {overdueCount}
               </span>
             </button>
@@ -326,13 +336,15 @@ export function TaskPanel({
             data-tour="completed-tasks-button"
             onClick={() => setCompletedDrawerOpen(true)}
             className="ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 py-1 rounded-md text-[11px] font-medium text-foreground hover:bg-muted/60 transition-colors group"
+            aria-label={t('已完成 {count} 項任務', { count: totalCompleted })}
+            title={t('已完成 {count} 項任務', { count: totalCompleted })}
           >
-            <CheckCircle2 className="w-3 h-3 text-primary" />
-            {t('已完成')}
+            <CheckCircle2 className="w-3 h-3 shrink-0 text-primary" />
+            <span className="hidden @[500px]/panel:inline">{t('已完成')}</span>
             <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-primary/15 text-primary text-[9px] font-semibold">
               {totalCompleted}
             </span>
-            <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-3 h-3 shrink-0 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
           </button>
         </div>
 
