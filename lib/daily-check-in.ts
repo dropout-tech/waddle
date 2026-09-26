@@ -18,4 +18,15 @@ export interface CheckInRanking {
   total_points: number
   is_current_user: boolean
   in_top_50: boolean
+  /** Legacy display string ("小企鵝 N"); the UI localizes penguin_number instead. */
+  leaderboard_name?: string
+  /** Legacy flag from the retired nickname feature. */
+  has_nickname?: boolean
+  /** Permanent public serial. Absent before migration 20260927100000. */
+  penguin_number?: number | null
+}
+
+/** Short fallback code, used only before the serial-number migration is live. */
+export function leaderboardCode(alias: string): string {
+  return alias.slice(0, 4)
 }

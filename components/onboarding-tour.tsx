@@ -176,13 +176,6 @@ const MOBILE_STEPS: TourStep[] = [
     padding: 0,
   },
   {
-    target: '[data-tour="focus-block"]',
-    title: '當前重點',
-    body: '任務欄最上面這條是「此刻最重要的事」。沒設定時 Huddle 會自動挑（逾期最久 → 今天排程 → 最急迫）；點右邊鉛筆可改成自己打一句推進狀態，或釘選某個任務。',
-    placement: 'bottom',
-    padding: 0,
-  },
-  {
     target: '[data-tour="task-row"]',
     title: '點任務 = 編輯，長按 = 拖到日曆',
     body: '輕點任務開啟詳細頁；長按 0.3 秒後拖移可以直接排到日曆上的時間。打開後可以把任務標為「會議」，會多參與者 / 地點 / 視訊連結。',

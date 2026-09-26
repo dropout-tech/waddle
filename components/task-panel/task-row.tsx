@@ -91,6 +91,7 @@ function TaskRowImpl({
   const [ghostOrigin, setGhostOrigin] = useState({ x: 0, y: 0 })
   const ghostElementRef = useRef<HTMLDivElement>(null)
   const swipeSurfaceRef = useRef<HTMLDivElement>(null)
+  const deleteActionRef = useRef<HTMLButtonElement>(null)
   // Once the drag activates, the trailing click event (if any) needs to be
   // suppressed so we don't open the modal at the same time as the drop.
   const suppressNextClickRef = useRef(false)
@@ -106,6 +107,13 @@ function TaskRowImpl({
       ? 'transform 180ms cubic-bezier(0.22, 1, 0.36, 1)'
       : 'none'
     surface.style.transform = `translate3d(${offset}px, 0, 0)`
+    // The delete action sits UNDER the row. Row backgrounds are translucent
+    // (paper theme: --row-bg is a low-alpha tint or transparent), so an
+    // always-painted action showed through every row as a ghosted
+    // "刪刪除" (iPhone report 2026-09-26). Only paint it while the row is
+    // actually pulled aside.
+    const action = deleteActionRef.current
+    if (action) action.style.visibility = offset < 0 ? 'visible' : 'hidden'
   }
 
   useEffect(() => {
@@ -391,8 +399,11 @@ function TaskRowImpl({
       >
         {onDelete && (
           <button
+            ref={deleteActionRef}
             type="button"
             data-task-delete-action="mobile"
+            // Hidden at rest; setSwipeOffset() flips this while swiping.
+            style={{ visibility: isDeleteRevealed ? 'visible' : 'hidden' }}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={handleDelete}
             className="absolute inset-y-0 right-0 flex w-[76px] items-center justify-center gap-1.5 bg-primary/12 text-xs font-semibold text-primary transition-colors active:bg-primary/20 md:hidden"

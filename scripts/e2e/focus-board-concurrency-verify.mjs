@@ -158,52 +158,42 @@ try {
       const proto = Object.getPrototypeOf(el)
       Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, value)
     }
-    function findButton(root, label) {
-      return [...root.querySelectorAll('button')].find((b) => b.getAttribute('aria-label') === label)
-    }
     const tick = () => new Promise((r) => setTimeout(r, 0))
     const cardA = document.querySelector(`[data-focus-card="${catA}"]`)
     const cardB = document.querySelector(`[data-focus-card="${catB}"]`)
-    findButton(cardA, '編輯「九豆」目前狀態').click()
+    const inputA = cardA.querySelector('textarea[aria-label="「九豆」備註"]')
+    const inputB = cardB.querySelector('textarea[aria-label="「Nova air」備註"]')
+    inputA.focus()
     await tick()
-    const inputA = cardA.querySelector('input[aria-label="自訂狀態"]')
     setNativeValue(inputA, 'A卡併發測試')
     inputA.dispatchEvent(new Event('input', { bubbles: true }))
     await tick()
     // Blur A synchronously — fires its onBlur -> save() -> suspends at the
     // `await onUpdate(...)` without yielding a microtask checkpoint yet.
-    inputA.blur()
-    // Still the same task: open B before the queue's `.then()` (which sets
+    // Still the same task: focus B before the queue's `.then()` (which sets
     // `saving`) has had a chance to run.
-    findButton(cardB, '編輯「Nova air」目前狀態').click()
-    const inputBImmediate = cardB.querySelector('input[aria-label="自訂狀態"]')
-    const bFoundImmediately = !!inputBImmediate
-    const bDisabledImmediately = inputBImmediate?.disabled ?? null
+    inputA.blur()
+    inputB.focus()
+    const bFoundImmediately = !!inputB
+    const bDisabledImmediately = inputB?.disabled ?? null
     await tick()
-    const inputB = cardB.querySelector('input[aria-label="自訂狀態"]')
-    const bOpenedWhileAUnresolved = !!inputB && !inputB.disabled
-    if (inputB && !inputB.disabled) {
+    const bOpenedWhileAUnresolved = !!inputB && !inputB.disabled && document.activeElement === inputB
+    if (bOpenedWhileAUnresolved) {
       setNativeValue(inputB, 'B卡併發測試')
       inputB.dispatchEvent(new Event('input', { bubbles: true }))
-      // No tick here on purpose — every extra yield point is one more
-      // chance for the queue's `saving` flip to interleave and make the
-      // race harder to land. React commits controlled-input state from a
-      // dispatched 'input' event synchronously enough for the immediate
-      // submit below to see the new value (mirrors how a real fast typist
-      // triggers Enter right after their last keystroke).
-      const form = inputB.closest('form')
-      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      await tick()
+      inputB.blur()
     }
     return { bOpenedWhileAUnresolved, hadInputB: !!inputB, bFoundImmediately, bDisabledImmediately }
   }, { catA: CATS[0].id, catB: CATS[1].id })
-  check('B\'s editor opens (not yet disabled) in the same turn A\'s save starts', raced.bOpenedWhileAUnresolved, JSON.stringify(raced))
+  check('B\'s remarks stay editable (not disabled) in the same turn A\'s save starts', raced.bOpenedWhileAUnresolved, JSON.stringify(raced))
   // Give the serial queue time to flush both writes (A's 1.5s delay + B's).
   await sleep(4000)
   delayMs = 0
   check(
     'Both A and B edits are present after the queue flushes (no silent drop)',
-    storedFocus.cards[0]?.status?.text === 'A卡併發測試' && storedFocus.cards[1]?.status?.text === 'B卡併發測試',
-    `A=${JSON.stringify(storedFocus.cards[0]?.status)} B=${JSON.stringify(storedFocus.cards[1]?.status)}`,
+    storedFocus.cards[0]?.remarks === 'A卡併發測試' && storedFocus.cards[1]?.remarks === 'B卡併發測試',
+    `A=${JSON.stringify(storedFocus.cards[0]?.remarks)} B=${JSON.stringify(storedFocus.cards[1]?.remarks)}`,
   )
   check('At least two focus_board writes landed (queued, not dropped)', writes.length - beforeWrites >= 2, `writes=${writes.length - beforeWrites}`)
 
@@ -211,8 +201,8 @@ try {
   await page.reload()
   await sleep(3000)
   await openBoard(page)
-  await cardA.getByRole('button', { name: '編輯「九豆」目前狀態' }).click()
-  await cardA.getByRole('textbox', { name: '自訂狀態' }).fill('草稿未存檔就切走')
+  await cardA.getByRole('textbox', { name: '「九豆」備註' }).click()
+  await cardA.getByRole('textbox', { name: '「九豆」備註' }).fill('草稿未存檔就切走')
   const beforeHideWrites = writes.length
   // Read localStorage inside the SAME evaluate call, right after dispatch —
   // persistDraft() writes it synchronously before its fire-and-forget
@@ -223,24 +213,35 @@ try {
     document.dispatchEvent(new Event('visibilitychange'))
     return localStorage.getItem(`waddle-focus-draft-v1:${catId}`)
   }, CATS[0].id)
-  check('Draft is persisted to localStorage when the tab is hidden mid-edit', !!draftRaw && JSON.parse(draftRaw).text === '草稿未存檔就切走', draftRaw ?? 'null')
+  check('Draft is persisted to localStorage when the tab is hidden mid-edit', !!draftRaw && JSON.parse(draftRaw).remarks === '草稿未存檔就切走', draftRaw ?? 'null')
   await sleep(500)
   check('Hiding the tab also attempts a best-effort save', writes.length > beforeHideWrites)
 
   // Reload (simulating reopening after the tab/app was closed) and confirm
   // the draft is restored into the editor with a toast, then clears once saved.
-  await page.evaluate((catId) => {
+  // Leave the editor first: a still-focused draft would be re-persisted by
+  // pagehide during the reload below and overwrite the seeded draft.
+  await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' }); document.activeElement?.blur() })
+  await sleep(500)
+  await page.evaluate(({ catA, catB }) => {
     // Re-seed localStorage since the best-effort save above may have already
     // cleared it after succeeding — we specifically want to verify recovery
-    // when the flush never reached the server.
-    localStorage.setItem(`waddle-focus-draft-v1:${catId}`, JSON.stringify({ editing: 'status', mode: 'text', taskId: '', text: '復原草稿測試', remarks: '', ts: Date.now() }))
-  }, CATS[0].id)
+    // when the flush never reached the server. Card B carries a legacy draft
+    // from the removed status editor: it must be discarded without errors.
+    localStorage.setItem(`waddle-focus-draft-v1:${catA}`, JSON.stringify({ editing: 'remarks', remarks: '復原草稿測試', ts: Date.now() }))
+    localStorage.setItem(`waddle-focus-draft-v1:${catB}`, JSON.stringify({ editing: 'status', mode: 'text', taskId: '', text: '舊狀態草稿', remarks: 'B卡併發測試', ts: Date.now() }))
+  }, { catA: CATS[0].id, catB: CATS[1].id })
   await page.reload()
   await sleep(3000)
   await openBoard(page)
-  const restoredTextbox = cardA.getByRole('textbox', { name: '自訂狀態' })
-  check('Draft auto-reopens the editor with the recovered text on next load', await restoredTextbox.inputValue().catch(() => '') === '復原草稿測試')
+  const restoredTextbox = cardA.getByRole('textbox', { name: '「九豆」備註' })
+  await sleep(800) // restore runs in a post-mount effect
+  const dbg = await page.evaluate((catA) => ({ ls: localStorage.getItem(`waddle-focus-draft-v1:${catA}`), vals: [...document.querySelectorAll('textarea[data-focus-remarks]')].map((e) => e.value) }), CATS[0].id)
+  check('Draft is restored into the inline remarks on next load', await restoredTextbox.inputValue().catch(() => '') === '復原草稿測試', JSON.stringify(dbg))
+  check('Legacy status-editor draft is discarded quietly', await page.evaluate((catB) => localStorage.getItem(`waddle-focus-draft-v1:${catB}`), CATS[1].id) === null && await cardB.getByText('舊狀態草稿').count() === 0)
   await page.screenshot({ path: path.join(SHOTS, 'draft-restored.png'), fullPage: true })
+  await cardA.getByRole('button', { name: '儲存', exact: true }).click(); await sleep(500)
+  check('Restored draft saves via the explicit save button', storedFocus.cards[0]?.remarks === '復原草稿測試' && await page.evaluate((catA) => localStorage.getItem(`waddle-focus-draft-v1:${catA}`), CATS[0].id) === null)
   check('No uncaught browser errors', pageErrors.length === 0, pageErrors.join('; '))
 } catch (error) { failed++; console.error(error) }
 finally {

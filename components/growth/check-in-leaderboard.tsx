@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { CheckInRanking } from '@/lib/daily-check-in'
+import { leaderboardCode, type CheckInRanking } from '@/lib/daily-check-in'
 import { useI18n } from '@/lib/i18n/react'
+import { cn } from '@/lib/utils'
 
 export function CheckInLeaderboard({ score }: { score: number | undefined }) {
   const { t } = useI18n()
@@ -36,38 +37,54 @@ export function CheckInLeaderboard({ score }: { score: number | undefined }) {
   }, [supabase, score, attempt])
   const own = rows.find(row => row.is_current_user)
   const leaders = rows.filter(row => row.in_top_50)
+  // Everyone appears by a permanent serial; the short code only covers the
+  // moment before the serial-number migration is live.
+  const nameOf = (row: CheckInRanking) =>
+    row.penguin_number != null ? t('小企鵝 {n}', { n: row.penguin_number }) : t('小企鵝 #{code}', { code: leaderboardCode(row.penguin_alias) })
   // Staged rollout: keep the existing growth page intact until the RPC is deployed.
   if (unavailable) return null
   return (
-    <section aria-labelledby="check-in-ranking-title" className="mt-10 w-full border-t border-border pt-7 text-left">
-      <h2 id="check-in-ranking-title" className="text-lg font-semibold">{t('累積分數排行榜')}</h2>
-      <p className="mt-2 text-xs leading-6 text-muted-foreground">{t('顯示前 50 位小企鵝，相同分數並列。暱稱由系統匿名產生。')}</p>
-      {loading ? <p role="status" className="py-6 text-sm text-muted-foreground">{t('正在讀取排行榜…')}</p> : failed ? (
-        <div role="alert" className="py-5 text-sm">
-          <p>{t('排行榜暫時讀不到，請再試一次。')}</p>
-          <button onClick={() => setAttempt(n => n + 1)} className="min-h-11 rounded-lg px-3 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{t('重新讀取')}</button>
-        </div>
-      ) : <>
-        {own && <p className="my-4 rounded-xl bg-secondary/50 px-4 py-3 text-sm font-medium">
-          {own.rank_position === null ? t('簽到後，就能留下你的第一個分數。') : t('你的名次：第 {n} 名', { n: own.rank_position })}
-          <span className="ml-2">{t('{n} 分', { n: own.total_points })}</span>
-        </p>}
-        {leaders.length === 0 ? <p className="py-4 text-sm text-muted-foreground">{t('排行榜正等著第一個小小的開始。')}</p> : (
-          <table className="w-full text-sm">
-            <caption className="sr-only">{t('累積分數排行榜')}</caption>
-            <thead className="border-b border-border text-xs text-muted-foreground"><tr>
-              <th scope="col" className="py-3 pr-2 text-left font-medium">{t('名次')}</th>
-              <th scope="col" className="py-3 text-left font-medium">{t('小企鵝')}</th>
-              <th scope="col" className="py-3 pl-2 text-right font-medium">{t('分數')}</th>
-            </tr></thead>
-            <tbody>{leaders.map(row => <tr key={row.penguin_alias} className={row.is_current_user ? 'border-b border-border/50 bg-secondary/30' : 'border-b border-border/50'}>
-              <td className="px-2 py-4 tabular-nums">{row.rank_position}</td>
-              <td className="py-4"><span className="break-all">{t('企鵝 {id}', { id: row.penguin_alias })}</span>{row.is_current_user && <span className="ml-2 text-xs font-semibold">{t('（你）')}</span>}</td>
-              <td className="px-2 py-4 text-right tabular-nums">{row.total_points}</td>
-            </tr>)}</tbody>
-          </table>
+    <section aria-labelledby="check-in-ranking-title" className="mt-8 w-full text-left">
+      <h2 id="check-in-ranking-title" className="px-1 text-base font-semibold">{t('累積分數排行榜')}</h2>
+
+      {own && !loading && !failed && (
+        <p className="mt-1 px-1 text-sm text-muted-foreground">
+          {own.rank_position === null
+            ? t('簽到後，就能留下你的第一個分數。')
+            : t('你是{name}，目前第 {n} 名。', { n: own.rank_position, name: nameOf(own) })}
+        </p>
+      )}
+
+      <div className="mt-3 rounded-2xl border border-border bg-card px-2 shadow-sm sm:px-3">
+        {loading && rows.length === 0 ? <p role="status" className="px-2 py-6 text-sm text-muted-foreground">{t('正在讀取排行榜…')}</p> : failed ? (
+          <div role="alert" className="px-2 py-5 text-sm">
+            <p>{t('排行榜暫時讀不到，請再試一次。')}</p>
+            <button onClick={() => setAttempt(n => n + 1)} className="min-h-11 rounded-lg px-0 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{t('重新讀取')}</button>
+          </div>
+        ) : leaders.length === 0 ? <p className="px-2 py-6 text-sm text-muted-foreground">{t('排行榜正等著第一個小小的開始。')}</p> : (
+          <ol aria-label={t('累積分數排行榜')} className="text-sm">
+            {leaders.map(row => (
+              <li key={row.penguin_alias}
+                className={cn('grid min-h-12 grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border-b border-border/60 px-2 py-2 last:border-0', row.is_current_user && '-mx-2 rounded-xl border-transparent bg-accent/50 px-4 sm:-mx-3 sm:px-5')}>
+                <span
+                  aria-label={t('第 {n} 名', { n: row.rank_position ?? '' })}
+                  className={cn(
+                    'inline-flex size-7 items-center justify-center rounded-full text-xs font-semibold tabular-nums',
+                    row.rank_position === 1 ? 'bg-[var(--art-mustard,#edc747)] text-[#292b24]'
+                      : row.rank_position !== null && row.rank_position <= 3 ? 'bg-muted text-foreground ring-1 ring-border'
+                      : 'text-muted-foreground',
+                  )}>{row.rank_position}</span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className={cn('truncate', row.is_current_user ? 'font-semibold text-foreground' : 'text-foreground')}>{nameOf(row)}</span>
+                  {row.is_current_user && <span className="shrink-0 text-xs font-semibold text-foreground">{t('（你）')}</span>}
+                </span>
+                <span className="text-right font-semibold tabular-nums">{t('{n} 分', { n: row.total_points })}</span>
+              </li>
+            ))}
+          </ol>
         )}
-      </>}
+      </div>
+      <p className="mt-2 px-1 text-xs leading-5 text-muted-foreground">{t('前 50 名，同分並列。每位小企鵝都有一個固定編號，不會顯示帳號名稱。')}</p>
     </section>
   )
 }

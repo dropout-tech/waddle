@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -8,7 +8,6 @@ import {
   ChevronUp,
   LayoutGrid,
   List,
-  Pencil,
   SlidersHorizontal,
   Target,
 } from "lucide-react";
@@ -233,20 +232,26 @@ function ProgressCard({
 }) {
   const { t } = useI18n();
   const displayColor = useDisplayColor();
-  const [editing, setEditing] = useState<"all" | "status" | "remarks" | null>(null);
-  const [text, setText] = useState("");
+  // Remarks are edited in place: the textarea *is* the remarks area. `editing`
+  // is true while it holds a local draft that hasn't been committed yet.
+  const [editing, setEditing] = useState(false);
   const [remarks, setRemarks] = useState("");
-  const [mode, setMode] = useState<"text" | "task">("text");
-  const [taskId, setTaskId] = useState("");
+  // A draft brought back from an abrupt close (or a failed save) isn't
+  // focused, so blur can't commit it — show an explicit save/discard row.
+  const [restored, setRestored] = useState(false);
   const [creating, setCreating] = useState(false);
+  const remarksRef = useRef<HTMLTextAreaElement>(null);
   const tasks = category.tasks.filter(
     (task) => !task.isArchived && task.showInTaskList !== false,
   );
-  // Never resolve a reference outside this category, even after a task is moved.
+  // Current status is chosen from the task list below (◎ button); the card
+  // only displays it. Never resolve a reference outside this category.
   const linked =
     card.status?.mode === "task"
       ? tasks.find((task) => task.id === card.status?.taskId)
       : undefined;
+  // Legacy data: a typed status (`mode: "text"`) or the old `note` field is
+  // still shown read-only so existing boards don't lose information.
   const statusText = card.status
     ? card.status.mode === "task"
       ? linked?.title
@@ -275,11 +280,18 @@ function ProgressCard({
       }
     });
   const editable = !!onSetFocusBoard;
-  const field =
-    "min-h-11 w-full min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
   const submitting = useRef(false);
   const cancelled = useRef(false);
   const [saveFailed, setSaveFailed] = useState(false);
+  const remarksValue = editing ? remarks : (card.remarks ?? "");
+
+  // Grow with the content instead of jumping to a fixed tall box.
+  useLayoutEffect(() => {
+    const el = remarksRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [remarksValue]);
 
   // Closing the tab or backgrounding the app (iOS Capacitor included) mid-edit
   // must not silently lose the draft. localStorage is the reliable fallback —
@@ -295,24 +307,22 @@ function ProgressCard({
     try {
       const raw = localStorage.getItem(draftKey);
       if (!raw) return;
-      const draft = JSON.parse(raw) as {
-        editing?: "all" | "status" | "remarks";
-        mode?: "text" | "task";
-        taskId?: string;
-        text?: string;
-        remarks?: string;
-      };
-      if (!draft.editing) {
+      // Older drafts may also carry status fields (`mode`/`text`/`taskId`)
+      // from the removed status editor; only the remarks part is restorable.
+      const draft = JSON.parse(raw) as { editing?: string; remarks?: unknown };
+      if (
+        !draft.editing ||
+        typeof draft.remarks !== "string" ||
+        draft.remarks.trim() === (card.remarks ?? "")
+      ) {
         clearDraft();
         return;
       }
       cancelled.current = false;
       setSaveFailed(false);
-      setMode(draft.mode === "task" ? "task" : "text");
-      setTaskId(draft.taskId ?? "");
-      setText(draft.text ?? "");
-      setRemarks(draft.remarks ?? "");
-      setEditing(draft.editing);
+      setRemarks(draft.remarks);
+      setEditing(true);
+      setRestored(true);
       toast.info(t("已還原上次未儲存的草稿，請確認後再送出"));
     } catch {
       clearDraft();
@@ -323,12 +333,12 @@ function ProgressCard({
   // Persist the in-progress draft whenever the page is about to disappear.
   // Refs (not effect deps) hold the latest values so we don't churn the
   // listeners on every keystroke.
-  const draftSnapshot = { editing, mode, taskId, text, remarks };
+  const draftSnapshot = { editing: editing ? "remarks" : null, remarks };
   const draftSnapshotRef = useRef(draftSnapshot);
   draftSnapshotRef.current = draftSnapshot;
   // `save` closes over this render's state; the listeners below are only
   // attached once (stable deps), so without this ref they'd keep calling
-  // the mount-time `save` — which still sees `editing === null` — forever.
+  // the mount-time `save` — which still sees `editing === false` — forever.
   const saveRef = useRef(save);
   saveRef.current = save;
   useEffect(() => {
@@ -353,49 +363,39 @@ function ProgressCard({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
-  function edit(target: "all" | "status" | "remarks" = "all") {
-    cancelled.current = false;
+  function finishEditing() {
+    setRestored(false);
+    clearDraft();
+    // A flush triggered while the user is still typing (e.g. app briefly
+    // backgrounded) must not yank the draft out from under them.
+    if (document.activeElement !== remarksRef.current) setEditing(false);
+  }
+  function cancelEditing() {
+    cancelled.current = true;
     setSaveFailed(false);
-    setMode(card.status?.mode === "task" ? "task" : "text");
-    setTaskId(linked?.id ?? "");
-    setText(
-      card.status?.mode === "text"
-        ? (card.status.text ?? "")
-        : (card.note ?? ""),
-    );
-    setRemarks(card.remarks ?? "");
-    setEditing(target);
+    setRestored(false);
+    setEditing(false);
+    clearDraft();
+    remarksRef.current?.blur();
   }
   async function save() {
     // Note: `saving` (the board-wide indicator) is intentionally NOT part of
-    // this guard. A card whose editor blurs/submits while another card is
-    // mid-save must still queue its write via onUpdate (see FocusBoard's
-    // serial queue) rather than being silently dropped here.
+    // this guard. A card whose remarks blur while another card is mid-save
+    // must still queue its write via onUpdate (see FocusBoard's serial
+    // queue) rather than being silently dropped here.
     if (!editing || cancelled.current || submitting.current) return;
-    if (editing !== "remarks" && mode === "task" && !taskId) return;
-    const statusChanged = editing !== "remarks" && (
-      mode === "task"
-        ? card.status?.mode !== "task" || card.status.taskId !== taskId
-        : card.status?.mode === "task" || text.trim() !== (statusText ?? "")
-    );
-    const remarksChanged = editing !== "status" && remarks.trim() !== (card.remarks ?? "");
-    if (!statusChanged && !remarksChanged) {
-      setEditing(null);
-      clearDraft();
+    const next = remarks.trim();
+    // After a failed write the board state already holds the optimistic
+    // value, so "unchanged" can't be trusted — a retry must always write.
+    if (next === (card.remarks ?? "") && !saveFailed) {
+      finishEditing();
       return;
     }
     submitting.current = true;
     setSaveFailed(false);
     try {
-      await onUpdate({
-        ...(statusChanged ? { status: mode === "task"
-          ? { mode: "task" as const, taskId, updatedAt: new Date().toISOString() }
-          : { mode: "text" as const, text: text.trim(), updatedAt: new Date().toISOString() }
-        } : {}),
-        ...(remarksChanged ? { remarks: remarks.trim() } : {}),
-      });
-      setEditing(null);
-      clearDraft();
+      await onUpdate({ remarks: next });
+      finishEditing();
     } catch {
       setSaveFailed(true);
       toast.error(t("儲存失敗，請重試"));
@@ -425,202 +425,159 @@ function ProgressCard({
             {workspace.name}
           </p>
         </div>
-        {editable && (
-          <button
-            aria-label={t("編輯「{name}」狀態與備註", { name: category.name })}
-            disabled={saving}
-            onClick={() => edit()}
-            className="-mr-2 -mt-2 flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Pencil className="size-4" />
-          </button>
-        )}
       </div>
-      {editing ? (
-        <form
-          className="mt-3 space-y-3"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && isImeComposing(e)) e.preventDefault();
-            if (e.key === "Escape" && !isImeComposing(e)) {
-              e.preventDefault();
-              e.stopPropagation();
-              if (!saving && !submitting.current) {
-                cancelled.current = true;
-                setEditing(null);
-                clearDraft();
-              }
-            }
-          }}
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-              void save();
-            }
-          }}
-          onSubmit={(e) => {
-            e.preventDefault();
-            void save();
-          }}
-        >
-          <fieldset disabled={saving} className="min-w-0 space-y-3">
-          {editing !== "remarks" && <>
-          <label className="block space-y-1 text-sm">
-            <span>{t("目前狀態")}</span>
-            <select
-              className={field}
-              value={mode}
-              onChange={(e) => setMode(e.target.value as "text" | "task")}
-            >
-              <option value="text">{t("自訂文字")}</option>
-              <option value="task">{t("引用任務")}</option>
-            </select>
-          </label>
-          {mode === "text" ? (
-            <>
-              <input
-                aria-label={t("自訂狀態")}
-                autoFocus
-                className={field}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                maxLength={2000}
-              />
-              <p className="text-xs text-muted-foreground">
-                {t("只儲存狀態文字，不會自動建立任務。")}
-              </p>
-            </>
-          ) : (
-            <select
-              aria-label={t("選擇狀態任務")}
-              autoFocus
-              required
-              className={field}
-              value={taskId}
-              onChange={(e) => setTaskId(e.target.value)}
-            >
-              <option value="">{t("選擇任務")}</option>
-              {tasks.map((task) => (
-                <option key={task.id} value={task.id}>
-                  {task.isCompleted ? `${t("已完成")} · ` : ""}
-                  {task.title}
-                </option>
-              ))}
-            </select>
-          )}
-          </>}
-          {editing !== "status" && <label className="block space-y-1 text-sm">
-            <span>{t("備註")}</span>
-            <textarea
-              className={field}
-              autoFocus={editing === "remarks"}
-              rows={3}
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              maxLength={10000}
-            />
-          </label>}
-          <div className="flex items-center gap-2">
-            <p role="status" className="text-xs text-muted-foreground">
-              {t(saving ? "儲存中…" : saveFailed ? "儲存失敗，請重試" : "離開編輯區自動儲存，Esc 取消")}
-            </p>
-            {saveFailed && <button type="submit" className="min-h-11 rounded-lg px-3 text-sm text-primary hover:bg-muted">
-              {t("重試")}
-            </button>}
+      <div className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+        <div className="min-w-0 [overflow-wrap:anywhere]">
+          <p className="mb-1 text-xs font-medium text-muted-foreground">
+            {t("目前狀態")}
+          </p>
+          {linked ? (
             <button
               type="button"
-              onClick={() => {
-                cancelled.current = true;
-                setEditing(null);
-                clearDraft();
-              }}
-              className="min-h-11 rounded-lg px-4 text-sm hover:bg-muted"
+              onClick={() => onSelectTask(linked)}
+              aria-label={t("開啟原任務") + "：" + linked.title}
+              className="min-h-11 w-full min-w-0 max-w-full rounded-md px-1 py-1 text-left text-sm break-words hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {t("取消")}
+              <Target className="mr-1.5 inline size-4 text-primary" />
+              <span className="break-words">{linked.title}</span>
+              {linked.isCompleted && (
+                <span className="ml-2 text-muted-foreground">
+                  {t("已完成")}
+                </span>
+              )}
             </button>
-          </div>
-          </fieldset>
-        </form>
-      ) : (
-        <div className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
-          <div className="min-w-0 [overflow-wrap:anywhere]">
-            <p className="mb-1 text-xs font-medium text-muted-foreground">
-              {t("目前狀態")}
+          ) : (
+            <p
+              data-focus-status
+              className={cn(
+                "flex min-h-11 items-center whitespace-pre-wrap break-words px-1 py-1 text-sm",
+                !statusText && "text-muted-foreground",
+              )}
+            >
+              {statusText ||
+                t(
+                  card.status?.mode === "task"
+                    ? "原任務已移動或移除，請重新設定狀態"
+                    : editable && tasks.length
+                      ? "點下方任務旁的 ◎ 設為目前狀態"
+                      : "尚未設定狀態",
+                )}
             </p>
-            {editable ? (
-              <button type="button" disabled={saving} onClick={() => edit("status")} aria-label={t("編輯「{name}」目前狀態", { name: category.name })} className="min-h-11 w-full min-w-0 rounded-md px-1 py-1 text-left text-sm whitespace-pre-wrap break-words hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
-                {linked && <Target className="mr-1.5 inline size-4" />}
-                {statusText || t(card.status?.mode === "task" ? "原任務已移動或移除，請重新設定狀態" : "尚未設定狀態")}
-              </button>
-            ) : linked ? (
+          )}
+          {editable &&
+            statusText &&
+            !linked &&
+            card.status?.mode !== "task" &&
+            onAddTask && (
               <button
-                onClick={() => onSelectTask(linked)}
-                className="min-h-11 w-full min-w-0 max-w-full break-words text-left text-base font-medium leading-relaxed hover:underline"
+                disabled={
+                  creating || tasks.some((task) => task.title === statusText)
+                }
+                onClick={async () => {
+                  setCreating(true);
+                  try {
+                    const created: unknown = await onAddTask(
+                      category.id,
+                      statusText,
+                    );
+                    if (created === false)
+                      toast.error(t("建立任務失敗，請重試"));
+                  } catch {
+                    toast.error(t("建立任務失敗，請重試"));
+                  } finally {
+                    setCreating(false);
+                  }
+                }}
+                className="mt-1 min-h-11 rounded-md px-2 text-xs text-primary hover:bg-muted disabled:text-muted-foreground"
               >
-                <Target className="mr-1.5 inline size-4" />
-                <span className="break-words">{linked.title}</span>
-                {linked.isCompleted && (
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    {t("已完成")}
-                  </span>
+                {t(
+                  tasks.some((task) => task.title === statusText)
+                    ? "已有同名任務"
+                    : creating
+                      ? "建立中…"
+                      : "將此狀態新增為任務",
                 )}
               </button>
-            ) : (
-              <p className="whitespace-pre-wrap break-words text-base leading-relaxed">
-                {statusText ||
-                  t(
-                    card.status?.mode === "task"
-                      ? "原任務已移動或移除，請重新設定狀態"
-                      : "尚未設定狀態",
-                  )}
-              </p>
             )}
-            {editable && linked && <button type="button" onClick={() => onSelectTask(linked)} className="min-h-11 rounded-md px-2 text-xs text-primary hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">{t("開啟原任務")}</button>}
-            {editable &&
-              statusText &&
-              card.status?.mode !== "task" &&
-              onAddTask && (
-                <button
-                  disabled={
-                    creating || tasks.some((task) => task.title === statusText)
-                  }
-                  onClick={async () => {
-                    setCreating(true);
-                    try {
-                      const created: unknown = await onAddTask(
-                        category.id,
-                        statusText,
-                      );
-                      if (created === false)
-                        toast.error(t("建立任務失敗，請重試"));
-                    } catch {
-                      toast.error(t("建立任務失敗，請重試"));
-                    } finally {
-                      setCreating(false);
-                    }
-                  }}
-                  className="mt-1 min-h-11 rounded-md px-2 text-xs text-primary hover:bg-muted disabled:text-muted-foreground"
-                >
-                  {t(
-                    tasks.some((task) => task.title === statusText)
-                      ? "已有同名任務"
-                      : creating
-                        ? "建立中…"
-                        : "將此狀態新增為任務",
-                  )}
-                </button>
-              )}
-          </div>
-          <div className="min-w-0 [overflow-wrap:anywhere]">
-            <p className="mb-1 text-xs font-medium text-muted-foreground">
-              {t("備註")}
-            </p>
-            {editable ? <button type="button" disabled={saving} onClick={() => edit("remarks")} aria-label={t("編輯「{name}」備註", { name: category.name })} className="min-h-11 w-full min-w-0 rounded-md px-1 py-1 text-left text-sm whitespace-pre-wrap break-words text-muted-foreground hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
-              {card.remarks || t("尚無備註")}
-            </button> : <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">
-              {card.remarks || t("尚無備註")}
-            </p>}
-          </div>
         </div>
-      )}
+        <div className="min-w-0 [overflow-wrap:anywhere]">
+          <p className="mb-1 text-xs font-medium text-muted-foreground">
+            {t("備註")}
+          </p>
+          {editable ? (
+            <>
+              <textarea
+                ref={remarksRef}
+                data-focus-remarks
+                aria-label={t("「{name}」備註", { name: category.name })}
+                placeholder={t("尚無備註")}
+                rows={1}
+                maxLength={10000}
+                value={remarksValue}
+                onFocus={(e) => {
+                  if (!editing) {
+                    cancelled.current = false;
+                    setSaveFailed(false);
+                    setRemarks(card.remarks ?? "");
+                    setEditing(true);
+                  }
+                  // iOS: wait for the keyboard to finish sliding up, then keep
+                  // the note in view instead of hidden behind it.
+                  const el = e.currentTarget;
+                  window.setTimeout(() => {
+                    if (document.activeElement === el)
+                      el.scrollIntoView({ block: "center", behavior: "smooth" });
+                  }, 350);
+                }}
+                onChange={(e) => {
+                  if (!editing) setEditing(true);
+                  setRemarks(e.target.value);
+                }}
+                onBlur={() => void save()}
+                onKeyDown={(e) => {
+                  // Plain Enter is a newline (never a submit), so IME
+                  // confirmation can't send anything. ⌘/Ctrl+Enter commits.
+                  if (isImeComposing(e)) return;
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!submitting.current) cancelEditing();
+                  } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="block min-h-11 w-full min-w-0 resize-none overflow-hidden whitespace-pre-wrap break-words rounded-md border-0 bg-transparent px-1 py-2.5 text-base leading-6 text-muted-foreground shadow-none outline-none transition-colors placeholder:text-muted-foreground hover:bg-muted/60 focus:bg-muted/40 focus:text-foreground focus-visible:outline-none md:py-3 md:text-sm md:leading-5"
+              />
+              {(saveFailed || restored) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <p role="status" className="text-xs text-muted-foreground">
+                    {t(saveFailed ? "儲存失敗，請重試" : "已還原上次未儲存的草稿，請確認後再送出")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void save()}
+                    className="min-h-11 rounded-lg px-3 text-sm text-primary hover:bg-muted"
+                  >
+                    {t(saveFailed ? "重試" : "儲存")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEditing}
+                    className="min-h-11 rounded-lg px-3 text-sm hover:bg-muted"
+                  >
+                    {t("取消")}
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">
+              {card.remarks || t("尚無備註")}
+            </p>
+          )}
+        </div>
+      </div>
       <div className="mt-2 border-t border-border pt-1">
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
           <button type="button" aria-label={t(taskView === "collapsed" ? "展開「{name}」任務" : "收起「{name}」任務", { name: category.name })} aria-expanded={taskView !== "collapsed"} onClick={() => onTaskViewChange(taskView === "collapsed" ? "preview" : "collapsed")} className="flex min-h-11 items-center gap-1 rounded-md px-1 text-left hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring">
@@ -701,18 +658,28 @@ function ProgressCard({
               </button>
               {editable && (
                 <button
-                  aria-label={t("將「{name}」設為目前狀態", {
-                    name: task.title,
-                  })}
-                  title={t("設為目前狀態")}
+                  type="button"
+                  aria-pressed={linked?.id === task.id}
+                  aria-label={t(
+                    linked?.id === task.id
+                      ? "取消「{name}」目前狀態"
+                      : "將「{name}」設為目前狀態",
+                    { name: task.title },
+                  )}
+                  title={t(linked?.id === task.id ? "取消目前狀態" : "設為目前狀態")}
                   disabled={saving}
                   onClick={() =>
+                    // The task list is the one place the current status is
+                    // chosen; tapping the active ◎ again clears it.
                     void onUpdate({
-                      status: {
-                        mode: "task",
-                        taskId: task.id,
-                        updatedAt: new Date().toISOString(),
-                      },
+                      status:
+                        linked?.id === task.id
+                          ? { mode: "off", updatedAt: new Date().toISOString() }
+                          : {
+                              mode: "task",
+                              taskId: task.id,
+                              updatedAt: new Date().toISOString(),
+                            },
                     }).catch(() => toast.error(t("儲存失敗，請重試")))
                   }
                   className={cn(

@@ -74,7 +74,7 @@ export function FocusBoardEditorModal({
       size="lg"
       ariaLabel={t("編輯重點版面")}
     >
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border p-5 pt-[calc(1.25rem+env(safe-area-inset-top))] md:pt-5">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border p-5">
         <h2 className="text-lg font-semibold">{t("編輯重點版面")}</h2>
         <button
           disabled={saving}

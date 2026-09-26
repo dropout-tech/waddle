@@ -161,7 +161,9 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
           onClick={onExit}
           title={exitVariant === 'back' ? t('返回面板') : t('關閉')}
           aria-label={exitVariant === 'back' ? t('返回面板') : t('關閉')}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          // 44pt tap target on phones (was 32px and, before the ModalShell
+          // safe-area fix, half under the iOS status bar); desktop keeps 32px.
+          className="-ml-1.5 flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:ml-0 md:h-8 md:w-8"
         >
           {exitVariant === 'back' ? <ArrowLeft className="h-4 w-4" /> : <X className="h-4 w-4" />}
         </button>

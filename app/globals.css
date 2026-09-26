@@ -267,6 +267,18 @@
     overflow: hidden;
     overscroll-behavior: none;
   }
+  /* Soft keyboard up (hooks/use-soft-keyboard.ts): hide the bottom tab bar
+     and floating buttons so they don't ride up on top of the keyboard and
+     cover the field being typed in. */
+  html[data-keyboard="open"] [data-hide-on-keyboard] {
+    display: none !important;
+  }
+  /* Phone sheets that normally stop above the tab bar (白板, 連結) reach
+     the bottom while the tab bar is hidden for the keyboard (their inline
+     `bottom` reads this variable). */
+  html[data-keyboard="open"] {
+    --sheet-bottom: 0px;
+  }
   body {
     @apply bg-background text-foreground;
     /* Native feel inside the Capacitor WebView: no rubber-band overscroll on

@@ -55,6 +55,7 @@ function DailyWhiteboard({ items, ...props }: {
   items: ScratchpadItem[]
   date: string
   readOnly: boolean
+  fillHeight?: boolean
   onAddItem: FocusScratchpadProps['onAddItem']
   onUpdateItem: FocusScratchpadProps['onUpdateItem']
   onDeleteItem: FocusScratchpadProps['onDeleteItem']
@@ -98,12 +99,13 @@ export function FocusScratchpad({ initialDate, className, isOpen, onOpenChange, 
   const control = 'inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-2 text-sm hover:bg-secondary disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
 
   return <>
-    {isExpanded && !fill && <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-popover" onClick={() => setIsExpanded(false)} />}
+    {/* Backdrop only for the desktop pull-down; the phone sheet (hideTrigger) fills the screen above the tab bar, and a backdrop there blurred and blocked the tab bar. */}
+    {isExpanded && !fill && !hideTrigger && <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-popover" onClick={() => setIsExpanded(false)} />}
     <div className={cn('relative z-toast', className)}>
       {!hideTrigger && !isExpanded && <button data-tour="scratchpad" className="absolute left-1/2 top-0 flex min-h-11 -translate-x-1/2 items-center gap-2 rounded-b-xl border border-t-0 border-border bg-card px-4 text-sm" onClick={() => { setSelectedDate(todayKey); setIsExpanded(true) }}>{t('白板')}<ChevronDown size={16} /></button>}
-      <div className={cn(fill ? 'fixed inset-0 bg-card' : hideTrigger ? 'fixed inset-x-0 top-0 bottom-[58px] bg-card' : 'absolute inset-x-0 top-0 overflow-hidden border-b border-border bg-card', !isExpanded && !fill && 'hidden')} style={hideTrigger && !fill ? { paddingTop: 'env(safe-area-inset-top)' } : undefined}>
-        <div className={cn('overflow-y-auto', fill || hideTrigger ? 'h-full' : 'max-h-[85dvh]')}>
-          <div className="mx-auto w-full max-w-6xl px-3 py-2 sm:px-4 md:px-6">
+      <div className={cn(fill ? 'fixed inset-0 bg-card' : hideTrigger ? 'fixed inset-x-0 top-0 bg-card' : 'absolute inset-x-0 top-0 overflow-hidden border-b border-border bg-card', !isExpanded && !fill && 'hidden')} data-sheet-above-tabbar={hideTrigger && !fill ? '' : undefined} style={hideTrigger && !fill ? { paddingTop: 'env(safe-area-inset-top)', bottom: 'var(--sheet-bottom, calc(58px + env(safe-area-inset-bottom)))' } : undefined}>
+        <div className={cn('overflow-y-auto', fill || hideTrigger ? 'flex h-full flex-col' : 'max-h-[85dvh]')}>
+          <div className={cn('mx-auto w-full max-w-6xl px-3 py-2 sm:px-4 md:px-6', (fill || hideTrigger) && 'flex min-h-0 flex-1 flex-col max-md:pb-0')}>
             <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1" aria-label={t('白板日期')}>
               <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
                 <button className={control} aria-label={t('上一個日期')} disabled={dateIndex < 0 || dateIndex >= dates.length - 1} onClick={() => setSelectedDate(dates[dateIndex + 1])}><ChevronLeft size={16} /></button>
@@ -113,11 +115,11 @@ export function FocusScratchpad({ initialDate, className, isOpen, onOpenChange, 
               </div>
               <div className="flex items-center gap-1">
                 {!fill && <FloatOutButton tab="scratchpad" fallbackUrl="/float/scratchpad" windowName="huddle-scratchpad" width={480} height={620} />}
-                {items.length > 0 && isToday && <button className={control} onClick={() => { if (window.confirm(t('確定要清除所有暫存內容嗎？'))) onClearDate(selectedDate) }}><Trash2 size={16} />{t('清除')}</button>}
-                {!fill && <button className={control} onClick={() => setIsExpanded(false)}><ChevronUp size={16} />{t('收起')}</button>}
+                {items.length > 0 && isToday && <button className={control} onClick={() => { if (window.confirm(t('確定要清除所有暫存內容嗎？'))) onClearDate(selectedDate) }}><Trash2 size={16} /><span className="max-md:sr-only">{t('清除')}</span></button>}
+                {!fill && <button className={control} onClick={() => setIsExpanded(false)}><ChevronUp size={16} /><span className="max-md:sr-only">{t('收起')}</span></button>}
               </div>
             </header>
-            <DailyWhiteboard key={selectedDate} items={items} date={selectedDate} readOnly={!isToday} onAddItem={onAddItem} onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem} />
+            <DailyWhiteboard key={selectedDate} items={items} date={selectedDate} readOnly={!isToday} fillHeight={!!(fill || hideTrigger)} onAddItem={onAddItem} onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem} />
           </div>
         </div>
       </div>

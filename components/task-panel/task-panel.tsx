@@ -6,9 +6,7 @@ import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
 import { forEachTask, isTaskOverdue } from '@/lib/task-utils'
 import type { Workspace, Task } from '@/lib/types'
-import type { FocusSettings } from '@/lib/focus'
 import { PanelHeader } from './panel-header'
-import { FocusBlock } from './focus-block'
 import { WorkspaceSection } from './workspace-section'
 import { FilterBar, type FilterState } from './filter-bar'
 import { UnifiedTaskList } from './unified-task-list'
@@ -45,10 +43,6 @@ interface TaskPanelProps {
    * stay reachable in the "已完成" drawer.
    */
   keepCompletedTodayInList?: boolean
-  /** "當前重點" block settings. Omitted ⇒ the block doesn't render. */
-  focusBoard?: FocusSettings
-  /** Narrow mutation for the focus block; omitted ⇒ block stays read-only. */
-  onSetFocusBoard?: (next: FocusSettings) => Promise<void> | void
   onToggleCategoryCollapse: (categoryId: string) => void
   onReorderCategories?: (workspaceId: string, orderedCategoryIds: string[]) => void
   onToggleComplete: (taskId: string) => void
@@ -76,8 +70,6 @@ export function TaskPanel({
   workspaces,
   isExpanded = false,
   keepCompletedTodayInList = true,
-  focusBoard,
-  onSetFocusBoard,
   onToggleCategoryCollapse,
   onReorderCategories,
   onToggleComplete,
@@ -107,7 +99,9 @@ export function TaskPanel({
       const saved = localStorage.getItem('waddle-density-v1')
       if (saved === 'compact' || saved === 'comfortable') return saved
     }
-    return 'comfortable'
+    // Default to compact (2026-09-26 owner request: see more tasks at once).
+    // A saved choice above always wins, so existing users keep theirs.
+    return 'compact'
   })
   const [viewMode, setViewMode] = useState<ViewMode>('category')
   const [metaOrder, setMetaOrder] = useState<MetaField[]>(() => {
@@ -301,19 +295,6 @@ export function TaskPanel({
           onClosePanel={onClosePanel}
           onToggleExpand={onToggleExpand}
         />
-
-        {/* "當前重點" — only on the mobile 任務 tab (isExpanded). The desktop
-            sidebar is too narrow for it; there it lives in the full-screen
-            task view's 總覽 tab instead (FullScreenTaskView). */}
-        {isExpanded && focusBoard && (
-          <FocusBlock
-            workspaces={workspaces}
-            focus={focusBoard}
-            todayStr={todayStr}
-            onSelectTask={onSelectTask}
-            onSetFocusBoard={onSetFocusBoard}
-          />
-        )}
 
         {/* Quick-access row: today's meetings (popover) + completed-tasks
             drawer. Two parallel entry points kept on one row so the panel

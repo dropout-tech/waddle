@@ -20,6 +20,10 @@ type ProfilesRow = {
   id: string
   display_name: string | null
   avatar_url: string | null
+  /** Deprecated 2026-09-27: nickname feature retired, column kept. */
+  leaderboard_nickname?: string | null
+  /** Permanent public leaderboard serial (migration 20260927100000). */
+  penguin_number?: number
   created_at: string
   updated_at: string
 }
@@ -348,6 +352,7 @@ type ProfilesInsert = {
   id: string
   display_name?: string | null
   avatar_url?: string | null
+  leaderboard_nickname?: string | null
 }
 
 type WorkspacesInsert = {

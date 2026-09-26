@@ -1,8 +1,8 @@
 'use client'
 /* eslint-disable @next/next/no-img-element -- canvas accepts user data URLs and generated SVG strokes */
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { CheckSquare, FileText, Grip, ImagePlus, Link2, Maximize2, Minus, Pencil, Plus, Scan, Trash2, Type } from 'lucide-react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { CheckSquare, CircleHelp, FileText, Grip, ImagePlus, Link2, Maximize2, Minimize2, Minus, Pencil, Plus, Scan, Trash2, Type } from 'lucide-react'
 import type { ScratchpadItem } from '@/lib/types'
 import { canvasGeometry, type CanvasGeometry } from '@/lib/scratchpad-canvas'
 import { cn } from '@/lib/utils'
@@ -17,13 +17,32 @@ interface ScratchpadCanvasProps {
   onAddItem: (date: string, item: ScratchpadItem) => void
   onUpdateItem: (id: string, patch: Partial<ScratchpadItem>) => void
   onDeleteItem: (id: string) => void
+  /** Parent is a full-height column (mobile tab / float window): the canvas
+   * fills the remaining height edge-to-edge and "expand" becomes full screen. */
+  fillHeight?: boolean
 }
 type CanvasEditor = { id: string; isNew: boolean; date: string; type: 'text' | 'todo' | 'link'; content: string; title: string; geometry: CanvasGeometry; visibleWidth: number; visibleHeight: number }
 type Point = { x: number; y: number }
 type Gesture = { kind: 'pan' | 'move' | 'resize' | 'draw'; start: Point; original: CanvasGeometry; id?: string; points?: Point[] }
 const button = 'inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40'
 
-export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateItem, onDeleteItem }: ScratchpadCanvasProps) {
+/** Icon-only on phones (label from md up). Touch long-press shows the label,
+ * since `title` tooltips never appear on iOS. */
+function ToolButton({ label, icon, onClick, pressed }: { label: string; icon: ReactNode; onClick: () => void; pressed?: boolean }) {
+  const [hint, setHint] = useState(false)
+  const timer = useRef<number | undefined>(undefined)
+  const longPressed = useRef(false)
+  const clear = () => { window.clearTimeout(timer.current); if (longPressed.current) window.setTimeout(() => setHint(false), 900) }
+  return <button type="button" aria-label={label} title={label} aria-pressed={pressed} className={cn(button, 'relative select-none [-webkit-touch-callout:none]', pressed && 'bg-primary/10 text-primary')}
+    onPointerDown={e => { if (e.pointerType === 'mouse') return; longPressed.current = false; timer.current = window.setTimeout(() => { longPressed.current = true; setHint(true) }, 450) }}
+    onPointerUp={clear} onPointerCancel={() => { clear(); setHint(false) }} onContextMenu={e => e.preventDefault()}
+    onClick={e => { if (longPressed.current) { longPressed.current = false; e.preventDefault(); return } onClick() }}>
+    {icon}<span className="hidden md:inline">{label}</span>
+    {hint && <span role="tooltip" className="pointer-events-none absolute left-1/2 top-full z-dropdown mt-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs text-background">{label}</span>}
+  </button>
+}
+
+export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateItem, onDeleteItem, fillHeight = false }: ScratchpadCanvasProps) {
   const { t } = useI18n()
   const viewport = useRef<HTMLDivElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -38,6 +57,7 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
   const [pen, setPen] = useState(false)
   const [stroke, setStroke] = useState<Point[]>([])
   const [expanded, setExpanded] = useState(false)
+  const [help, setHelp] = useState(false)
   const [editor, setEditorState] = useState<CanvasEditor | null>(null)
   const editorRef = useRef<CanvasEditor | null>(null)
   const editorElement = useRef<HTMLFormElement>(null)
@@ -167,9 +187,12 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
     if (item && type !== 'link' && hasWhiteboardDocument(item)) { setDetailId(item.id); return }
     const width = Math.min(280, Math.max(200, ((viewport.current?.clientWidth ?? 320) - 32) / view.zoom))
     const height = 220
+    // A double-clicked text draft starts its caret at the tapped point: offset
+    // by the handle row (44), padding (12) and half a text line.
+    const tapped = point && type === 'text' ? { x: point.x - 12, y: point.y - 68 } : point
     const geometry = item ? canvasGeometry(item) : {
-      x: point?.x ?? ((viewport.current?.clientWidth ?? 320) / 2 - view.x) / view.zoom - width / 2,
-      y: point?.y ?? ((viewport.current?.clientHeight ?? 400) / 2 - view.y) / view.zoom - height / 2,
+      x: tapped?.x ?? ((viewport.current?.clientWidth ?? 320) / 2 - view.x) / view.zoom - width / 2,
+      y: tapped?.y ?? ((viewport.current?.clientHeight ?? 400) / 2 - view.y) / view.zoom - height / 2,
       width, height,
     }
     // Editing always uses readable text, even when the board was zoomed out.
@@ -188,6 +211,40 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
     setError('')
     setEditor({ id, isNew: !item, date, type, content: item?.content ?? '', title: item?.title ?? '', geometry, visibleWidth, visibleHeight })
   }
+  // Soft keyboard: when the visible area shrinks (visualViewport on mobile web,
+  // a resized WebView in Capacitor), pan the board so the text being edited
+  // sits in the upper part of what is still visible. Viewport only; no writes.
+  const editingId = editor?.id
+  useEffect(() => {
+    if (!editingId) return
+    const vv = window.visualViewport
+    const align = () => {
+      const box = editorElement.current?.getBoundingClientRect()
+      const canvas = viewport.current?.getBoundingClientRect()
+      if (!box || !canvas) return
+      const top = Math.max(canvas.top, vv ? vv.offsetTop : 0)
+      const bottom = Math.min(canvas.bottom, vv ? vv.offsetTop + vv.height : window.innerHeight)
+      if (bottom - top < 60) return
+      if (box.top >= top + 8 && box.top + Math.min(box.height, 96) <= bottom - 8) return
+      const target = top + Math.max(12, (bottom - top) * 0.2)
+      setView(v => ({ ...v, y: v.y + (target - box.top) }))
+    }
+    // Several resize events arrive per keyboard animation; measure at most once
+    // per frame so a pan is never applied twice before React re-renders.
+    let frame = 0
+    const schedule = () => { window.cancelAnimationFrame(frame); frame = window.requestAnimationFrame(align) }
+    const timer = window.setTimeout(schedule, 350)
+    vv?.addEventListener('resize', schedule)
+    vv?.addEventListener('scroll', schedule)
+    window.addEventListener('resize', schedule)
+    return () => {
+      window.clearTimeout(timer)
+      window.cancelAnimationFrame(frame)
+      vv?.removeEventListener('resize', schedule)
+      vv?.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+    }
+  }, [editingId])
   const openDetail = (item: ScratchpadItem) => {
     if (!saveEditor()) return
     setSelected(item.id)
@@ -217,20 +274,28 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
       value={editor.content} onChange={e => { const current = editorRef.current; if (current) setEditor({ ...current, content: e.target.value }) }}
       onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; if (!editorElement.current?.contains(document.activeElement)) saveEditor() }}/>
     {editor.type === 'link' && <input aria-label={t('連結標題')} placeholder={t('連結標題（選填）')} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-base" value={editor.title} onChange={e => { const current = editorRef.current; if (current) setEditor({ ...current, title: e.target.value }) }}/>}
-    <div className="flex shrink-0 items-center justify-between gap-1 text-xs text-muted-foreground"><span>{t('點空白處儲存')}</span><button type="button" className={button} onPointerDown={e => e.preventDefault()} onClick={() => { setEditor(null); setError(''); viewport.current?.focus() }}>{t('取消')}</button></div>
+    <div className="flex shrink-0 items-center justify-between gap-1 text-xs text-muted-foreground/70"><span>{t('點空白處儲存')}</span><button type="button" className={button} onPointerDown={e => e.preventDefault()} onClick={() => { setEditor(null); setError(''); viewport.current?.focus() }}>{t('取消')}</button></div>
   </form>
-  return <section className="min-w-0" aria-label={t('白板')}>
-    <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-medium">{t('白板')}</h3><p className="text-xs text-muted-foreground">{t('按兩下空白處寫字；開啟內容可使用記事本編輯工具。')}</p></div><button className={button} aria-label={expanded ? t('縮小畫布區域') : t('放大畫布區域')} onClick={() => setExpanded(!expanded)}><Maximize2 size={18}/></button></div>
-    {!readOnly && <div className="flex flex-wrap items-center gap-1 border-t border-border py-2" aria-label={t('畫布工具')}>
-      <button className={button} onClick={() => beginEditor('text')}><Type size={18}/>{t('文字')}</button>
-      <button className={button} onClick={addChecklist}><CheckSquare size={18}/>{t('檢查清單')}</button>
-      <button className={button} onClick={() => fileInput.current?.click()}><ImagePlus size={18}/>{t('圖片')}</button>
-      <button className={button} onClick={() => beginEditor('link')}><Link2 size={18}/>{t('連結')}</button>
-      <button className={cn(button, pen && 'bg-primary/10 text-primary')} aria-pressed={pen} onClick={() => setPen(!pen)}><Pencil size={18}/>{t('畫筆')}</button>
-      <input ref={fileInput} type="file" accept="image/*" className="hidden" aria-label={t('加入畫布圖片')} onChange={e => { image(e.target.files?.[0]); e.target.value = '' }}/>
-    </div>}
+  const fullScreen = fillHeight && expanded
+  return <section className={cn('min-w-0', fillHeight && 'flex min-h-0 flex-1 flex-col', fullScreen && 'fixed inset-0 z-modal bg-background px-3 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]')} aria-label={t('白板')}>
+    <div className="mb-1 flex flex-wrap items-center gap-x-1 md:mb-2">
+      <h3 className="mr-1 shrink-0 font-medium max-md:sr-only">{t('白板')}</h3>
+      {!readOnly && <div role="toolbar" className="flex min-w-0 flex-nowrap items-center md:flex-wrap md:gap-1" aria-label={t('畫布工具')}>
+        <ToolButton label={t('文字')} icon={<Type size={18}/>} onClick={() => beginEditor('text')}/>
+        <ToolButton label={t('檢查清單')} icon={<CheckSquare size={18}/>} onClick={addChecklist}/>
+        <ToolButton label={t('圖片')} icon={<ImagePlus size={18}/>} onClick={() => fileInput.current?.click()}/>
+        <ToolButton label={t('連結')} icon={<Link2 size={18}/>} onClick={() => beginEditor('link')}/>
+        <ToolButton label={t('畫筆')} icon={<Pencil size={18}/>} pressed={pen} onClick={() => setPen(!pen)}/>
+        <input ref={fileInput} type="file" accept="image/*" className="hidden" aria-label={t('加入畫布圖片')} onChange={e => { image(e.target.files?.[0]); e.target.value = '' }}/>
+      </div>}
+      <div className="ml-auto flex shrink-0 items-center">
+        <button type="button" className={cn(button, 'text-muted-foreground', help && 'bg-muted text-foreground')} aria-label={t('白板使用說明')} title={t('白板使用說明')} aria-expanded={help} onClick={() => setHelp(!help)}><CircleHelp size={18}/></button>
+        <button type="button" className={cn(button, 'text-muted-foreground')} aria-label={fillHeight ? (expanded ? t('結束全螢幕') : t('全螢幕白板')) : expanded ? t('縮小畫布區域') : t('放大畫布區域')} onClick={() => setExpanded(!expanded)}>{expanded ? <Minimize2 size={18}/> : <Maximize2 size={18}/>}</button>
+      </div>
+    </div>
+    {help && <p className="mb-1 text-xs text-muted-foreground">{t('按兩下空白處寫字；開啟內容可使用記事本編輯工具。')}</p>}
     {error && <p role="alert" className="mb-2 text-sm text-destructive">{error}</p>}
-    <div ref={viewport} data-testid="scratchpad-canvas" className={cn('relative isolate w-full touch-none overflow-hidden rounded-xl border border-border bg-secondary/30', pen ? 'cursor-crosshair' : 'cursor-grab')} style={{ height: expanded ? '80dvh' : 'min(65dvh, 720px)', minHeight: 320, backgroundImage: 'radial-gradient(var(--border) 1px, transparent 1px)', backgroundSize: `${24 * view.zoom}px ${24 * view.zoom}px`, backgroundPosition: `${view.x}px ${view.y}px` }}
+    <div ref={viewport} data-testid="scratchpad-canvas" className={cn('relative isolate w-full touch-none overflow-hidden rounded-xl border border-border bg-secondary/30 max-md:-mx-3 sm:max-md:-mx-4 max-md:w-auto max-md:rounded-none max-md:border-0 max-md:bg-transparent', fillHeight && 'min-h-0 flex-1', pen ? 'cursor-crosshair' : 'cursor-grab')} style={{ ...(fillHeight ? {} : { height: expanded ? '80dvh' : 'min(65dvh, 720px)' }), minHeight: 320, backgroundImage: 'radial-gradient(var(--border) 1px, transparent 1px)', backgroundSize: `${24 * view.zoom}px ${24 * view.zoom}px`, backgroundPosition: `${view.x}px ${view.y}px` }}
       onPointerDown={e => { if (e.target === e.currentTarget && saveEditor()) start(e, pen && !readOnly ? 'draw' : 'pan') }} onPointerMove={move} onPointerUp={() => finish()} onPointerCancel={() => finish(true)}
       onDoubleClick={e => { if (e.target === e.currentTarget && !pen) beginEditor('text', world(e.clientX, e.clientY)) }}
       onPaste={e => { const file = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'))?.getAsFile(); if (file) { e.stopPropagation(); e.preventDefault(); image(file) } }}
@@ -246,11 +311,15 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
           const checklist = document ? whiteboardChecklistSummary(document) : null
           const previewText = document ? whiteboardDocumentText(document) : item.content
           return <article key={item.id} data-testid="canvas-item" data-canvas-item={item.id}
-            className={cn('group pointer-events-auto absolute flex flex-col rounded-xl border text-card-foreground', editing ? 'bg-background' : plain ? 'bg-transparent' : 'bg-card', active ? 'border-primary' : plain ? 'border-transparent' : 'border-border')}
+            className={cn('group pointer-events-auto absolute flex flex-col rounded-xl border text-card-foreground',
+              // Plain text is written straight on the paper: no card, no frame.
+              // While editing only a faint dashed hint shows where the text box is.
+              plain ? (editing ? 'border-dashed border-primary/25 bg-transparent' : 'border-transparent bg-transparent')
+                : cn('bg-card/85 shadow-[0_1px_2px_rgb(0_0_0/0.05)]', active ? 'border-primary/40' : 'border-transparent'))}
             style={{ left: b.x, top: b.y, width: editing ? editor.visibleWidth : b.width, height: editing ? editor.visibleHeight : b.height, zIndex: editing ? 3 : active ? 2 : 1 }}
             onPointerDown={e => { e.stopPropagation(); setSelected(item.id) }}
             onDoubleClick={e => { if (!editing && !(e.target as HTMLElement).closest('button,input,a')) { e.stopPropagation(); if (rich || readOnly) openDetail(item); else if (item.type === 'text' || item.type === 'todo') beginEditor(item.type, undefined, item) } }}>
-            <div className={cn('flex h-11 shrink-0 items-center justify-between px-1', !active && 'opacity-0 group-hover:opacity-100 focus-within:opacity-100')}>
+            <div className={cn('flex h-11 shrink-0 items-center justify-between px-1 text-muted-foreground/70', !active && 'opacity-0 group-hover:opacity-100 focus-within:opacity-100')}>
               <button disabled={readOnly || editing} data-testid="canvas-drag-handle" aria-label={t('拖動卡片')} className={cn(button, 'touch-none cursor-grab')} style={{ transform: `scale(${1 / view.zoom})`, transformOrigin: 'top left' }} onFocus={() => setSelected(item.id)} onPointerDown={e => { if (saveEditor()) start(e, 'move', item) }} onKeyDown={e => { if (readOnly || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return; e.preventDefault(); changeGeometryWithKeyboard(item, b, 'move', e.key) }}><Grip size={18}/></button>
               {!plain && <span className="truncate text-xs text-muted-foreground">{item.title || (item.type === 'todo' ? t('待辦') : item.type === 'image' ? t('圖片') : item.type === 'link' ? t('連結') : checklist?.total ? t('檢查清單') : t('筆記'))}</span>}
               {item.type === 'link' && !readOnly && <button className={button} aria-label={t('編輯連結')} title={t('編輯連結')} onClick={() => beginEditor('link', undefined, item)}><Pencil size={16}/></button>}
@@ -260,16 +329,20 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
               {checklist && checklist.total > 0 && <p className="mb-2 text-xs text-muted-foreground">{t('已完成 {checked} / {total} 項', { checked: checklist.checked, total: checklist.total })}</p>}
               {item.type === 'image' ? <img src={item.content} alt={item.title || t('畫布圖片')} draggable={false} className="h-full w-full object-contain"/> : item.type === 'link' ? <a href={/^https?:\/\//i.test(item.content) ? item.content : undefined} target="_blank" rel="noopener noreferrer" className="break-all text-primary underline">{item.title || item.content}</a> : <div className="flex items-start gap-2">{item.type === 'todo' && !rich && <label className="flex min-h-11 min-w-11 shrink-0 items-center justify-center" style={{ transform: `scale(${1 / view.zoom})`, transformOrigin: 'top left' }}><span className="sr-only">{t('完成畫布待辦')}</span><input type="checkbox" aria-label={t('完成畫布待辦')} checked={!!item.isChecked} disabled={readOnly} className="h-6 w-6" onChange={e => onUpdateItem(item.id, { isChecked: e.target.checked })}/></label>}<p tabIndex={readOnly ? undefined : 0} role={readOnly ? undefined : 'button'} aria-label={readOnly ? undefined : t('編輯{type}：{content}', { type: item.type === 'todo' ? t('待辦') : t('文字'), content: item.content })} onKeyDown={e => { if (!readOnly && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); beginEditor(item.type as CanvasEditor['type'], undefined, item) } }} className={cn('min-h-11 min-w-0 flex-1 whitespace-pre-wrap break-words leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-primary [overflow-wrap:anywhere]', !readOnly && 'cursor-text', !rich && item.isChecked && 'text-muted-foreground line-through')}>{previewText || (checklist?.total ? t('開啟內容，開始編輯檢查清單') : t('開啟內容，開始寫筆記'))}</p></div>}
             </div>}
-            {!readOnly && !editing && <button data-testid="canvas-resize-handle" aria-label={t('調整卡片大小')} className={cn(button, 'absolute bottom-0 right-0 touch-none cursor-se-resize bg-background', !active && 'opacity-0 focus:opacity-100')} style={{ transform: `scale(${1 / view.zoom})`, transformOrigin: 'bottom right' }} onFocus={() => setSelected(item.id)} onPointerDown={e => start(e, 'resize', item)} onKeyDown={e => { if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return; e.preventDefault(); changeGeometryWithKeyboard(item, b, 'resize', e.key) }}><Maximize2 size={15}/></button>}
+            {!readOnly && !editing && <button data-testid="canvas-resize-handle" aria-label={t('調整卡片大小')} className={cn(button, 'absolute bottom-0 right-0 touch-none cursor-se-resize text-muted-foreground/60', !active && 'opacity-0 focus:opacity-100')} style={{ transform: `scale(${1 / view.zoom})`, transformOrigin: 'bottom right' }} onFocus={() => setSelected(item.id)} onPointerDown={e => start(e, 'resize', item)} onKeyDown={e => { if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return; e.preventDefault(); changeGeometryWithKeyboard(item, b, 'resize', e.key) }}><Maximize2 size={15}/></button>}
           </article>
         })}
-        {editor?.isNew && !readOnly && <article data-testid="canvas-draft" className={cn('pointer-events-auto absolute flex flex-col rounded-xl border border-primary text-foreground', editor.type === 'text' ? 'bg-background' : 'bg-card')} style={{ left: editor.geometry.x, top: editor.geometry.y, width: editor.visibleWidth, height: editor.visibleHeight, zIndex: 3 }}><div className="h-11 shrink-0"/>{renderEditor()}</article>}
+        {editor?.isNew && !readOnly && <article data-testid="canvas-draft" className={cn('pointer-events-auto absolute flex flex-col rounded-xl border text-foreground', editor.type === 'text' ? 'border-dashed border-primary/25 bg-transparent' : 'border-primary/40 bg-card')} style={{ left: editor.geometry.x, top: editor.geometry.y, width: editor.visibleWidth, height: editor.visibleHeight, zIndex: 3 }}><div className="h-11 shrink-0"/>{renderEditor()}</article>}
         {stroke.length > 1 && <svg className="absolute overflow-visible" width="1" height="1"><polyline points={stroke.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#6c5b4d" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>}
       </div>
+      <div className={cn('absolute bottom-2 right-2 z-panel flex items-center rounded-full border border-border/60 bg-background/85 text-muted-foreground backdrop-blur-sm max-md:right-3', editor && 'hidden')}>
+        <button type="button" className={cn(button, 'rounded-full')} aria-label={t('縮小畫布')} disabled={view.zoom <= .25} onClick={() => zoom(view.zoom - .1)}><Minus size={16}/></button>
+        <span className="min-w-10 text-center text-xs tabular-nums" aria-live="polite">{Math.round(view.zoom * 100)}%</span>
+        <button type="button" className={cn(button, 'rounded-full')} aria-label={t('放大畫布')} disabled={view.zoom >= 2} onClick={() => zoom(view.zoom + .1)}><Plus size={16}/></button>
+        <button type="button" className={cn(button, 'rounded-full')} aria-label={t('顯示全部')} title={t('顯示全部')} onClick={fit}><Scan size={16}/></button>
+      </div>
+      {selectedItem && !readOnly && !editor && <button type="button" className={cn(button, 'absolute bottom-2 left-2 z-panel rounded-full border border-border/60 bg-background/85 text-muted-foreground backdrop-blur-sm max-md:left-3')} aria-label={t('刪除選取的畫布卡片')} onClick={() => { if (window.confirm(t('確定刪除這張畫布卡片？'))) { onDeleteItem(selectedItem.id); setSelected(null) } }}><Trash2 size={16}/></button>}
       {!items.length && !stroke.length && !editor && <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">{readOnly ? t('這天還沒有白板內容') : pen ? t('在空白處開始畫圖') : t('按兩下這裡直接寫字，或點「文字」開始。')}</div>}
-    </div>
-    <div className="flex flex-wrap items-center justify-between gap-1 py-2"><div className="flex items-center"><button className={button} aria-label={t('縮小畫布')} disabled={view.zoom <= .25} onClick={() => zoom(view.zoom - .1)}><Minus size={18}/></button><span className="min-w-12 text-center text-xs tabular-nums" aria-live="polite">{Math.round(view.zoom * 100)}%</span><button className={button} aria-label={t('放大畫布')} disabled={view.zoom >= 2} onClick={() => zoom(view.zoom + .1)}><Plus size={18}/></button><button className={button} onClick={fit}><Scan size={18}/>{t('顯示全部')}</button></div>
-      {selectedItem && !readOnly && <div className="flex items-center"><button className={button} aria-label={t('刪除選取的畫布卡片')} onClick={() => { if (window.confirm(t('確定刪除這張畫布卡片？'))) { onDeleteItem(selectedItem.id); setSelected(null) } }}><Trash2 size={17}/></button></div>}
     </div>
     {detailItem && <WhiteboardDetail key={detailItem.id} item={detailItem} readOnly={readOnly} onUpdateItem={onUpdateItem} onClose={() => setDetailId(null)}/>}
   </section>
