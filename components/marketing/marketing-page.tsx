@@ -8,6 +8,7 @@ import { ArrowDown, ArrowRight, ChevronDown, Download, Play } from 'lucide-react
 import { setLang } from '@/lib/i18n'
 import { brandQuote } from '@/lib/brand'
 import { FeatureFilm } from './feature-film'
+import { CheckInToy, DoodleToy, ToyButton, ToyStage } from './magic-toys'
 import { FocusRing, FoldVignette, Hammock, HeroSwarm, RoamingPenguin, fishZoneClass, focusStageClass, headlineClass, posterStageClass } from './penguin-circus'
 import styles from './marketing-page.module.css'
 
@@ -97,7 +98,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
     if (v === 'ink' || v === 'yellow') document.getElementById('top')?.setAttribute('data-hero', v)
   }, [])
   return (
-    <main lang={en ? 'en' : 'zh-Hant'} id="top" data-surface="marketing" data-hero={HERO_THEME} className={`${styles.site} ${display.variable} ${condensed.variable} ${en ? styles.english : ''}`}>
+    <main lang={en ? 'en' : 'zh-Hant'} id="top" data-surface="marketing" data-hero={HERO_THEME} className={`${styles.site} ${fishZoneClass} ${display.variable} ${condensed.variable} ${en ? styles.english : ''}`}>
       <a className={styles.skip} href="#features">{en ? 'Skip to features' : '跳至功能介紹'}</a>
       <header className={styles.header}>
         <Link href={`${base}/about`} className={styles.brand} aria-label="Huddle">Huddle<span className={styles.brandDot}>.</span></Link>
@@ -110,13 +111,13 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
 
       {/* HERO — one giant quote (brand tagline, lib/brand.ts) over a wide desk
           scene where the penguin is small and the world is big. */}
-      <section className={`${styles.hero} ${fishZoneClass}`} aria-labelledby="hero-title">
+      <section className={styles.hero} aria-labelledby="hero-title">
         <picture className={styles.heroArt} data-penguin-stop="hero-m" data-penguin-only="mobile" data-penguin-at="0.8 0.93" data-penguin-pose="wave">
           <source media="(max-width: 760px)" srcSet="/art/hero-mobile.webp" width={1080} height={1350} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/art/hero-desk-v2.webp" width={1600} height={900} alt="" fetchPriority="high" decoding="async" />
         </picture>
-        <HeroSwarm />
+        <HeroSwarm locale={locale} />
         <div className={styles.heroCopy}>
           <figure className={styles.quote} data-quoted={quote.author ? "" : undefined}>
             <blockquote>
@@ -141,30 +142,30 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       <section id="features" className={styles.pillars} aria-label={en ? 'What Huddle brings together' : 'Huddle 的三個重點'}>
         {PILLAR_ART.map((art, i) => (
           <article key={art.src} className={art.kind === 'spot' ? styles.pillarSpot : undefined}>
-            <div className={styles.pillarArt} {...(i === 1 ? { 'data-penguin-stop': 'calendar', 'data-penguin-at': '0.5 0.84', 'data-penguin-pose': 'skate', 'data-penguin-motion': 'skate' } : {})}><Image src={art.src} width={art.w} height={art.h} alt="" sizes="(max-width: 760px) 92vw, 56vw" /></div>
-            <div className={styles.pillarCopy}><span className={styles.num}>0{i + 1}</span><h2 {...(i !== 1 ? { 'data-penguin-stop': `pillar-${i}`, 'data-penguin-at': '0 0 170 -2', 'data-penguin-at-m': '0 0 118 -2', 'data-penguin-pose': i === 0 ? 'carry' : 'wave' } : {})}>{t.pillars[i][0]}</h2><p>{t.pillars[i][1]}</p></div>
+            <div className={styles.pillarArt} {...(i === 1 ? { 'data-penguin-stop': 'calendar', 'data-penguin-at': '0.5 0.84', 'data-penguin-pose': 'skate', 'data-penguin-motion': 'skate' } : {})}><Image src={art.src} width={art.w} height={art.h} alt="" sizes="(max-width: 760px) 92vw, 56vw" />{i < 2 ? <ToyStage toy={i ? 'sort' : 'chores'} locale={locale} /> : null}</div>
+            <div className={styles.pillarCopy}><span className={styles.num}>0{i + 1}</span><h2 {...(i !== 1 ? { 'data-penguin-stop': `pillar-${i}`, 'data-penguin-at': '0 0 170 -2', 'data-penguin-at-m': '0 0 118 -2', 'data-penguin-pose': i === 0 ? 'carry' : 'wave' } : {})}>{t.pillars[i][0]}</h2><p>{t.pillars[i][1]}</p>{i < 2 ? <ToyButton toy={i ? 'sort' : 'chores'} locale={locale} /> : null}</div>
           </article>
         ))}
       </section>
 
       <section className={styles.moreFeatures} aria-labelledby="more-title">
         <div className={styles.morePoster}>
-          <div className={posterStageClass} data-penguin-stop="fold" data-penguin-at="0.9 0 0 2"><Image src="/art/film/F-07.webp" width={405} height={720} alt="" sizes="(max-width: 760px) 60vw, 30vw" /><FoldVignette locale={locale} /></div>
+          <div className={posterStageClass} data-penguin-stop="fold" data-penguin-at="0.9 0 0 2"><Image src="/art/film/F-07.webp" width={405} height={720} alt="" sizes="(max-width: 760px) 60vw, 30vw" /><FoldVignette locale={locale} /><ToyStage toy="meeting" locale={locale} /></div>
         </div>
         <div>
-          <div className={styles.moreIntro}><h2 id="more-title">{t.moreTitle}</h2><p>{t.moreIntro}</p></div>
+          <div className={styles.moreIntro}><h2 id="more-title">{t.moreTitle}</h2><p>{t.moreIntro}</p><ToyButton toy="meeting" locale={locale} /></div>
           <div className={styles.featureRows}>{MORE_ART.map((src, i) => <article key={t.more[i][0]}><Image src={src} width={800} height={800} alt="" sizes="160px" className={styles.spot} /><div><h3>{t.more[i][0]}</h3><p>{t.more[i][1]}</p></div></article>)}</div>
         </div>
       </section>
 
       <section className={styles.whiteboard} aria-labelledby="board-title">
-        <div className={styles.chapterCopy}><h2 id="board-title">{t.boardTitle}</h2><p>{t.boardBody}</p><div className={styles.tabs} data-penguin-stop="board" data-penguin-only="desktop" data-penguin-at="0 1 110 88" data-penguin-pose="slide" data-penguin-motion="pace" role="tablist" aria-label={en ? 'Whiteboard views' : '白板畫面'}>{t.boardTabs.map((label, i) => <button key={label} id={`board-tab-${i}`} type="button" role="tab" aria-selected={boardView === i} aria-controls="board-panel" tabIndex={boardView === i ? 0 : -1} onClick={() => setBoardView(i)} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const next = 1 - i; setBoardView(next); document.getElementById(`board-tab-${next}`)?.focus() } }}>{label}</button>)}</div></div>
+        <div className={styles.chapterCopy}><h2 id="board-title">{t.boardTitle}</h2><p>{t.boardBody}</p><div className={styles.tabs} data-penguin-stop="board" data-penguin-only="desktop" data-penguin-at="0 1 110 88" data-penguin-pose="slide" data-penguin-motion="pace" role="tablist" aria-label={en ? 'Whiteboard views' : '白板畫面'}>{t.boardTabs.map((label, i) => <button key={label} id={`board-tab-${i}`} type="button" role="tab" aria-selected={boardView === i} aria-controls="board-panel" tabIndex={boardView === i ? 0 : -1} onClick={() => setBoardView(i)} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const next = 1 - i; setBoardView(next); document.getElementById(`board-tab-${next}`)?.focus() } }}>{label}</button>)}</div><DoodleToy locale={locale} /></div>
         <figure role="tabpanel" id="board-panel" aria-labelledby={`board-tab-${boardView}`} className={styles.boardFigure}><Image src={`/marketing/${boardView === 0 ? 'whiteboard-demo' : 'whiteboard-detail-demo'}${en ? '-en' : ''}.png`} width={1440} height={1000} alt={t.boardAlt[boardView]} sizes="(max-width: 760px) 92vw, 64vw" /><figcaption>{t.boardNote}</figcaption></figure>
       </section>
 
       <div id="feature-film" className={styles.film}><FeatureFilm locale={locale} /></div>
 
-      <section className={styles.focus} aria-labelledby="focus-title"><div className={styles.focusCopy}><h2 id="focus-title">{t.focusTitle}</h2><p>{t.focusBody}</p><Link href="/login" onClick={toLang} className={styles.textLink}>{t.focusAction}<ArrowRight size={22} aria-hidden="true" /></Link></div><div className={styles.focusVisual}><div className={focusStageClass} data-penguin-stop="focus" data-penguin-at="0.5 0.5" data-penguin-pose="slide" data-penguin-motion="orbit"><Image src="/art/feature-focus.webp" width={800} height={800} alt={en ? 'Huddle penguin holding a focus timer' : 'Huddle 企鵝抱著專注計時環'} sizes="(max-width: 760px) 80vw, 40vw" /><FocusRing /></div><span className={styles.handNote}>{en ? 'A little at a time.' : '一步一步，也很好。'}</span></div></section>
+      <section className={styles.focus} aria-labelledby="focus-title"><div className={styles.focusCopy}><h2 id="focus-title">{t.focusTitle}</h2><p>{t.focusBody}</p><Link href="/login" onClick={toLang} className={styles.textLink}>{t.focusAction}<ArrowRight size={22} aria-hidden="true" /></Link><ToyButton toy="focus" locale={locale} /></div><div className={styles.focusVisual}><div className={focusStageClass} data-penguin-stop="focus" data-penguin-at="0.5 0.5" data-penguin-pose="slide" data-penguin-motion="orbit"><Image src="/art/feature-focus.webp" width={800} height={800} alt={en ? 'Huddle penguin holding a focus timer' : 'Huddle 企鵝抱著專注計時環'} sizes="(max-width: 760px) 80vw, 40vw" /><FocusRing /><ToyStage toy="focus" locale={locale} /></div><span className={styles.handNote}>{en ? 'A little at a time.' : '一步一步，也很好。'}</span></div></section>
 
       <section id="pricing" className={styles.pricing} aria-labelledby="pricing-title">
         <div className={styles.priceHead}>
@@ -189,7 +190,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
         </picture>
       </section>
 
-      <section className={styles.faq} aria-labelledby="faq-title"><h2 id="faq-title" data-penguin-stop="faq" data-penguin-only="desktop" data-penguin-at="0 1 70 110">{t.faqTitle}</h2><div>{t.questions.map(([q, a]) => <details key={q}><summary>{q}<ChevronDown size={22} aria-hidden="true" /></summary><p>{a}</p></details>)}</div></section>
+      <section className={styles.faq} aria-labelledby="faq-title"><div><h2 id="faq-title">{t.faqTitle}</h2><CheckInToy locale={locale} /></div><div>{t.questions.map(([q, a]) => <details key={q}><summary>{q}<ChevronDown size={22} aria-hidden="true" /></summary><p>{a}</p></details>)}</div></section>
       <footer className={styles.footer}><Hammock /><div><Link href={`${base}/about`} className={styles.brand}>Huddle.</Link><p>{t.footerLine}</p></div><nav aria-label={en ? 'Service information' : '服務資訊'}>{['terms', 'privacy', 'refunds', 'support'].map((path, i) => <Link href={`${base}/${path}`} key={path}>{t.legal[i]}</Link>)}<a href="#top">{t.all}<ArrowDown className={styles.up} size={15} aria-hidden="true" /></a></nav></footer>
       <RoamingPenguin locale={locale} />
     </main>
