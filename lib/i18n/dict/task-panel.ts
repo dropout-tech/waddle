@@ -71,6 +71,7 @@ export const dict: Record<string, string> = {
   '依時間': 'By time',
   '依急迫程度': 'By urgency',
   '待整理': 'Review',
+  '整理': 'Review',
   '整理 {count} 個待處理任務': 'Review {count} past tasks',
 
   // overdue-task-review.tsx
