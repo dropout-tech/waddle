@@ -112,9 +112,13 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
             : 'bg-muted text-muted-foreground hover:bg-muted/80',
         )}
         title={count > 0 ? t('今天有 {count} 場會議', { count }) : t('今天沒有會議')}
+        aria-label={count > 0 ? t('今天有 {count} 場會議', { count }) : t('今天沒有會議')}
       >
-        <Users className="w-3 h-3" />
-        <span>{t('今日會議')}</span>
+        <Users className="w-3 h-3 shrink-0" />
+        {/* Label hides below ~500px of PANEL width (container query on the
+            @container/panel ancestor in task-panel.tsx) so this chip never
+            forces the quick-access row to wrap on a narrow panel. */}
+        <span className="hidden @[500px]/panel:inline">{t('今日會議')}</span>
         <span
           className={cn(
             'inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[9px] font-semibold',

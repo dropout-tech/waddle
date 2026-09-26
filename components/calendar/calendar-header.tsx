@@ -446,7 +446,7 @@ export function CalendarHeader({
                     <NotebookPen className="w-4 h-4" />
                     <span>{t('記事本')}</span>
                   </button>
-                  {onOpenMeetings && <button type="button" onClick={() => { setOverflowOpen(false); onOpenMeetings() }} className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60"><Users className="h-4 w-4"/><span>{lang === 'en' ? 'Find a time' : '約交集時間'}</span>{pendingMeetingCount > 0 && <span className="rounded-full bg-primary px-1.5 text-primary-foreground">{pendingMeetingCount}</span>}</button>}
+                  {onOpenMeetings && <button type="button" onClick={() => { setOverflowOpen(false); onOpenMeetings() }} className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60"><Users className="h-4 w-4"/><span>{lang === 'en' ? 'Find a time' : '約交集'}</span>{pendingMeetingCount > 0 && <span className="rounded-full bg-primary px-1.5 text-primary-foreground">{pendingMeetingCount}</span>}</button>}
                   {onOpenSharing && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenSharing() }}
@@ -508,96 +508,101 @@ export function CalendarHeader({
         </div>
       </div>
 
-      {/* Peer chips — one per connected calendar-share peer; tap toggles
-          that peer's overlay on/off. Renders nothing when there are no
-          peers. h-9 visual + invisible ::before expansion clears the 44px
-          touch floor on mobile without inflating the row. */}
-      {!isMobile && sharePeers.length > 0 && onTogglePeerVisible && (
-        <div
-          className="flex items-center gap-1.5 px-3 pb-1.5 pt-0.5 overflow-x-auto scrollbar-hide"
-          role="group"
-          aria-label={t('共享行事曆顯示')}
-        >
-          {sharePeers.map((peer) => {
-            const visible = isPeerVisible(visiblePeers, peer.peerId)
-            const name = peer.displayName || t('未命名使用者')
-            return (
-              <button
-                key={peer.peerId}
-                type="button"
-                onClick={() => onTogglePeerVisible(peer.peerId)}
-                aria-pressed={visible}
-                title={visible ? t('點擊隱藏 {name} 的行事曆', { name }) : t('點擊顯示 {name} 的行事曆', { name })}
-                className={cn(
-                  'relative flex items-center gap-1.5 h-9 pl-1.5 pr-2.5 rounded-full border text-xs font-medium flex-shrink-0 transition-colors',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  "before:content-[''] before:absolute before:inset-0 before:-my-1.5 md:before:hidden",
-                  visible
-                    ? 'border-primary/40 bg-primary/10 text-foreground'
-                    : 'border-border bg-transparent text-muted-foreground opacity-60'
-                )}
-              >
-                <span className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {peer.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- static export has no image optimizer
-                    <img src={peer.avatarUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <UserIcon className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
-                  )}
-                </span>
-                <span className="truncate max-w-[96px]">{name}</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
       {/* Secondary Row — desktop only. Mobile uses pinch zoom + the
-          overflow menu above for journal / report / settings. */}
+          overflow menu above for journal / report / settings.
+          Peer chips (2026-09-26): used to be their own row that existed
+          only to hold one avatar pill, pushing the calendar grid down.
+          Now folded into this row's left side, next to zoom, so calendar
+          height is identical whether or not anyone is sharing with you. */}
       <div className="hidden md:flex items-center justify-between px-4 py-2 gap-4 border-t border-border/50 bg-muted/30">
-        {/* Left: Zoom Controls */}
-        {viewMode !== 'month' && onZoomChange ? (
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground font-medium">{t('縮放')}</span>
-            <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-background border border-border/50">
-              <button
-                type="button"
-                onClick={() => onZoomChange(Math.max(1, zoomLevel - 1))}
-                disabled={zoomLevel <= 1}
-                aria-label={t('縮小')}
-                className={cn(
-                  'p-0.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  zoomLevel <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
-                )}
-              >
-                <ZoomOut className="w-3.5 h-3.5" aria-hidden="true" />
-              </button>
-              <span className="text-[10px] text-muted-foreground min-w-[30px] text-center" aria-live="polite">
-                {t(ZOOM_LABELS[zoomLevel - 1])}
-              </span>
-              <button
-                type="button"
-                onClick={() => onZoomChange(Math.min(4, zoomLevel + 1))}
-                disabled={zoomLevel >= 4}
-                aria-label={t('放大')}
-                className={cn(
-                  'p-0.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  zoomLevel >= 4 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
-                )}
-              >
-                <ZoomIn className="w-3.5 h-3.5" aria-hidden="true" />
-              </button>
-            </div>
+        {/* Left: Zoom Controls + shared-peer avatar stack */}
+        <div className="flex items-center gap-3 min-w-0">
+          {viewMode !== 'month' && onZoomChange && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="text-[10px] text-muted-foreground font-medium">{t('縮放')}</span>
+              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-background border border-border/50">
+                <button
+                  type="button"
+                  onClick={() => onZoomChange(Math.max(1, zoomLevel - 1))}
+                  disabled={zoomLevel <= 1}
+                  aria-label={t('縮小')}
+                  className={cn(
+                    'p-0.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    zoomLevel <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
+                  )}
+                >
+                  <ZoomOut className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+                <span className="text-[10px] text-muted-foreground min-w-[30px] text-center" aria-live="polite">
+                  {t(ZOOM_LABELS[zoomLevel - 1])}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onZoomChange(Math.min(4, zoomLevel + 1))}
+                  disabled={zoomLevel >= 4}
+                  aria-label={t('放大')}
+                  className={cn(
+                    'p-0.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    zoomLevel >= 4 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
+                  )}
+                >
+                  <ZoomIn className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+              </div>
 
-            {/* Time Range Display */}
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background border border-border/50 text-[10px] text-muted-foreground">
-              <Clock className="w-3 h-3" />
-              <span>{String(startHour).padStart(2, '0')}:00 - {String(endHour).padStart(2, '0')}:00</span>
+              {/* Time Range Display */}
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background border border-border/50 text-[10px] text-muted-foreground">
+                <Clock className="w-3 h-3" />
+                <span>{String(startHour).padStart(2, '0')}:00 - {String(endHour).padStart(2, '0')}:00</span>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div />
-        )}
+          )}
+
+          {/* Shared-peer avatars — overlapping stack, tap toggles that
+              peer's overlay on/off. Capped at 4 visible avatars; the rest
+              collapse into a "+N" badge (names listed in its tooltip) so
+              the row never grows taller or wraps regardless of peer count. */}
+          {sharePeers.length > 0 && onTogglePeerVisible && (
+            <div
+              className="flex items-center -space-x-2 flex-shrink-0"
+              role="group"
+              aria-label={t('共享行事曆顯示')}
+            >
+              {sharePeers.slice(0, 4).map((peer) => {
+                const visible = isPeerVisible(visiblePeers, peer.peerId)
+                const name = peer.displayName || t('未命名使用者')
+                return (
+                  <button
+                    key={peer.peerId}
+                    type="button"
+                    onClick={() => onTogglePeerVisible(peer.peerId)}
+                    aria-pressed={visible}
+                    title={visible ? t('點擊隱藏 {name} 的行事曆', { name }) : t('點擊顯示 {name} 的行事曆', { name })}
+                    className={cn(
+                      'relative w-6 h-6 rounded-full border-2 border-card flex items-center justify-center overflow-hidden transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10',
+                      visible ? 'bg-primary/10' : 'bg-muted opacity-50'
+                    )}
+                  >
+                    {peer.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- static export has no image optimizer
+                      <img src={peer.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <UserIcon className="w-3 h-3 text-primary" aria-hidden="true" />
+                    )}
+                  </button>
+                )
+              })}
+              {sharePeers.length > 4 && (
+                <div
+                  className="relative w-6 h-6 rounded-full border-2 border-card bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground"
+                  title={sharePeers.slice(4).map((p) => p.displayName || t('未命名使用者')).join('、')}
+                >
+                  +{sharePeers.length - 4}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Right: frequent tools stay visible; lower-frequency views live in
             one stable disclosure menu so the toolbar never grows sideways. */}
@@ -605,7 +610,6 @@ export function CalendarHeader({
           <UndoRedoButtons className="mr-1" />
           {/* 常駐的懸浮小視窗啟動鈕——不必先開計時（不支援 PiP 的環境自動不顯示） */}
           <HubLauncherButton />
-          {onOpenMeetings && <button type="button" onClick={onOpenMeetings} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"><Users className="h-3.5 w-3.5"/>{lang === 'en' ? 'Find a time' : '約交集時間'}{pendingMeetingCount > 0 && <span className="rounded-full bg-primary px-1.5 text-primary-foreground">{pendingMeetingCount}</span>}</button>}
           <button
             type="button"
             data-tour="notebook-entry"
@@ -646,6 +650,17 @@ export function CalendarHeader({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40 rounded-xl p-1.5">
+              {onOpenMeetings && (
+                <DropdownMenuItem onSelect={onOpenMeetings} className="gap-2.5 rounded-lg py-2 text-xs justify-between">
+                  <span className="flex items-center gap-2.5">
+                    <Users className="w-3.5 h-3.5" />
+                    {lang === 'en' ? 'Find a time' : '約交集'}
+                  </span>
+                  {pendingMeetingCount > 0 && (
+                    <span className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">{pendingMeetingCount}</span>
+                  )}
+                </DropdownMenuItem>
+              )}
               {onOpenJournal && (
                 <DropdownMenuItem onSelect={onOpenJournal} className="gap-2.5 rounded-lg py-2 text-xs">
                   <BookOpen className="w-3.5 h-3.5" />
