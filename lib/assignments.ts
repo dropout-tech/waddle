@@ -80,6 +80,7 @@ const ERRORS: Record<string, string> = {
   ORG_FULL: '這個組織已達 200 位成員上限',
   OWNER_CANNOT_LEAVE: '擁有者無法退出組織，如要結束請解散組織',
   FORBIDDEN: '你沒有權限執行這個操作',
+  REMOVED_FROM_ORG: '你已被移出這個組織，請聯絡管理員重新開放',
   'invalid invite': '邀請連結無效或已過期',
 }
 

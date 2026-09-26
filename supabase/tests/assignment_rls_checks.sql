@@ -164,9 +164,46 @@ select public.remove_org_member(:'org_id','00000000-0000-4000-8000-0000000000d1'
 set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000d1';
 select public.t_ok((select count(*)=0 from public.tasks where user_id='00000000-0000-4000-8000-0000000000a1'),'removed member loses the org-assigned task');
 select public.t_err(format($$select * from public.get_org_board('%s')$$, :'org_id'),'FORBIDDEN','removed member loses board access');
+select public.t_err(format($$select public.accept_org_invite('%s')$$, :'token2'),'REMOVED_FROM_ORG','kicked member cannot rejoin with the old multi-use link');
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000a1';
+select public.create_org_invite(:'org_id') as token3 \gset
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000d1';
+select public.t_err(format($$select public.accept_org_invite('%s')$$, :'token3'),'REMOVED_FROM_ORG','kicked member cannot rejoin with a fresh link either');
+select public.t_err(format($$select public.unblock_org_member('%s','00000000-0000-4000-8000-0000000000d1')$$, :'org_id'),'FORBIDDEN','non-member cannot lift their own block');
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000a1';
+select public.unblock_org_member(:'org_id','00000000-0000-4000-8000-0000000000d1');
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000d1';
+select public.accept_org_invite(:'token3');
+select public.t_ok((select count(*)=2 from public.get_org_members(:'org_id')),'after owner unblocks, the person can rejoin with a valid link');
+select public.leave_org(:'org_id');
+select public.accept_org_invite(:'token3');
+select public.t_ok((select count(*)=2 from public.get_org_members(:'org_id')),'voluntary leave does not block rejoining');
+select public.leave_org(:'org_id');
 set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000a1';
 select public.delete_organization(:'org_id');
 select public.t_ok((select jsonb_array_length(public.get_my_organizations()->'orgs')=0),'owner can delete the organization');
+
+-- Owner deletes their account → org cascades away → its assignments end.
+reset role;
+insert into auth.users(id,email) values ('00000000-0000-4000-8000-0000000000f1','owner-f@example.invalid');
+insert into public.billing_entitlements(user_id,entitlement,expires_at,observed_at_ms) values
+ ('00000000-0000-4000-8000-0000000000f1','pro',now()+interval '30 days',1);
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000f1';
+select public.create_organization('Doomed') as org2 \gset
+select public.create_org_invite(:'org2') as token4 \gset
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000a1';
+select public.accept_org_invite(:'token4');
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000d1';
+select public.accept_org_invite(:'token4');
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000a1';
+select public.assign_task('30000000-0000-4000-8000-000000000002','00000000-0000-4000-8000-0000000000d1',:'org2');
+reset role;
+delete from auth.users where id = '00000000-0000-4000-8000-0000000000f1';
+select public.t_ok((select assignee_id is null and assignment_status is null from public.tasks where id='30000000-0000-4000-8000-000000000002'),
+  'owner account deletion cascades the org AND ends its assignments (BEFORE DELETE trigger)');
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000a1';
 
 delete from public.calendar_shares;  -- A dissolves the share with B
 set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000b1';
@@ -176,6 +213,8 @@ select public.t_ok((select count(*)=0 from public.tasks),'dissolving the calenda
 reset role;
 select public.t_ok(not has_function_privilege('anon','public.assign_task(uuid,uuid,uuid)','EXECUTE'),'anon cannot execute assign_task');
 select public.t_ok(not has_function_privilege('authenticated','huddle_ops.has_pro(uuid)','EXECUTE'),'clients cannot call the Pro helper');
+select public.t_ok(not has_table_privilege('authenticated','public.organization_blocks','SELECT')
+  and not has_table_privilege('authenticated','public.organization_blocks','DELETE'),'organization_blocks has no client privileges');
 select public.t_ok(not has_table_privilege('authenticated','public.organizations','SELECT')
   and not has_table_privilege('authenticated','public.organization_members','INSERT')
   and not has_table_privilege('authenticated','public.organization_invites','SELECT'),'organization tables are RPC-only');

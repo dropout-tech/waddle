@@ -16,6 +16,8 @@ export const dict: Record<string, string> = {
   '這個組織已達 200 位成員上限': 'This organization has reached the 200-member limit.',
   '擁有者無法退出組織，如要結束請解散組織': 'Owners cannot leave. Delete the organization instead.',
   '你沒有權限執行這個操作': "You don't have permission to do that.",
+  '你已被移出這個組織，請聯絡管理員重新開放': 'You were removed from this organization. Ask an admin to let you back in.',
+  '對方可以看到這張任務的描述與備註': "They'll see this task's description and notes.",
 
   // hooks/use-waddle-data.ts
   '指派給我': 'Assigned to me',

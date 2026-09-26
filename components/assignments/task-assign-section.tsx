@@ -108,6 +108,7 @@ export function TaskAssignSection({ task }: { task: Task }) {
         <span className="text-xs font-medium text-muted-foreground">{t('指派給')}</span>
         {busy && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
       </div>
+      <p className="mt-1 text-xs text-muted-foreground">{t('對方可以看到這張任務的描述與備註')}</p>
       {assignment ? (
         <div className="mt-2 space-y-2">
           <div className="flex items-center gap-2">

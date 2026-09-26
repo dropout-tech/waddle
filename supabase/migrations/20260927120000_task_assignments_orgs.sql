@@ -72,13 +72,25 @@ create table public.organization_invites (
 );
 create index organization_invites_org_idx on public.organization_invites(org_id);
 
+-- Members removed by an owner/admin. Invite links are multi-use, so without
+-- this a kicked member could rejoin with the same link. Voluntary leave does
+-- NOT block. Lifted only by unblock_org_member (owner/admin).
+create table public.organization_blocks (
+  org_id     uuid not null references public.organizations(id) on delete cascade,
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  blocked_by uuid references auth.users(id) on delete set null,
+  blocked_at timestamptz not null default now(),
+  primary key (org_id, user_id)
+);
+
 alter table public.organizations        enable row level security;
 alter table public.organization_members enable row level security;
 alter table public.organization_invites enable row level security;
-revoke all on public.organizations, public.organization_members, public.organization_invites
-  from public, anon, authenticated;
-grant all on public.organizations, public.organization_members, public.organization_invites
-  to service_role;
+alter table public.organization_blocks  enable row level security;
+revoke all on public.organizations, public.organization_members, public.organization_invites,
+  public.organization_blocks from public, anon, authenticated;
+grant all on public.organizations, public.organization_members, public.organization_invites,
+  public.organization_blocks to service_role;
 
 -- ── Task assignment columns ─────────────────────────────────────────────────
 -- No "assignee xor status" CHECK on purpose: assignee_id is ON DELETE SET NULL
@@ -186,6 +198,21 @@ begin
 end;
 $$;
 revoke all on function huddle_ops.share_detach() from public, anon, authenticated;
+-- Any way an organization disappears (delete_organization, or the owner's
+-- account deletion cascading through organizations.owner_id) ends its
+-- assignments first, so they don't linger as plain assignments.
+create or replace function huddle_ops.org_before_delete() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform huddle_ops.org_detach(old.id, null);
+  return old;
+end;
+$$;
+revoke all on function huddle_ops.org_before_delete() from public, anon, authenticated;
+create trigger organizations_assignment_detach
+  before delete on public.organizations
+  for each row execute function huddle_ops.org_before_delete();
+
 create trigger calendar_shares_assignment_detach
   after delete on public.calendar_shares
   for each row execute function huddle_ops.share_detach();
@@ -426,6 +453,9 @@ begin
      and i.revoked_at is null and i.expires_at > now();
   if v_inv.id is null then raise exception 'invalid invite' using errcode = 'P0001'; end if;
   perform 1 from public.organizations where id = v_inv.org_id for update;
+  if exists(select 1 from public.organization_blocks b where b.org_id = v_inv.org_id and b.user_id = v_uid) then
+    raise exception 'REMOVED_FROM_ORG' using errcode = 'P0001';
+  end if;
   if not exists(select 1 from public.organization_members where org_id = v_inv.org_id and user_id = v_uid)
      and (select count(*) from public.organization_members where org_id = v_inv.org_id) >= 200 then
     raise exception 'ORG_FULL' using errcode = 'P0001';
@@ -510,6 +540,24 @@ begin
   end if;
   perform huddle_ops.org_detach(p_org, p_user);
   delete from public.organization_members where org_id = p_org and user_id = p_user;
+  insert into public.organization_blocks(org_id, user_id, blocked_by)
+  values (p_org, p_user, v_uid)
+  on conflict (org_id, user_id) do update set blocked_by = excluded.blocked_by, blocked_at = now();
+end;
+$$;
+
+-- Let a removed person back in (they still need a valid invite link).
+create or replace function public.unblock_org_member(p_org uuid, p_user uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := auth.uid();
+begin
+  if v_uid is null or not huddle_ops.access_allowed() then
+    raise exception 'authentication required' using errcode = '42501';
+  end if;
+  if coalesce(huddle_ops.org_role(p_org, v_uid), '') not in ('owner','admin') then
+    raise exception 'FORBIDDEN' using errcode = '42501';
+  end if;
+  delete from public.organization_blocks where org_id = p_org and user_id = p_user;
 end;
 $$;
 
@@ -572,7 +620,8 @@ do $$ declare f text; begin
     'public.preview_org_invite(text)', 'public.accept_org_invite(text)',
     'public.get_org_members(uuid)', 'public.get_org_board(uuid)',
     'public.remove_org_member(uuid,uuid)', 'public.set_org_member_role(uuid,uuid,text)',
-    'public.leave_org(uuid)', 'public.delete_organization(uuid)'] loop
+    'public.leave_org(uuid)', 'public.delete_organization(uuid)',
+    'public.unblock_org_member(uuid,uuid)'] loop
     execute format('revoke all on function %s from public, anon', f);
     execute format('grant execute on function %s to authenticated', f);
   end loop;
