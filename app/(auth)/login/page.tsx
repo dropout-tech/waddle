@@ -10,6 +10,7 @@ import { DesktopLoginPending } from '@/components/auth/desktop-login-pending'
 import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
 import { useBrowserFinished } from '@/lib/auth/use-browser-finished'
 import { PENDING_SHARE_INVITE_KEY } from '@/hooks/use-calendar-sharing'
+import { pendingOrgInvitePath } from '@/lib/assignments'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -105,6 +106,11 @@ function LoginForm() {
     // normal post-login destination.
     if (window.sessionStorage.getItem(PENDING_SHARE_INVITE_KEY)) {
       router.push('/share/invite')
+      return
+    }
+    const orgInvite = pendingOrgInvitePath()
+    if (orgInvite) {
+      router.push(orgInvite)
       return
     }
 

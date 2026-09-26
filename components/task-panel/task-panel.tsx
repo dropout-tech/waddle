@@ -10,6 +10,7 @@ import { PanelHeader } from './panel-header'
 import { WorkspaceSection } from './workspace-section'
 import { FilterBar, type FilterState } from './filter-bar'
 import { UnifiedTaskList } from './unified-task-list'
+import { TaskRow } from './task-row'
 import { CompletedTasksDrawer } from './completed-tasks-drawer'
 import { TodayMeetingsPopover } from './today-meetings-popover'
 import { useI18n } from '@/lib/i18n/react'
@@ -35,6 +36,8 @@ const VIEW_MODE_LABEL: Record<ViewMode, string> = {
 
 interface TaskPanelProps {
   workspaces: Workspace[]
+  /** Tasks other people assigned to me — rendered as their own section. */
+  assignedTasks?: Task[]
   isExpanded?: boolean
   /**
    * If true (the user setting default), tasks completed today stay
@@ -68,6 +71,7 @@ interface TaskPanelProps {
 
 export function TaskPanel({
   workspaces,
+  assignedTasks = [],
   isExpanded = false,
   keepCompletedTodayInList = true,
   onToggleCategoryCollapse,
@@ -212,16 +216,27 @@ export function TaskPanel({
     return sortWorkspacesForDisplay(list)
   }, [workspaces, filters, keepCompletedTodayInList, todayStr])
 
+  // Assigned-to-me tasks: same search / completed-today rules as the list.
+  const visibleAssigned = useMemo(() => assignedTasks.filter((task) => {
+    if (filters.search && !task.title.toLowerCase().includes(filters.search.toLowerCase())) return false
+    if (filters.urgency.length > 0 && !filters.urgency.includes(task.urgency)) return false
+    if (task.isCompleted) {
+      if (!filters.showCompleted || !keepCompletedTodayInList || !task.completedAt) return false
+      if (toDateString(new Date(task.completedAt)) !== todayStr) return false
+    }
+    return true
+  }), [assignedTasks, filters, keepCompletedTodayInList, todayStr])
+
   // Flatten all tasks for unified view
   const allFilteredTasks = useMemo(() => {
-    const tasks: Task[] = []
+    const tasks: Task[] = [...visibleAssigned]
     filteredWorkspaces.forEach((ws) => {
       ws.categories.forEach((cat) => {
         tasks.push(...cat.tasks)
       })
     })
     return tasks
-  }, [filteredWorkspaces])
+  }, [filteredWorkspaces, visibleAssigned])
 
   const hasActiveFilters =
     filters.urgency.length > 0 ||
@@ -446,6 +461,28 @@ export function TaskPanel({
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-3 py-4"
       >
+        {viewMode === 'category' && visibleAssigned.length > 0 && (
+          <section data-testid="assigned-to-me-section" data-tour="assigned-section" className="mb-4">
+            <h3 className="mb-1.5 flex items-center gap-2 px-1 text-xs font-semibold text-muted-foreground">
+              {t('指派給我')}
+              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[10px]">
+                {visibleAssigned.filter((x) => !x.isCompleted).length}
+              </span>
+            </h3>
+            <div className="space-y-1">
+              {visibleAssigned.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  density={density}
+                  metaOrder={metaOrder}
+                  onToggleComplete={onToggleComplete}
+                  onSelect={onSelectTask}
+                />
+              ))}
+            </div>
+          </section>
+        )}
         {viewMode === 'category' ? (
           filteredWorkspaces.map((workspace) => (
             <div key={workspace.id} id={`workspace-${workspace.id}`}>

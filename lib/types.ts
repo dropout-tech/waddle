@@ -176,6 +176,27 @@ export interface Task {
   parentId?: string
   /** Dates (YYYY-MM-DD) to exclude from the master recurrence rule. */
   exdates?: string[]
+  /**
+   * Task assignment (migration 20260927120000). Present when the task is
+   * assigned to someone (role 'assigner' — I own it) or assigned to me
+   * (role 'assignee' — someone else owns it; only completion / actual time /
+   * schedule can be changed, enforced by a DB trigger). Never persisted via
+   * taskToRow: assignment changes go through the assign/unassign/return RPCs.
+   */
+  assignment?: TaskAssignment
+}
+
+export interface TaskAssignment {
+  role: 'assigner' | 'assignee'
+  /** The other person: assignee when role=assigner, assigner when role=assignee. */
+  peerId: string
+  peerName: string
+  peerAvatar?: string
+  status: 'active' | 'returned'
+  returnNote?: string
+  organizationId?: string
+  organizationName?: string
+  assignedAt?: string
 }
 
 export interface TimeBlock {

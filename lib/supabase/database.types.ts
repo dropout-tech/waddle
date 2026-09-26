@@ -92,6 +92,13 @@ type TasksRow = {
   meeting_url?: string | null
   exdates?: string[] | null
   parent_id?: string | null
+  /** Migration 20260927120000 — task assignment. Written only via RPCs
+   *  (a DB trigger rejects direct client writes), so absent from TasksInsert. */
+  assignee_id?: string | null
+  organization_id?: string | null
+  assignment_status?: 'active' | 'returned' | null
+  return_note?: string | null
+  assigned_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -661,6 +668,73 @@ export type Database = {
           created_at: string
         }[]
       }
+      // Migration 20260927120000 — task assignment + organizations.
+      assign_task: { Args: { p_task: string; p_assignee: string; p_org?: string | null }; Returns: undefined }
+      unassign_task: { Args: { p_task: string }; Returns: undefined }
+      return_task: { Args: { p_task: string; p_note: string }; Returns: undefined }
+      list_task_assignments: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          task_id: string
+          role: 'assignee' | 'assigner'
+          peer_id: string
+          peer_name: string | null
+          peer_avatar: string | null
+          status: 'active' | 'returned'
+          return_note: string | null
+          organization_id: string | null
+          organization_name: string | null
+          assigned_at: string | null
+          title: string
+          is_completed: boolean
+          completed_at: string | null
+          scheduled_date: string | null
+          due_date: string | null
+        }[]
+      }
+      get_assignable_people: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          user_id: string
+          display_name: string | null
+          avatar_url: string | null
+          source: 'share' | 'org'
+          org_id: string | null
+          org_name: string | null
+        }[]
+      }
+      get_my_organizations: { Args: Record<PropertyKey, never>; Returns: Json }
+      create_organization: { Args: { p_name: string }; Returns: string }
+      create_org_invite: { Args: { p_org: string }; Returns: string }
+      preview_org_invite: {
+        Args: { p_token: string }
+        Returns: { org_name: string; inviter_name: string | null; member_count: number; already_member: boolean }[]
+      }
+      accept_org_invite: { Args: { p_token: string }; Returns: string }
+      get_org_members: {
+        Args: { p_org: string }
+        Returns: { user_id: string; display_name: string | null; avatar_url: string | null; role: 'owner' | 'admin' | 'member'; joined_at: string }[]
+      }
+      get_org_board: {
+        Args: { p_org: string }
+        Returns: {
+          task_id: string
+          title: string
+          assignee_id: string
+          assignee_name: string | null
+          assigner_id: string
+          assigner_name: string | null
+          is_completed: boolean
+          completed_at: string | null
+          due_date: string | null
+          scheduled_date: string | null
+          assigned_at: string | null
+        }[]
+      }
+      remove_org_member: { Args: { p_org: string; p_user: string }; Returns: undefined }
+      set_org_member_role: { Args: { p_org: string; p_user: string; p_role: 'admin' | 'member' }; Returns: undefined }
+      leave_org: { Args: { p_org: string }; Returns: undefined }
+      delete_organization: { Args: { p_org: string }; Returns: undefined }
       get_shared_calendar: {
         Args: { p_peer: string; p_from: string; p_to: string }
         Returns: {

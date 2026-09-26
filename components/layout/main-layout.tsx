@@ -36,6 +36,8 @@ import type { PetSettings } from '@/lib/pet/types'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
+  /** Tasks other people assigned to me (not part of my workspace tree). */
+  assignedTasks?: Task[]
   timeBlocks: TimeBlock[]
   slotTypes?: SlotType[]
   settings: UserSettings
@@ -96,6 +98,7 @@ const REVIEW_PANE_KEY = 'waddle-review-pane-open-v1'
 
 export function MainLayout({
   workspaces,
+  assignedTasks = [],
   timeBlocks,
   slotTypes,
   settings,
@@ -410,7 +413,9 @@ export function MainLayout({
     return tasks
   }, [workspaces])
 
-  const allTasks = getAllTasks()
+  // Assigned-to-me tasks join the calendar and the day's pending list; the
+  // task panel renders them as their own section (see TaskPanel).
+  const allTasks = [...getAllTasks(), ...assignedTasks]
   const meetingController = useMeetingInvitations(selectedDate)
   const [meetingsOpen, setMeetingsOpen] = useState(false)
   const [meetingInviteId, setMeetingInviteId] = useState<string>()
@@ -611,6 +616,7 @@ export function MainLayout({
               <div key="tasks" className="h-full flex flex-col animate-in slide-in-from-left duration-200 fade-in">
               <TaskPanel
                 workspaces={workspaces}
+                assignedTasks={assignedTasks}
                 isExpanded={true}
                 keepCompletedTodayInList={settings?.keepCompletedTodayInList ?? true}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
@@ -932,6 +938,7 @@ export function MainLayout({
             <ErrorBoundary>
               <TaskPanel
                 workspaces={workspaces}
+                assignedTasks={assignedTasks}
                 isExpanded={false}
                 keepCompletedTodayInList={settings?.keepCompletedTodayInList ?? true}
                 onToggleCategoryCollapse={onToggleCategoryCollapse}
