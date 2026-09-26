@@ -68,6 +68,7 @@ function HuddlePage() {
     saveSettings,
     setQuickLinks,
     setFocusBoard,
+    setPet,
     scratchpadByDate,
     addScratchpadItem,
     updateScratchpadItem,
@@ -513,6 +514,8 @@ function HuddlePage() {
         onTimeBlockSelect={handleSelectTimeBlock}
         onSetQuickLinks={setQuickLinks}
         onSetFocusBoard={setFocusBoard}
+        onSetPet={setPet}
+        petCanAdopt={onboardingCompleted}
         scratchpadByDate={scratchpadByDate}
         onAddScratchpadItem={addScratchpadItem}
         onUpdateScratchpadItem={updateScratchpadItem}
@@ -565,6 +568,7 @@ function HuddlePage() {
           onClose={() => setIsSettingsOpen(false)}
           onSave={saveSettings}
           onSetDefaultCategory={setDefaultCategory}
+          onSetPet={setPet}
         />
       )}
 

@@ -11,6 +11,7 @@ import { dict as growth } from './dict/growth'
 import { dict as operations } from './dict/operations'
 import { dict as account } from './dict/account'
 import { dict as meetings } from './dict/meetings'
+import { dict as pet } from './dict/pet'
 import { dict as stickyNotes } from './dict/sticky-notes'
 
 // Merged English dictionary. Keys are the Traditional Chinese source strings
@@ -31,6 +32,7 @@ export const en: Record<string, string> = {
   ...account,
   ...operations,
   ...meetings,
+  ...pet,
   ...stickyNotes,
   // Whiteboard canvas controls.
   "手寫筆記": "Handwritten note",

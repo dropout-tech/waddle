@@ -12,6 +12,7 @@ import type {
   UserSettings,
 } from '@/lib/types'
 import { normalizeFocusSettings } from '@/lib/focus'
+import { normalizePet } from '@/lib/pet/types'
 
 type TaskRow = Database['public']['Tables']['tasks']['Row']
 type TaskInsert = Database['public']['Tables']['tasks']['Insert']
@@ -237,8 +238,13 @@ export function rowToSettings(
 ): UserSettings {
   // notifications and lunch_break/buffer_time live as JSONB; merge with defaults
   // so partially-filled rows still hydrate cleanly.
-  const notifications = (row.notifications && Object.keys(row.notifications as object).length > 0)
-    ? (row.notifications as unknown as UserSettings['notifications'])
+  // The pet rides inside the notifications blob (key `pet`); split it out so
+  // `notifications` keeps its own shape and the pet gets its own field.
+  const { pet: rawPet, ...notificationsBlob } = (row.notifications && typeof row.notifications === 'object' && !Array.isArray(row.notifications))
+    ? (row.notifications as Record<string, unknown>)
+    : {}
+  const notifications = Object.keys(notificationsBlob).length > 0
+    ? (notificationsBlob as unknown as UserSettings['notifications'])
     : fallbackSettings.notifications
 
   return {
@@ -277,5 +283,6 @@ export function rowToSettings(
     // to DEFAULT_FOCUS_SETTINGS when the column is absent (undefined) or
     // malformed, so older deployments degrade cleanly.
     focusBoard: normalizeFocusSettings(row.focus_board),
+    pet: normalizePet(rawPet),
   }
 }

@@ -277,7 +277,7 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
     <div className="flex shrink-0 items-center justify-between gap-1 text-xs text-muted-foreground/70"><span>{t('點空白處儲存')}</span><button type="button" className={button} onPointerDown={e => e.preventDefault()} onClick={() => { setEditor(null); setError(''); viewport.current?.focus() }}>{t('取消')}</button></div>
   </form>
   const fullScreen = fillHeight && expanded
-  return <section className={cn('min-w-0', fillHeight && 'flex min-h-0 flex-1 flex-col', fullScreen && 'fixed inset-0 z-modal bg-background px-3 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]')} aria-label={t('白板')}>
+  return <section className={cn('min-w-0', fillHeight && 'flex min-h-0 flex-1 flex-col', fullScreen && 'fixed inset-0 z-modal bg-background px-3 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]')} data-pet-hide={fullScreen ? '' : undefined} aria-label={t('白板')}>
     <div className="mb-1 flex flex-wrap items-center gap-x-1 md:mb-2">
       <h3 className="mr-1 shrink-0 font-medium max-md:sr-only">{t('白板')}</h3>
       {!readOnly && <div role="toolbar" className="flex min-w-0 flex-nowrap items-center md:flex-wrap md:gap-1" aria-label={t('畫布工具')}>
