@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Barlow_Condensed, Noto_Sans_TC } from 'next/font/google'
@@ -13,6 +13,10 @@ import styles from './marketing-page.module.css'
 
 const display = Noto_Sans_TC({ weight: '900', subsets: ['latin'], display: 'swap', preload: false, variable: '--poster-zh' })
 const condensed = Barlow_Condensed({ weight: '800', subsets: ['latin'], display: 'swap', variable: '--poster-en' })
+// Hero theme (2026-09-26): 'ink' = black poster hero + yellow second slab;
+// 'yellow' = the previous yellow hero. Flip this one value to roll back.
+// Preview either without a deploy: /about?hero=yellow or ?hero=ink.
+const HERO_THEME: 'ink' | 'yellow' = 'ink'
 const release = 'https://github.com/dropout-tech/waddle/releases/tag/v0.1.2-beta.1'
 const download = (arch: string) => `https://github.com/dropout-tech/waddle/releases/download/v0.1.2-beta.1/Huddle-0.1.2-mac-${arch}.dmg`
 const copy = {
@@ -88,8 +92,12 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
   const quote = brandQuote(en ? 'en' : 'zh')
   const [boardView, setBoardView] = useState(0)
   const toLang = () => setLang(en ? 'en' : 'zh-TW')
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get('hero')
+    if (v === 'ink' || v === 'yellow') document.getElementById('top')?.setAttribute('data-hero', v)
+  }, [])
   return (
-    <main lang={en ? 'en' : 'zh-Hant'} id="top" data-surface="marketing" className={`${styles.site} ${display.variable} ${condensed.variable} ${en ? styles.english : ''}`}>
+    <main lang={en ? 'en' : 'zh-Hant'} id="top" data-surface="marketing" data-hero={HERO_THEME} className={`${styles.site} ${display.variable} ${condensed.variable} ${en ? styles.english : ''}`}>
       <a className={styles.skip} href="#features">{en ? 'Skip to features' : '跳至功能介紹'}</a>
       <header className={styles.header}>
         <Link href={`${base}/about`} className={styles.brand} aria-label="Huddle">Huddle<span className={styles.brandDot}>.</span></Link>

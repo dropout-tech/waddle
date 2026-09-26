@@ -237,3 +237,27 @@
 @media (prefers-reduced-motion: reduce) { .site *, .site *::before, .site *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
 /* whiteboard copy sits in a narrow column next to a big capture */
 @media (min-width: 1101px) { .chapterCopy h2 { font-size: clamp(42px, 3.9vw, 64px); } .english .chapterCopy h2 { font-size: clamp(46px, 4.3vw, 70px); } }
+
+/* ── Hero theme "ink" (default since 2026-09-26; <main data-hero>) ─────────
+   Black poster hero, mustard headline, the second clause in paper white with
+   the orange marker. The cream scene sits in a paper frame with a hard yellow
+   offset shadow so it reads as a pasted print, and is small enough that the
+   penguin in it is ~100px tall at 1440. The slab after the hero flips to
+   yellow to keep the ink/yellow rhythm. data-hero="yellow" = previous look. */
+.site[data-hero=ink] .hero { background: var(--ink); color: var(--paper); }
+.site[data-hero=ink] .hero h1 { color: var(--yellow); }
+.site[data-hero=ink] .hero h1 [data-merge-clause] { color: var(--paper); }
+.site[data-hero=ink] .heroSub { color: #e4dfcf; }
+.site[data-hero=ink] .hero .primary { background: var(--yellow); color: var(--ink); }
+.site[data-hero=ink] .hero .primary:hover { background: #f4d668; }
+.site[data-hero=ink] .hero :is(a, button):focus-visible { outline-color: var(--yellow); }
+.site[data-hero=ink] .heroArt { inset: auto; right: max(4%, calc((100vw - 1440px) / 2 + 58px)); top: 50%; width: min(38vw, 540px); padding: 10px; background: #f5efe0 url(/art/paper-texture.jpg) 0 0 / 520px; border-radius: 16px; box-shadow: 12px 12px 0 var(--yellow); transform: translateY(-46%) rotate(-2.5deg); }
+.site[data-hero=ink] .heroArt::after { display: none; }
+.site[data-hero=ink] .heroArt img { height: auto; aspect-ratio: 4 / 3; border-radius: 9px; object-fit: cover; object-position: 100% 50%; }
+.site[data-hero=ink] .proof { background: var(--yellow); color: var(--ink); }
+.site[data-hero=ink] .proof :is(h2, .kicker) { color: var(--ink); }
+@media (max-width: 760px) {
+  .site[data-hero=ink] .hero { padding-bottom: 48px; }
+  .site[data-hero=ink] .heroArt { position: relative; right: auto; top: auto; width: 82%; margin: 34px auto 0; padding: 7px; box-shadow: 8px 8px 0 var(--yellow); transform: rotate(-2.5deg); }
+  .site[data-hero=ink] .heroArt img { -webkit-mask-image: none; mask-image: none; aspect-ratio: 5 / 4; object-fit: cover; object-position: center 90%; }
+}

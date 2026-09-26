@@ -184,6 +184,13 @@ App 繼續使用既有 `--radius: 0.75rem` 與陶瓷表面規則，不能將海�
 - **字級**：內文 18–24px（手機 16–17），章節標題 42–84px，價格 88–132px；標題 `word-break: keep-all` 只在標點斷。
 - **效能**：插畫一律 WebP、預先縮好（next.config 關閉最佳化），首屏圖 `fetchPriority=high`，其餘 lazy。2026-09-26 實測：1440 首次載入圖片約 517KB、捲到底約 893KB。
 
+### 首屏墨色版＋企鵝馬戲團（2026-09-26）
+
+- **首屏主題開關**：`marketing-page.tsx` 的 `HERO_THEME`（寫在 `<main data-hero>`）。`ink`（預設）＝墨底 `#292b24`、第一句芥末黃 `#edc747`、「或是一個 Huddle」紙白＋橘色麥克筆底線；插畫裝進紙紋圓角框（10px 紙邊、黃色 12px 硬陰影、-2.5° 斜貼），桌機裁成 4:3 右半場景、寬 `min(38vw, 540px)`，框內企鵝約 100–120px 高；緊接的 `proof` 板翻成黃底墨字，維持黑黃交錯。改回 `yellow` 即回到先前黃色首屏；不用重新部署也能預覽：`?hero=yellow`／`?hero=ink`。
+- **企鵝永遠小小隻**：常駐企鵝桌機 84px、手機 60px；首屏五隻分身 68／50px。深色板上靠一圈紙白光暈（drop-shadow）維持可讀。
+- **企鵝馬戲團**（`components/marketing/penguin-circus.tsx`）：停靠點用 `data-penguin-stop` 標在頁面元素上（`data-penguin-at="fx fy dx dy"` 指腳底位置；`-m` 版給手機；`data-penguin-only` 限桌機／手機；`motion` = skate／orbit／pace；`nap` = 到站就藏起來換吊床那隻）。新增區塊要讓企鵝停，只加屬性、不改元件。停靠點避開按鈕與連結（手機上企鵝可點，會擋觸控）。
+- **動畫紀律**：只動 transform／opacity（CLS 0）；CSS modules 裡動畫請寫 longhand（`animation-duration` 等），shorthand＋另一條 `animation-name` 會被編譯成 0s；`prefers-reduced-motion` 一律改靜態擺位；原生 App／桌面殼不跑。
+
 ### Public marketing：既有實裝
 
 - 導覽：奶油紙面，44px 導覽連結，hover 底線；手機登入控制目前為 40px 高，其餘 CTA 44–48px。這是目前實裝記錄，44px 仍為產品觸控目標基準。
