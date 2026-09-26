@@ -18,7 +18,7 @@ import { useI18n } from '@/lib/i18n/react'
 import { getLang, t } from '@/lib/i18n'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { TaskAssignSection, AssigneeBanner } from '@/components/assignments/task-assign-section'
+import { TaskAssignButton } from '@/components/assignments/task-assign-section'
 
 // Weekday letters for the recurrence day-picker. Kept lang-aware directly
 // (not routed through t()) because a single Chinese character like '日'
@@ -270,11 +270,9 @@ export function TaskDetailModal({
                 header (which is `relative`), not to this little chip, so it
                 spans the drawer's content gutters instead of slicing the
                 title input underneath in half. */}
-            {isAssignee ? (
-              <span className="inline-flex max-w-[12rem] items-center truncate rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                {t('來自 {name}', { name: task.assignment!.peerName })}
-              </span>
-            ) : (
+            {/* Assignee: the category belongs to the assigner — the header
+                avatar button (right) says who it's from. */}
+            {!isAssignee && (
             <CategoryCascadePicker
               workspaces={workspaces}
               value={selectedCategoryId}
@@ -288,6 +286,9 @@ export function TaskDetailModal({
             )}
           </div>
           <div className="flex items-center gap-1">
+            {/* Assignment lives entirely in this small header control + its
+                popover (migration 20260927120000). */}
+            {!isCreate && <TaskAssignButton task={task} onReturned={onClose} />}
             {!isCreate && onDelete && !isAssignee && (
               <button
                 onClick={() => {
@@ -328,11 +329,6 @@ export function TaskDetailModal({
               className="text-lg font-semibold border-0 px-0 focus-visible:ring-0 bg-transparent"
             />
           </div>
-
-          {/* Assignment (migration 20260927120000) — edit mode only. */}
-          {!isCreate && (isAssignee
-            ? <AssigneeBanner task={task} onReturned={onClose} />
-            : <TaskAssignSection task={task} />)}
 
           {/* Urgency — visual slider with color-coded level */}
           <UrgencySlider value={urgency} onChange={setUrgency} />

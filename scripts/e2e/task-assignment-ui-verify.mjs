@@ -142,7 +142,7 @@ async function main() {
   const browser = await chromium.launch()
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'zh-TW' })
   await context.addInitScript(() => {
-    const s = document.createElement('style'); s.textContent = 'nextjs-portal{display:none!important}'
+    const s = document.createElement('style'); s.textContent = 'nextjs-portal,[data-pet-adopt]{display:none!important}'
     document.addEventListener('DOMContentLoaded', () => document.head.appendChild(s))
   })
   const page = await context.newPage()
@@ -162,9 +162,12 @@ async function main() {
   const section = page.getByTestId('assigned-to-me-section')
   ok(await section.isVisible(), '1280 board shows the 指派給我 section')
   ok((await section.textContent())?.includes('確認報價單'), 'assigned-to-me task listed with its title')
-  ok((await section.textContent())?.includes('來自 小安'), 'assigned-to-me row shows 來自 小安')
-  ok(await page.getByText('指派給 小安').first().isVisible().catch(() => false), 'own assigned task shows 指派給 小安 chip')
-  ok(await page.getByText('阿哲 已退回').first().isVisible().catch(() => false), 'returned task shows 阿哲 已退回 chip')
+  ok(await section.getByRole('img', { name: '來自 小安' }).first().isVisible(), 'assigned-to-me row shows a 來自 小安 avatar (name in aria-label)')
+  ok(await page.getByRole('img', { name: '指派給 小安' }).first().isVisible().catch(() => false), 'own assigned task shows a 指派給 小安 avatar')
+  ok(await page.getByRole('img', { name: /阿哲 已退回/ }).first().isVisible().catch(() => false), 'returned task shows a 阿哲 已退回 avatar')
+  const chipBox = await page.getByTestId('assignment-chip').first().boundingBox()
+  ok(!!chipBox && chipBox.width <= 18 && chipBox.height <= 18, `row marker is a tiny avatar (${chipBox?.width}×${chipBox?.height})`)
+  ok(!(await page.locator('[data-tour="task-row"]').allTextContents()).some((x) => /來自|指派給|已退回/.test(x)), 'task rows carry no assignment text labels')
   await shot(page, 'board-1280.png')
 
   // Assignee completes: only whitelisted columns may be sent.
@@ -179,9 +182,17 @@ async function main() {
 
   // Owner modal: assign section + picker.
   await page.getByText('整理客戶名單').first().click()
-  await page.getByTestId('task-assign-section').waitFor({ timeout: 8000 })
-  ok((await page.getByTestId('task-assign-section').textContent())?.includes('這週排不進來'), 'owner modal shows the return reason')
-  await page.getByRole('button', { name: '改派' }).click()
+  const assignBtn = page.getByTestId('task-assign-button')
+  await assignBtn.waitFor({ timeout: 8000 })
+  ok(await page.getByTestId('task-assign-section').count() === 0, 'modal body has no assignment card')
+  const btnBox = await assignBtn.boundingBox()
+  ok(!!btnBox && btnBox.width >= 44 && btnBox.height >= 44, `header assign button hit area ≥44 (${btnBox?.width}×${btnBox?.height})`)
+  await shot(page, 'modal-owner-closed-1280.png')
+  await assignBtn.click()
+  const pop = page.getByTestId('task-assign-popover')
+  await pop.waitFor({ timeout: 5000 })
+  ok((await pop.textContent())?.includes('這週排不進來'), 'popover shows the return reason')
+  ok((await pop.textContent())?.includes('對方可以看到描述與備註'), 'privacy hint lives in the popover')
   await page.getByRole('option', { name: /小安/ }).waitFor({ timeout: 5000 })
   await shot(page, 'modal-owner-assign-1280.png')
   await page.getByRole('option', { name: /阿哲/ }).click()
@@ -192,12 +203,13 @@ async function main() {
 
   // Assignee modal: banner + return.
   await section.getByText('確認報價單').click()
-  await page.getByTestId('assignee-banner').waitFor({ timeout: 8000 })
+  await page.getByTestId('task-assign-button').waitFor({ timeout: 8000 })
   ok(await page.getByRole('dialog').getByTitle('刪除任務').count() === 0, 'assignee modal hides the delete button')
-  await page.getByRole('button', { name: '退回這個任務' }).click()
+  await shot(page, 'modal-assignee-closed-1280.png')
+  await page.getByTestId('task-assign-button').click()
   await page.getByPlaceholder('寫一句退回理由（對方會看到）').fill('需要先確認預算')
   await shot(page, 'modal-assignee-return-1280.png')
-  await page.getByRole('button', { name: '確認退回' }).click()
+  await page.getByTestId('task-assign-popover').getByRole('button', { name: '退回這個任務' }).click()
   await page.waitForTimeout(500)
   const ret = state.rpcs.find((r) => r.name === 'return_task')
   ok(!!ret && JSON.parse(ret.body).p_note === '需要先確認預算', 'return_task called with the reason')
@@ -277,8 +289,22 @@ async function main() {
   const row = page.getByTestId('assigned-to-me-section').getByText('確認報價單')
   if (await row.count()) {
     await row.first().click()
-    await page.getByTestId('assignee-banner').waitFor({ timeout: 8000 }).catch(() => {})
+    await page.getByTestId('task-assign-button').waitFor({ timeout: 8000 }).catch(() => {})
     await shot(page, 'modal-assignee-390.png')
+    await page.getByTestId('task-assign-button').click()
+    await page.getByTestId('task-assign-popover').waitFor({ timeout: 5000 })
+    const pb = await page.getByTestId('task-assign-popover').boundingBox()
+    ok(!!pb && pb.x >= 0 && pb.x + pb.width <= 390, `390 popover fits the viewport (${Math.round(pb?.x)}..${Math.round((pb?.x ?? 0) + (pb?.width ?? 0))})`)
+    await shot(page, 'modal-assignee-popover-390.png')
+    await closeDialogs(page)
+  }
+  const own = page.locator('[data-tour="task-row"]:visible', { hasText: '整理客戶名單' }).first()
+  if (await own.count()) {
+    await own.scrollIntoViewIfNeeded()
+    await own.click()
+    await page.getByTestId('task-assign-button').click()
+    await page.getByTestId('task-assign-popover').waitFor({ timeout: 5000 })
+    await shot(page, 'modal-owner-popover-390.png')
     await closeDialogs(page)
   }
 

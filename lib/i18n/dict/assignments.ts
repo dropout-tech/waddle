@@ -17,7 +17,9 @@ export const dict: Record<string, string> = {
   '擁有者無法退出組織，如要結束請解散組織': 'Owners cannot leave. Delete the organization instead.',
   '你沒有權限執行這個操作': "You don't have permission to do that.",
   '你已被移出這個組織，請聯絡管理員重新開放': 'You were removed from this organization. Ask an admin to let you back in.',
-  '對方可以看到這張任務的描述與備註': "They'll see this task's description and notes.",
+  '對方可以看到描述與備註': "They'll see the description and notes.",
+  '指派給…': 'Assign to…',
+  '退回理由': 'Reason for returning',
 
   // hooks/use-waddle-data.ts
   '指派給我': 'Assigned to me',
@@ -104,6 +106,6 @@ export const dict: Record<string, string> = {
 
   // components/onboarding-tour.tsx
   '🤝 指派任務 ＆ 組織': '🤝 Assignments & organizations',
-  '打開任務詳情，在「指派給」選一位共享夥伴或同組織成員，這張任務就會同時出現在對方的清單與日曆——對方完成時你這邊立刻看得到。對方也可以附一句理由退回。使用者選單的「指派任務」可以查看進度；Pro 會員還能在「組織」建立團隊、用邀請連結拉成員進來。':
-    'Open a task and pick a sharing partner or organization member under "Assign to" — the same task appears in their list and calendar, and you see it the moment they finish. They can also return it with a short reason. Track progress under "Assignments" in the user menu; Pro members can create a team under "Organizations" and invite people with a link.',
+  '任務詳情右上角的小人像按鈕可以把任務指派給共享夥伴或同組織成員：同一張任務會出現在對方的清單與日曆，對方完成時你立刻看得到，對方也能附一句理由退回。進度在使用者選單「指派任務」；Pro 會員可在「組織」用邀請連結建立團隊。':
+    'Use the small person button at the top right of a task to assign it to a sharing partner or organization member: the same task shows up in their list and calendar, you see it the moment they finish, and they can return it with a short reason. Track progress under "Assignments" in the user menu; Pro members can build a team under "Organizations" with an invite link.',
 }
