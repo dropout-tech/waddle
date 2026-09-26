@@ -13,7 +13,7 @@
 .roam { position: fixed; left: 0; top: 0; z-index: 30; width: var(--s, 84px); height: var(--s, 84px); pointer-events: none; opacity: 0; transition: opacity .35s; will-change: transform; contain: layout style; }
 .roam[data-awake] { opacity: 1; }
 .roam[data-hidden] { opacity: 0; transition-duration: .15s; }
-.roamBody { position: absolute; inset: 0; transform-origin: 50% 100%; pointer-events: auto; cursor: pointer; touch-action: manipulation; }
+.roamBody { position: absolute; inset: 0; transform-origin: 50% 100%; pointer-events: auto; touch-action: manipulation; }
 .roam[data-peek] .roamBody, .roam:not([data-awake]) .roamBody, .roam[data-hidden] .roamBody { pointer-events: none; }
 .roamInner { position: absolute; inset: 0; transform-origin: 50% 100%; }
 /* idle life: a slow breath when standing; snoring when asleep */
@@ -34,6 +34,11 @@
 .thrown::before, .foldCard::before { content: ''; width: 14px; height: 14px; flex: none; border: 2px solid #292b24; border-radius: 3px; background: #edc747; }
 .say { position: absolute; left: 0; top: 0; padding: 4px 10px; background: #292b24; color: #edc747; border-radius: 4px; font: 800 18px/1.1 var(--poster-en, sans-serif); letter-spacing: .04em; white-space: nowrap; }
 .poof { position: absolute; left: 0; top: 0; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 5px dashed #cf5731; }
+.fish { position: absolute; left: 0; top: 0; width: 44px; height: 30px; }
+.fish svg { display: block; filter: drop-shadow(0 0 1.5px #f6f3e9); }
+.heart, .spark { position: absolute; left: 0; top: 0; margin: -12px 0 0 -8px; font: 800 22px/1 system-ui, sans-serif; color: #cf5731; text-shadow: 0 0 2px #f6f3e9; }
+.soap { position: absolute; left: 0; top: 0; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; border: 2px solid #292b24; background: radial-gradient(circle at 34% 32%, #fff 0 16%, #d8eef4aa 34%, #a9d7e533 100%); }
+.spark { color: #edc747; text-shadow: 0 0 1px #292b24, 0 0 1px #292b24; }
 .bonk { position: absolute; left: 0; top: 0; width: 34px; height: 34px; margin: -17px 0 0 -17px; }
 
 /* ── Hero swarm: five penguins, then one Huddle ──────────────────────────── */
@@ -49,9 +54,13 @@
 .headline[data-chaos] > span:first-child { animation: jitter .18s steps(2) infinite; }
 @keyframes jitter { 0% { transform: translate(-1px, 1px) rotate(-.4deg); } 100% { transform: translate(2px, -1px) rotate(.5deg); } }
 
-/* Egg #1 — the cursor is a fish in the hero (links keep their own cursor) */
-.fishZone { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='24' viewBox='0 0 36 24'%3E%3Cpath d='M3 12c5-8 15-9 22-3l7-6v18l-7-6c-7 6-17 5-22-3z' fill='%23cf5731' stroke='%23292b24' stroke-width='2.4' stroke-linejoin='round'/%3E%3Ccircle cx='10' cy='10.5' r='2' fill='%23292b24'/%3E%3C/svg%3E") 2 12, auto; }
-.fishZone :is(a, button) { cursor: pointer; }
+/* Egg #1 — the cursor is a fish across the whole marketing page (mouse only).
+   UI keeps honest cursors: pointer on controls, text caret in fields. */
+@media (hover: hover) and (pointer: fine) {
+  .fishZone { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='24' viewBox='0 0 36 24'%3E%3Cpath d='M3 12c5-8 15-9 22-3l7-6v18l-7-6c-7 6-17 5-22-3z' fill='%23cf5731' stroke='%23292b24' stroke-width='2.4' stroke-linejoin='round'/%3E%3Ccircle cx='10' cy='10.5' r='2' fill='%23292b24'/%3E%3C/svg%3E") 2 12, auto; }
+  .fishZone :is(a, button, summary, label, select, [role=tab], [role=button]) { cursor: pointer; }
+  .fishZone :is(input:not([type=button], [type=submit], [type=checkbox], [type=radio]), textarea, [contenteditable=true]) { cursor: text; }
+}
 
 /* ── AI fold: chat bubbles fold into a task card that flies into the phone ─ */
 .posterStage { position: relative; }
@@ -105,7 +114,8 @@
 /* ── Reduced motion: static placements, nothing roams ───────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .roam, .fx, .swarm > .swarmBird { display: none; }
-  .swarmStatic { display: flex; position: absolute; right: 6%; bottom: 7%; }
+  .swarmStatic { display: flex; position: absolute; right: 6%; bottom: 7%; pointer-events: auto; }
+  .swarmStatic[data-fed]::after { content: attr(data-say); position: absolute; right: 0; bottom: 100%; margin-bottom: 8px; padding: 4px 10px; background: #292b24; color: #edc747; border-radius: 4px; font: 800 16px/1.2 var(--poster-zh, sans-serif); white-space: nowrap; }
   .swarmStatic img { width: 58px; height: 58px; object-fit: contain; object-position: 50% 100%; margin-left: -14px; }
   .fold > * { animation: none; }
   .fold > .foldCard { opacity: 1; transform: translate(14cqw, 49cqh) rotate(-3deg); }

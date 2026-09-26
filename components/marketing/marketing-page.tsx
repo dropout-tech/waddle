@@ -97,7 +97,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
     if (v === 'ink' || v === 'yellow') document.getElementById('top')?.setAttribute('data-hero', v)
   }, [])
   return (
-    <main lang={en ? 'en' : 'zh-Hant'} id="top" data-surface="marketing" data-hero={HERO_THEME} className={`${styles.site} ${display.variable} ${condensed.variable} ${en ? styles.english : ''}`}>
+    <main lang={en ? 'en' : 'zh-Hant'} id="top" data-surface="marketing" data-hero={HERO_THEME} className={`${styles.site} ${fishZoneClass} ${display.variable} ${condensed.variable} ${en ? styles.english : ''}`}>
       <a className={styles.skip} href="#features">{en ? 'Skip to features' : '跳至功能介紹'}</a>
       <header className={styles.header}>
         <Link href={`${base}/about`} className={styles.brand} aria-label="Huddle">Huddle<span className={styles.brandDot}>.</span></Link>
@@ -110,13 +110,13 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
 
       {/* HERO — one giant quote (brand tagline, lib/brand.ts) over a wide desk
           scene where the penguin is small and the world is big. */}
-      <section className={`${styles.hero} ${fishZoneClass}`} aria-labelledby="hero-title">
+      <section className={styles.hero} aria-labelledby="hero-title">
         <picture className={styles.heroArt} data-penguin-stop="hero-m" data-penguin-only="mobile" data-penguin-at="0.8 0.93" data-penguin-pose="wave">
           <source media="(max-width: 760px)" srcSet="/art/hero-mobile.webp" width={1080} height={1350} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/art/hero-desk-v2.webp" width={1600} height={900} alt="" fetchPriority="high" decoding="async" />
         </picture>
-        <HeroSwarm />
+        <HeroSwarm locale={locale} />
         <div className={styles.heroCopy}>
           <figure className={styles.quote} data-quoted={quote.author ? "" : undefined}>
             <blockquote>
