@@ -26,6 +26,7 @@ import { WORKSPACE_COLORS, UNCATEGORIZED_WORKSPACE_COLOR } from '@/lib/palette'
 import { UNCATEGORIZED_WORKSPACE_ICON } from '@/lib/default-category'
 import { DEFAULT_FOCUS_SETTINGS, normalizeFocusSettings } from '@/lib/focus'
 import type { FocusSettings } from '@/lib/focus'
+import { normalizePet, type PetSettings } from '@/lib/pet/types'
 // Aliased: this file uses `t` pervasively as the loop variable for "task"
 // (c.tasks.map((t) => ...)), so importing the translator as `t` would shadow it.
 import { t as translate, getLang } from '@/lib/i18n'
@@ -134,6 +135,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   defaultCategoryEnabled: true,
   quickLinks: [],
   focusBoard: DEFAULT_FOCUS_SETTINGS,
+  pet: null,
   weatherCity: 'Taipei',
   weatherUnit: 'celsius',
   lunchBreak: { enabled: true, startTime: '12:00', endTime: '13:00', color: '#F5F5F5' },
@@ -225,6 +227,11 @@ interface UseWaddleData {
    * the `focus_board` column, same pattern as `setQuickLinks`.
    */
   setFocusBoard: (next: FocusSettings) => Promise<void>
+  /**
+   * Narrow mutation for the penguin pet. Rewrites only the `notifications`
+   * JSONB blob (pet lives under its `pet` key — no migration).
+   */
+  setPet: (next: PetSettings) => Promise<void>
   // Scratchpad (focus board). Items are stored per-date in the DB so
   // history navigation works across devices; the localStorage-only
   // implementation it replaced lost everything on a browser switch.
@@ -241,6 +248,11 @@ export function useWaddleData(): UseWaddleData {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([])
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
+  // Latest pet + notifications, readable from callbacks without re-creating
+  // them. saveSettings writes petRef back so a settings-modal copy made
+  // before the pet changed can't roll it back.
+  const petRef = useRef<PetSettings | null>(null)
+  const notificationsRef = useRef<UserSettings['notifications']>(DEFAULT_SETTINGS.notifications)
   const [scratchpadByDate, commitScratchpadByDate] = useState<Record<string, ScratchpadItem[]>>({})
   const scratchpadRef = useRef<Record<string, ScratchpadItem[]>>({})
   // A single FIFO includes date-wide clear and reorder operations, so a
@@ -646,9 +658,22 @@ export function useWaddleData(): UseWaddleData {
         }
       }
 
+      // Pet: DB first; the per-account localStorage mirror covers a write
+      // that never reached the DB (offline, failed save).
+      if (!builtSettings.pet) {
+        try {
+          const raw = window.localStorage.getItem(`huddle-pet-v1:${user.id}`)
+          if (raw) builtSettings.pet = normalizePet(JSON.parse(raw))
+        } catch {
+          /* ignore corrupt localStorage */
+        }
+      }
+
       if (isStale()) return
       setWorkspaces(builtWorkspaces)
       setTimeBlocks(builtTimeBlocks)
+      petRef.current = builtSettings.pet
+      notificationsRef.current = builtSettings.notifications
       setSettings(builtSettings)
       setScratchpadByDate(builtScratchpad)
       if (initial) {
@@ -2589,6 +2614,9 @@ export function useWaddleData(): UseWaddleData {
     newTimeBlocks: TimeBlock[],
   ) => {
     const userId = requireUserId()
+    // The pet is owned by setPet — always keep the latest one.
+    newSettings = { ...newSettings, pet: petRef.current }
+    notificationsRef.current = newSettings.notifications
     setSettings(newSettings)
     setTimeBlocks(newTimeBlocks)
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
@@ -2612,7 +2640,9 @@ export function useWaddleData(): UseWaddleData {
       lunch_break: newSettings.lunchBreak as unknown as Json,
       buffer_time: newSettings.bufferTime as unknown as Json,
       default_task_colors: newSettings.defaultTaskColors as unknown as Json,
-      notifications: newSettings.notifications as unknown as Json,
+      notifications: (petRef.current
+        ? { ...newSettings.notifications, pet: petRef.current }
+        : newSettings.notifications) as unknown as Json,
     }
     // Always mirror view-range + completed-list values to localStorage so
     // they persist even if the DB rejects them (pre-migration) or only the
@@ -2856,6 +2886,30 @@ export function useWaddleData(): UseWaddleData {
         handleDbError('儲存當前重點')(error)
         throw error
       }
+    } finally {
+      pendingWritesRef.current -= 1
+    }
+  }, [supabase])
+
+  /** Penguin pet — narrow write of the notifications blob (see UseWaddleData.setPet). */
+  const setPet = useCallback(async (next: PetSettings) => {
+    const userId = requireUserId()
+    petRef.current = next
+    setSettings((prev) => ({ ...prev, pet: next }))
+    try {
+      window.localStorage.setItem(`huddle-pet-v1:${userId}`, JSON.stringify(next))
+    } catch {
+      /* ignore */
+    }
+    pendingWritesRef.current += 1; mutationSeqRef.current += 1
+    try {
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert(
+          { user_id: userId, notifications: { ...notificationsRef.current, pet: next } as unknown as Json },
+          { onConflict: 'user_id' },
+        )
+      if (error) handleDbError('儲存企鵝設定')(error)
     } finally {
       pendingWritesRef.current -= 1
     }
@@ -3198,6 +3252,7 @@ export function useWaddleData(): UseWaddleData {
     saveSettings,
     setQuickLinks,
     setFocusBoard,
+    setPet,
     scratchpadByDate,
     addScratchpadItem,
     updateScratchpadItem,
