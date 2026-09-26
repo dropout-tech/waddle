@@ -20,8 +20,10 @@ type ProfilesRow = {
   id: string
   display_name: string | null
   avatar_url: string | null
-  /** Opt-in public leaderboard name (migration 20260926130000). */
+  /** Deprecated 2026-09-27: nickname feature retired, column kept. */
   leaderboard_nickname?: string | null
+  /** Permanent public leaderboard serial (migration 20260927100000). */
+  penguin_number?: number
   created_at: string
   updated_at: string
 }
@@ -149,6 +151,20 @@ type NotebookCategoriesRow = {
   icon: string | null
   sort_order: number
   is_archived: boolean
+  created_at: string
+  updated_at: string
+}
+
+type StickyNotesRow = {
+  id: string
+  user_id: string
+  content: Json | null
+  x: number
+  y: number
+  width: number
+  height: number
+  color: string
+  z_index: number
   created_at: string
   updated_at: string
 }
@@ -451,6 +467,19 @@ type NotebookCategoriesInsert = {
   updated_at?: string
 }
 
+type StickyNotesInsert = {
+  id?: string
+  user_id: string
+  content?: Json | null
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  color?: string
+  z_index?: number
+  updated_at?: string
+}
+
 type TimeBlocksInsert = {
   id?: string
   user_id: string
@@ -571,6 +600,7 @@ export type Database = {
       scratchpad_items: Tbl<ScratchpadItemsRow, ScratchpadItemsInsert>
       notebook_notes: Tbl<NotebookNotesRow, NotebookNotesInsert>
       notebook_categories: Tbl<NotebookCategoriesRow, NotebookCategoriesInsert>
+      sticky_notes: Tbl<StickyNotesRow, StickyNotesInsert>
       time_blocks: Tbl<TimeBlocksRow, TimeBlocksInsert>
       slot_types: Tbl<SlotTypesRow, SlotTypesInsert>
       user_settings: Tbl<UserSettingsRow, UserSettingsInsert>
@@ -600,7 +630,6 @@ export type Database = {
     // with supabase/migrations/0016_calendar_sharing.sql if it changes.
     Functions: {
       get_check_in_leaderboard: { Args: Record<PropertyKey, never>; Returns: CheckInRanking[] }
-      set_leaderboard_nickname: { Args: { p_nickname: string | null }; Returns: string | null }
       get_daily_check_in_status: { Args: Record<PropertyKey, never>; Returns: CheckInStatus[] }
       claim_daily_check_in: { Args: Record<PropertyKey, never>; Returns: CheckInStatus[] }
       huddle_operations: { Args: { p_action: string; p_data?: Json }; Returns: Json }

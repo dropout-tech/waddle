@@ -31,18 +31,24 @@ import { useEffect, useRef } from 'react'
 import { isDesktop, isNative } from '@/lib/platform'
 import styles from './penguin-circus.module.css'
 
-export const POSES = ['stand', 'slide', 'fly', 'wave', 'skate', 'sleep', 'carry'] as const
+export const POSES = ['stand', 'slide', 'fly', 'wave', 'skate', 'sleep', 'carry', 'open', 'chomp', 'full', 'yawn', 'phone', 'flag', 'shades', 'splat', 'music'] as const
 type Pose = (typeof POSES)[number]
 const src = (p: Pose) => `/art/penguin/${p}.webp`
 const FACES_RIGHT = new Set<Pose>(['slide', 'fly', 'skate'])
+// Each stop's base pose rotates through a few moods so no visit looks the same.
+const VARIANTS: Partial<Record<Pose, Pose[]>> = {
+  stand: ['stand', 'phone', 'shades', 'flag'],
+  wave: ['wave', 'flag', 'shades'],
+  carry: ['carry', 'phone', 'flag'],
+}
 export const headlineClass = styles.headline
 export const fishZoneClass = styles.fishZone
 export const posterStageClass = styles.posterStage
 export const focusStageClass = styles.focusStage
 
 const words = {
-  zh: { pop: '啪！', honk: '呱！', cards: ['買魚', '回 87 封信', '跟自己開會', '午睡 20 分鐘', '假裝很忙', '把企鵝收好'], bubbles: ['週四開會？', '三點可以', '我帶簡報'], card: '週四 15:00 團隊會議' },
-  en: { pop: 'POP!', honk: 'HONK!', cards: ['Buy fish', 'Reply to 87 emails', 'Meeting with myself', '20-min nap', 'Look busy', 'Put penguins away'], bubbles: ['Meet Thursday?', '3pm works', "I'll bring slides"], card: 'Thu 3:00 PM · Team sync' },
+  zh: { pop: '啪！', honk: '呱！', burp: '嗝～', full: '吃飽了…', thanks: '謝謝魚！', eep: '嚇！', oops: '哎呀', cool: '帥吧', done: '搞定！', cards: ['買魚', '回 87 封信', '跟自己開會', '午睡 20 分鐘', '假裝很忙', '把企鵝收好'], bubbles: ['週四開會？', '三點可以', '我帶簡報'], card: '週四 15:00 團隊會議' },
+  en: { pop: 'POP!', honk: 'HONK!', burp: '*burp*', full: 'So full…', thanks: 'Thanks for the fish!', eep: 'EEP!', oops: 'Oops', cool: 'Cool.', done: 'Done!', cards: ['Buy fish', 'Reply to 87 emails', 'Meeting with myself', '20-min nap', 'Look busy', 'Put penguins away'], bubbles: ['Meet Thursday?', '3pm works', "I'll bring slides"], card: 'Thu 3:00 PM · Team sync' },
 } as const
 type Locale = keyof typeof words
 
@@ -54,7 +60,7 @@ const mobile = () => window.innerWidth <= 760
 
 const SWARM_POSES: Pose[] = ['slide', 'fly', 'skate', 'carry', 'wave']
 
-export function HeroSwarm() {
+export function HeroSwarm({ locale = 'zh' }: { locale?: Locale }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const layer = ref.current
@@ -157,7 +163,8 @@ export function HeroSwarm() {
         // eslint-disable-next-line @next/next/no-img-element
         <div key={p} className={styles.swarmBird}><img src={src(p)} alt="" width={240} height={240} decoding="async" draggable={false} /></div>
       ))}
-      <div className={styles.swarmStatic}>
+      {/* reduced motion: a static huddle; clicking it only shows a speech bubble */}
+      <div className={styles.swarmStatic} data-say={words[locale].thanks} onClick={e => { const el = e.currentTarget; el.setAttribute('data-fed', ''); window.setTimeout(() => el.removeAttribute('data-fed'), 1600) }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {(['slide', 'wave', 'stand', 'carry', 'skate'] as Pose[]).map((p, i) => <img key={i} src={src(p)} alt="" width={240} height={240} loading="lazy" />)}
       </div>
@@ -289,13 +296,135 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
       body.animate([{ transform: body.style.transform }, { transform: `${body.style.transform} translateY(-70px) rotate(180deg)`, offset: 0.45 }, { transform: `${body.style.transform} translateY(-70px) rotate(360deg)`, offset: 0.55 }, { transform: body.style.transform }], { duration: 720, easing: 'cubic-bezier(.3,.6,.4,1)', composite: 'replace' })
       say(w.honk)
     }
-    const onClick = () => {
-      if (performance.now() < busyUntil) return
-      ;[split, toss, honk][reaction++ % 3]()
+    const hop = (h = 18, ms = 420) => body.animate([{ transform: 'none' }, { transform: `translateY(-${h}px) scale(1.05, .95)`, offset: 0.4 }, { transform: 'none' }], { duration: ms, easing: 'ease-out' })
+    const slip = () => {
+      busyUntil = performance.now() + 1500
+      holdPose('splat', 950)
+      body.animate([{ transform: 'none' }, { transform: 'translateX(14px) rotate(-14deg)', offset: 0.2 }, { transform: 'translateX(24px)', offset: 0.55 }, { transform: 'translateX(24px)', offset: 0.85 }, { transform: 'none' }], { duration: 1400, easing: 'ease-out' })
+      window.setTimeout(() => { say(w.oops); holdPose('stand', 400); hop(22) }, 1000)
     }
-    body.addEventListener('click', onClick)
+    const cool = () => { busyUntil = performance.now() + 1500; holdPose('shades', 1500); hop(10, 360); window.setTimeout(() => say(w.cool), 250) }
+    const flagWave = () => {
+      holdPose('flag', 1900)
+      body.animate([{ transform: 'rotate(0)' }, { transform: 'rotate(-6deg)' }, { transform: 'rotate(6deg)' }, { transform: 'rotate(0)' }], { duration: 480, iterations: 3, easing: 'ease-in-out' })
+    }
+    const scare = () => {
+      busyUntil = performance.now() + 1700
+      const b = document.createElement('span'); b.className = styles.soap; fx.appendChild(b)
+      const bx = x + S * 0.55, by = y - S * 0.3
+      b.animate([
+        { transform: `translate(${bx}px,${by}px) scale(.3)`, opacity: 0 },
+        { transform: `translate(${bx - 6}px,${by - 30}px) scale(1)`, opacity: 1, offset: 0.3 },
+        { transform: `translate(${bx - 18}px,${by - 52}px) scale(1.05)`, opacity: 1, offset: 0.62 },
+        { transform: `translate(${bx - 18}px,${by - 52}px) scale(1.7)`, opacity: 0 },
+      ], { duration: 1150, easing: 'ease-out' }).finished.then(() => b.remove(), () => b.remove())
+      window.setTimeout(() => { holdPose('open', 650); hop(34, 380); say(w.eep) }, 720)
+    }
+    const IDLES: Array<() => void> = [
+      () => holdPose('yawn', 1500),
+      () => holdPose('phone', 2300),
+      flagWave, cool, slip, scare,
+    ]
+    let lastIdle = -1, nextIdleAt = performance.now() + 6000
+    const idle = () => {
+      let i = Math.floor(Math.random() * IDLES.length)
+      if (i === lastIdle) i = (i + 1) % IDLES.length
+      lastIdle = i; IDLES[i]()
+    }
+    const onCheer = () => {
+      if (!awake || performance.now() < busyUntil) return
+      busyUntil = performance.now() + 1200
+      holdPose('flag', 1200); hop(26)
+    }
+    window.addEventListener('huddle:cheer', onCheer)
+    // focus toy: headphones on, eyes closed, nodding, notes float up
+    let notesTimer = 0
+    const onFocusMode = (e: Event) => {
+      const on = (e as CustomEvent).detail === true
+      window.clearInterval(notesTimer)
+      root.toggleAttribute('data-music', on)
+      if (on) {
+        busyUntil = performance.now() + 60000; holdPose('music', 60000)
+        notesTimer = window.setInterval(() => {
+          const n = document.createElement('span'); n.className = styles.note; n.textContent = Math.random() < 0.5 ? '♪' : '♫'; fx.appendChild(n)
+          const nx = x + (Math.random() - 0.3) * S * 0.6, ny = y - S * 0.95
+          n.animate([{ transform: `translate(${nx}px,${ny}px) scale(.5)`, opacity: 0 }, { transform: `translate(${nx + 10}px,${ny - 26}px) scale(1) rotate(-10deg)`, opacity: 1, offset: 0.3 }, { transform: `translate(${nx + 26}px,${ny - 64}px) scale(1) rotate(12deg)`, opacity: 0 }], { duration: 1300, easing: 'ease-out' }).finished.then(() => n.remove(), () => n.remove())
+        }, 380)
+      } else {
+        hold.until = 0; busyUntil = performance.now() + 500
+        holdPose('open', 500); hop(24)
+      }
+    }
+    window.addEventListener('huddle:focus-mode', onFocusMode)
+    /* ── feeding (the main click reaction, 2026-09-26) ──
+       A fish flies from the click point in an arc into the open beak; each
+       fish makes the penguin rounder; the 4th one sits it down, full, for a
+       short nap, then it slims back down over time. */
+    let fat = 0, fatS = 0, lastFed = 0
+    const hold = { pose: 'stand' as Pose, until: 0 }
+    const holdPose = (p: Pose, ms: number) => { hold.pose = p; hold.until = performance.now() + ms; setPose(p) }
+    const burst = (cx: number, cy: number) => {
+      for (let i = 0; i < 5; i++) {
+        const el = document.createElement('span'); el.className = i % 2 ? styles.spark : styles.heart; el.textContent = i % 2 ? '✦' : '♥'; fx.appendChild(el)
+        const a = -Math.PI / 2 + (i - 2) * 0.55, d = 46 + Math.random() * 26
+        el.animate([
+          { transform: `translate(${cx}px,${cy}px) scale(.3)`, opacity: 0 },
+          { transform: `translate(${cx + Math.cos(a) * d * 0.6}px,${cy + Math.sin(a) * d * 0.6}px) scale(1.15)`, opacity: 1, offset: 0.35 },
+          { transform: `translate(${cx + Math.cos(a) * d}px,${cy + Math.sin(a) * d - 14}px) scale(.8)`, opacity: 0 },
+        ], { duration: 760, easing: 'ease-out', delay: i * 40 }).finished.then(() => el.remove(), () => el.remove())
+      }
+    }
+    const gulp = () => {
+      const now = performance.now()
+      fat = Math.min(4, fat + 1); lastFed = now
+      holdPose('chomp', 620)
+      body.animate([{ transform: 'none' }, { transform: 'translateY(-18px) scale(1.06, .95)', offset: 0.4 }, { transform: 'none' }], { duration: 440, easing: 'ease-out' })
+      burst(x, y - S * 0.9)
+      if (fat >= 4) {
+        busyUntil = now + 5600
+        window.setTimeout(() => { say(w.full); holdPose('full', 2300) }, 620)
+        window.setTimeout(() => holdPose('sleep', 2600), 2920)
+        window.setTimeout(() => { fat = 1; lastFed = performance.now() }, 5500)
+      } else if (fat === 2 || Math.random() < 0.3) window.setTimeout(() => say(w.burp), 520)
+    }
+    const feed = (fromX: number, fromY: number) => {
+      busyUntil = performance.now() + 1250
+      holdPose('open', 640)
+      const el = document.createElement('div'); el.className = styles.fish
+      el.innerHTML = '<svg viewBox="0 0 36 24" width="44" height="30" aria-hidden="true"><path d="M3 12c5-8 15-9 22-3l7-6v18l-7-6c-7 6-17 5-22-3z" fill="#cf5731" stroke="#292b24" stroke-width="2.4" stroke-linejoin="round"/><circle cx="10" cy="10.5" r="2" fill="#292b24"/></svg>'
+      fx.appendChild(el)
+      const mx = x, my = y - S * 0.6, dx = mx - fromX, dy = my - fromY
+      const peak = Math.max(110, Math.min(230, Math.hypot(dx, dy) * 0.45 + 90))
+      // a click right on the penguin tosses the fish up and over, not in place
+      const side = Math.abs(dx) < 50 ? (fromX > window.innerWidth / 2 ? -70 : 70) : 0
+      const dir = (dx || side) >= 0 ? 1 : -1, frames: Keyframe[] = []
+      for (let i = 0; i <= 12; i++) {
+        const k = i / 12
+        frames.push({ transform: `translate(${fromX + dx * k + side * Math.sin(Math.PI * k) - 6}px,${fromY + dy * k - peak * 4 * k * (1 - k) - 15}px) rotate(${dir * 400 * k}deg) scale(${1 - 0.45 * k})` })
+      }
+      el.animate(frames, { duration: 560, easing: 'linear' }).finished.then(() => { el.remove(); gulp() }, () => el.remove())
+    }
+    const INTERACTIVE = 'a,button,input,textarea,select,label,summary,video,[role=tab],[role=button],[contenteditable]'
+    const onClick = (e: MouseEvent) => {
+      if (!awake || performance.now() < busyUntil || root.hasAttribute('data-hidden') || root.hasAttribute('data-peek')) return
+      const onBird = body.contains(e.target as Node)
+      if (!onBird) {
+        // mouse users can also toss from nearby empty space (never from UI)
+        if (!fine || (e.target as Element).closest?.(INTERACTIVE) || window.getSelection()?.toString()) return
+        if (Math.hypot(e.clientX - x, e.clientY - (y - S / 2)) > 280) return
+      }
+      if (onBird && Math.random() < 0.25) {
+        const others = [split, toss, honk, slip, cool, scare]
+        others[(reaction++ + Math.floor(Math.random() * others.length)) % others.length]()
+        return
+      }
+      feed(e.clientX, e.clientY)
+    }
+    document.addEventListener('click', onClick)
 
     /* ── main loop ── */
+    let variantFor: Stop | null = null, variant: Pose = 'stand'
+    const lastVariant = new WeakMap<HTMLElement, Pose>()
     let raf = 0, last = performance.now()
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame)
@@ -318,7 +447,16 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
       let napping = false
       if (active) {
         const r = active.el.getBoundingClientRect(), a = anchor(active, r), ts = now / 1000
-        tx = a.x; ty = a.y; stopPose = active.pose
+        tx = a.x; ty = a.y
+        if (active !== variantFor) {
+          variantFor = active
+          const pool = VARIANTS[active.pose] ?? [active.pose], prev = lastVariant.get(active.el)
+          let v = pool[Math.floor(Math.random() * pool.length)]
+          if (pool.length > 1 && v === prev) v = pool[(pool.indexOf(v) + 1) % pool.length]
+          lastVariant.set(active.el, v); variant = v
+          nextIdleAt = now + 4500 + Math.random() * 4000
+        }
+        stopPose = variant
         if (active.motion === 'skate') {
           const rx = Math.min(r.width * 0.3, 170), ry = rx * 0.2
           tx += Math.sin(ts * 1.3) * rx; ty += Math.sin(ts * 2.6) * ry; motionFacing = Math.cos(ts * 1.3) >= 0 ? 1 : -1
@@ -357,8 +495,13 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
         if (Math.hypot(vx, dvy) > 480 && !peek) { travelPose = Math.abs(dvy) > Math.abs(vx) * 1.1 ? (dvy < 0 ? 'fly' : 'carry') : 'slide'; travelUntil = now + 300 }
         const traveling = now < travelUntil
         const near = Math.hypot(tx - x, ty - y) < 26
-        const p: Pose = fleeing ? 'fly' : traveling ? travelPose : peek ? 'stand' : stopPose
+        if (traveling || fleeing) hold.until = 0
+        const p: Pose = fleeing ? 'fly' : traveling ? travelPose : peek ? 'stand' : now < hold.until ? hold.pose : stopPose
         if (!(pose === 'carry' && now < busyUntil + 500 && !traveling)) setPose(p)
+        // idle mood: only when parked at a still stop and nothing else is going on
+        if (near && !traveling && !fleeing && !peek && !napping && !active?.motion && now > hold.until) {
+          if (now > nextIdleAt) { idle(); nextIdleAt = now + 6500 + Math.random() * 5000 }
+        } else if (now > nextIdleAt - 2500) nextIdleAt = now + 2500
         // facing: movement > motion script > look at the pointer
         if (Math.abs(vx) > 60) facing = vx > 0 ? 1 : -1
         else if (motionFacing && near) facing = motionFacing
@@ -370,11 +513,14 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
         root.toggleAttribute('data-hidden', hide)
         stops.forEach(s => { if (s.nap) s.el.toggleAttribute('data-occupied', hide && s === active) })
       }
+      if (busy && now < hold.until) { setPose(hold.pose); rot = 0 } else if (now < hold.until) rot = 0
+      if (fat > 0 && !busy && now - lastFed > 9000) { fat--; lastFed = now }
+      fatS += (fat - fatS) * Math.min(1, dt * 6)
       root.toggleAttribute('data-peek', peek !== 0)
       flipSmooth += ((FACES_RIGHT.has(pose) ? facing : 1) - flipSmooth) * Math.min(1, dt * 14)
       const fl = Math.abs(flipSmooth) < 0.12 ? 0.12 * Math.sign(flipSmooth || 1) : flipSmooth
       root.style.transform = `translate3d(${x - S / 2}px,${y - S}px,0)`
-      if (!busy || pose !== 'carry') inner.style.transform = `${peek < 0 ? 'rotate(180deg) ' : ''}rotate(${rot}deg) scaleX(${fl})`
+      if (!busy || pose !== 'carry') inner.style.transform = `${peek < 0 ? 'rotate(180deg) ' : ''}rotate(${rot}deg) scaleX(${fl}) scale(${1 + fatS * 0.08},${1 + fatS * 0.025})`
     }
     raf = requestAnimationFrame(frame)
 
@@ -382,7 +528,7 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
       cancelAnimationFrame(raf); clearTimeout(fallback)
       window.removeEventListener(MERGED, wake); window.removeEventListener('resize', onResize)
       window.removeEventListener('pointermove', onMove); document.documentElement.removeEventListener('pointerleave', onLeave)
-      body.removeEventListener('click', onClick)
+      document.removeEventListener('click', onClick); window.removeEventListener('huddle:cheer', onCheer); window.removeEventListener('huddle:focus-mode', onFocusMode); window.clearInterval(notesTimer)
       fx.replaceChildren()
     }
   }, [locale])
@@ -422,7 +568,7 @@ export function FoldVignette({ locale = 'zh' }: { locale?: Locale }) {
   const ref = usePlayWhenVisible<HTMLDivElement>()
   const w = words[locale]
   return (
-    <div ref={ref} className={styles.fold} aria-hidden="true">
+    <div ref={ref} className={styles.fold} data-fold="" aria-hidden="true">
       <span className={`${styles.bubble} ${styles.b1}`}>{w.bubbles[0]}</span>
       <span className={`${styles.bubble} ${styles.b2}`}>{w.bubbles[1]}</span>
       <span className={`${styles.bubble} ${styles.b3}`}>{w.bubbles[2]}</span>
@@ -442,6 +588,7 @@ export function FocusRing() {
     let raf = 0, visible = false
     const update = () => {
       raf = 0
+      if (stage.hasAttribute('data-toy-running')) return // the focus toy is driving the ring
       const r = stage.getBoundingClientRect(), vh = window.innerHeight
       const p = Math.min(1, Math.max(0, (vh - r.top) / (vh + r.height * 0.6)))
       stage.style.setProperty('--p', p.toFixed(3))
@@ -460,7 +607,7 @@ export function FocusRing() {
         <circle className={styles.ringTrack} cx="18" cy="18" r="16" pathLength={100} />
         <circle className={styles.ringFill} cx="18" cy="18" r="16" pathLength={100} />
       </svg>
-      <span ref={timeRef} className={styles.ringTime} aria-hidden="true">25:00</span>
+      <span ref={timeRef} className={styles.ringTime} data-ring-time="" aria-hidden="true">25:00</span>
     </>
   )
 }

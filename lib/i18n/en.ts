@@ -12,6 +12,7 @@ import { dict as operations } from './dict/operations'
 import { dict as account } from './dict/account'
 import { dict as meetings } from './dict/meetings'
 import { dict as pet } from './dict/pet'
+import { dict as stickyNotes } from './dict/sticky-notes'
 
 // Merged English dictionary. Keys are the Traditional Chinese source strings
 // (see lib/i18n/index.ts). Split by feature area purely to keep files
@@ -32,6 +33,7 @@ export const en: Record<string, string> = {
   ...operations,
   ...meetings,
   ...pet,
+  ...stickyNotes,
   // Whiteboard canvas controls.
   "手寫筆記": "Handwritten note",
   "請選擇圖片檔案。": "Please choose an image file.",
