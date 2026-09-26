@@ -37,8 +37,8 @@ export interface PetSettings {
 }
 
 export const PET_NAME_MAX = 12
-export const DEFAULT_PET_NAME_ZH = '嘎嘎'
-export const DEFAULT_PET_NAME_EN = 'Gaga'
+export const DEFAULT_PET_NAME_ZH = 'Huddle'
+export const DEFAULT_PET_NAME_EN = 'Huddle'
 
 export function defaultPet(lang: 'zh-TW' | 'en' = 'zh-TW'): PetSettings {
   return {
