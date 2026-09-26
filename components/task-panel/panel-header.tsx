@@ -26,7 +26,7 @@ import {
 // surprise rather than a canned response), throttled to one toast per
 // 1.5s so rapid clicking can't spam the toast stack.
 const PET_MESSAGES = [
-  '嘎。',
+  '呱。',
   '今天也慢慢來就好。',
   '謝謝你摸我。',
   '記得喝口水。',
