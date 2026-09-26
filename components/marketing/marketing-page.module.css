@@ -58,7 +58,7 @@
 .pillars { max-width: 1400px; margin: 0 auto; padding: 140px 4% 60px; display: grid; gap: 130px; }
 .pillars article { display: grid; grid-template-columns: 1.3fr 1fr; gap: 80px; align-items: center; }
 .pillars article:nth-child(even) .pillarArt { order: 2; }
-.pillarArt { min-width: 0; }
+.pillarArt { position: relative; min-width: 0; }
 .pillarArt img { display: block; width: 100%; height: auto; border-radius: 18px; }
 .pillarSpot .pillarArt img { max-width: 580px; margin: auto; border-radius: 0; mix-blend-mode: multiply; -webkit-mask-image: radial-gradient(closest-side, #000 74%, transparent); mask-image: radial-gradient(closest-side, #000 74%, transparent); }
 .num { display: block; margin-bottom: 20px; font-family: var(--poster-en), sans-serif; font-weight: 800; font-size: clamp(60px, 6.4vw, 104px); line-height: .85; color: var(--orange); }
@@ -124,7 +124,7 @@
 
 /* ── FAQ / footer ───────────────────────────────────────────────────────── */
 .faq { max-width: 1320px; margin: auto; padding: 130px 4%; display: grid; grid-template-columns: .7fr 1.3fr; gap: 64px; }
-.faq > h2 { margin: 0; font-family: var(--poster-zh), sans-serif; font-weight: 900; font-size: clamp(38px, 4.2vw, 64px); line-height: 1.1; letter-spacing: -.04em; }
+.faq h2 { margin: 0; font-family: var(--poster-zh), sans-serif; font-weight: 900; font-size: clamp(38px, 4.2vw, 64px); line-height: 1.1; letter-spacing: -.04em; }
 .faq details { border-bottom: 2px solid #cbc7b8; }
 .faq summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 18px; min-height: 44px; padding: 26px 0; font-size: 21px; font-weight: 800; cursor: pointer; }
 .faq summary::-webkit-details-marker { display: none; }
@@ -141,7 +141,7 @@
 
 /* ── English: condensed poster type ─────────────────────────────────────── */
 .english .hero h1 { font-family: var(--poster-en), sans-serif; font-size: clamp(60px, 6.8vw, 118px); line-height: .9; letter-spacing: -.01em; text-transform: uppercase; }
-.english :is(.proof h2, .pillars h2, .moreIntro h2, .chapterCopy h2, .focus h2, .priceHead h2, .download h2, .faq > h2, .featureRows h3) { font-family: var(--poster-en), sans-serif; letter-spacing: -.01em; line-height: 1; }
+.english :is(.proof h2, .pillars h2, .moreIntro h2, .chapterCopy h2, .focus h2, .priceHead h2, .download h2, .faq h2, .featureRows h3) { font-family: var(--poster-en), sans-serif; letter-spacing: -.01em; line-height: 1; }
 .english .proof h2 { font-size: clamp(56px, 8vw, 132px); text-transform: uppercase; line-height: .92; }
 .english .featureRows h3 { font-size: clamp(32px, 2.9vw, 44px); }
 

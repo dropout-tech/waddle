@@ -1,0 +1,49 @@
+/* Magic toys — pressable, absurd riffs on each feature (2026-09-26).
+   Buttons: yellow poster chip with a hard ink shadow (same language as the
+   thrown task cards). Stages: absolute, aria-hidden, pointer-events none;
+   everything moves with transform/opacity only. */
+
+.toyRow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 26px; }
+.toyBtn { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 10px 18px; background: #edc747; color: #292b24; border: 2px solid #292b24; border-radius: 4px; box-shadow: 3px 3px 0 #292b24; font: 800 16px/1.2 var(--poster-zh, sans-serif); cursor: pointer; transition: transform .08s, box-shadow .08s, background-color .15s; }
+.toyBtn:hover { background: #f4d668; }
+.toyBtn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #292b24; }
+.toyBtn[aria-busy=true] { background: #f1dc8f; }
+.hint { font-size: 14px; color: #54564a; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.stage { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.stage > * { position: absolute; left: 0; top: 0; opacity: 0; will-change: transform; }
+
+.card { display: flex; align-items: center; gap: 8px; padding: 7px 11px 7px 8px; background: #fbf9f2; color: #292b24; border: 2px solid #292b24; border-radius: 6px; box-shadow: 3px 3px 0 #292b24; font: 800 14px/1.2 var(--poster-zh, sans-serif); white-space: nowrap; }
+.card::before { content: ''; width: 13px; height: 13px; flex: none; border: 2px solid #292b24; border-radius: 3px; background: #edc747; }
+.stamp { padding: 6px 16px; border: 4px solid #cf5731; border-radius: 8px; background: #f6f3e9d9; color: #cf5731; font: 900 32px/1 var(--poster-zh, sans-serif); letter-spacing: .08em; }
+.label { padding: 6px 12px; background: #292b24; color: #edc747; border-radius: 4px; font: 800 17px/1.1 var(--poster-zh, sans-serif); white-space: nowrap; }
+
+/* sort my week */
+.sheet { left: 12%; top: auto; bottom: 4%; width: 76%; height: 44%; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: 22px repeat(3, 1fr); gap: 4px; padding: 10px; background: #fbf9f2; border: 2px solid #292b24; border-radius: 8px; box-shadow: 4px 4px 0 #292b24; }
+.sheet b { font: 800 13px/22px var(--poster-en, sans-serif); text-align: center; color: #292b24; }
+.sheet i { border: 1.5px dashed #292b2440; border-radius: 4px; }
+.block { border: 2px solid #292b24; border-radius: 5px; }
+.b0 { background: #edc747; } .b1 { background: #cf5731; } .b2 { background: #9fb98a; } .b3 { background: #f6f3e9; }
+
+/* focus */
+.shield { border-radius: 50%; border: 3px dashed #edc747; background: radial-gradient(circle, #edc74700 58%, #edc74733 100%); }
+.note { padding: 6px 11px; background: #292b24; color: #f6f3e9; border-radius: 16px; font: 700 13px/1.2 var(--poster-zh, sans-serif); white-space: nowrap; }
+.spark { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid #292b24; }
+
+/* meeting */
+.garble { padding: 4px 9px; background: #f6f3e9; color: #292b24; border: 2px dashed #292b24; border-radius: 12px; font: 800 12px/1.2 var(--poster-zh, sans-serif); white-space: nowrap; }
+.ding { width: 46px; height: 46px; border-radius: 50%; border: 4px solid #edc747; }
+
+/* daily check-in */
+.checkin { margin-top: 40px; max-width: 360px; }
+.checkCard { position: relative; padding: 16px 18px 18px; background: #fbf9f2; border: 2px solid #292b24; border-radius: 10px; box-shadow: 5px 5px 0 #edc747; }
+.checkTitle { margin: 0 0 12px; font: 800 15px/1.2 var(--poster-zh, sans-serif); }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.week span { display: grid; place-items: center; aspect-ratio: 1; border: 1.5px solid #292b2455; border-radius: 6px; font: 800 14px/1 var(--poster-en, sans-serif); }
+.week span[data-today] { border: 2px solid #292b24; background: #edc747; }
+.stampLayer { position: absolute; inset: 0; pointer-events: none; }
+.stampLayer > * { position: absolute; left: 0; top: 0; }
+.checkStamp { padding: 4px 8px; border: 3px solid #cf5731; border-radius: 6px; background: #f6f3e9cc; color: #cf5731; font: 900 18px/1 var(--poster-zh, sans-serif); white-space: nowrap; }
+.legend { padding: 8px 18px; border-width: 5px; font-size: 34px; letter-spacing: .06em; }
+.pa { color: #292b24; font: 900 20px/1 var(--poster-en, sans-serif); white-space: nowrap; }

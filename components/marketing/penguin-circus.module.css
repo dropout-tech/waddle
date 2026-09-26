@@ -67,6 +67,7 @@
 .fold { position: absolute; inset: 0; container-type: size; pointer-events: none; }
 .fold > * { position: absolute; left: 0; top: 0; opacity: 0; animation-duration: 7s; animation-timing-function: cubic-bezier(.3, .7, .3, 1); animation-iteration-count: infinite; animation-play-state: paused; }
 .fold[data-play] > * { animation-play-state: running; }
+.fold[data-toy] > * { visibility: hidden; }
 .bubble { padding: 7px 11px; background: #fbf9f2; color: #292b24; border: 2px solid #292b24; border-radius: 14px 14px 14px 3px; font: 800 13px/1.2 var(--poster-zh, sans-serif); white-space: nowrap; }
 .b1 { animation-name: b1; } .b2 { animation-name: b2; } .b3 { animation-name: b3; }
 @keyframes b1 { 0% { opacity: 0; transform: translate(26cqw, 78cqh) scale(.3); } 6% { opacity: 1; transform: translate(3cqw, 57cqh) scale(1) rotate(-3deg); } 44% { opacity: 1; transform: translate(3cqw, 56cqh) scale(1) rotate(-3deg); } 54%, 100% { opacity: 0; transform: translate(34cqw, 50cqh) scale(.15, .5) rotate(30deg); } }

@@ -334,7 +334,7 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
     const onCheer = () => {
       if (!awake || performance.now() < busyUntil) return
       busyUntil = performance.now() + 1200
-      holdPose('flag', 1200); hop(26); say(w.done)
+      holdPose('flag', 1200); hop(26)
     }
     window.addEventListener('huddle:cheer', onCheer)
     /* ── feeding (the main click reaction, 2026-09-26) ──
@@ -549,7 +549,7 @@ export function FoldVignette({ locale = 'zh' }: { locale?: Locale }) {
   const ref = usePlayWhenVisible<HTMLDivElement>()
   const w = words[locale]
   return (
-    <div ref={ref} className={styles.fold} aria-hidden="true">
+    <div ref={ref} className={styles.fold} data-fold="" aria-hidden="true">
       <span className={`${styles.bubble} ${styles.b1}`}>{w.bubbles[0]}</span>
       <span className={`${styles.bubble} ${styles.b2}`}>{w.bubbles[1]}</span>
       <span className={`${styles.bubble} ${styles.b3}`}>{w.bubbles[2]}</span>
@@ -569,6 +569,7 @@ export function FocusRing() {
     let raf = 0, visible = false
     const update = () => {
       raf = 0
+      if (stage.hasAttribute('data-toy-running')) return // the focus toy is driving the ring
       const r = stage.getBoundingClientRect(), vh = window.innerHeight
       const p = Math.min(1, Math.max(0, (vh - r.top) / (vh + r.height * 0.6)))
       stage.style.setProperty('--p', p.toFixed(3))
@@ -587,7 +588,7 @@ export function FocusRing() {
         <circle className={styles.ringTrack} cx="18" cy="18" r="16" pathLength={100} />
         <circle className={styles.ringFill} cx="18" cy="18" r="16" pathLength={100} />
       </svg>
-      <span ref={timeRef} className={styles.ringTime} aria-hidden="true">25:00</span>
+      <span ref={timeRef} className={styles.ringTime} data-ring-time="" aria-hidden="true">25:00</span>
     </>
   )
 }
