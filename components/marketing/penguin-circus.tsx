@@ -31,7 +31,7 @@ import { useEffect, useRef } from 'react'
 import { isDesktop, isNative } from '@/lib/platform'
 import styles from './penguin-circus.module.css'
 
-export const POSES = ['stand', 'slide', 'fly', 'wave', 'skate', 'sleep', 'carry', 'open', 'chomp', 'full', 'yawn', 'phone', 'flag', 'shades', 'splat', 'music'] as const
+export const POSES = ['stand', 'slide', 'fly', 'wave', 'skate', 'sleep', 'carry', 'happy', 'full', 'stretch', 'phone', 'flag', 'shades', 'splat', 'music'] as const
 type Pose = (typeof POSES)[number]
 const src = (p: Pose) => `/art/penguin/${p}.webp`
 const FACES_RIGHT = new Set<Pose>(['slide', 'fly', 'skate'])
@@ -47,7 +47,7 @@ export const posterStageClass = styles.posterStage
 export const focusStageClass = styles.focusStage
 
 const words = {
-  zh: { pop: '啪！', honk: '嘎！', burp: '嗝～', full: '吃飽了…', thanks: '謝謝魚！', eep: '嚇！', oops: '哎呀', cool: '帥吧', done: '搞定！', cards: ['買魚', '回 87 封信', '跟自己開會', '午睡 20 分鐘', '假裝很忙', '把企鵝收好'], bubbles: ['週四開會？', '三點可以', '我帶簡報'], card: '週四 15:00 團隊會議' },
+  zh: { pop: '啪！', honk: '呱！', burp: '嗝～', full: '吃飽了…', thanks: '謝謝魚！', eep: '嚇！', oops: '哎呀', cool: '帥吧', done: '搞定！', cards: ['買魚', '回 87 封信', '跟自己開會', '午睡 20 分鐘', '假裝很忙', '把企鵝收好'], bubbles: ['週四開會？', '三點可以', '我帶簡報'], card: '週四 15:00 團隊會議' },
   en: { pop: 'POP!', honk: 'HONK!', burp: '*burp*', full: 'So full…', thanks: 'Thanks for the fish!', eep: 'EEP!', oops: 'Oops', cool: 'Cool.', done: 'Done!', cards: ['Buy fish', 'Reply to 87 emails', 'Meeting with myself', '20-min nap', 'Look busy', 'Put penguins away'], bubbles: ['Meet Thursday?', '3pm works', "I'll bring slides"], card: 'Thu 3:00 PM · Team sync' },
 } as const
 type Locale = keyof typeof words
@@ -174,7 +174,7 @@ export function HeroSwarm({ locale = 'zh' }: { locale?: Locale }) {
 
 /* ─────────────────────────── Roaming penguin ─────────────────────────── */
 
-type Stop = { el: HTMLElement; at: number[]; atM?: number[]; pose: Pose; motion?: string; nap: boolean }
+type Stop = { el: HTMLElement; at: number[]; atM?: number[]; pose: Pose; motion?: string; nap: boolean; priority: boolean }
 const parse = (v?: string) => (v ? v.trim().split(/\s+/).map(Number) : undefined)
 
 export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
@@ -205,7 +205,7 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
       const only = mobile() ? 'desktop' : 'mobile'
       stops = Array.from(document.querySelectorAll<HTMLElement>('[data-penguin-stop]')).filter(el => el.dataset.penguinOnly !== only).map(el => ({
         el, at: parse(el.dataset.penguinAt) ?? [0.5, 0.5], atM: parse(el.dataset.penguinAtM),
-        pose: (el.dataset.penguinPose as Pose) || 'stand', motion: el.dataset.penguinMotion, nap: el.dataset.penguinNap !== undefined,
+        pose: (el.dataset.penguinPose as Pose) || 'stand', motion: el.dataset.penguinMotion, nap: el.dataset.penguinNap !== undefined, priority: el.dataset.penguinPriority !== undefined,
       }))
     }
     collect()
@@ -318,10 +318,10 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
         { transform: `translate(${bx - 18}px,${by - 52}px) scale(1.05)`, opacity: 1, offset: 0.62 },
         { transform: `translate(${bx - 18}px,${by - 52}px) scale(1.7)`, opacity: 0 },
       ], { duration: 1150, easing: 'ease-out' }).finished.then(() => b.remove(), () => b.remove())
-      window.setTimeout(() => { holdPose('open', 650); hop(34, 380); say(w.eep) }, 720)
+      window.setTimeout(() => { holdPose('stand', 650); hop(34, 380); say(w.eep) }, 720)
     }
     const IDLES: Array<() => void> = [
-      () => holdPose('yawn', 1500),
+      () => holdPose('stretch', 1500),
       () => holdPose('phone', 2300),
       flagWave, cool, slip, scare,
     ]
@@ -352,7 +352,7 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
         }, 380)
       } else {
         hold.until = 0; busyUntil = performance.now() + 500
-        holdPose('open', 500); hop(24)
+        holdPose('happy', 700); hop(24)
       }
     }
     window.addEventListener('huddle:focus-mode', onFocusMode)
@@ -377,9 +377,10 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
     const gulp = () => {
       const now = performance.now()
       fat = Math.min(4, fat + 1); lastFed = now
-      holdPose('chomp', 620)
-      body.animate([{ transform: 'none' }, { transform: 'translateY(-18px) scale(1.06, .95)', offset: 0.4 }, { transform: 'none' }], { duration: 440, easing: 'ease-out' })
-      burst(x, y - S * 0.9)
+      holdPose('happy', 900)
+      crumbs(x, y - S * 0.5)
+      body.animate([{ transform: 'none' }, { transform: 'translateY(-20px) scale(1.06, .95)', offset: 0.4 }, { transform: 'none' }], { duration: 460, easing: 'ease-out' })
+      burst(x, y - S * 0.95)
       if (fat >= 4) {
         busyUntil = now + 5600
         window.setTimeout(() => { say(w.full); holdPose('full', 2300) }, 620)
@@ -387,13 +388,24 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
         window.setTimeout(() => { fat = 1; lastFed = performance.now() }, 5500)
       } else if (fat === 2 || Math.random() < 0.3) window.setTimeout(() => say(w.burp), 520)
     }
+    // the fish vanishes with a little puff of crumbs and sparkles (the penguin has no mouth)
+    const crumbs = (cx: number, cy: number) => {
+      for (let i = 0; i < 7; i++) {
+        const el = document.createElement('span'); el.className = styles.crumb; fx.appendChild(el)
+        const a = (i / 7) * Math.PI * 2, d = 16 + Math.random() * 16
+        el.animate([
+          { transform: `translate(${cx}px,${cy}px) scale(1)`, opacity: 1 },
+          { transform: `translate(${cx + Math.cos(a) * d}px,${cy + Math.sin(a) * d}px) scale(.4)`, opacity: 0 },
+        ], { duration: 380, easing: 'ease-out' }).finished.then(() => el.remove(), () => el.remove())
+      }
+    }
     const feed = (fromX: number, fromY: number) => {
       busyUntil = performance.now() + 1250
-      holdPose('open', 640)
+      holdPose('stand', 640)
       const el = document.createElement('div'); el.className = styles.fish
       el.innerHTML = '<svg viewBox="0 0 36 24" width="44" height="30" aria-hidden="true"><path d="M3 12c5-8 15-9 22-3l7-6v18l-7-6c-7 6-17 5-22-3z" fill="#cf5731" stroke="#292b24" stroke-width="2.4" stroke-linejoin="round"/><circle cx="10" cy="10.5" r="2" fill="#292b24"/></svg>'
       fx.appendChild(el)
-      const mx = x, my = y - S * 0.6, dx = mx - fromX, dy = my - fromY
+      const mx = x, my = y - S * 0.5, dx = mx - fromX, dy = my - fromY
       const peak = Math.max(110, Math.min(230, Math.hypot(dx, dy) * 0.45 + 90))
       // a click right on the penguin tosses the fish up and over, not in place
       const side = Math.abs(dx) < 50 ? (fromX > window.innerWidth / 2 ? -70 : 70) : 0
@@ -438,7 +450,8 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
         for (const s of stops) {
           const r = s.el.getBoundingClientRect()
           if (!r.height) continue
-          const d = Math.abs(anchor(s, r).y - vh * 0.52)
+          // priority stops (the hammock) win whenever they are fully on screen
+          const d = s.priority && r.top >= 0 && r.bottom <= vh ? -1 : Math.abs(anchor(s, r).y - vh * 0.52)
           if (d < bd) { bd = d; best = s }
         }
         active = best
@@ -613,18 +626,24 @@ export function FocusRing() {
 }
 
 export function Hammock() {
+  // Layered so the penguin sleeps IN the hammock: ropes + back cloth, then
+  // the penguin, then the front cloth edge wrapping its lower body.
   return (
-    <div className={styles.hammock} data-penguin-stop="hammock" data-penguin-at="0.5 0.78" data-penguin-pose="sleep" data-penguin-nap="" aria-hidden="true">
+    <div className={styles.hammock} data-penguin-stop="hammock" data-penguin-at="0.5 0.7" data-penguin-pose="sleep" data-penguin-nap="" data-penguin-priority="" aria-hidden="true">
       <div className={styles.hammockSwing}>
-        <svg viewBox="0 0 190 96" preserveAspectRatio="none">
+        <svg viewBox="0 0 190 96" preserveAspectRatio="xMidYMid meet">
           <circle cx="6" cy="8" r="5" fill="none" stroke="#292b24" strokeWidth="3" />
           <circle cx="184" cy="8" r="5" fill="none" stroke="#292b24" strokeWidth="3" />
-          <path d="M9 12 L38 46 M181 12 L152 46" stroke="#292b24" strokeWidth="2.5" fill="none" />
-          <path d="M34 44 Q95 104 156 44 Q95 72 34 44 Z" fill="#edc747" stroke="#292b24" strokeWidth="3" strokeLinejoin="round" />
-          <path d="M52 56 Q95 86 138 56 M70 52 L74 68 M95 54 L95 75 M120 52 L116 68" stroke="#292b24" strokeWidth="1.6" fill="none" opacity=".55" />
+          <path d="M9 12 L40 50 M181 12 L150 50" stroke="#292b24" strokeWidth="2.5" fill="none" />
+          <g className={styles.bed}>
+            {/* back cloth: the inside of the hammock, a shade darker */}
+            <path d="M32 44 Q95 50 158 44 Q95 110 32 44 Z" fill="#c9a233" stroke="#292b24" strokeWidth="3" strokeLinejoin="round" />
+            <image className={styles.hammockBird} href={src('sleep')} x="46" y="2" width="100" height="70" preserveAspectRatio="xMidYMax meet" />
+            {/* front cloth: the near edge, wrapping over the penguin's body */}
+            <path d="M32 44 Q95 80 158 44 Q95 112 32 44 Z" fill="#edc747" stroke="#292b24" strokeWidth="3" strokeLinejoin="round" />
+            <path d="M48 60 Q95 90 142 60 M70 62 L71 70 M95 65 L95 75 M120 62 L119 70" stroke="#292b24" strokeWidth="1.6" fill="none" opacity=".5" />
+          </g>
         </svg>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className={styles.hammockBird} src={src('sleep')} alt="" width={240} height={240} loading="lazy" />
         <span className={styles.zzz}><span>z</span><span>z</span><span>Z</span></span>
       </div>
     </div>
