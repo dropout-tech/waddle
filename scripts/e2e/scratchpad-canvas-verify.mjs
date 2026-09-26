@@ -26,7 +26,8 @@ const blankPoint = async page => {
   throw new Error('No visible blank canvas point')
  })
 }
-const blurEditor = async page => { await page.getByRole('heading', {name:'白板',exact:true}).click(); await settle() }
+// Phones hide the "白板" heading (screen-reader only), so tap blank paper there instead.
+const blurEditor = async page => { if ((page.viewportSize()?.width ?? 1280) < 768) { const p = await blankPoint(page); await page.mouse.click(p.x, p.y) } else await page.getByRole('heading', {name:'白板',exact:true}).click(); await settle() }
 
 try {
  for(let i=0;i<120;i++){try{if((await fetch(base+'/login')).ok)break}catch{}await sleep(1000)}
@@ -126,7 +127,8 @@ try {
  const expected=await page.getByTestId('scratchpad-canvas').evaluate((el,p)=>{const r=el.getBoundingClientRect(),m=new DOMMatrix(getComputedStyle(el.firstElementChild).transform);return {x:(p.x-r.left-m.e)/m.a,y:(p.y-r.top-m.f)/m.d}},point)
  before=writes.length;await page.mouse.dblclick(point.x,point.y);await editor.waitFor();await editor.fill('雙擊定位文字');await blurEditor(page)
  const placed=rows.find(row=>row.content==='雙擊定位文字')
- check('Double click places text at the clicked point after pan and zoom',!!placed&&Math.abs(placed.metadata.canvas.x-expected.x)<3&&Math.abs(placed.metadata.canvas.y-expected.y)<3&&writes.length===before+1)
+ // The text box is offset (-12, -68) so its first line/caret lands on the tapped point.
+ check('Double click places text at the clicked point after pan and zoom',!!placed&&Math.abs(placed.metadata.canvas.x-(expected.x-12))<3&&Math.abs(placed.metadata.canvas.y-(expected.y-68))<3&&writes.length===before+1)
  // A whiteboard object opens a full notebook editor, preserving its identity and geometry.
  await page.setViewportSize({width:1280,height:1000});await page.getByRole('button',{name:'顯示全部',exact:true}).click()
  before=writes.length;await textCard.getByTestId('canvas-drag-handle').focus();await textCard.getByRole('button',{name:'開啟內容',exact:true}).click()
@@ -164,7 +166,7 @@ try {
  check('New checklist saves its document on the whiteboard',rows.some(row=>row.content.includes('新檢查清單項目')&&JSON.stringify(row.metadata.document).includes('taskList'))&&writes.length>before)
  const beforeDrop=rows.length;await page.evaluate(() => { const transfer=new DataTransfer();transfer.items.add(new File([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j5ZkAAAAASUVORK5CYII='),c=>c.charCodeAt(0))],'drop.png',{type:'image/png'}));const canvas=document.querySelector('[data-testid="scratchpad-canvas"]');canvas.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:transfer})); });await sleep(300)
  check('Dropping over whiteboard creates one canvas image',rows.length===beforeDrop+1&&rows.at(-1).type==='image'&&rows.at(-1).metadata?.canvas)
- await page.getByRole('button',{name:'畫筆',exact:true}).click();const canvas=page.getByTestId('scratchpad-canvas');b=await canvas.boundingBox();await page.mouse.move(b.x+b.width-100,b.y+b.height-100);await page.mouse.down();await page.mouse.move(b.x+b.width-40,b.y+b.height-40,{steps:8});await page.mouse.up();await sleep(300)
+ await page.getByRole('button',{name:'畫筆',exact:true}).click();const penStart=await blankPoint(page);await page.mouse.move(penStart.x,penStart.y);await page.mouse.down();await page.mouse.move(penStart.x-60,penStart.y-60,{steps:8});await page.mouse.up();await sleep(300)
  check('Pen stroke persists as a resizable canvas image',rows.some(row=>row.type==='image'&&row.title==='手寫筆記'&&row.metadata?.canvas))
  await page.getByRole('button',{name:'畫筆',exact:true}).click()
  mkdirSync('/tmp/huddle-whiteboard-shots',{recursive:true})
