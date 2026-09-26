@@ -1,6 +1,6 @@
 ---
-name: Huddle — public poster and warm ceramic workspace
-description: Public marketing uses the approved desk poster; the signed-in workspace retains its warm ceramic system.
+name: Huddle — bold public poster and paper workspace
+description: Public marketing uses the bold yellow desk poster; the signed-in workspace uses the paper light theme (A 輕版, 2026-09-26).
 colors:
   marketing-paper: "#f6f3e9"
   marketing-ink: "#292b24"
@@ -44,14 +44,24 @@ components:
 
 公開官網以暖黃紙面、厚重墨字、手繪桌邊物件與真實產品截圖，表現一個人整理一天的節奏。這是使用者已選定的獨立展覽海報世界；最終視覺依據為 `.impeccable/mocks/user-approved-poster.png`，direction contract 位於 `app/layout.tsx` 的首個 body template（seed `58f78b58`）。
 
-**The Scope Rule.** 海報系統只適用公開 marketing 與影片展示；不改寫登入後 app、auth 表單或其他既有介面的 warm ceramic 規則。下方 YAML 的 marketing／film token 僅屬公開展示，app 色票仍以 `app/globals.css` 與 `lib/palette.ts` 為準。
+**The Scope Rule（2026-09-26 修訂）.** 黃色海報（粗墨字、大圖）只適用公開 marketing 與影片展示。登入後 app 與 auth 頁改用「App 內紙本輕版」（見下節），由 `<html data-art="paper">` 預設啟用、`app/art-theme.css` 覆寫語意 token；官網以 `data-surface="marketing"` 退出紙紋。兩套互不混用：官網不套紙本 token，app 不用海報字重（900）與黃色大色面。`app/globals.css` 的陶瓷色票保留為 fallback 與資料色（`lib/palette.ts`）來源。
 
 **Key Characteristics:**
 - 公開官網：黃色海報、粗墨字、真實產品證據。
 - 工作介面：暖米陶瓷、低壓力、舒適密度。
 - 插畫承接情緒，功能與可用性由產品畫面和文字說明。
 
-### App：既有主題（保留）
+### App 內紙本輕版（2026-09-26 起預設）
+
+老闆看過 A／B 樣張後選 A 輕版，取代陶瓷米白外觀；B（手繪框線）已移除。
+
+- **色票（淺色）**：紙 `#f6f3e9`、卡片 `#fbf9f2`、面板 `#f3efe2`、墨 `#292b24`、主色赤陶 `#b8482a`（按鈕字 4.7:1 AA；品牌 `#cf5731` 只給 ring／現在時間線）、芥末 `#edc747` 作今日淡底與 chart、邊線 `#e0d8c0`、次要字 `#66645a`。
+- **色票（深色，桌燈下的墨色桌面）**：底 `#22231e`、卡片 `#2b2c26`、字 `#f3eedd`、主色芥末 `#edc747`（墨上 8.7:1）、次要字 `#b9b3a0`。
+- **紙紋**：單一固定層 `body::after`，`/art/paper-texture.jpg` 520px 平鋪，淺色 multiply 0.4、深色 soft-light 0.18；不加在個別元件上（效能）。
+- **插畫用法**：手繪企鵝只用於空狀態、登入場景、官網；不進功能 icon 位置。淺色以 `.art-illus` multiply＋放射遮罩融進紙面；深色變成小張貼紙（圓角＋陰影、亮度 0.92）。企鵝要小小隻、圓圓矮矮，場景大企鵝小。素材在 `public/art/`。
+- **仍保留**：版面、圓角 `--radius`、動畫曲線、禁區（不用紅驚嘆、不催促）全部照舊。
+
+### App：既有主題（fallback）
 **雙模式，淺色為主**。淺色是 warm cream paper（陶瓷釉色背景），dark 是 warm charcoal（不是 pure black，也帶 chroma 0.015）。沒有 pure `#fff` 或 `#000`——所有中性色都偏 warm hue 85（暖米）或 55（暖灰褐）。
 
 物理場景：一個人在桌邊、桌燈或自然光下，打開筆電寫今天的計畫；不是會議室、不是辦公室、不是凌晨的 SRE 螢幕。所以淺色是預設。
@@ -162,6 +172,17 @@ Primary：暖黃用於主海報；墨色用於標題與實心 CTA。Secondary：
 App 繼續使用既有 `--radius: 0.75rem` 與陶瓷表面規則，不能將海報控制元件的小圓角套入工作面板。
 
 ## Components
+
+### 官網大膽版（2026-09-26）
+
+老闆要「原本的黃色海報官網，但更大膽」。原則：
+
+- **首屏是一句名言**：`lib/brand.ts` 的 `BRAND_QUOTE` 是全站標語唯一來源（名言＋作者；作者空白就不顯示署名）。首屏 Noto Sans TC 900、桌機約 86–104px，只在標點後斷行；橘色大引號「“」當名言記號；署名用 Barlow Condensed 800 大寫＋橘色短線。
+- **場景大、企鵝小**：首屏背景是 `hero-desk-v2.webp`（左留白給字、右側桌邊場景），手機換 `hero-mobile.webp`，圖頂端以遮罩融進 `#eecb71` 黃底。
+- **黑黃強對比**：首屏下緊接墨色板（`proof`），黃色 900 大標＋整寬真實產品截圖；下載區同為墨色板。
+- **每個功能區都配大圖**：三大重點改成左右交錯的大章節（圖佔 55%，編號 Barlow 橘色大字）；其他功能以黃色海報框直式插畫＋168px 小插畫列；方案與下載配寬幅分鏡（手機換直式）。分鏡素材在 `public/art/film/`。
+- **字級**：內文 18–24px（手機 16–17），章節標題 42–84px，價格 88–132px；標題 `word-break: keep-all` 只在標點斷。
+- **效能**：插畫一律 WebP、預先縮好（next.config 關閉最佳化），首屏圖 `fetchPriority=high`，其餘 lazy。2026-09-26 實測：1440 首次載入圖片約 517KB、捲到底約 893KB。
 
 ### Public marketing：既有實裝
 

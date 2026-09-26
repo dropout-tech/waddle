@@ -95,7 +95,6 @@ export const dict: Record<string, string> = {
   '目前沒有需要注意的事項': 'Nothing needs your attention right now',
   '還有 {n} 個任務...': '{n} more tasks...',
   '全部歸檔': 'Archive all',
-  '慢慢搖擺，把事情做完': "Take it slow, get it done.",
 
   // onboarding-tour.tsx
   '新手導覽': 'Onboarding tour',
@@ -136,8 +135,8 @@ export const dict: Record<string, string> = {
   '✨ 底部四分頁': '✨ Four tabs at the bottom',
 
   // onboarding-tour.tsx — tour step bodies & hints (desktop)
-  '整合任務、時間排程、專注計時、日記反思的工作面板。慢慢搖擺，把事情做完。90 秒帶你走過。':
-    'One workspace for tasks, scheduling, focus time, and journaling. Take it slow and get things done. Takes about 90 seconds.',
+  '整合任務、時間排程、專注計時、日記反思的工作面板。90 秒帶你走過。':
+    'One workspace for tasks, scheduling, focus time, and journaling. Takes about 90 seconds.',
   '工作區（工作 / 個人 / 學習）→ 分類（本週 / 待辦…）→ 任務。所有任務都在這。最上面灰色的「未分類」是預設收件匣——在日曆上隨手建立、還沒想好歸屬的任務都會先掉進這裡，之後再拖到對的地方。工作區標題右邊的「＋」可以新增分類；上方篩選列還能切換「精簡 / 舒適」兩種密度，任務多的時候切精簡一次看更多。':
     'Workspaces (Work / Personal / Learning) → categories (This week / To-do…) → tasks. Everything lives here. The grey "Uncategorized" workspace at the top is your default inbox — anything you jot down on the calendar without picking a home lands there first, so you can file it later. The "+" next to a workspace name adds a category; the filter bar above can switch between Compact and Comfortable density — switch to Compact when you have a lot of tasks to see more at once.',
   '左邊圈圈 = 完成；點任務本身 = 打開詳細編輯。打開後可以把任務標為「會議」，會多三個欄位（參與者 / 地點 / 視訊連結）。':
@@ -180,8 +179,8 @@ export const dict: Record<string, string> = {
     'The calendar page\'s "⋯" menu has Daily check-in to log your mood and build a streak; the user menu has Meetings to tasks — paste a transcript and it\'s organized into to-dos automatically.',
 
   // onboarding-tour.tsx — tour step bodies (mobile-only variants)
-  '整合任務、時間排程、專注計時、日記反思的工作面板。慢慢搖擺，把事情做完。':
-    'One workspace for tasks, scheduling, focus time, and journaling. Take it slow and get things done.',
+  '整合任務、時間排程、專注計時、日記反思的工作面板。':
+    'One workspace for tasks, scheduling, focus time, and journaling.',
   '工作區 → 分類 → 任務的三層結構。所有任務都在這。最上面灰色的「未分類」是預設收件匣，沒指定分類的新任務都會先掉進這裡。工作區標題右邊的「＋」可以新增分類。':
     'Three layers: workspaces → categories → tasks. Everything lives here. The grey "Uncategorized" workspace at the top is your default inbox — new tasks with no category picked land there. The "+" next to a workspace name adds a category.',
   '輕點任務開啟詳細頁；長按 0.3 秒後拖移可以直接排到日曆上的時間。打開後可以把任務標為「會議」，會多參與者 / 地點 / 視訊連結。':

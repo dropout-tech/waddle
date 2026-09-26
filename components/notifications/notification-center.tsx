@@ -19,6 +19,7 @@ import type { Task, Workspace } from '@/lib/types'
 import { getTaskOverdueDate, isTaskOverdue } from '@/lib/task-utils'
 import { toDateString } from '@/lib/calendar-utils'
 import { useI18n } from '@/lib/i18n/react'
+import { brandQuote } from '@/lib/brand'
 import { t } from '@/lib/i18n'
 
 interface NotificationCenterProps {
@@ -627,7 +628,7 @@ export function NotificationCenter({
             {notifications.length > 0 && (
               <div className="px-4 py-3 border-t border-border bg-secondary/20">
                 <p className="text-[10px] text-muted-foreground text-center">
-                  {t('慢慢搖擺，把事情做完')}
+                  {brandQuote(lang).quote}
                 </p>
               </div>
             )}

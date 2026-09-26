@@ -10,6 +10,7 @@ import { FocusTimerProvider } from '@/components/timer/focus-timer-provider'
 import { OperationsNotices } from '@/components/operations/announcements'
 import { EnrollmentBridge } from '@/components/operations/enrollment-bridge'
 import { FloatingHub } from '@/components/floating/floating-hub'
+import { BRAND_TITLE } from '@/lib/brand'
 
 const geist = Geist({
   subsets: ['latin'],
@@ -29,12 +30,12 @@ const notoSansTC = Noto_Sans_TC({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://waddle.zeabur.app'),
-  title: 'Huddle｜慢慢搖擺，把事情做完',
+  title: BRAND_TITLE,
   description:
     '把任務、行程、專注與筆記收進同一張桌面。Huddle 是一個溫柔、不催促的個人工作空間。',
   applicationName: 'Huddle',
   openGraph: {
-    title: 'Huddle｜慢慢搖擺，把事情做完',
+    title: BRAND_TITLE,
     description: '把任務、行程、專注與筆記收進同一張桌面。',
     type: 'website',
     locale: 'zh_TW',
@@ -42,7 +43,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary',
-    title: 'Huddle｜慢慢搖擺，把事情做完',
+    title: BRAND_TITLE,
     description: '把任務、行程、專注與筆記收進同一張桌面。',
     images: ['/app-icon-512.png'],
   },
@@ -91,22 +92,16 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // data-art="paper": the app's paper look (app/art-theme.css), on by default.
+  // Public marketing opts out via [data-surface='marketing'].
   return (
-    <html lang="zh-TW" className="bg-background" suppressHydrationWarning>
+    <html lang="zh-TW" className="bg-background" data-art="paper" suppressHydrationWarning>
       <head>
         {/* Set viewport class before hydration so CSS / hooks see the right
             value on first paint and avoid the desktop-flash on mobile. */}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{if(window.huddleDesktop&&window.huddleDesktop.isDesktop&&window.huddleDesktop.platform==='darwin'&&!window.opener)document.documentElement.dataset.desktopTitlebar='mac';var m=window.matchMedia('(max-width:767px)').matches;document.documentElement.dataset.viewport=m?'mobile':'desktop';if(m)document.documentElement.classList.add('is-mobile');var f=localStorage.getItem('waddle-font-size-v1');var map={sm:'87.5%',lg:'112.5%',xl:'125%'};if(f&&map[f])document.documentElement.style.fontSize=map[f];}catch(e){}})();`,
-          }}
-        />
-        {/* Art-direction preview (sample only): ?art=paper|sketch sets
-            html[data-art] for this tab; ?art=off clears it. No param and no
-            stored choice = current production look, untouched. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var d=document.documentElement,k='huddle-art',p=new URLSearchParams(location.search).get('art');if(p==='paper'||p==='sketch')sessionStorage.setItem(k,p);else if(p==='off')sessionStorage.removeItem(k);var a=sessionStorage.getItem(k);if(a!=='paper'&&a!=='sketch')return;d.dataset.art=a;if(a==='sketch'){var l=document.createElement('link');l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family=LXGW+WenKai+TC:wght@400;700&display=swap';document.head.appendChild(l);}}catch(e){}})();`,
           }}
         />
       </head>

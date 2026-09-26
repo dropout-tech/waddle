@@ -567,7 +567,7 @@
 }
 
 /* ------------------------------------------------------------
- * Motion baseline — Waddle's "慢慢搖擺" rhythm.
+ * Motion baseline — Huddle's unhurried rhythm.
  *
  * 1) Brand easing token. Anywhere a one-shot transition or animation
  *    needs a curve, prefer `transition-timing-function: var(--ease-quart)`

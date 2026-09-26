@@ -1,19 +1,13 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   Art-direction SAMPLE (2026-09-26) — storyboard "paper" look.
-   Everything here is scoped to html[data-art]; with no attribute the app is
-   byte-for-byte the current production theme. Toggle: ?art=paper|sketch|off
-   (see the inline script in app/layout.tsx).
-
-   paper  : palette + paper grain + illustrations. Layout/shape unchanged.
-   sketch : paper + hand-drawn outlines, handwritten headings, wavy rules.
+   App「紙本輕版」(paper) — approved 2026-09-26, ON by default.
+   app/layout.tsx renders <html data-art="paper">; everything here is scoped
+   to html[data-art] so the old ceramic tokens in globals.css stay as the
+   fallback (e.g. set data-art off in devtools to compare).
+   The public marketing site is NOT paper: it keeps the yellow poster look
+   and opts out of the page-wide grain via [data-surface='marketing'].
    Tokens: cream #f6f3e9 · ink #292b24 · mustard #edc747 · terracotta #cf5731
+   See DESIGN.md「App 內紙本輕版」.
    ───────────────────────────────────────────────────────────────────────── */
-
-/* Illustration slots: hidden (and, being lazy <img>, never fetched) unless an
-   art mode is on. .art-hide marks the old icon an illustration replaces. */
-.art-only { display: none !important; }
-html[data-art] .art-only { display: block !important; }
-html[data-art] .art-hide { display: none !important; }
 
 /* ── Palette: light ─────────────────────────────────────────────────────── */
 html[data-art] {
@@ -111,6 +105,8 @@ html.dark[data-art] body::after {
   mix-blend-mode: soft-light;
   opacity: 0.18;
 }
+/* Marketing pages have their own poster surface — no app grain on top. */
+html:has([data-surface='marketing']) body::after { display: none; }
 
 /* Illustrations sit on cream paper: fuse with the page in light mode, become
    a small pasted-in paper print in dark mode. */
@@ -154,74 +150,6 @@ html[data-art] .bg-primary\/10 { background-color: color-mix(in srgb, var(--art-
 html.dark[data-art] .bg-primary\/5 { background-color: color-mix(in srgb, var(--art-mustard) 3%, transparent); }
 html.dark[data-art] .bg-primary\/10 { background-color: color-mix(in srgb, var(--art-mustard) 8%, transparent); }
 html[data-art] [data-tour='task-row'] { box-shadow: 0 1px 0 color-mix(in srgb, var(--art-ink) 6%, transparent); }
-
-/* ══════════════════════════════════════════════════════════════════════════
-   SKETCH — only when data-art="sketch"
-   ══════════════════════════════════════════════════════════════════════════ */
-html[data-art='sketch'] {
-  --font-hand: 'LXGW WenKai TC', 'Kaiti TC', 'BiauKai', 'STKaiti', 'Noto Sans TC', serif;
-  /* lopsided radii read as a hand-drawn box without any SVG filter cost */
-  --sketch-r-sm: 14px 5px 12px 6px / 6px 12px 5px 14px;
-  --sketch-r-md: 18px 7px 20px 6px / 7px 18px 6px 20px;
-  --sketch-line: #292b24;
-  --sketch-shadow: 2px 3px 0 color-mix(in srgb, #292b24 16%, transparent);
-  --wavy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='6' viewBox='0 0 120 6'%3E%3Cpath d='M0 3.2 C 12 1.4 20 4.6 33 3 S 55 1.6 67 3.4 S 92 4.4 104 2.6 S 116 3 120 3.2' fill='none' stroke='%23292b24' stroke-opacity='.45' stroke-width='1.3' stroke-linecap='round'/%3E%3C/svg%3E");
-}
-html.dark[data-art='sketch'] {
-  --sketch-line: #d9d2bd;
-  --sketch-shadow: 2px 3px 0 color-mix(in srgb, #000 45%, transparent);
-  --wavy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='6' viewBox='0 0 120 6'%3E%3Cpath d='M0 3.2 C 12 1.4 20 4.6 33 3 S 55 1.6 67 3.4 S 92 4.4 104 2.6 S 116 3 120 3.2' fill='none' stroke='%23e8e1cc' stroke-opacity='.4' stroke-width='1.3' stroke-linecap='round'/%3E%3C/svg%3E");
-}
-
-/* Handwritten headings (body text stays Noto Sans TC for legibility) */
-html[data-art='sketch'] :is(h1, h2, h3, [data-slot='card-title']) {
-  font-family: var(--font-hand);
-  letter-spacing: 0.01em;
-}
-
-/* Buttons with a filled/outlined body get a hand-drawn outline.
-   ghost/link buttons (toolbar icons) stay clean to keep dense bars calm. */
-html[data-art='sketch'] [data-slot='button']:is([data-variant='default'], [data-variant='outline'], [data-variant='secondary'], [data-variant='destructive']) {
-  border: 1.5px solid var(--sketch-line) !important;
-  border-radius: var(--sketch-r-sm) !important;
-  box-shadow: var(--sketch-shadow);
-}
-html[data-art='sketch'] [data-slot='button']:is([data-variant='default'], [data-variant='outline'], [data-variant='secondary']):active {
-  box-shadow: none; transform: translate(1px, 2px);
-}
-
-/* Inputs and cards */
-html[data-art='sketch'] :is([data-slot='input'], textarea) {
-  border: 1.5px solid color-mix(in srgb, var(--sketch-line) 70%, transparent) !important;
-  border-radius: var(--sketch-r-sm) !important;
-}
-html[data-art='sketch'] [data-slot='card'] {
-  border: 1.5px solid var(--sketch-line) !important;
-  border-radius: var(--sketch-r-md) !important;
-  box-shadow: 3px 4px 0 color-mix(in srgb, var(--sketch-line) 14%, transparent) !important;
-}
-
-/* Task cards: ink outline with the category colour kept as the fat left
-   pencil stroke; readable, not busy. */
-html[data-art='sketch'] [data-tour='task-row'] {
-  border: 1.25px solid color-mix(in srgb, var(--sketch-line) 55%, transparent) !important;
-  border-left-width: 4px !important;
-  border-radius: var(--sketch-r-md) !important;
-  box-shadow: var(--sketch-shadow) !important;
-}
-
-/* Hand-drawn rules */
-html[data-art='sketch'] [data-slot='separator'] {
-  background: var(--wavy) 0 50% / 120px 6px repeat-x !important;
-  height: 6px !important;
-}
-
-/* Illustrations get a slight tilt, like a pasted sticker */
-html[data-art='sketch'] .art-illus { transform: rotate(-1.5deg); }
-
-@media (prefers-reduced-motion: reduce) {
-  html[data-art='sketch'] [data-slot='button']:active { transform: none; }
-}
 
 /* Desktop shows the big illustration in the editor pane; keep the list side quiet. */
 @media (min-width: 768px) { html[data-art] .art-list-illus { display: none !important; } }

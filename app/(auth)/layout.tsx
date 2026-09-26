@@ -4,6 +4,7 @@ import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { RedirectIfAuthed } from '@/components/auth/redirect-if-authed'
 import { useI18n } from '@/lib/i18n/react'
 import { cn } from '@/lib/utils'
+import { brandQuote } from '@/lib/brand'
 
 // Low-key language switch — one of the entry points for a first-time visitor
 // to pick English before they even sign in (the full picker lives in
@@ -34,16 +35,16 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { t } = useI18n()
+  const { lang } = useI18n()
   return (
     // Vertical rhythm: geometric centering left a dead ~130px band under the
     // card (logo anchors the top, nothing answers it below). The 2:3 flex
     // spacers lift the card slightly above center, and the slogan — moved
     // out of the cramped logo lockup — closes the composition at the bottom.
     <main className="art-auth-main min-h-dvh w-full bg-gradient-to-br from-background via-background to-muted/40 flex flex-col items-center px-4 pt-[env(safe-area-inset-top)]">
-      {/* Art-direction sample only (html[data-art]); hidden + never fetched otherwise. */}
+      {/* Paper look: hand-drawn scene behind the form (app/art-theme.css). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/art/login-scene.jpg" alt="" aria-hidden loading="lazy" className="art-only art-auth-scene" />
+      <img src="/art/login-scene.jpg" alt="" aria-hidden loading="lazy" className="art-auth-scene" />
       <RedirectIfAuthed />
       <LanguageToggle />
       <div aria-hidden className="art-auth-top min-h-8 flex-[2]" />
@@ -58,7 +59,7 @@ export default function AuthLayout({
       <div aria-hidden className="min-h-6 flex-[3]" />
       {/* Full-strength muted token (no /70): the slogan must still clear
           WCAG AA on both cream and charcoal backgrounds. */}
-      <p className="pb-[max(1.5rem,env(safe-area-inset-bottom))] text-xs text-muted-foreground">{t('慢慢搖擺，把事情做完')}</p>
+      <p className="pb-[max(1.5rem,env(safe-area-inset-bottom))] text-xs text-muted-foreground">{brandQuote(lang).quote}</p>
     </main>
   )
 }

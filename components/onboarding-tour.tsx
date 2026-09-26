@@ -37,7 +37,7 @@ interface TourStep {
 const DESKTOP_STEPS: TourStep[] = [
   {
     title: '歡迎來到 Huddle',
-    body: '整合任務、時間排程、專注計時、日記反思的工作面板。慢慢搖擺，把事情做完。90 秒帶你走過。',
+    body: '整合任務、時間排程、專注計時、日記反思的工作面板。90 秒帶你走過。',
   },
   {
     target: '[data-tour="left-panel"]',
@@ -166,7 +166,7 @@ const DESKTOP_STEPS: TourStep[] = [
 const MOBILE_STEPS: TourStep[] = [
   {
     title: '歡迎來到 Huddle',
-    body: '整合任務、時間排程、專注計時、日記反思的工作面板。慢慢搖擺，把事情做完。',
+    body: '整合任務、時間排程、專注計時、日記反思的工作面板。',
   },
   {
     target: '[data-tour="left-panel"]',
