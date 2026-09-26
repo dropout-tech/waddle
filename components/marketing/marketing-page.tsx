@@ -97,6 +97,29 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
     const v = new URLSearchParams(window.location.search).get('hero')
     if (v === 'ink' || v === 'yellow') document.getElementById('top')?.setAttribute('data-hero', v)
   }, [])
+  // Mobile Safari on cellular occasionally drops an image request and paints
+  // the "?" broken-image glyph (seen on a real iPhone over 4G, never
+  // reproducible on wifi). Retry each failed <img> up to twice with a
+  // cache-busting query — also on its <picture> sources — so a flaky
+  // connection self-heals instead of leaving a hole in the page.
+  useEffect(() => {
+    const root = document.getElementById('top')
+    if (!root) return
+    const bust = (url: string, n: number) => url.replace(/([?&])r=\d+(&|$)/, '$1').replace(/[?&]$/, '') + (url.includes('?') ? '&' : '?') + `r=${n}${Date.now() % 100000}`
+    const retry = (img: HTMLImageElement) => {
+      const n = Number(img.dataset.retry || 0)
+      if (n >= 2) return
+      img.dataset.retry = String(n + 1)
+      window.setTimeout(() => {
+        img.parentElement?.querySelectorAll('source').forEach(s => { if (s.srcset) s.srcset = bust(s.srcset, n + 1) })
+        img.src = bust(img.getAttribute('src') || img.src, n + 1)
+      }, 700 * (n + 1))
+    }
+    const onError = (e: Event) => { if (e.target instanceof HTMLImageElement) retry(e.target) }
+    root.addEventListener('error', onError, true)
+    root.querySelectorAll('img').forEach(img => { if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) retry(img) })
+    return () => root.removeEventListener('error', onError, true)
+  }, [])
   return (
     <main lang={en ? 'en' : 'zh-Hant'} id="top" data-surface="marketing" data-hero={HERO_THEME} className={`${styles.site} ${fishZoneClass} ${display.variable} ${condensed.variable} ${en ? styles.english : ''}`}>
       <a className={styles.skip} href="#features">{en ? 'Skip to features' : '跳至功能介紹'}</a>
