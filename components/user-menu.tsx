@@ -7,11 +7,12 @@ import type { Membership } from '@/lib/operations/types'
 import { Gift } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { LogOut, Mail, User, Loader2, Moon, Sun, FileText } from 'lucide-react'
+import { LogOut, Mail, User, Loader2, Moon, Sun, FileText, StickyNote as StickyNoteIcon, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { AccountRegistrationDate } from '@/components/auth/account-registration-date'
 import { useI18n } from '@/lib/i18n/react'
+import { useStickyNotesToggle } from '@/components/sticky-notes/sticky-notes-provider'
 
 interface SessionInfo {
   email: string
@@ -49,6 +50,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
   const ref = useRef<HTMLDivElement>(null)
   const { resolvedTheme, setTheme } = useTheme()
   const { t } = useI18n()
+  const stickyNotes = useStickyNotesToggle()
   // next-themes resolves the theme only on the client; gate the toggle's
   // label/icon on mount so SSR and first render don't disagree.
   const [mounted, setMounted] = useState(false)
@@ -208,6 +210,34 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             <span>{isDark ? t('切換淺色') : t('切換深色')}</span>
           </button>
+
+          <div className="border-t border-border" />
+
+          {/* 便條紙開關（貼在玻璃層，跨頁共用，見 sticky-notes-provider.tsx）。
+              「新增便條紙」只在開著的時候顯示，避免使用者以為關著也能加。 */}
+          <button
+            data-tour="sticky-notes-toggle"
+            onClick={() => stickyNotes.toggle()}
+            className={cn(
+              'w-full min-h-11 flex items-center gap-2 px-4 py-2.5 text-sm',
+              'hover:bg-muted/60 transition-colors text-foreground'
+            )}
+            role="menuitemcheckbox"
+            aria-checked={stickyNotes.enabled}
+          >
+            <StickyNoteIcon className="w-4 h-4" />
+            <span>{stickyNotes.enabled ? t('隱藏便條紙') : t('顯示便條紙')}</span>
+          </button>
+          {stickyNotes.enabled && (
+            <button
+              onClick={() => { setOpen(false); stickyNotes.addNote() }}
+              className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 pl-10 text-sm hover:bg-muted/60 transition-colors text-foreground"
+              role="menuitem"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{t('新增便條紙')}</span>
+            </button>
+          )}
 
           <div className="border-t border-border" />
 

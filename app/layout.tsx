@@ -10,6 +10,7 @@ import { FocusTimerProvider } from '@/components/timer/focus-timer-provider'
 import { OperationsNotices } from '@/components/operations/announcements'
 import { EnrollmentBridge } from '@/components/operations/enrollment-bridge'
 import { FloatingHub } from '@/components/floating/floating-hub'
+import { StickyNotesProvider } from '@/components/sticky-notes/sticky-notes-provider'
 import { BRAND_TITLE } from '@/lib/brand'
 
 const geist = Geist({
@@ -140,7 +141,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                   三分頁共用）。掛在 FocusTimerProvider 裡面，計時器分頁
                   才吃得到同一份計時狀態。 */}
               <FloatingHub />
-              {children}
+              {/* 便條紙玻璃層：跟懸浮工作站一樣掛在 router outlet 之上，
+                  換頁／切分頁都不卸載，所有頁面共用同一組便條。開關與
+                  「新增便條紙」動作在 UserMenu 裡（頂部使用者選單）。 */}
+              <StickyNotesProvider>{children}</StickyNotesProvider>
             </FocusTimerProvider>
           </AuthProvider>
         </ThemeProvider>
