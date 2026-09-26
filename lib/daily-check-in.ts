@@ -18,4 +18,19 @@ export interface CheckInRanking {
   total_points: number
   is_current_user: boolean
   in_top_50: boolean
+  /** Opted-in nickname, or the server's anonymous code. Absent before the nickname migration. */
+  leaderboard_name?: string
+  has_nickname?: boolean
+}
+
+export const LEADERBOARD_NICKNAME_MAX = 16
+
+/** Mirrors the database trim (ASCII + full-width whitespace at both ends). */
+export function normalizeLeaderboardNickname(value: string): string {
+  return value.trim()
+}
+
+/** Short anonymous code shown when a member has not chosen a nickname. */
+export function leaderboardCode(alias: string): string {
+  return alias.slice(0, 4)
 }

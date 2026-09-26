@@ -20,6 +20,8 @@ type ProfilesRow = {
   id: string
   display_name: string | null
   avatar_url: string | null
+  /** Opt-in public leaderboard name (migration 20260926130000). */
+  leaderboard_nickname?: string | null
   created_at: string
   updated_at: string
 }
@@ -334,6 +336,7 @@ type ProfilesInsert = {
   id: string
   display_name?: string | null
   avatar_url?: string | null
+  leaderboard_nickname?: string | null
 }
 
 type WorkspacesInsert = {
@@ -597,6 +600,7 @@ export type Database = {
     // with supabase/migrations/0016_calendar_sharing.sql if it changes.
     Functions: {
       get_check_in_leaderboard: { Args: Record<PropertyKey, never>; Returns: CheckInRanking[] }
+      set_leaderboard_nickname: { Args: { p_nickname: string | null }; Returns: string | null }
       get_daily_check_in_status: { Args: Record<PropertyKey, never>; Returns: CheckInStatus[] }
       claim_daily_check_in: { Args: Record<PropertyKey, never>; Returns: CheckInStatus[] }
       huddle_operations: { Args: { p_action: string; p_data?: Json }; Returns: Json }
