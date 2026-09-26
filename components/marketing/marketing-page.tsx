@@ -105,7 +105,10 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
   useEffect(() => {
     const root = document.getElementById('top')
     if (!root) return
-    const bust = (url: string, n: number) => url.replace(/([?&])r=\d+(&|$)/, '$1').replace(/[?&]$/, '') + (url.includes('?') ? '&' : '?') + `r=${n}${Date.now() % 100000}`
+    const bust = (url: string, n: number) => {
+      const clean = url.replace(/([?&])r=\d+(&|$)/, '$1').replace(/[?&]$/, '')
+      return clean + (clean.includes('?') ? '&' : '?') + `r=${n}${Date.now() % 100000}`
+    }
     const retry = (img: HTMLImageElement) => {
       const n = Number(img.dataset.retry || 0)
       if (n >= 2) return
