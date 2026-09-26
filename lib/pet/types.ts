@@ -80,8 +80,17 @@ export function normalizePet(raw: unknown): PetSettings | null {
   }
 }
 
-/** Idle-chatter base interval per frequency (minutes), jittered ±25% at runtime. */
-export const IDLE_MINUTES: Record<PetChattiness, number> = { low: 45, medium: 20, high: 8 }
+/**
+ * Idle-chatter base interval per frequency (minutes), jittered ±20% at
+ * runtime: 少 ≈ 2–3 h, 中 (default) ≈ 60–90 min, 多 ≈ 25–35 min. The owner
+ * wants the penguin to speak up only now and then (2026-09-27). Stored as
+ * the level name, so existing users on the default pick this up as-is.
+ */
+export const IDLE_MINUTES: Record<PetChattiness, number> = { low: 150, medium: 75, high: 30 }
+/** At most this many idle lines per day (per device), whatever the frequency. */
+export const IDLE_DAILY_CAP = 4
+/** Chance that completing a task gets a celebration line. */
+export const CELEBRATE_CHANCE = 1 / 3
 
 /**
  * Warm palette (DESIGN.md: hue 25–155, no cold blues/purples). `body` is a

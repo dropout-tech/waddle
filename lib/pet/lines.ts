@@ -14,6 +14,8 @@
  * {time} = minutes or a clock time, {title} = a meeting title.
  */
 
+import { JOKES_EN, JOKES_ZH } from './jokes'
+
 export type PetLineCategory =
   | 'absurd' // 荒謬獨白
   | 'joke' // 企鵝冷笑話
@@ -31,8 +33,9 @@ export type PetLineCategory =
 export interface PetLine {
   id: string
   cat: PetLineCategory
-  zh: string
-  en: string
+  /** Omitted = this line only exists in the other language (jokes). */
+  zh?: string
+  en?: string
 }
 
 const group = (cat: PetLineCategory, rows: Array<[string, string]>): PetLine[] =>
@@ -86,38 +89,9 @@ export const PET_LINES: PetLine[] = [
     ['有人說我走路搖搖擺擺，我說那叫風格。', 'Someone said I waddle. I call it style.'],
     ['我剛整理好我的羽毛，現在我是一隻很有條理的企鵝。', 'I just organized my feathers. I\'m a very organized penguin now.'],
   ]),
-  ...group('joke', [
-    ['企鵝最討厭哪一門課？熱力學。', 'What\'s a penguin\'s least favorite class? Thermodynamics.'],
-    ['企鵝為什麼穿燕尾服？因為隨時可能被邀去晚宴。', 'Why do penguins wear tuxedos? You never know when a gala will break out.'],
-    ['企鵝去看醫生，醫生說：「你太冷靜了。」', 'A penguin went to the doctor. Diagnosis: far too chill.'],
-    ['企鵝為什麼不跟北極熊玩？一個住南極、一個住北極，行程實在喬不攏。', 'Why don\'t penguins hang out with polar bears? Opposite poles. Scheduling nightmare.'],
-    ['企鵝怎麼打招呼？「冰」安！', 'How do penguins say hello? "Ice to meet you."'],
-    ['企鵝最喜歡星期幾？星期五，因為可以「魚」快一下。', 'A penguin\'s favorite day of the week? Fry-day.'],
-    ['企鵝為什麼不寫日記？因為每天都是「冰」凡的一天。', 'Why don\'t penguins keep diaries? Every entry says "cold, fish, nap."'],
-    ['企鵝為什麼當不了間諜？走到哪都穿正式服裝，太顯眼。', 'Why can\'t penguins be spies? They always show up in formal wear.'],
-    ['企鵝跌倒會說什麼？「我是故意的，這叫滑行。」', 'What does a penguin say after slipping? "I meant that. It\'s called gliding."'],
-    ['企鵝的偶像是誰？冰箱，因為它永遠保持冷靜。', 'Who\'s a penguin\'s idol? The fridge. It always keeps its cool.'],
-    ['企鵝為什麼會游泳？因為不會飛，總得有個嗜好。', 'Why do penguins swim? They can\'t fly, so they needed a hobby.'],
-    ['企鵝考試前說：「讓我冷靜一下。」然後牠就結冰了。', 'Before an exam a penguin said, "Let me cool down." Then it froze solid.'],
-    ['企鵝的車為什麼是黑白的？因為牠懶得選顏色。', 'Why is a penguin\'s car black and white? It couldn\'t be bothered to choose.'],
-    ['企鵝為什麼不去沙漠？牠查過了，那邊沒有冰塊外送。', 'Why don\'t penguins visit the desert? No ice delivery. They checked.'],
-    ['企鵝為什麼游那麼快？因為後面有人喊「有魚！」', 'Why do penguins swim so fast? Someone behind them yelled "FISH!"'],
-    ['企鵝的社群貼文都寫什麼？「今天也是黑白分明的一天。」', 'What do penguins post online? "Another black-and-white kind of day."'],
-    ['企鵝為什麼不怕上台？因為牠們天生就穿好正式服裝了。', 'Why aren\'t penguins nervous on stage? They were born dressed for it.'],
-    ['企鵝最常說的謊話？「我一點都不冷。」', 'A penguin\'s most common lie? "I\'m not even cold."'],
-    ['企鵝搬家最怕什麼？怕新家的冰箱不讓牠住進去。', 'What do penguins fear when moving? A new fridge that won\'t let them in.'],
-    ['企鵝怎麼形容熱天？「我正在慢慢變成企鵝湯。」', 'How do penguins describe a hot day? "I\'m slowly becoming penguin soup."'],
-    ['企鵝點飲料都說什麼？「去冰……開玩笑的，冰塊加冰塊。」', 'How does a penguin order a drink? "No ice... kidding. Extra ice. Ice on the side."'],
-    ['企鵝為什麼在雪地玩躲貓貓一定輸？因為一轉身就露出黑色的背。', 'Why do penguins lose at hide-and-seek in the snow? Their backs give them away.'],
-    ['企鵝最喜歡什麼樂器？鼓，因為牠們很會拍（鰭）。', 'What instrument do penguins play? Flipper bongos.'],
-    ['企鵝為什麼不網購？因為購物車在冰上一直滑走。', 'Why don\'t penguins shop online? They keep sliding past checkout.'],
-    ['企鵝為什麼都講短話？講太久舌頭會結冰。', 'Why do penguins keep it short? Talk too long and your tongue freezes.'],
-    ['企鵝的電腦為什麼不會過熱？因為散熱一流，廢話。', 'Why don\'t penguin computers overheat? Excellent cooling. Obviously.'],
-    ['企鵝最喜歡的甜點？冰淇淋。第二喜歡？更多冰淇淋。', 'A penguin\'s favorite dessert? Ice cream. Second favorite? More ice cream.'],
-    ['企鵝上班遲到的理由？「路上塞企鵝。」', 'A penguin\'s excuse for being late? "Penguin traffic."'],
-    ['企鵝為什麼不撐雨傘？牠們覺得雨只是比較溫柔的海。', 'Why don\'t penguins use umbrellas? Rain is just a gentler ocean.'],
-    ['企鵝最怕哪種天氣預報？「晴時多雲偶熱浪」。', 'Which forecast do penguins dread? "Sunny with a chance of heatwave."'],
-  ]),
+  // Jokes are puns written natively per language — see lib/pet/jokes.ts.
+  ...JOKES_ZH.map((zh, i): PetLine => ({ id: `joke-zh-${i + 1}`, cat: 'joke', zh })),
+  ...JOKES_EN.map((en, i): PetLine => ({ id: `joke-en-${i + 1}`, cat: 'joke', en })),
   ...group('work', [
     ['我幫你把待辦清單看過一遍了，它們看起來都很想被完成。', 'I looked over your to-do list. They all seem eager to be done.'],
     ['開會小技巧：如果大家都不說話，就說「呱」。效果我還在研究。', 'Meeting tip: if everyone\'s silent, say "honk." Results pending.'],
@@ -292,7 +266,7 @@ export function linesOf(cat: PetLineCategory): PetLine[] {
 
 /** Fill {placeholders}; unknown keys are left as-is. */
 export function renderLine(line: PetLine, lang: 'zh-TW' | 'en', vars: Record<string, string | number> = {}): string {
-  const text = lang === 'en' ? line.en : line.zh
+  const text = (lang === 'en' ? line.en ?? line.zh : line.zh ?? line.en) ?? ''
   return text.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m))
 }
 
@@ -322,14 +296,14 @@ function writeRecent(map: Record<string, number>) {
 }
 
 /**
- * Pick a line from `cats` (weighted by how many lines each category has)
+ * Pick a line in `lang` from `cats` (weighted by how many lines each category has)
  * that hasn't been said in the last 24 hours on this device. When every
  * candidate was used, the least recently used one wins. Records the pick.
  */
-export function pickLine(cats: PetLineCategory[], rand: () => number = Math.random): PetLine {
+export function pickLine(cats: PetLineCategory[], lang: 'zh-TW' | 'en', rand: () => number = Math.random): PetLine {
   const now = Date.now()
   const recent = typeof window === 'undefined' ? {} : readRecent(now)
-  const pool = PET_LINES.filter((l) => cats.includes(l.cat))
+  const pool = PET_LINES.filter((l) => cats.includes(l.cat) && (lang === 'en' ? l.en : l.zh))
   const fresh = pool.filter((l) => !(l.id in recent))
   const line = fresh.length > 0
     ? fresh[Math.floor(rand() * fresh.length)]

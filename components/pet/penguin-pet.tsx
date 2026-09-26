@@ -10,7 +10,7 @@ import { isTaskOverdue } from '@/lib/task-utils'
 import { toDateString } from '@/lib/calendar-utils'
 import { pickLine, renderLine, type PetLineCategory } from '@/lib/pet/lines'
 import { isPetMuted, localDate, readPetLocal, writePetLocal } from '@/lib/pet/local'
-import { IDLE_MINUTES, type PetSettings } from '@/lib/pet/types'
+import { CELEBRATE_CHANCE, IDLE_DAILY_CAP, IDLE_MINUTES, type PetSettings } from '@/lib/pet/types'
 import type { Workspace } from '@/lib/types'
 import { PetSprite, type PetPose } from './pet-sprite'
 import { PetAdoptCard } from './pet-adopt-card'
@@ -20,7 +20,6 @@ type Act = '' | 'hop' | 'jump' | 'spin' | 'shy' | 'walk'
 
 const TICK_MS = 30_000
 const MIN_GAP_MS = 45_000 // never two automatic lines closer than this
-const OVERDUE_GAP_MS = 4 * 60 * 60 * 1000
 const MEETING_LEAD_MS = 10 * 60 * 1000
 const COMBO_MS = 1300
 const LONG_PRESS_MS = 500
@@ -37,7 +36,9 @@ const CONTROL_SELECTOR =
  * input, tab… Probed on a grid finer than the smallest icon button.
  */
 function usePetYield(active: boolean, ref: React.RefObject<HTMLElement | null>, deps: unknown) {
-  const [blocked, setBlocked] = useState(false)
+  // Starts blocked: the penguin stays invisible until a check has proven its
+  // spot free (no flash of a penguin sitting on a button on first paint).
+  const [blocked, setBlocked] = useState(true)
   useEffect(() => {
     if (!active) return
     let raf = 0
@@ -61,7 +62,7 @@ function usePetYield(active: boolean, ref: React.RefObject<HTMLElement | null>, 
       setBlocked(hit)
     }
     const schedule = () => { if (!raf) raf = requestAnimationFrame(check) }
-    schedule()
+    check() // synchronously on (re)position, not a frame later
     const poll = window.setInterval(schedule, 500)
     document.addEventListener('scroll', schedule, { capture: true, passive: true })
     window.addEventListener('resize', schedule)
@@ -245,7 +246,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
 
   const line = useCallback(
     (cats: PetLineCategory[], vars: Record<string, string | number> = {}) =>
-      renderLine(pickLine(cats), lang, { name: petRef.current.name, ...vars }),
+      renderLine(pickLine(cats, lang), lang, { name: petRef.current.name, ...vars }),
     [lang],
   )
 
@@ -332,6 +333,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
     for (const id of completedIds) if (!prev.has(id)) { fresh = true; break }
     if (!fresh || Date.now() - lastCelebrate.current < 60_000) return
     if (!shown || quiet || menuOpen || isPetMuted()) return
+    if (Math.random() >= CELEBRATE_CHANCE) return // only now and then
     lastCelebrate.current = Date.now()
     say(line(['celebrate']), { auto: true, act: 'jump' })
   }, [completedIds, workspaces.length, shown, quiet, menuOpen, say, line])
@@ -351,7 +353,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   useEffect(() => {
     if (pageHidden) return
     const base = IDLE_MINUTES[pet.chattiness] * 60_000
-    const jitter = () => base * (0.75 + Math.random() * 0.5)
+    const jitter = () => base * (0.8 + Math.random() * 0.4)
     if (!nextIdleAt.current) nextIdleAt.current = Date.now() + jitter() * 0.5
 
     let checkInBusy = false
@@ -361,14 +363,15 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
       const nowMs = now.getTime()
       const local = readPetLocal()
 
-      // 1) meeting within 10 minutes — a real reminder.
-      for (const m of collectMeetings(workspaces)) {
+      const today = localDate(now)
+
+      // 1) meeting within 10 minutes — a real reminder, once a day.
+      for (const m of local.meetingNudged === today ? [] : collectMeetings(workspaces)) {
         const start = meetingStartAsDate(m)
         if (!start) continue
         const until = start.getTime() - nowMs
-        const key = `${m.id}@${m.scheduledDate}T${m.scheduledStartTime}`
-        if (until > 0 && until <= MEETING_LEAD_MS && !(local.meetingsNudged ?? []).includes(key)) {
-          writePetLocal({ meetingsNudged: [...(local.meetingsNudged ?? []), key].slice(-50) })
+        if (until > 0 && until <= MEETING_LEAD_MS) {
+          writePetLocal({ meetingNudged: today })
           say(line(['meeting'], { title: m.title, time: Math.max(1, Math.ceil(until / 60_000)) }), { auto: true, act: 'jump' })
           return
         }
@@ -386,7 +389,6 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
       }
 
       // 3) evening check-in nudge — once per day, only if actually not checked in.
-      const today = localDate(now)
       if (hour >= 18 && hour < 23 && local.checkInNudged !== today && !checkInBusy) {
         checkInBusy = true
         writePetLocal({ checkInNudged: today })
@@ -403,22 +405,26 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
         }
       }
 
-      // 4) overdue tasks — at most every 4 hours, not in the first minute.
-      if (overdueCount > 0 && nowMs - mountedAt.current > 60_000 && nowMs - (local.overdueNudgedAt ?? 0) > OVERDUE_GAP_MS) {
-        writePetLocal({ overdueNudgedAt: nowMs })
+      // 4) overdue tasks — once a day, not in the first minute.
+      if (overdueCount > 0 && nowMs - mountedAt.current > 60_000 && local.overdueNudged !== today) {
+        writePetLocal({ overdueNudged: today })
         say(line(['overdue'], { count: overdueCount }), { auto: true })
         return
       }
 
-      // 5) idle chatter: ~40% tips, ~40% absurd/jokes, ~20% real reminder.
+      // 5) idle chatter (capped per day): ~40% tips, ~40% absurd/jokes,
+      //    ~20% a real reminder when one applies.
       if (nowMs >= nextIdleAt.current) {
         nextIdleAt.current = nowMs + jitter()
+        const used = local.idleDate === today ? local.idleCount ?? 0 : 0
+        if (used >= IDLE_DAILY_CAP) return
+        writePetLocal({ idleDate: today, idleCount: used + 1 })
         const r = Math.random()
         if (isNightHour(hour) && r < 0.5) return say(line(['night'], { time: clock(now) }), { auto: true })
         if (r < 0.4) return say(line(['tip']), { auto: true })
         if (r < 0.8) return say(line(['absurd', 'joke', 'work']), { auto: true })
-        if (overdueCount > 0) {
-          writePetLocal({ overdueNudgedAt: nowMs })
+        if (overdueCount > 0 && local.overdueNudged !== today) {
+          writePetLocal({ overdueNudged: today })
           return say(line(['overdue'], { count: overdueCount }), { auto: true })
         }
         return say(line(['tip', 'absurd']), { auto: true })

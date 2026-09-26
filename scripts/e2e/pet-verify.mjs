@@ -180,7 +180,12 @@ try {
   await page.waitForTimeout(350); await page.screenshot({ path: `${SHOTS}/1440-adopt-filled.png` })
   await card.locator('[data-pet-adopt-confirm]').click()
   await card.waitFor({ state: 'detached' })
-  const petWrite = writes.find((w) => w.path.endsWith('/user_settings') && w.body?.notifications?.pet)
+  // The upsert leaves after the card closes (optimistic UI) — wait for it.
+  let petWrite
+  for (let i = 0; i < 50 && !petWrite; i++) {
+    petWrite = writes.find((w) => w.path.endsWith('/user_settings') && w.body?.notifications?.pet)
+    if (!petWrite) await page.waitForTimeout(100)
+  }
   assert(petWrite, 'adoption was sent as a user_settings write (intercepted)')
   const saved = petWrite.body.notifications.pet
   assert.equal(saved.name, '豆豆'); assert.equal(saved.color, 'terracotta'); assert.equal(saved.accessory, 'hat'); assert.equal(saved.adopted, true)
@@ -233,9 +238,9 @@ try {
   for (let i = 0; i < 100; i++) { await page.clock.runFor(30_000); if (await bubble.count()) autoWhileMuted++ }
   assert.equal(autoWhileMuted, 0, 'no automatic line while muted')
   ok('安靜 1 小時生效', '靜音期間快轉 50 分鐘，0 次自動說話')
-  // Mute expires after the hour → idle chatter comes back.
+  // Mute expires after the hour → it speaks again (a once-a-day reminder or idle chatter).
   let spoke = ''
-  for (let i = 0; i < 120 && !spoke; i++) { await page.clock.runFor(30_000); if (await bubble.count()) spoke = await bubbleText(page) }
+  for (let i = 0; i < 240 && !spoke; i++) { await page.clock.runFor(30_000); if (await bubble.count()) spoke = await bubbleText(page) }
   assert(spoke, 'speaks again after the hour')
   ok('一小時後恢復自動說話', spoke)
   await pressOutside(page)
@@ -257,13 +262,15 @@ try {
   await page.clock.runFor(600)
   assert.equal(await page.locator('[data-pet]').evaluate((el) => getComputedStyle(el).display), 'none', 'pet steps aside while a modal is open')
   const before = writes.length
+  assert.equal(await section.locator('[data-pet-chattiness="medium"]').innerText(), '中（約 1–1.5 小時）')
+  assert.equal(await section.locator('[data-pet-chattiness="medium"]').getAttribute('aria-checked'), 'true', 'default = 中')
   await section.locator('[data-pet-chattiness="high"]').click()
   let w
   for (let i = 0; i < 50 && !w; i++) { await page.waitForTimeout(100); w = writes.slice(before).find((x) => x.body?.notifications?.pet) }
   assert.equal(w?.body.notifications.pet.chattiness, 'high')
   await section.scrollIntoViewIfNeeded()
   await page.waitForTimeout(350); await page.screenshot({ path: `${SHOTS}/1440-settings.png` })
-  ok('設定頁企鵝區', '改頻率=多 → 寫入被攔截；modal 開啟時企鵝隱藏')
+  ok('設定頁企鵝區', '預設=中（約 1–1.5 小時）；改頻率=多 → 寫入被攔截；modal 開啟時企鵝隱藏')
   await page.keyboard.press('Escape')
   if (errors.length) console.log('page errors:', errors)
   await desk.close()

@@ -7,9 +7,9 @@ import { cleanPetName, defaultPet, petNameLength, PET_CHATTINESS, PET_NAME_MAX, 
 import { PetEditor, type PetLook } from './pet-editor'
 
 const CHATTY_LABEL: Record<PetChattiness, { zh: string; en: string }> = {
-  low: { zh: '少（約 45 分鐘）', en: 'Rarely (~45 min)' },
-  medium: { zh: '中（約 20 分鐘）', en: 'Sometimes (~20 min)' },
-  high: { zh: '多（約 8 分鐘）', en: 'Often (~8 min)' },
+  low: { zh: '少（約 2–3 小時）', en: 'Rarely (~2–3 h)' },
+  medium: { zh: '中（約 1–1.5 小時）', en: 'Sometimes (~1–1.5 h)' },
+  high: { zh: '多（約 30 分鐘）', en: 'Often (~30 min)' },
 }
 
 /**

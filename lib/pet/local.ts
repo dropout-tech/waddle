@@ -13,10 +13,13 @@ export interface PetLocalState {
   /** Local YYYY-MM-DD stamps so once-a-day nudges stay once a day. */
   checkInNudged?: string
   nightNudged?: string
-  /** Epoch ms of the last overdue nudge (≥4h apart). */
-  overdueNudgedAt?: number
-  /** Meeting ids already announced (pruned to the last 50). */
-  meetingsNudged?: string[]
+  /** Local YYYY-MM-DD of the last overdue nudge (once a day). */
+  overdueNudged?: string
+  /** Local YYYY-MM-DD of the last meeting nudge (once a day). */
+  meetingNudged?: string
+  /** Idle chatter budget: how many idle lines were said on `idleDate`. */
+  idleDate?: string
+  idleCount?: number
   /** Epoch ms of the last automatic line of any kind. */
   lastSpokeAt?: number
   /** Adoption card dismissed without deciding ("稍後") — local YYYY-MM-DD. */

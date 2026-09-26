@@ -17,6 +17,10 @@ const BODY = '#555549'
  * (162,82)); the accessory sits outside the filter so it keeps its colour.
  * Pure presentation — animation state arrives as data attributes that
  * pet.module.css keys off.
+ *
+ * The penguin has NO mouth (owner rule). Only the closed-beak `stand` and
+ * `sleep` art is used; every reaction (talking, jump, spin, shy) is a
+ * transform + blink/blush overlay on those — never an open-mouth pose.
  */
 export function PetSprite({
   color,
