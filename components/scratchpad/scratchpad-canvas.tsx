@@ -7,6 +7,7 @@ import type { ScratchpadItem } from '@/lib/types'
 import { canvasGeometry, type CanvasGeometry } from '@/lib/scratchpad-canvas'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
+import { createPortal } from 'react-dom'
 import { WhiteboardDetail } from './whiteboard-detail'
 import { createChecklistDocument, getWhiteboardDocument, hasWhiteboardDocument, replaceWhiteboardSourceLink, whiteboardChecklistSummary, whiteboardDocumentText } from '@/lib/whiteboard-document'
 
@@ -56,7 +57,41 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
   const [selected, setSelected] = useState<string | null>(null)
   const [pen, setPen] = useState(false)
   const [stroke, setStroke] = useState<Point[]>([])
-  const [expanded, setExpanded] = useState(false)
+  // Full screen: the Fullscreen API where available (desktop browsers, Electron);
+  // otherwise (iPhone Safari, Capacitor iOS) a viewport overlay portalled to
+  // <body> above every floating widget. Both look and behave the same.
+  const [full, setFull] = useState<'native' | 'overlay' | null>(null)
+  const [sectionEl, setSectionEl] = useState<HTMLElement | null>(null)
+  const enterFull = () => {
+    const el = sectionEl
+    if (el && document.fullscreenEnabled && typeof el.requestFullscreen === 'function') {
+      el.requestFullscreen().catch(() => setFull('overlay'))
+    } else setFull('overlay')
+  }
+  const exitFull = () => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+    setFull(null)
+  }
+  useEffect(() => {
+    const sync = () => setFull(current => document.fullscreenElement && document.fullscreenElement === sectionEl ? 'native' : current === 'native' ? null : current)
+    document.addEventListener('fullscreenchange', sync)
+    return () => document.removeEventListener('fullscreenchange', sync)
+  }, [sectionEl])
+  useEffect(() => {
+    if (!full) return
+    // Capture phase: runs before FocusScratchpad's window listener, so Escape
+    // leaves full screen instead of closing the whiteboard. Escape typed in an
+    // editor or dialog is left alone (it cancels the draft / closes the dialog).
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
+      if ((event.target as Element | null)?.closest?.('textarea,input,[contenteditable="true"],[role="dialog"]')) return
+      event.preventDefault(); event.stopPropagation()
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+      setFull(null)
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [full])
   const [help, setHelp] = useState(false)
   const [editor, setEditorState] = useState<CanvasEditor | null>(null)
   const editorRef = useRef<CanvasEditor | null>(null)
@@ -276,8 +311,10 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
     {editor.type === 'link' && <input aria-label={t('連結標題')} placeholder={t('連結標題（選填）')} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-base" value={editor.title} onChange={e => { const current = editorRef.current; if (current) setEditor({ ...current, title: e.target.value }) }}/>}
     <div className="flex shrink-0 items-center justify-between gap-1 text-xs text-muted-foreground/70"><span>{t('點空白處儲存')}</span><button type="button" className={button} onPointerDown={e => e.preventDefault()} onClick={() => { setEditor(null); setError(''); viewport.current?.focus() }}>{t('取消')}</button></div>
   </form>
-  const fullScreen = fillHeight && expanded
-  return <section className={cn('min-w-0', fillHeight && 'flex min-h-0 flex-1 flex-col', fullScreen && 'fixed inset-0 z-modal bg-background px-3 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]')} data-pet-hide={fullScreen ? '' : undefined} aria-label={t('白板')}>
+  const fills = fillHeight || !!full
+  const content = <section ref={setSectionEl} data-testid="whiteboard-section" data-fullscreen={full ?? undefined} data-pet-hide={full ? '' : undefined}
+    className={cn('min-w-0', fills && 'flex min-h-0 flex-1 flex-col', full && 'fixed inset-0 bg-background px-3 pb-[env(safe-area-inset-bottom)] pt-[max(env(safe-area-inset-top),0.5rem)] md:px-6')}
+    style={full === 'overlay' ? { zIndex: 2147483000 } : undefined} aria-label={t('白板')}>
     <div className="mb-1 flex flex-wrap items-center gap-x-1 md:mb-2">
       <h3 className="mr-1 shrink-0 font-medium max-md:sr-only">{t('白板')}</h3>
       {!readOnly && <div role="toolbar" className="flex min-w-0 flex-nowrap items-center md:flex-wrap md:gap-1" aria-label={t('畫布工具')}>
@@ -290,12 +327,12 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
       </div>}
       <div className="ml-auto flex shrink-0 items-center">
         <button type="button" className={cn(button, 'text-muted-foreground', help && 'bg-muted text-foreground')} aria-label={t('白板使用說明')} title={t('白板使用說明')} aria-expanded={help} onClick={() => setHelp(!help)}><CircleHelp size={18}/></button>
-        <button type="button" className={cn(button, 'text-muted-foreground')} aria-label={fillHeight ? (expanded ? t('結束全螢幕') : t('全螢幕白板')) : expanded ? t('縮小畫布區域') : t('放大畫布區域')} onClick={() => setExpanded(!expanded)}>{expanded ? <Minimize2 size={18}/> : <Maximize2 size={18}/>}</button>
+        <button type="button" className={cn(button, 'text-muted-foreground')} aria-label={full ? t('結束全螢幕') : t('全螢幕白板')} title={full ? t('結束全螢幕') : t('全螢幕白板')} aria-pressed={!!full} onClick={() => full ? exitFull() : enterFull()}>{full ? <Minimize2 size={18}/> : <Maximize2 size={18}/>}</button>
       </div>
     </div>
     {help && <p className="mb-1 text-xs text-muted-foreground">{t('按兩下空白處寫字；開啟內容可使用記事本編輯工具。')}</p>}
     {error && <p role="alert" className="mb-2 text-sm text-destructive">{error}</p>}
-    <div ref={viewport} data-testid="scratchpad-canvas" className={cn('relative isolate w-full touch-none overflow-hidden rounded-xl border border-border bg-secondary/30 max-md:-mx-3 sm:max-md:-mx-4 max-md:w-auto max-md:rounded-none max-md:border-0 max-md:bg-transparent', fillHeight && 'min-h-0 flex-1', pen ? 'cursor-crosshair' : 'cursor-grab')} style={{ ...(fillHeight ? {} : { height: expanded ? '80dvh' : 'min(65dvh, 720px)' }), minHeight: 320, backgroundImage: 'radial-gradient(var(--border) 1px, transparent 1px)', backgroundSize: `${24 * view.zoom}px ${24 * view.zoom}px`, backgroundPosition: `${view.x}px ${view.y}px` }}
+    <div ref={viewport} data-testid="scratchpad-canvas" className={cn('relative isolate w-full touch-none overflow-hidden rounded-xl border border-border bg-secondary/30 max-md:-mx-3 sm:max-md:-mx-4 max-md:w-auto max-md:rounded-none max-md:border-0 max-md:bg-transparent', fills && 'min-h-0 flex-1', pen ? 'cursor-crosshair' : 'cursor-grab')} style={{ ...(fills ? {} : { height: 'min(65dvh, 720px)' }), minHeight: 320, backgroundImage: 'radial-gradient(var(--border) 1px, transparent 1px)', backgroundSize: `${24 * view.zoom}px ${24 * view.zoom}px`, backgroundPosition: `${view.x}px ${view.y}px` }}
       onPointerDown={e => { if (e.target === e.currentTarget && saveEditor()) start(e, pen && !readOnly ? 'draw' : 'pan') }} onPointerMove={move} onPointerUp={() => finish()} onPointerCancel={() => finish(true)}
       onDoubleClick={e => { if (e.target === e.currentTarget && !pen) beginEditor('text', world(e.clientX, e.clientY)) }}
       onPaste={e => { const file = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'))?.getAsFile(); if (file) { e.stopPropagation(); e.preventDefault(); image(file) } }}
@@ -344,6 +381,7 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
       {selectedItem && !readOnly && !editor && <button type="button" className={cn(button, 'absolute bottom-2 left-2 z-panel rounded-full border border-border/60 bg-background/85 text-muted-foreground backdrop-blur-sm max-md:left-3')} aria-label={t('刪除選取的畫布卡片')} onClick={() => { if (window.confirm(t('確定刪除這張畫布卡片？'))) { onDeleteItem(selectedItem.id); setSelected(null) } }}><Trash2 size={16}/></button>}
       {!items.length && !stroke.length && !editor && <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">{readOnly ? t('這天還沒有白板內容') : pen ? t('在空白處開始畫圖') : t('按兩下這裡直接寫字，或點「文字」開始。')}</div>}
     </div>
-    {detailItem && <WhiteboardDetail key={detailItem.id} item={detailItem} readOnly={readOnly} onUpdateItem={onUpdateItem} onClose={() => setDetailId(null)}/>}
+    {detailItem && <WhiteboardDetail key={detailItem.id} item={detailItem} readOnly={readOnly} onUpdateItem={onUpdateItem} onClose={() => setDetailId(null)} container={full ? sectionEl : undefined}/>}
   </section>
+  return full === 'overlay' ? createPortal(content, document.body) : content
 }

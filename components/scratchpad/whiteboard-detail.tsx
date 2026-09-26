@@ -15,10 +15,12 @@ interface WhiteboardDetailProps {
   readOnly: boolean
   onUpdateItem: (id: string, patch: Partial<ScratchpadItem>) => void
   onClose: () => void
+  /** Render inside this element (the full-screen whiteboard) instead of <body>. */
+  container?: HTMLElement | null
 }
 
 /** A document view of the same whiteboard record; never creates a notebook note. */
-export function WhiteboardDetail({ item, readOnly, onUpdateItem, onClose }: WhiteboardDetailProps) {
+export function WhiteboardDetail({ item, readOnly, onUpdateItem, onClose, container }: WhiteboardDetailProps) {
   const { t } = useI18n()
   const latest = useRef({ item, readOnly, onUpdateItem })
   useLayoutEffect(() => { latest.current = { item, readOnly, onUpdateItem } }, [item, readOnly, onUpdateItem])
@@ -67,7 +69,7 @@ export function WhiteboardDetail({ item, readOnly, onUpdateItem, onClose }: Whit
 
   return (
     <Dialog open onOpenChange={open => { if (!open) close() }}>
-      <DialogPortal>
+      <DialogPortal container={container ?? undefined}>
         <DialogOverlay style={{ zIndex: 'calc(var(--z-index-toast) + 1)' }} />
       <DialogPrimitive.Content
         data-whiteboard-detail
