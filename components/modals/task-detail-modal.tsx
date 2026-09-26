@@ -296,6 +296,7 @@ export function TaskDetailModal({
             )}
             <button
               onClick={onClose}
+              aria-label={t('關閉')}
               className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
             >
               <X className="w-5 h-5 text-muted-foreground" />

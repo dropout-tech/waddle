@@ -36,7 +36,8 @@ struct CompleteTask:AppIntent {
     init(_ id:String,_ account:String,_ epoch:String){taskId=id;accountId=account;self.epoch=epoch}
     func perform() async throws -> some IntentResult {try WidgetStore.complete(taskId:taskId,accountId:accountId,epoch:epoch);WidgetCenter.shared.reloadAllTimelines();return .result()}
 }
-struct Entry:TimelineEntry {var date:Date;var configuration:Configuration;var snapshot:Snapshot?;var pending:Set<String>}
+enum EmptyReason {case signedOut,awaitingSync,sharingUnavailable}
+struct Entry:TimelineEntry {var date:Date;var configuration:Configuration;var snapshot:Snapshot?;var pending:Set<String>;var emptyReason:EmptyReason = .signedOut}
 struct Provider:AppIntentTimelineProvider {
     func placeholder(in context:Context)->Entry {Entry(date:Date(),configuration:Configuration(),snapshot:nil,pending:[])}
     func snapshot(for configuration:Configuration,in context:Context) async -> Entry {read(configuration)}
@@ -47,7 +48,11 @@ struct Provider:AppIntentTimelineProvider {
         let state=WidgetStore.read()
         let snapshot=(state["snapshot"] as? [String:Any]).flatMap{try? JSONSerialization.data(withJSONObject:$0)}.flatMap{try? JSONDecoder().decode(Snapshot.self,from:$0)}
         let actions=state["actions"] as? [[String:Any]] ?? []
-        return Entry(date:Date(),configuration:config,snapshot:snapshot,pending:Set(actions.compactMap{$0["taskId"] as? String}))
+        // Why there is nothing to show: no shared container at all (App Group
+        // not provisioned), signed in but the app has not published yet, or
+        // simply signed out. Each gets its own hint instead of a blank card.
+        let reason:EmptyReason = !WidgetStore.isAvailable ? .sharingUnavailable : ((state["accountId"] as? String ?? "").isEmpty ? .signedOut : .awaitingSync)
+        return Entry(date:Date(),configuration:config,snapshot:snapshot,pending:Set(actions.compactMap{$0["taskId"] as? String}),emptyReason:reason)
     }
 }
 struct WidgetView:View {
@@ -59,6 +64,8 @@ struct WidgetView:View {
     var paper:Color{scheme == .dark ? Color(red:0.16,green:0.16,blue:0.14):Color(red:0.99,green:0.98,blue:0.94)}
     let clay=Color(red:0.69,green:0.31,blue:0.22)
     var limit:Int{family == .systemLarge ? 5:family == .systemMedium ? 3:2}
+    var emptyTitle:String{switch entry.emptyReason {case .signedOut:"開啟 Huddle 登入";case .awaitingSync:"請開啟 Huddle 同步";case .sharingUnavailable:"小工具暫時無法同步"}}
+    var emptyHint:String{switch entry.emptyReason {case .signedOut:"讓今天的安排來到手邊";case .awaitingSync:"打開 App 一次，資料就會出現";case .sharingUnavailable:"此安裝版本未開啟資料共享（App Group）"}}
     func url(_ k:Kind,_ item:Item?=nil)->URL {
         var u=URLComponents();u.scheme="huddle";u.host="widget";u.path="/"+k.rawValue
         var q=[URLQueryItem(name:"accountId",value:entry.snapshot?.accountId),URLQueryItem(name:"epoch",value:entry.snapshot?.epoch)]
@@ -76,7 +83,7 @@ struct WidgetView:View {
                     Spacer(minLength:0)
                     HStack(spacing:3){Image(systemName:"clock");Text(entry.pending.isEmpty ? "更新 \(String(s.generatedAt.prefix(10)))":"待同步 · 開啟 Huddle")}.font(.system(size:9)).foregroundStyle(ink.opacity(0.7)).lineLimit(1)
                 }.foregroundStyle(ink).widgetURL(url(kind)).privacySensitive()
-            } else {Link(destination:url(kind)){VStack(spacing:8){Image("Huddle").resizable().scaledToFit().frame(width:55,height:55);Text("開啟 Huddle 登入").font(.caption);Text("讓今天的安排來到手邊").font(.caption2)}}}
+            } else {Link(destination:url(kind)){VStack(spacing:8){Image("Huddle").resizable().scaledToFit().frame(width:55,height:55);Text(emptyTitle).font(.caption).multilineTextAlignment(.center);Text(emptyHint).font(.caption2).multilineTextAlignment(.center).foregroundStyle(ink.opacity(0.7))}.foregroundStyle(ink)}}
         }.containerBackground(paper,for:.widget)
     }
     @ViewBuilder func content(_ s:Snapshot)->some View {

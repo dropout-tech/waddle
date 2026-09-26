@@ -37,7 +37,7 @@ interface TourStep {
 const DESKTOP_STEPS: TourStep[] = [
   {
     title: '歡迎來到 Huddle',
-    body: '整合任務、時間排程、專注計時、日記反思的工作面板。慢慢搖擺，把事情做完。90 秒帶你走過。',
+    body: '整合任務、時間排程、專注計時、日記反思的工作面板。90 秒帶你走過。',
   },
   {
     target: '[data-tour="left-panel"]',
@@ -76,7 +76,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="calendar-panel"]',
     title: '🤚 拖曳就是排程',
-    body: '把任務拖到時間軸 = 排時間。從時間軸拖回上方待排程 = 取消時間（日期保留）。每週循環的任務拖到別的時間時，Huddle 會問你：只改這一天、改這天與之後、還是改所有循環 — 像 Google 日曆一樣自由。',
+    body: '把任務拖到時間軸 = 排時間。從時間軸拖回上方待排程 = 取消時間（日期保留）。在時間軸空白處點兩下，就直接在那個時段建立任務。每週循環的任務拖到別的時間時，Huddle 會問你：只改這一天、改這天與之後、還是改所有循環 — 像 Google 日曆一樣自由。',
     placement: 'left',
     padding: 0,
   },
@@ -166,7 +166,7 @@ const DESKTOP_STEPS: TourStep[] = [
 const MOBILE_STEPS: TourStep[] = [
   {
     title: '歡迎來到 Huddle',
-    body: '整合任務、時間排程、專注計時、日記反思的工作面板。慢慢搖擺，把事情做完。',
+    body: '整合任務、時間排程、專注計時、日記反思的工作面板。',
   },
   {
     target: '[data-tour="left-panel"]',
@@ -208,11 +208,18 @@ const MOBILE_STEPS: TourStep[] = [
     padding: 0,
   },
   {
-    target: '[data-tour="notification-center"]',
-    title: '通知中心',
-    body: '上方鈴鐺集中放 Huddle 要跟你說的事：已逾期、快到期、放太久沒動的任務。有事情時會出現數字小標，看完可以逐則關掉。',
+    target: '[data-tour="mobile-more"]',
+    title: '通知、帳號都在「⋯」',
+    body: '右上角「⋯」收著通知中心、帳號、共享對象與記事本等工具。有新通知時「⋯」會出現數字小標，點開選「通知」查看。',
     placement: 'bottom',
     padding: 4,
+  },
+  {
+    target: '[data-tour="mobile-add-task"]',
+    title: '＋ 新增任務',
+    body: '日曆右下角的「＋」隨時新增任務；在時間軸空白處點兩下，也能直接在那個時段建立任務。',
+    placement: 'top',
+    padding: 6,
   },
   {
     title: '✨ 底部四分頁',

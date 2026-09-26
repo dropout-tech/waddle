@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, NotebookPen, BarChart3, Settings, Sparkles, MoreHorizontal, Download, Users } from 'lucide-react'
+import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, NotebookPen, BarChart3, Settings, Sparkles, MoreHorizontal, Download, Users, Bell, CircleUser, Eye, EyeOff } from 'lucide-react'
 import { UndoRedoButtons } from '@/components/undo-redo-buttons'
 import {
   DropdownMenu,
@@ -98,6 +98,16 @@ export function CalendarHeader({
   // Independent view-mode picker on mobile: tap a single button to pick 日 / 週 / 月.
   const [viewPickerOpen, setViewPickerOpen] = useState(false)
   const viewPickerRef = useRef<HTMLDivElement>(null)
+  // Mobile: bell / avatar / peer chips live inside the ⋯ menu so the date
+  // title never gets truncated. These drive the (trigger-less) panels.
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [notifCount, setNotifCount] = useState(0)
+  const [notifHigh, setNotifHigh] = useState(false)
+  const handleNotifCount = useCallback((n: number, high: boolean) => {
+    setNotifCount(n)
+    setNotifHigh(high)
+  }, [])
 
   useEffect(() => {
     if (!overflowOpen && !viewPickerOpen) return
@@ -141,7 +151,7 @@ export function CalendarHeader({
       const wd = ['日', '一', '二', '三', '四', '五', '六'][selectedDate.getDay()]
       return `${selectedDate.getMonth() + 1}/${selectedDate.getDate()} 週${wd}`
     }
-    if (lang === 'en') return format(selectedDate, 'MMMM yyyy')
+    if (lang === 'en') return format(selectedDate, isMobile ? 'MMM yyyy' : 'MMMM yyyy')
     return `${selectedDate.getFullYear()}年 ${selectedDate.getMonth() + 1}月`
   }
 
@@ -210,7 +220,7 @@ export function CalendarHeader({
           <span
             className={cn(
               'px-1 truncate',
-              isMobile ? 'text-[15px] font-semibold' : 'text-sm md:font-medium'
+              isMobile ? 'text-[15px] font-semibold whitespace-nowrap' : 'text-sm md:font-medium'
             )}
             aria-live="polite"
           >
@@ -306,7 +316,8 @@ export function CalendarHeader({
             onClick={onTodayClick}
             aria-label={isToday() ? t('已是今天') : t('回到今天')}
             className={cn(
-              'text-xs font-medium rounded-lg h-8 border-border transition-colors',
+              'text-xs font-medium rounded-lg border-border transition-colors',
+              isMobile ? 'h-11 px-3' : 'h-8',
               isToday() && 'text-muted-foreground'
             )}
           >
@@ -317,14 +328,13 @@ export function CalendarHeader({
             <TodayProgressRing workspaces={workspaces || []} />
           </div>
 
-          <NotificationCenter
-            workspaces={workspaces || []}
-            onTaskClick={onTaskClick}
-            onReviewOverdue={onOpenOverdueReview}
-          />
-
-          {/* Inline UserMenu on mobile (replaces the floating one) */}
-          {isMobile && <UserMenu className="relative" />}
+          {!isMobile && (
+            <NotificationCenter
+              workspaces={workspaces || []}
+              onTaskClick={onTaskClick}
+              onReviewOverdue={onOpenOverdueReview}
+            />
+          )}
 
           {/* Mobile-only overflow menu. Keep the permanent desktop hierarchy,
               but adapt it to one touch-safe menu instead of squeezing five
@@ -333,28 +343,114 @@ export function CalendarHeader({
             <div className="relative" ref={overflowRef}>
               <button
                 type="button"
+                data-tour="mobile-more"
                 onClick={() => setOverflowOpen(v => !v)}
-                aria-label={t('更多')}
+                aria-label={notifCount > 0 ? t('更多（{n} 則通知）', { n: notifCount }) : t('更多')}
                 aria-expanded={overflowOpen}
-                className="flex items-center justify-center w-11 h-11 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="relative flex items-center justify-center w-11 h-11 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
+                <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
+                {notifCount > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full text-[9px] font-bold text-white',
+                      notifHigh ? 'bg-urgency-critical' : 'bg-urgency-high',
+                    )}
+                  >
+                    {notifCount > 9 ? '9+' : notifCount}
+                  </span>
+                )}
               </button>
+              {/* Trigger-less panels opened from the menu below. */}
+              <NotificationCenter
+                workspaces={workspaces || []}
+                onTaskClick={onTaskClick}
+                onReviewOverdue={onOpenOverdueReview}
+                hideTrigger
+                open={notifOpen}
+                onOpenChange={setNotifOpen}
+                onCountChange={handleNotifCount}
+              />
+              <UserMenu
+                className="absolute right-0 top-full"
+                hideTrigger
+                open={userMenuOpen}
+                onOpenChange={setUserMenuOpen}
+              />
               {overflowOpen && (
-                <div className="absolute right-0 top-full mt-1 w-44 max-w-[calc(100vw-1.5rem)] bg-card border border-border rounded-xl shadow-lg overflow-hidden z-popover" role="menu">
+                <div className="absolute right-0 top-full mt-1 w-56 max-w-[calc(100vw-1.5rem)] max-h-[calc(100dvh-8rem)] overflow-y-auto bg-card border border-border rounded-xl shadow-lg z-popover" role="menu">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-tour="notification-center"
+                    onClick={() => { setOverflowOpen(false); setNotifOpen(true) }}
+                    className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                  >
+                    <Bell className="w-4 h-4" />
+                    <span className="flex-1 text-left">{t('通知')}</span>
+                    {notifCount > 0 && (
+                      <span className={cn('rounded-full px-1.5 text-[11px] font-semibold text-white', notifHigh ? 'bg-urgency-critical' : 'bg-urgency-high')}>
+                        {notifCount > 9 ? '9+' : notifCount}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-tour="user-menu"
+                    onClick={() => { setOverflowOpen(false); setUserMenuOpen(true) }}
+                    className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                  >
+                    <CircleUser className="w-4 h-4" />
+                    <span>{t('帳號')}</span>
+                  </button>
+                  {sharePeers.length > 0 && onTogglePeerVisible && (
+                    <div className="border-y border-border/60 py-1" role="group" aria-label={t('共享行事曆顯示')}>
+                      <div className="px-3 pt-1 pb-0.5 text-[11px] font-medium text-muted-foreground">{t('共享對象')}</div>
+                      {sharePeers.map((peer) => {
+                        const visible = isPeerVisible(visiblePeers, peer.peerId)
+                        const name = peer.displayName || t('未命名使用者')
+                        return (
+                          <button
+                            key={peer.peerId}
+                            type="button"
+                            role="menuitemcheckbox"
+                            aria-checked={visible}
+                            onClick={() => onTogglePeerVisible(peer.peerId)}
+                            className={cn(
+                              'w-full min-h-11 flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/60 transition-colors',
+                              visible ? 'text-foreground' : 'text-muted-foreground'
+                            )}
+                          >
+                            <span className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0">
+                              {peer.avatarUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element -- static export has no image optimizer
+                                <img src={peer.avatarUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <UserIcon className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+                              )}
+                            </span>
+                            <span className="flex-1 min-w-0 truncate text-left">{name}</span>
+                            {visible ? <Eye className="w-4 h-4 text-primary" aria-hidden="true" /> : <EyeOff className="w-4 h-4" aria-hidden="true" />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                   <button
                     data-tour="notebook-entry"
                     onClick={() => { setOverflowOpen(false); openNotebook() }}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                    className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                   >
                     <NotebookPen className="w-4 h-4" />
                     <span>{t('記事本')}</span>
                   </button>
-                  {onOpenMeetings && <button type="button" onClick={() => { setOverflowOpen(false); onOpenMeetings() }} className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60"><Users className="h-4 w-4"/><span>{lang === 'en' ? 'Find a time' : '約交集時間'}</span>{pendingMeetingCount > 0 && <span className="rounded-full bg-primary px-1.5 text-primary-foreground">{pendingMeetingCount}</span>}</button>}
+                  {onOpenMeetings && <button type="button" onClick={() => { setOverflowOpen(false); onOpenMeetings() }} className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60"><Users className="h-4 w-4"/><span>{lang === 'en' ? 'Find a time' : '約交集時間'}</span>{pendingMeetingCount > 0 && <span className="rounded-full bg-primary px-1.5 text-primary-foreground">{pendingMeetingCount}</span>}</button>}
                   {onOpenSharing && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenSharing() }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                      className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
                       <Users className="w-4 h-4" />
                       <span>{t('共享')}</span>
@@ -363,7 +459,7 @@ export function CalendarHeader({
                   {onOpenJournal && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenJournal() }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                      className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
                       <BookOpen className="w-4 h-4" />
                       <span>{t('日記')}</span>
@@ -372,7 +468,7 @@ export function CalendarHeader({
                   {onOpenReport && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenReport() }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                      className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
                       <BarChart3 className="w-4 h-4" />
                       <span>{t('報告')}</span>
@@ -381,7 +477,7 @@ export function CalendarHeader({
                   {onOpenGrowth && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenGrowth() }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                      className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
                       <HuddleFootprints className="h-4 w-4 gap-0.5" />
                       <span>{t('每日簽到')}</span>
@@ -390,7 +486,7 @@ export function CalendarHeader({
                   {onOpenExport && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenExport() }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                      className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
                       <Download className="w-4 h-4" />
                       <span>{t('匯出行程')}</span>
@@ -399,7 +495,7 @@ export function CalendarHeader({
                   {onOpenSettings && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenSettings() }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                      className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
                       <Settings className="w-4 h-4" />
                       <span>{t('設定')}</span>
@@ -416,7 +512,7 @@ export function CalendarHeader({
           that peer's overlay on/off. Renders nothing when there are no
           peers. h-9 visual + invisible ::before expansion clears the 44px
           touch floor on mobile without inflating the row. */}
-      {sharePeers.length > 0 && onTogglePeerVisible && (
+      {!isMobile && sharePeers.length > 0 && onTogglePeerVisible && (
         <div
           className="flex items-center gap-1.5 px-3 pb-1.5 pt-0.5 overflow-x-auto scrollbar-hide"
           role="group"

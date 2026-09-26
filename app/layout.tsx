@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Noto_Sans_TC } from 'next/font/google'
 import './globals.css'
+import './art-theme.css'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { NativeShell } from '@/components/native/native-shell'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -9,6 +10,7 @@ import { FocusTimerProvider } from '@/components/timer/focus-timer-provider'
 import { OperationsNotices } from '@/components/operations/announcements'
 import { EnrollmentBridge } from '@/components/operations/enrollment-bridge'
 import { FloatingHub } from '@/components/floating/floating-hub'
+import { BRAND_TITLE } from '@/lib/brand'
 
 const geist = Geist({
   subsets: ['latin'],
@@ -28,12 +30,12 @@ const notoSansTC = Noto_Sans_TC({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://waddle.zeabur.app'),
-  title: 'Huddle｜慢慢搖擺，把事情做完',
+  title: BRAND_TITLE,
   description:
     '把任務、行程、專注與筆記收進同一張桌面。Huddle 是一個溫柔、不催促的個人工作空間。',
   applicationName: 'Huddle',
   openGraph: {
-    title: 'Huddle｜慢慢搖擺，把事情做完',
+    title: BRAND_TITLE,
     description: '把任務、行程、專注與筆記收進同一張桌面。',
     type: 'website',
     locale: 'zh_TW',
@@ -41,7 +43,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary',
-    title: 'Huddle｜慢慢搖擺，把事情做完',
+    title: BRAND_TITLE,
     description: '把任務、行程、專注與筆記收進同一張桌面。',
     images: ['/app-icon-512.png'],
   },
@@ -90,8 +92,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // data-art="paper": the app's paper look (app/art-theme.css), on by default.
+  // Public marketing opts out via [data-surface='marketing'].
   return (
-    <html lang="zh-TW" className="bg-background" suppressHydrationWarning>
+    <html lang="zh-TW" className="bg-background" data-art="paper" suppressHydrationWarning>
       <head>
         {/* Set viewport class before hydration so CSS / hooks see the right
             value on first paint and avoid the desktop-flash on mobile. */}

@@ -1,0 +1,155 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   App「紙本輕版」(paper) — approved 2026-09-26, ON by default.
+   app/layout.tsx renders <html data-art="paper">; everything here is scoped
+   to html[data-art] so the old ceramic tokens in globals.css stay as the
+   fallback (e.g. set data-art off in devtools to compare).
+   The public marketing site is NOT paper: it keeps the yellow poster look
+   and opts out of the page-wide grain via [data-surface='marketing'].
+   Tokens: cream #f6f3e9 · ink #292b24 · mustard #edc747 · terracotta #cf5731
+   See DESIGN.md「App 內紙本輕版」.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Palette: light ─────────────────────────────────────────────────────── */
+html[data-art] {
+  --art-ink: #292b24;
+  --art-cream: #f6f3e9;
+  --art-mustard: #edc747;
+  --art-orange: #cf5731;
+
+  --background: #f6f3e9;
+  --foreground: #292b24;
+  --card: #fbf9f2;
+  --card-foreground: #292b24;
+  --panel: #f3efe2;
+  --panel-secondary: #efe9d6;
+  --popover: #fbf9f2;
+  --popover-foreground: #292b24;
+  /* #b8482a on cream = 4.7:1 (AA for button text); brand #cf5731 stays for rings/now-line */
+  --primary: #b8482a;
+  --primary-foreground: #fbf9f2;
+  --secondary: #f5e3a0;
+  --secondary-foreground: #3d3a22;
+  --muted: #eee8d6;
+  --muted-foreground: #66645a;
+  --accent: #f7e7ab;
+  --accent-foreground: #3d3a22;
+  --border: #e0d8c0;
+  --border-subtle: #ebe5d2;
+  --input: #f1ecdd;
+  --ring: #cf5731;
+  --current-time: #cf5731;
+  --calendar-grid: #ebe4cf;
+  --calendar-grid-subtle: #f1ecdc;
+  --sidebar: #f3efe2;
+  --sidebar-foreground: #292b24;
+  --sidebar-primary: #b8482a;
+  --sidebar-primary-foreground: #fbf9f2;
+  --sidebar-accent: #f7e7ab;
+  --sidebar-accent-foreground: #3d3a22;
+  --sidebar-border: #e0d8c0;
+  --sidebar-ring: #cf5731;
+  --workspace-1: #cf5731;
+  --chart-1: #cf5731;
+  --chart-5: #edc747;
+}
+
+/* ── Palette: dark (warm ink desk under a lamp) ─────────────────────────── */
+html.dark[data-art] {
+  --background: #22231e;
+  --foreground: #f3eedd;
+  --card: #2b2c26;
+  --card-foreground: #f3eedd;
+  --panel: #26271f;
+  --panel-secondary: #2f3029;
+  --popover: #2b2c26;
+  --popover-foreground: #f3eedd;
+  /* mustard on ink = 8.7:1 */
+  --primary: #edc747;
+  --primary-foreground: #292b24;
+  --secondary: #3a3726;
+  --secondary-foreground: #f1dc8f;
+  --muted: #33342c;
+  --muted-foreground: #b9b3a0;
+  --accent: #45402a;
+  --accent-foreground: #f6e7b0;
+  --border: #3e3f35;
+  --border-subtle: #33342c;
+  --input: #30312a;
+  --ring: #edc747;
+  --current-time: #e9774f;
+  --calendar-grid: #34352d;
+  --calendar-grid-subtle: #2c2d27;
+  --sidebar: #26271f;
+  --sidebar-foreground: #f3eedd;
+  --sidebar-primary: #edc747;
+  --sidebar-primary-foreground: #292b24;
+  --sidebar-accent: #45402a;
+  --sidebar-accent-foreground: #f6e7b0;
+  --sidebar-border: #3e3f35;
+  --sidebar-ring: #edc747;
+}
+
+/* ── Paper grain: one fixed, non-interactive overlay (GPU-composited once;
+   no per-element filters). Multiply keeps ink/illustrations intact. ─────── */
+html[data-art] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  background: url('/art/paper-texture.jpg') 0 0 / 520px auto repeat;
+  mix-blend-mode: multiply;
+  opacity: 0.4;
+}
+html.dark[data-art] body::after {
+  mix-blend-mode: soft-light;
+  opacity: 0.18;
+}
+/* Marketing pages have their own poster surface — no app grain on top. */
+html:has([data-surface='marketing']) body::after { display: none; }
+
+/* Illustrations sit on cream paper: fuse with the page in light mode, become
+   a small pasted-in paper print in dark mode. */
+html[data-art] .art-illus {
+  mix-blend-mode: multiply;
+  /* feather the square cream backdrop so the drawing sits on the page */
+  -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 72%, transparent 100%);
+}
+html.dark[data-art] .art-illus {
+  mix-blend-mode: normal;
+  -webkit-mask-image: none;
+  mask-image: none;
+  border-radius: 14px;
+  filter: brightness(0.92) saturate(0.95);
+  box-shadow: 0 10px 24px -14px #000;
+}
+
+/* Notebook empty state illustration */
+.art-empty-illus { width: min(220px, 60vw); height: auto; margin: 0 auto 4px; }
+
+/* Auth scene */
+html[data-art] .art-auth-main { background: var(--background); position: relative; isolation: isolate; }
+.art-auth-scene { position: absolute; z-index: -1; pointer-events: none; }
+@media (min-width: 1024px) {
+  html[data-art] .art-auth-main { padding-left: 46vw; }
+  .art-auth-scene { inset: 0 auto 0 0; width: 62vw; height: 100%; object-fit: cover; object-position: left center;
+    -webkit-mask-image: linear-gradient(90deg, #000 70%, transparent); mask-image: linear-gradient(90deg, #000 70%, transparent); }
+}
+@media (max-width: 1023px) {
+  .art-auth-scene { top: 0; left: 0; width: 100%; height: 300px; object-fit: cover; object-position: 20% 42%;
+    -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); }
+  html[data-art] .art-auth-main > .art-auth-top { min-height: 190px; }
+}
+html.dark[data-art] .art-auth-scene { filter: brightness(0.62) saturate(0.9); }
+
+/* Paper look for the app's main surfaces: soft mustard wash on "today"
+   (the calendar tints today with bg-primary/5 and /10). */
+html[data-art] .bg-primary\/5 { background-color: color-mix(in srgb, var(--art-mustard) 10%, transparent); }
+html[data-art] .bg-primary\/10 { background-color: color-mix(in srgb, var(--art-mustard) 22%, transparent); }
+html.dark[data-art] .bg-primary\/5 { background-color: color-mix(in srgb, var(--art-mustard) 3%, transparent); }
+html.dark[data-art] .bg-primary\/10 { background-color: color-mix(in srgb, var(--art-mustard) 8%, transparent); }
+html[data-art] [data-tour='task-row'] { box-shadow: 0 1px 0 color-mix(in srgb, var(--art-ink) 6%, transparent); }
+
+/* Desktop shows the big illustration in the editor pane; keep the list side quiet. */
+@media (min-width: 768px) { html[data-art] .art-list-illus { display: none !important; } }

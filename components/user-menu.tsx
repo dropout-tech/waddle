@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { operations } from '@/lib/operations/client'
 import type { Membership } from '@/lib/operations/types'
@@ -27,13 +27,24 @@ interface UserMenuProps {
    * the mobile layout uses this so the avatar doesn't overlap content.
    */
   className?: string
+  /** Controlled open state (mobile calendar header opens it from ⋯). */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Render only the dropdown, no avatar button. */
+  hideTrigger?: boolean
 }
 
-export function UserMenu({ className }: UserMenuProps = {}) {
+export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTrigger = false }: UserMenuProps = {}) {
   const router = useRouter()
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [publicAlias, setPublicAlias] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
+  const [innerOpen, setInnerOpen] = useState(false)
+  const open = controlledOpen ?? innerOpen
+  const setOpen = useCallback((next: boolean | ((v: boolean) => boolean)) => {
+    const value = typeof next === 'function' ? next(open) : next
+    if (onOpenChange) onOpenChange(value)
+    else setInnerOpen(value)
+  }, [open, onOpenChange])
   const [signingOut, setSigningOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const { resolvedTheme, setTheme } = useTheme()
@@ -82,7 +93,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
+  }, [open, setOpen])
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -100,7 +111,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
 
   return (
     <div ref={ref} className={className ?? 'fixed top-3 right-3 z-50'}>
-      <button
+      {!hideTrigger && <button
         data-tour="user-menu"
         onClick={() => setOpen((v) => !v)}
         className={cn(
@@ -122,7 +133,7 @@ export function UserMenu({ className }: UserMenuProps = {}) {
         ) : (
           <span className="text-sm font-semibold text-foreground">{initials}</span>
         )}
-      </button>
+      </button>}
 
       {open && (
         <div

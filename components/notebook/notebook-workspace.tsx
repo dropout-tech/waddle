@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { ArrowLeft, X, ChevronLeft, Check, Loader2, CloudOff, PanelLeft, ListPlus } from 'lucide-react'
+import { ArrowLeft, X, ChevronLeft, Check, Loader2, CloudOff, ListPlus } from 'lucide-react'
 import { useNotebook } from '@/hooks/use-notebook'
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
@@ -254,7 +254,8 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-              <PanelLeft className="h-10 w-10 text-muted-foreground/30" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/art/empty-notes.jpg" alt="" aria-hidden loading="lazy" width={220} height={220} className="art-illus art-empty-illus" />
               <p className="text-sm text-muted-foreground">
                 {loading ? t('載入中…') : t('選一篇記事，或建立新的一篇')}
               </p>

@@ -240,6 +240,20 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    /* The root scroller's overscroll value lives on <html>, not <body> —
+       without this iOS still rubber-bands the whole document. */
+    overscroll-behavior: none;
+  }
+  /* Signed-in app shell (main-layout mobile) is a fixed one-screen layout:
+     only inner panels scroll. Locking the document stops the whole page
+     (header + tab bar) from being dragged in Safari / the iOS WebView. */
+  html.app-shell-locked,
+  html.app-shell-locked body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
   body {
     @apply bg-background text-foreground;
     /* Native feel inside the Capacitor WebView: no rubber-band overscroll on
@@ -553,7 +567,7 @@
 }
 
 /* ------------------------------------------------------------
- * Motion baseline — Waddle's "慢慢搖擺" rhythm.
+ * Motion baseline — Huddle's unhurried rhythm.
  *
  * 1) Brand easing token. Anywhere a one-shot transition or animation
  *    needs a curve, prefer `transition-timing-function: var(--ease-quart)`
