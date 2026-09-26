@@ -16,7 +16,7 @@ const condensed = Barlow_Condensed({ weight: '800', subsets: ['latin'], display:
 // Hero theme (2026-09-26): 'ink' = black poster hero + yellow second slab;
 // 'yellow' = the previous yellow hero. Flip this one value to roll back.
 // Preview either without a deploy: /about?hero=yellow or ?hero=ink.
-const HERO_THEME: 'ink' | 'yellow' = 'ink'
+const HERO_THEME: 'ink' | 'yellow' = 'yellow'
 const release = 'https://github.com/dropout-tech/waddle/releases/tag/v0.1.2-beta.1'
 const download = (arch: string) => `https://github.com/dropout-tech/waddle/releases/download/v0.1.2-beta.1/Huddle-0.1.2-mac-${arch}.dmg`
 const copy = {
