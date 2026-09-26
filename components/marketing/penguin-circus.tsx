@@ -41,7 +41,7 @@ export const posterStageClass = styles.posterStage
 export const focusStageClass = styles.focusStage
 
 const words = {
-  zh: { pop: '啪！', honk: '嘎！', cards: ['買魚', '回 87 封信', '跟自己開會', '午睡 20 分鐘', '假裝很忙', '把企鵝收好'], bubbles: ['週四開會？', '三點可以', '我帶簡報'], card: '週四 15:00 團隊會議' },
+  zh: { pop: '啪！', honk: '呱！', cards: ['買魚', '回 87 封信', '跟自己開會', '午睡 20 分鐘', '假裝很忙', '把企鵝收好'], bubbles: ['週四開會？', '三點可以', '我帶簡報'], card: '週四 15:00 團隊會議' },
   en: { pop: 'POP!', honk: 'HONK!', cards: ['Buy fish', 'Reply to 87 emails', 'Meeting with myself', '20-min nap', 'Look busy', 'Put penguins away'], bubbles: ['Meet Thursday?', '3pm works', "I'll bring slides"], card: 'Thu 3:00 PM · Team sync' },
 } as const
 type Locale = keyof typeof words
