@@ -8,6 +8,7 @@ import { ArrowDown, ArrowRight, ChevronDown, Download, Play } from 'lucide-react
 import { setLang } from '@/lib/i18n'
 import { brandQuote } from '@/lib/brand'
 import { FeatureFilm } from './feature-film'
+import { FocusRing, FoldVignette, Hammock, HeroSwarm, RoamingPenguin, fishZoneClass, focusStageClass, headlineClass, posterStageClass } from './penguin-circus'
 import styles from './marketing-page.module.css'
 
 const display = Noto_Sans_TC({ weight: '900', subsets: ['latin'], display: 'swap', preload: false, variable: '--poster-zh' })
@@ -101,16 +102,17 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
 
       {/* HERO — one giant quote (brand tagline, lib/brand.ts) over a wide desk
           scene where the penguin is small and the world is big. */}
-      <section className={styles.hero} aria-labelledby="hero-title">
-        <picture className={styles.heroArt}>
+      <section className={`${styles.hero} ${fishZoneClass}`} aria-labelledby="hero-title">
+        <picture className={styles.heroArt} data-penguin-stop="hero-m" data-penguin-only="mobile" data-penguin-at="0.8 0.93" data-penguin-pose="wave">
           <source media="(max-width: 760px)" srcSet="/art/hero-mobile.webp" width={1080} height={1350} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/art/hero-desk-v2.webp" width={1600} height={900} alt="" fetchPriority="high" decoding="async" />
         </picture>
+        <HeroSwarm />
         <div className={styles.heroCopy}>
           <figure className={styles.quote} data-quoted={quote.author ? "" : undefined}>
             <blockquote>
-              <h1 id="hero-title">{clauses(quote.quote).map((c, i) => <span key={i}>{c}</span>)}</h1>
+              <h1 id="hero-title" className={headlineClass}>{clauses(quote.quote).map((c, i, all) => <span key={i} {...(i === all.length - 1 ? { 'data-merge-clause': '', 'data-penguin-stop': 'hero', 'data-penguin-at': '1 1 34 -6', 'data-penguin-only': 'desktop', 'data-penguin-pose': 'wave' } : {})}>{c}</span>)}</h1>
             </blockquote>
             {quote.author ? <figcaption className={styles.author}>{quote.author}</figcaption> : null}
           </figure>
@@ -121,7 +123,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
 
       {/* PROOF — ink slab, yellow type, the real product at full width. */}
       <section className={styles.proof} aria-labelledby="proof-title">
-        <div className={styles.proofHead}><p className={styles.kicker}>{t.proofKicker}</p><h2 id="proof-title">{t.proofTitle}</h2></div>
+        <div className={styles.proofHead}><p className={styles.kicker}>{t.proofKicker}</p><h2 id="proof-title" data-penguin-stop="proof" data-penguin-at="0.62 1 0 -8" data-penguin-at-m="0.86 0 0 -10">{t.proofTitle}</h2></div>
         <figure className={styles.heroProduct}>
           <div className={styles.monitor}><Image src={`/marketing/workspace-demo${en ? '-en' : ''}.png`} width={1440} height={1000} alt={en ? 'Huddle tasks beside a daily calendar, using demonstration data' : 'Huddle 任務清單與每日行事曆並列，使用示範資料'} sizes="(max-width: 760px) 94vw, 86vw" /></div>
           <figcaption>{t.sample}</figcaption>
@@ -131,15 +133,15 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       <section id="features" className={styles.pillars} aria-label={en ? 'What Huddle brings together' : 'Huddle 的三個重點'}>
         {PILLAR_ART.map((art, i) => (
           <article key={art.src} className={art.kind === 'spot' ? styles.pillarSpot : undefined}>
-            <div className={styles.pillarArt}><Image src={art.src} width={art.w} height={art.h} alt="" sizes="(max-width: 760px) 92vw, 56vw" /></div>
-            <div className={styles.pillarCopy}><span className={styles.num}>0{i + 1}</span><h2>{t.pillars[i][0]}</h2><p>{t.pillars[i][1]}</p></div>
+            <div className={styles.pillarArt} {...(i === 1 ? { 'data-penguin-stop': 'calendar', 'data-penguin-at': '0.5 0.84', 'data-penguin-pose': 'skate', 'data-penguin-motion': 'skate' } : {})}><Image src={art.src} width={art.w} height={art.h} alt="" sizes="(max-width: 760px) 92vw, 56vw" /></div>
+            <div className={styles.pillarCopy}><span className={styles.num}>0{i + 1}</span><h2 {...(i !== 1 ? { 'data-penguin-stop': `pillar-${i}`, 'data-penguin-at': '0 0 170 -2', 'data-penguin-at-m': '0 0 118 -2', 'data-penguin-pose': i === 0 ? 'carry' : 'wave' } : {})}>{t.pillars[i][0]}</h2><p>{t.pillars[i][1]}</p></div>
           </article>
         ))}
       </section>
 
       <section className={styles.moreFeatures} aria-labelledby="more-title">
         <div className={styles.morePoster}>
-          <Image src="/art/film/F-07.webp" width={405} height={720} alt="" sizes="(max-width: 760px) 60vw, 30vw" />
+          <div className={posterStageClass} data-penguin-stop="fold" data-penguin-at="0.9 0 0 2"><Image src="/art/film/F-07.webp" width={405} height={720} alt="" sizes="(max-width: 760px) 60vw, 30vw" /><FoldVignette locale={locale} /></div>
         </div>
         <div>
           <div className={styles.moreIntro}><h2 id="more-title">{t.moreTitle}</h2><p>{t.moreIntro}</p></div>
@@ -148,13 +150,13 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       </section>
 
       <section className={styles.whiteboard} aria-labelledby="board-title">
-        <div className={styles.chapterCopy}><h2 id="board-title">{t.boardTitle}</h2><p>{t.boardBody}</p><div className={styles.tabs} role="tablist" aria-label={en ? 'Whiteboard views' : '白板畫面'}>{t.boardTabs.map((label, i) => <button key={label} id={`board-tab-${i}`} type="button" role="tab" aria-selected={boardView === i} aria-controls="board-panel" tabIndex={boardView === i ? 0 : -1} onClick={() => setBoardView(i)} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const next = 1 - i; setBoardView(next); document.getElementById(`board-tab-${next}`)?.focus() } }}>{label}</button>)}</div></div>
+        <div className={styles.chapterCopy}><h2 id="board-title">{t.boardTitle}</h2><p>{t.boardBody}</p><div className={styles.tabs} data-penguin-stop="board" data-penguin-only="desktop" data-penguin-at="0 1 110 88" data-penguin-pose="slide" data-penguin-motion="pace" role="tablist" aria-label={en ? 'Whiteboard views' : '白板畫面'}>{t.boardTabs.map((label, i) => <button key={label} id={`board-tab-${i}`} type="button" role="tab" aria-selected={boardView === i} aria-controls="board-panel" tabIndex={boardView === i ? 0 : -1} onClick={() => setBoardView(i)} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const next = 1 - i; setBoardView(next); document.getElementById(`board-tab-${next}`)?.focus() } }}>{label}</button>)}</div></div>
         <figure role="tabpanel" id="board-panel" aria-labelledby={`board-tab-${boardView}`} className={styles.boardFigure}><Image src={`/marketing/${boardView === 0 ? 'whiteboard-demo' : 'whiteboard-detail-demo'}${en ? '-en' : ''}.png`} width={1440} height={1000} alt={t.boardAlt[boardView]} sizes="(max-width: 760px) 92vw, 64vw" /><figcaption>{t.boardNote}</figcaption></figure>
       </section>
 
       <div id="feature-film" className={styles.film}><FeatureFilm locale={locale} /></div>
 
-      <section className={styles.focus} aria-labelledby="focus-title"><div className={styles.focusCopy}><h2 id="focus-title">{t.focusTitle}</h2><p>{t.focusBody}</p><Link href="/login" onClick={toLang} className={styles.textLink}>{t.focusAction}<ArrowRight size={22} aria-hidden="true" /></Link></div><div className={styles.focusVisual}><Image src="/art/feature-focus.webp" width={800} height={800} alt={en ? 'Huddle penguin holding a focus timer' : 'Huddle 企鵝抱著專注計時環'} sizes="(max-width: 760px) 80vw, 40vw" /><span className={styles.handNote}>{en ? 'A little at a time.' : '一步一步，也很好。'}</span></div></section>
+      <section className={styles.focus} aria-labelledby="focus-title"><div className={styles.focusCopy}><h2 id="focus-title">{t.focusTitle}</h2><p>{t.focusBody}</p><Link href="/login" onClick={toLang} className={styles.textLink}>{t.focusAction}<ArrowRight size={22} aria-hidden="true" /></Link></div><div className={styles.focusVisual}><div className={focusStageClass} data-penguin-stop="focus" data-penguin-at="0.5 0.5" data-penguin-pose="slide" data-penguin-motion="orbit"><Image src="/art/feature-focus.webp" width={800} height={800} alt={en ? 'Huddle penguin holding a focus timer' : 'Huddle 企鵝抱著專注計時環'} sizes="(max-width: 760px) 80vw, 40vw" /><FocusRing /></div><span className={styles.handNote}>{en ? 'A little at a time.' : '一步一步，也很好。'}</span></div></section>
 
       <section id="pricing" className={styles.pricing} aria-labelledby="pricing-title">
         <div className={styles.priceHead}>
@@ -165,11 +167,11 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
             <img src="/art/film/C-06.webp" width={1280} height={720} alt="" loading="lazy" decoding="async" />
           </picture>
         </div>
-        <div className={styles.plans}><article><h3>{t.free}</h3><p className={styles.price}>NT$0</p><p>{t.freeBody}</p><Link href="/signup" onClick={toLang} className={styles.primary}>{t.start}<ArrowRight size={19} aria-hidden="true" /></Link></article><article className={styles.pro}><h3>Pro <span>{t.soon}</span></h3><p className={styles.price}>NT$149<small>{t.month}</small></p><p className={styles.annual}>{t.year}</p><p>{t.proBody}</p></article></div>
+        <div className={styles.plans}><article data-penguin-stop="price" data-penguin-at="0.86 0 0 -3"><h3>{t.free}</h3><p className={styles.price}>NT$0</p><p>{t.freeBody}</p><Link href="/signup" onClick={toLang} className={styles.primary}>{t.start}<ArrowRight size={19} aria-hidden="true" /></Link></article><article className={styles.pro}><h3>Pro <span>{t.soon}</span></h3><p className={styles.price}>NT$149<small>{t.month}</small></p><p className={styles.annual}>{t.year}</p><p>{t.proBody}</p></article></div>
       </section>
 
       <section id="download" className={styles.download} aria-labelledby="download-title">
-        <div className={styles.downloadCopy}><h2 id="download-title">{t.downloadTitle}</h2><p>{t.downloadBody}</p>
+        <div className={styles.downloadCopy}><h2 id="download-title" data-penguin-stop="download" data-penguin-at="0 0 70 -10" data-penguin-pose="wave">{t.downloadTitle}</h2><p>{t.downloadBody}</p>
           <div className={styles.downloadOptions}><a href={download('arm64')}><span>Mac · Apple Silicon</span><Download size={24} aria-hidden="true" /></a><a href={download('x64')}><span>Mac · Intel</span><Download size={24} aria-hidden="true" /></a><a href="https://github.com/dropout-tech/waddle/releases/download/v0.1.2-beta.1/Huddle-0.1.2-win-x64.exe"><span>Windows · x64</span><Download size={24} aria-hidden="true" /></a><p>{t.downloadNote}</p><a href={release} className={styles.releaseLink}>{t.release}<ArrowRight size={17} aria-hidden="true" /></a></div>
         </div>
         <picture className={styles.sceneArt}>
@@ -179,8 +181,9 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
         </picture>
       </section>
 
-      <section className={styles.faq} aria-labelledby="faq-title"><h2 id="faq-title">{t.faqTitle}</h2><div>{t.questions.map(([q, a]) => <details key={q}><summary>{q}<ChevronDown size={22} aria-hidden="true" /></summary><p>{a}</p></details>)}</div></section>
-      <footer className={styles.footer}><div><Link href={`${base}/about`} className={styles.brand}>Huddle.</Link><p>{t.footerLine}</p></div><nav aria-label={en ? 'Service information' : '服務資訊'}>{['terms', 'privacy', 'refunds', 'support'].map((path, i) => <Link href={`${base}/${path}`} key={path}>{t.legal[i]}</Link>)}<a href="#top">{t.all}<ArrowDown className={styles.up} size={15} aria-hidden="true" /></a></nav></footer>
+      <section className={styles.faq} aria-labelledby="faq-title"><h2 id="faq-title" data-penguin-stop="faq" data-penguin-only="desktop" data-penguin-at="0 1 70 110">{t.faqTitle}</h2><div>{t.questions.map(([q, a]) => <details key={q}><summary>{q}<ChevronDown size={22} aria-hidden="true" /></summary><p>{a}</p></details>)}</div></section>
+      <footer className={styles.footer}><Hammock /><div><Link href={`${base}/about`} className={styles.brand}>Huddle.</Link><p>{t.footerLine}</p></div><nav aria-label={en ? 'Service information' : '服務資訊'}>{['terms', 'privacy', 'refunds', 'support'].map((path, i) => <Link href={`${base}/${path}`} key={path}>{t.legal[i]}</Link>)}<a href="#top">{t.all}<ArrowDown className={styles.up} size={15} aria-hidden="true" /></a></nav></footer>
+      <RoamingPenguin locale={locale} />
     </main>
   )
 }

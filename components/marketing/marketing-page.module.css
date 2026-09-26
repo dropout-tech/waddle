@@ -33,7 +33,7 @@
 .heroArt img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: right bottom; }
 /* keeps the quote legible wherever the scene reaches under it */
 .heroArt::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, var(--hero-cream) 0 30%, #f5efe0d9 44%, #f5efe000 60%); }
-.heroCopy { width: 100%; max-width: 1440px; margin: 0 auto; padding: 40px 4% 80px; }
+.heroCopy { position: relative; z-index: 1; width: 100%; max-width: 1440px; margin: 0 auto; padding: 40px 4% 80px; }
 .quote { margin: 0; max-width: min(54vw, 900px); }
 .quote blockquote { margin: 0; }
 .quote[data-quoted] blockquote::before { content: '\201C'; display: block; height: .44em; margin: 0 0 0 -.05em; font-family: var(--poster-en), sans-serif; font-weight: 800; font-size: clamp(96px, 11vw, 190px); line-height: .8; color: var(--orange); }
@@ -72,7 +72,8 @@
 /* ── More features: poster + rows ───────────────────────────────────────── */
 .moreFeatures { max-width: 1400px; margin: 0 auto; padding: 130px 4%; display: grid; grid-template-columns: .78fr 1.22fr; gap: 88px; align-items: start; }
 .morePoster { position: sticky; top: 32px; display: flex; justify-content: center; padding: 56px 40px; background: var(--yellow); border-radius: 20px; }
-.morePoster img { display: block; width: min(100%, 390px); height: auto; border-radius: 14px; box-shadow: 0 22px 44px -26px #292b24b0; transform: rotate(-2deg); }
+.morePoster > div { width: min(100%, 390px); transform: rotate(-2deg); }
+.morePoster img { display: block; width: 100%; height: auto; border-radius: 14px; box-shadow: 0 22px 44px -26px #292b24b0; }
 .featureRows { margin-top: 48px; }
 .featureRows article { display: grid; grid-template-columns: 168px 1fr; gap: 34px; align-items: center; padding: 30px 0; border-top: 3px solid var(--ink); }
 .spot { display: block; width: 168px; height: 168px; mix-blend-mode: multiply; -webkit-mask-image: radial-gradient(closest-side, #000 74%, transparent); mask-image: radial-gradient(closest-side, #000 74%, transparent); }
@@ -93,7 +94,8 @@
 /* ── Focus ──────────────────────────────────────────────────────────────── */
 .focus { max-width: 1320px; margin: auto; padding: 130px 4%; display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center; }
 .focusVisual { text-align: center; }
-.focusVisual img { display: block; width: min(100%, 580px); height: auto; margin: auto; transform: rotate(-3deg); mix-blend-mode: multiply; -webkit-mask-image: radial-gradient(closest-side, #000 74%, transparent); mask-image: radial-gradient(closest-side, #000 74%, transparent); }
+.focusVisual > div { width: min(100%, 580px); margin: auto; }
+.focusVisual img { display: block; width: 100%; height: auto; margin: auto; transform: rotate(-3deg); mix-blend-mode: multiply; -webkit-mask-image: radial-gradient(closest-side, #000 74%, transparent); mask-image: radial-gradient(closest-side, #000 74%, transparent); }
 .handNote { display: block; margin-top: 8px; font-size: 26px; font-weight: 800; transform: rotate(-4deg); }
 
 /* ── Pricing ────────────────────────────────────────────────────────────── */
@@ -129,7 +131,7 @@
 .faq summary svg { flex-shrink: 0; }
 .faq details[open] summary svg { transform: rotate(180deg); }
 .faq details p { margin: 0; padding: 0 30px 28px 0; font-size: 17px; line-height: 1.9; color: var(--muted); }
-.footer { display: flex; justify-content: space-between; align-items: center; gap: 35px; padding: 48px 4%; border-top: 3px solid var(--ink); }
+.footer { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 35px; padding: 48px 4%; border-top: 3px solid var(--ink); }
 .footer .brand { font-size: 52px; }
 .footer p { margin: 12px 0 0; font-size: 15px; color: #54564a; }
 .footer nav { display: flex; flex-wrap: wrap; gap: 12px 28px; max-width: 620px; font-size: 15px; }
@@ -166,7 +168,7 @@
   .heroArt { position: relative; inset: auto; order: 2; z-index: 0; margin-top: -44vw; }
   .heroArt::after { display: none; }
   .heroArt img { height: auto; -webkit-mask-image: linear-gradient(transparent, #000 34%); mask-image: linear-gradient(transparent, #000 34%); }
-  .heroCopy { position: relative; z-index: 1; padding: 22px 5% 0; }
+  .heroCopy { position: relative; z-index: 2; padding: 22px 5% 0; }
   .quote { max-width: none; }
   .quote[data-quoted] blockquote::before { font-size: 96px; }
   .hero h1 { font-size: min(11.4vw, 64px); line-height: 1.12; }
@@ -195,7 +197,7 @@
   .moreIntro p, .chapterCopy > p, .focusCopy > p, .priceHead p, .downloadCopy > p { font-size: 17px; }
   .moreFeatures { padding: 80px 5%; gap: 40px; }
   .morePoster { padding: 32px 24px; }
-  .morePoster img { width: min(74%, 300px); }
+  .morePoster > div { width: min(74%, 300px); }
   .featureRows { margin-top: 28px; }
   .featureRows article { grid-template-columns: 96px 1fr; gap: 18px; padding: 22px 0; }
   .spot { width: 96px; height: 96px; }
@@ -205,7 +207,7 @@
   .whiteboard { padding: 40px 5% 80px; gap: 30px; }
   .tabs button { font-size: 15px; }
   .focus { grid-template-columns: 1fr; gap: 20px; padding: 80px 5%; }
-  .focusVisual img { width: min(82%, 380px); }
+  .focusVisual > div { width: min(82%, 380px); }
   .handNote { font-size: 20px; }
 
   .pricing { padding: 80px 5%; }

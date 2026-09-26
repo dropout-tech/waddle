@@ -1,0 +1,119 @@
+/* Penguin circus — the absurd, always-on layer of the marketing site
+   (2026-09-26 boss brief: "one penguin always sliding / flying around").
+   Rules: only transform/opacity move (no layout → no CLS); every layer is
+   aria-hidden and pointer-events:none except the roaming penguin's body;
+   prefers-reduced-motion shows static placements (see bottom). */
+
+.pose { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; opacity: 0; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+.pose[data-on] { opacity: 1; }
+
+/* ── Roaming penguin (fixed, one per page) ───────────────────────────────── */
+.roam { position: fixed; left: 0; top: 0; z-index: 30; width: var(--s, 84px); height: var(--s, 84px); pointer-events: none; opacity: 0; transition: opacity .35s; will-change: transform; contain: layout style; }
+.roam[data-awake] { opacity: 1; }
+.roam[data-hidden] { opacity: 0; transition-duration: .15s; }
+.roamBody { position: absolute; inset: 0; transform-origin: 50% 100%; pointer-events: auto; cursor: pointer; touch-action: manipulation; }
+.roam[data-peek] .roamBody, .roam:not([data-awake]) .roamBody, .roam[data-hidden] .roamBody { pointer-events: none; }
+.roamInner { position: absolute; inset: 0; transform-origin: 50% 100%; }
+/* idle life: a slow breath when standing; snoring when asleep */
+.roam[data-pose=stand] .roamInner, .roam[data-pose=wave] .roamInner, .roam[data-pose=carry] .roamInner { animation: breathe 2.4s ease-in-out infinite; }
+.roam[data-pose=wave] .roamInner { animation-duration: .9s; }
+@keyframes breathe { 50% { transform: scale(1.04, .96); } }
+.zzz { position: absolute; left: 62%; top: 4%; display: none; font: 800 16px/1 var(--poster-en, sans-serif); color: var(--ink, #292b24); }
+.roam[data-pose=sleep] .zzz { display: block; }
+.zzz span { position: absolute; animation: zzz 2.4s ease-out infinite; opacity: 0; }
+.zzz span:nth-child(2) { animation-delay: .8s; font-size: 20px; }
+.zzz span:nth-child(3) { animation-delay: 1.6s; font-size: 24px; }
+@keyframes zzz { 0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(22px, -46px) rotate(12deg); opacity: 0; } }
+
+/* reaction fx (clones, thrown cards, pops) live in their own fixed layer */
+.fx { position: fixed; inset: 0; z-index: 31; pointer-events: none; overflow: hidden; contain: strict; }
+.clone { position: absolute; left: 0; top: 0; width: var(--s, 84px); height: var(--s, 84px); object-fit: contain; object-position: 50% 100%; }
+.thrown { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 9px; background: #fbf9f2; color: #292b24; border: 2px solid #292b24; border-radius: 6px; box-shadow: 3px 3px 0 #292b24; font: 800 14px/1.2 var(--poster-zh, sans-serif); white-space: nowrap; }
+.thrown::before, .foldCard::before { content: ''; width: 14px; height: 14px; flex: none; border: 2px solid #292b24; border-radius: 3px; background: #edc747; }
+.say { position: absolute; left: 0; top: 0; padding: 4px 10px; background: #292b24; color: #edc747; border-radius: 4px; font: 800 18px/1.1 var(--poster-en, sans-serif); letter-spacing: .04em; white-space: nowrap; }
+.poof { position: absolute; left: 0; top: 0; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 5px dashed #cf5731; }
+.bonk { position: absolute; left: 0; top: 0; width: 34px; height: 34px; margin: -17px 0 0 -17px; }
+
+/* ── Hero swarm: five penguins, then one Huddle ──────────────────────────── */
+.swarm { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.swarmBird { position: absolute; left: 0; top: 0; width: var(--s, 64px); height: var(--s, 64px); opacity: 0; will-change: transform; }
+.swarmBird[data-live] { opacity: 1; }
+.swarmBird img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; }
+.swarmStatic { display: none; }
+/* the merged clause gets stamped with an orange marker */
+.headline [data-merge-clause] { position: relative; }
+.headline [data-merge-clause]::after { content: ''; position: absolute; left: 0; right: .3em; bottom: .02em; height: .16em; background: var(--orange, #cf5731); transform: scaleX(0); transform-origin: left; transition: transform .45s cubic-bezier(.2, .9, .3, 1.3); z-index: -1; }
+.headline[data-merged] [data-merge-clause]::after { transform: scaleX(1); }
+.headline[data-chaos] > span:first-child { animation: jitter .18s steps(2) infinite; }
+@keyframes jitter { 0% { transform: translate(-1px, 1px) rotate(-.4deg); } 100% { transform: translate(2px, -1px) rotate(.5deg); } }
+
+/* Egg #1 — the cursor is a fish in the hero (links keep their own cursor) */
+.fishZone { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='24' viewBox='0 0 36 24'%3E%3Cpath d='M3 12c5-8 15-9 22-3l7-6v18l-7-6c-7 6-17 5-22-3z' fill='%23cf5731' stroke='%23292b24' stroke-width='2.4' stroke-linejoin='round'/%3E%3Ccircle cx='10' cy='10.5' r='2' fill='%23292b24'/%3E%3C/svg%3E") 2 12, auto; }
+.fishZone :is(a, button) { cursor: pointer; }
+
+/* ── AI fold: chat bubbles fold into a task card that flies into the phone ─ */
+.posterStage { position: relative; }
+.fold { position: absolute; inset: 0; container-type: size; pointer-events: none; }
+.fold > * { position: absolute; left: 0; top: 0; opacity: 0; animation-duration: 7s; animation-timing-function: cubic-bezier(.3, .7, .3, 1); animation-iteration-count: infinite; animation-play-state: paused; }
+.fold[data-play] > * { animation-play-state: running; }
+.bubble { padding: 7px 11px; background: #fbf9f2; color: #292b24; border: 2px solid #292b24; border-radius: 14px 14px 14px 3px; font: 800 13px/1.2 var(--poster-zh, sans-serif); white-space: nowrap; }
+.b1 { animation-name: b1; } .b2 { animation-name: b2; } .b3 { animation-name: b3; }
+@keyframes b1 { 0% { opacity: 0; transform: translate(26cqw, 78cqh) scale(.3); } 6% { opacity: 1; transform: translate(3cqw, 57cqh) scale(1) rotate(-3deg); } 44% { opacity: 1; transform: translate(3cqw, 56cqh) scale(1) rotate(-3deg); } 54%, 100% { opacity: 0; transform: translate(34cqw, 50cqh) scale(.15, .5) rotate(30deg); } }
+@keyframes b2 { 0%, 8% { opacity: 0; transform: translate(26cqw, 78cqh) scale(.3); } 14% { opacity: 1; transform: translate(40cqw, 63cqh) scale(1) rotate(2deg); } 46% { opacity: 1; transform: translate(40cqw, 62cqh) scale(1) rotate(2deg); } 55%, 100% { opacity: 0; transform: translate(36cqw, 50cqh) scale(.15, .5) rotate(-30deg); } }
+@keyframes b3 { 0%, 16% { opacity: 0; transform: translate(26cqw, 78cqh) scale(.3); } 22% { opacity: 1; transform: translate(8cqw, 69cqh) scale(1) rotate(-1deg); } 48% { opacity: 1; transform: translate(8cqw, 68cqh) scale(1) rotate(-1deg); } 56%, 100% { opacity: 0; transform: translate(35cqw, 50cqh) scale(.15, .5) rotate(20deg); } }
+.foldCard { display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 9px; background: #fbf9f2; color: #292b24; border: 2px solid #292b24; border-radius: 6px; box-shadow: 3px 3px 0 #292b24; font: 800 13px/1.2 var(--poster-zh, sans-serif); white-space: nowrap; animation-name: card; }
+@keyframes card {
+  0%, 52% { opacity: 0; transform: translate(22cqw, 50cqh) scale(.3) rotate(0); }
+  58% { opacity: 1; transform: translate(18cqw, 49cqh) scale(1.1) rotate(-5deg); }
+  66% { opacity: 1; transform: translate(18cqw, 49cqh) scale(1) rotate(-3deg); }
+  76% { opacity: 1; transform: translate(34cqw, 22cqh) scale(.7) rotate(14deg); }
+  84% { opacity: 1; transform: translate(47cqw, 36cqh) scale(.22) rotate(28deg); }
+  88%, 100% { opacity: 0; transform: translate(49cqw, 38cqh) scale(.05) rotate(30deg); }
+}
+.ding { width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; border: 4px solid #edc747; animation-name: ding; }
+@keyframes ding { 0%, 84% { opacity: 0; transform: translate(57cqw, 38cqh) scale(.2); } 88% { opacity: 1; } 96%, 100% { opacity: 0; transform: translate(57cqw, 38cqh) scale(1.6); } }
+
+/* ── Focus: a timer ring the penguin runs laps on ────────────────────────── */
+.focusStage { position: relative; }
+.ring { position: absolute; left: 50%; top: 50%; width: 92%; aspect-ratio: 1; transform: translate(-50%, -50%) rotate(-90deg); pointer-events: none; overflow: visible; }
+.ring circle { fill: none; stroke-width: 1.6; }
+.ring .ringTrack { stroke: #292b2426; stroke-width: .7; stroke-dasharray: .6 2.4; }
+.ringFill { stroke: var(--orange, #cf5731); stroke-linecap: round; stroke-dasharray: 100 100; stroke-dashoffset: calc(100 - var(--p, 0) * 100); }
+.ringTime { position: absolute; right: 2%; top: 4%; padding: 4px 9px; background: #292b24; color: #edc747; border-radius: 4px; font: 800 20px/1 var(--poster-en, sans-serif); letter-spacing: .05em; font-variant-numeric: tabular-nums; transform: rotate(4deg); }
+
+/* ── Egg #2 — footer hammock (the penguin naps here at the end) ─────────── */
+.hammock { position: absolute; right: 9%; top: -104px; width: 190px; height: 96px; pointer-events: none; }
+.hammock svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.hammockBird { position: absolute; left: 50%; top: 10px; width: 112px; height: 80px; object-fit: contain; object-position: 50% 100%; margin-left: -56px; opacity: 0; transition: opacity .25s; transform-origin: 50% 90%; }
+.hammock[data-occupied] .hammockBird { opacity: 1; }
+.hammock[data-occupied] .hammockSwing { animation: swing 3.2s ease-in-out infinite; }
+.hammockSwing { position: absolute; inset: 0; transform-origin: 50% 0; }
+@keyframes swing { 50% { transform: rotate(2.5deg); } }
+.hammock .zzz { left: 64%; top: -4px; }
+.hammock[data-occupied] .zzz { display: block; }
+
+@media (max-width: 760px) {
+  .swarm { z-index: 1; } /* the hero art has flex order:2 on mobile, which paints it after us */
+  .hammock { right: 10%; top: -74px; width: 140px; height: 70px; }
+  .hammockBird { width: 72px; height: 52px; margin-left: -36px; top: 14px; }
+  .bubble, .foldCard { font-size: 12px; }
+  .ringTime { font-size: 16px; }
+}
+
+/* ── Reduced motion: static placements, nothing roams ───────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .roam, .fx, .swarm > .swarmBird { display: none; }
+  .swarmStatic { display: flex; position: absolute; right: 6%; bottom: 7%; }
+  .swarmStatic img { width: 58px; height: 58px; object-fit: contain; object-position: 50% 100%; margin-left: -14px; }
+  .fold > * { animation: none; }
+  .fold > .foldCard { opacity: 1; transform: translate(14cqw, 49cqh) rotate(-3deg); }
+  .hammock .hammockBird { opacity: 1; }
+  .ringFill { stroke-dashoffset: 0; }
+  .headline [data-merge-clause]::after { transform: scaleX(1); transition: none; }
+  .headline[data-chaos] > span:first-child { animation: none; }
+  .zzz { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 760px) {
+  .swarmStatic { bottom: 3%; right: 4%; }
+  .swarmStatic img { width: 46px; height: 46px; }
+}
