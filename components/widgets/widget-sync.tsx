@@ -11,7 +11,17 @@ import { HuddleWidgets, publishWidgets, widgetAccount } from '@/lib/widgets/nati
 import { rowToTask } from '@/lib/supabase/mappers'
 import { createClient } from '@/lib/supabase/client'
 import { getWaterNextDueAt, getWaterReminderEnabled } from '@/lib/water-reminder'
+import { checkInDate } from '@/lib/daily-check-in'
+import type { WidgetSnapshot } from '@/lib/widgets/model'
+import type { FocusTimerContextValue } from '@/components/timer/focus-timer-provider'
 import type { Workspace, TimeBlock, ScratchpadItem, NotebookNote } from '@/lib/types'
+
+/** Apple Watch focus buttons; each is a no-op when the timer is already in that state. */
+function applyWatchFocus(timer:FocusTimerContextValue,action:'start'|'pause'|'resume') {
+  if(action==='pause'&&timer.state==='running') timer.pauseTimer()
+  else if(action==='resume'&&timer.state==='paused') timer.resumeTimer()
+  else if(action==='start'&&(timer.state==='idle'||timer.state==='completed')) timer.startTimer({forceMini:true})
+}
 
 export function WidgetSync({workspaces,timeBlocks,boards,notes}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[]}) {
   const {user}=useAuth(), timer=useFocusTimer(), notebook=useNotebook()
@@ -19,13 +29,19 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes}:{workspaces:Work
   useEffect(()=>{latest.current={workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user}},[workspaces,timeBlocks,boards,timer,notebook.notes,notes,user])
   useEffect(()=>{
     let alive=true, busy=false
+    let checkIn:{at:number;value?:WidgetSnapshot['checkIn']}|undefined
     const sync=async()=>{
       if(busy || !alive || !latest.current.user) return
       busy=true
       try {
         const source=latest.current.user.id, auth=widgetAccount()
         if(auth.accountId !== source || !auth.epoch) return
-        const {actions=[]}=await HuddleWidgets.read()
+        const {actions=[],focusCommand}=await HuddleWidgets.read()
+        if(focusCommand) {
+          // Late watch commands (app was closed) are dropped, never applied after the fact.
+          if(focusCommand.accountId===source&&focusCommand.epoch===auth.epoch&&Date.now()-focusCommand.at<120_000) applyWatchFocus(latest.current.timer,focusCommand.action)
+          await HuddleWidgets.acknowledge({accountId:source,epoch:auth.epoch,ids:[focusCommand.id]})
+        }
         const db=createClient(), handled:string[]=[]
         for(const action of actions) {
           if(!alive || widgetAccount().accountId !== source || widgetAccount().epoch !== auth.epoch) return
@@ -54,6 +70,13 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes}:{workspaces:Work
         const s=x.timer.session
         snapshot.focus={mode:s?.mode,state:x.timer.state,title:s?.label ?? '慢慢來，先專心一件事',seconds:x.timer.displayTime,endAt:s && x.timer.state==='running' && s.mode==='pomodoro' ? s.startedAt.getTime()+s.pausedMs+s.targetSeconds*1000:null,note:focusNoteExcerpt(x.notes,snapshot.today,s?.label)}
         snapshot.water={enabled:getWaterReminderEnabled(),nextAt:getWaterNextDueAt(),count:0}
+        // Check-in status for the watch; refreshed at most every 5 minutes or when the Taipei day changes.
+        if(!checkIn||Date.now()-checkIn.at>300_000||checkIn.value?.date!==checkInDate()) {
+          const {data,error}=await db.rpc('get_daily_check_in_status').single()
+          if(!alive || widgetAccount().accountId!==source || widgetAccount().epoch!==auth.epoch) return
+          checkIn={at:Date.now(),value:error||!data?undefined:{date:data.check_in_date,checkedIn:data.checked_in,points:data.total_points}}
+        }
+        snapshot.checkIn=checkIn.value
         await publishWidgets(snapshot)
         await syncWidgetReminders(snapshot)
       } catch { /* Keep last snapshot; widget shows its last update time. */ }

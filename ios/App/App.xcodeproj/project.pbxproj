@@ -7,28 +7,58 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		19F5B1F112AFC37B2C66051F /* HuddleWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = E48730BD658250B4B9D87627 /* HuddleWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1E8558A547F10BF9CA9BB8B1 /* HuddleWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA7E18F670F8436968B9F81 /* HuddleWidgets.swift */; };
 		26187E20E0BB7CA1B4F2B8C2 /* FocusActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C3DFCCF29B8CF5AB92E0D2 /* FocusActivity.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		39C1F5E319447E3221C3FF57 /* HuddleWatchWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CDD393725870B55F6F73294 /* HuddleWatchWidgets.swift */; };
 		4054581696231AFE80114F14 /* WidgetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D67F3981417FE8CCD971AD /* WidgetStore.swift */; };
 		4A3ACB9B48AB60DD5A27903E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9927E66813D216AEDF94613A /* Assets.xcassets */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
+		4D8D1C10A2177887E350DF9B /* HuddleWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE365E2D3055460C740DA61 /* HuddleWatchApp.swift */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		512B8A591F5999D1B9BC9B07 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 485A682053E2FD23DE4D9EB8 /* Localizable.xcstrings */; };
+		6FDB9A338CB0B9D3E07E8F0F /* HuddleWatchWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3BDA02B8954F81990AD14673 /* HuddleWatchWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		725A4B1EECBFB629155EB28F /* WatchLocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43B209578EE3AD4F5419CE85 /* WatchLocalStore.swift */; };
+		746199016547E08016392BFE /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 485A682053E2FD23DE4D9EB8 /* Localizable.xcstrings */; };
 		7DA2B46A6231E3CF79475816 /* HuddleWidgetsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3606CF855FD16D79701250E5 /* HuddleWidgetsPlugin.swift */; };
 		7DBE0B63E7DAD39857150E13 /* FocusActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90C3DFCCF29B8CF5AB92E0D2 /* FocusActivity.swift */; };
 		8ACBE0CA38D7A68EEC054948 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 20210919ADFBE781B703E260 /* Foundation.framework */; };
+		A241864D4AEEDCAE64B78E94 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B3A379E19D07DA79D3A248 /* WatchModels.swift */; };
 		B8609CAC6459542D6D5EA6BF /* WidgetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D67F3981417FE8CCD971AD /* WidgetStore.swift */; };
+		BA8D1E871291C3F19589C382 /* WatchLocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43B209578EE3AD4F5419CE85 /* WatchLocalStore.swift */; };
+		C91F67540182C8A77DF678B9 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 326DAC32E35262211C79CA20 /* Foundation.framework */; };
+		CEE50EBE87514FF20D7A29FA /* WatchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F092C41EE133A9E24F354D5 /* WatchBridge.swift */; };
+		D33C79AC889A431EAA9D1ED4 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B3A379E19D07DA79D3A248 /* WatchModels.swift */; };
+		D3F4D5B4093579F1A13D44D9 /* WatchModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABFC16FFDAD8FA9C09FF9A71 /* WatchModel.swift */; };
+		EBDFBA5806CFA19D364948C7 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 326DAC32E35262211C79CA20 /* Foundation.framework */; };
+		F20FFD8492BA0A316B370ACE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 23EC77844D94E102FE7F3578 /* Assets.xcassets */; };
 		F518D87A52682BBA603CB1A2 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D3A507C9B179A3B32A68E868 /* SwiftUI.framework */; };
 		F5917789BDF40FB583042EC6 /* HuddleWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 551031DD182B5935BCCFC749 /* HuddleWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F8F4A788B70B39F626100AE1 /* WatchModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75B3A379E19D07DA79D3A248 /* WatchModels.swift */; };
 		FB646FF0B6C90A8402F78604 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28C53C00153F913D15DBED25 /* WidgetKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		461261411A4633E0ECC23421 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DCF6D4AF52F2F59D2706F6F8;
+			remoteInfo = HuddleWatch;
+		};
+		BAEEB185F46F9292FE15860E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7CC4E0BD33F125AF320FB378;
+			remoteInfo = HuddleWatchWidgets;
+		};
 		E2C8698B974FDDE9961DFFD4 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
@@ -50,13 +80,40 @@
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CA78B4376CF28AD36CB19223 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				6FDB9A338CB0B9D3E07E8F0F /* HuddleWatchWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F31EC96F39953DD0F08577E5 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				19F5B1F112AFC37B2C66051F /* HuddleWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		20210919ADFBE781B703E260 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		23EC77844D94E102FE7F3578 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		28C53C00153F913D15DBED25 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/WidgetKit.framework; sourceTree = DEVELOPER_DIR; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		326DAC32E35262211C79CA20 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/WatchOS.platform/Developer/SDKs/WatchOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		3606CF855FD16D79701250E5 /* HuddleWidgetsPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HuddleWidgetsPlugin.swift; sourceTree = "<group>"; };
+		3BDA02B8954F81990AD14673 /* HuddleWatchWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HuddleWatchWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		43B209578EE3AD4F5419CE85 /* WatchLocalStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchLocalStore.swift; sourceTree = "<group>"; };
+		485A682053E2FD23DE4D9EB8 /* Localizable.xcstrings */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -67,13 +124,22 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		551031DD182B5935BCCFC749 /* HuddleWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HuddleWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		68D67F3981417FE8CCD971AD /* WidgetStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetStore.swift; sourceTree = "<group>"; };
+		6CE365E2D3055460C740DA61 /* HuddleWatchApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HuddleWatchApp.swift; sourceTree = "<group>"; };
+		75B3A379E19D07DA79D3A248 /* WatchModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchModels.swift; sourceTree = "<group>"; };
+		7BEBAF49113E9AD1FF800994 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7CDD393725870B55F6F73294 /* HuddleWatchWidgets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HuddleWatchWidgets.swift; sourceTree = "<group>"; };
+		7F092C41EE133A9E24F354D5 /* WatchBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchBridge.swift; sourceTree = "<group>"; };
 		90C3DFCCF29B8CF5AB92E0D2 /* FocusActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FocusActivity.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		9927E66813D216AEDF94613A /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		99B1C0CC5DEE9D9B344FD2BE /* HuddleWatch.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = HuddleWatch.entitlements; sourceTree = "<group>"; };
+		ABFC16FFDAD8FA9C09FF9A71 /* WatchModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchModel.swift; sourceTree = "<group>"; };
 		BFA7E18F670F8436968B9F81 /* HuddleWidgets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HuddleWidgets.swift; sourceTree = "<group>"; };
 		C189947393C92E9EE3012F56 /* HuddleWidgets.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = HuddleWidgets.entitlements; sourceTree = "<group>"; };
 		D3A507C9B179A3B32A68E868 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/SwiftUI.framework; sourceTree = DEVELOPER_DIR; };
+		E48730BD658250B4B9D87627 /* HuddleWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HuddleWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F30509A7AF44C3CD7E4C41F8 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F9DEBEB99112D1F7C15415DC /* HuddleWatchWidgets.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = HuddleWatchWidgets.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -87,11 +153,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0EB0C5616F893DA49D22B40D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C91F67540182C8A77DF678B9 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3011FED79650016851F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F2139ED57486E8F3181FA411 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EBDFBA5806CFA19D364948C7 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -108,6 +190,14 @@
 			path = WidgetShared;
 			sourceTree = "<group>";
 		};
+		2D4DE331212276B91A2E8D77 /* watchOS */ = {
+			isa = PBXGroup;
+			children = (
+				326DAC32E35262211C79CA20 /* Foundation.framework */,
+			);
+			name = watchOS;
+			sourceTree = "<group>";
+		};
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
@@ -117,6 +207,9 @@
 				0D27A38329A64FC00EA53481 /* WidgetShared */,
 				746E01F2E794EC51314E2AC0 /* Frameworks */,
 				7C54CEB84759A6A7DA751760 /* HuddleWidgets */,
+				E8EF81698C01C8BB0D0A446B /* WatchShared */,
+				AF48034C673E9F7E94C0EB8A /* HuddleWatch */,
+				851440C830B50581675FF6E5 /* HuddleWatchWidgets */,
 			);
 			sourceTree = "<group>";
 		};
@@ -125,6 +218,8 @@
 			children = (
 				504EC3041FED79650016851F /* App.app */,
 				551031DD182B5935BCCFC749 /* HuddleWidgets.appex */,
+				E48730BD658250B4B9D87627 /* HuddleWatch.app */,
+				3BDA02B8954F81990AD14673 /* HuddleWatchWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -141,6 +236,7 @@
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
 				3606CF855FD16D79701250E5 /* HuddleWidgetsPlugin.swift */,
+				7F092C41EE133A9E24F354D5 /* WatchBridge.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -149,6 +245,7 @@
 			isa = PBXGroup;
 			children = (
 				D1C99635A309A72521E879DA /* iOS */,
+				2D4DE331212276B91A2E8D77 /* watchOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -165,6 +262,29 @@
 			path = HuddleWidgets;
 			sourceTree = "<group>";
 		};
+		851440C830B50581675FF6E5 /* HuddleWatchWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				7CDD393725870B55F6F73294 /* HuddleWatchWidgets.swift */,
+				7BEBAF49113E9AD1FF800994 /* Info.plist */,
+				F9DEBEB99112D1F7C15415DC /* HuddleWatchWidgets.entitlements */,
+			);
+			name = HuddleWatchWidgets;
+			path = HuddleWatchWidgets;
+			sourceTree = "<group>";
+		};
+		AF48034C673E9F7E94C0EB8A /* HuddleWatch */ = {
+			isa = PBXGroup;
+			children = (
+				6CE365E2D3055460C740DA61 /* HuddleWatchApp.swift */,
+				ABFC16FFDAD8FA9C09FF9A71 /* WatchModel.swift */,
+				23EC77844D94E102FE7F3578 /* Assets.xcassets */,
+				99B1C0CC5DEE9D9B344FD2BE /* HuddleWatch.entitlements */,
+			);
+			name = HuddleWatch;
+			path = HuddleWatch;
+			sourceTree = "<group>";
+		};
 		D1C99635A309A72521E879DA /* iOS */ = {
 			isa = PBXGroup;
 			children = (
@@ -173,6 +293,17 @@
 				D3A507C9B179A3B32A68E868 /* SwiftUI.framework */,
 			);
 			name = iOS;
+			sourceTree = "<group>";
+		};
+		E8EF81698C01C8BB0D0A446B /* WatchShared */ = {
+			isa = PBXGroup;
+			children = (
+				75B3A379E19D07DA79D3A248 /* WatchModels.swift */,
+				43B209578EE3AD4F5419CE85 /* WatchLocalStore.swift */,
+				485A682053E2FD23DE4D9EB8 /* Localizable.xcstrings */,
+			);
+			name = WatchShared;
+			path = WatchShared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -203,11 +334,13 @@
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
 				B9D2377692A7F64D1C841D39 /* Embed App Extensions */,
+				F31EC96F39953DD0F08577E5 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				7460C9485DBEE0D8F415DC61 /* PBXTargetDependency */,
+				8E93AA018C9A01AEB1C52E1D /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -215,6 +348,42 @@
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		7CC4E0BD33F125AF320FB378 /* HuddleWatchWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 735290572593A75D47085168 /* Build configuration list for PBXNativeTarget "HuddleWatchWidgets" */;
+			buildPhases = (
+				A0CE7A4F2E48DC95558DAC81 /* Sources */,
+				F2139ED57486E8F3181FA411 /* Frameworks */,
+				32F9D1B291A29A8C5CD7C28D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HuddleWatchWidgets;
+			productName = HuddleWatchWidgets;
+			productReference = 3BDA02B8954F81990AD14673 /* HuddleWatchWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		DCF6D4AF52F2F59D2706F6F8 /* HuddleWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 269466EEE40627D95B272FFA /* Build configuration list for PBXNativeTarget "HuddleWatch" */;
+			buildPhases = (
+				9ACB5D276533A64E0E67CD57 /* Sources */,
+				0EB0C5616F893DA49D22B40D /* Frameworks */,
+				52571CE33E4274CA26D1232D /* Resources */,
+				CA78B4376CF28AD36CB19223 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2DE50A3152D732AA0A3A18FC /* PBXTargetDependency */,
+			);
+			name = HuddleWatch;
+			productName = HuddleWatch;
+			productReference = E48730BD658250B4B9D87627 /* HuddleWatch.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -240,6 +409,7 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hant",
 			);
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
@@ -251,11 +421,21 @@
 			targets = (
 				504EC3031FED79650016851F /* App */,
 				1698E6B1D09E1AD2CCEB212C /* HuddleWidgets */,
+				DCF6D4AF52F2F59D2706F6F8 /* HuddleWatch */,
+				7CC4E0BD33F125AF320FB378 /* HuddleWatchWidgets */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		32F9D1B291A29A8C5CD7C28D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				512B8A591F5999D1B9BC9B07 /* Localizable.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3021FED79650016851F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -266,6 +446,15 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		52571CE33E4274CA26D1232D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F20FFD8492BA0A316B370ACE /* Assets.xcassets in Resources */,
+				746199016547E08016392BFE /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -288,6 +477,29 @@
 				4054581696231AFE80114F14 /* WidgetStore.swift in Sources */,
 				7DA2B46A6231E3CF79475816 /* HuddleWidgetsPlugin.swift in Sources */,
 				26187E20E0BB7CA1B4F2B8C2 /* FocusActivity.swift in Sources */,
+				CEE50EBE87514FF20D7A29FA /* WatchBridge.swift in Sources */,
+				A241864D4AEEDCAE64B78E94 /* WatchModels.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9ACB5D276533A64E0E67CD57 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4D8D1C10A2177887E350DF9B /* HuddleWatchApp.swift in Sources */,
+				D3F4D5B4093579F1A13D44D9 /* WatchModel.swift in Sources */,
+				D33C79AC889A431EAA9D1ED4 /* WatchModels.swift in Sources */,
+				725A4B1EECBFB629155EB28F /* WatchLocalStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A0CE7A4F2E48DC95558DAC81 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				39C1F5E319447E3221C3FF57 /* HuddleWatchWidgets.swift in Sources */,
+				F8F4A788B70B39F626100AE1 /* WatchModels.swift in Sources */,
+				BA8D1E871291C3F19589C382 /* WatchLocalStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -304,11 +516,23 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		2DE50A3152D732AA0A3A18FC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = HuddleWatchWidgets;
+			target = 7CC4E0BD33F125AF320FB378 /* HuddleWatchWidgets */;
+			targetProxy = BAEEB185F46F9292FE15860E /* PBXContainerItemProxy */;
+		};
 		7460C9485DBEE0D8F415DC61 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = HuddleWidgets;
 			target = 1698E6B1D09E1AD2CCEB212C /* HuddleWidgets */;
 			targetProxy = E2C8698B974FDDE9961DFFD4 /* PBXContainerItemProxy */;
+		};
+		8E93AA018C9A01AEB1C52E1D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = HuddleWatch;
+			target = DCF6D4AF52F2F59D2706F6F8 /* HuddleWatch */;
+			targetProxy = 461261411A4633E0ECC23421 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -532,9 +756,120 @@
 			};
 			name = Release;
 		};
+		A7731BB9C29C0883E48FAC2C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HuddleWatch/HuddleWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PQZ8V7ZAXU;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Huddle;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.lazylazy.huddle;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lazylazy.huddle.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
+		B04E5C650FD7C7D3C86BFD3D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = HuddleWatchWidgets/HuddleWatchWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PQZ8V7ZAXU;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HuddleWatchWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Huddle;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lazylazy.huddle.watchkitapp.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		DF30FC5775DAD6A1CF803BB6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HuddleWatch/HuddleWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PQZ8V7ZAXU;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Huddle;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.lazylazy.huddle;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = NO;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lazylazy.huddle.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		DFDE406679625877B496CF57 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = HuddleWatchWidgets/HuddleWatchWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PQZ8V7ZAXU;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HuddleWatchWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Huddle;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lazylazy.huddle.watchkitapp.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		269466EEE40627D95B272FFA /* Build configuration list for PBXNativeTarget "HuddleWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A7731BB9C29C0883E48FAC2C /* Release */,
+				DF30FC5775DAD6A1CF803BB6 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -549,6 +884,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		735290572593A75D47085168 /* Build configuration list for PBXNativeTarget "HuddleWatchWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DFDE406679625877B496CF57 /* Release */,
+				B04E5C650FD7C7D3C86BFD3D /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
