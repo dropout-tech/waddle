@@ -471,6 +471,10 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
     return () => {
       window.clearTimeout(t)
       window.clearTimeout(sub)
+      // The effect re-runs whenever pose/bubble/menu change — including
+      // right after doBlink() (wake-up sets pose). Clearing `sub` without
+      // reopening the eyes left the lids stuck shut (half-covered eyes).
+      setBlink(false)
     }
   }, [animate, isMobile, pose, bubble, menuOpen, playAct])
 

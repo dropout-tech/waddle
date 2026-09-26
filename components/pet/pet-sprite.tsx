@@ -13,8 +13,8 @@ const BODY = '#555549'
 /**
  * The penguin itself: the existing marketing art (public/art/penguin) with a
  * colour filter, SVG eyelids/blush and an SVG accessory layered on top.
- * All geometry is in the art's 240×240 space (eyes measured at (90,82) and
- * (162,82)); the accessory sits outside the filter so it keeps its colour.
+ * All geometry is in the art's 240×240 space (eyes measured at (82.5,83) and
+ * (158,83), white r≈20 + outline); the accessory sits outside the filter so it keeps its colour.
  * Pure presentation — animation state arrives as data attributes that
  * pet.module.css keys off.
  *
@@ -48,8 +48,8 @@ export function PetSprite({
         {standing && (
           <svg viewBox="0 0 240 240" className={styles.overlay}>
             <g className={styles.lids}>
-              <ellipse cx="90" cy="82" rx="20" ry="21" fill={BODY} />
-              <ellipse cx="162" cy="82" rx="20" ry="21" fill={BODY} />
+              <ellipse cx="82.5" cy="83" rx="23" ry="23" fill={BODY} />
+              <ellipse cx="158" cy="83" rx="23" ry="23" fill={BODY} />
             </g>
             <g className={styles.blush} data-on={blush ? '' : undefined}>
               <ellipse cx="60" cy="114" rx="16" ry="9" fill="#e79a86" />
@@ -89,13 +89,13 @@ function Accessory({ kind, accent }: { kind: PetAccessory; accent: string }) {
     case 'glasses':
       return (
         <g stroke={INK} strokeWidth="5" fill="none">
-          <circle cx="90" cy="82" r="27" fill={accent} fillOpacity="0.14" />
-          <circle cx="90" cy="82" r="27" stroke={accent} strokeWidth="7" />
-          <circle cx="90" cy="82" r="27" />
-          <circle cx="162" cy="82" r="27" fill={accent} fillOpacity="0.14" />
-          <circle cx="162" cy="82" r="27" stroke={accent} strokeWidth="7" />
-          <circle cx="162" cy="82" r="27" />
-          <path d="M117 80 Q126 72 135 80" strokeWidth="6" />
+          <circle cx="82.5" cy="83" r="27" fill={accent} fillOpacity="0.14" />
+          <circle cx="82.5" cy="83" r="27" stroke={accent} strokeWidth="7" />
+          <circle cx="82.5" cy="83" r="27" />
+          <circle cx="158" cy="83" r="27" fill={accent} fillOpacity="0.14" />
+          <circle cx="158" cy="83" r="27" stroke={accent} strokeWidth="7" />
+          <circle cx="158" cy="83" r="27" />
+          <path d="M109 81 Q120 73 131 81" strokeWidth="6" />
         </g>
       )
     case 'headphones':
