@@ -108,7 +108,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
           <img src="/art/hero-desk-v2.webp" width={1600} height={900} alt="" fetchPriority="high" decoding="async" />
         </picture>
         <div className={styles.heroCopy}>
-          <figure className={styles.quote}>
+          <figure className={styles.quote} data-quoted={quote.author ? "" : undefined}>
             <blockquote>
               <h1 id="hero-title">{clauses(quote.quote).map((c, i) => <span key={i}>{c}</span>)}</h1>
             </blockquote>

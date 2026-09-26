@@ -36,7 +36,7 @@
 .heroCopy { width: 100%; max-width: 1440px; margin: 0 auto; padding: 40px 4% 80px; }
 .quote { margin: 0; max-width: min(54vw, 900px); }
 .quote blockquote { margin: 0; }
-.quote blockquote::before { content: '\201C'; display: block; height: .44em; margin: 0 0 0 -.05em; font-family: var(--poster-en), sans-serif; font-weight: 800; font-size: clamp(96px, 11vw, 190px); line-height: .8; color: var(--orange); }
+.quote[data-quoted] blockquote::before { content: '\201C'; display: block; height: .44em; margin: 0 0 0 -.05em; font-family: var(--poster-en), sans-serif; font-weight: 800; font-size: clamp(96px, 11vw, 190px); line-height: .8; color: var(--orange); }
 .hero h1 { font-family: var(--poster-zh), sans-serif; font-weight: 900; font-size: clamp(50px, 6vw, 104px); line-height: 1.1; letter-spacing: -.045em; margin: 0; transform: rotate(-1.2deg) skew(-2deg); transform-origin: left bottom; }
 .hero h1 span { display: inline-block; max-width: 100%; }
 .author { display: flex; align-items: center; gap: 16px; margin-top: 30px; font-family: var(--poster-en), sans-serif; font-weight: 800; font-size: clamp(20px, 1.8vw, 28px); letter-spacing: .06em; text-transform: uppercase; }
@@ -168,7 +168,7 @@
   .heroArt img { height: auto; -webkit-mask-image: linear-gradient(transparent, #000 34%); mask-image: linear-gradient(transparent, #000 34%); }
   .heroCopy { position: relative; z-index: 1; padding: 22px 5% 0; }
   .quote { max-width: none; }
-  .quote blockquote::before { font-size: 96px; }
+  .quote[data-quoted] blockquote::before { font-size: 96px; }
   .hero h1 { font-size: min(11.4vw, 64px); line-height: 1.12; }
   .heroSub { font-size: 17px; margin-top: 18px; }
   .heroActions { gap: 4px 20px; margin-top: 20px; }
