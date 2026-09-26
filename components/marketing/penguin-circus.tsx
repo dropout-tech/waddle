@@ -626,18 +626,24 @@ export function FocusRing() {
 }
 
 export function Hammock() {
+  // Layered so the penguin sleeps IN the hammock: ropes + back cloth, then
+  // the penguin, then the front cloth edge wrapping its lower body.
   return (
-    <div className={styles.hammock} data-penguin-stop="hammock" data-penguin-at="0.5 0.78" data-penguin-pose="sleep" data-penguin-nap="" data-penguin-priority="" aria-hidden="true">
+    <div className={styles.hammock} data-penguin-stop="hammock" data-penguin-at="0.5 0.7" data-penguin-pose="sleep" data-penguin-nap="" data-penguin-priority="" aria-hidden="true">
       <div className={styles.hammockSwing}>
-        <svg viewBox="0 0 190 96" preserveAspectRatio="none">
+        <svg viewBox="0 0 190 96" preserveAspectRatio="xMidYMid meet">
           <circle cx="6" cy="8" r="5" fill="none" stroke="#292b24" strokeWidth="3" />
           <circle cx="184" cy="8" r="5" fill="none" stroke="#292b24" strokeWidth="3" />
-          <path d="M9 12 L38 46 M181 12 L152 46" stroke="#292b24" strokeWidth="2.5" fill="none" />
-          <path d="M34 44 Q95 104 156 44 Q95 72 34 44 Z" fill="#edc747" stroke="#292b24" strokeWidth="3" strokeLinejoin="round" />
-          <path d="M52 56 Q95 86 138 56 M70 52 L74 68 M95 54 L95 75 M120 52 L116 68" stroke="#292b24" strokeWidth="1.6" fill="none" opacity=".55" />
+          <path d="M9 12 L40 50 M181 12 L150 50" stroke="#292b24" strokeWidth="2.5" fill="none" />
+          <g className={styles.bed}>
+            {/* back cloth: the inside of the hammock, a shade darker */}
+            <path d="M32 44 Q95 50 158 44 Q95 110 32 44 Z" fill="#c9a233" stroke="#292b24" strokeWidth="3" strokeLinejoin="round" />
+            <image className={styles.hammockBird} href={src('sleep')} x="46" y="2" width="100" height="70" preserveAspectRatio="xMidYMax meet" />
+            {/* front cloth: the near edge, wrapping over the penguin's body */}
+            <path d="M32 44 Q95 80 158 44 Q95 112 32 44 Z" fill="#edc747" stroke="#292b24" strokeWidth="3" strokeLinejoin="round" />
+            <path d="M48 60 Q95 90 142 60 M70 62 L71 70 M95 65 L95 75 M120 62 L119 70" stroke="#292b24" strokeWidth="1.6" fill="none" opacity=".5" />
+          </g>
         </svg>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className={styles.hammockBird} src={src('sleep')} alt="" width={240} height={240} loading="lazy" />
         <span className={styles.zzz}><span>z</span><span>z</span><span>Z</span></span>
       </div>
     </div>
