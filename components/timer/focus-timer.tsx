@@ -109,6 +109,9 @@ export function FocusTimer({ onCreateTimeBlock }: FocusTimerProps) {
       <div
         ref={floatRef}
         data-timer-launcher-root
+        // Collapsed chip gets out of the way of the soft keyboard
+        // (hooks/use-soft-keyboard.ts); the expanded sheet stays.
+        data-hide-on-keyboard={mobileExpanded ? undefined : ''}
         data-timer-launcher-quiet={glance ? (scrolling ? 'scroll' : blocked ? 'yield' : 'off') : 'off'}
         className={cn(
           "fixed z-40 transition-all duration-300",

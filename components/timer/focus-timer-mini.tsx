@@ -386,6 +386,7 @@ export function FocusTimerMini({
       data-waddle-mini-root
       data-timer-mini-state={phone ? (collapsed ? 'collapsed' : 'expanded') : 'desktop'}
       data-timer-mini-quiet={quiet ? (scrolling ? 'scroll' : 'yield') : 'off'}
+      data-hide-on-keyboard
       className={cn('fixed z-toast bottom-6 right-6', phone && 'animate-in fade-in slide-in-from-bottom-2')}
       style={containerStyle}
       role="region"

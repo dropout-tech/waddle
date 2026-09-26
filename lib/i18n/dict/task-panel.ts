@@ -223,19 +223,7 @@ export const dict: Record<string, string> = {
 
   // focus-block.tsx
   '當前重點': 'Current focus',
-  '編輯當前重點': 'Edit current focus',
-  '逾期 {days} 天': '{days} days overdue',
-  '逾期': 'Overdue',
-  '急迫': 'Urgent',
-  '手動釘選': 'Pinned',
   '自訂': 'Custom',
-  '原本釘的任務已完成，已換下一個': 'The pinned task is done — showing the next one',
-  '各工作區重點': 'Focus by workspace',
-  '還有 {count} 個工作區': '{count} more workspaces',
-  '設定工作區重點': 'Set a workspace focus',
-  '編輯「{name}」的重點': 'Edit focus for "{name}"',
-  '今天很輕鬆 🐧': 'Nothing pressing today 🐧',
-  '設定重點': 'Set a focus',
 
   // focus-board.tsx — the 重點 tab's per-category board
   '分類看板': 'Category board',
@@ -244,7 +232,6 @@ export const dict: Record<string, string> = {
   '挑幾個分類放上來，這裡就會列出它們接下來的幾件事。':
     'Put a few categories up here and this page will list what comes next in each one.',
   '選擇分類': 'Pick categories',
-  '這個分類都完成了 🐧': 'All clear in this one 🐧',
   '還有 {count} 個': '{count} more',
   '{count} 個逾期': '{count} overdue',
 
@@ -272,13 +259,6 @@ export const dict: Record<string, string> = {
   // every entry, so they carry their own colon (fullwidth in zh, ASCII in en)
   // instead of one being appended in JSX.
   '大綱': 'Outline',
-  '標題：': 'Title:',
-  '當前重點：': 'Current focus:',
-  '當前進展：': 'Current progress:',
-  '任務：': 'Tasks:',
-  '點一下寫下進展': 'Add a progress note',
-  '這個分類現在推到哪了？': 'Where does this one stand?',
-  'Enter 存檔・Esc 取消・點別處也會存': 'Enter to save · Esc to cancel · clicking away saves too',
 
   // Category progress board
   "全部展開": "Expand all",

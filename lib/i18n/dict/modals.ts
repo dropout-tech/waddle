@@ -353,20 +353,7 @@ export const dict: Record<string, string> = {
   '回到 Huddle': 'Back to Huddle',
 
   // ── focus-editor-modal.tsx ──────────────────────────────────────────────
-  '設定當前重點': 'Set your current focus',
-  '設定「{name}」的重點': 'Set the focus for "{name}"',
-  '自動推薦': 'Auto',
   '自訂文字': 'Custom text',
-  '釘選任務': 'Pin a task',
-  '不顯示': 'Hide',
-  'Huddle 會挑逾期最久 → 今天排程 → 最急迫的任務':
-    'Huddle picks the longest overdue task, then today’s schedule, then the most urgent one',
-  '現在會顯示': 'Showing now',
-  '例：推進講師資源站': 'e.g. Push the instructor resource site forward',
-  '已選擇：{title}': 'Selected: {title}',
-  '沒有符合的任務': 'No matching tasks',
-  '這個工作區不會出現在「各工作區重點」清單裡。':
-    'This workspace stays out of the “Focus by workspace” list.',
 
   // ── focus-board-editor-modal.tsx ────────────────────────────────────────
   '編輯重點版面': 'Edit the focus board',
@@ -377,7 +364,6 @@ export const dict: Record<string, string> = {
   '{count} 個未完成': '{count} open',
   '把「{name}」往上移': 'Move “{name}” up',
   '把「{name}」往下移': 'Move “{name}” down',
-  '「{name}」的進度': 'Progress note for “{name}”',
   '這個分類現在推到哪了？（選填）': 'Where does this one stand? (optional)',
   '還沒有分類可以選': 'No categories to pick yet',
   '已選 {count} 張卡': '{count} cards selected',
@@ -386,7 +372,4 @@ export const dict: Record<string, string> = {
   '這個大分類還沒有小分類': 'No sub-categories in this workspace yet',
 
   // ── settings-modal.tsx · 當前重點 ───────────────────────────────────────
-  '顯示當前重點': 'Show current focus',
-  '在任務欄最上面釘一句「現在最重要的事」，可以自己打字或釘一個任務。':
-    'Pin one line at the top of the task panel — type it yourself or pin a task.',
 }

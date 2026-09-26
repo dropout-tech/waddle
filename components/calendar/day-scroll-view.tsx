@@ -1226,7 +1226,17 @@ export function DayScrollView({
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-auto"
-        style={isMobile && !activeTaskDrag && !pendingTaskDrag && !activeBlockDrag ? { scrollSnapType: 'x mandatory', scrollSnapStop: 'always' } : undefined}
+        style={isMobile && !activeTaskDrag && !pendingTaskDrag && !activeBlockDrag ? {
+          scrollSnapType: 'x mandatory',
+          scrollSnapStop: 'always',
+          // The sticky time-label column (TIME_COL_WIDTH) sits inside this
+          // scroller, so without this the snap aligned each day column to
+          // x=0 — under the labels — leaving the body 56px left of the
+          // header and a sliver of the next day on the right (iPhone
+          // report 2026-09-26). The header scroller has no gutter inside,
+          // so both now land on the same scrollLeft.
+          scrollPaddingLeft: `${TIME_COL_WIDTH}px`,
+        } : undefined}
         onScroll={() => {
           handleScroll()
           syncScroll('grid')

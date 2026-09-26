@@ -88,7 +88,7 @@ interface FullScreenTaskViewProps {
   onToggleComplete?: (taskId: string) => void
   onClose: () => void
   onAddTask?: (categoryId: string, title: string) => void
-  /** "當前重點" settings. Omitted ⇒ the block doesn't render. */
+  /** 重點 board settings. Omitted ⇒ the 任務重點 tab is hidden. */
   focusBoard?: FocusSettings
   /** Narrow mutation for the focus block; omitted ⇒ block stays read-only. */
   onSetFocusBoard?: (next: FocusSettings) => Promise<void> | void

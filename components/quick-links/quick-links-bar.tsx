@@ -100,7 +100,10 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
       {/* Backdrop — same z-stacking as scratchpad so the two never fight
           over the screen. Subtle blur + dark wash so the panel reads as
           a foreground surface. */}
-      {isExpanded && (
+      {/* Desktop only: on phones (hideTrigger) the sheet fills the screen
+          above the tab bar, and this full-viewport backdrop sat on top of
+          the tab bar - blurred and unclickable (owner report 2026-09-26). */}
+      {isExpanded && !hideTrigger && (
         <div
           className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-popover"
           onClick={() => setExpanded(false)}
@@ -149,10 +152,11 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
               the bottom tab bar (58 px). translate-y handles the slide. */}
         <div
           ref={panelRef}
+          data-sheet-above-tabbar={hideTrigger ? '' : undefined}
           className={cn(
             hideTrigger
               ? cn(
-                  'fixed left-0 right-0 top-0 bottom-[58px]',
+                  'fixed left-0 right-0 top-0',
                   'bg-card border-b border-border shadow-2xl',
                   'transition-transform duration-300 ease-out',
                   isExpanded ? '' : 'pointer-events-none',
@@ -167,6 +171,12 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
           style={
             hideTrigger
               ? {
+                  // Safe areas: the iOS shell runs with contentInset
+                  // 'never' (capacitor.config.ts), so this fixed sheet must
+                  // clear the status bar itself, and it ends above the tab
+                  // bar, which is 58px + the home-indicator inset tall.
+                  paddingTop: 'env(safe-area-inset-top)',
+                  bottom: 'var(--sheet-bottom, calc(58px + env(safe-area-inset-bottom)))',
                   // Mirror of scratchpad's offset: translate-y-full only
                   // shifts by the element's own height. With top:0
                   // bottom:58 the height is (100dvh − 58), so a plain
@@ -174,7 +184,7 @@ export function QuickLinksBar({ links, onSave, isOpen, onOpenChange, hideTrigger
                   // the tab bar — pad the slide to fully hide.
                   transform: isExpanded
                     ? 'translateY(0)'
-                    : 'translateY(calc(100% + 58px))',
+                    : 'translateY(calc(100% + 58px + env(safe-area-inset-bottom)))',
                 }
               : undefined
           }
