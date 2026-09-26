@@ -19,6 +19,7 @@ import { getLang, t } from '@/lib/i18n'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { TaskAssignButton } from '@/components/assignments/task-assign-section'
+import type { AssignablePerson } from '@/lib/assignments'
 
 // Weekday letters for the recurrence day-picker. Kept lang-aware directly
 // (not routed through t()) because a single Chinese character like '日'
@@ -73,7 +74,8 @@ interface TaskDetailModalProps {
   /** 'edit' (default) edits an existing task; 'create' uses task as a draft and saves as a new task. */
   mode?: 'edit' | 'create'
   onClose: () => void
-  onSave: (updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('./recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => void
+  /** `assignTo` (create mode only): assign to this person right after the insert. */
+  onSave: (updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('./recurrence-choice-modal').RecurrenceChoice, targetDate?: string, assignTo?: AssignablePerson) => void
   onToggleComplete?: (taskId: string) => void
   onDelete?: (taskId: string, targetDate?: string, recurrenceChoice?: import('./recurrence-choice-modal').RecurrenceChoice) => void
 }
@@ -94,6 +96,9 @@ export function TaskDetailModal({
   // Someone else's task assigned to me: their workspace/category, their
   // title/notes. Only completion / time / schedule are mine to change.
   const isAssignee = task.assignment?.role === 'assignee'
+  // Create mode: the person picked in the header, assigned after the insert.
+  const [stagedAssignee, setStagedAssignee] = useState<AssignablePerson | null>(null)
+  const [assignNotice, setAssignNotice] = useState('')
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description || '')
   const [urgency, setUrgency] = useState(task.urgency)
@@ -166,6 +171,17 @@ export function TaskDetailModal({
   }
 
   const commitSave = (choice?: RecurrenceChoice) => {
+    if (isAssignee) {
+      // Assignee: only the whitelisted (schedule) fields are editable, so
+      // that is exactly what gets saved — nothing is silently dropped.
+      onSave({
+        scheduledDate: scheduledDate || '',
+        scheduledStartTime: scheduledStartTime || '',
+        scheduledEndTime: scheduledEndTime || '',
+      }, undefined, choice, occurrenceDate)
+      onClose()
+      return
+    }
     // Send `''` (not `undefined`) for cleared fields so taskToRow writes
     // DB NULL — otherwise the mapper drops the key and the old value
     // sticks around. Same goes for meeting fields when isMeeting is off.
@@ -210,7 +226,13 @@ export function TaskDetailModal({
       }
     }
 
-    onSave(updates, selectedCategoryId !== task.categoryId ? selectedCategoryId : undefined, choice, occurrenceDate)
+    onSave(
+      updates,
+      selectedCategoryId !== task.categoryId ? selectedCategoryId : undefined,
+      choice,
+      occurrenceDate,
+      isCreate && !isRecurring && stagedAssignee ? stagedAssignee : undefined,
+    )
     onClose()
   }
 
@@ -289,6 +311,11 @@ export function TaskDetailModal({
             {/* Assignment lives entirely in this small header control + its
                 popover (migration 20260927120000). */}
             {!isCreate && <TaskAssignButton task={task} onReturned={onClose} />}
+            {/* Create: pick someone now, assigned right after the insert.
+                Recurring tasks can't be assigned, so hide it then. */}
+            {isCreate && !isRecurring && (
+              <TaskAssignButton task={task} staged={stagedAssignee} onStage={(p) => { setStagedAssignee(p); setAssignNotice('') }} />
+            )}
             {!isCreate && onDelete && !isAssignee && (
               <button
                 onClick={() => {
@@ -326,12 +353,25 @@ export function TaskDetailModal({
               onChange={(e) => setTitle(e.target.value)}
               placeholder={isCreate ? t('輸入任務標題…') : t('任務名稱')}
               readOnly={isAssignee}
-              className="text-lg font-semibold border-0 px-0 focus-visible:ring-0 bg-transparent"
+              disabled={isAssignee}
+              className="text-lg font-semibold border-0 px-0 focus-visible:ring-0 bg-transparent disabled:opacity-100"
             />
+            {isAssignee && (
+              <p data-testid="assignee-lock-hint" className="mt-1 text-xs text-muted-foreground">
+                {t('由 {name} 指派，只能調整排程與完成狀態', { name: task.assignment!.peerName })}
+              </p>
+            )}
+            {assignNotice && (
+              <p data-testid="assign-notice" role="status" className="mt-1 text-xs text-muted-foreground">{assignNotice}</p>
+            )}
           </div>
 
-          {/* Urgency — visual slider with color-coded level */}
-          <UrgencySlider value={urgency} onChange={setUrgency} />
+          {/* Assignee: every non-whitelisted control below is disabled via
+              <fieldset disabled> (the DB trigger enforces the same list). */}
+          <fieldset disabled={isAssignee} className="m-0 min-w-0 border-0 p-0 disabled:opacity-60">
+            {/* Urgency — visual slider with color-coded level */}
+            <UrgencySlider value={urgency} onChange={setUrgency} />
+          </fieldset>
 
           {/* Time block: scheduled date + start/end + duration + quick presets */}
           <TimeBlockSection
@@ -345,7 +385,9 @@ export function TaskDetailModal({
             onEndTimeChange={setScheduledEndTime}
             onEstimatedMinutesChange={setEstimatedMinutes}
             onDueDateChange={setDueDate}
+            lockMeta={isAssignee}
           >
+            <fieldset disabled={isAssignee} className="m-0 min-w-0 border-0 p-0 disabled:opacity-60">
             <RecurrenceSettings
               isRecurring={isRecurring}
               recurrenceType={recurrenceType}
@@ -354,6 +396,10 @@ export function TaskDetailModal({
               recurrenceEndDate={recurrenceEndDate}
               onRecurringChange={(next) => {
                 setIsRecurring(next)
+                if (next && stagedAssignee) {
+                  setStagedAssignee(null)
+                  setAssignNotice(t('重複任務無法指派，已取消選擇的對象'))
+                }
                 // Recurring tasks would otherwise spawn unbounded copies in
                 // the left task panel. Auto-hide on enable so the calendar
                 // stays the source of truth for repeats; users can re-enable
@@ -365,8 +411,10 @@ export function TaskDetailModal({
               onToggleRecurrenceDay={toggleRecurrenceDay}
               onRecurrenceEndDateChange={setRecurrenceEndDate}
             />
+            </fieldset>
           </TimeBlockSection>
 
+          <fieldset disabled={isAssignee} className="m-0 min-w-0 space-y-5 border-0 p-0 disabled:opacity-60">
           {/* Task content follows scheduling in the main reading flow. */}
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -566,6 +614,7 @@ export function TaskDetailModal({
               </label>
             </div>
           </div>
+          </fieldset>
 
         </div>
 
@@ -713,6 +762,8 @@ interface TimeBlockSectionProps {
   onEndTimeChange: (v: string) => void
   onEstimatedMinutesChange: (v: string) => void
   onDueDateChange: (v: string) => void
+  /** Assignee view: estimated time + deadline are read-only. */
+  lockMeta?: boolean
   children?: ReactNode
 }
 
@@ -727,6 +778,7 @@ function TimeBlockSection({
   onEndTimeChange,
   onEstimatedMinutesChange,
   onDueDateChange,
+  lockMeta = false,
   children,
 }: TimeBlockSectionProps) {
   const { t } = useI18n()
@@ -959,7 +1011,7 @@ function TimeBlockSection({
         </button>
 
         {showTimingDetails && (
-          <div className="grid grid-cols-1 gap-4 pt-3 sm:grid-cols-2">
+          <fieldset disabled={lockMeta} className="m-0 grid min-w-0 grid-cols-1 gap-4 border-0 p-0 pt-3 sm:grid-cols-2 disabled:opacity-60">
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Clock className="h-3.5 w-3.5" />
@@ -985,7 +1037,7 @@ function TimeBlockSection({
                 aria-label={t('截止日期')}
               />
             </div>
-          </div>
+          </fieldset>
         )}
       </div>
     </div>
