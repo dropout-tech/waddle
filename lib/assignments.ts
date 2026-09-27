@@ -10,17 +10,13 @@ import { t } from '@/lib/i18n'
 import { isNative } from '@/lib/platform'
 import type { TaskAssignment } from '@/lib/types'
 
-/** sessionStorage key for an org invite token pending across the login round-trip. */
-export const PENDING_ORG_INVITE_KEY = 'huddle-pending-org-invite'
-
-/** Where to resume after login if an org invite is pending (else null). */
-export function pendingOrgInvitePath(): string | null {
-  try {
-    return window.sessionStorage.getItem(PENDING_ORG_INVITE_KEY) ? '/org/invite' : null
-  } catch {
-    return null
-  }
-}
+export {
+  PENDING_ORG_INVITE_KEY,
+  savePendingOrgInvite,
+  readPendingOrgInvite,
+  clearPendingOrgInvite,
+  pendingOrgInvitePath,
+} from '@/lib/pending-org-invite'
 
 export interface AssignmentRecord extends TaskAssignment {
   taskId: string

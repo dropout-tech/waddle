@@ -96,6 +96,9 @@ export function TaskDetailModal({
   // Someone else's task assigned to me: their workspace/category, their
   // title/notes. Only completion / time / schedule are mine to change.
   const isAssignee = task.assignment?.role === 'assignee'
+  // Owner of an assigned task: recurrence is off-limits (assign_task rejects
+  // recurring tasks, and the assignee paths only ever touch the master row).
+  const ownerAssigned = !isCreate && task.assignment?.role === 'assigner'
   // Create mode: the person picked in the header, assigned after the insert.
   const [stagedAssignee, setStagedAssignee] = useState<AssignablePerson | null>(null)
   const [assignNotice, setAssignNotice] = useState('')
@@ -387,7 +390,12 @@ export function TaskDetailModal({
             onDueDateChange={setDueDate}
             lockMeta={isAssignee}
           >
-            <fieldset disabled={isAssignee} className="m-0 min-w-0 border-0 p-0 disabled:opacity-60">
+            {ownerAssigned && (
+              <p data-testid="recurrence-locked-hint" className="mb-2 text-xs text-muted-foreground">
+                {t('已指派的任務不能設為重複，請先取消指派')}
+              </p>
+            )}
+            <fieldset disabled={isAssignee || ownerAssigned} className="m-0 min-w-0 border-0 p-0 disabled:opacity-60">
             <RecurrenceSettings
               isRecurring={isRecurring}
               recurrenceType={recurrenceType}

@@ -56,7 +56,7 @@ function Callback() {
         if (cancelled || timedOut) return
         window.history.replaceState(null, '', '/auth/callback')
         window.clearTimeout(timer)
-        if (success) router.replace(pendingMeetingPath() || '/')
+        if (success) router.replace(pendingMeetingPath() || pendingOrgInvitePath() || '/')
         else setFailure('無法完成桌面登入，請返回桌面程式重新登入。')
         return
       }

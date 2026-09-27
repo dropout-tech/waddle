@@ -109,7 +109,7 @@ function CreateOrg({ canCreate, onCreated, onCancel }: { canCreate: boolean; onC
       {canCreate ? (
         <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row">
           <input value={name} onChange={(e) => setName(e.target.value.slice(0, 60))} placeholder={t('組織名稱，例如「行銷部」')}
-            aria-label={t('組織名稱')} className="min-h-11 flex-1 rounded-lg border border-border bg-background px-3 text-sm" />
+            aria-label={t('組織名稱')} className="min-h-11 flex-1 rounded-lg border border-border bg-background px-3 text-base md:text-sm" />
           <div className="flex gap-2">
             {onCancel && <button type="button" onClick={onCancel} className="min-h-11 rounded-lg border border-border px-4 text-sm">{t('取消')}</button>}
             <button type="submit" disabled={busy || !name.trim()} className="min-h-11 rounded-lg bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50">
@@ -205,7 +205,7 @@ function OrgDetail({ org, onChanged }: { org: OrgSummary; onChanged: () => Promi
             {link ? (
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input readOnly value={link} onFocus={(e) => e.currentTarget.select()} aria-label={t('邀請連結')}
-                  className="min-h-11 flex-1 truncate rounded-lg border border-border bg-background px-3 text-xs" />
+                  className="min-h-11 flex-1 truncate rounded-lg border border-border bg-background px-3 text-base md:text-xs" />
                 <button onClick={copy} className="flex min-h-11 items-center justify-center gap-1 rounded-lg bg-primary px-4 text-sm text-primary-foreground"><Copy className="h-4 w-4" />{t('複製')}</button>
               </div>
             ) : (

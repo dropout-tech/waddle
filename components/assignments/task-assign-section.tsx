@@ -67,7 +67,7 @@ export function TaskAssignmentChip({ task }: { task: Task }) {
   const a = task.assignment
   if (!a) return null
   const label = assignmentLabel(t, a)
-  const title = a.status === 'returned' && a.returnNote ? `${label}：${a.returnNote}` : label
+  const title = a.status === 'returned' && a.returnNote ? t('{label}：{note}', { label, note: a.returnNote }) : label
   return (
     <span
       data-testid="assignment-chip"
@@ -222,7 +222,7 @@ export function TaskAssignButton({ task, onReturned, staged, onStage }: {
                 rows={2}
                 placeholder={t('寫一句退回理由（對方會看到）')}
                 aria-label={t('退回理由')}
-                className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm"
+                className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-base md:text-sm"
               />
               <button
                 type="button"

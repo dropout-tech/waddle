@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { pendingMeetingPath } from '@/lib/auth/meeting-return'
+import { pendingOrgInvitePath } from '@/lib/pending-org-invite'
 import { createClient } from '@/lib/supabase/client'
 import { isNative } from '@/lib/platform'
 
@@ -30,7 +31,7 @@ export function DeepLinkHandler() {
           if (code) await supabase.auth.exchangeCodeForSession(code)
           const { Browser } = await import('@capacitor/browser')
           await Browser.close().catch(() => {})
-          router.replace(pendingMeetingPath() || '/')
+          router.replace(pendingMeetingPath() || pendingOrgInvitePath() || '/')
         } catch {
           router.replace('/login?error=auth_callback_failed')
         }

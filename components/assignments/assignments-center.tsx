@@ -173,7 +173,7 @@ function MineRow({ item, onChanged }: { item: AssignmentRecord; onChanged: () =>
         <div className="mt-2 space-y-2">
           <textarea value={note} onChange={(e) => setNote(e.target.value.slice(0, 200))} rows={2}
             placeholder={t('寫一句退回理由（對方會看到）')}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base md:text-sm" />
           <div className="flex gap-2">
             <button type="button" disabled={busy} onClick={() => setReturning(false)} className="min-h-11 flex-1 rounded-lg border border-border text-sm">{t('取消')}</button>
             <button type="button" disabled={busy} onClick={submitReturn} className="min-h-11 flex-1 rounded-lg bg-destructive text-sm text-destructive-foreground">{t('確認退回')}</button>
