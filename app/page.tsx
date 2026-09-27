@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
-import { Toaster } from 'sonner'
+import { Toaster, toast } from 'sonner'
 import { WidgetSync } from '@/components/widgets/widget-sync'
 import { MainLayout } from '@/components/layout/main-layout'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
@@ -31,6 +31,8 @@ import { AuthGuard } from '@/components/auth/auth-guard'
 import { CategoryPrefixProvider } from '@/components/category-prefix-context'
 import { NotebookOverlayProvider } from '@/components/notebook/notebook-overlay-provider'
 import { useI18n } from '@/lib/i18n/react'
+import { t as translate } from '@/lib/i18n'
+import { assignTask, assignmentErrorMessage, notifyAssignmentsChanged, type AssignablePerson } from '@/lib/assignments'
 import type { Task, SlotType, TimeBlock } from '@/lib/types'
 
 function HuddlePage() {
@@ -220,7 +222,7 @@ function HuddlePage() {
   }, [workspaces, settings.defaultCategoryEnabled])
 
   // Save handler shared by edit + create modes.
-  const handleSaveTask = useCallback(async (updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => {
+  const handleSaveTask = useCallback(async (updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string, assignTo?: AssignablePerson) => {
     if (!selectedTask) return
 
     if (taskMode === 'create') {
@@ -249,11 +251,22 @@ function HuddlePage() {
         createdAt: now,
         updatedAt: now,
       }
-      await createTask(newTask)
+      const inserted = await createTask(newTask)
       // Task persisted — now it's safe to remove the source scratchpad note
       // (if this create came from a "promote to task"). On a thrown createTask
       // we skip the delete, so the note survives.
       if (promotedId) deleteScratchpadItem(promotedId)
+      // Picked someone in the create modal: assign only after the row exists.
+      // A failed assignment never undoes the (already saved) task.
+      if (assignTo && inserted && !newTask.isRecurring) {
+        try {
+          await assignTask(newTask.id, assignTo.userId, assignTo.orgId)
+          toast.success(translate('已指派給 {name}', { name: assignTo.displayName }))
+          notifyAssignmentsChanged()
+        } catch (err) {
+          toast.error(translate('任務已建立，但指派給 {name} 失敗：{reason}', { name: assignTo.displayName, reason: assignmentErrorMessage(err) }))
+        }
+      }
       return
     }
 

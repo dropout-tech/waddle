@@ -91,14 +91,22 @@ export function TaskAssignmentChip({ task }: { task: Task }) {
  * the assignee the return-with-reason form — so the modal body stays
  * untouched. The visual is small; the hit area is 44×44.
  */
-export function TaskAssignButton({ task, onReturned }: { task: Task; onReturned?: () => void }) {
+export function TaskAssignButton({ task, onReturned, staged, onStage }: {
+  task: Task
+  onReturned?: () => void
+  /** Create mode: the person picked so far (nothing is written until save). */
+  staged?: AssignablePerson | null
+  /** Create mode: picking only stages the choice; the caller assigns after insert. */
+  onStage?: (person: AssignablePerson | null) => void
+}) {
   const { t } = useI18n()
+  const stageMode = !!onStage
   const [open, setOpen] = useState(false)
   const [people, setPeople] = useState<AssignablePerson[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
   const wrapRef = useRef<HTMLDivElement>(null)
-  const a = task.assignment
+  const a = stageMode ? undefined : task.assignment
   const isAssignee = a?.role === 'assignee'
 
   useEffect(() => {
@@ -124,7 +132,7 @@ export function TaskAssignButton({ task, onReturned }: { task: Task; onReturned?
   }, [open])
 
   // Recurring tasks can't be assigned (RPC rejects); don't advertise it.
-  if (!a && task.isRecurring) return null
+  if (!a && task.isRecurring && !stageMode) return null
 
   async function toggle() {
     const next = !open
@@ -153,7 +161,13 @@ export function TaskAssignButton({ task, onReturned }: { task: Task; onReturned?
     }
   }
 
-  const label = a ? assignmentLabel(t, a) : t('指派給…')
+  const label = a
+    ? assignmentLabel(t, a)
+    : staged
+      ? t('建立後指派給 {name}', { name: staged.displayName })
+      : t('指派給…')
+  // What the header shows: the real assignment, or the staged pick.
+  const shown = a ? { name: a.peerName, url: a.peerAvatar } : staged ? { name: staged.displayName, url: staged.avatarUrl } : null
 
   return (
     <div ref={wrapRef}>
@@ -167,10 +181,10 @@ export function TaskAssignButton({ task, onReturned }: { task: Task; onReturned?
         title={label}
         className="relative -my-2 flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
       >
-        {a ? (
+        {shown ? (
           <span className="relative inline-flex">
-            <PersonAvatar name={a.peerName} url={a.peerAvatar} size={20} />
-            {a.status === 'returned' && (
+            <PersonAvatar name={shown.name} url={shown.url} size={20} />
+            {a?.status === 'returned' && (
               <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-card" aria-hidden />
             )}
           </span>
@@ -186,11 +200,11 @@ export function TaskAssignButton({ task, onReturned }: { task: Task; onReturned?
           data-testid="task-assign-popover"
           className="absolute right-3 top-full z-50 mt-1 w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-card p-2 text-sm shadow-lg"
         >
-          {a && (
+          {shown && (
             <div className="flex items-center gap-2 px-2 py-1.5">
-              <PersonAvatar name={a.peerName} url={a.peerAvatar} size={24} />
+              <PersonAvatar name={shown.name} url={shown.url} size={24} />
               <p className="min-w-0 flex-1 truncate font-medium">{label}</p>
-              {!isAssignee && <AssignmentStatusPill task={task} />}
+              {a && !isAssignee && <AssignmentStatusPill task={task} />}
             </div>
           )}
           {a?.status === 'returned' && !isAssignee && (
@@ -236,9 +250,12 @@ export function TaskAssignButton({ task, onReturned }: { task: Task; onReturned?
                       <button
                         type="button"
                         role="option"
-                        aria-selected={a?.peerId === p.userId}
+                        aria-selected={(a?.peerId ?? staged?.userId) === p.userId}
                         disabled={busy}
-                        onClick={() => run(() => assignTask(task.id, p.userId, p.orgId), t('已指派給 {name}', { name: p.displayName }))}
+                        onClick={() => {
+                          if (onStage) { onStage(p); setOpen(false); return }
+                          void run(() => assignTask(task.id, p.userId, p.orgId), t('已指派給 {name}', { name: p.displayName }))
+                        }}
                         className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left hover:bg-muted/60 disabled:opacity-50"
                       >
                         <PersonAvatar name={p.displayName} url={p.avatarUrl} size={24} />
@@ -252,6 +269,15 @@ export function TaskAssignButton({ task, onReturned }: { task: Task; onReturned?
                     </li>
                   ))}
                 </ul>
+              )}
+              {stageMode && staged && (
+                <button
+                  type="button"
+                  onClick={() => { onStage!(null); setOpen(false) }}
+                  className="mt-1 flex min-h-11 w-full items-center justify-center rounded-lg border-t border-border text-sm text-muted-foreground hover:bg-muted/60"
+                >
+                  {t('不指派')}
+                </button>
               )}
               {a && (
                 <button

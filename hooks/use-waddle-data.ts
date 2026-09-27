@@ -219,7 +219,8 @@ interface UseWaddleData {
    * so the task lands in that day's pending area.
    */
   unscheduleTask: (taskId: string, date?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => Promise<void>
-  createTask: (task: Task) => Promise<void>
+  /** Resolves true once the row is in the DB (false if the insert failed). */
+  createTask: (task: Task) => Promise<boolean>
   // Time blocks
   addTimeBlock: (block: Omit<TimeBlock, 'id'>) => Promise<void>
   updateTimeBlock: (id: string, updates: Partial<TimeBlock>) => Promise<void>
@@ -1284,6 +1285,7 @@ export function useWaddleData(): UseWaddleData {
       return base
     }
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
+    let inserted = false
     // Registered for the same reason as addTask — mutations on this task
     // must not outrace its INSERT (see pendingTaskCreatesRef).
     const insertPromise = (async () => {
@@ -1302,8 +1304,9 @@ export function useWaddleData(): UseWaddleData {
         }
         // Idempotent: the row (client UUID) is already in the DB and our
         // optimistic state — swallow the duplicate instead of alarming the user.
-        if (error && isDuplicateKeyError(error)) return
+        if (error && isDuplicateKeyError(error)) { inserted = true; return }
         if (error) handleDbError('建立任務')(error)
+        else inserted = true
       } finally {
         pendingWritesRef.current -= 1
         delete pendingTaskCreatesRef.current[task.id]
@@ -1311,6 +1314,7 @@ export function useWaddleData(): UseWaddleData {
     })()
     pendingTaskCreatesRef.current[task.id] = insertPromise
     await insertPromise
+    return inserted
   }, [supabase])
 
   const updateTask = useCallback(async (
@@ -1914,7 +1918,7 @@ export function useWaddleData(): UseWaddleData {
         if (recordUndo) {
           pushUndoableAction({
             label: translate('刪除「{title}」', { title: snapshot.title }),
-            undo: () => createTask(snapshot),
+            undo: async () => { await createTask(snapshot) },
             redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
           })
         }
@@ -1997,7 +2001,7 @@ export function useWaddleData(): UseWaddleData {
         if (recordUndo) {
           pushUndoableAction({
             label: translate('刪除「{title}」', { title: snapshot.title }),
-            undo: () => createTask(snapshot),
+            undo: async () => { await createTask(snapshot) },
             redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
           })
         }

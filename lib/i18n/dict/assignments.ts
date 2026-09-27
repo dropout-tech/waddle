@@ -19,6 +19,11 @@ export const dict: Record<string, string> = {
   '你已被移出這個組織，請聯絡管理員重新開放': 'You were removed from this organization. Ask an admin to let you back in.',
   '對方可以看到描述與備註': "They'll see the description and notes.",
   '指派給…': 'Assign to…',
+  '建立後指派給 {name}': 'Will assign to {name} on save',
+  '不指派': "Don't assign",
+  '重複任務無法指派，已取消選擇的對象': "Recurring tasks can't be assigned — the selected person was cleared.",
+  '任務已建立，但指派給 {name} 失敗：{reason}': 'Task created, but assigning it to {name} failed: {reason}',
+  '由 {name} 指派，只能調整排程與完成狀態': 'Assigned by {name} — you can only change the schedule and completion.',
   '退回理由': 'Reason for returning',
 
   // hooks/use-waddle-data.ts

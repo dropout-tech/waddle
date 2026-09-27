@@ -102,7 +102,9 @@ async function installRoutes(page) {
     if (Array.isArray(body) && body[0] && !state.cat) { state.cat = body[0]; resolveCat() }
     await route.fulfill({ response: res, json: body })
   })
-  await page.route('**/rest/v1/tasks?*', async (route) => {
+  // Predicate, not a glob: an INSERT hits /rest/v1/tasks with NO query
+  // string, which a `tasks?*` glob silently misses (it then reaches the DB).
+  await page.route((u) => u.pathname.endsWith('/rest/v1/tasks'), async (route) => {
     const req = route.request()
     if (req.method() !== 'GET') {
       state.writes.push({ method: req.method(), url: req.url(), body: req.postData() })
