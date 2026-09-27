@@ -105,23 +105,35 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
   useEffect(() => {
     const root = document.getElementById('top')
     if (!root) return
+    const strip = (url: string) => url.replace(/([?&])r=\d+(&|$)/, '$1').replace(/[?&]$/, '')
     const bust = (url: string, n: number) => {
-      const clean = url.replace(/([?&])r=\d+(&|$)/, '$1').replace(/[?&]$/, '')
+      const clean = strip(url)
       return clean + (clean.includes('?') ? '&' : '?') + `r=${n}${Date.now() % 100000}`
     }
+    const timers = new Set<number>()
     const retry = (img: HTMLImageElement) => {
+      // The count belongs to one image URL: next/image reuses the same <img>
+      // node when the source changes (e.g. switching board tabs), so a new
+      // URL starts with a fresh budget of two retries.
+      const base = strip(img.getAttribute('src') || img.src)
+      if (img.dataset.retrySrc !== base) { img.dataset.retrySrc = base; img.dataset.retry = '0' }
       const n = Number(img.dataset.retry || 0)
       if (n >= 2) return
       img.dataset.retry = String(n + 1)
-      window.setTimeout(() => {
+      const id = window.setTimeout(() => {
+        timers.delete(id)
         img.parentElement?.querySelectorAll('source').forEach(s => { if (s.srcset) s.srcset = bust(s.srcset, n + 1) })
         img.src = bust(img.getAttribute('src') || img.src, n + 1)
       }, 700 * (n + 1))
+      timers.add(id)
     }
     const onError = (e: Event) => { if (e.target instanceof HTMLImageElement) retry(e.target) }
     root.addEventListener('error', onError, true)
     root.querySelectorAll('img').forEach(img => { if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) retry(img) })
-    return () => root.removeEventListener('error', onError, true)
+    return () => {
+      root.removeEventListener('error', onError, true)
+      timers.forEach((id) => window.clearTimeout(id))
+    }
   }, [])
   return (
     <main lang={en ? 'en' : 'zh-Hant'} id="top" data-surface="marketing" data-hero={HERO_THEME} className={`${styles.site} ${fishZoneClass} ${display.variable} ${condensed.variable} ${en ? styles.english : ''}`}>

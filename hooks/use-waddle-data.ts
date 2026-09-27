@@ -33,6 +33,9 @@ import { t as translate, getLang } from '@/lib/i18n'
 import {
   listAssignments,
   toTaskAssignment,
+  assignTask,
+  assignmentErrorMessage,
+  notifyAssignmentsChanged,
   ASSIGNMENTS_CHANGED_EVENT,
 } from '@/lib/assignments'
 import type {
@@ -453,7 +456,9 @@ export function useWaddleData(): UseWaddleData {
         if (t.user_id !== user.id) {
           // Visible only through tasks_select_assignee: assigned to me.
           const assignment = assignmentById.get(t.id) ?? fallbackAssignment(t, false)
-          if (!assignment) continue
+          // The owner archived it: gone from my list and calendar, same as
+          // my own archived tasks (they reappear if the owner unarchives).
+          if (!assignment || t.is_archived) continue
           const task = rowToTask(t, translate('指派給我'), ASSIGNED_WORKSPACE_COLOR, translate('來自 {name}', { name: assignment.peerName }))
           builtAssigned.push({ ...task, assignment })
           continue
@@ -804,8 +809,10 @@ export function useWaddleData(): UseWaddleData {
   // tasks_assignment_guard enforces the same whitelist); anything else in
   // `updates` is dropped here instead of failing the whole write.
   const isAssignedToMe = (taskId: string) => assignedTasksRef.current.some((x) => x.id === taskId)
+  // Undo closures call through a ref (the callback can't name itself).
+  const patchAssignedTaskRef = useRef<((id: string, u: Partial<Task>, rec?: boolean) => Promise<void>) | null>(null)
   // Stable (refs + supabase only) so it can sit in the mutation callbacks' deps.
-  const patchAssignedTask = useCallback(async (taskId: string, updates: Partial<Task>) => {
+  const patchAssignedTask = useCallback(async (taskId: string, updates: Partial<Task>, recordUndo: boolean = true) => {
     const before = assignedTasksRef.current.find((x) => x.id === taskId)
     if (!before) return
     const allowed: Partial<Task> = {}
@@ -820,23 +827,46 @@ export function useWaddleData(): UseWaddleData {
     if ('scheduledDate' in updates) { allowed.scheduledDate = updates.scheduledDate; row.scheduled_date = updates.scheduledDate || null }
     if ('scheduledStartTime' in updates) { allowed.scheduledStartTime = updates.scheduledStartTime; row.scheduled_start_time = updates.scheduledStartTime || null }
     if ('scheduledEndTime' in updates) { allowed.scheduledEndTime = updates.scheduledEndTime; row.scheduled_end_time = updates.scheduledEndTime || null }
-    if (Object.keys(row).length === 0) return
+    if (Object.keys(row).length === 0) {
+      // e.g. archive / move category / recolor on someone else's task: say
+      // so instead of silently doing nothing.
+      toast.info(translate('被指派的任務只能調整排程與完成狀態'))
+      return
+    }
     const apply = (next: Task[]) => { assignedTasksRef.current = next; setAssignedTasks(next) }
     apply(assignedTasksRef.current.map((x) => x.id === taskId ? { ...x, ...allowed, updatedAt: new Date().toISOString() } : x))
     if (allowed.isCompleted && !before.isCompleted) { playTaskCompleteSound(); hapticTaskComplete() }
     pendingWritesRef.current += 1; mutationSeqRef.current += 1
     try {
       const { data, error } = await supabase.from('tasks').update(row).eq('id', taskId).select('id')
-      if (error || !data || data.length === 0) {
-        // 0 rows = assignment was withdrawn/returned meanwhile.
+      if (error) {
         apply(assignedTasksRef.current.map((x) => x.id === taskId ? before : x))
-        if (error) handleDbError('更新任務')(error)
-        else toast.error(translate('這個任務已被取消指派'))
+        handleDbError('更新任務')(error)
+      } else if (!data || data.length === 0) {
+        // 0 rows = the owner withdrew / deleted it meanwhile: it is no longer
+        // mine to see, so drop it now instead of waiting for a refetch.
+        apply(assignedTasksRef.current.filter((x) => x.id !== taskId))
+        toast.error(translate('這個任務已被取消指派'))
+      } else if (recordUndo) {
+        // Own entry on the undo stack, so ⌘Z reverts THIS edit rather than
+        // some earlier unrelated action.
+        const prev: Partial<Task> = {}
+        for (const k of Object.keys(allowed) as (keyof Task)[]) (prev as Record<string, unknown>)[k] = before[k]
+        if ('isCompleted' in allowed) prev.completedAt = before.completedAt
+        const label = 'isCompleted' in allowed
+          ? translate(allowed.isCompleted ? '完成「{title}」' : '取消完成「{title}」', { title: before.title })
+          : translate('重排「{title}」', { title: before.title })
+        pushUndoableAction({
+          label,
+          undo: async () => { await patchAssignedTaskRef.current?.(taskId, prev, false) },
+          redo: async () => { await patchAssignedTaskRef.current?.(taskId, allowed, false) },
+        })
       }
     } finally {
       pendingWritesRef.current -= 1
     }
   }, [supabase])
+  useEffect(() => { patchAssignedTaskRef.current = patchAssignedTask }, [patchAssignedTask])
 
   // ═════════════════════════════════════════════════════
   // Workspace mutations
@@ -1252,8 +1282,11 @@ export function useWaddleData(): UseWaddleData {
    * Persist a fully-formed Task (the create flow assembles a draft first,
    * then commits it via this method when the user hits Save in the modal).
    */
-  const createTask = useCallback(async (task: Task) => {
+  const createTask = useCallback(async (input: Task) => {
     const userId = requireUserId()
+    // A freshly inserted row is never assigned in the DB (the guard trigger
+    // rejects assignment columns on INSERT) — keep local state honest.
+    const task: Task = input.assignment ? { ...input, assignment: undefined } : input
 
     setWorkspaces((prev) =>
       prev.map((w) =>
@@ -1316,6 +1349,23 @@ export function useWaddleData(): UseWaddleData {
     await insertPromise
     return inserted
   }, [supabase])
+
+  // Undo of a delete. The row comes back unassigned (INSERT can't carry
+  // assignment columns), so an assignment I had made is re-created through
+  // assign_task — the same validated path as the UI — and the list refetches
+  // the real state. If that fails (peer/org gone), the task stays restored and
+  // unassigned, which is also what the screen shows.
+  const restoreDeletedTask = useCallback(async (snapshot: Task) => {
+    const inserted = await createTask(snapshot)
+    const a = snapshot.assignment
+    if (!inserted || !a || a.role !== 'assigner' || snapshot.isRecurring) return
+    try {
+      await assignTask(snapshot.id, a.peerId, a.organizationId)
+      notifyAssignmentsChanged()
+    } catch (err) {
+      toast.error(translate('已還原任務，但無法重新指派給 {name}：{reason}', { name: a.peerName, reason: assignmentErrorMessage(err) }))
+    }
+  }, [createTask])
 
   const updateTask = useCallback(async (
     taskId: string,
@@ -1481,6 +1531,7 @@ export function useWaddleData(): UseWaddleData {
         const newTask: Task = {
           ...existing,
           ...updates,
+          assignment: undefined,
           id: crypto.randomUUID(),
           isRecurring: false,
           recurrence: undefined,
@@ -1529,6 +1580,7 @@ export function useWaddleData(): UseWaddleData {
       const newTask: Task = {
         ...existing,
         ...updates,
+        assignment: undefined,
         id: crypto.randomUUID(),
         scheduledDate: targetDate,
         createdAt: new Date().toISOString(),
@@ -1859,7 +1911,7 @@ export function useWaddleData(): UseWaddleData {
         pushUndoableAction({
           label: translate('刪除「{title}」', { title: snapshot.title }),
           undo: async () => {
-            await createTask(snapshot)
+            await restoreDeletedTask(snapshot)
             if (exdateRestore) {
               // Re-add the date back to parent's exdates so the master skips
               // it again (matching the pre-delete state).
@@ -1918,7 +1970,7 @@ export function useWaddleData(): UseWaddleData {
         if (recordUndo) {
           pushUndoableAction({
             label: translate('刪除「{title}」', { title: snapshot.title }),
-            undo: async () => { await createTask(snapshot) },
+            undo: () => restoreDeletedTask(snapshot),
             redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
           })
         }
@@ -2001,7 +2053,7 @@ export function useWaddleData(): UseWaddleData {
         if (recordUndo) {
           pushUndoableAction({
             label: translate('刪除「{title}」', { title: snapshot.title }),
-            undo: async () => { await createTask(snapshot) },
+            undo: () => restoreDeletedTask(snapshot),
             redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
           })
         }
@@ -2075,7 +2127,7 @@ export function useWaddleData(): UseWaddleData {
         })
       }
     }
-  }, [supabase])
+  }, [supabase, restoreDeletedTask])
 
   const rescheduleTask = useCallback(async (
     taskId: string,
@@ -2237,6 +2289,7 @@ export function useWaddleData(): UseWaddleData {
         const nextExdates = [...(task.exdates || []), targetDate]
         const newTask: Task = {
           ...task,
+          assignment: undefined,
           id: crypto.randomUUID(),
           isRecurring: false,
           recurrence: undefined,
@@ -2298,6 +2351,7 @@ export function useWaddleData(): UseWaddleData {
 
       const newTask: Task = {
         ...task,
+        assignment: undefined,
         id: crypto.randomUUID(),
         scheduledDate: date,
         scheduledStartTime: startTime,
@@ -2469,6 +2523,7 @@ export function useWaddleData(): UseWaddleData {
         const nextExdates = [...(task.exdates || []), targetDate]
         const newTask: Task = {
           ...task,
+          assignment: undefined,
           id: crypto.randomUUID(),
           isRecurring: false,
           recurrence: undefined,
@@ -2519,6 +2574,7 @@ export function useWaddleData(): UseWaddleData {
 
       const newTask: Task = {
         ...task,
+        assignment: undefined,
         id: crypto.randomUUID(),
         scheduledDate: date,
         scheduledStartTime: undefined,

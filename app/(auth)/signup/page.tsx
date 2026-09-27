@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { pendingMeetingPath } from '@/lib/auth/meeting-return'
+import { pendingOrgInvitePath } from '@/lib/pending-org-invite'
 import { createClient } from '@/lib/supabase/client'
 import { DesktopLoginPending } from '@/components/auth/desktop-login-pending'
 import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
@@ -90,7 +91,7 @@ export default function SignupPage() {
     // If "Confirm email" is OFF in Supabase, session is created immediately.
     // If ON, user needs to click the email link first.
     if (data.session) {
-      router.push(pendingMeetingPath() || '/')
+      router.push(pendingMeetingPath() || pendingOrgInvitePath() || '/')
       router.refresh()
       return
     }

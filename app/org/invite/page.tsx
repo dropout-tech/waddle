@@ -9,7 +9,9 @@ import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/lib/i18n/react'
 import {
-  PENDING_ORG_INVITE_KEY,
+  savePendingOrgInvite,
+  readPendingOrgInvite,
+  clearPendingOrgInvite,
   previewOrgInvite,
   acceptOrgInvite,
   assignmentErrorMessage,
@@ -17,7 +19,8 @@ import {
 
 // Organization invite landing page — mirrors app/share/invite/page.tsx:
 // token in the URL fragment (#t=…, never sent to a server), stashed in
-// sessionStorage across the login round-trip and cleared on return.
+// localStorage (24h TTL, survives the new-tab email confirmation) across the
+// login / sign-up round trip and cleared on return.
 
 type Status = 'resolving' | 'loading-preview' | 'preview' | 'invalid' | 'accepting'
 type Preview = NonNullable<Awaited<ReturnType<typeof previewOrgInvite>>>
@@ -29,10 +32,6 @@ function readTokenFromHash(): string | null {
   try { return decodeURIComponent(raw) } catch { return raw }
 }
 
-function safeSessionGet(key: string) {
-  try { return window.sessionStorage.getItem(key) } catch { return null }
-}
-
 export default function OrgInvitePage() {
   const router = useRouter()
   const { t } = useI18n()
@@ -42,7 +41,7 @@ export default function OrgInvitePage() {
   const [preview, setPreview] = useState<Preview | null>(null)
 
   useEffect(() => {
-    const resolved = readTokenFromHash() || safeSessionGet(PENDING_ORG_INVITE_KEY)
+    const resolved = readTokenFromHash() || readPendingOrgInvite()
     if (!resolved) { setStatus('invalid'); return }
     setToken(resolved)
   }, [])
@@ -50,11 +49,12 @@ export default function OrgInvitePage() {
   useEffect(() => {
     if (!token || authLoading) return
     if (!session) {
-      try { window.sessionStorage.setItem(PENDING_ORG_INVITE_KEY, token) } catch { /* private mode */ }
-      router.push('/login')
+      savePendingOrgInvite(token)
+      // replace, not push: Back from /login must not bounce here again.
+      router.replace('/login')
       return
     }
-    try { window.sessionStorage.removeItem(PENDING_ORG_INVITE_KEY) } catch { /* private mode */ }
+    clearPendingOrgInvite()
     let cancelled = false
     setStatus('loading-preview')
     void (async () => {
