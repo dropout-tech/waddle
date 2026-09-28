@@ -13,12 +13,18 @@ const FILM_720 = '/marketing/promo-film/huddle-promo-720.mp4'
 const FILM_1080 = '/marketing/promo-film/huddle-promo-1080.mp4'
 const NARROW_QUERY = '(max-width: 760px)'
 const FADE_MS = 600
+// Failsafe for a slow film host (a single range request has taken ~20s in
+// production): say we're loading, then let the visitor in rather than leave
+// them staring at the gate.
+const START_HINT_MS = 2500
+const START_GIVE_UP_MS = 12000
+const STALL_GIVE_UP_MS = 10000
 // While the gate is up, the hero swarm and the roaming penguin hold their
 // first-visit show (penguin-circus.tsx) and start when this event fires.
 export const INTRO_OPEN_ATTR = 'data-intro-open'
 export const INTRO_CLOSED_EVENT = 'huddle:intro-closed'
 
-export type IntroCopy = { tick: string; line: string; play: string; skip: string; label: string }
+export type IntroCopy = { tick: string; line: string; play: string; skip: string; loading: string; label: string }
 type Phase = 'hidden' | 'gate' | 'film' | 'closing'
 
 function seen() {
@@ -42,6 +48,7 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
   const [phase, setPhase] = useState<Phase>('hidden')
   const [rolling, setRolling] = useState(false)
   const [blocked, setBlocked] = useState(false)
+  const [buffering, setBuffering] = useState(false)
   const [src, setSrc] = useState(FILM_1080)
   const decided = useRef<'pending' | 'hold' | 'done'>('pending')
   const held = useRef(false)
@@ -51,6 +58,10 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
   const skipLinkRef = useRef<HTMLButtonElement>(null)
   const skipRef = useRef<HTMLButtonElement>(null)
   const closeTimer = useRef(0)
+  const started = useRef(false)
+  const hintTimer = useRef(0)
+  const startTimer = useRef(0)
+  const stallTimer = useRef(0)
 
   const hold = useCallback(() => {
     held.current = true
@@ -83,7 +94,12 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
     setPhase('gate')
   }, [loading, session, hold, release])
 
-  useEffect(() => () => { window.clearTimeout(closeTimer.current); release() }, [release])
+  const clearFailsafe = useCallback(() => {
+    window.clearTimeout(hintTimer.current); window.clearTimeout(startTimer.current); window.clearTimeout(stallTimer.current)
+    hintTimer.current = startTimer.current = stallTimer.current = 0
+  }, [])
+
+  useEffect(() => () => { window.clearTimeout(closeTimer.current); clearFailsafe(); release() }, [release, clearFailsafe])
 
   const open = phase === 'gate' || phase === 'film'
 
@@ -103,6 +119,8 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
 
   const close = useCallback(() => {
     if (phase !== 'gate' && phase !== 'film') return
+    clearFailsafe()
+    setBuffering(false)
     markSeen()
     videoRef.current?.pause()
     setPhase('closing')
@@ -114,7 +132,10 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
       page.focus({ preventScroll: true })
     }
     closeTimer.current = window.setTimeout(() => { setPhase('hidden'); release() }, reducedMotion() ? 0 : FADE_MS)
-  }, [phase, release])
+  }, [phase, release, clearFailsafe])
+  // Failsafe timers fire later than the render that set them.
+  const closeRef = useRef(close)
+  useEffect(() => { closeRef.current = close }, [close])
 
   useEffect(() => {
     if (!open) return
@@ -138,13 +159,32 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
     // Keep this synchronous: iOS only unlocks sound for play() called
     // directly inside the tap handler.
     video.muted = false
-    const started = video.play()
+    const attempt = video.play()
     setPhase('film')
-    started?.catch((err: unknown) => {
+    hintTimer.current = window.setTimeout(() => setBuffering(true), START_HINT_MS)
+    startTimer.current = window.setTimeout(() => closeRef.current(), START_GIVE_UP_MS)
+    attempt?.catch((err: unknown) => {
       if (err instanceof DOMException && err.name === 'AbortError') return
-      // Still refused: hand over the native controls to press play.
+      // Still refused: hand over the native controls to press play (the
+      // give-up timer still lets them in if they don't).
+      window.clearTimeout(hintTimer.current); setBuffering(false)
       setBlocked(true); setRolling(true)
     })
+  }
+  const markStarted = () => {
+    if (started.current) return
+    started.current = true
+    window.clearTimeout(hintTimer.current); window.clearTimeout(startTimer.current)
+  }
+  // Mid-film stall: loading line on the film; give up after 10s straight.
+  const beginStall = () => {
+    if (!started.current || stallTimer.current || phase !== 'film') return
+    setBuffering(true)
+    stallTimer.current = window.setTimeout(() => closeRef.current(), STALL_GIVE_UP_MS)
+  }
+  const endStall = () => {
+    window.clearTimeout(stallTimer.current); stallTimer.current = 0
+    setBuffering(false)
   }
 
   if (phase === 'hidden') return null
@@ -166,7 +206,12 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
         playsInline
         preload={src === FILM_720 ? 'metadata' : 'auto'}
         controls={blocked}
-        onPlaying={() => setRolling(true)}
+        onPlaying={() => { setRolling(true); markStarted(); endStall() }}
+        onTimeUpdate={e => { if (e.currentTarget.currentTime > 0) markStarted() }}
+        onWaiting={beginStall}
+        // "stalled" also fires while playing on from buffer; only a stall
+        // that has run out of frames counts.
+        onStalled={e => { if (e.currentTarget.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) beginStall() }}
         onEnded={close}
         onError={close}
       />
@@ -180,9 +225,11 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
               <svg viewBox="0 0 10 12" width="10" height="12" aria-hidden="true"><path d="M0 0l10 6-10 6z" fill="currentColor" /></svg>{copy.play}
             </button>
             <button ref={skipLinkRef} type="button" className={styles.skipLink} onClick={close}>{copy.skip}</button>
+            <p className={styles.loading} aria-live="polite">{buffering && !rolling ? <span>{copy.loading}</span> : null}</p>
           </div>
         </div>
       </div>
+      <p className={styles.filmLoading} aria-live="polite">{buffering && rolling ? <span>{copy.loading}</span> : null}</p>
       {phase !== 'gate' ? <button ref={skipRef} type="button" className={styles.skip} onClick={close}>{copy.skip}<ChevronsRight size={16} aria-hidden="true" /></button> : null}
     </div>,
     document.body,
