@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f3e9">
+<title>Huddle · 目前離線 / Offline</title>
+<link rel="icon" href="/app-icon-192.png">
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+    padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+    box-sizing: border-box; background: #f6f3e9; color: #292b24;
+    font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang TC", "Segoe UI", Roboto, sans-serif;
+    text-align: center;
+  }
+  main { max-width: 22rem; }
+  img { width: 88px; height: 88px; border-radius: 22px; }
+  h1 { font-size: 1.35rem; margin: 20px 0 6px; }
+  .en { color: #6b6a5f; font-size: 0.95rem; margin: 0 0 4px; }
+  p { line-height: 1.6; margin: 0 0 4px; }
+  button {
+    margin-top: 22px; min-height: 44px; padding: 0 22px; border-radius: 999px; border: 0;
+    background: #b8482a; color: #fbf9f2; font-size: 1rem; font-weight: 600; cursor: pointer;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { color-scheme: dark; }
+    body { background: #22231e; color: #f3eedd; }
+    .en { color: #b9b4a2; }
+    button { background: #edc747; color: #292b24; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <img src="/app-icon-192.png" alt="" width="88" height="88">
+  <h1>目前沒有網路連線</h1>
+  <p class="en">You're offline</p>
+  <p>連上網路後，Huddle 會自動回來。</p>
+  <p class="en">Huddle will come back as soon as you're connected.</p>
+  <button type="button" onclick="location.reload()">重新整理 · Try again</button>
+</main>
+<script>
+  window.addEventListener('online', function () { location.reload() })
+</script>
+</body>
+</html>

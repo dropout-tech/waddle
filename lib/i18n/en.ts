@@ -14,6 +14,7 @@ import { dict as meetings } from './dict/meetings'
 import { dict as pet } from './dict/pet'
 import { dict as stickyNotes } from './dict/sticky-notes'
 import { dict as assignments } from './dict/assignments'
+import { dict as pwa } from './dict/pwa'
 import { dict as widgets } from './dict/widgets'
 
 // Merged English dictionary. Keys are the Traditional Chinese source strings
@@ -38,6 +39,7 @@ export const en: Record<string, string> = {
   ...stickyNotes,
   ...widgets,
   ...assignments,
+  ...pwa,
   // Whiteboard canvas controls.
   "手寫筆記": "Handwritten note",
   "請選擇圖片檔案。": "Please choose an image file.",

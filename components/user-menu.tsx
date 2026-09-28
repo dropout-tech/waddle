@@ -15,6 +15,7 @@ import { useI18n } from '@/lib/i18n/react'
 import { useStickyNotesToggle } from '@/components/sticky-notes/sticky-notes-provider'
 import { listAssignments } from '@/lib/assignments'
 import { Building2, ClipboardList } from 'lucide-react'
+import { InstallAppMenuItem } from '@/components/pwa/install-app-menu-item'
 
 interface SessionInfo {
   email: string
@@ -238,6 +239,9 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             <span>{isDark ? t('切換淺色') : t('切換深色')}</span>
           </button>
+
+          {/* Phone website only; renders nothing when installed / native / desktop. */}
+          <InstallAppMenuItem onDone={() => setOpen(false)} />
 
           <div className="border-t border-border" />
 
