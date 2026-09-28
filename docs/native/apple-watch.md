@@ -78,6 +78,12 @@ sh ios/App/WatchTests/run.sh
 - 已跑過：HuddleWatch 對 watchOS Simulator build 成功；App 對 iOS Simulator 與 generic iOS（未簽章）build 成功，產物內含 `App.app/Watch/HuddleWatch.app/PlugIns/HuddleWatchWidgets.appex`，手錶 App 的 Info.plist 有 `WKApplication`、`WKCompanionAppBundleIdentifier = com.lazylazy.huddle`、繁中 `zh-Hant.lproj`；共用邏輯測試 32/32 通過；`pnpm exec tsc --noEmit`、相關 ESLint、`scripts/tests/widgets.test.mjs` 7/7 通過。
 - 沒跑過：本機沒有 watchOS 模擬器 runtime（也沒有下載），所以**手錶畫面沒有實際開過**；WatchConnectivity 的傳輸、複雜功能顯示、JS 套用計時指令都只經過編譯，沒有端對端驗證。需要配對的實機（或下載 watchOS 模擬器 runtime）才能驗收。
 
+### 2026-09-28 補驗（分支 `codex/apple-watch`，已合併最新 main）
+
+- 合併無衝突；main 新增的快照欄位 `week` 手錶不讀、不影響。用目前 `makeSnapshot` 產出的快照餵給 `WatchSnapshot.make` 逐欄比對（任務時間／分類／完成／重複任務不可勾／專注／簽到／帳號隔離）全數通過。
+- iOS 模擬器 build 成功且內嵌手錶 App；watchOS 26.5 模擬器（與 iPhone 模擬器配對）實際開過三頁：等待同步空狀態、今日任務、專注倒數、每日簽到。資料是直接寫入手錶端 App Group 的快照，**WatchConnectivity 實際傳輸仍未端對端驗證**。
+- 實機簽章：iPhone App 與 HuddleWidgets 已有描述檔；`xcodebuild -allowProvisioningUpdates` 對手錶兩個 target 報 `No Accounts`／找不到 `com.lazylazy.huddle.watchkitapp(.widgets)` 描述檔——命令列讀不到 Xcode 登入的帳號，需在 Xcode 內對 HuddleWatch、HuddleWatchWidgets 各開一次 Signing & Capabilities 讓它建立 App ID 與描述檔。
+
 ## 上線前需要的事
 
 1. 付費 Apple Developer 帳號：為 `com.lazylazy.huddle.watchkitapp`、`.watchkitapp.widgets` 建 App ID，並開啟 App Group `group.com.lazylazy.huddle`（免費 Personal Team 對 App Group／擴充元件的簽章限制較多，可能無法裝到手錶）。
