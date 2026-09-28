@@ -5,12 +5,12 @@
 ## 啟用前
 
 1. 先於隔離環境套用既有 `20260920082633_billing_entitlements.sql`，再套用 `20260925075939_operations_referrals.sql`。後者建立非公開 `huddle_ops` schema、帶驗證的 RPC、帳號停用限制，以及不儲存任務內容的活動統計。
-2. 管理員僅限 `lazy@dreamcube.tw` 與 `lazydragon0247@gmail.com`。每次後台 RPC 都在伺服器查詢 `auth.users` 的目前 Email 與驗證狀態；帳號完成 Email 驗證後即可使用，改成其他 Email 時立即失去資格。前端或 user metadata 無法授權。
+2. 管理員以帳號 user id 綁定（`huddle_ops.admin_users`，自 `20260928120000_security_hardening.sql` 起）。該 migration 從 `lazy@dreamcube.tw` 與 `lazydragon0247@gmail.com` 兩個已驗證帳號帶入初始名單；之後改 Email 不影響資格，新註冊同名 Email 也不會取得資格。前端或 user metadata 無法授權。
 3. 用一般帳號驗證無法呼叫管理操作，再用上述管理員登入 `/admin`。
 4. 在「活動設定」自行開啟新戶體驗、手動贈送、優惠兌換、推薦獎勵及站內提醒。贈送／促銷相關開關預設全關；排行榜總開關預設開，但每位會員預設不公開。
 5. 發布需完成 migration、站台部署與線上驗收；正式購買仍停用。
 
-允許名單位於不公開的 `huddle_ops.admin_emails`，一般會員無法讀寫，資料表約束也限制只能填上述兩個 Email。尚未註冊的指定 Email，日後註冊並完成驗證即可取得管理資格。
+允許名單位於不公開的 `huddle_ops.admin_users`（user id），一般會員無法讀寫。新增管理員需由資料庫管理者以 user id 手動插入。舊表 `huddle_ops.admin_emails` 保留但已不參與授權。
 
 ## 日常操作
 

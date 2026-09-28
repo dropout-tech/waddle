@@ -1,6 +1,7 @@
 import { isNative } from '@/lib/platform'
 import { createClient } from '@/lib/supabase/client'
 import type { Json } from '@/lib/supabase/database.types'
+import { t } from '@/lib/i18n'
 
 // On app start the auth guard, the user menu and the notices bar all ask for
 // 'self' at the same moment. Share one request among concurrent callers (and
@@ -52,7 +53,8 @@ async function callOperations<T>(
       throw new Error(
         '會員服務尚未啟用，請稍後再試。管理員需先完成資料庫更新。'
       )
-    throw new Error(error.message)
+    // Server messages are zh-TW source strings; t() passes unknown ones through.
+    throw new Error(t(error.message))
   }
   // Some refusals (e.g. rate-limited coupon attempts) are returned rather than
   // raised so the server can persist them; surface them as errors here.

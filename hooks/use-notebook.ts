@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { scheduleImageCleanupAfterDelete } from '@/lib/image-cleanup'
 import type { NotebookNote, NotebookCategory, TiptapDoc } from '@/lib/types'
 import type { Database } from '@/lib/supabase/database.types'
 import { t } from '@/lib/i18n'
@@ -253,6 +254,9 @@ export function useNotebook() {
       if (error) {
         console.error('[notebook] delete failed', error)
         setNotes(snapshot)
+      } else if (userIdRef.current) {
+        // Notes have no undo, so their now-orphaned images can go.
+        scheduleImageCleanupAfterDelete(userIdRef.current)
       }
     },
     [supabase],
