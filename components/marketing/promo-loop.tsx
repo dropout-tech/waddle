@@ -26,6 +26,7 @@ export function PromoLoop({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const manualPauseRef = useRef(false)
+  const sourceKeyRef = useRef('')
 
   const [narrow, setNarrow] = useState(false)
   const [inView, setInView] = useState(false)
@@ -66,18 +67,35 @@ export function PromoLoop({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
     if (inView) setReady(true)
   }, [inView])
 
+  const variant = narrow ? SOURCES.mobile : SOURCES.desktop
+
   // Sources render only once `ready`, so the browser must be told to
   // (re-)scan them — adding <source> children after mount doesn't do this
-  // on its own.
+  // on its own. Only reload when the chosen source actually changes (e.g.
+  // crossing the 760px breakpoint on rotation), not on every dependency
+  // change, and resume playback afterwards unless the user paused manually.
   useEffect(() => {
     const video = videoRef.current
     if (!video || !ready) return
+    const key = `${variant.webm}|${variant.mp4}`
+    if (sourceKeyRef.current === key) return
+    sourceKeyRef.current = key
     video.load()
-  }, [ready, narrow])
+    if (inView && !reducedMotion && !manualPauseRef.current) {
+      void video.play().catch(() => {})
+    }
+  }, [ready, variant.webm, variant.mp4, inView, reducedMotion])
 
+  // Drives play/pause from viewport visibility and the reduced-motion
+  // preference. Reduced motion must stop playback immediately even if the
+  // video was already playing when the preference changed.
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !ready || reducedMotion) return
+    if (!video || !ready) return
+    if (reducedMotion) {
+      video.pause()
+      return
+    }
     if (inView) {
       if (!manualPauseRef.current) void video.play().catch(() => {})
     } else {
@@ -96,8 +114,6 @@ export function PromoLoop({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       video.pause()
     }
   }
-
-  const variant = narrow ? SOURCES.mobile : SOURCES.desktop
 
   return (
     <section lang={en ? 'en' : 'zh-TW'} className={styles.section}>
@@ -119,7 +135,7 @@ export function PromoLoop({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
           >
             {ready ? (
               <>
-                <source src={variant.webm} type="video/webm" />
+                <source src={variant.webm} type='video/webm; codecs="vp9"' />
                 <source src={variant.mp4} type="video/mp4" />
               </>
             ) : null}
