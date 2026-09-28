@@ -1,13 +1,14 @@
 'use client'
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/auth-provider'
 import { isNative } from '@/lib/platform'
-import { parseWidgetURL, type WidgetDestination } from '@/lib/widgets/model'
+import { parseWidgetURL, widgetPath, type WidgetDestination } from '@/lib/widgets/model'
+import { queueWidgetLaunch } from '@/lib/widgets/launch'
 import { widgetAccount } from '@/lib/widgets/native'
 let pending: WidgetDestination | null = null
 export function WidgetLinks() {
-  const { user, loading } = useAuth(); const router = useRouter()
+  const { user, loading } = useAuth(); const router = useRouter(); const pathname = usePathname()
   useEffect(()=>{
     if (!isNative()) return
     let live=true, remove:(()=>void)|undefined
@@ -23,11 +24,15 @@ export function WidgetLinks() {
       if(loading || !user || !pending) return
       const d=pending, owner=widgetAccount(); pending=null
       if(d.accountId && (d.accountId !== user.id || (d.epoch && owner.epoch && d.epoch !== owner.epoch))) return
-      const q=new URLSearchParams({open:d.kind}); if(d.id) q.set('id',d.id); if(d.date) q.set('date',d.date)
-      router.push(`/widgets/?${q}`)
+      // Straight to the real screen (see widgetPath). Board destinations are
+      // queued rather than pushed: when the board is already on screen a push
+      // to the same page would not remount it, so it would never see the query.
+      const path=widgetPath(d)
+      if(path.startsWith('/?')) { queueWidgetLaunch(path.slice(2)); if(pathname !== '/') router.push('/') }
+      else router.push(path)
     }
     route(); window.addEventListener('huddle-widget-link',route)
     return ()=>window.removeEventListener('huddle-widget-link',route)
-  },[user,loading,router])
+  },[user,loading,router,pathname])
   return null
 }

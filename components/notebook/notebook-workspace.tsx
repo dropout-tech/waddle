@@ -21,6 +21,9 @@ interface NotebookWorkspaceProps {
   /** 'back' → ArrowLeft + "返回面板" (full-page route). 'close' → X +
    *  "關閉" (modal overlay). */
   exitVariant: 'back' | 'close'
+  /** Open straight into one note (home-screen widget taps): an existing id,
+   *  a brand-new note, or the note with this exact title (created if missing). */
+  launchNote?: { id: string } | { create: true } | { title: string }
 }
 
 /**
@@ -33,7 +36,7 @@ interface NotebookWorkspaceProps {
  * flex-col` and expects a definite-height ancestor (either the viewport via
  * `h-[100dvh]` on the full-page shell, or ModalShell's sized panel).
  */
-export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProps) {
+export function NotebookWorkspace({ onExit, exitVariant, launchNote }: NotebookWorkspaceProps) {
   const { t } = useI18n()
   const {
     notes,
@@ -136,6 +139,21 @@ export function NotebookWorkspace({ onExit, exitVariant }: NotebookWorkspaceProp
       setActiveId(notes[0]?.id ?? null)
     }
   }, [notes, activeId])
+
+  // Widget launch: once, after the notes have loaded.
+  const launched = useRef(false)
+  useEffect(() => {
+    if (!launchNote || launched.current || loading) return
+    launched.current = true
+    let note = 'id' in launchNote ? notes.find((n) => n.id === launchNote.id)
+      : 'title' in launchNote ? notes.find((n) => !n.isArchived && n.title === launchNote.title)
+      : undefined
+    if (!note && !('id' in launchNote)) {
+      note = createNote() ?? undefined
+      if (note && 'title' in launchNote) renameNote(note.id, launchNote.title)
+    }
+    if (note) { setActiveId(note.id); setMobilePane('editor') }
+  }, [launchNote, loading, notes, createNote, renameNote])
 
   const activeNote = notes.find((n) => n.id === activeId) ?? null
 

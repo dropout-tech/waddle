@@ -33,6 +33,7 @@ import type { RecurrenceChoice } from '@/components/modals/recurrence-choice-mod
 import { useSoftKeyboard } from '@/hooks/use-soft-keyboard'
 import { PenguinPet } from '@/components/pet/penguin-pet'
 import type { PetSettings } from '@/lib/pet/types'
+import { useWidgetLaunch } from '@/components/widgets/use-widget-launch'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
@@ -293,22 +294,12 @@ export function MainLayout({
   // Focus mode for journal/report (full screen view)
   const [focusMode, setFocusMode] = useState<'none' | 'journal' | 'report' | 'growth'>('none')
   
-  const widgetLaunchConsumed = useRef(false)
-  useEffect(() => {
-    if (widgetLaunchConsumed.current) return
-    widgetLaunchConsumed.current = true
-    const q = new URLSearchParams(window.location.search)
-    const kind = q.get('widget'), date = q.get('date'), id = q.get('task')
-    if (!kind) return
-    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) setSelectedDate(new Date(`${date}T12:00:00`))
-    // Widgets only exist on the phone, where the calendar defaults to 週 — a
-    // widget tap must not force 日 (owner, 2026-09-28).
-    if (kind === 'calendar' || kind === 'overview' || kind === 'agenda') { setMobileTab('calendar'); setViewMode(kind === 'calendar' ? 'month' : 'week') }
-    else if (kind === 'tasks' || kind === 'top-three') setMobileTab('tasks')
-    if (id) { const task = workspaces.flatMap(w => w.categories.flatMap(c => c.tasks)).find(t => t.id === id); if (task) onSelectTask(task) }
-    if (kind === 'new-task') onCreateCalendarTask?.(toDateString(new Date()))
-    window.history.replaceState(null, '', window.location.pathname)
-  }, [workspaces, onSelectTask, onCreateCalendarTask])
+  // Native widget taps (/?widget=…) → the real screen. See use-widget-launch.ts.
+  useWidgetLaunch({
+    workspaces, setSelectedDate, setMobileTab, setViewMode,
+    openWhiteboard: () => { setMobileLinksOpen(false); setMobileFocusBoardOpen(false); setMobileScratchpadOpen(true) },
+    selectTask: onSelectTask, createTask: onCreateCalendarTask,
+  })
 
   // Calendar zoom level - controls hour height and visible time range
   // Zoom levels: 1 = compact (40px/hour), 2 = normal (60px/hour), 3 = expanded (80px/hour), 4 = detailed (100px/hour)

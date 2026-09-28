@@ -14,6 +14,7 @@ import { dict as meetings } from './dict/meetings'
 import { dict as pet } from './dict/pet'
 import { dict as stickyNotes } from './dict/sticky-notes'
 import { dict as assignments } from './dict/assignments'
+import { dict as widgets } from './dict/widgets'
 
 // Merged English dictionary. Keys are the Traditional Chinese source strings
 // (see lib/i18n/index.ts). Split by feature area purely to keep files
@@ -35,6 +36,7 @@ export const en: Record<string, string> = {
   ...meetings,
   ...pet,
   ...stickyNotes,
+  ...widgets,
   ...assignments,
   // Whiteboard canvas controls.
   "手寫筆記": "Handwritten note",

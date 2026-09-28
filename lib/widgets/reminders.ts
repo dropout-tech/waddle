@@ -19,6 +19,13 @@ export async function enableWidgetReminders(accountId:string) {
   if(result.display!=='granted')return false
   localStorage.setItem(`huddle.widget-reminders:${accountId}`,'1');signature='';return true
 }
+export function widgetRemindersEnabled(accountId:string) {
+  return typeof localStorage!=='undefined' && localStorage.getItem(`huddle.widget-reminders:${accountId}`)==='1'
+}
+/** Turn off; the next sync (huddle-widget-refresh) cancels anything already scheduled. */
+export function disableWidgetReminders(accountId:string) {
+  localStorage.removeItem(`huddle.widget-reminders:${accountId}`);signature=''
+}
 export async function syncWidgetReminders(snapshot:WidgetSnapshot) {
   if(!isNative()||snapshot.accountId!==currentAccount)return
   const enabled=localStorage.getItem(`huddle.widget-reminders:${snapshot.accountId}`)==='1'
