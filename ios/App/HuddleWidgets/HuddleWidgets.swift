@@ -77,11 +77,16 @@ struct WidgetView:View {
             if family == .accessoryCircular {Link(destination:url(kind)){Image(systemName:kind == .focus ? "timer":"square.grid.2x2")}}
             else if family == .accessoryRectangular || family == .accessoryInline {Link(destination:url(kind)){Text("Huddle · \(kind.title)").font(.caption)}}
             else if let s=entry.snapshot {
-                VStack(alignment:.leading,spacing:8){
-                    HStack{Text(kind.title).font(.caption.weight(.semibold));Spacer();Image("Huddle").resizable().scaledToFit().frame(width:25,height:25)}
+                // Calendar-heavy widgets fill the whole frame: drop the title row
+                // (the month label + mascot stand in for it) and the "updated"
+                // footer unless there's something pending, or the grid overflows
+                // and iOS clips the top edge.
+                let dense = kind == .overview || kind == .calendar
+                VStack(alignment:.leading,spacing:dense ? 4:8){
+                    if !dense {HStack{Text(kind.title).font(.caption.weight(.semibold));Spacer();Image("Huddle").resizable().scaledToFit().frame(width:25,height:25)}}
                     content(s)
                     Spacer(minLength:0)
-                    HStack(spacing:3){Image(systemName:"clock");Text(entry.pending.isEmpty ? "更新 \(String(s.generatedAt.prefix(10)))":"待同步 · 開啟 Huddle")}.font(.system(size:9)).foregroundStyle(ink.opacity(0.7)).lineLimit(1)
+                    if !dense || !entry.pending.isEmpty {HStack(spacing:3){Image(systemName:"clock");Text(entry.pending.isEmpty ? "更新 \(String(s.generatedAt.prefix(10)))":"待同步 · 開啟 Huddle")}.font(.system(size:9)).foregroundStyle(ink.opacity(0.7)).lineLimit(1)}
                 }.foregroundStyle(ink).widgetURL(url(kind)).privacySensitive()
             } else {Link(destination:url(kind)){VStack(spacing:8){Image("Huddle").resizable().scaledToFit().frame(width:55,height:55);Text(emptyTitle).font(.caption).multilineTextAlignment(.center);Text(emptyHint).font(.caption2).multilineTextAlignment(.center).foregroundStyle(ink.opacity(0.7))}.foregroundStyle(ink)}}
         }.containerBackground(paper,for:.widget)
@@ -124,9 +129,9 @@ struct WidgetView:View {
         }.padding(.vertical,3)}
     }
     func calendar(_ s:Snapshot)->some View {
-        VStack(spacing:3){Text(String(s.today.prefix(7))).font(.subheadline.weight(.semibold)).frame(maxWidth:.infinity,alignment:.leading)
-            LazyVGrid(columns:Array(repeating:GridItem(.flexible(),spacing:1),count:7),spacing:3){ForEach(["日","一","二","三","四","五","六"],id:\.self){Text($0).font(.system(size:9)).foregroundStyle(.secondary)}
-                ForEach(s.days){day in Text("\(day.day)").font(.system(size:family == .systemLarge ? 12:10,weight:day.date == s.today ? .bold:.regular)).frame(maxWidth:.infinity,minHeight:family == .systemLarge ? 21:14).background(day.date == s.today ? clay:Color.clear,in:Circle()).foregroundStyle(day.date == s.today ? Color.white:ink.opacity(day.inMonth ? 1:0.4)).overlay(alignment:.bottom){if day.count>0{Circle().fill(day.date == s.today ? Color.white:clay).frame(width:2,height:2)}}}
+        VStack(spacing:2){HStack(spacing:4){Text(String(s.today.prefix(7))).font(.subheadline.weight(.semibold));Spacer(minLength:0);Image("Huddle").resizable().scaledToFit().frame(width:20,height:20)}
+            LazyVGrid(columns:Array(repeating:GridItem(.flexible(),spacing:1),count:7),spacing:family == .systemLarge ? 2:1){ForEach(["日","一","二","三","四","五","六"],id:\.self){Text($0).font(.system(size:9)).foregroundStyle(.secondary)}
+                ForEach(s.days){day in Text("\(day.day)").font(.system(size:family == .systemLarge ? 12:10,weight:day.date == s.today ? .bold:.regular)).frame(maxWidth:.infinity,minHeight:family == .systemLarge ? 19:13).background(day.date == s.today ? clay:Color.clear,in:Circle()).foregroundStyle(day.date == s.today ? Color.white:ink.opacity(day.inMonth ? 1:0.4)).overlay(alignment:.bottom){if day.count>0{Circle().fill(day.date == s.today ? Color.white:clay).frame(width:2,height:2)}}}
             }
         }
     }
