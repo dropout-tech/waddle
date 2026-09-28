@@ -29,6 +29,13 @@ const PUMP_MS = 25
 const TICK_FADE_S = 0.3
 const REVEAL_LINE_MS = 1200
 const REVEAL_PLAY_MS = 2400
+// The first tick must always sound: if the two files aren't decoded at the
+// click, wait for them up to this long, then start on a synthesized click
+// (switching to the files as soon as they land).
+const SOUND_WAIT_MS = 1200
+// Fallback click: filtered-noise transient + decaying sine. Levels matched to
+// the files (peak/RMS within ~5%, measured with OfflineAudioContext).
+const SYNTH = [{ freq: 3300, level: 0.46 }, { freq: 2500, level: 0.42 }] // tick, tock
 // While the gate is up, the hero swarm and the roaming penguin hold their
 // first-visit show (penguin-circus.tsx) and start when this event fires.
 export const INTRO_OPEN_ATTR = 'data-intro-open'
@@ -37,8 +44,41 @@ export const INTRO_CLOSED_EVENT = 'huddle:intro-closed'
 export type IntroCopy = { tick: string; enter: string; enterTap: string; hint: string; line: string; play: string; skip: string; loading: string; label: string }
 // enter = stage 1 (still clock, "click to enter"); gate = stage 2 (ticking, line, ▶)
 type Phase = 'hidden' | 'enter' | 'gate' | 'film' | 'closing'
-type Audio = { ctx: AudioContext; gain: GainNode; buffers: (AudioBuffer | null)[] }
+type Audio = { ctx: AudioContext; gain: GainNode; buffers: (AudioBuffer | null)[]; settled: boolean; ready: Promise<unknown>; noise: AudioBuffer | null }
 type AudioSessionNavigator = Navigator & { audioSession?: { type: string } }
+
+// Fetch the two sounds as early as possible (gate mount), decode later into
+// whichever AudioContext exists.
+function fetchSounds() {
+  return TICK_SOUNDS.map(url => {
+    const p = fetch(url).then(r => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+    p.catch(() => {}) // may never be decoded (signed-in visitor): not an unhandled rejection
+    return p
+  })
+}
+
+// One synthesized click at `when` (tick or tock), into `dest`.
+function synthClick(ctx: BaseAudioContext, dest: AudioNode, when: number, kind: number, noise: AudioBuffer): AudioScheduledSourceNode[] {
+  const { freq, level } = SYNTH[kind]
+  const osc = ctx.createOscillator()
+  osc.frequency.value = freq
+  const tone = ctx.createGain()
+  tone.gain.setValueAtTime(0, when)
+  tone.gain.linearRampToValueAtTime(level, when + 0.002)
+  tone.gain.exponentialRampToValueAtTime(0.0001, when + 0.07)
+  osc.connect(tone).connect(dest)
+  osc.start(when); osc.stop(when + 0.08)
+  const burst = ctx.createBufferSource()
+  burst.buffer = noise
+  const band = ctx.createBiquadFilter()
+  band.type = 'bandpass'; band.frequency.value = freq; band.Q.value = 0.9
+  const env = ctx.createGain()
+  env.gain.setValueAtTime(level, when)
+  env.gain.exponentialRampToValueAtTime(0.0001, when + 0.018)
+  burst.connect(band).connect(env).connect(dest)
+  burst.start(when); burst.stop(when + 0.02)
+  return [osc, burst]
+}
 
 function seen() {
   try { return window.localStorage.getItem(SEEN_KEY) === '1' } catch { return false }
@@ -82,7 +122,8 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
   const startTimer = useRef(0)
   const stallTimer = useRef(0)
   const audio = useRef<Audio | null>(null)
-  const clock = useRef({ mode: 'perf' as 'ctx' | 'perf', start: 0, perfStart: 0, beats: 0, steps: 0, pump: 0, raf: 0, stop: 0, sources: new Set<AudioBufferSourceNode>() })
+  const clock = useRef({ mode: 'perf' as 'ctx' | 'perf', start: 0, perfStart: 0, beats: 0, steps: 0, pump: 0, raf: 0, stop: 0, wait: 0, gen: 0, audible: 0, kinds: [] as string[], sources: new Set<AudioScheduledSourceNode>() })
+  const soundData = useRef<Promise<ArrayBuffer>[] | null>(null)
 
   const hold = useCallback(() => {
     held.current = true
@@ -105,6 +146,7 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
       // gate stays unseen for a later plain visit.
       const eligible = !isNative() && !isDesktop() && (force || (!window.location.hash && !seen()))
       decided.current = eligible ? 'hold' : 'done'
+      if (eligible) soundData.current = fetchSounds()
     }
     if (decided.current !== 'hold') return
     if (!held.current) hold()
@@ -140,6 +182,7 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
   const shutAudio = useCallback(() => {
     const c = clock.current
     stopPump()
+    window.clearTimeout(c.wait); c.wait = 0; c.gen++ // a pending start is void
     cancelAnimationFrame(c.raf); c.raf = 0
     c.sources.forEach(s => { try { s.stop() } catch { /* not started */ } })
     c.sources.clear()
@@ -153,8 +196,8 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
     }
   }, [stopPump])
 
-  // Stage 1 mounts: a suspended AudioContext plus the two decoded sounds, so
-  // the enter click only has to resume it. Any failure stays silent.
+  // Stage 1 mounts: a suspended AudioContext, decoding the two sounds right
+  // away (that works while suspended), so the enter click only resumes it.
   useEffect(() => {
     if (phase !== 'enter' || audio.current) return
     const root = rootRef.current
@@ -167,20 +210,22 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
       const gain = ctx.createGain()
       gain.gain.value = TICK_GAIN
       gain.connect(ctx.destination)
-      a = { ctx, gain, buffers: [null, null] }
+      a = { ctx, gain, buffers: [null, null], settled: false, ready: Promise.resolve(), noise: null }
+      const noise = ctx.createBuffer(1, Math.round(ctx.sampleRate * 0.02), ctx.sampleRate)
+      const data = noise.getChannelData(0)
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+      a.noise = noise
     } catch { return }
     audio.current = a
     if (a.ctx.state === 'running') void a.ctx.suspend().catch(() => {})
     const show = () => root?.setAttribute('data-audio', a.ctx.state)
     a.ctx.onstatechange = show
     show()
-    TICK_SOUNDS.forEach((url, i) => {
-      fetch(url)
-        .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
-        .then(data => a.ctx.decodeAudioData(data))
-        .then(buffer => { a.buffers[i] = buffer })
-        .catch(() => { /* no tick sound this time; the clock still moves */ })
-    })
+    const data = soundData.current ?? (soundData.current = fetchSounds())
+    a.ready = Promise.allSettled(data.map((p, i) => p
+      .then(bytes => a.ctx.decodeAudioData(bytes.slice(0)))
+      .then(buffer => { a.buffers[i] = buffer })))
+      .then(() => { a.settled = true; rootRef.current?.setAttribute('data-sounds', 'settled') }) // decoded, or failed for good (the synth covers it)
   }, [phase])
 
   const clearFailsafe = useCallback(() => {
@@ -261,29 +306,38 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
     const a = audio.current
     if (a) void a.ctx.resume().catch(() => {})
     const c = clock.current
-    c.mode = a ? 'ctx' : 'perf'
-    c.start = a ? a.ctx.currentTime : 0
-    c.perfStart = performance.now()
-    c.beats = 0; c.steps = 0
+    const clickedAt = performance.now()
     const still = reducedMotion()
     const root = rootRef.current
-    // Beat k (tick, tock, tick…) sounds at start + k seconds.
+    const track = (s: AudioScheduledSourceNode) => { c.sources.add(s); s.onended = () => c.sources.delete(s) }
+    // Beat k (tick, tock, tick…) sounds at start + k seconds: the file if it
+    // has decoded, otherwise the synthesized click.
     const pump = () => {
       const due = elapsed() + LOOKAHEAD_S
       while (c.beats < due) {
         const now = audio.current
-        const buffer = c.mode === 'ctx' && now ? now.buffers[c.beats % 2] : null
-        if (now && buffer) {
-          const s = now.ctx.createBufferSource()
-          s.buffer = buffer
-          s.connect(now.gain)
-          s.onended = () => c.sources.delete(s)
-          c.sources.add(s)
-          s.start(Math.max(c.start + c.beats, now.ctx.currentTime))
+        if (c.mode === 'ctx' && now && now.ctx.state !== 'closed') {
+          const kind = c.beats % 2
+          const when = Math.max(c.start + c.beats, now.ctx.currentTime)
+          const buffer = now.buffers[kind]
+          if (buffer) {
+            const s = now.ctx.createBufferSource()
+            s.buffer = buffer
+            s.connect(now.gain)
+            track(s)
+            s.start(when)
+            c.kinds.push('file')
+          } else if (now.noise) {
+            synthClick(now.ctx, now.gain, when, kind, now.noise).forEach(track)
+            c.kinds.push('synth')
+          }
+          c.audible = c.kinds.length
         }
         c.beats++
       }
       root?.setAttribute('data-ticks', String(c.beats))
+      root?.setAttribute('data-audible', String(c.audible))
+      root?.setAttribute('data-beat-sources', c.kinds.slice(0, 12).join(','))
     }
     // The hand steps 6° on each beat, read off the same clock.
     const frame = () => {
@@ -293,14 +347,35 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
       c.steps = steps
       if (!still && handRef.current) handRef.current.style.transform = `rotate(${steps * 6}deg)`
     }
-    pump()
-    c.pump = window.setInterval(pump, PUMP_MS)
-    frame()
+    // The metronome: first tick, hand and the stage-2 reveal all count from here.
+    let begun = false
+    const begin = () => {
+      begun = true
+      window.clearTimeout(c.wait); c.wait = 0
+      const live = audio.current
+      c.mode = live ? 'ctx' : 'perf'
+      c.start = live ? live.ctx.currentTime : 0
+      c.perfStart = performance.now()
+      c.beats = 0; c.steps = 0; c.audible = 0; c.kinds = []
+      root?.setAttribute('data-first-beat-delay', String(Math.round(performance.now() - clickedAt)))
+      pump()
+      c.pump = window.setInterval(pump, PUMP_MS)
+      frame()
+      revealTimers.current = [
+        window.setTimeout(() => setReveal(1), REVEAL_LINE_MS),
+        window.setTimeout(() => setReveal(2), REVEAL_PLAY_MS),
+      ]
+    }
     setPhase('gate')
-    revealTimers.current = [
-      window.setTimeout(() => setReveal(1), REVEAL_LINE_MS),
-      window.setTimeout(() => setReveal(2), REVEAL_PLAY_MS),
-    ]
+    if (!a || a.settled) begin()
+    else {
+      // Sounds still on their way: start the moment they're ready, or on the
+      // synth after SOUND_WAIT_MS. A close in between voids this (gen).
+      const gen = c.gen
+      const go = () => { if (c.gen === gen && !begun) begin() }
+      c.wait = window.setTimeout(go, SOUND_WAIT_MS)
+      void a.ready.then(go)
+    }
     // Hold focus on the dialog until ▶ appears (a second Enter must not skip).
     rootRef.current?.focus({ preventScroll: true })
   }
