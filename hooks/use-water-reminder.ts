@@ -29,6 +29,8 @@ import {
  * - `storage` event lets a settings change in another tab disable the
  *   reminder live without a refresh.
  */
+export const WATER_OPEN_EVENT = 'huddle-water-open'
+
 export function useWaterReminder() {
   const [isOpen, setIsOpen] = useState(false)
   const [enabled, setEnabledState] = useState(false)
@@ -68,8 +70,12 @@ export function useWaterReminder() {
       }
     }
     window.addEventListener('storage', onStorage)
+    // The 喝水提醒 home-screen widget opens this popup directly (drink / snooze).
+    const onOpen = () => setIsOpen(true)
+    window.addEventListener(WATER_OPEN_EVENT, onOpen)
 
     return () => {
+      window.removeEventListener(WATER_OPEN_EVENT, onOpen)
       window.clearInterval(id)
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('storage', onStorage)
