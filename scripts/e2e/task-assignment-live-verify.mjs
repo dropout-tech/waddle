@@ -177,6 +177,16 @@ async function main() {
     ok(!!rejoin.error && errText(rejoin.error).includes('REMOVED_FROM_ORG'), 'removed B cannot rejoin with the old link (REMOVED_FROM_ORG)')
     const boardGone = await B.rpc('get_org_board', { p_org: orgId })
     ok(!!boardGone.error, 'removed B cannot read the org board')
+    const blocksB = await B.rpc('get_org_blocks', { p_org: orgId })
+    ok(!!blocksB.error, 'removed B cannot list the removed-members panel')
+    const blocksA = await A.rpc('get_org_blocks', { p_org: orgId })
+    ok((blocksA.data ?? []).some((r) => r.user_id === bId), 'owner A sees B in the removed-members list')
+    const unb = await A.rpc('unblock_org_member', { p_org: orgId, p_user: bId })
+    ok(!unb.error, `owner A unblocks B (${errText(unb.error) || 'ok'})`)
+    const blocksA2 = await A.rpc('get_org_blocks', { p_org: orgId })
+    ok(!(blocksA2.data ?? []).some((r) => r.user_id === bId), 'B no longer listed after unblock')
+    const rejoin2 = await B.rpc('accept_org_invite', { p_token: inv.data })
+    ok(!rejoin2.error && rejoin2.data === orgId, `unblocked B rejoins with the invite link (${errText(rejoin2.error) || 'ok'})`)
   } finally {
     for (const id of created.orgs) {
       const d = await A.rpc('delete_organization', { p_org: id })
