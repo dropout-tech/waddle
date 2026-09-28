@@ -185,6 +185,14 @@ export const setOrgMemberRole = (orgId: string, userId: string, role: 'admin' | 
 export const leaveOrg = (orgId: string) => rpc<void>('leave_org', { p_org: orgId })
 export const deleteOrganization = (orgId: string) => rpc<void>('delete_organization', { p_org: orgId })
 
+export interface OrgBlock { userId: string; displayName: string; avatarUrl?: string; blockedAt?: string }
+/** Owner/admin only (DB-enforced, migration 20260928100000). */
+export async function getOrgBlocks(orgId: string): Promise<OrgBlock[]> {
+  const rows = await rpc<{ user_id: string; display_name: string | null; avatar_url: string | null; blocked_at: string | null }[]>('get_org_blocks', { p_org: orgId })
+  return (rows ?? []).map((r) => ({ userId: r.user_id, displayName: r.display_name || t('Huddle 使用者'), avatarUrl: r.avatar_url ?? undefined, blockedAt: r.blocked_at ?? undefined }))
+}
+export const unblockOrgMember = (orgId: string, userId: string) => rpc<void>('unblock_org_member', { p_org: orgId, p_user: userId })
+
 /** Invite link: token in the fragment so it never reaches a server log. */
 export function orgInviteLink(token: string): string {
   // Native WebViews have a capacitor:// origin that can't be shared; use the

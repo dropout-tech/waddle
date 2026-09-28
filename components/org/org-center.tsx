@@ -19,12 +19,16 @@ import {
   setOrgMemberRole,
   leaveOrg,
   deleteOrganization,
+  getOrgBlocks,
+  unblockOrgMember,
   assignmentErrorMessage,
   notifyAssignmentsChanged,
   type OrgSummary,
   type OrgMember,
   type OrgBoardItem,
+  type OrgBlock,
 } from '@/lib/assignments'
+import { getLang } from '@/lib/i18n'
 
 const ROLE_LABEL: Record<OrgMember['role'], string> = { owner: '擁有者', admin: '管理員', member: '成員' }
 
@@ -133,6 +137,8 @@ function OrgDetail({ org, onChanged }: { org: OrgSummary; onChanged: () => Promi
   const { user } = useAuth()
   const [members, setMembers] = useState<OrgMember[] | null>(null)
   const [board, setBoard] = useState<OrgBoardItem[] | null>(null)
+  const [blocks, setBlocks] = useState<OrgBlock[]>([])
+  const [unblockedHint, setUnblockedHint] = useState('')
   const [link, setLink] = useState('')
   const [busy, setBusy] = useState(false)
   const alive = useRef(true)
@@ -142,11 +148,30 @@ function OrgDetail({ org, onChanged }: { org: OrgSummary; onChanged: () => Promi
     try {
       const [m, b] = await Promise.all([getOrgMembers(org.id), getOrgBoard(org.id)])
       if (alive.current) { setMembers(m); setBoard(b) }
+      // Owner/admin only; any failure (e.g. RPC not deployed yet) just hides
+      // the section — it's an auxiliary panel.
+      if (manager) {
+        const list = await getOrgBlocks(org.id).catch(() => [] as OrgBlock[])
+        if (alive.current) setBlocks(list)
+      }
     } catch (err) {
       if (alive.current) { setMembers([]); setBoard([]); toast.error(assignmentErrorMessage(err)) }
     }
-  }, [org.id])
+  }, [org.id, manager])
   useEffect(() => { alive.current = true; void load(); return () => { alive.current = false } }, [load])
+
+  async function unblock(b: OrgBlock) {
+    setBusy(true)
+    try {
+      await unblockOrgMember(org.id, b.userId)
+      setBlocks((prev) => prev.filter((x) => x.userId !== b.userId))
+      setUnblockedHint(t('已解除 {name} 的封鎖。對方可以用邀請連結重新加入。', { name: b.displayName }))
+    } catch (err) {
+      toast.error(assignmentErrorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function run(action: () => Promise<unknown>, ok: string, after?: () => Promise<void>) {
     setBusy(true)
@@ -246,6 +271,38 @@ function OrgDetail({ org, onChanged }: { org: OrgSummary; onChanged: () => Promi
           </ul>
         )}
       </section>
+
+      {/* Removed members (owner/admin only). Hidden entirely when empty. */}
+      {manager && (blocks.length > 0 || unblockedHint) && (
+        <section data-testid="org-blocks" className="rounded-2xl border border-border bg-card px-5 py-3">
+          <h3 className="flex items-center gap-2 py-1 text-sm font-semibold">
+            {t('已移出的成員')}
+            {blocks.length > 0 && <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground">{blocks.length}</span>}
+          </h3>
+          {blocks.length > 0 && (
+            <ul className="divide-y divide-border">
+              {blocks.map((b) => (
+                <li key={b.userId} className="flex min-h-12 items-center gap-3 py-1.5">
+                  <PersonAvatar name={b.displayName} url={b.avatarUrl} size={28} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm">{b.displayName}</p>
+                    {b.blockedAt && (
+                      <p className="text-xs text-muted-foreground">
+                        {t('移出於 {date}', { date: new Date(b.blockedAt).toLocaleDateString(getLang() === 'en' ? 'en-US' : 'zh-TW') })}
+                      </p>
+                    )}
+                  </div>
+                  <button disabled={busy} onClick={() => unblock(b)}
+                    className="min-h-11 shrink-0 rounded-lg px-3 text-xs text-muted-foreground hover:bg-muted disabled:opacity-50">
+                    {t('解除封鎖')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {unblockedHint && <p data-testid="org-unblock-hint" role="status" className="py-1.5 text-xs text-muted-foreground">{unblockedHint}</p>}
+        </section>
+      )}
 
       <section data-testid="org-board" className="rounded-2xl border border-border bg-card p-5">
         <h3 className="mb-1 font-semibold">{t('組織看板')}</h3>
