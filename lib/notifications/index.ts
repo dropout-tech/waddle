@@ -15,6 +15,7 @@ import {
   type ReminderLead,
 } from '@/lib/meeting-reminder'
 import { t } from '@/lib/i18n'
+import { petVoiced } from '@/lib/pet/voice'
 
 // iOS allows at most 64 pending local notifications; stay comfortably under.
 const MAX_SCHEDULED = 48
@@ -110,10 +111,12 @@ export async function syncMeetingReminders(
       const bodyLines = [t('{time} 開始（{lead} 分鐘後）', { time: m.scheduledStartTime, lead })]
       if (m.location) bodyLines.push(t('地點：{location}', { location: trim(m.location, 80) }))
       if (m.attendees) bodyLines.push(t('參與者：{attendees}', { attendees: trim(m.attendees, 120) }))
+      // Said by the adopted penguin when there is one (lib/pet/voice.ts); wording only.
+      const text = petVoiced({ title: t('會議提醒 · {title}', { title: trim(m.title, 80) || t('會議') }), body: bodyLines.join('\n') })
       return {
         id: hashId(reminderId),
-        title: t('會議提醒 · {title}', { title: trim(m.title, 80) || t('會議') }),
-        body: bodyLines.join('\n'),
+        title: text.title,
+        body: text.body,
         schedule: { at: new Date(fireAt) },
         extra: { kind: 'meeting', meetingUrl: m.meetingUrl ?? null },
       }

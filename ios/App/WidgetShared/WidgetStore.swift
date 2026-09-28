@@ -91,6 +91,13 @@ enum WidgetStore {
             state["actions"]=actions
         }
     }
+    /// A tap on the 「我的 Huddle」 penguin: it says 「呱」 and moves to its next line. Display-only, never synced.
+    static func pokePet(at: Date = Date()) throws {
+        try transaction { state in
+            let n=(state["petPoke"] as? [String:Any])?["n"] as? Int ?? 0
+            state["petPoke"]=["n":n+1,"at":(at.timeIntervalSince1970*1000).rounded()]
+        }
+    }
     /// Which slice of the day the 本週時間表 widget shows. Display-only, never synced.
     static func setWeekWindow(_ window: String, at: Date = Date()) throws {
         try transaction { state in state["weekWindow"]=["value":window,"at":(at.timeIntervalSince1970*1000).rounded()] }

@@ -12,12 +12,16 @@ import { rowToTask } from '@/lib/supabase/mappers'
 import { createClient } from '@/lib/supabase/client'
 import { getWaterNextDueAt, getWaterReminderEnabled, recordWaterFromWidget } from '@/lib/water-reminder'
 import { applyWidgetActions } from '@/lib/widgets/actions'
+import { widgetPet } from '@/lib/widgets/pet'
+import { isTaskOverdue } from '@/lib/task-utils'
+import { getLang } from '@/lib/i18n'
+import type { PetSettings } from '@/lib/pet/types'
 import type { Workspace, TimeBlock, ScratchpadItem, NotebookNote } from '@/lib/types'
 
-export function WidgetSync({workspaces,timeBlocks,boards,notes}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[]}) {
+export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[];pet?:PetSettings|null}) {
   const {user}=useAuth(), timer=useFocusTimer(), notebook=useNotebook()
-  const latest=useRef({workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user})
-  useEffect(()=>{latest.current={workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user}},[workspaces,timeBlocks,boards,timer,notebook.notes,notes,user])
+  const latest=useRef({workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet})
+  useEffect(()=>{latest.current={workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet}},[workspaces,timeBlocks,boards,timer,notebook.notes,notes,user,pet])
   useEffect(()=>{
     let alive=true, busy=false
     const sync=async()=>{
@@ -51,6 +55,9 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes}:{workspaces:Work
         const s=x.timer.session
         snapshot.focus={mode:s?.mode,state:x.timer.state,title:s?.label ?? '慢慢來，先專心一件事',seconds:x.timer.displayTime,endAt:s && x.timer.state==='running' && s.mode==='pomodoro' ? s.startedAt.getTime()+s.pausedMs+s.targetSeconds*1000:null,note:focusNoteExcerpt(x.notes,snapshot.today,s?.label)}
         snapshot.water={enabled:getWaterReminderEnabled(),nextAt:getWaterNextDueAt(),count:0}
+        // 「我的 Huddle」: look + ready-rendered lines; the widget picks the bubble itself.
+        const overdue=x.workspaces.filter(w=>!w.isArchived).flatMap(w=>w.categories.filter(c=>!c.isArchived).flatMap(c=>c.tasks)).filter(t=>isTaskOverdue(t,snapshot.today)).length
+        snapshot.pet=widgetPet(x.pet,{overdue,lang:getLang(),day:snapshot.today})
         await publishWidgets(snapshot)
         await syncWidgetReminders(snapshot)
       } catch { /* Keep last snapshot; widget shows its last update time. */ }
@@ -65,6 +72,6 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes}:{workspaces:Work
     window.addEventListener('focus',onVisible);document.addEventListener('visibilitychange',onVisible)
     return ()=>{alive=false;clearTimeout(changeTimer);window.removeEventListener('huddle-widget-refresh',onChange);clearInterval(id);clearTimeout(first);window.removeEventListener('focus',onVisible);document.removeEventListener('visibilitychange',onVisible)}
   },[user?.id])
-  useEffect(()=>{window.dispatchEvent(new Event('huddle-widget-refresh'))},[workspaces,timeBlocks,boards,notebook.notes,notes,timer.state,timer.session])
+  useEffect(()=>{window.dispatchEvent(new Event('huddle-widget-refresh'))},[workspaces,timeBlocks,boards,notebook.notes,notes,timer.state,timer.session,pet])
   return null
 }

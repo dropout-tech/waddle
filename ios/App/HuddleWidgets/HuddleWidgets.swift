@@ -17,12 +17,15 @@ struct Snapshot:Decodable {
     var days:[Day];var tasks:[Item];var agenda:[Item];var notes:[Item];var boards:[Item];var focus:FocusInfo;var water:WaterInfo
     /// Optional: snapshots written by older app builds don't have it.
     var week:[Slot]?
+    /// 「我的 Huddle」 (lib/widgets/pet.ts). Optional for the same reason.
+    var pet:PetInfo?
 }
+struct PetInfo:Decodable {var adopted:Bool;var name:String;var color:String;var accessory:String;var lang:String;var overdue:Int;var overdueLine:String;var lines:[String]}
 enum Kind:String,AppEnum,CaseIterable {
-    case overview,calendar,agenda,week,tasks,topThree="top-three",whiteboard,notebook,focusNote="focus-note",focus,water,shortcuts
+    case overview,calendar,agenda,week,tasks,topThree="top-three",whiteboard,notebook,focusNote="focus-note",focus,water,shortcuts,pet
     static var typeDisplayRepresentation:TypeDisplayRepresentation="小工具類型"
-    static var caseDisplayRepresentations:[Kind:DisplayRepresentation]=[.overview:"月曆＋今日任務",.calendar:"可視化小月曆",.agenda:"近期行程",.week:"本週時間表",.tasks:"任務清單",.topThree:"今天三件事",.whiteboard:"白板",.notebook:"記事本",.focusNote:"專注記事",.focus:"專注計時",.water:"喝水提醒",.shortcuts:"隨手記入口"]
-    var title:String {switch self {case .overview:return "月曆＋今日任務";case .calendar:return "可視化小月曆";case .agenda:return "近期行程";case .week:return "本週時間表";case .tasks:return "任務清單";case .topThree:return "今天三件事";case .whiteboard:return "白板";case .notebook:return "記事本";case .focusNote:return "專注記事";case .focus:return "專注計時";case .water:return "喝水提醒";case .shortcuts:return "隨手記入口"}}
+    static var caseDisplayRepresentations:[Kind:DisplayRepresentation]=[.overview:"月曆＋今日任務",.calendar:"可視化小月曆",.agenda:"近期行程",.week:"本週時間表",.tasks:"任務清單",.topThree:"今天三件事",.whiteboard:"白板",.notebook:"記事本",.focusNote:"專注記事",.focus:"專注計時",.water:"喝水提醒",.shortcuts:"隨手記入口",.pet:"我的 Huddle"]
+    var title:String {switch self {case .overview:return "月曆＋今日任務";case .calendar:return "可視化小月曆";case .agenda:return "近期行程";case .week:return "本週時間表";case .tasks:return "任務清單";case .topThree:return "今天三件事";case .whiteboard:return "白板";case .notebook:return "記事本";case .focusNote:return "專注記事";case .focus:return "專注計時";case .water:return "喝水提醒";case .shortcuts:return "隨手記入口";case .pet:return "我的 Huddle"}}
     /// Gallery blurb (「新增小工具」畫面每款各自的說明).
     var blurb:String {switch self {
         case .overview:return "本月月曆，加上今天要做的事，直接打勾。"
@@ -37,6 +40,7 @@ enum Kind:String,AppEnum,CaseIterable {
         case .focus:return "在主畫面直接開始、暫停、結束專注。"
         case .water:return "喝了一杯就按一下，App 會幫你重新計時提醒。"
         case .shortcuts:return "白板、記事本、專注記事，一鍵打開。"
+        case .pet:return "你領養的企鵝：提醒你接下來的事，點牠會呱一聲。"
     }}
     /// Each split-out widget's own identifier. The legacy configurable widget
     /// keeps "HuddleWidgets" so copies already on a home screen survive.
@@ -47,6 +51,7 @@ enum Kind:String,AppEnum,CaseIterable {
         case .week:return [.systemMedium,.systemLarge]
         case .topThree,.focusNote,.water:return [.systemSmall,.systemMedium]
         case .shortcuts:return [.systemMedium]
+        case .pet:return [.systemSmall,.systemMedium,.systemLarge,.accessoryRectangular]
         case .focus:return [.systemSmall,.systemMedium,.accessoryCircular,.accessoryRectangular]
         case .agenda,.tasks,.whiteboard,.notebook:return [.systemSmall,.systemMedium,.systemLarge]
     }}
@@ -119,6 +124,14 @@ struct SetWeekWindow:AppIntent {
     init(_ w:WeekWindow){window=w.rawValue}
     func perform() async throws -> some IntentResult {try WidgetStore.setWeekWindow(window);WidgetCenter.shared.reloadAllTimelines();return .result()}
 }
+struct PokePet:AppIntent {
+    static var title:LocalizedStringResource="戳一下企鵝"
+    static var isDiscoverable=false
+    init(){}
+    func perform() async throws -> some IntentResult {try WidgetStore.pokePet();WidgetCenter.shared.reloadAllTimelines();return .result()}
+}
+/// How long a 「呱」 line stays up after a tap before the bubble goes back to reminders.
+let petPokeLifetime:TimeInterval=600
 enum EmptyReason {case signedOut,awaitingSync,sharingUnavailable}
 /// Local calendar day key ("yyyy-MM-dd"), shared by views, intents and the entry loader (not main-actor bound).
 let huddleDayFormat:DateFormatter={let f=DateFormatter();f.calendar=Calendar(identifier:.gregorian);f.locale=Locale(identifier:"en_US_POSIX");f.dateFormat="yyyy-MM-dd";return f}()
@@ -133,6 +146,8 @@ struct Entry:TimelineEntry {
     var waterCount:Int=0;var waterLast:Date?=nil
     var pendingCount:Int=0
     var window:WeekWindow = .all
+    /// Penguin taps so far and when the last one was (「我的 Huddle」).
+    var petPokeN:Int=0;var petPokeAt:Date?=nil
     var emptyReason:EmptyReason = .signedOut
 }
 /// A chosen window falls back to 全天 after an hour, so the widget never sits on 晚上 the next morning.
@@ -155,9 +170,29 @@ func loadEntry(kind:Kind,category:String?=nil,noteID:String?=nil,now:Date=Date()
     }
     if let w=state["weekWindow"] as? [String:Any],let v=(w["value"] as? String).flatMap(WeekWindow.init(rawValue:)),let at=w["at"] as? Double,
        now.timeIntervalSince1970-at/1000 < weekWindowLifetime {e.window=v}
+    if let poke=state["petPoke"] as? [String:Any] {e.petPokeN=poke["n"] as? Int ?? 0;e.petPokeAt=(poke["at"] as? Double).map{Date(timeIntervalSince1970:$0/1000)}}
     return e
 }
-func makeTimeline(_ e:Entry)->Timeline<Entry> {Timeline(entries:[e],policy:.after(e.date.addingTimeInterval(900)))}
+func makeTimeline(_ e:Entry)->Timeline<Entry> {
+    guard e.kind == .pet else {return Timeline(entries:[e],policy:.after(e.date.addingTimeInterval(900)))}
+    // The penguin's bubble changes on its own: when today's next item starts,
+    // when water comes due, when a 「呱」 wears off, and hourly for a fresh line.
+    let now=e.date
+    var at:[Date]=[]
+    if let s=e.snapshot {
+        for slot in s.week ?? [] where slot.date == s.today {
+            let p=slot.start.split(separator:":").compactMap{Int($0)}
+            if p.count == 2,let d=Calendar.current.date(bySettingHour:p[0],minute:p[1],second:0,of:now) {at.append(d.addingTimeInterval(60))}
+        }
+        if let next=s.water.nextAt {at.append(Date(timeIntervalSince1970:next/1000))}
+    }
+    if let poke=e.petPokeAt {at.append(poke.addingTimeInterval(petPokeLifetime+1))}
+    let hour=Calendar.current.dateInterval(of:.hour,for:now)?.end ?? now.addingTimeInterval(3600)
+    for h in 0..<6 {at.append(hour.addingTimeInterval(Double(h)*3600))}
+    let future=Array(Set(at.filter{$0 > now && $0 < now.addingTimeInterval(6*3600)})).sorted().prefix(12)
+    let entries=[e]+future.map{loadEntry(kind:e.kind,category:e.category,noteID:e.noteID,now:$0)}
+    return Timeline(entries:entries,policy:.after(now.addingTimeInterval(1800)))
+}
 struct IntentProvider<I:HuddleIntent>:AppIntentTimelineProvider {
     var fixed:Kind?=nil
     func entry(_ c:I)->Entry {loadEntry(kind:fixed ?? c.entryKind ?? .overview,category:c.entryCategory,noteID:c.entryNoteID)}
@@ -193,7 +228,9 @@ struct WidgetView:View {
     }
     var body:some View {
         Group {
-            if family == .accessoryCircular {Link(destination:url(kind)){Image(systemName:kind == .focus ? "timer":"square.grid.2x2")}}
+            if kind == .pet && family == .accessoryRectangular {petLockScreen}
+            else if kind == .pet,let s=entry.snapshot {petPanel(s).foregroundStyle(ink).widgetURL(petLink(s)).privacySensitive()}
+            else if family == .accessoryCircular {Link(destination:url(kind)){Image(systemName:kind == .focus ? "timer":"square.grid.2x2")}}
             else if family == .accessoryRectangular || family == .accessoryInline {Link(destination:url(kind)){Text("Huddle · \(kind.title)").font(.caption)}}
             else if let s=entry.snapshot {
                 // Calendar-heavy widgets fill the whole frame: drop the title row
@@ -239,6 +276,7 @@ struct WidgetView:View {
         case .focus: focusPanel(s)
         case .water: waterPanel(s)
         case .shortcuts: Text("想法來了，先留下來。").font(.caption);shortcuts
+        case .pet: petPanel(s)
         }
     }
     var shortcuts:some View {HStack{ForEach([Kind.whiteboard,.notebook,.focusNote],id:\.self){k in Link(destination:url(k)){VStack(spacing:5){Image(systemName:k == .whiteboard ? "rectangle.3.group":k == .notebook ? "book":"pencil.line");Text(k.title).font(.system(size:10))}.frame(maxWidth:.infinity).padding(.vertical,8)}}}}
@@ -436,6 +474,175 @@ struct WidgetView:View {
     }
     static let clockFormat:DateFormatter={let f=DateFormatter();f.locale=Locale(identifier:"en_US_POSIX");f.dateFormat="HH:mm";return f}()
 }
+// MARK: 我的 Huddle — the adopted penguin and its speech bubble.
+func hexColor(_ hex:String)->Color {
+    var v:UInt64=0
+    guard hex.count == 7,hex.hasPrefix("#"),Scanner(string:String(hex.dropFirst())).scanHexInt64(&v) else {return .gray}
+    return Color(red:Double((v>>16)&0xff)/255,green:Double((v>>8)&0xff)/255,blue:Double(v&0xff)/255)
+}
+/// The penguin art ("Huddle" asset, the same drawing as the web's
+/// public/art/penguin/stand.webp) recoloured, with the accessory drawn on top.
+/// Accessory geometry is the web's (components/pet/pet-sprite.tsx, 240×240
+/// space) mapped onto this 512px export: x' = 56.1 + 1.665x, y' = 51.5 + 1.665y
+/// (fitted on the two eye centres). NO mouth — owner rule; nothing here draws one.
+struct PenguinFigure:View {
+    var color:String;var accessory:String;var blush:Bool=false
+    static let inkLine=hexColor("#292b24")
+    /// Body tint (hue/saturation over the art's own shading), brightness lift, accessory colour — lib/pet/types.ts PET_COLOR_STYLES.
+    static let palette:[String:(tint:Color?,lift:Double,accent:Color)]=[
+        "ink":(nil,0,hexColor("#b8482a")),
+        "cocoa":(hexColor("#8a5a3c"),0.06,hexColor("#dca06a")),
+        "terracotta":(hexColor("#b24f2e"),0.08,hexColor("#cf5731")),
+        "mustard":(hexColor("#d9a91c"),0.24,hexColor("#edc747")),
+        "sage":(hexColor("#6f8057"),0.1,hexColor("#cdd3a6")),
+    ]
+    var body:some View {
+        GeometryReader{g in
+            let side=min(g.size.width,g.size.height),k=side*1.665/512
+            let t=CGAffineTransform(a:k,b:0,c:0,d:k,tx:side*56.1/512,ty:side*51.5/512)
+            let look=Self.palette[color] ?? Self.palette["ink"]!
+            ZStack(alignment:.topLeading){
+                tinted(look.tint,look.lift).frame(width:side,height:side)
+                if blush {
+                    Path{p in p.addEllipse(in:CGRect(x:44,y:105,width:32,height:18));p.addEllipse(in:CGRect(x:176,y:105,width:32,height:18))}.applying(t).fill(hexColor("#e79a86").opacity(0.9))
+                }
+                accessoryShapes(t,k,look.accent)
+            }.frame(width:side,height:side).position(x:g.size.width/2,y:g.size.height/2)
+        }
+    }
+    @ViewBuilder func tinted(_ tint:Color?,_ lift:Double)->some View {
+        let art=Image("Huddle").resizable().scaledToFit()
+        if let tint {ZStack{art;tint.blendMode(.color)}.compositingGroup().mask(art).brightness(lift)} else {art}
+    }
+    @ViewBuilder func accessoryShapes(_ t:CGAffineTransform,_ k:CGFloat,_ accent:Color)->some View {
+        let line=StrokeStyle(lineWidth:5*k,lineJoin:.round)
+        switch accessory {
+        case "scarf":
+            let tail=Path{p in p.move(to:CGPoint(x:150,y:124));p.addLine(to:CGPoint(x:170,y:176));p.addLine(to:CGPoint(x:150,y:181));p.addLine(to:CGPoint(x:136,y:128));p.closeSubpath()}.applying(t)
+            let band=Path{p in p.move(to:CGPoint(x:38,y:110));p.addQuadCurve(to:CGPoint(x:202,y:110),control:CGPoint(x:120,y:140));p.addLine(to:CGPoint(x:206,y:130));p.addQuadCurve(to:CGPoint(x:34,y:130),control:CGPoint(x:120,y:160));p.closeSubpath()}.applying(t)
+            let knit=Path{p in for (a,b) in [((70,124),(74,140)),((100,131),(102,148)),((140,131),(138,148)),((170,124),(166,140))] {p.move(to:CGPoint(x:a.0,y:a.1));p.addLine(to:CGPoint(x:b.0,y:b.1))}}.applying(t)
+            ZStack{tail.fill(accent);tail.stroke(Self.inkLine,style:line);band.fill(accent);band.stroke(Self.inkLine,style:line);knit.stroke(Self.inkLine.opacity(0.35),lineWidth:4*k)}
+        case "hat":
+            let dome=Path{p in p.move(to:CGPoint(x:72,y:40));p.addQuadCurve(to:CGPoint(x:120,y:2),control:CGPoint(x:72,y:2));p.addQuadCurve(to:CGPoint(x:168,y:40),control:CGPoint(x:168,y:2));p.closeSubpath()}.applying(t)
+            let brim=Path(roundedRect:CGRect(x:64,y:30,width:112,height:18),cornerRadius:9).applying(t)
+            let ribs=Path{p in for x in [84,102,120,138,156] {p.move(to:CGPoint(x:x,y:34));p.addLine(to:CGPoint(x:x,y:46))}}.applying(t)
+            let pom=Path(ellipseIn:CGRect(x:109,y:-9,width:22,height:22)).applying(t)
+            ZStack{dome.fill(accent);dome.stroke(Self.inkLine,style:line);brim.fill(accent);brim.stroke(Self.inkLine,style:line);ribs.stroke(Self.inkLine.opacity(0.35),lineWidth:4*k);pom.fill(hexColor("#f6f3e9"));pom.stroke(Self.inkLine,style:line)}
+        case "glasses":
+            let rims=Path{p in p.addEllipse(in:CGRect(x:55.5,y:56,width:54,height:54));p.addEllipse(in:CGRect(x:131,y:56,width:54,height:54))}.applying(t)
+            let bridge=Path{p in p.move(to:CGPoint(x:109,y:81));p.addQuadCurve(to:CGPoint(x:131,y:81),control:CGPoint(x:120,y:73))}.applying(t)
+            ZStack{rims.fill(accent.opacity(0.14));rims.stroke(accent,lineWidth:7*k);rims.stroke(Self.inkLine,lineWidth:5*k);bridge.stroke(Self.inkLine,lineWidth:6*k)}
+        case "headphones":
+            let band=Path{p in p.move(to:CGPoint(x:34,y:92));p.addQuadCurve(to:CGPoint(x:120,y:12),control:CGPoint(x:30,y:14));p.addQuadCurve(to:CGPoint(x:206,y:92),control:CGPoint(x:210,y:14))}.applying(t)
+            let cups=Path{p in p.addRoundedRect(in:CGRect(x:14,y:72,width:32,height:50),cornerSize:CGSize(width:14,height:14));p.addRoundedRect(in:CGRect(x:194,y:72,width:32,height:50),cornerSize:CGSize(width:14,height:14))}.applying(t)
+            ZStack{band.stroke(Self.inkLine,lineWidth:14*k);band.stroke(accent,lineWidth:6*k);cups.fill(accent);cups.stroke(Self.inkLine,style:line)}
+        default: EmptyView()
+        }
+    }
+}
+struct PetBubble {var text:String;var link:URL}
+extension WidgetView {
+    var petEN:Bool {entry.snapshot?.pet?.lang == "en"}
+    /// Most important thing right now: a fresh 「呱」 > today's next scheduled
+    /// item > overdue / unfinished today > water > a fun line (rotates hourly).
+    /// `safe` = lock screen: never shows a task title.
+    func petBubble(_ s:Snapshot,_ p:PetInfo,safe:Bool=false)->PetBubble {
+        let en=p.lang == "en",now=entry.date
+        if let at=entry.petPokeAt,now.timeIntervalSince(at) >= 0,now.timeIntervalSince(at) < petPokeLifetime {
+            let line=p.lines.isEmpty ? "":p.lines[entry.petPokeN % p.lines.count]
+            return PetBubble(text:(en ? "Honk! ":"呱！")+line,link:url(.pet))
+        }
+        let cal=Calendar.current
+        let nowMin=cal.component(.hour,from:now)*60+cal.component(.minute,from:now)
+        if huddleDayFormat.string(from:now) == s.today,
+           let next=(s.week ?? []).filter({$0.date == s.today && minutes($0.start) >= nowMin}).min(by:{minutes($0.start) < minutes($1.start)}) {
+            let title=String(next.title.prefix(14))
+            let text=safe ? (en ? "Something at \(next.start). Honk!":"\(next.start) 有安排，呱！")
+                          :(en ? "\(next.start) “\(title)”. Honk!":"\(next.start) 要「\(title)」，呱！")
+            return PetBubble(text:text,link:url(.week,date:s.today))
+        }
+        if p.overdue > 0 && !p.overdueLine.isEmpty {return PetBubble(text:p.overdueLine,link:url(.tasks))}
+        let open=s.tasks.filter{!(entry.pendingTasks[$0.id] ?? ($0.completed == true))}.count
+        if open > 0 {return PetBubble(text:en ? "\(open) left on today's list. Honk.":"今天還有 \(open) 件事，呱。先挑最小的？",link:url(.tasks))}
+        let waterDue=s.water.enabled && (s.water.nextAt.map{$0/1000 <= now.timeIntervalSince1970} ?? false)
+        let sipped=entry.waterLast.map{now.timeIntervalSince($0) < 3600} ?? false
+        if waterDue && !sipped {return PetBubble(text:en ? "It's been a while since your last sip. Honk.":"好一陣子沒喝水了，喝一口吧，呱。",link:url(.water))}
+        if p.lines.isEmpty {return PetBubble(text:en ? "Honk.":"呱。",link:url(.pet))}
+        return PetBubble(text:p.lines[Int(now.timeIntervalSince1970/3600) % p.lines.count],link:url(.pet))
+    }
+    func petLink(_ s:Snapshot)->URL {
+        guard let p=s.pet,p.adopted else {return url(.pet)}
+        return petBubble(s,p).link
+    }
+    var bubbleFill:Color {scheme == .dark ? Color(red:0.24,green:0.24,blue:0.21):Color.white}
+    /// Rounded bubble with a small tail pointing at the penguin (down-left, or left in the medium layout).
+    func bubble(_ text:String,size:CGFloat,lines:Int,tailLeft:Bool)->some View {
+        Text(text).font(.system(size:size,weight:.medium,design:.rounded)).lineLimit(lines).minimumScaleFactor(0.75)
+            .multilineTextAlignment(.leading).fixedSize(horizontal:false,vertical:true)
+            .padding(.horizontal,10).padding(.vertical,7)
+            .frame(maxWidth:.infinity,alignment:.leading)
+            .background(RoundedRectangle(cornerRadius:14,style:.continuous).fill(bubbleFill))
+            .overlay(RoundedRectangle(cornerRadius:14,style:.continuous).stroke(ink.opacity(0.75),lineWidth:1.2))
+            .overlay(alignment:tailLeft ? .leading:.bottomLeading){
+                Path{p in
+                    if tailLeft {p.move(to:CGPoint(x:1,y:0));p.addLine(to:CGPoint(x:-8,y:6));p.addLine(to:CGPoint(x:1,y:12))}
+                    else {p.move(to:CGPoint(x:0,y:-1));p.addLine(to:CGPoint(x:4,y:9));p.addLine(to:CGPoint(x:14,y:-1))}
+                }.fill(bubbleFill).overlay(Path{p in
+                    if tailLeft {p.move(to:CGPoint(x:0,y:0));p.addLine(to:CGPoint(x:-8,y:6));p.addLine(to:CGPoint(x:0,y:12))}
+                    else {p.move(to:CGPoint(x:0,y:0));p.addLine(to:CGPoint(x:4,y:9));p.addLine(to:CGPoint(x:14,y:0))}
+                }.stroke(ink.opacity(0.75),lineWidth:1.2))
+                .frame(width:tailLeft ? 1:14,height:tailLeft ? 12:1).offset(x:tailLeft ? 0:18)
+            }
+    }
+    func poke(_ p:PetInfo,_ size:CGFloat)->some View {
+        let fresh=entry.petPokeAt.map{entry.date.timeIntervalSince($0) < petPokeLifetime} ?? false
+        return Button(intent:PokePet()){PenguinFigure(color:p.color,accessory:p.accessory,blush:fresh).frame(width:size,height:size).contentShape(Rectangle())}.buttonStyle(.plain)
+    }
+    @ViewBuilder func petPanel(_ s:Snapshot)->some View {
+        if let p=s.pet,p.adopted {
+            let b=petBubble(s,p)
+            switch family {
+            case .systemMedium:
+                HStack(alignment:.center,spacing:14){
+                    poke(p,112)
+                    VStack(alignment:.leading,spacing:6){
+                        Text(p.name).font(.caption.weight(.semibold)).foregroundStyle(ink.opacity(0.75))
+                        Link(destination:b.link){bubble(b.text,size:14,lines:4,tailLeft:true)}
+                    }
+                }.frame(maxWidth:.infinity,maxHeight:.infinity)
+            case .systemLarge:
+                VStack(spacing:10){
+                    Link(destination:b.link){bubble(b.text,size:17,lines:5,tailLeft:false)}
+                    poke(p,230).frame(maxHeight:.infinity)
+                    HStack{Text(p.name).font(.subheadline.weight(.semibold));Spacer();Text(p.lang == "en" ? "Tap me to honk":"點我呱一聲").font(.caption2).foregroundStyle(ink.opacity(0.6))}
+                }
+            default:
+                // Small: iOS opens widgetURL (the bubble's target) for taps outside the penguin button.
+                VStack(alignment:.leading,spacing:6){
+                    bubble(b.text,size:12,lines:3,tailLeft:false)
+                    HStack(alignment:.bottom){poke(p,76);Spacer(minLength:0);Text(p.name).font(.caption2.weight(.semibold)).foregroundStyle(ink.opacity(0.75)).lineLimit(1)}
+                }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
+            }
+        } else {
+            // Not adopted yet (or an app build that doesn't send `pet`).
+            let en=s.pet?.lang == "en"
+            VStack(spacing:8){
+                PenguinFigure(color:"ink",accessory:"none").frame(width:family == .systemSmall ? 64:90,height:family == .systemSmall ? 64:90).opacity(0.55)
+                Text(en ? "Open Huddle to adopt your penguin":"打開 Huddle 領養你的企鵝").font(.caption.weight(.semibold)).multilineTextAlignment(.center)
+            }.frame(maxWidth:.infinity,maxHeight:.infinity)
+        }
+    }
+    /// Lock screen: name + a title-free bubble (the lock screen can be seen by anyone).
+    @ViewBuilder var petLockScreen:some View {
+        if let s=entry.snapshot,let p=s.pet,p.adopted {
+            let b=petBubble(s,p,safe:true)
+            VStack(alignment:.leading,spacing:1){Text(p.name).font(.headline).lineLimit(1);Text(b.text).font(.caption).lineLimit(2)}
+                .frame(maxWidth:.infinity,alignment:.leading).widgetURL(b.link)
+        } else {
+            Text(entry.snapshot?.pet?.lang == "en" ? "Open Huddle to adopt your penguin":"打開 Huddle 領養你的企鵝").font(.caption).widgetURL(url(.pet))
+        }
+    }
+}
 /// The original all-in-one widget. Its kind string stays "HuddleWidgets" so the
 /// copies people already placed keep working (a removed kind turns them blank).
 struct HuddleWidgets:Widget {
@@ -467,6 +674,7 @@ struct FocusNoteWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.f
 struct FocusWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.focus)}}
 struct WaterWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.water)}}
 struct ShortcutsWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.shortcuts)}}
+struct PetWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.pet)}}
 
 struct HuddleFocusLiveActivity: Widget {
     var body: some WidgetConfiguration {
@@ -490,9 +698,9 @@ struct HuddleFocusLiveActivity: Widget {
 }
 // The iOS 26.5 SDK's WidgetBundleBuilder.buildBlock is variadic (parameter
 // packs), but older toolchains stop at 10 children — two nested bundles of
-// six keep every level well under that either way.
+// six or seven keep every level well under that either way.
 struct HuddlePlanWidgets:WidgetBundle {
-    var body:some Widget {OverviewWidget();CalendarWidget();AgendaWidget();WeekWidget();TasksWidget();TopThreeWidget()}
+    var body:some Widget {PetWidget();OverviewWidget();CalendarWidget();AgendaWidget();WeekWidget();TasksWidget();TopThreeWidget()}
 }
 struct HuddleCaptureWidgets:WidgetBundle {
     var body:some Widget {WhiteboardWidget();NotebookWidget();FocusNoteWidget();FocusWidget();WaterWidget();ShortcutsWidget()}
