@@ -11,5 +11,5 @@ export function AccountRegistrationDate() {
   const label = new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : 'zh-TW', {
     timeZone: 'Asia/Taipei', year: 'numeric', month: 'long', day: 'numeric',
   }).format(date)
-  return <p className="mt-3 text-xs leading-5 text-muted-foreground">{t('註冊日期')}：<time dateTime={user?.created_at}>{label}</time></p>
+  return <p className="mt-3 text-xs leading-5 text-muted-foreground">{t('破蛋日期')}：<time dateTime={user?.created_at}>{label}</time></p>
 }
