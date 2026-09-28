@@ -6,11 +6,11 @@
 // break "復原"). The app calls this function on launch (≤ once a day) and
 // after deleting a note; it removes the caller's objects that are older than
 // 24h and no longer referenced by ANY row in the database (see core.mjs for
-// the rules and migration 20260928120000_notebook_image_references.sql for
+// the rules and migration 20260928140000_notebook_image_references.sql for
 // the reference lookup).
 //
 // Deploy:  supabase functions deploy cleanup-images   (verify_jwt stays on)
-// Requires migration 20260928120000 to be applied first.
+// Requires migration 20260928140000 to be applied first.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { BUCKET, MAX_LIST, createHandler } from './core.mjs'
