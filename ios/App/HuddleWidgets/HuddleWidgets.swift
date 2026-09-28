@@ -676,16 +676,30 @@ struct WaterWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.water
 struct ShortcutsWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.shortcuts)}}
 struct PetWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.pet)}}
 
+/// Lock screen / Notification Center banner. Ink and background come from the
+/// same colour scheme so the text always contrasts its own tile: the system
+/// default (white text in dark mode) was near-invisible on the cream tint.
+struct FocusLiveActivityView:View {
+    let state:FocusActivity.ContentState
+    @Environment(\.colorScheme) private var scheme
+    private var ink:Color{scheme == .dark ? Color(red:0.96,green:0.94,blue:0.88):hexColor("#292b24")}
+    private var paper:Color{scheme == .dark ? hexColor("#292b24"):Color(red:0.99,green:0.98,blue:0.94)}
+    var body:some View {
+        HStack {
+            Image("Huddle").resizable().scaledToFit().frame(width:42,height:42)
+            VStack(alignment:.leading){Text("Huddle · 專注").font(.headline);Text(state.paused ? "休息一下，等等繼續":"慢慢來，先專心一件事").font(.caption).foregroundStyle(ink.opacity(0.75))}
+            Spacer()
+            if !state.paused && state.endAt>Date(){Text(timerInterval:Date()...state.endAt,countsDown:true).monospacedDigit().frame(width:72)}
+            else {Text(String(format:"%02d:%02d",state.seconds/60,state.seconds%60)).monospacedDigit()}
+        }.padding().foregroundStyle(ink)
+        .activityBackgroundTint(paper).activitySystemActionForegroundColor(ink)
+        .widgetURL(URL(string:"huddle://widget/focus"))
+    }
+}
 struct HuddleFocusLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for:FocusActivity.self) { context in
-            HStack {
-                Image("Huddle").resizable().scaledToFit().frame(width:42,height:42)
-                VStack(alignment:.leading){Text("Huddle · 專注").font(.headline);Text(context.state.paused ? "休息一下，等等繼續":"慢慢來，先專心一件事").font(.caption)}
-                Spacer()
-                if !context.state.paused && context.state.endAt>Date(){Text(timerInterval:Date()...context.state.endAt,countsDown:true).monospacedDigit().frame(width:72)}
-                else {Text(String(format:"%02d:%02d",context.state.seconds/60,context.state.seconds%60)).monospacedDigit()}
-            }.padding().activityBackgroundTint(Color(red:0.99,green:0.98,blue:0.94)).widgetURL(URL(string:"huddle://widget/focus"))
+            FocusLiveActivityView(state:context.state)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading){Image("Huddle").resizable().scaledToFit().frame(width:36,height:36)}
