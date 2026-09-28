@@ -2,11 +2,12 @@
 
 import { useId, useRef, useState } from 'react'
 import { Play, RotateCcw } from 'lucide-react'
+import { marketingMediaUrl } from '@/lib/marketing-media'
 import styles from './feature-film.module.css'
 
-const FILM_720 = '/marketing/promo-film/huddle-promo-720.mp4'
-const FILM_1080 = '/marketing/promo-film/huddle-promo-1080.mp4'
-const POSTER = '/marketing/promo-film/huddle-promo-poster.jpg'
+const FILM_720 = marketingMediaUrl('promo-film/huddle-promo-720.mp4')
+const FILM_1080 = marketingMediaUrl('promo-film/huddle-promo-1080.mp4')
+const POSTER = marketingMediaUrl('promo-film/huddle-promo-poster.jpg')
 const NARROW_QUERY = '(max-width: 760px)'
 
 /** Public, click-to-play media with sound (pressing play is the gesture that
