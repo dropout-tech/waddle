@@ -53,6 +53,10 @@ const words = {
 type Locale = keyof typeof words
 
 const MERGED = 'huddle:merged'
+// The first-visit gate (first-visit-intro.tsx) covers the page: hold the show
+// until it closes, so the five penguins burst out right after the film.
+const INTRO_CLOSED = 'huddle:intro-closed'
+const introOpen = () => document.documentElement.hasAttribute('data-intro-open')
 const noMotion = () => typeof window === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches || isNative() || isDesktop()
 const mobile = () => window.innerWidth <= 760
 
@@ -153,8 +157,9 @@ export function HeroSwarm({ locale = 'zh' }: { locale?: Locale }) {
       }
       raf = requestAnimationFrame(frame)
     }
-    const start = window.setTimeout(() => { raf = requestAnimationFrame(frame) }, 500)
-    return () => { cancelled = true; clearTimeout(start); cancelAnimationFrame(raf); headline?.removeAttribute('data-chaos') }
+    const begin = () => { raf = requestAnimationFrame(frame) }
+    const start = window.setTimeout(() => { if (introOpen()) window.addEventListener(INTRO_CLOSED, begin, { once: true }); else begin() }, 500)
+    return () => { cancelled = true; clearTimeout(start); window.removeEventListener(INTRO_CLOSED, begin); cancelAnimationFrame(raf); headline?.removeAttribute('data-chaos') }
   }, [])
 
   return (
@@ -232,7 +237,9 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
       awake = true; root.setAttribute('data-awake', '')
     }
     window.addEventListener(MERGED, wake)
-    const fallback = window.setTimeout(() => wake(), 6500)
+    let fallback = 0
+    const armFallback = () => { fallback = window.setTimeout(() => { if (introOpen()) window.addEventListener(INTRO_CLOSED, armFallback, { once: true }); else wake() }, 6500) }
+    armFallback()
 
     const onMove = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse') return
@@ -538,7 +545,7 @@ export function RoamingPenguin({ locale = 'zh' }: { locale?: Locale }) {
     raf = requestAnimationFrame(frame)
 
     return () => {
-      cancelAnimationFrame(raf); clearTimeout(fallback)
+      cancelAnimationFrame(raf); clearTimeout(fallback); window.removeEventListener(INTRO_CLOSED, armFallback)
       window.removeEventListener(MERGED, wake); window.removeEventListener('resize', onResize)
       window.removeEventListener('pointermove', onMove); document.documentElement.removeEventListener('pointerleave', onLeave)
       document.removeEventListener('click', onClick); window.removeEventListener('huddle:cheer', onCheer); window.removeEventListener('huddle:focus-mode', onFocusMode); window.clearInterval(notesTimer)
