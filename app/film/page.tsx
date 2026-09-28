@@ -3,8 +3,8 @@ import Link from 'next/link'
 import { FeatureFilm } from '@/components/marketing/feature-film'
 
 export const metadata: Metadata = {
-  title: 'Huddle 功能短片｜完整預覽',
-  description: '觀看 Huddle 的 18 秒情境短片，了解任務、行程、專注與筆記如何陪你整理一天。',
+  title: 'Huddle 宣傳片｜完整預覽',
+  description: '觀看 Huddle 約 44 秒的宣傳片，看一隻企鵝如何在忙碌的一天裡，幫你把散落的事情整理妥當。',
   robots: { index: false, follow: false },
 }
 
@@ -13,7 +13,7 @@ export default function FilmPage() {
     <main className="min-h-screen bg-[#f3df7d] text-[#25231e]">
       <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 pt-6">
         <Link href="/about" className="inline-flex min-h-11 items-center text-sm underline underline-offset-4">回到 Huddle 官網</Link>
-        <h1 className="text-base font-semibold">Huddle · 功能短片完整預覽</h1>
+        <h1 className="text-base font-semibold">Huddle · 宣傳片完整預覽</h1>
         <Link href="/en/film" hrefLang="en" lang="en" className="inline-flex min-h-11 items-center text-sm underline underline-offset-4">English</Link>
       </header>
       <FeatureFilm />
