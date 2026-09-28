@@ -1,0 +1,19 @@
+.section { padding: clamp(40px, 6vw, 88px) 20px; }
+.inner { max-width: 1152px; margin-inline: auto; min-width: 0; display: grid; grid-template-columns: 1.35fr 1fr; gap: 56px; align-items: center; }
+
+/* Same frame/radius/shadow conventions as the feature-film .screen. */
+.frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #25231e; overflow: hidden; border-radius: 12px; box-shadow: 0 14px 36px -24px #25231e; }
+.video { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+.toggle { position: absolute; right: 14px; bottom: 14px; width: 44px; height: 44px; display: inline-flex; justify-content: center; align-items: center; border: 0; border-radius: 999px; background: rgba(37, 35, 30, .72); color: #fff9dc; cursor: pointer; }
+.toggle:hover { background: rgba(37, 35, 30, .92); }
+.toggle:focus-visible { outline: 3px solid #25231e; outline-offset: 4px; }
+
+.tagline { margin: 0; font-family: var(--poster-zh), sans-serif; font-weight: 900; font-size: clamp(24px, 2.6vw, 38px); line-height: 1.4; letter-spacing: -.02em; }
+.tagline.en { font-family: var(--poster-en), sans-serif; letter-spacing: -.01em; text-transform: uppercase; line-height: 1.25; }
+
+@media (max-width: 760px) {
+  .section { padding: clamp(32px, 9vw, 56px) 16px; }
+  .inner { grid-template-columns: 1fr; gap: 22px; }
+  .tagline { font-size: clamp(22px, 6vw, 28px); }
+}

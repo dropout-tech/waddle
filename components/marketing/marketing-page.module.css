@@ -6,7 +6,7 @@
 /* CJK display type: break only after punctuation unless a line overflows */
 .site :is(h1, h2, h3) { word-break: keep-all; overflow-wrap: anywhere; }
 .site :is(a,button,summary):focus-visible { outline: 3px solid var(--orange); outline-offset: 5px; }
-.site section[id], .film { scroll-margin-top: 24px; }
+.site section[id], .film, .promo { scroll-margin-top: 24px; }
 .skip { position: fixed; top: 8px; left: 8px; z-index: 100; transform: translateY(-200%); padding: 12px 20px; background: var(--ink); color: var(--paper); }
 .skip:focus { transform: none; }
 
@@ -90,6 +90,9 @@
 .boardFigure figcaption { margin-top: 16px; font-size: 14px; line-height: 1.8; color: var(--muted); }
 
 .film { background: var(--yellow); }
+
+/* ── Promo loop: calm "breathing moment" before the download CTA ─────────── */
+.promo { background: var(--yellow); }
 
 /* ── Focus ──────────────────────────────────────────────────────────────── */
 .focus { max-width: 1320px; margin: auto; padding: 130px 4%; display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center; }

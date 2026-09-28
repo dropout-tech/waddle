@@ -8,6 +8,7 @@ import { ArrowDown, ArrowRight, ChevronDown, Download, Play } from 'lucide-react
 import { setLang } from '@/lib/i18n'
 import { brandQuote } from '@/lib/brand'
 import { FeatureFilm } from './feature-film'
+import { PromoLoop } from './promo-loop'
 import { CheckInToy, DoodleToy, ToyButton, ToyStage } from './magic-toys'
 import { FocusRing, FoldVignette, Hammock, HeroSwarm, RoamingPenguin, fishZoneClass, focusStageClass, headlineClass, posterStageClass } from './penguin-circus'
 import styles from './marketing-page.module.css'
@@ -216,6 +217,8 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
         </div>
         <div className={styles.plans}><article data-penguin-stop="price" data-penguin-at="0.86 0 0 -3"><h3>{t.free}</h3><p className={styles.price}>NT$0</p><p>{t.freeBody}</p><Link href="/signup" onClick={toLang} className={styles.primary}>{t.start}<ArrowRight size={19} aria-hidden="true" /></Link></article><article className={styles.pro}><h3>Pro <span>{t.soon}</span></h3><p className={styles.price}>NT$149<small>{t.month}</small></p><p className={styles.annual}>{t.year}</p><p>{t.proBody}</p></article></div>
       </section>
+
+      <div id="promo-loop" className={styles.promo}><PromoLoop locale={locale} /></div>
 
       <section id="download" className={styles.download} aria-labelledby="download-title">
         <div className={styles.downloadCopy}><h2 id="download-title" data-penguin-stop="download" data-penguin-at="0 0 70 -10" data-penguin-pose="wave">{t.downloadTitle}</h2><p>{t.downloadBody}</p>
