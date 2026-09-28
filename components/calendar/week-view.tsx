@@ -259,19 +259,26 @@ export function WeekView({
 
   // Recenter scroll on selectedDate change (and when DAY_WIDTH changes —
   // mobile measurement landing or rotation shifts every column boundary).
+  // Waits for the measured width: recentring first with the 120px fallback
+  // and again once measured left iOS on the stale first position (the
+  // header↔grid scroll sync replays it), so the week opened
+  // INITIAL_DAYS_BEFORE × (120 − measured) px off with today's column cut in
+  // half (iPhone report 2026-09-28). Both scrollers are set directly instead
+  // of relying on the sync handler.
   useEffect(() => {
     const container = scrollContainerRef.current
-    if (!container) return
+    if (!container || viewportWidth === 0) return
 
     const targetScrollLeft = INITIAL_DAYS_BEFORE * DAY_WIDTH
 
     isScrolling.current = true
     container.scrollLeft = targetScrollLeft
+    if (headerScrollRef.current) headerScrollRef.current.scrollLeft = targetScrollLeft
     lastScrollLeft.current = container.scrollLeft
 
     const t = window.setTimeout(() => { isScrolling.current = false }, 150)
     return () => window.clearTimeout(t)
-  }, [selectedDate, DAY_WIDTH])
+  }, [selectedDate, DAY_WIDTH, viewportWidth])
 
   // After prepending days, shift scrollLeft so visual position is preserved
   useLayoutEffect(() => {
@@ -805,12 +812,24 @@ export function WeekView({
     }
   }, [])
 
-  // Resizable header height state - default to show ~4 task rows
-  const [headerHeight, setHeaderHeight] = useState(160) // default: show pending tasks
+  // Resizable header height. Until the user drags the handle (null), desktop
+  // keeps the 160px default (~4 task rows) and phones fit it to the busiest
+  // loaded day's all-day chips — a fixed 160 left ~1/5 of an iPhone screen
+  // empty (report 2026-09-28).
+  const [resizedHeaderHeight, setHeaderHeight] = useState<number | null>(null)
   const HEADER_DATE_HEIGHT = 52 // fixed date row height
   const HEADER_HANDLE_HEIGHT = 8 // resize handle (h-2) below the header row
   const HEADER_MIN = 100 // min: at least some space for pending tasks
   const HEADER_MAX = 320
+  const HEADER_DEFAULT = 160
+  const ALL_DAY_ROW = 20 // one chip (10px text, py-[3px]) + 1px gap
+  const headerHeight = resizedHeaderHeight ?? (isMobile
+    ? Math.min(
+        HEADER_DEFAULT,
+        HEADER_DATE_HEIGHT + HEADER_HANDLE_HEIGHT + 6 +
+          Math.max(1, ...allDates.map(d => getAllDayTasksForDate(d).length)) * ALL_DAY_ROW
+      )
+    : HEADER_DEFAULT)
   const isResizingHeader = useRef(false)
   const resizeStartY = useRef(0)
   const resizeStartH = useRef(0)
@@ -859,7 +878,7 @@ export function WeekView({
           {/* Scrollable header area */}
           <div
             ref={headerScrollRef}
-            className="flex-1 overflow-x-auto overflow-y-auto scrollbar-hide"
+            className="flex-1 overflow-x-auto overflow-y-auto calendar-scroller"
             onScroll={() => syncScroll('header')}
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
@@ -1018,8 +1037,8 @@ export function WeekView({
 
       {/* Scrollable Time Grid */}
       <div 
-        ref={scrollContainerRef} 
-        className="flex-1 overflow-auto"
+        ref={scrollContainerRef}
+        className="flex-1 overflow-auto calendar-scroller"
         onScroll={(e) => {
           handleScroll()
           syncScroll('grid')

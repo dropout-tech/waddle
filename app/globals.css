@@ -324,6 +324,19 @@
   background: oklch(0.75 0.03 55);
 }
 
+/* Phone calendar scrollers (day / week grids + their all-day headers):
+   iOS draws native scroll indicators on these, and during a snap swipe the
+   vertical one lags behind the content and flashes mid-screen (iPhone
+   report 2026-09-28). Phone-width only — desktop keeps its thin scrollbar. */
+@media (max-width: 767px) {
+  .calendar-scroller {
+    scrollbar-width: none;
+  }
+  .calendar-scroller::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Paper Card Effect - Like Japanese stationery */
 .paper-card {
   background: oklch(0.995 0.003 85);
