@@ -11,10 +11,12 @@ import { HuddleWidgets, publishWidgets, widgetAccount } from '@/lib/widgets/nati
 import { rowToTask } from '@/lib/supabase/mappers'
 import { createClient } from '@/lib/supabase/client'
 import { getWaterNextDueAt, getWaterReminderEnabled, recordWaterFromWidget } from '@/lib/water-reminder'
-import { applyWidgetActions } from '@/lib/widgets/actions'
+import { applyWidgetActions, withWatchFocus, WATCH_FOCUS_TTL_MS } from '@/lib/widgets/actions'
 import { widgetPet } from '@/lib/widgets/pet'
 import { isTaskOverdue } from '@/lib/task-utils'
 import { getLang } from '@/lib/i18n'
+import { checkInDate } from '@/lib/daily-check-in'
+import type { WidgetSnapshot } from '@/lib/widgets/model'
 import type { PetSettings } from '@/lib/pet/types'
 import type { Workspace, TimeBlock, ScratchpadItem, NotebookNote } from '@/lib/types'
 
@@ -24,21 +26,28 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{worksp
   useEffect(()=>{latest.current={workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet}},[workspaces,timeBlocks,boards,timer,notebook.notes,notes,user,pet])
   useEffect(()=>{
     let alive=true, busy=false
+    let checkIn:{at:number;value?:WidgetSnapshot['checkIn']}|undefined
     const sync=async()=>{
       if(busy || !alive || !latest.current.user) return
       busy=true
       try {
         const source=latest.current.user.id, auth=widgetAccount()
         if(auth.accountId !== source || !auth.epoch) return
-        const {actions=[]}=await HuddleWidgets.read()
+        const {actions=[],focusCommand}=await HuddleWidgets.read()
         const db=createClient()
-        // Widget taps (task ticks, water, focus timer) replayed in order — lib/widgets/actions.ts.
-        const {handled,aborted}=await applyWidgetActions(actions,{db,source,epoch:auth.epoch,
+        // A watch "start" during the ~2s completion farewell waits in its slot (not acked) and
+        // runs on the refresh that follows the timer going idle; stale ones are still dropped.
+        const watch=focusCommand?.action==='start' && latest.current.timer.state==='completed' && Date.now()-focusCommand.at<WATCH_FOCUS_TTL_MS ? undefined : focusCommand
+        const {queue,dropped}=withWatchFocus(actions,watch,source,auth.epoch)
+        // Widget taps (task ticks, water, focus timer) and the Apple Watch focus command, replayed
+        // in order through one path — lib/widgets/actions.ts → timer.applyWidgetFocus.
+        const replay=await applyWidgetActions(queue,{db,source,epoch:auth.epoch,
           isCurrent:()=>alive && widgetAccount().accountId===source && widgetAccount().epoch===auth.epoch,
           focus:(op,at)=>latest.current.timer.applyWidgetFocus(op,at),
           water:at=>recordWaterFromWidget(at),
           notify:message=>toast.info(message)})
-        if(aborted) return
+        if(replay.aborted) return
+        const handled=[...dropped,...replay.handled]
         if(handled.length) {await HuddleWidgets.acknowledge({accountId:source,epoch:auth.epoch,ids:handled});window.dispatchEvent(new Event('huddle-widget-synced'));return}
         if(!alive || widgetAccount().accountId!==source || widgetAccount().epoch!==auth.epoch) return
         const x=latest.current
@@ -58,6 +67,13 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{worksp
         // 「我的 Huddle」: look + ready-rendered lines; the widget picks the bubble itself.
         const overdue=x.workspaces.filter(w=>!w.isArchived).flatMap(w=>w.categories.filter(c=>!c.isArchived).flatMap(c=>c.tasks)).filter(t=>isTaskOverdue(t,snapshot.today)).length
         snapshot.pet=widgetPet(x.pet,{overdue,lang:getLang(),day:snapshot.today})
+        // Check-in status for the watch; refreshed at most every 5 minutes or when the Taipei day changes.
+        if(!checkIn||Date.now()-checkIn.at>300_000||checkIn.value?.date!==checkInDate()) {
+          const {data,error}=await db.rpc('get_daily_check_in_status').single()
+          if(!alive || widgetAccount().accountId!==source || widgetAccount().epoch!==auth.epoch) return
+          checkIn={at:Date.now(),value:error||!data?undefined:{date:data.check_in_date,checkedIn:data.checked_in,points:data.total_points}}
+        }
+        snapshot.checkIn=checkIn.value
         await publishWidgets(snapshot)
         await syncWidgetReminders(snapshot)
       } catch { /* Keep last snapshot; widget shows its last update time. */ }

@@ -23,6 +23,8 @@ export interface WidgetSnapshot {
   water: { enabled: boolean; nextAt: number | null; count: number }
   /** 「我的 Huddle」 widget (lib/widgets/pet.ts). Optional: the Swift side decodes it as optional too. */
   pet?: WidgetPet
+  /** Today's daily check-in (Asia/Taipei day); optional so older native readers ignore it. */
+  checkIn?: { date: string; checkedIn: boolean; points: number }
 }
 export function plainText(doc: unknown, depth = 0): string {
   if (!doc || typeof doc !== 'object' || depth > 20) return ''

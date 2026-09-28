@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
+import type { WatchFocusCommand } from './native'
 
 /**
  * The widget → app queue. Native widget buttons (ios/App/HuddleWidgets) never
@@ -29,6 +30,24 @@ export interface WidgetActionDeps {
 }
 
 const FOCUS_OPS: readonly FocusOp[] = ['start', 'pause', 'resume', 'stop']
+
+/** Watch taps older than this (app was closed) are dropped, never applied after the fact. */
+export const WATCH_FOCUS_TTL_MS = 120_000
+/**
+ * Folds the Apple Watch's single focus-command slot (WatchBridge.swift) into the
+ * widget queue as an ordinary focus action, so both go through the same replay
+ * (one focus tap per pass → the timer's applyWidgetFocus). It is placed among the
+ * widget focus taps by time. `dropped` = ids to acknowledge without applying.
+ */
+export function withWatchFocus(actions: WidgetAction[], command: WatchFocusCommand | undefined, source: string, epoch: string, now = Date.now()): { queue: WidgetAction[]; dropped: string[] } {
+  if (!command) return { queue: actions, dropped: [] }
+  if (command.accountId !== source || command.epoch !== epoch || !(now - command.at < WATCH_FOCUS_TTL_MS)) return { queue: actions, dropped: [command.id] }
+  const watch: FocusAction = { id: command.id, type: 'focus', op: command.action, at: command.at, accountId: source, epoch }
+  const queue = [...actions]
+  const i = queue.findIndex(a => a.type === 'focus' && a.at > command.at)
+  if (i < 0) queue.push(watch); else queue.splice(i, 0, watch)
+  return { queue, dropped: [] }
+}
 
 /**
  * Replays the queue in order and returns the ids that are done with (applied,

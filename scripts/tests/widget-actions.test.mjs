@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 registerHooks({resolve(specifier,context,next){if(specifier.startsWith('@/'))return next(pathToFileURL(resolve(specifier.slice(2)+'.ts')).href,context);return next(specifier,context)}})
-const {applyWidgetActions}=await import('../../lib/widgets/actions.ts')
+const {applyWidgetActions,withWatchFocus,WATCH_FOCUS_TTL_MS}=await import('../../lib/widgets/actions.ts')
 
 const NOW=Date.UTC(2026,8,28,4,0,0)
 function mockDb(rows){
@@ -94,4 +94,29 @@ test('water reminder: widget glass sets next reminder one interval later, never 
   w.recordWaterFromWidget(NOW);assert.equal(w.getWaterNextDueAt(),NOW+30*60_000)
   w.recordWaterFromWidget(NOW-3_600_000);assert.equal(w.getWaterNextDueAt(),NOW+30*60_000)
   delete globalThis.window
+})
+test('watch focus command joins the widget focus path in time order; simultaneous pauses never double-flip',async()=>{
+  const {db}=mockDb({})
+  // Minimal timer with applyWidgetFocus's state guards (components/timer/focus-timer-provider.tsx).
+  let state='running'; const applied=[]
+  const {deps:d}=deps(db,{focus:(op,at)=>{applied.push([op,at]);if(op==='pause'&&state==='running')state='paused';else if(op==='resume'&&state==='paused')state='running'}})
+  const widget=[{id:'w-pause',type:'focus',op:'pause',at:NOW-2_000,...base}]
+  const watch={id:'watch-1',action:'pause',at:NOW-1_000,...base}
+  let {queue,dropped}=withWatchFocus(widget,watch,'owner-a','epoch-a',NOW)
+  assert.deepEqual(queue.map(a=>a.id),['w-pause','watch-1']);assert.deepEqual(dropped,[])
+  let r=await applyWidgetActions(queue,d)
+  assert.deepEqual(r.handled,['w-pause'],'watch pause waits for the next pass');assert.equal(state,'paused')
+  ;({queue}=withWatchFocus([],watch,'owner-a','epoch-a',NOW))
+  r=await applyWidgetActions(queue,d)
+  assert.deepEqual(r.handled,['watch-1']);assert.equal(state,'paused','second pause is a no-op, not a resume')
+  assert.deepEqual(applied.map(a=>a[0]),['pause','pause'])
+  // An earlier watch tap is placed before a later widget tap.
+  ;({queue}=withWatchFocus([{id:'w2',type:'focus',op:'resume',at:NOW,...base}],{...watch,at:NOW-5_000},'owner-a','epoch-a',NOW))
+  assert.deepEqual(queue.map(a=>a.id),['watch-1','w2'])
+})
+test('stale or foreign watch focus commands are acknowledged without being applied',()=>{
+  const cmd={id:'watch-old',action:'start',at:NOW-WATCH_FOCUS_TTL_MS,...base}
+  assert.deepEqual(withWatchFocus([],cmd,'owner-a','epoch-a',NOW),{queue:[],dropped:['watch-old']})
+  assert.deepEqual(withWatchFocus([],{...cmd,at:NOW,epoch:'old'},'owner-a','epoch-a',NOW),{queue:[],dropped:['watch-old']})
+  assert.deepEqual(withWatchFocus([],undefined,'owner-a','epoch-a',NOW),{queue:[],dropped:[]})
 })

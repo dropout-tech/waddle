@@ -68,6 +68,20 @@ enum WidgetStore {
             state["actions"]=actions
         }
     }
+    /// Apple Watch checkbox (WatchBridge.swift): complete-only, never cancels or unticks.
+    /// Already done, or a change for this task already queued → nothing to do.
+    static func complete(taskId: String, accountId: String, epoch: String) throws {
+        try transaction { state in
+            guard owns(state, accountId, epoch),
+                  let snapshot=state["snapshot"] as? [String:Any], let tasks=snapshot["tasks"] as? [[String:Any]],
+                  let task=tasks.first(where: { $0["id"] as? String == taskId }), task["actionable"] as? Bool == true,
+                  task["completed"] as? Bool != true, let revision=task["revision"] as? String else {return}
+            var actions=state["actions"] as? [[String:Any]] ?? []
+            guard !actions.contains(where:{isTaskAction($0) && $0["taskId"] as? String == taskId}), actions.count < queueLimit else {return}
+            actions.append(["id":UUID().uuidString,"type":"task","taskId":taskId,"revision":revision,"completed":true,"accountId":accountId,"epoch":epoch])
+            state["actions"]=actions
+        }
+    }
     /// One glass of water: queue it for the app (which re-arms its reminder)
     /// and keep today's local tally for the widget face.
     static func logWater(accountId: String, epoch: String, day: String, at: Date = Date()) throws {
