@@ -22,7 +22,7 @@ export const dict: Record<string, string> = {
   "分數": "Score",
   "（你）": "(you)",
   "每天一小步，慢慢累積，也看見彼此的努力。": "Small steps add up. See how everyone is growing.",
-  "註冊日期": "Registration date",
+  "破蛋日期": "Hatch date",
 
   '累積分數 {n} 分': 'Total score: {n}',
   '每天一小步，慢慢累積。分數將作為未來排行的依據。': 'Small steps add up. Your score will count toward future rankings.',
