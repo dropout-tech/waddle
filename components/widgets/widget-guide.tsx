@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, CalendarRange, CalendarClock, ListChecks, Star, PanelsTopLeft, NotebookPen, PencilLine, Timer, Droplets, LayoutGrid, CalendarCheck, Smartphone, type LucideIcon } from 'lucide-react'
+import { CalendarDays, CalendarRange, CalendarClock, ListChecks, Star, PanelsTopLeft, NotebookPen, PencilLine, Timer, Droplets, LayoutGrid, Bird, CalendarCheck, Smartphone, type LucideIcon } from 'lucide-react'
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { useI18n } from '@/lib/i18n/react'
 import { isNative } from '@/lib/platform'
@@ -17,15 +17,16 @@ const WIDGETS: { name: string; body: string; Icon: LucideIcon }[] = [
   { name: '白板', body: '最近一張白板的縮圖，點一下接著寫', Icon: PanelsTopLeft },
   { name: '記事本', body: '最近的筆記，點一下打開', Icon: NotebookPen },
   { name: '專注記事', body: '專注時冒出的想法，先記下來', Icon: PencilLine },
-  { name: '專注計時', body: '倒數計時就在主畫面', Icon: Timer },
-  { name: '喝水提醒', body: '提醒你起來喝口水', Icon: Droplets },
+  { name: '專注計時', body: '在主畫面直接開始、暫停、結束', Icon: Timer },
+  { name: '喝水提醒', body: '喝了一杯就按一下，App 幫你重新計時', Icon: Droplets },
   { name: '隨手記入口', body: '白板、記事本、專注記事一鍵直達', Icon: LayoutGrid },
+  { name: '我的 Huddle', body: '你領養的企鵝，會提醒你接下來的事', Icon: Bird },
 ]
 
 const STEPS = [
   '長按主畫面空白處，直到圖示開始晃動',
   '點左上角的「＋」（或「編輯」→「加入小工具」），搜尋 Huddle',
-  '選好大小後點「加入小工具」；之後長按小工具 →「編輯小工具」就能換成其他類型',
+  '每一款都列在裡面，左右滑動選好大小後點「加入小工具」',
 ]
 
 /**

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import { Pause, Play, X, ChevronUp, ChevronDown, Music2, Minimize } from 'lucide-react'
+import { Pause, Play, X, ChevronUp, ChevronDown, Music2, Minimize, PictureInPicture2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { useI18n } from '@/lib/i18n/react'
@@ -63,6 +63,10 @@ export interface ImmersiveProps {
   onSkipCompletion: () => void
   /** Shrink to corner mini pill without ending the session. */
   onMinimize: () => void
+  /** 浮動顯示（子母畫面）開著嗎——按鈕改成「收回」。 */
+  isFloating?: boolean
+  /** 把倒數變成永遠置頂的子母畫面；不支援的環境由呼叫端給提示。 */
+  onToggleFloat?: () => void
   onToggleBgm: () => void
   // Music picker callbacks so the bar can swap tracks mid-session. Each must
   // unlock the audio context (Web Audio autoplay policy) before mutating prefs.
@@ -116,7 +120,7 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
     visible, state, phase, label, color, timeText, progress, startedAtText,
     targetSeconds, startedAt, remainingSeconds, pomodoroCount,
     music, musicVolume, ambient, bgmPlaying, unavailableSrcs, completion,
-    onPause, onResume, onExit, onSkipCompletion, onMinimize, onToggleBgm,
+    onPause, onResume, onExit, onSkipCompletion, onMinimize, onToggleBgm, isFloating, onToggleFloat,
     onSelectMusic, onMusicVolumeChange, onToggleAmbient, onAmbientVolumeChange,
   } = props
   const { t } = useI18n()
@@ -448,6 +452,25 @@ export function FocusTimerImmersive(props: ImmersiveProps) {
             <PomodoroDots count={pomodoroCount} color={accent} />
           )}
           <div className="flex items-center gap-0.5">
+            {onToggleFloat && (
+              <button
+                type="button"
+                onClick={onToggleFloat}
+                aria-label={isFloating ? t('收回浮動顯示') : t('浮動顯示')}
+                aria-pressed={!!isFloating}
+                title={t('浮動顯示：離開 App 也看得到倒數')}
+                data-focus-float
+                className={cn(
+                  'h-11 px-3 rounded-full flex items-center gap-1.5 text-[12px] font-medium transition-colors',
+                  isFloating
+                    ? 'bg-foreground/10 text-foreground'
+                    : 'text-foreground/55 hover:text-foreground hover:bg-foreground/5',
+                )}
+              >
+                <PictureInPicture2 className="w-4 h-4" />
+                <span>{isFloating ? t('浮動中') : t('浮動顯示')}</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={onMinimize}

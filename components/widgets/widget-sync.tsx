@@ -10,34 +10,56 @@ import { focusNoteExcerpt, makeSnapshot } from '@/lib/widgets/model'
 import { HuddleWidgets, publishWidgets, widgetAccount } from '@/lib/widgets/native'
 import { rowToTask } from '@/lib/supabase/mappers'
 import { createClient } from '@/lib/supabase/client'
-import { getWaterNextDueAt, getWaterReminderEnabled } from '@/lib/water-reminder'
+import { getWaterNextDueAt, getWaterReminderEnabled, recordWaterFromWidget } from '@/lib/water-reminder'
+import { applyWidgetActions, withWatchFocus, WATCH_FOCUS_TTL_MS } from '@/lib/widgets/actions'
+import { widgetPet } from '@/lib/widgets/pet'
+import { isTaskOverdue } from '@/lib/task-utils'
+import { getLang } from '@/lib/i18n'
+import { checkInDate } from '@/lib/daily-check-in'
+import type { WidgetSnapshot } from '@/lib/widgets/model'
+import type { PetSettings } from '@/lib/pet/types'
 import type { Workspace, TimeBlock, ScratchpadItem, NotebookNote } from '@/lib/types'
 
-export function WidgetSync({workspaces,timeBlocks,boards,notes}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[]}) {
+type Timer=ReturnType<typeof useFocusTimer>
+/** Live Activity / focus widget payload, derived from the in-memory timer only (no network). */
+function focusOf(timer:Timer,notes:NotebookNote[],today:string):WidgetSnapshot['focus'] {
+  const s=timer.session
+  return {mode:s?.mode,state:timer.state,title:s?.label ?? '慢慢來，先專心一件事',seconds:timer.displayTime,endAt:s && timer.state==='running' && s.mode==='pomodoro' ? s.startedAt.getTime()+s.pausedMs+s.targetSeconds*1000:null,note:focusNoteExcerpt(notes,today,s?.label)}
+}
+
+export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[];pet?:PetSettings|null}) {
   const {user}=useAuth(), timer=useFocusTimer(), notebook=useNotebook()
-  const latest=useRef({workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user})
-  useEffect(()=>{latest.current={workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user}},[workspaces,timeBlocks,boards,timer,notebook.notes,notes,user])
+  const latest=useRef({workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet})
+  // Last snapshot that reached the native store — lets a focus start/pause/stop
+  // republish instantly instead of waiting on the debounced, network-bound sync.
+  const lastSnap=useRef<WidgetSnapshot|null>(null)
+  useEffect(()=>{latest.current={workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet}},[workspaces,timeBlocks,boards,timer,notebook.notes,notes,user,pet])
   useEffect(()=>{
-    let alive=true, busy=false
-    const sync=async()=>{
-      if(busy || !alive || !latest.current.user) return
+    let alive=true, busy=false, again=false
+    let checkIn:{at:number;value?:WidgetSnapshot['checkIn']}|undefined
+    const sync=async():Promise<void>=>{
+      // A change that lands mid-sync must not be dropped (it used to wait for the 30s tick).
+      if(busy) {again=true;return}
+      if(!alive || !latest.current.user) return
       busy=true
       try {
         const source=latest.current.user.id, auth=widgetAccount()
         if(auth.accountId !== source || !auth.epoch) return
-        const {actions=[]}=await HuddleWidgets.read()
-        const db=createClient(), handled:string[]=[]
-        for(const action of actions) {
-          if(!alive || widgetAccount().accountId !== source || widgetAccount().epoch !== auth.epoch) return
-          if(action.accountId!==source || action.epoch!==auth.epoch) continue
-          // Explicit SET, never toggle: retry after a crash cannot undo completion.
-          const {data:current,error:readError}=await db.from('tasks').select('id,is_completed,updated_at,is_recurring,is_archived').eq('id',action.taskId).eq('user_id',source).maybeSingle()
-          if(!alive || widgetAccount().accountId !== source || widgetAccount().epoch !== auth.epoch) return
-          if(readError) continue
-          if(!current || current.is_completed || current.is_archived || current.is_recurring || current.updated_at!==action.revision) {handled.push(action.id);if(!current?.is_completed)toast.info('小工具任務已變更，請在 App 確認最新內容');continue}
-          const {data,error}=await db.from('tasks').update({is_completed:true,completed_at:new Date().toISOString()}).eq('id',action.taskId).eq('user_id',source).eq('updated_at',action.revision).select('id')
-          if(!error && data?.length) handled.push(action.id)
-        }
+        const {actions=[],focusCommand}=await HuddleWidgets.read()
+        const db=createClient()
+        // A watch "start" during the ~2s completion farewell waits in its slot (not acked) and
+        // runs on the refresh that follows the timer going idle; stale ones are still dropped.
+        const watch=focusCommand?.action==='start' && latest.current.timer.state==='completed' && Date.now()-focusCommand.at<WATCH_FOCUS_TTL_MS ? undefined : focusCommand
+        const {queue,dropped}=withWatchFocus(actions,watch,source,auth.epoch)
+        // Widget taps (task ticks, water, focus timer) and the Apple Watch focus command, replayed
+        // in order through one path — lib/widgets/actions.ts → timer.applyWidgetFocus.
+        const replay=await applyWidgetActions(queue,{db,source,epoch:auth.epoch,
+          isCurrent:()=>alive && widgetAccount().accountId===source && widgetAccount().epoch===auth.epoch,
+          focus:(op,at)=>latest.current.timer.applyWidgetFocus(op,at),
+          water:at=>recordWaterFromWidget(at),
+          notify:message=>toast.info(message)})
+        if(replay.aborted) return
+        const handled=[...dropped,...replay.handled]
         if(handled.length) {await HuddleWidgets.acknowledge({accountId:source,epoch:auth.epoch,ids:handled});window.dispatchEvent(new Event('huddle-widget-synced'));return}
         if(!alive || widgetAccount().accountId!==source || widgetAccount().epoch!==auth.epoch) return
         const x=latest.current
@@ -51,13 +73,24 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes}:{workspaces:Work
           snapshot.tasks=makeSnapshot({accountId:source,epoch:auth.epoch,tasks:(rows??[]).map(r=>rowToTask(r,'','',labels.get(r.id)??'')),blocks:[],boards:{}}).tasks
         }
         snapshot.boards = snapshot.boards.map(b => ({...b, thumbnail: boardThumbnail(x.boards[b.id] ?? [])}))
-        const s=x.timer.session
-        snapshot.focus={mode:s?.mode,state:x.timer.state,title:s?.label ?? '慢慢來，先專心一件事',seconds:x.timer.displayTime,endAt:s && x.timer.state==='running' && s.mode==='pomodoro' ? s.startedAt.getTime()+s.pausedMs+s.targetSeconds*1000:null,note:focusNoteExcerpt(x.notes,snapshot.today,s?.label)}
         snapshot.water={enabled:getWaterReminderEnabled(),nextAt:getWaterNextDueAt(),count:0}
+        // 「我的 Huddle」: look + ready-rendered lines; the widget picks the bubble itself.
+        const overdue=x.workspaces.filter(w=>!w.isArchived).flatMap(w=>w.categories.filter(c=>!c.isArchived).flatMap(c=>c.tasks)).filter(t=>isTaskOverdue(t,snapshot.today)).length
+        snapshot.pet=widgetPet(x.pet,{overdue,lang:getLang(),day:snapshot.today})
+        // Check-in status for the watch; refreshed at most every 5 minutes or when the Taipei day changes.
+        if(!checkIn||Date.now()-checkIn.at>300_000||checkIn.value?.date!==checkInDate()) {
+          const {data,error}=await db.rpc('get_daily_check_in_status').single()
+          if(!alive || widgetAccount().accountId!==source || widgetAccount().epoch!==auth.epoch) return
+          checkIn={at:Date.now(),value:error||!data?undefined:{date:data.check_in_date,checkedIn:data.checked_in,points:data.total_points}}
+        }
+        snapshot.checkIn=checkIn.value
+        // Read the timer after the network awaits so a start/pause during the fetch isn't overwritten.
+        snapshot.focus=focusOf(latest.current.timer,latest.current.notes,snapshot.today)
         await publishWidgets(snapshot)
+        lastSnap.current=snapshot
         await syncWidgetReminders(snapshot)
       } catch { /* Keep last snapshot; widget shows its last update time. */ }
-      finally {busy=false}
+      finally {busy=false;if(again && alive) {again=false;void sync()}}
     }
     let changeTimer: ReturnType<typeof setTimeout> | undefined
     const onChange=()=>{clearTimeout(changeTimer);changeTimer=setTimeout(()=>void sync(),750)}
@@ -66,8 +99,18 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes}:{workspaces:Work
     const id=window.setInterval(()=>void sync(),30_000)
     const first=window.setTimeout(()=>void sync(),750)
     window.addEventListener('focus',onVisible);document.addEventListener('visibilitychange',onVisible)
-    return ()=>{alive=false;clearTimeout(changeTimer);window.removeEventListener('huddle-widget-refresh',onChange);clearInterval(id);clearTimeout(first);window.removeEventListener('focus',onVisible);document.removeEventListener('visibilitychange',onVisible)}
+    return ()=>{alive=false;lastSnap.current=null;clearTimeout(changeTimer);window.removeEventListener('huddle-widget-refresh',onChange);clearInterval(id);clearTimeout(first);window.removeEventListener('focus',onVisible);document.removeEventListener('visibilitychange',onVisible)}
   },[user?.id])
-  useEffect(()=>{window.dispatchEvent(new Event('huddle-widget-refresh'))},[workspaces,timeBlocks,boards,notebook.notes,notes,timer.state,timer.session])
+  useEffect(()=>{window.dispatchEvent(new Event('huddle-widget-refresh'))},[workspaces,timeBlocks,boards,notebook.notes,notes,timer.state,timer.session,pet])
+  // Focus start / pause / resume / stop → push the Live Activity right away from the
+  // last published snapshot (only `focus` changes; the full sync above follows).
+  useEffect(()=>{
+    const last=lastSnap.current, auth=widgetAccount()
+    if(!last || !user || last.accountId!==user.id || auth.accountId!==last.accountId || auth.epoch!==last.epoch) return
+    const next={...last,generatedAt:new Date().toISOString(),focus:focusOf(timer,notes??notebook.notes,last.today)}
+    lastSnap.current=next
+    void publishWidgets(next).catch(()=>{})
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only focus transitions, not every tick
+  },[timer.state,timer.session])
   return null
 }

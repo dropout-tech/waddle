@@ -1,9 +1,12 @@
 import { registerPlugin, Capacitor } from '@capacitor/core'
 import type { WidgetSnapshot } from './model'
+import type { WidgetAction } from './actions'
+/** Queued by the Apple Watch (ios/App/App/WatchBridge.swift); acknowledged by id like actions. */
+export interface WatchFocusCommand { id:string; action:'start'|'pause'|'resume'; accountId:string; epoch:string; at:number }
 interface WidgetPlugin {
   setAccount(input:{accountId:string}):Promise<{epoch:string}>
   publish(input:{snapshot:WidgetSnapshot}):Promise<void>
-  read():Promise<{snapshot?:WidgetSnapshot; actions?:{id:string;taskId:string;revision:string;accountId:string;epoch:string}[]}>
+  read():Promise<{snapshot?:WidgetSnapshot; actions?:WidgetAction[]; focusCommand?:WatchFocusCommand}>
   acknowledge(input:{accountId:string;epoch:string;ids:string[]}):Promise<void>
 }
 export const HuddleWidgets = registerPlugin<WidgetPlugin>('HuddleWidgets')

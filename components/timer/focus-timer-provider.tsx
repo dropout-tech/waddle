@@ -41,6 +41,12 @@ import {
   closeFloatingHub, getHubServerState, getHubState, hubAvailable,
   openFloatingHub, setHubTab, subscribeHub,
 } from '@/lib/floating-hub'
+import {
+  closeFocusPip, focusPipServerOpen, isFocusPipOpen, openFocusPip, setFocusPipModel,
+  subscribeFocusPip, videoPipSupported,
+} from '@/lib/focus-pip'
+import { toast } from 'sonner'
+import { isNative } from '@/lib/platform'
 import { FloatingTimerCard } from './floating-timer-card'
 import { FocusTimerImmersive } from './focus-timer-immersive'
 import { FocusTimerMini } from './focus-timer-mini'
@@ -367,6 +373,10 @@ export interface FocusTimerContextValue {
    *  （兩者都是懸浮工作站快速開始用的捷徑）；`forceMini` 跳過「開始時進沉浸
    *  畫面」偏好——從懸浮視窗啟動時，主視窗突然蓋上全螢幕會嚇到人。 */
   startTimer: (opts?: { immersive?: boolean; presetIndex?: number; stopwatch?: boolean; forceMini?: boolean }) => void
+  /** Replays one tap from the native 專注計時 home-screen widget at the time it
+   *  happened (`at`, ms). Taps that don't fit the current state are ignored —
+   *  the widget runs the same state machine (HuddleWidgets.swift focusFace). */
+  applyWidgetFocus: (op: 'start' | 'pause' | 'resume' | 'stop', at: number) => void
   /** MainLayout registers its onCreateCalendarTimeBlock here on mount;
    *  returns the unregister function for the effect cleanup. */
   registerRecorder: (fn: RecorderFn) => () => void
@@ -586,7 +596,7 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
     return POMODORO_PRESETS[selectedPreset].minutes * 60
   }, [useCustom, customMinutes, selectedPreset])
 
-  const startTimer = useCallback((opts?: { immersive?: boolean; presetIndex?: number; stopwatch?: boolean; forceMini?: boolean }) => {
+  const startTimer = useCallback((opts?: { immersive?: boolean; presetIndex?: number; stopwatch?: boolean; forceMini?: boolean; startedAt?: Date }) => {
     const eng = getBgmEngine()
     eng?.unlockAudio()
     eng?.prepareMusic(prefs.music)
@@ -609,7 +619,7 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
       setMode('stopwatch')
     }
     const effMode: TimerMode = preset ? 'pomodoro' : opts?.stopwatch ? 'stopwatch' : mode
-    const now = new Date()
+    const now = opts?.startedAt ?? new Date()
     const label = preset
       ? (customLabel || t(preset.label))
       : opts?.stopwatch
@@ -998,10 +1008,50 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
   // 顯示）；⑵ 產出計時卡節點交給工作站的計時器分頁渲染。計時卡是 portal
   // 內容、仍屬這棵 React 樹，所以懸浮視窗裡的暫停/繼續/結束吃的就是上面
   // 那台 state machine——不需要跨視窗同步。
-  const [canFloatTimer, setCanFloatTimer] = useState(false)
-  useEffect(() => { setCanFloatTimer(hubAvailable()) }, [])
+  // 浮動顯示有兩條路：桌面 Chrome/Edge 用上面的 Document PiP 工作站（能按鈕操作）；
+  // 其他地方（iOS App、Safari、手機瀏覽器）退回「倒數畫成影片」的影片子母畫面
+  // （lib/focus-pip.ts）。兩者都沒有 → 按鈕仍在，按了給明確提示。
+  const [floatKind, setFloatKind] = useState<'document' | 'video' | null>(null)
+  useEffect(() => { setFloatKind(hubAvailable() ? 'document' : videoPipSupported() ? 'video' : null) }, [])
+  const canFloatTimer = floatKind !== null
   const hub = useSyncExternalStore(subscribeHub, getHubState, getHubServerState)
-  const hubOpenOnTimer = hub.window !== null && hub.tab === 'timer'
+  const videoPipOpen = useSyncExternalStore(subscribeFocusPip, isFocusPipOpen, focusPipServerOpen)
+  const hubOpenOnTimer = (hub.window !== null && hub.tab === 'timer') || videoPipOpen
+
+  // 影片子母畫面只需要在 session 轉換時同步（每秒重畫由 focus-pip 自己用牆鐘算）。
+  useEffect(() => {
+    if (floatKind !== 'video') return
+    if (!session || state === 'idle') { setFocusPipModel(null); return }
+    setFocusPipModel({
+      state, mode: session.mode, phase: session.phase,
+      startedAt: session.startedAt.getTime(), pausedMs: session.pausedMs,
+      pausedAt: session.pausedAt ? session.pausedAt.getTime() : null,
+      targetSeconds: session.targetSeconds, label: session.label, color: session.color,
+      status: state === 'paused' ? t('已暫停') : state === 'completed' ? t('完成')
+        : session.phase === 'break' ? t('休息中') : t('專注中'),
+    }, true)
+  }, [floatKind, session, state, t])
+  useEffect(() => () => setFocusPipModel(null), [])
+
+  const toggleFloat = useCallback(() => {
+    if (floatKind === 'document') {
+      // 沒開 → 開工作站到計時器分頁；開著但停在別的分頁 → 切過去；
+      // 已經在看計時器 → 收回。
+      if (!hub.window) void openFloatingHub('timer')
+      else if (hub.tab !== 'timer') setHubTab('timer')
+      else closeFloatingHub()
+      return
+    }
+    if (floatKind === 'video') {
+      if (isFocusPipOpen()) { void closeFocusPip(); return }
+      openFocusPip().catch(() => toast.error(t('浮動顯示沒有開成功，請再按一次')))
+      return
+    }
+    // App 殼裡講「換瀏覽器」沒有意義——那是裝置（或模擬器）本身不支援子母畫面。
+    toast.info(isNative()
+      ? t('這台裝置不支援子母畫面，無法浮動顯示')
+      : t('這個瀏覽器不支援浮動顯示，請改用 Chrome、Edge 或 Safari'))
+  }, [floatKind, hub.window, hub.tab, t])
 
   // 計時卡節點（idle 時 null，工作站那邊會改顯示快速開始畫面）。
   const floatingTimerCard: React.ReactNode = session && state !== 'idle' ? (
@@ -1021,6 +1071,32 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
     />
   ) : null
 
+  const applyWidgetFocus = useCallback((op: 'start' | 'pause' | 'resume' | 'stop', at: number) => {
+    const when = Math.min(at, Date.now())
+    if (op === 'start') {
+      if (state !== 'idle' || Date.now() - when > ACTIVE_SESSION_MAX_AGE_MS) return
+      // Backdated start: the wall-clock tick catches up (and completes it if it already ran out).
+      startTimer({ forceMini: true, startedAt: new Date(when) })
+      return
+    }
+    if (!session) return
+    const pauseAt = Math.max(when, session.startedAt.getTime())
+    if (op === 'pause' && state === 'running') {
+      // Freeze the display at the moment of the tap, not now.
+      const frozen = Math.max(0, Math.floor((pauseAt - session.startedAt.getTime() - session.pausedMs) / 1000))
+      setSession({ ...session, pausedAt: new Date(pauseAt) })
+      if (session.mode === 'pomodoro') setTimeLeft(Math.max(0, session.targetSeconds - frozen))
+      else setElapsed(frozen)
+      setState('paused')
+    } else if (op === 'resume' && state === 'paused') {
+      const added = session.pausedAt ? Math.max(0, when - session.pausedAt.getTime()) : 0
+      setSession({ ...session, pausedAt: null, pausedMs: session.pausedMs + added })
+      setState('running')
+    } else if (op === 'stop' && (state === 'running' || state === 'paused')) {
+      beginCompletion(session.pausedAt ? session : { ...session, pausedAt: new Date(pauseAt) }, 'manual', 'idle', false, COMPLETION_HOLD_MANUAL_MS)
+    }
+  }, [state, session, startTimer, beginCompletion])
+
   const contextValue = useMemo<FocusTimerContextValue>(() => ({
     state, session, displayTime,
     isExpanded, setIsExpanded,
@@ -1035,14 +1111,14 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
     bgmManualPlaying, setBgmManualPlaying,
     prefs, setPrefs,
     unavailableSrcs,
-    startTimer, pauseTimer, resumeTimer,
+    startTimer, pauseTimer, resumeTimer, applyWidgetFocus,
     stopTimer: () => { if (session) beginCompletion(session, 'manual', 'idle', false, COMPLETION_HOLD_MANUAL_MS) },
     registerRecorder,
     floatingTimerCard,
   }), [
     state, session, displayTime, isExpanded, mode, selectedPreset, customMinutes,
     useCustom, focusType, customLabel, showSettings, showBgmSettings, bgmManualPlaying,
-    prefs, unavailableSrcs, startTimer, pauseTimer, resumeTimer, beginCompletion, registerRecorder, floatingTimerCard,
+    prefs, unavailableSrcs, startTimer, pauseTimer, resumeTimer, applyWidgetFocus, beginCompletion, registerRecorder, floatingTimerCard,
   ])
 
   let overlay: React.ReactNode = null
@@ -1078,6 +1154,8 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
           }}
           onSkipCompletion={skipCompletion}
           onMinimize={() => setView('mini')}
+          isFloating={hubOpenOnTimer}
+          onToggleFloat={toggleFloat}
           onToggleBgm={() => {
             getBgmEngine()?.unlockAudio()
             // Real in-session mute/unmute (the old latch had no audible
@@ -1136,13 +1214,7 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
           onSkipCompletion={skipCompletion}
           canFloat={canFloatTimer}
           isFloating={hubOpenOnTimer}
-          onToggleFloat={() => {
-            // 沒開 → 開工作站到計時器分頁；開著但停在別的分頁 → 切過去；
-            // 已經在看計時器 → 收回。
-            if (!hub.window) void openFloatingHub('timer')
-            else if (hub.tab !== 'timer') setHubTab('timer')
-            else closeFloatingHub()
-          }}
+          onToggleFloat={toggleFloat}
         />
       )
     }

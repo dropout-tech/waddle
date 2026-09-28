@@ -31,7 +31,8 @@ import { t } from '@/lib/i18n'
  * - The meeting hasn't started yet (now < startTime)
  * - We haven't already fired for this meeting (deduped via localStorage)
  */
-export function useMeetingReminders(workspaces: Workspace[]) {
+/** `petVoice` = the adopted penguin's name (lib/pet/voice.ts): a change re-schedules native reminders in its voice. */
+export function useMeetingReminders(workspaces: Workspace[], petVoice: string | null = null) {
   const { user } = useAuth()
   const sourceAccount = user?.id ?? null
   useEffect(() => {
@@ -151,5 +152,5 @@ export function useMeetingReminders(workspaces: Workspace[]) {
     check()
     const id = window.setInterval(check, 30 * 1000)
     return () => { disposed = true; window.clearInterval(id) }
-  }, [workspaces, sourceAccount])
+  }, [workspaces, sourceAccount, petVoice])
 }

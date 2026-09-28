@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Toaster, toast } from 'sonner'
 import { WidgetSync } from '@/components/widgets/widget-sync'
+import { petVoiceName, setPetVoice } from '@/lib/pet/voice'
 import { MainLayout } from '@/components/layout/main-layout'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
 import { TimeBlockModal } from '@/components/modals/time-block-modal'
@@ -83,7 +84,11 @@ function HuddlePage() {
   // Watch all meetings and fire browser notifications N minutes before
   // each one starts. Pref + permission live in localStorage / Notification
   // API respectively; the hook is a no-op when either is missing.
-  useMeetingReminders(workspaces)
+  // Phone reminders are "said" by the adopted penguin (wording only). Set the
+  // voice before the reminder hook below re-schedules with it.
+  const petVoice = petVoiceName(settings.pet)
+  useEffect(() => { setPetVoice(settings.pet) }, [settings.pet])
+  useMeetingReminders(workspaces, petVoice)
 
   // Global ⌘Z / ⌘⇧Z — see hooks/use-undo-shortcuts.ts for the input-field guard.
   useUndoShortcuts()
@@ -489,7 +494,7 @@ function HuddlePage() {
     <ErrorBoundary>
       <CategoryPrefixProvider value={settings.showCategoryPrefix ?? true}>
       <NotebookOverlayProvider>
-      {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} />}
+      {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} pet={settings.pet} />}
       <MainLayout
         workspaces={workspaces}
         assignedTasks={assignedTasks}

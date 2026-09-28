@@ -1,11 +1,13 @@
 import type { Task, TimeBlock, NotebookNote, ScratchpadItem } from '@/lib/types'
 import { taskOccursOnDate, toDateString } from '@/lib/calendar-utils'
+import type { WidgetPet } from './pet'
 
-export const widgetKinds = ['overview', 'calendar', 'agenda', 'week', 'tasks', 'top-three', 'whiteboard', 'notebook', 'focus-note', 'focus', 'water', 'shortcuts'] as const
+export const widgetKinds = ['overview', 'calendar', 'agenda', 'week', 'tasks', 'top-three', 'whiteboard', 'notebook', 'focus-note', 'focus', 'water', 'shortcuts', 'pet'] as const
 export type WidgetKind = typeof widgetKinds[number]
 export const widgetNames: Record<WidgetKind, string> = {
   overview: '月曆＋今日任務', calendar: '可視化小月曆', agenda: '近期行程', week: '本週時間表', tasks: '任務清單',
   'top-three': '今天三件事', whiteboard: '白板', notebook: '記事本', 'focus-note': '專注記事', focus: '專注計時', water: '喝水提醒', shortcuts: '隨手記入口',
+  pet: '我的 Huddle',
 }
 export interface WidgetItem { id: string; title: string; subtitle: string; date?: string; time?: string; completed?: boolean; actionable?: boolean; revision?: string; thumbnail?: string }
 /** One scheduled slot for the native 本週時間表 widget (today + next 6 days). */
@@ -19,6 +21,10 @@ export interface WidgetSnapshot {
   days: { date: string; day: number; inMonth: boolean; count: number }[]
   focus: { mode?: 'pomodoro' | 'stopwatch'; state: string; title: string; endAt: number | null; seconds: number; note: string }
   water: { enabled: boolean; nextAt: number | null; count: number }
+  /** 「我的 Huddle」 widget (lib/widgets/pet.ts). Optional: the Swift side decodes it as optional too. */
+  pet?: WidgetPet
+  /** Today's daily check-in (Asia/Taipei day); optional so older native readers ignore it. */
+  checkIn?: { date: string; checkedIn: boolean; points: number }
 }
 export function plainText(doc: unknown, depth = 0): string {
   if (!doc || typeof doc !== 'object' || depth > 20) return ''
