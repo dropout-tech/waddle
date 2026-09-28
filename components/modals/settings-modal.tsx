@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import type { UserSettings, TimeBlock, SlotType, Workspace, NotificationSettings } from '@/lib/types'
 import { useI18n } from '@/lib/i18n/react'
 import type { Lang } from '@/lib/i18n'
+import { WidgetReminderSetting } from '@/components/widgets/widget-reminder-setting'
 import { FONT_SIZES, getFontSize, setFontSize, type FontSizeKey } from '@/lib/font-size'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -836,6 +837,9 @@ export function SettingsModal({
                 </div>
               )}
             </div>
+
+            {/* iPhone app only: background reminders + home-screen widget how-to */}
+            <WidgetReminderSetting />
 
             {/* Keep today's completed in list */}
             <label className="flex items-center justify-between cursor-pointer">

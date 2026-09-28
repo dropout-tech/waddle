@@ -10,15 +10,19 @@ struct Item: Decodable, Identifiable {
 struct Day: Decodable, Identifiable {var date:String;var day:Int;var inMonth:Bool;var count:Int;var id:String{date}}
 struct FocusInfo:Decodable {var state:String;var title:String;var endAt:Double?;var seconds:Int;var note:String}
 struct WaterInfo:Decodable {var enabled:Bool;var nextAt:Double?;var count:Int}
+/// One scheduled slot for the 本週時間表 widget (today + 6 days, "HH:mm", "#rrggbb").
+struct Slot:Decodable {var date:String;var start:String;var end:String;var title:String;var color:String}
 struct Snapshot:Decodable {
     var accountId:String;var epoch:String;var generatedAt:String;var today:String
     var days:[Day];var tasks:[Item];var agenda:[Item];var notes:[Item];var boards:[Item];var focus:FocusInfo;var water:WaterInfo
+    /// Optional: snapshots written by older app builds don't have it.
+    var week:[Slot]?
 }
 enum Kind:String,AppEnum,CaseIterable {
-    case overview,calendar,agenda,tasks,topThree="top-three",whiteboard,notebook,focusNote="focus-note",focus,water,shortcuts
+    case overview,calendar,agenda,week,tasks,topThree="top-three",whiteboard,notebook,focusNote="focus-note",focus,water,shortcuts
     static var typeDisplayRepresentation:TypeDisplayRepresentation="小工具類型"
-    static var caseDisplayRepresentations:[Kind:DisplayRepresentation]=[.overview:"月曆＋今日任務",.calendar:"可視化小月曆",.agenda:"近期行程",.tasks:"任務清單",.topThree:"今天三件事",.whiteboard:"白板",.notebook:"記事本",.focusNote:"專注記事",.focus:"專注計時",.water:"喝水提醒",.shortcuts:"隨手記入口"]
-    var title:String {switch self {case .overview:return "月曆＋今日任務";case .calendar:return "可視化小月曆";case .agenda:return "近期行程";case .tasks:return "任務清單";case .topThree:return "今天三件事";case .whiteboard:return "白板";case .notebook:return "記事本";case .focusNote:return "專注記事";case .focus:return "專注計時";case .water:return "喝水提醒";case .shortcuts:return "隨手記入口"}}
+    static var caseDisplayRepresentations:[Kind:DisplayRepresentation]=[.overview:"月曆＋今日任務",.calendar:"可視化小月曆",.agenda:"近期行程",.week:"本週時間表",.tasks:"任務清單",.topThree:"今天三件事",.whiteboard:"白板",.notebook:"記事本",.focusNote:"專注記事",.focus:"專注計時",.water:"喝水提醒",.shortcuts:"隨手記入口"]
+    var title:String {switch self {case .overview:return "月曆＋今日任務";case .calendar:return "可視化小月曆";case .agenda:return "近期行程";case .week:return "本週時間表";case .tasks:return "任務清單";case .topThree:return "今天三件事";case .whiteboard:return "白板";case .notebook:return "記事本";case .focusNote:return "專注記事";case .focus:return "專注計時";case .water:return "喝水提醒";case .shortcuts:return "隨手記入口"}}
 }
 struct Configuration:WidgetConfigurationIntent {
     static var title:LocalizedStringResource="Huddle 小工具"
@@ -66,10 +70,13 @@ struct WidgetView:View {
     var limit:Int{family == .systemLarge ? 5:family == .systemMedium ? 3:2}
     var emptyTitle:String{switch entry.emptyReason {case .signedOut:"開啟 Huddle 登入";case .awaitingSync:"請開啟 Huddle 同步";case .sharingUnavailable:"小工具暫時無法同步"}}
     var emptyHint:String{switch entry.emptyReason {case .signedOut:"讓今天的安排來到手邊";case .awaitingSync:"打開 App 一次，資料就會出現";case .sharingUnavailable:"此安裝版本未開啟資料共享（App Group）"}}
-    func url(_ k:Kind,_ item:Item?=nil)->URL {
+    // Every tap: huddle://widget/<kind>?accountId=&epoch=[&id=][&date=]. The app
+    // maps it to a real screen in one place (lib/widgets/model.ts widgetPath).
+    func url(_ k:Kind,_ item:Item?=nil,date:String?=nil)->URL {
         var u=URLComponents();u.scheme="huddle";u.host="widget";u.path="/"+k.rawValue
         var q=[URLQueryItem(name:"accountId",value:entry.snapshot?.accountId),URLQueryItem(name:"epoch",value:entry.snapshot?.epoch)]
-        if let item {q.append(URLQueryItem(name:"id",value:item.id));q.append(URLQueryItem(name:"date",value:item.date))};u.queryItems=q
+        if let item {q.append(URLQueryItem(name:"id",value:item.id))}
+        if let d=date ?? item?.date {q.append(URLQueryItem(name:"date",value:d))};u.queryItems=q
         return u.url!
     }
     var body:some View {
@@ -81,7 +88,7 @@ struct WidgetView:View {
                 // (the month label + mascot stand in for it) and the "updated"
                 // footer unless there's something pending, or the grid overflows
                 // and iOS clips the top edge.
-                let dense = kind == .overview || kind == .calendar
+                let dense = kind == .overview || kind == .calendar || kind == .week
                 VStack(alignment:.leading,spacing:dense ? 4:8){
                     if !dense {HStack{Text(kind.title).font(.caption.weight(.semibold));Spacer();Image("Huddle").resizable().scaledToFit().frame(width:25,height:25)}}
                     content(s)
@@ -96,7 +103,8 @@ struct WidgetView:View {
         case .calendar: calendar(s)
         case .overview:
             if family == .systemMedium {HStack(alignment:.top,spacing:12){calendar(s);VStack(alignment:.leading,spacing:5){Text("今天，慢慢來").font(.caption);rows(Array(s.tasks.prefix(2)),s,true)}}}
-            else {calendar(s);if family == .systemLarge {rows(Array(s.tasks.prefix(2)),s,true);shortcuts}}
+            else {calendar(s);if family == .systemLarge {rows(Array(s.tasks.prefix(4)),s,true);shortcuts}}
+        case .week: week(s)
         case .tasks,.topThree:
             let tasks=s.tasks.filter{(kind != .topThree || $0.completed != true) && (entry.configuration.category?.isEmpty != false || $0.subtitle == entry.configuration.category)}
             rows(Array(tasks.prefix(kind == .topThree ? 3:limit)),s,true)
@@ -125,13 +133,90 @@ struct WidgetView:View {
             if task,item.actionable == true,item.completed != true,!entry.pending.contains(item.id){Button(intent:CompleteTask(item.id,s.accountId,s.epoch)){Image(systemName:"square").font(.title3)}.buttonStyle(.plain)}
             else if task {Image(systemName:entry.pending.contains(item.id) ? "clock":item.completed == true ? "checkmark.square":"arrow.up.right.square").foregroundStyle(clay)}
             else if let time=item.time {Text(time).font(.caption).monospacedDigit()}
-            Link(destination:url(kind,item)){VStack(alignment:.leading,spacing:2){Text(item.title).font(.caption).lineLimit(1);if family == .systemLarge {Text(item.subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(2)}}};Spacer(minLength:0)
+            Link(destination:url(kind,item)){VStack(alignment:.leading,spacing:2){Text(item.title).font(.caption).lineLimit(1);if family == .systemLarge && kind != .overview {Text(item.subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(2)}}};Spacer(minLength:0)
         }.padding(.vertical,3)}
     }
     func calendar(_ s:Snapshot)->some View {
         VStack(spacing:2){HStack(spacing:4){Text(String(s.today.prefix(7))).font(.subheadline.weight(.semibold));Spacer(minLength:0);Image("Huddle").resizable().scaledToFit().frame(width:20,height:20)}
             LazyVGrid(columns:Array(repeating:GridItem(.flexible(),spacing:1),count:7),spacing:family == .systemLarge ? 2:1){ForEach(["日","一","二","三","四","五","六"],id:\.self){Text($0).font(.system(size:9)).foregroundStyle(.secondary)}
-                ForEach(s.days){day in Text("\(day.day)").font(.system(size:family == .systemLarge ? 12:10,weight:day.date == s.today ? .bold:.regular)).frame(maxWidth:.infinity,minHeight:family == .systemLarge ? 19:13).background(day.date == s.today ? clay:Color.clear,in:Circle()).foregroundStyle(day.date == s.today ? Color.white:ink.opacity(day.inMonth ? 1:0.4)).overlay(alignment:.bottom){if day.count>0{Circle().fill(day.date == s.today ? Color.white:clay).frame(width:2,height:2)}}}
+                ForEach(s.days){day in
+                    let cell=Text("\(day.day)").font(.system(size:family == .systemLarge ? 12:10,weight:day.date == s.today ? .bold:.regular)).frame(maxWidth:.infinity,minHeight:family == .systemLarge ? 19:13).background(day.date == s.today ? clay:Color.clear,in:Circle()).foregroundStyle(day.date == s.today ? Color.white:ink.opacity(day.inMonth ? 1:0.4)).overlay(alignment:.bottom){if day.count>0{Circle().fill(day.date == s.today ? Color.white:clay).frame(width:2,height:2)}}
+                    // Tap a date → that day in the app's week view (small widgets only support one tap target).
+                    if family == .systemSmall {cell} else {Link(destination:url(.week,date:day.date)){cell}}
+                }
+            }
+        }
+    }
+    // MARK: 本週時間表 — 7 day columns × the hours that have something scheduled.
+    static let dayFormat:DateFormatter={let f=DateFormatter();f.calendar=Calendar(identifier:.gregorian);f.locale=Locale(identifier:"en_US_POSIX");f.dateFormat="yyyy-MM-dd";return f}()
+    func minutes(_ hhmm:String)->Int {let p=hhmm.split(separator:":");return p.count == 2 ? min(1440,(Int(p[0]) ?? 0)*60+(Int(p[1]) ?? 0)):0}
+    func color(_ hex:String)->Color {
+        var v:UInt64=0
+        guard hex.count == 7,hex.hasPrefix("#"),Scanner(string:String(hex.dropFirst())).scanHexInt64(&v) else {return clay}
+        return Color(red:Double((v>>16)&0xff)/255,green:Double((v>>8)&0xff)/255,blue:Double(v&0xff)/255)
+    }
+    /// Fit the grid to the scheduled hours (at least 6h tall); 08–22 when the week is empty.
+    func hourRange(_ slots:[Slot])->(Int,Int) {
+        guard let first=slots.map({minutes($0.start)}).min(),let last=slots.map({minutes($0.end)}).max() else {return (8,22)}
+        var lo=first/60,hi=max(lo+1,(last+59)/60)
+        if hi-lo<6 {lo=max(0,lo-(6-(hi-lo))/2);hi=min(24,lo+6);lo=max(0,hi-6)}
+        return (lo,hi)
+    }
+    func week(_ s:Snapshot)->some View {
+        let cal=Calendar(identifier:.gregorian)
+        let start=Self.dayFormat.date(from:s.today) ?? entry.date
+        let dates=(0..<7).map{cal.date(byAdding:.day,value:$0,to:start) ?? start}
+        let keys=dates.map{Self.dayFormat.string(from:$0)}
+        let slots=(s.week ?? []).filter{keys.contains($0.date)}
+        let (lo,hi)=hourRange(slots)
+        let large=family == .systemLarge
+        let gutter:CGFloat=14,gap:CGFloat=2
+        let step=hi-lo <= 8 ? 2:(large ? 2:4)
+        let now=cal.component(.hour,from:entry.date)*60+cal.component(.minute,from:entry.date)
+        let nowToday=Self.dayFormat.string(from:entry.date) == s.today && now >= lo*60 && now <= hi*60
+        return VStack(spacing:3){
+            HStack(spacing:gap){
+                Text(large ? "本週":"").font(.system(size:8,weight:.semibold)).frame(width:gutter,alignment:.leading).fixedSize()
+                ForEach(0..<7,id:\.self){i in
+                    let d=dates[i],today=keys[i] == s.today
+                    VStack(spacing:0){Text(["日","一","二","三","四","五","六"][cal.component(.weekday,from:d)-1]).font(.system(size:8));Text("\(cal.component(.day,from:d))").font(.system(size:large ? 12:10,weight:today ? .bold:.regular))}
+                        .frame(maxWidth:.infinity).padding(.vertical,1)
+                        .background(today ? clay:Color.clear,in:RoundedRectangle(cornerRadius:5))
+                        .foregroundStyle(today ? Color.white:ink)
+                }
+            }
+            GeometryReader{geo in
+                let h=geo.size.height,colW=(geo.size.width-gutter-gap*7)/7,perMin=h/CGFloat(max(1,hi-lo)*60)
+                ZStack(alignment:.topLeading){
+                    ForEach(Array(stride(from:lo,through:hi,by:step)),id:\.self){hr in
+                        let y=CGFloat((hr-lo)*60)*perMin
+                        Rectangle().fill(ink.opacity(0.12)).frame(width:geo.size.width-gutter,height:0.5).offset(x:gutter,y:y)
+                        Text("\(hr)").font(.system(size:7)).monospacedDigit().foregroundStyle(ink.opacity(0.55)).frame(width:gutter-2,alignment:.leading).offset(y:min(max(0,y-4),h-9))
+                    }
+                    ForEach(Array(keys.enumerated()),id:\.offset){i,key in
+                        Link(destination:url(.week,date:key)){
+                            ZStack(alignment:.topLeading){
+                                RoundedRectangle(cornerRadius:4).fill(key == s.today ? clay.opacity(0.10):ink.opacity(0.035))
+                                ForEach(Array(slots.filter{$0.date == key}.enumerated()),id:\.offset){_,slot in
+                                    let a=max(minutes(slot.start),lo*60),b=min(minutes(slot.end),hi*60)
+                                    let bh=max(CGFloat(b-a)*perMin,3),tint=color(slot.color)
+                                    HStack(spacing:0){
+                                        Rectangle().fill(tint).frame(width:2)
+                                        if large && bh >= 11 {Text(slot.title).font(.system(size:8,weight:.medium)).multilineTextAlignment(.leading).lineLimit(bh >= 22 ? 2:1).minimumScaleFactor(0.8).padding(.leading,2).padding(.top,1).frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)}
+                                        else {Spacer(minLength:0)}
+                                    }
+                                    .frame(width:colW-2,height:bh).background(tint.opacity(0.28)).clipShape(RoundedRectangle(cornerRadius:3))
+                                    .offset(x:1,y:CGFloat(a-lo*60)*perMin)
+                                }
+                                if key == s.today && nowToday {
+                                    let y=CGFloat(now-lo*60)*perMin
+                                    Rectangle().fill(clay).frame(width:colW,height:1.5).offset(y:y-0.75)
+                                    Circle().fill(clay).frame(width:5,height:5).offset(x:-2,y:y-2.5)
+                                }
+                            }.frame(width:colW,height:h)
+                        }.offset(x:gutter+gap+CGFloat(i)*(colW+gap))
+                    }
+                }
             }
         }
     }
@@ -140,7 +225,7 @@ struct HuddleWidgets:Widget {
     var body:some WidgetConfiguration {
         AppIntentConfiguration(kind:"HuddleWidgets",intent:Configuration.self,provider:Provider()){entry in WidgetView(entry:entry)}
             .configurationDisplayName("Huddle · 今天在手邊")
-            .description("月曆、任務、白板、記事、專注與喝水。長按編輯可選擇 11 款內容。")
+            .description("月曆、任務、白板、記事、專注與喝水。長按編輯可選擇 12 款內容。")
             .supportedFamilies([.systemSmall,.systemMedium,.systemLarge,.accessoryCircular,.accessoryRectangular,.accessoryInline])
     }
 }

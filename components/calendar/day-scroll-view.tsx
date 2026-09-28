@@ -974,12 +974,23 @@ export function DayScrollView({
     }
   }, [isDragging, dragStart, dragEnd, yToTime])
 
-  // Resizable header height state - default to show pending tasks area
-  const [headerHeight, setHeaderHeight] = useState(160)
+  // Resizable header height (desktop drag handle). Phones have no handle, so
+  // there it fits the busiest loaded day's all-day chips instead of a fixed
+  // 160px that left ~1/5 of an iPhone screen empty (report 2026-09-28).
+  const [resizedHeaderHeight, setHeaderHeight] = useState<number | null>(null)
   const HEADER_DATE_HEIGHT = 60
   const HEADER_HANDLE_HEIGHT = 8 // resize handle (h-2) below the header row
   const HEADER_MIN = 100 // min: at least some space for pending tasks
   const HEADER_MAX = 360
+  const HEADER_DEFAULT = 160
+  const ALL_DAY_ROW = 24 // one chip (11px text, py-1) + gap-0.5
+  const headerHeight = resizedHeaderHeight ?? (isMobile
+    ? Math.min(
+        HEADER_DEFAULT,
+        HEADER_DATE_HEIGHT + HEADER_HANDLE_HEIGHT + 8 +
+          Math.max(1, ...allDates.map(d => getAllDayTasksForDate(d).length)) * ALL_DAY_ROW
+      )
+    : HEADER_DEFAULT)
   const isResizingHeader = useRef(false)
   const resizeStartY = useRef(0)
   const resizeStartH = useRef(0)
@@ -1037,7 +1048,7 @@ export function DayScrollView({
           <div className="w-14 flex-shrink-0 border-r border-border" />
           <div
             ref={headerScrollRef}
-            className="flex-1 overflow-x-auto overflow-y-auto"
+            className="flex-1 overflow-x-auto overflow-y-auto calendar-scroller"
             onScroll={() => syncScroll('header')}
             style={{
               scrollbarWidth: 'none',
@@ -1225,7 +1236,7 @@ export function DayScrollView({
           day boundary mid-drag. */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-auto"
+        className="flex-1 overflow-auto calendar-scroller"
         style={isMobile && !activeTaskDrag && !pendingTaskDrag && !activeBlockDrag ? {
           scrollSnapType: 'x mandatory',
           scrollSnapStop: 'always',

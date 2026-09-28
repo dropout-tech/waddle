@@ -1,8 +1,8 @@
 'use client'
-import { Suspense } from 'react'
-import { WidgetGallery } from '@/components/widgets/widget-gallery'
-import { useI18n } from '@/lib/i18n/react'
+import { WidgetGuide } from '@/components/widgets/widget-guide'
+
+// How-to for the native iPhone home-screen widgets (the in-app widget
+// simulator was removed — widgets live on the home screen only).
 export default function WidgetsPage() {
-  const { t } = useI18n()
-  return <Suspense fallback={<main>{t('載入小工具…')}</main>}><WidgetGallery/></Suspense>
+  return <WidgetGuide />
 }
