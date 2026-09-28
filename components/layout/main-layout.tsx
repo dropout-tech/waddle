@@ -301,7 +301,9 @@ export function MainLayout({
     const kind = q.get('widget'), date = q.get('date'), id = q.get('task')
     if (!kind) return
     if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) setSelectedDate(new Date(`${date}T12:00:00`))
-    if (kind === 'calendar' || kind === 'overview' || kind === 'agenda') { setMobileTab('calendar'); setViewMode(kind === 'calendar' ? 'month' : 'day') }
+    // Widgets only exist on the phone, where the calendar defaults to 週 — a
+    // widget tap must not force 日 (owner, 2026-09-28).
+    if (kind === 'calendar' || kind === 'overview' || kind === 'agenda') { setMobileTab('calendar'); setViewMode(kind === 'calendar' ? 'month' : 'week') }
     else if (kind === 'tasks' || kind === 'top-three') setMobileTab('tasks')
     if (id) { const task = workspaces.flatMap(w => w.categories.flatMap(c => c.tasks)).find(t => t.id === id); if (task) onSelectTask(task) }
     if (kind === 'new-task') onCreateCalendarTask?.(toDateString(new Date()))

@@ -8,6 +8,7 @@ import { canvasGeometry, type CanvasGeometry } from '@/lib/scratchpad-canvas'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
 import { createPortal } from 'react-dom'
+import { isNative } from '@/lib/platform'
 import { WhiteboardDetail } from './whiteboard-detail'
 import { createChecklistDocument, getWhiteboardDocument, hasWhiteboardDocument, replaceWhiteboardSourceLink, whiteboardChecklistSummary, whiteboardDocumentText } from '@/lib/whiteboard-document'
 
@@ -64,7 +65,10 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
   const [sectionEl, setSectionEl] = useState<HTMLElement | null>(null)
   const enterFull = () => {
     const el = sectionEl
-    if (el && document.fullscreenEnabled && typeof el.requestFullscreen === 'function') {
+    // The iOS app is already full screen, and WKWebView's element full screen
+    // covers the status bar and shows a system "Swipe down to exit" banner —
+    // use the overlay there instead.
+    if (el && !isNative() && document.fullscreenEnabled && typeof el.requestFullscreen === 'function') {
       el.requestFullscreen().catch(() => setFull('overlay'))
     } else setFull('overlay')
   }
