@@ -34,6 +34,12 @@ const nextConfig = {
                 { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
               ],
             },
+            {
+              // The PWA service worker must never be served stale by an HTTP
+              // or CDN cache, or a fixed worker could fail to roll out.
+              source: '/sw.js',
+              headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }],
+            },
           ]
         },
       }),

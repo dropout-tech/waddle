@@ -5,6 +5,7 @@ import './globals.css'
 import './art-theme.css'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { NativeShell } from '@/components/native/native-shell'
+import { PwaSetup } from '@/components/pwa/pwa-setup'
 import { ThemeProvider } from '@/components/theme-provider'
 import { FocusTimerProvider } from '@/components/timer/focus-timer-provider'
 import { OperationsNotices } from '@/components/operations/announcements'
@@ -99,10 +100,12 @@ export default function RootLayout({
     <html lang="zh-TW" className="bg-background" data-art="paper" suppressHydrationWarning>
       <head>
         {/* Set viewport class before hydration so CSS / hooks see the right
-            value on first paint and avoid the desktop-flash on mobile. */}
+            value on first paint and avoid the desktop-flash on mobile.
+            Also parks Chrome's install prompt (beforeinstallprompt) for the
+            user-menu 「安裝到手機」 row — it can fire before React hydrates. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{if(window.huddleDesktop&&window.huddleDesktop.isDesktop&&window.huddleDesktop.platform==='darwin'&&!window.opener)document.documentElement.dataset.desktopTitlebar='mac';var m=window.matchMedia('(max-width:767px)').matches;document.documentElement.dataset.viewport=m?'mobile':'desktop';if(m)document.documentElement.classList.add('is-mobile');var f=localStorage.getItem('waddle-font-size-v1');var map={sm:'87.5%',lg:'112.5%',xl:'125%'};if(f&&map[f])document.documentElement.style.fontSize=map[f];}catch(e){}})();`,
+            __html: `(function(){try{if(window.huddleDesktop&&window.huddleDesktop.isDesktop&&window.huddleDesktop.platform==='darwin'&&!window.opener)document.documentElement.dataset.desktopTitlebar='mac';var m=window.matchMedia('(max-width:767px)').matches;document.documentElement.dataset.viewport=m?'mobile':'desktop';if(m)document.documentElement.classList.add('is-mobile');var f=localStorage.getItem('waddle-font-size-v1');var map={sm:'87.5%',lg:'112.5%',xl:'125%'};if(f&&map[f])document.documentElement.style.fontSize=map[f];}catch(e){}try{window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__huddleInstallPrompt=e})}catch(e){}})();`,
           }}
         />
       </head>
@@ -129,6 +132,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           disableTransitionOnChange
         >
           <NativeShell />
+          <PwaSetup />
           <AuthProvider>
             <EnrollmentBridge />
             <OperationsNotices />
