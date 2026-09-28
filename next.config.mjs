@@ -37,7 +37,8 @@ const cspDirectives = [
   `style-src 'self' 'unsafe-inline'`,
   `img-src 'self' data: blob: ${supabaseOrigin}`,
   `font-src 'self' data:`,
-  `media-src 'self'`,
+  // Marketing videos (intro gate, promo film, promo loop) stream from the Supabase CDN bucket marketing-media.
+  `media-src 'self' ${supabaseOrigin}`,
   `connect-src 'self' ${supabaseOrigin} ${supabaseWsOrigin}`,
   `frame-src 'self'`,
   `object-src 'none'`,
