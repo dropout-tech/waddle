@@ -104,7 +104,6 @@
 				68D67F3981417FE8CCD971AD /* WidgetStore.swift */,
 				90C3DFCCF29B8CF5AB92E0D2 /* FocusActivity.swift */,
 			);
-			name = WidgetShared;
 			path = WidgetShared;
 			sourceTree = "<group>";
 		};
@@ -161,7 +160,6 @@
 				F30509A7AF44C3CD7E4C41F8 /* Info.plist */,
 				C189947393C92E9EE3012F56 /* HuddleWidgets.entitlements */,
 			);
-			name = HuddleWidgets;
 			path = HuddleWidgets;
 			sourceTree = "<group>";
 		};
@@ -340,6 +338,7 @@
 				CODE_SIGN_ENTITLEMENTS = HuddleWidgets/HuddleWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PQZ8V7ZAXU;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = HuddleWidgets/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -518,6 +517,7 @@
 				CODE_SIGN_ENTITLEMENTS = HuddleWidgets/HuddleWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = PQZ8V7ZAXU;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = HuddleWidgets/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
