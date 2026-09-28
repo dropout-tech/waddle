@@ -108,6 +108,12 @@ export async function performRedo(): Promise<UndoableAction | null> {
   }
 }
 
+/** True while any undo/redo step could still bring deleted or edited content
+ *  back (used to hold off orphaned-image cleanup; see lib/image-cleanup.ts). */
+export function hasUndoHistory() {
+  return undoStack.length > 0 || redoStack.length > 0
+}
+
 /** For tests or "fresh session" boundaries (e.g. user logout). */
 export function clearUndoStacks() {
   undoStack = []

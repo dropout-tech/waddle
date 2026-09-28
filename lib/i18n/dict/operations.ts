@@ -321,4 +321,11 @@ export const dict: Record<string, string> = {
   '撤銷這筆贈送': 'Revoke this gift',
   '尚無贈送紀錄。': 'No gifts yet.',
   '確認撤銷': 'Confirm revoke',
+
+  // Server-side validation messages (supabase/migrations/20260928120000_security_hardening.sql)
+  '顯示名稱需為 1–32 個字': 'Display names must be 1–32 characters.',
+  '顯示名稱不能包含 @、< >、控制字元或隱形字元': 'Display names cannot contain @, < >, control characters or invisible characters.',
+  '顯示名稱不能包含 Huddle、官方、客服、管理員等保留字，以免被誤認為官方帳號':
+    'Display names cannot contain reserved words such as Huddle, official, support or admin, so they are not mistaken for an official account.',
+  '此推薦碼不能用於推薦人本人或同一人的其他帳號': "This referral code can't be used by the referrer or by other accounts of the same person.",
 }

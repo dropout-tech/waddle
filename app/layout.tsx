@@ -9,6 +9,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { FocusTimerProvider } from '@/components/timer/focus-timer-provider'
 import { OperationsNotices } from '@/components/operations/announcements'
 import { EnrollmentBridge } from '@/components/operations/enrollment-bridge'
+import { ImageCleanupBridge } from '@/components/storage/image-cleanup-bridge'
 import { FloatingHub } from '@/components/floating/floating-hub'
 import { StickyNotesProvider } from '@/components/sticky-notes/sticky-notes-provider'
 import { BRAND_TITLE } from '@/lib/brand'
@@ -131,6 +132,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <NativeShell />
           <AuthProvider>
             <EnrollmentBridge />
+            <ImageCleanupBridge />
             <OperationsNotices />
             {/* Cross-route focus timer state — mounted above the router
                 outlet so a running session (and its BGM) survives

@@ -20,6 +20,8 @@ insert into auth.users(id,email) values
  ('00000000-0000-4000-8000-00000000000b','suspended@example.invalid'),
  ('00000000-0000-4000-8000-00000000000c','active@example.invalid'),
  ('00000000-0000-4000-8000-00000000000d','fresh@example.invalid');
+-- Administrators are bound by user id since 20260928120000.
+insert into huddle_ops.admin_users(user_id) values ('00000000-0000-4000-8000-00000000000a');
 insert into public.calendar_shares(user_lo,user_hi) values
  ('00000000-0000-4000-8000-00000000000a','00000000-0000-4000-8000-00000000000b'),
  ('00000000-0000-4000-8000-00000000000a','00000000-0000-4000-8000-00000000000c'),
