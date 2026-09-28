@@ -6,11 +6,12 @@ import { ChevronsRight } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { isDesktop, isNative } from '@/lib/platform'
 import { lockBodyScroll, unlockBodyScroll } from '@/lib/utils'
+import { marketingMediaUrl } from '@/lib/marketing-media'
 import styles from './first-visit-intro.module.css'
 
 const SEEN_KEY = 'huddle-intro-seen'
-const FILM_720 = '/marketing/promo-film/huddle-promo-720.mp4'
-const FILM_1080 = '/marketing/promo-film/huddle-promo-1080.mp4'
+const FILM_720 = marketingMediaUrl('promo-film/huddle-promo-720.mp4')
+const FILM_1080 = marketingMediaUrl('promo-film/huddle-promo-1080.mp4')
 const NARROW_QUERY = '(max-width: 760px)'
 const FADE_MS = 600
 // Failsafe for a slow film host (a single range request has taken ~20s in

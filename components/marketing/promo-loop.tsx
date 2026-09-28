@@ -3,14 +3,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pause, Play } from 'lucide-react'
 import { BRAND_QUOTE } from '@/lib/brand'
+import { marketingMediaUrl } from '@/lib/marketing-media'
 import styles from './promo-loop.module.css'
 
 // Seamless 7s loops, no audio track. 720p under 760px, 1080p otherwise.
 const SOURCES = {
-  desktop: { webm: '/marketing/promo-loop/hammock-1080.webm', mp4: '/marketing/promo-loop/hammock-1080.mp4' },
-  mobile: { webm: '/marketing/promo-loop/hammock-720.webm', mp4: '/marketing/promo-loop/hammock-720.mp4' },
+  desktop: { webm: marketingMediaUrl('promo-loop/hammock-1080.webm'), mp4: marketingMediaUrl('promo-loop/hammock-1080.mp4') },
+  mobile: { webm: marketingMediaUrl('promo-loop/hammock-720.webm'), mp4: marketingMediaUrl('promo-loop/hammock-720.mp4') },
 } as const
-const POSTER = '/marketing/promo-loop/hammock-poster.jpg'
+const POSTER = marketingMediaUrl('promo-loop/hammock-poster.jpg')
 const NARROW_QUERY = '(max-width: 760px)'
 
 /** Ambient "breathing moment" loop — the calm ending of the promo film,

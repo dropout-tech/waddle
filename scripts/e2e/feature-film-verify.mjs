@@ -1,6 +1,29 @@
 /* eslint-disable no-console -- executable video player regression */
 import assert from 'node:assert/strict'
+import { existsSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
+
+// Videos and posters are served from the Supabase CDN (bucket
+// `marketing-media`), not this app's own host — load the project's env so we
+// can assert playback actually comes from there.
+function loadEnvFile(filePath) {
+  const out = {}
+  if (!existsSync(filePath)) return out
+  for (const rawLine of readFileSync(filePath, 'utf8').split('\n')) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const eq = line.indexOf('=')
+    if (eq === -1) continue
+    const key = line.slice(0, eq).trim()
+    let value = line.slice(eq + 1).trim()
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1)
+    out[key] = value
+  }
+  return out
+}
+const localEnv = loadEnvFile('.env.local')
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || localEnv.NEXT_PUBLIC_SUPABASE_URL
+const CDN_PREFIX = `${SUPABASE_URL}/storage/v1/object/public/marketing-media/v1/`
 const base = process.env.E2E_BASE_URL || 'http://localhost:3190'
 const browser = await chromium.launch()
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' })
@@ -34,7 +57,7 @@ try {
     check(`${path}: play button receives keyboard focus`, await play.evaluate(el => document.activeElement === el))
     await page.keyboard.press('Enter')
     await page.waitForFunction(() => { const v = document.querySelector('video[poster$="huddle-promo-poster.jpg"]'); return v && !v.paused && v.currentTime > 0.15 })
-    check(`${path}: keyboard starts playback with sound`, await section.getByRole('button', { name: labels.pause, exact: true }).isVisible() && await video.evaluate(v => !v.muted))
+    check(`${path}: keyboard starts playback with sound, served from the Supabase CDN`, await section.getByRole('button', { name: labels.pause, exact: true }).isVisible() && await video.evaluate((v, prefix) => !v.muted && v.currentSrc.startsWith(prefix), CDN_PREFIX))
     await section.getByRole('button', { name: labels.pause, exact: true }).click()
     check(`${path}: pause stops playback`, await video.evaluate(v => v.paused))
     await video.evaluate(v => { v.currentTime = 8 })
@@ -71,7 +94,8 @@ try {
     const v = narrowPage.locator(FILM)
     await v.waitFor({ state: 'attached' })
     await narrowPage.waitForFunction(() => document.querySelector('video[poster$="huddle-promo-poster.jpg"]')?.readyState >= 1)
-    check(`${width}px: video loads the ${expected} source`, (await v.evaluate(el => el.currentSrc)).includes(expected))
+    const currentSrc = await v.evaluate(el => el.currentSrc)
+    check(`${width}px: video loads the ${expected} source from the Supabase CDN`, currentSrc.includes(expected) && currentSrc.startsWith(CDN_PREFIX))
     await narrowContext.close()
   }
 
