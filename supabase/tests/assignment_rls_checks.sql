@@ -170,8 +170,38 @@ select public.create_org_invite(:'org_id') as token3 \gset
 set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000d1';
 select public.t_err(format($$select public.accept_org_invite('%s')$$, :'token3'),'REMOVED_FROM_ORG','kicked member cannot rejoin with a fresh link either');
 select public.t_err(format($$select public.unblock_org_member('%s','00000000-0000-4000-8000-0000000000d1')$$, :'org_id'),'FORBIDDEN','non-member cannot lift their own block');
+select public.t_err(format($$select * from public.get_org_blocks('%s')$$, :'org_id'),'FORBIDDEN','the removed person cannot list the block list');
+
+-- get_org_blocks (20260928100000): owner/admin of THIS org only.
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000a1';
+select public.t_ok((select count(*)=1 and bool_and(user_id='00000000-0000-4000-8000-0000000000d1' and blocked_at is not null) from public.get_org_blocks(:'org_id')),
+  'owner lists removed members (user + blocked_at)');
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000c1';
+select public.accept_org_invite(:'token3');
+select public.t_err(format($$select * from public.get_org_blocks('%s')$$, :'org_id'),'FORBIDDEN','plain member cannot list removed members');
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000a1';
+select public.set_org_member_role(:'org_id','00000000-0000-4000-8000-0000000000c1','admin');
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000c1';
+select public.t_ok((select count(*)=1 from public.get_org_blocks(:'org_id')),'admin lists removed members');
+select public.leave_org(:'org_id');
+reset role;
+insert into auth.users(id,email) values ('00000000-0000-4000-8000-0000000000a9','other-owner@example.invalid');
+insert into public.billing_entitlements(user_id,entitlement,expires_at,observed_at_ms) values
+ ('00000000-0000-4000-8000-0000000000a9','pro',now()+interval '30 days',1);
+set role authenticated;
+set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000a9';
+select public.create_organization('Other org') as other_org \gset
+select public.t_ok((select count(*)=0 from public.get_org_blocks(:'other_org')),'other org owner sees only their own (empty) list');
+select public.t_err(format($$select * from public.get_org_blocks('%s')$$, :'org_id'),'FORBIDDEN','another org''s owner/admin cannot list this org''s removed members');
+select public.delete_organization(:'other_org');
+reset role;
+select public.t_ok(not has_function_privilege('anon','public.get_org_blocks(uuid)','EXECUTE'),'anon cannot execute get_org_blocks');
+set role authenticated;
+
 set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000a1';
 select public.unblock_org_member(:'org_id','00000000-0000-4000-8000-0000000000d1');
+select public.t_ok((select count(*)=0 from public.get_org_blocks(:'org_id')),'unblocked person leaves the removed list (not re-added as member)');
+select public.t_ok((select count(*)=1 from public.get_org_members(:'org_id')),'unblocking does not re-add the person');
 set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000d1';
 select public.accept_org_invite(:'token3');
 select public.t_ok((select count(*)=2 from public.get_org_members(:'org_id')),'after owner unblocks, the person can rejoin with a valid link');
