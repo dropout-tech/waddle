@@ -12,6 +12,7 @@ import styles from './first-visit-intro.module.css'
 const SEEN_KEY = 'huddle-intro-seen'
 const FILM_720 = marketingMediaUrl('promo-film/huddle-promo-720.mp4')
 const FILM_1080 = marketingMediaUrl('promo-film/huddle-promo-1080.mp4')
+const TICK_SOUNDS = [marketingMediaUrl('intro/tick.mp3'), marketingMediaUrl('intro/tock.mp3')]
 const NARROW_QUERY = '(max-width: 760px)'
 const FADE_MS = 600
 // Failsafe for a slow film host (a single range request has taken ~20s in
@@ -20,13 +21,24 @@ const FADE_MS = 600
 const START_HINT_MS = 2500
 const START_GIVE_UP_MS = 12000
 const STALL_GIVE_UP_MS = 10000
+// The clock: tick/tock every second from the enter click, the hand stepping 6°
+// on each one. Web Audio lookahead scheduling keeps the beat exact.
+const TICK_GAIN = 0.8
+const LOOKAHEAD_S = 0.12
+const PUMP_MS = 25
+const TICK_FADE_S = 0.3
+const REVEAL_LINE_MS = 1200
+const REVEAL_PLAY_MS = 2400
 // While the gate is up, the hero swarm and the roaming penguin hold their
 // first-visit show (penguin-circus.tsx) and start when this event fires.
 export const INTRO_OPEN_ATTR = 'data-intro-open'
 export const INTRO_CLOSED_EVENT = 'huddle:intro-closed'
 
-export type IntroCopy = { tick: string; line: string; play: string; skip: string; loading: string; label: string }
-type Phase = 'hidden' | 'gate' | 'film' | 'closing'
+export type IntroCopy = { tick: string; enter: string; enterTap: string; hint: string; line: string; play: string; skip: string; loading: string; label: string }
+// enter = stage 1 (still clock, "click to enter"); gate = stage 2 (ticking, line, ▶)
+type Phase = 'hidden' | 'enter' | 'gate' | 'film' | 'closing'
+type Audio = { ctx: AudioContext; gain: GainNode; buffers: (AudioBuffer | null)[] }
+type AudioSessionNavigator = Navigator & { audioSession?: { type: string } }
 
 function seen() {
   try { return window.localStorage.getItem(SEEN_KEY) === '1' } catch { return false }
@@ -36,33 +48,41 @@ function markSeen() {
 }
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-/** First-visit entrance: a dark gate whose one button is the user gesture
- * browsers require before a film may play with sound. play() is called
- * synchronously inside the click handler on a <video> that is already in the
- * DOM (iOS only honours the gesture that way), inside a fixed overlay rather
- * than requestFullscreen (which would hand off to the native iOS player).
- * Signed-in visitors, native/desktop shells and #deep-links never see it.
- * `?intro=1` previews it again after it has been seen. */
+/** First-visit entrance. Stage 1 is a still clock and an "enter" button: that
+ * click is the gesture that unlocks sound, so the clock starts ticking (Web
+ * Audio) with the hand in step. Stage 2 reveals the line and ▶, whose click
+ * plays the film with sound: play() runs synchronously in the handler on a
+ * <video> already in the DOM (iOS only honours the gesture that way), inside a
+ * fixed overlay rather than requestFullscreen (which hands off to the native
+ * iOS player). Signed-in visitors, native/desktop shells and #deep-links never
+ * see it. `?intro=1` previews it again after it has been seen. */
 export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { locale?: 'zh' | 'en'; copy: IntroCopy; fontClass?: string }) {
   const en = locale === 'en'
   const { session, loading } = useAuth()
   const [phase, setPhase] = useState<Phase>('hidden')
+  const [reveal, setReveal] = useState(0)
   const [rolling, setRolling] = useState(false)
   const [blocked, setBlocked] = useState(false)
   const [buffering, setBuffering] = useState(false)
   const [src, setSrc] = useState(FILM_1080)
+  const [coarse, setCoarse] = useState(false)
   const decided = useRef<'pending' | 'hold' | 'done'>('pending')
   const held = useRef(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const handRef = useRef<HTMLSpanElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const enterRef = useRef<HTMLButtonElement>(null)
   const playRef = useRef<HTMLButtonElement>(null)
   const skipLinkRef = useRef<HTMLButtonElement>(null)
   const skipRef = useRef<HTMLButtonElement>(null)
   const closeTimer = useRef(0)
+  const revealTimers = useRef<number[]>([])
   const started = useRef(false)
   const hintTimer = useRef(0)
   const startTimer = useRef(0)
   const stallTimer = useRef(0)
+  const audio = useRef<Audio | null>(null)
+  const clock = useRef({ mode: 'perf' as 'ctx' | 'perf', start: 0, perfStart: 0, beats: 0, steps: 0, pump: 0, raf: 0, stop: 0, sources: new Set<AudioBufferSourceNode>() })
 
   const hold = useCallback(() => {
     held.current = true
@@ -92,17 +112,89 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
     decided.current = 'done'
     if (session) { release(); return }
     setSrc(window.matchMedia(NARROW_QUERY).matches ? FILM_720 : FILM_1080)
-    setPhase('gate')
+    setCoarse(window.matchMedia('(pointer: coarse)').matches)
+    setPhase('enter')
   }, [loading, session, hold, release])
+
+  /* ── clock audio ── */
+  // Seconds since the enter click, on the audio clock once it runs (so hand
+  // and sound agree); on the page clock if there is no audio at all.
+  const elapsed = useCallback(() => {
+    const c = clock.current
+    if (c.mode === 'ctx') {
+      const a = audio.current
+      if (a && a.ctx.state === 'running') return Math.max(0, a.ctx.currentTime - c.start)
+      if (a && performance.now() - c.perfStart < 800) return 0
+      c.mode = 'perf'; c.perfStart = performance.now() // audio never started: keep time silently
+    }
+    return (performance.now() - c.perfStart) / 1000
+  }, [])
+
+  const stopPump = useCallback(() => {
+    const c = clock.current
+    window.clearInterval(c.pump); window.clearTimeout(c.stop)
+    c.pump = c.stop = 0
+  }, [])
+
+  // Skip / end / failsafe / unmount: silence now and let the context go.
+  const shutAudio = useCallback(() => {
+    const c = clock.current
+    stopPump()
+    cancelAnimationFrame(c.raf); c.raf = 0
+    c.sources.forEach(s => { try { s.stop() } catch { /* not started */ } })
+    c.sources.clear()
+    const a = audio.current
+    audio.current = null
+    if (a) {
+      a.ctx.onstatechange = null
+      a.gain.gain.value = 0
+      void a.ctx.close().catch(() => {})
+      rootRef.current?.setAttribute('data-audio', 'closed')
+    }
+  }, [stopPump])
+
+  // Stage 1 mounts: a suspended AudioContext plus the two decoded sounds, so
+  // the enter click only has to resume it. Any failure stays silent.
+  useEffect(() => {
+    if (phase !== 'enter' || audio.current) return
+    const root = rootRef.current
+    root?.setAttribute('data-ticks', '0')
+    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AC) return
+    let a: Audio
+    try {
+      const ctx = new AC()
+      const gain = ctx.createGain()
+      gain.gain.value = TICK_GAIN
+      gain.connect(ctx.destination)
+      a = { ctx, gain, buffers: [null, null] }
+    } catch { return }
+    audio.current = a
+    if (a.ctx.state === 'running') void a.ctx.suspend().catch(() => {})
+    const show = () => root?.setAttribute('data-audio', a.ctx.state)
+    a.ctx.onstatechange = show
+    show()
+    TICK_SOUNDS.forEach((url, i) => {
+      fetch(url)
+        .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+        .then(data => a.ctx.decodeAudioData(data))
+        .then(buffer => { a.buffers[i] = buffer })
+        .catch(() => { /* no tick sound this time; the clock still moves */ })
+    })
+  }, [phase])
 
   const clearFailsafe = useCallback(() => {
     window.clearTimeout(hintTimer.current); window.clearTimeout(startTimer.current); window.clearTimeout(stallTimer.current)
     hintTimer.current = startTimer.current = stallTimer.current = 0
   }, [])
+  const clearReveal = useCallback(() => {
+    revealTimers.current.forEach(id => window.clearTimeout(id))
+    revealTimers.current = []
+  }, [])
 
-  useEffect(() => () => { window.clearTimeout(closeTimer.current); clearFailsafe(); release() }, [release, clearFailsafe])
+  useEffect(() => () => { window.clearTimeout(closeTimer.current); clearFailsafe(); clearReveal(); shutAudio(); release() }, [release, clearFailsafe, clearReveal, shutAudio])
 
-  const open = phase === 'gate' || phase === 'film'
+  const open = phase === 'enter' || phase === 'gate' || phase === 'film'
 
   // While open: the page behind is inert and doesn't scroll.
   useEffect(() => {
@@ -114,13 +206,18 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
   }, [open])
 
   useEffect(() => {
-    if (phase === 'gate') playRef.current?.focus({ preventScroll: true })
+    if (phase === 'enter') enterRef.current?.focus({ preventScroll: true })
     if (phase === 'film') skipRef.current?.focus({ preventScroll: true })
   }, [phase])
+  useEffect(() => {
+    if (reveal === 2) playRef.current?.focus({ preventScroll: true })
+  }, [reveal])
 
   const close = useCallback(() => {
-    if (phase !== 'gate' && phase !== 'film') return
+    if (phase !== 'enter' && phase !== 'gate' && phase !== 'film') return
     clearFailsafe()
+    clearReveal()
+    shutAudio()
     setBuffering(false)
     markSeen()
     videoRef.current?.pause()
@@ -133,7 +230,7 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
       page.focus({ preventScroll: true })
     }
     closeTimer.current = window.setTimeout(() => { setPhase('hidden'); release() }, reducedMotion() ? 0 : FADE_MS)
-  }, [phase, release, clearFailsafe])
+  }, [phase, release, clearFailsafe, clearReveal, shutAudio])
   // Failsafe timers fire later than the render that set them.
   const closeRef = useRef(close)
   useEffect(() => { closeRef.current = close }, [close])
@@ -143,8 +240,10 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); close(); return }
       if (e.key !== 'Tab') return
-      // Focus trap: cycle through this phase's controls only.
-      const items = (phase === 'gate' ? [playRef.current, skipLinkRef.current] : [skipRef.current, blocked ? videoRef.current : null]).filter((el): el is HTMLButtonElement | HTMLVideoElement => !!el)
+      // Focus trap: cycle through this stage's visible controls only.
+      const items = (phase === 'enter' ? [enterRef.current, skipLinkRef.current]
+        : phase === 'gate' ? [reveal === 2 ? playRef.current : null, skipLinkRef.current]
+          : [skipRef.current, blocked ? videoRef.current : null]).filter((el): el is HTMLButtonElement | HTMLVideoElement => !!el)
       e.preventDefault()
       if (!items.length) return
       const i = items.indexOf(document.activeElement as HTMLButtonElement)
@@ -152,7 +251,59 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [open, phase, blocked, close])
+  }, [open, phase, reveal, blocked, close])
+
+  const enter = () => {
+    if (phase !== 'enter') return
+    // All synchronous, inside the click: this is the gesture that unlocks sound.
+    const nav = navigator as AudioSessionNavigator
+    try { if (nav.audioSession) nav.audioSession.type = 'playback' } catch { /* older Safari */ } // play through the iOS silent switch
+    const a = audio.current
+    if (a) void a.ctx.resume().catch(() => {})
+    const c = clock.current
+    c.mode = a ? 'ctx' : 'perf'
+    c.start = a ? a.ctx.currentTime : 0
+    c.perfStart = performance.now()
+    c.beats = 0; c.steps = 0
+    const still = reducedMotion()
+    const root = rootRef.current
+    // Beat k (tick, tock, tick…) sounds at start + k seconds.
+    const pump = () => {
+      const due = elapsed() + LOOKAHEAD_S
+      while (c.beats < due) {
+        const now = audio.current
+        const buffer = c.mode === 'ctx' && now ? now.buffers[c.beats % 2] : null
+        if (now && buffer) {
+          const s = now.ctx.createBufferSource()
+          s.buffer = buffer
+          s.connect(now.gain)
+          s.onended = () => c.sources.delete(s)
+          c.sources.add(s)
+          s.start(Math.max(c.start + c.beats, now.ctx.currentTime))
+        }
+        c.beats++
+      }
+      root?.setAttribute('data-ticks', String(c.beats))
+    }
+    // The hand steps 6° on each beat, read off the same clock.
+    const frame = () => {
+      c.raf = requestAnimationFrame(frame)
+      const steps = Math.floor(elapsed()) + 1
+      if (steps === c.steps) return
+      c.steps = steps
+      if (!still && handRef.current) handRef.current.style.transform = `rotate(${steps * 6}deg)`
+    }
+    pump()
+    c.pump = window.setInterval(pump, PUMP_MS)
+    frame()
+    setPhase('gate')
+    revealTimers.current = [
+      window.setTimeout(() => setReveal(1), REVEAL_LINE_MS),
+      window.setTimeout(() => setReveal(2), REVEAL_PLAY_MS),
+    ]
+    // Hold focus on the dialog until ▶ appears (a second Enter must not skip).
+    rootRef.current?.focus({ preventScroll: true })
+  }
 
   const play = () => {
     const video = videoRef.current
@@ -162,6 +313,16 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
     video.muted = false
     const attempt = video.play()
     setPhase('film')
+    // The ticking bows out: fade, then stop scheduling. The hand keeps time
+    // silently until the film rolls.
+    const a = audio.current
+    if (a && a.ctx.state === 'running') {
+      const t = a.ctx.currentTime
+      a.gain.gain.cancelScheduledValues(t)
+      a.gain.gain.setValueAtTime(a.gain.gain.value, t)
+      a.gain.gain.linearRampToValueAtTime(0, t + TICK_FADE_S)
+    }
+    clock.current.stop = window.setTimeout(stopPump, TICK_FADE_S * 1000)
     hintTimer.current = window.setTimeout(() => setBuffering(true), START_HINT_MS)
     startTimer.current = window.setTimeout(() => closeRef.current(), START_GIVE_UP_MS)
     attempt?.catch((err: unknown) => {
@@ -195,6 +356,7 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
       role="dialog"
       aria-modal="true"
       aria-label={copy.label}
+      tabIndex={-1}
       lang={en ? 'en' : 'zh-Hant'}
       className={`${styles.root} ${fontClass} ${en ? styles.english : ''}`}
       data-phase={phase}
@@ -218,20 +380,22 @@ export function FirstVisitIntro({ locale = 'zh', copy, fontClass = '' }: { local
       />
       <div className={styles.gate}>
         <div className={styles.stack}>
-          <div className={styles.clock} aria-hidden="true"><span className={styles.dial} /><span className={styles.hand} /><span className={styles.pivot} /></div>
+          <div className={styles.clock} aria-hidden="true"><span className={styles.dial} /><span ref={handRef} className={styles.hand} /><span className={styles.pivot} /></div>
           <p className={styles.tick}>{copy.tick}</p>
-          <p className={styles.line}>{copy.line}</p>
+          <p className={styles.line} data-shown={reveal >= 1 ? '' : undefined}>{copy.line}</p>
           <div className={styles.actions}>
-            <button ref={playRef} type="button" className={styles.play} onClick={play}>
+            <button ref={enterRef} type="button" className={`${styles.cta} ${styles.enter}`} onClick={enter}>{en && coarse ? copy.enterTap : copy.enter}</button>
+            <button ref={playRef} type="button" className={`${styles.cta} ${styles.play}`} data-shown={reveal >= 2 ? '' : undefined} onClick={play}>
               <svg viewBox="0 0 10 12" width="10" height="12" aria-hidden="true"><path d="M0 0l10 6-10 6z" fill="currentColor" /></svg>{copy.play}
             </button>
-            <button ref={skipLinkRef} type="button" className={styles.skipLink} onClick={close}>{copy.skip}</button>
+            <p className={styles.hint}>{copy.hint}</p>
             <p className={styles.loading} aria-live="polite">{buffering && !rolling ? <span>{copy.loading}</span> : null}</p>
+            <button ref={skipLinkRef} type="button" className={styles.skipLink} onClick={close}>{copy.skip}</button>
           </div>
         </div>
       </div>
       <p className={styles.filmLoading} aria-live="polite">{buffering && rolling ? <span>{copy.loading}</span> : null}</p>
-      {phase !== 'gate' ? <button ref={skipRef} type="button" className={styles.skip} onClick={close}>{copy.skip}<ChevronsRight size={16} aria-hidden="true" /></button> : null}
+      {phase === 'film' || phase === 'closing' ? <button ref={skipRef} type="button" className={styles.skip} onClick={close}>{copy.skip}<ChevronsRight size={16} aria-hidden="true" /></button> : null}
     </div>,
     document.body,
   )

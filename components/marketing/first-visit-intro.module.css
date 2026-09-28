@@ -1,9 +1,12 @@
 /* First-visit gate (first-visit-intro.tsx). Ink room, one cream second hand
-   ticking on a faint dial, brand-orange pivot. Only transform/opacity move;
-   animations are longhand (Turbopack drops shorthand durations in modules). */
+   on a faint dial, brand-orange pivot. Stage 1 (enter): the hand is parked at
+   12. Stage 2 (gate): the hand steps 6° per tick, driven from JS on the audio
+   clock. Only transform/opacity move; animations are longhand (Turbopack
+   drops shorthand durations in modules). */
 .root { --cream: #f6f3e9; --muted: #b9b3a0; --room: #1b1c18; position: fixed; inset: 0; z-index: 10000; overflow: hidden; background: #000; color: var(--cream); overscroll-behavior: contain; touch-action: none; -webkit-tap-highlight-color: transparent; animation-name: dim; animation-duration: .5s; animation-timing-function: ease-out; animation-fill-mode: backwards; }
 .root[data-phase='closing'] { opacity: 0; pointer-events: none; transition: opacity .6s ease; }
 .root button { font: inherit; cursor: pointer; }
+.root:focus { outline: none; } /* holds focus between enter and ▶ */
 .root button:focus-visible { outline: 2px solid #cf5731; outline-offset: 5px; }
 
 /* ── The film: already in the DOM so play() can run inside the click ── */
@@ -18,7 +21,7 @@
 /* A second hand on a dial much larger than the words: the room is the clock. */
 .clock { --r: min(30vh, 42vw, 300px); position: relative; pointer-events: none; width: 12px; height: 12px; margin-bottom: 30px; }
 .dial { position: absolute; left: 50%; top: 50%; width: calc(var(--r) * 2); height: calc(var(--r) * 2); transform: translate(-50%, -50%); border: 1px solid rgba(246, 243, 233, .09); border-radius: 50%; }
-.hand { position: absolute; left: 50%; bottom: calc(50% - var(--r) * .14); width: 2px; height: calc(var(--r) * 1.06); margin-left: -1px; border-radius: 1px; background: linear-gradient(to top, rgba(246, 243, 233, .45), rgba(246, 243, 233, .85) 14%, rgba(246, 243, 233, .2)); transform-origin: 50% calc(100% - var(--r) * .14); transform: rotate(-54deg); animation-name: sweep; animation-duration: 60s; animation-timing-function: steps(60, end); animation-iteration-count: infinite; }
+.hand { position: absolute; left: 50%; bottom: calc(50% - var(--r) * .14); width: 2px; height: calc(var(--r) * 1.06); margin-left: -1px; border-radius: 1px; background: linear-gradient(to top, rgba(246, 243, 233, .45), rgba(246, 243, 233, .85) 14%, rgba(246, 243, 233, .2)); transform-origin: 50% calc(100% - var(--r) * .14); transform: rotate(0deg); transition: transform .14s cubic-bezier(.34, 1.8, .6, 1); } /* a small mechanical overshoot on each step */
 .pivot { position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; transform: translate(-50%, -50%); border-radius: 50%; background: #cf5731; box-shadow: 0 0 0 3px var(--room); }
 
 /* words and buttons sit above the (positioned) dial and hand */
@@ -30,10 +33,14 @@
 .english .line { max-width: 9em; font-family: var(--poster-en), sans-serif; font-weight: 800; font-size: clamp(42px, 6.4vw, 84px); line-height: .98; letter-spacing: .01em; text-transform: uppercase; }
 .english .tick { letter-spacing: .2em; padding-left: .2em; }
 .actions { display: grid; justify-items: center; row-gap: 4px; margin-top: 40px; }
-/* the skip link and, after the click, the loading line share the row under the button */
-.skipLink, .loading { grid-area: 2 / 1; }
-.play { display: inline-flex; align-items: center; gap: 14px; min-height: 52px; padding: 14px 28px; border: 1px solid rgba(246, 243, 233, .7); border-radius: 4px; background: transparent; color: var(--cream); font-size: 16px; font-weight: 700; letter-spacing: .06em; transition: background-color .25s, color .25s, border-color .25s; }
-.play:hover { background: var(--cream); border-color: var(--cream); color: var(--room); }
+/* shared cells keep the layout still between stages: enter ↔ ▶ (row 1),
+   sound hint ↔ loading line (row 2), skip link (row 3) */
+.enter, .play { grid-area: 1 / 1; }
+.hint, .loading { grid-area: 2 / 1; }
+.skipLink { grid-area: 3 / 1; }
+.cta { display: inline-flex; align-items: center; gap: 14px; min-height: 52px; padding: 14px 28px; border: 1px solid rgba(246, 243, 233, .7); border-radius: 4px; background: transparent; color: var(--cream); font-size: 16px; font-weight: 700; letter-spacing: .06em; transition: background-color .25s, color .25s, border-color .25s; }
+.cta:hover { background: var(--cream); border-color: var(--cream); color: var(--room); }
+.hint { margin: 8px 0 0; font-size: 13px; letter-spacing: .08em; color: var(--muted); }
 .skipLink { min-width: 64px; min-height: 44px; padding: 0 14px; border: 0; background: none; color: var(--muted); font-size: 14px; text-decoration: underline; text-decoration-color: rgba(185, 179, 160, .5); text-underline-offset: 5px; }
 .skipLink:hover { color: var(--cream); }
 .loading { display: flex; align-items: center; min-height: 44px; margin: 0; font-size: 14px; letter-spacing: .08em; color: var(--muted); pointer-events: none; }
@@ -42,12 +49,15 @@
 .filmLoading span { padding: 5px 12px; border-radius: 4px; background: rgba(16, 17, 14, .72); color: var(--muted); font-size: 13px; letter-spacing: .08em; }
 .loading span, .filmLoading span { animation-name: dim; animation-duration: .6s; animation-timing-function: ease-out; animation-fill-mode: backwards; }
 
-/* staggered reveal: tick → line → buttons, ~0.6s apart */
-.tick, .line, .actions { animation-name: dim; animation-duration: .9s; animation-timing-function: ease-out; animation-fill-mode: backwards; }
+/* stage 1 entrance: tick → enter button */
+.tick, .actions { animation-name: dim; animation-duration: .9s; animation-timing-function: ease-out; animation-fill-mode: backwards; }
 .tick { animation-delay: .35s; }
-.line { animation-delay: .95s; }
-.actions { animation-delay: 1.55s; }
-/* after the click: words go, the hand keeps ticking until the film rolls */
+.actions { animation-delay: .95s; }
+/* stage 2: enter + hint step aside; the line (1.2s) and ▶ (2.4s) arrive */
+.root:not([data-phase='enter']) :is(.enter, .hint) { opacity: 0; visibility: hidden; transition: opacity .3s ease, visibility 0s linear .3s; }
+.line, .play { opacity: 0; visibility: hidden; }
+.line[data-shown], .play[data-shown] { opacity: 1; visibility: visible; animation-name: dim; animation-duration: .8s; animation-timing-function: ease-out; animation-fill-mode: backwards; }
+/* after ▶: words go, the hand keeps time silently until the film rolls */
 .root[data-phase='film'] :is(.tick, .line, .play, .skipLink) { opacity: 0; visibility: hidden; animation-name: none; transition: opacity .4s ease, visibility 0s linear .4s; }
 .root[data-phase='film'] .actions { animation-name: none; }
 
@@ -66,4 +76,3 @@
 }
 
 @keyframes dim { from { opacity: 0; } }
-@keyframes sweep { from { transform: rotate(-54deg); } to { transform: rotate(306deg); } }
