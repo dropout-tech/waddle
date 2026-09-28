@@ -46,7 +46,7 @@ const copy = {
       ['我的資料會怎麼處理？', '登入帳號後，任務、行程與筆記會透過雲端服務儲存和同步。蒐集用途、分享、保存與刪除說明可在頁尾的隱私說明查看。'],
     ],
     footerLine: '把今天，整理成明天的線索。', legal: ['服務條款', '隱私說明', '取消與退款', '使用協助'], all: '回到頁首',
-    intro: { tick: '嘀嗒、嘀嗒……', line: '有東西一直在追你。', play: '看看是什麼', skip: '略過', label: 'Huddle 開場影片' },
+    intro: { tick: '嘀嗒、嘀嗒……', line: '有東西一直在追你。', play: '看看是什麼', skip: '略過', loading: '載入中…', label: 'Huddle 開場影片' },
   },
   en: {
     nav: ['Features', 'Plans', 'Download', 'Support'], login: 'Log in', start: 'Start for free',
@@ -71,7 +71,7 @@ const copy = {
       ['How is my data handled?', 'After you sign in, tasks, calendar entries and notes are stored and synced using cloud services. The Privacy page explains data use, sharing, retention and deletion.'],
     ],
     footerLine: 'A little clarity for today. A thread for tomorrow.', legal: ['Terms of use', 'Privacy', 'Cancellation & refunds', 'Support'], all: 'Back to top',
-    intro: { tick: 'Tick, tock…', line: 'Something has been chasing you.', play: 'See what it is', skip: 'Skip', label: 'Huddle opening film' },
+    intro: { tick: 'Tick, tock…', line: 'Something has been chasing you.', play: 'See what it is', skip: 'Skip', loading: 'Loading…', label: 'Huddle opening film' },
   },
 } as const
 
