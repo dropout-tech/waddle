@@ -80,3 +80,12 @@ export function scheduleNextWaterReminder(minutes: number = getWaterReminderInte
   setWaterNextDueAt(next)
   return next
 }
+
+/** A glass logged on the home-screen widget at `at` (ms): same as tapping
+ *  「喝了」 in the app at that moment — the next reminder is one interval later.
+ *  Never pulls an already-later reminder (e.g. a newer in-app tap) earlier. */
+export function recordWaterFromWidget(at: number) {
+  const next = at + getWaterReminderInterval() * 60 * 1000
+  const current = getWaterNextDueAt()
+  if (current === null || next > current) setWaterNextDueAt(next)
+}

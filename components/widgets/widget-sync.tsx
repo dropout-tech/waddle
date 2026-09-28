@@ -10,7 +10,8 @@ import { focusNoteExcerpt, makeSnapshot } from '@/lib/widgets/model'
 import { HuddleWidgets, publishWidgets, widgetAccount } from '@/lib/widgets/native'
 import { rowToTask } from '@/lib/supabase/mappers'
 import { createClient } from '@/lib/supabase/client'
-import { getWaterNextDueAt, getWaterReminderEnabled } from '@/lib/water-reminder'
+import { getWaterNextDueAt, getWaterReminderEnabled, recordWaterFromWidget } from '@/lib/water-reminder'
+import { applyWidgetActions } from '@/lib/widgets/actions'
 import type { Workspace, TimeBlock, ScratchpadItem, NotebookNote } from '@/lib/types'
 
 export function WidgetSync({workspaces,timeBlocks,boards,notes}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[]}) {
@@ -26,18 +27,14 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes}:{workspaces:Work
         const source=latest.current.user.id, auth=widgetAccount()
         if(auth.accountId !== source || !auth.epoch) return
         const {actions=[]}=await HuddleWidgets.read()
-        const db=createClient(), handled:string[]=[]
-        for(const action of actions) {
-          if(!alive || widgetAccount().accountId !== source || widgetAccount().epoch !== auth.epoch) return
-          if(action.accountId!==source || action.epoch!==auth.epoch) continue
-          // Explicit SET, never toggle: retry after a crash cannot undo completion.
-          const {data:current,error:readError}=await db.from('tasks').select('id,is_completed,updated_at,is_recurring,is_archived').eq('id',action.taskId).eq('user_id',source).maybeSingle()
-          if(!alive || widgetAccount().accountId !== source || widgetAccount().epoch !== auth.epoch) return
-          if(readError) continue
-          if(!current || current.is_completed || current.is_archived || current.is_recurring || current.updated_at!==action.revision) {handled.push(action.id);if(!current?.is_completed)toast.info('小工具任務已變更，請在 App 確認最新內容');continue}
-          const {data,error}=await db.from('tasks').update({is_completed:true,completed_at:new Date().toISOString()}).eq('id',action.taskId).eq('user_id',source).eq('updated_at',action.revision).select('id')
-          if(!error && data?.length) handled.push(action.id)
-        }
+        const db=createClient()
+        // Widget taps (task ticks, water, focus timer) replayed in order — lib/widgets/actions.ts.
+        const {handled,aborted}=await applyWidgetActions(actions,{db,source,epoch:auth.epoch,
+          isCurrent:()=>alive && widgetAccount().accountId===source && widgetAccount().epoch===auth.epoch,
+          focus:(op,at)=>latest.current.timer.applyWidgetFocus(op,at),
+          water:at=>recordWaterFromWidget(at),
+          notify:message=>toast.info(message)})
+        if(aborted) return
         if(handled.length) {await HuddleWidgets.acknowledge({accountId:source,epoch:auth.epoch,ids:handled});window.dispatchEvent(new Event('huddle-widget-synced'));return}
         if(!alive || widgetAccount().accountId!==source || widgetAccount().epoch!==auth.epoch) return
         const x=latest.current

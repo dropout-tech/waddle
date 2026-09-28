@@ -1,9 +1,10 @@
 import { registerPlugin, Capacitor } from '@capacitor/core'
 import type { WidgetSnapshot } from './model'
+import type { WidgetAction } from './actions'
 interface WidgetPlugin {
   setAccount(input:{accountId:string}):Promise<{epoch:string}>
   publish(input:{snapshot:WidgetSnapshot}):Promise<void>
-  read():Promise<{snapshot?:WidgetSnapshot; actions?:{id:string;taskId:string;revision:string;accountId:string;epoch:string}[]}>
+  read():Promise<{snapshot?:WidgetSnapshot; actions?:WidgetAction[]}>
   acknowledge(input:{accountId:string;epoch:string;ids:string[]}):Promise<void>
 }
 export const HuddleWidgets = registerPlugin<WidgetPlugin>('HuddleWidgets')
