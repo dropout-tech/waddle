@@ -41,6 +41,12 @@ import {
   closeFloatingHub, getHubServerState, getHubState, hubAvailable,
   openFloatingHub, setHubTab, subscribeHub,
 } from '@/lib/floating-hub'
+import {
+  closeFocusPip, focusPipServerOpen, isFocusPipOpen, openFocusPip, setFocusPipModel,
+  subscribeFocusPip, videoPipSupported,
+} from '@/lib/focus-pip'
+import { toast } from 'sonner'
+import { isNative } from '@/lib/platform'
 import { FloatingTimerCard } from './floating-timer-card'
 import { FocusTimerImmersive } from './focus-timer-immersive'
 import { FocusTimerMini } from './focus-timer-mini'
@@ -998,10 +1004,50 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
   // 顯示）；⑵ 產出計時卡節點交給工作站的計時器分頁渲染。計時卡是 portal
   // 內容、仍屬這棵 React 樹，所以懸浮視窗裡的暫停/繼續/結束吃的就是上面
   // 那台 state machine——不需要跨視窗同步。
-  const [canFloatTimer, setCanFloatTimer] = useState(false)
-  useEffect(() => { setCanFloatTimer(hubAvailable()) }, [])
+  // 浮動顯示有兩條路：桌面 Chrome/Edge 用上面的 Document PiP 工作站（能按鈕操作）；
+  // 其他地方（iOS App、Safari、手機瀏覽器）退回「倒數畫成影片」的影片子母畫面
+  // （lib/focus-pip.ts）。兩者都沒有 → 按鈕仍在，按了給明確提示。
+  const [floatKind, setFloatKind] = useState<'document' | 'video' | null>(null)
+  useEffect(() => { setFloatKind(hubAvailable() ? 'document' : videoPipSupported() ? 'video' : null) }, [])
+  const canFloatTimer = floatKind !== null
   const hub = useSyncExternalStore(subscribeHub, getHubState, getHubServerState)
-  const hubOpenOnTimer = hub.window !== null && hub.tab === 'timer'
+  const videoPipOpen = useSyncExternalStore(subscribeFocusPip, isFocusPipOpen, focusPipServerOpen)
+  const hubOpenOnTimer = (hub.window !== null && hub.tab === 'timer') || videoPipOpen
+
+  // 影片子母畫面只需要在 session 轉換時同步（每秒重畫由 focus-pip 自己用牆鐘算）。
+  useEffect(() => {
+    if (floatKind !== 'video') return
+    if (!session || state === 'idle') { setFocusPipModel(null); return }
+    setFocusPipModel({
+      state, mode: session.mode, phase: session.phase,
+      startedAt: session.startedAt.getTime(), pausedMs: session.pausedMs,
+      pausedAt: session.pausedAt ? session.pausedAt.getTime() : null,
+      targetSeconds: session.targetSeconds, label: session.label, color: session.color,
+      status: state === 'paused' ? t('已暫停') : state === 'completed' ? t('完成')
+        : session.phase === 'break' ? t('休息中') : t('專注中'),
+    }, true)
+  }, [floatKind, session, state, t])
+  useEffect(() => () => setFocusPipModel(null), [])
+
+  const toggleFloat = useCallback(() => {
+    if (floatKind === 'document') {
+      // 沒開 → 開工作站到計時器分頁；開著但停在別的分頁 → 切過去；
+      // 已經在看計時器 → 收回。
+      if (!hub.window) void openFloatingHub('timer')
+      else if (hub.tab !== 'timer') setHubTab('timer')
+      else closeFloatingHub()
+      return
+    }
+    if (floatKind === 'video') {
+      if (isFocusPipOpen()) { void closeFocusPip(); return }
+      openFocusPip().catch(() => toast.error(t('浮動顯示沒有開成功，請再按一次')))
+      return
+    }
+    // App 殼裡講「換瀏覽器」沒有意義——那是裝置（或模擬器）本身不支援子母畫面。
+    toast.info(isNative()
+      ? t('這台裝置不支援子母畫面，無法浮動顯示')
+      : t('這個瀏覽器不支援浮動顯示，請改用 Chrome、Edge 或 Safari'))
+  }, [floatKind, hub.window, hub.tab, t])
 
   // 計時卡節點（idle 時 null，工作站那邊會改顯示快速開始畫面）。
   const floatingTimerCard: React.ReactNode = session && state !== 'idle' ? (
@@ -1078,6 +1124,8 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
           }}
           onSkipCompletion={skipCompletion}
           onMinimize={() => setView('mini')}
+          isFloating={hubOpenOnTimer}
+          onToggleFloat={toggleFloat}
           onToggleBgm={() => {
             getBgmEngine()?.unlockAudio()
             // Real in-session mute/unmute (the old latch had no audible
@@ -1136,13 +1184,7 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
           onSkipCompletion={skipCompletion}
           canFloat={canFloatTimer}
           isFloating={hubOpenOnTimer}
-          onToggleFloat={() => {
-            // 沒開 → 開工作站到計時器分頁；開著但停在別的分頁 → 切過去；
-            // 已經在看計時器 → 收回。
-            if (!hub.window) void openFloatingHub('timer')
-            else if (hub.tab !== 'timer') setHubTab('timer')
-            else closeFloatingHub()
-          }}
+          onToggleFloat={toggleFloat}
         />
       )
     }

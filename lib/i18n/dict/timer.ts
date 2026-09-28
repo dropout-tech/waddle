@@ -183,4 +183,12 @@ export const dict: Record<string, string> = {
   '標記為未完成': "Mark as not done",
   '標記為完成': "Mark as done",
   '空白待辦…': 'Empty to-do…',
+  // Floating countdown (picture-in-picture)
+  '浮動顯示': 'Float',
+  '浮動中': 'Floating',
+  '收回浮動顯示': 'Close floating timer',
+  '浮動顯示：離開 App 也看得到倒數': 'Float: keep the countdown visible outside the app',
+  '浮動顯示沒有開成功，請再按一次': "Couldn't open the floating timer — tap again",
+  '這台裝置不支援子母畫面，無法浮動顯示': "This device doesn't support picture-in-picture, so the timer can't float",
+  '這個瀏覽器不支援浮動顯示，請改用 Chrome、Edge 或 Safari': "This browser can't float the timer — try Chrome, Edge or Safari",
 }
