@@ -367,6 +367,10 @@ export interface FocusTimerContextValue {
    *  （兩者都是懸浮工作站快速開始用的捷徑）；`forceMini` 跳過「開始時進沉浸
    *  畫面」偏好——從懸浮視窗啟動時，主視窗突然蓋上全螢幕會嚇到人。 */
   startTimer: (opts?: { immersive?: boolean; presetIndex?: number; stopwatch?: boolean; forceMini?: boolean }) => void
+  /** Replays one tap from the native 專注計時 home-screen widget at the time it
+   *  happened (`at`, ms). Taps that don't fit the current state are ignored —
+   *  the widget runs the same state machine (HuddleWidgets.swift focusFace). */
+  applyWidgetFocus: (op: 'start' | 'pause' | 'resume' | 'stop', at: number) => void
   /** MainLayout registers its onCreateCalendarTimeBlock here on mount;
    *  returns the unregister function for the effect cleanup. */
   registerRecorder: (fn: RecorderFn) => () => void
@@ -586,7 +590,7 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
     return POMODORO_PRESETS[selectedPreset].minutes * 60
   }, [useCustom, customMinutes, selectedPreset])
 
-  const startTimer = useCallback((opts?: { immersive?: boolean; presetIndex?: number; stopwatch?: boolean; forceMini?: boolean }) => {
+  const startTimer = useCallback((opts?: { immersive?: boolean; presetIndex?: number; stopwatch?: boolean; forceMini?: boolean; startedAt?: Date }) => {
     const eng = getBgmEngine()
     eng?.unlockAudio()
     eng?.prepareMusic(prefs.music)
@@ -609,7 +613,7 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
       setMode('stopwatch')
     }
     const effMode: TimerMode = preset ? 'pomodoro' : opts?.stopwatch ? 'stopwatch' : mode
-    const now = new Date()
+    const now = opts?.startedAt ?? new Date()
     const label = preset
       ? (customLabel || t(preset.label))
       : opts?.stopwatch
@@ -1021,6 +1025,32 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
     />
   ) : null
 
+  const applyWidgetFocus = useCallback((op: 'start' | 'pause' | 'resume' | 'stop', at: number) => {
+    const when = Math.min(at, Date.now())
+    if (op === 'start') {
+      if (state !== 'idle' || Date.now() - when > ACTIVE_SESSION_MAX_AGE_MS) return
+      // Backdated start: the wall-clock tick catches up (and completes it if it already ran out).
+      startTimer({ forceMini: true, startedAt: new Date(when) })
+      return
+    }
+    if (!session) return
+    const pauseAt = Math.max(when, session.startedAt.getTime())
+    if (op === 'pause' && state === 'running') {
+      // Freeze the display at the moment of the tap, not now.
+      const frozen = Math.max(0, Math.floor((pauseAt - session.startedAt.getTime() - session.pausedMs) / 1000))
+      setSession({ ...session, pausedAt: new Date(pauseAt) })
+      if (session.mode === 'pomodoro') setTimeLeft(Math.max(0, session.targetSeconds - frozen))
+      else setElapsed(frozen)
+      setState('paused')
+    } else if (op === 'resume' && state === 'paused') {
+      const added = session.pausedAt ? Math.max(0, when - session.pausedAt.getTime()) : 0
+      setSession({ ...session, pausedAt: null, pausedMs: session.pausedMs + added })
+      setState('running')
+    } else if (op === 'stop' && (state === 'running' || state === 'paused')) {
+      beginCompletion(session.pausedAt ? session : { ...session, pausedAt: new Date(pauseAt) }, 'manual', 'idle', false, COMPLETION_HOLD_MANUAL_MS)
+    }
+  }, [state, session, startTimer, beginCompletion])
+
   const contextValue = useMemo<FocusTimerContextValue>(() => ({
     state, session, displayTime,
     isExpanded, setIsExpanded,
@@ -1035,14 +1065,14 @@ function AccountFocusTimer({ children, accountId }: { children: React.ReactNode;
     bgmManualPlaying, setBgmManualPlaying,
     prefs, setPrefs,
     unavailableSrcs,
-    startTimer, pauseTimer, resumeTimer,
+    startTimer, pauseTimer, resumeTimer, applyWidgetFocus,
     stopTimer: () => { if (session) beginCompletion(session, 'manual', 'idle', false, COMPLETION_HOLD_MANUAL_MS) },
     registerRecorder,
     floatingTimerCard,
   }), [
     state, session, displayTime, isExpanded, mode, selectedPreset, customMinutes,
     useCustom, focusType, customLabel, showSettings, showBgmSettings, bgmManualPlaying,
-    prefs, unavailableSrcs, startTimer, pauseTimer, resumeTimer, beginCompletion, registerRecorder, floatingTimerCard,
+    prefs, unavailableSrcs, startTimer, pauseTimer, resumeTimer, applyWidgetFocus, beginCompletion, registerRecorder, floatingTimerCard,
   ])
 
   let overlay: React.ReactNode = null
