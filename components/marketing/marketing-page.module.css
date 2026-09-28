@@ -9,6 +9,7 @@
 .site section[id], .film, .promo { scroll-margin-top: 24px; }
 .skip { position: fixed; top: 8px; left: 8px; z-index: 100; transform: translateY(-200%); padding: 12px 20px; background: var(--ink); color: var(--paper); }
 .skip:focus { transform: none; }
+.site:focus { outline: none; } /* focus lands here when the first-visit gate closes */
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
 .header { height: 84px; display: flex; align-items: center; justify-content: space-between; gap: 24px; max-width: 1440px; margin: auto; padding: 0 4%; }

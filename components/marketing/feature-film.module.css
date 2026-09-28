@@ -9,13 +9,13 @@
 .caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 20px; margin-top: 14px; font-size: 12px; line-height: 1.7; }
 .caption p { margin: 0; }
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
-.actions button, .actions a { min-height: 44px; padding: 10px 18px; display: inline-flex; justify-content: center; align-items: center; gap: 8px; border: 1px solid #25231e; border-radius: 4px; font-size: 14px; cursor: pointer; }
+/* play + replay; sound lives in the native controls (no mute toggle / download since 2026-09-28) */
+.actions button { min-height: 44px; padding: 10px 18px; display: inline-flex; justify-content: center; align-items: center; gap: 8px; border: 1px solid #25231e; border-radius: 4px; font-size: 14px; cursor: pointer; }
 .actions button { background: #25231e; color: #fff9dc; }
-.actions .secondary, .actions a { background: transparent; color: #25231e; }
-.actions a { margin-left: auto; text-decoration: none; }
-.actions :is(button,a):focus-visible, .transcript summary:focus-visible { outline: 3px solid #25231e; outline-offset: 4px; }
+.actions .secondary { background: transparent; color: #25231e; }
+.actions button:focus-visible, .transcript summary:focus-visible { outline: 3px solid #25231e; outline-offset: 4px; }
 .error { font-size: 14px; line-height: 1.7; margin-top: 16px; }
 .transcript { margin-top: 30px; border-top: 1px solid #25231e40; padding-top: 18px; font-size: 14px; line-height: 1.85; }
 .transcript summary { min-height: 44px; cursor: pointer; font-weight: 600; }
 .transcript p { max-width: 780px; margin: 0 0 12px; }
-@media (max-width: 640px) { .heading { flex-direction: column; align-items: flex-start; gap: 18px; } .actions { gap: 8px; } .actions a { margin-left: 0; } .actions button, .actions a { padding-inline: 13px; } .caption { flex-direction: column; } }
+@media (max-width: 640px) { .heading { flex-direction: column; align-items: flex-start; gap: 18px; } .actions { gap: 8px; } .actions button { padding-inline: 13px; } .caption { flex-direction: column; } }

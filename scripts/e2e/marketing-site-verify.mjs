@@ -4,6 +4,8 @@ import { chromium } from 'playwright'
 const base = process.env.E2E_BASE_URL || 'http://localhost:3190'
 const browser = await chromium.launch()
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+// Returning visitor: skip the first-visit intro gate (covered by its own check).
+await context.addInitScript(() => { try { localStorage.setItem('huddle-intro-seen', '1') } catch {} })
 const page = await context.newPage()
 let checks = 0
 const check = (label, value) => { assert.ok(value, label); checks++; console.log('PASS', label) }

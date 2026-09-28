@@ -1,0 +1,61 @@
+/* First-visit gate (first-visit-intro.tsx). Ink room, one cream second hand
+   ticking on a faint dial, brand-orange pivot. Only transform/opacity move;
+   animations are longhand (Turbopack drops shorthand durations in modules). */
+.root { --cream: #f6f3e9; --muted: #b9b3a0; --room: #1b1c18; position: fixed; inset: 0; z-index: 10000; overflow: hidden; background: #000; color: var(--cream); overscroll-behavior: contain; touch-action: none; -webkit-tap-highlight-color: transparent; animation-name: dim; animation-duration: .5s; animation-timing-function: ease-out; animation-fill-mode: backwards; }
+.root[data-phase='closing'] { opacity: 0; pointer-events: none; transition: opacity .6s ease; }
+.root button { font: inherit; cursor: pointer; }
+.root button:focus-visible { outline: 2px solid #cf5731; outline-offset: 5px; }
+
+/* ── The film: already in the DOM so play() can run inside the click ── */
+.film { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; opacity: 0; transition: opacity .6s ease; }
+.root[data-rolling] .film { opacity: 1; }
+
+/* ── The gate ── */
+.gate { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); background: radial-gradient(120% 90% at 50% 34%, #2b2d26 0%, var(--room) 52%, #10110e 100%); transition: opacity .6s ease, visibility 0s linear .6s; }
+.root[data-rolling] .gate { opacity: 0; visibility: hidden; }
+.stack { display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 760px; padding-top: min(14vh, 120px); } /* pivot sits near 40% of the height */
+
+/* A second hand on a dial much larger than the words: the room is the clock. */
+.clock { --r: min(30vh, 42vw, 300px); position: relative; pointer-events: none; width: 12px; height: 12px; margin-bottom: 30px; }
+.dial { position: absolute; left: 50%; top: 50%; width: calc(var(--r) * 2); height: calc(var(--r) * 2); transform: translate(-50%, -50%); border: 1px solid rgba(246, 243, 233, .09); border-radius: 50%; }
+.hand { position: absolute; left: 50%; bottom: calc(50% - var(--r) * .14); width: 2px; height: calc(var(--r) * 1.06); margin-left: -1px; border-radius: 1px; background: linear-gradient(to top, rgba(246, 243, 233, .45), rgba(246, 243, 233, .85) 14%, rgba(246, 243, 233, .2)); transform-origin: 50% calc(100% - var(--r) * .14); transform: rotate(-54deg); animation-name: sweep; animation-duration: 60s; animation-timing-function: steps(60, end); animation-iteration-count: infinite; }
+.pivot { position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; transform: translate(-50%, -50%); border-radius: 50%; background: #cf5731; box-shadow: 0 0 0 3px var(--room); }
+
+/* words and buttons sit above the (positioned) dial and hand */
+.tick, .line, .actions { position: relative; z-index: 1; }
+.tick { margin: 0 0 14px; padding-left: .24em; font-size: 13px; letter-spacing: .24em; color: var(--muted); }
+.line { margin: 0; font-family: var(--poster-zh), 'Noto Sans TC', sans-serif; font-weight: 900; font-size: clamp(30px, 5.2vw, 64px); line-height: 1.2; letter-spacing: .02em; text-wrap: balance; }
+/* optical centring: the full-width 。 leaves its right half empty */
+.root:not(.english) .line { margin-right: -.4em; }
+.english .line { max-width: 9em; font-family: var(--poster-en), sans-serif; font-weight: 800; font-size: clamp(42px, 6.4vw, 84px); line-height: .98; letter-spacing: .01em; text-transform: uppercase; }
+.english .tick { letter-spacing: .2em; padding-left: .2em; }
+.actions { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 40px; }
+.play { display: inline-flex; align-items: center; gap: 14px; min-height: 52px; padding: 14px 28px; border: 1px solid rgba(246, 243, 233, .7); border-radius: 4px; background: transparent; color: var(--cream); font-size: 16px; font-weight: 700; letter-spacing: .06em; transition: background-color .25s, color .25s, border-color .25s; }
+.play:hover { background: var(--cream); border-color: var(--cream); color: var(--room); }
+.skipLink { min-width: 64px; min-height: 44px; padding: 0 14px; border: 0; background: none; color: var(--muted); font-size: 14px; text-decoration: underline; text-decoration-color: rgba(185, 179, 160, .5); text-underline-offset: 5px; }
+.skipLink:hover { color: var(--cream); }
+
+/* staggered reveal: tick → line → buttons, ~0.6s apart */
+.tick, .line, .actions { animation-name: dim; animation-duration: .9s; animation-timing-function: ease-out; animation-fill-mode: backwards; }
+.tick { animation-delay: .35s; }
+.line { animation-delay: .95s; }
+.actions { animation-delay: 1.55s; }
+/* after the click: words go, the hand keeps ticking until the film rolls */
+.root[data-phase='film'] :is(.tick, .line, .actions) { opacity: 0; visibility: hidden; animation-name: none; transition: opacity .4s ease, visibility 0s linear .4s; }
+
+/* ── Skip while the film plays ── */
+.skip { position: absolute; z-index: 1; top: max(16px, calc(env(safe-area-inset-top) + 10px)); right: max(16px, calc(env(safe-area-inset-right) + 10px)); display: inline-flex; align-items: center; gap: 6px; min-width: 44px; min-height: 44px; padding: 10px 14px 10px 18px; border: 1px solid rgba(246, 243, 233, .3); border-radius: 4px; background: rgba(16, 17, 14, .55); color: var(--cream); font-size: 14px; font-weight: 600; letter-spacing: .04em; transition: background-color .2s, border-color .2s; animation-name: dim; animation-duration: .4s; animation-timing-function: ease-out; animation-fill-mode: backwards; }
+.skip:hover { background: rgba(16, 17, 14, .82); border-color: rgba(246, 243, 233, .6); }
+
+@media (max-height: 480px) {
+  .stack { padding-top: 0; }
+  .clock { margin-bottom: 16px; }
+  .tick { margin-bottom: 8px; }
+  .actions { margin-top: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .root, .root * { animation-name: none !important; transition-property: none !important; }
+}
+
+@keyframes dim { from { opacity: 0; } }
+@keyframes sweep { from { transform: rotate(-54deg); } to { transform: rotate(306deg); } }

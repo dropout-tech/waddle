@@ -1,7 +1,7 @@
 'use client'
 
 import { useId, useRef, useState } from 'react'
-import { Download, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react'
+import { Play, RotateCcw } from 'lucide-react'
 import styles from './feature-film.module.css'
 
 const FILM_720 = '/marketing/promo-film/huddle-promo-720.mp4'
@@ -9,27 +9,28 @@ const FILM_1080 = '/marketing/promo-film/huddle-promo-1080.mp4'
 const POSTER = '/marketing/promo-film/huddle-promo-poster.jpg'
 const NARROW_QUERY = '(max-width: 760px)'
 
-/** Public, click-to-play media. Native controls remain the primary player UI.
+/** Public, click-to-play media with sound (pressing play is the gesture that
+ * allows it). Native controls remain the primary player UI, volume included.
  * Same file for zh and en: the end card already carries both languages. */
 export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
   const en = locale === 'en'
   const copy = en ? {
-    title: ['Give your scattered ideas', 'a place in your day.'],
-    intro: ['From a passing thought to a task done.', 'See how Huddle helps you make room for your day.'],
-    label: 'Huddle promo film', fallback: 'Your browser cannot play this video. Use the download link below to watch it.',
+    title: ['When time keeps chasing you,', 'what do you do?'],
+    intro: ['One penguin, chased by the clock every single day.', 'Watch it find its own pace again, in 44 seconds.'],
+    label: 'Huddle promo film', fallback: 'Your browser cannot play this video.',
     notice: 'An animated story; all visuals are illustrations.',
-    caption: '44 seconds · Music and sound effects. Muted by default; turn sound on whenever you like.',
-    pause: 'Pause video', resume: 'Resume', play: 'Play video', replay: 'Play from start', unmute: 'Turn sound on', mute: 'Turn sound off', download: 'Download video',
-    error: 'The video is unavailable right now. Please try again later or use the download link.', summary: 'Read the story summary',
+    caption: '44 seconds · Music and sound effects, best with sound on.',
+    pause: 'Pause video', resume: 'Resume', play: 'Play video', replay: 'Play from start',
+    error: 'The video is unavailable right now. Please try again later.', summary: 'Read the story summary',
     paragraphs: [
       'The penguin is trapped inside a giant clock, running as the clock hands chase it from behind.',
       'It tumbles into an office, looks around, and realises how much is still undone, so it splits into five penguins, each scrambling to keep up.',
       'The five merge back into one and let Huddle sort things out. The penguin settles into a hammock as the bilingual line appears: "You need five penguins. Or one Huddle." There is no dialogue, and the music and sound effects carry no instructions.',
     ],
   } : {
-    title: ['把散落的想法，', '留給今天的自己。'], intro: ['從一個念頭，到一件做完的事。', '用一小段時間，看看 Huddle 如何陪你整理一天。'],
-    label: 'Huddle 宣傳片', fallback: '你的瀏覽器無法播放此影片，請使用下方的下載連結觀看。', notice: '動畫故事，畫面為插畫示意。', caption: '44 秒 · 含配樂與音效。預設靜音，可自行開啟聲音。',
-    pause: '暫停影片', resume: '繼續播放', play: '開始播放', replay: '從頭播放', unmute: '開啟聲音', mute: '關閉聲音', download: '下載影片', error: '影片暫時無法播放。你可以稍後再試，或使用下載連結。', summary: '閱讀文字版故事摘要',
+    title: ['時間追著你跑的時候，', '你會怎麼辦？'], intro: ['有一隻企鵝，每天都被時鐘追著跑。', '44 秒，看牠怎麼找回自己的步調。'],
+    label: 'Huddle 宣傳片', fallback: '你的瀏覽器無法播放此影片。', notice: '動畫故事，畫面為插畫示意。', caption: '44 秒 · 配樂與音效，建議開聲音觀看。',
+    pause: '暫停影片', resume: '繼續播放', play: '開始播放', replay: '從頭播放', error: '影片暫時無法播放，請稍後再試。', summary: '閱讀文字版故事摘要',
     paragraphs: [
       '企鵝被困在一個巨大的時鐘裡，指針從後面追著牠跑，越追越近。',
       '牠跌進辦公室，左右張望，發現還有好多事沒做，於是分身成五隻企鵝，各自手忙腳亂。',
@@ -40,8 +41,15 @@ export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [failed, setFailed] = useState(false)
   const [playing, setPlaying] = useState(false)
-  const [muted, setMuted] = useState(true)
   const [hasPlayed, setHasPlayed] = useState(false)
+
+  // A <source> whose media doesn't match fires "error" by spec (every desktop
+  // load), and React bubbles it to the <video>. Only call it failed when the
+  // element itself has given up: a media error, or no usable source left.
+  const onMediaError = () => {
+    const video = videoRef.current
+    if (video && (video.error || video.networkState === HTMLMediaElement.NETWORK_NO_SOURCE)) setFailed(true)
+  }
 
   async function play(restart = false) {
     const video = videoRef.current
@@ -69,8 +77,6 @@ export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
             <video
               ref={videoRef}
               controls
-              muted={muted}
-              onVolumeChange={event => setMuted(event.currentTarget.muted)}
               playsInline
               preload="metadata"
               width={1920}
@@ -78,13 +84,13 @@ export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
               poster={POSTER}
               aria-label={copy.label}
               aria-describedby={`${id}-description ${id}-notice`}
-              onError={() => setFailed(true)}
+              onError={onMediaError}
               onPlay={() => { setPlaying(true); setHasPlayed(true); setFailed(false) }}
               onPause={() => setPlaying(false)}
               onEnded={() => setPlaying(false)}
             >
-              <source media={NARROW_QUERY} src={FILM_720} type="video/mp4" onError={() => setFailed(true)} />
-              <source src={FILM_1080} type="video/mp4" onError={() => setFailed(true)} />
+              <source media={NARROW_QUERY} src={FILM_720} type="video/mp4" />
+              <source src={FILM_1080} type="video/mp4" />
               {copy.fallback}
             </video>
           </div>
@@ -100,13 +106,6 @@ export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
           <button type="button" className={styles.secondary} onClick={() => void play(true)}>
             <RotateCcw size={16} aria-hidden="true" />{copy.replay}
           </button>
-          <button type="button" className={styles.secondary} onClick={() => {
-            const video = videoRef.current
-            if (video) { video.muted = !video.muted; setMuted(video.muted) }
-          }}>
-            {muted ? <Volume2 size={16} aria-hidden="true" /> : <VolumeX size={16} aria-hidden="true" />}{muted ? copy.unmute : copy.mute}
-          </button>
-          <a href={FILM_1080} download="huddle-promo-film.mp4"><Download size={16} aria-hidden="true" />{copy.download}</a>
         </div>
         {failed && <p className={styles.error} role="status">{copy.error}</p>}
         <details className={styles.transcript}>
