@@ -316,8 +316,10 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
     <div className="flex shrink-0 items-center justify-between gap-1 text-xs text-muted-foreground/70"><span>{t('點空白處儲存')}</span><button type="button" className={button} onPointerDown={e => e.preventDefault()} onClick={() => { setEditor(null); setError(''); viewport.current?.focus() }}>{t('取消')}</button></div>
   </form>
   const fills = fillHeight || !!full
+  // no-drag: the macOS desktop app's title-bar drag strip (globals.css, top
+  // 48px) swallows clicks even under full screen, so the toolbar went dead.
   const content = <section ref={setSectionEl} data-testid="whiteboard-section" data-fullscreen={full ?? undefined} data-pet-hide={full ? '' : undefined}
-    className={cn('min-w-0', fills && 'flex min-h-0 flex-1 flex-col', full && 'fixed inset-0 bg-background px-3 pb-[env(safe-area-inset-bottom)] pt-[max(env(safe-area-inset-top),0.5rem)] md:px-6')}
+    className={cn('min-w-0', fills && 'flex min-h-0 flex-1 flex-col', full && 'fixed inset-0 bg-background px-3 pb-[env(safe-area-inset-bottom)] pt-[max(env(safe-area-inset-top),0.5rem)] [-webkit-app-region:no-drag] md:px-6')}
     style={full === 'overlay' ? { zIndex: 2147483000 } : undefined} aria-label={t('白板')}>
     <div className="mb-1 flex flex-wrap items-center gap-x-1 md:mb-2">
       <h3 className="mr-1 shrink-0 font-medium max-md:sr-only">{t('白板')}</h3>
