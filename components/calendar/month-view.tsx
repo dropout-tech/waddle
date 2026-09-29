@@ -6,6 +6,7 @@ import type { Task, TimeBlock } from '@/lib/types'
 import { Check, Plus, ChevronRight } from 'lucide-react'
 import { toDateString, taskOccursOnDate, timeToMinutes } from '@/lib/calendar-utils'
 import type { PeerEvent } from '@/hooks/use-calendar-sharing'
+import { GoogleAgendaRow, GoogleMonthChip } from './google-event-block'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -409,7 +410,9 @@ export function MonthView({
 
                 {/* Peer shared events — read-only rows (no tap handlers).
                     Dashed accent + desaturation match the timeline styling. */}
-                {agendaPeerEvents.map((ev) => (
+                {agendaPeerEvents.map((ev) => ev.google ? (
+                  <GoogleAgendaRow key={ev.id} event={ev} />
+                ) : (
                   <div
                     key={ev.id}
                     data-peer-event={ev.detail}
@@ -673,6 +676,7 @@ export function MonthView({
                         {/* Peer shared events — read-only chips (no click
                             handlers), dashed + desaturated like the timeline. */}
                         {dayPeerEvents.slice(0, 2).map((ev) => {
+                          if (ev.google) return <GoogleMonthChip key={ev.id} event={ev} />
                           const peerColor = displayColor(ev.calendarColor)
                           return (
                             <div

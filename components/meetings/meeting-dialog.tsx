@@ -143,9 +143,10 @@ export function MeetingPanel({
   initialDate = new Date(),
   inviteId,
 }: MeetingPanelProps) {
-  const { lang } = useI18n()
+  const { lang, t: tr } = useI18n()
   const t = copy[lang === 'en' ? 'en' : 'zh']
   const english = lang === 'en'
+  const [googleIncomplete, setGoogleIncomplete] = useState(false)
   const [search, setSearch] = useState<MeetingSearch>({
     peerIds: [],
     from: toDateString(initialDate),
@@ -208,10 +209,12 @@ export function MeetingPanel({
     setMessage('')
     setSlots(null)
     setSelected(null)
+    setGoogleIncomplete(false)
     try {
       const found = await controller.findSlots(search, tasks, timeBlocks)
       if (current === generation.current) {
-        setSlots(found)
+        setSlots(found.slots)
+        setGoogleIncomplete(found.googleIncomplete)
         setSelected(null)
       }
     } catch (error) {
@@ -385,6 +388,11 @@ export function MeetingPanel({
       {slots && (
         <section aria-label={t.slots}>
           <h3 className="mb-2 text-sm font-medium">{t.slots}</h3>
+          {googleIncomplete && (
+            <p role="status" data-testid="google-busy-incomplete" className="mb-2 text-xs text-amber-700 dark:text-amber-400">
+              {tr('部分 Google 行程未納入')}
+            </p>
+          )}
           {!slots.length ? (
             <p className="text-sm">{t.none}</p>
           ) : (

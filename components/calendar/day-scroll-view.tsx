@@ -23,6 +23,8 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { CurrentTimeLine } from './current-time-line'
 import { TaskBlock, type TaskDragStart } from './task-block'
 import { PeerEventBlock } from './peer-event-block'
+import { GoogleAllDayChip } from './google-event-block'
+import { clampToGrid } from '@/lib/google-calendar'
 import type { PeerEvent } from '@/hooks/use-calendar-sharing'
 import { SlotIcon } from './slot-icon'
 import { X, ChevronLeft } from 'lucide-react'
@@ -420,11 +422,20 @@ export function DayScrollView({
 
   // Peer overlay events for a date — same recurring expansion as own tasks
   // (PeerEvent is Task-shaped so taskOccursOnDate works unchanged).
+  // Google pieces are clamped to the visible hour range (see week-view).
   const getPeerEventsForDate = useCallback((date: Date) => {
-    return peerEvents.filter(
-      (ev) => taskOccursOnDate(ev, date) && ev.scheduledStartTime && ev.scheduledEndTime
-    )
-  }, [peerEvents])
+    return peerEvents.flatMap((ev) => {
+      if (!taskOccursOnDate(ev, date) || !ev.scheduledStartTime || !ev.scheduledEndTime) return []
+      if (!ev.google) return [ev]
+      const c = clampToGrid(ev.scheduledStartTime, ev.scheduledEndTime, startHour, endHour)
+      return c ? [{ ...ev, scheduledStartTime: c.start, scheduledEndTime: c.end }] : []
+    })
+  }, [peerEvents, startHour, endHour])
+
+  // Google all-day events (no times) → chips in the all-day zone.
+  const getGoogleAllDayForDate = useCallback((date: Date) =>
+    peerEvents.filter((ev) => ev.google && !ev.scheduledStartTime && taskOccursOnDate(ev, date)),
+  [peerEvents])
 
   // Get all-day tasks (including recurring expansions)
   const getAllDayTasksForDate = useCallback((date: Date) => {
@@ -988,7 +999,7 @@ export function DayScrollView({
     ? Math.min(
         HEADER_DEFAULT,
         HEADER_DATE_HEIGHT + HEADER_HANDLE_HEIGHT + 8 +
-          Math.max(1, ...allDates.map(d => getAllDayTasksForDate(d).length)) * ALL_DAY_ROW
+          Math.max(1, ...allDates.map(d => getAllDayTasksForDate(d).length + getGoogleAllDayForDate(d).length)) * ALL_DAY_ROW
       )
     : HEADER_DEFAULT)
   const isResizingHeader = useRef(false)
@@ -1157,6 +1168,9 @@ export function DayScrollView({
                       }}
                       title={(activeTaskDrag || pendingTaskDrag) ? translate('放開以放到待排程') : translate('點擊新增任務')}
                     >
+                      {getGoogleAllDayForDate(date).map((ev) => (
+                        <GoogleAllDayChip key={ev.id} event={ev} size="md" />
+                      ))}
                       {allDayTasks.map((task) => {
                         const isThisTaskBeingDragged = pendingTaskDrag?.task.id === task.id
                         return (
