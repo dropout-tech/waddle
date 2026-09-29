@@ -151,8 +151,8 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
         .update({
           ...(patch.x !== undefined ? { x: patch.x } : {}),
           ...(patch.y !== undefined ? { y: patch.y } : {}),
-          ...(patch.width !== undefined ? { width: patch.width } : {}),
-          ...(patch.height !== undefined ? { height: patch.height } : {}),
+          ...(patch.width !== undefined ? { width: Math.round(patch.width) } : {}),
+          ...(patch.height !== undefined ? { height: Math.round(patch.height) } : {}),
           ...(patch.color !== undefined ? { color: patch.color } : {}),
           ...(patch.zIndex !== undefined ? { z_index: patch.zIndex } : {}),
           updated_at: now,
