@@ -12,6 +12,8 @@ import { isNative } from '@/lib/platform'
 import { WhiteboardDetail } from './whiteboard-detail'
 import { createChecklistDocument, getWhiteboardDocument, hasWhiteboardDocument, replaceWhiteboardSourceLink, whiteboardChecklistSummary, whiteboardDocumentText } from '@/lib/whiteboard-document'
 import { completeMathAtCaret } from '@/lib/inline-math'
+import { cardHighlightCss, cardTextCss, getCardStyle, type CardStyle } from '@/lib/whiteboard-style'
+import { CardFormatToolbar } from './card-format-toolbar'
 
 interface ScratchpadCanvasProps {
   items: ScratchpadItem[]
@@ -26,7 +28,10 @@ interface ScratchpadCanvasProps {
 }
 type CanvasEditor = { id: string; isNew: boolean; date: string; type: 'text' | 'todo' | 'link'; content: string; title: string; geometry: CanvasGeometry; visibleWidth: number; visibleHeight: number }
 type Point = { x: number; y: number }
-type Gesture = { kind: 'pan' | 'move' | 'resize' | 'draw'; start: Point; original: CanvasGeometry; id?: string; points?: Point[] }
+// `moved` stays false until the pointer travels past DRAG_SLOP, so a plain
+// click on a card selects it without writing a geometry update.
+type Gesture = { kind: 'pan' | 'move' | 'resize' | 'draw'; start: Point; original: CanvasGeometry; id?: string; points?: Point[]; moved?: boolean }
+const DRAG_SLOP = 4
 const button = 'inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40'
 
 /** Icon-only on phones (label from md up). Touch long-press shows the label,
@@ -97,6 +102,38 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [full])
+  useEffect(() => {
+    // Laptop trackpad pinch: Chromium/Firefox/Electron send it as wheel events
+    // with ctrlKey set (Ctrl+mouse wheel looks the same); Safari sends
+    // GestureEvents. Without these native, non-passive listeners the pinch
+    // zoomed the whole page (or did nothing) instead of the board. Plain
+    // two-finger scrolling is left alone so the page still scrolls past the board.
+    const el = viewport.current
+    if (!el) return
+    const zoomAt = (clientX: number, clientY: number, next: (zoom: number) => number) => setView(v => {
+      const rect = el.getBoundingClientRect(); const px = clientX - rect.left; const py = clientY - rect.top
+      const z = Math.max(.25, Math.min(2, next(v.zoom)))
+      return { zoom: z, x: px - (px - v.x) * z / v.zoom, y: py - (py - v.y) * z / v.zoom }
+    })
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return
+      event.preventDefault()
+      const delta = Math.max(-25, Math.min(25, event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY))
+      zoomAt(event.clientX, event.clientY, zoom => zoom * Math.exp(-delta * 0.01))
+    }
+    type SafariGesture = Event & { scale: number; clientX: number; clientY: number }
+    let gestureStartZoom = 1
+    const onGestureStart = (event: Event) => { event.preventDefault(); setView(v => { gestureStartZoom = v.zoom; return v }) }
+    const onGestureChange = (event: Event) => { event.preventDefault(); const g = event as SafariGesture; zoomAt(g.clientX, g.clientY, () => gestureStartZoom * g.scale) }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('gesturestart', onGestureStart)
+    el.addEventListener('gesturechange', onGestureChange)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('gesturestart', onGestureStart)
+      el.removeEventListener('gesturechange', onGestureChange)
+    }
+  }, [full])
   const [help, setHelp] = useState(false)
   const [editor, setEditorState] = useState<CanvasEditor | null>(null)
   const editorRef = useRef<CanvasEditor | null>(null)
@@ -122,6 +159,11 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
   const add = (type: ScratchpadItem['type'], content: string, title?: string, geometry = position()) => {
     const item: ScratchpadItem = { id: crypto.randomUUID(), type, content, title, sortOrder: 0, createdAt: new Date().toISOString(), metadata: { canvas: geometry } }
     onAddItem(date, item); setSelected(item.id)
+  }
+  const saveStyle = (item: ScratchpadItem, patch: Partial<CardStyle>) => {
+    const style: CardStyle = { ...getCardStyle(item), ...patch }
+    for (const key of Object.keys(style) as (keyof CardStyle)[]) if (style[key] === undefined) delete style[key]
+    onUpdateItem(item.id, { metadata: { ...item.metadata, style } })
   }
   const saveGeometry = (item: ScratchpadItem, geometry: CanvasGeometry) => onUpdateItem(item.id, { metadata: { ...item.metadata, canvas: geometry } })
   const changeGeometryWithKeyboard = (item: ScratchpadItem, rendered: CanvasGeometry, kind: 'move' | 'resize', key: string) => {
@@ -164,6 +206,8 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
   const move = (event: ReactPointerEvent) => {
     const active = gesture.current; if (!active) return
     const dx = event.clientX - active.start.x; const dy = event.clientY - active.start.y
+    if (!active.moved && Math.hypot(dx, dy) < DRAG_SLOP) return
+    active.moved = true
     if (active.kind === 'pan') setView(v => ({ ...v, x: active.original.x + dx, y: active.original.y + dy }))
     else if (active.kind === 'draw') { active.points!.push(world(event.clientX, event.clientY)); setStroke([...active.points!]) }
     else { const b = active.original; const geometry = active.kind === 'move' ? { ...b, x: b.x + dx / view.zoom, y: b.y + dy / view.zoom } : { ...b, width: Math.max(200, Math.min(2000, b.width + dx / view.zoom)), height: Math.max(160, Math.min(2000, b.height + dy / view.zoom)) }; const next = { id: active.id!, geometry }; previewRef.current = next; setPreview(next) }
@@ -311,6 +355,7 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
     }}>
     <textarea key={editor.id} autoFocus aria-label={editor.type === 'link' ? t('連結網址') : t('畫布內容')} placeholder={editor.type === 'link' ? t('貼上網址…') : editor.type === 'todo' ? t('輸入待辦…') : t('直接寫下想法…')}
       className="min-h-11 w-full flex-1 resize-none bg-transparent text-base leading-relaxed outline-none placeholder:text-muted-foreground"
+      style={editor.type === 'link' ? undefined : cardTextCss(getCardStyle(items.find(item => item.id === editor.id) ?? {}))}
       value={editor.content} onChange={e => {
         const current = editorRef.current
         if (!current) return
@@ -377,8 +422,21 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
               // While editing only a faint dashed hint shows where the text box is.
               plain ? (editing ? 'border-dashed border-primary/25 bg-transparent' : 'border-transparent bg-transparent')
                 : cn('bg-card/85 shadow-[0_1px_2px_rgb(0_0_0/0.05)]', active ? 'border-primary/40' : 'border-transparent'))}
-            style={{ left: b.x, top: b.y, width: editing ? editor.visibleWidth : b.width, height: editing ? editor.visibleHeight : b.height, zIndex: editing ? 3 : active ? 2 : 1 }}
-            onPointerDown={e => { e.stopPropagation(); setSelected(item.id) }}
+            style={{ left: b.x, top: b.y, width: editing ? editor.visibleWidth : b.width, height: editing ? editor.visibleHeight : b.height, zIndex: editing ? 3 : active ? 2 : 1, cursor: readOnly || editing ? undefined : 'move',
+              // The body is a scroll container, so touch would scroll it and cancel
+              // the drag; once selected the finger belongs to dragging instead.
+              touchAction: selected === item.id && !readOnly && !editing ? 'none' : undefined }}
+            onPointerDown={e => {
+              e.stopPropagation()
+              const wasSelected = selected === item.id
+              setSelected(item.id)
+              // Slide-app dragging: grab the card anywhere. A mouse drags right
+              // away; touch needs the card selected first so a stray swipe
+              // never drags an object. Controls inside the card keep their clicks.
+              if (readOnly || editing || e.button !== 0 || (e.target as HTMLElement).closest('button,input,a,label,textarea')) return
+              if (e.pointerType !== 'mouse' && !wasSelected) return
+              if (saveEditor()) start(e, 'move', item)
+            }}
             onDoubleClick={e => { if (!editing && !(e.target as HTMLElement).closest('button,input,a')) { e.stopPropagation(); if (rich || readOnly) openDetail(item); else if (item.type === 'text' || item.type === 'todo') beginEditor(item.type, undefined, item) } }}>
             <div className={cn('flex h-11 shrink-0 items-center justify-between px-1 text-muted-foreground/70', !active && 'opacity-0 group-hover:opacity-100 focus-within:opacity-100')}>
               <button disabled={readOnly || editing} data-testid="canvas-drag-handle" aria-label={t('拖動卡片')} className={cn(button, 'touch-none cursor-grab')} style={{ transform: `scale(${1 / view.zoom})`, transformOrigin: 'top left' }} onFocus={() => setSelected(item.id)} onPointerDown={e => { if (saveEditor()) start(e, 'move', item) }} onKeyDown={e => { if (readOnly || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return; e.preventDefault(); changeGeometryWithKeyboard(item, b, 'move', e.key) }}><Grip size={18}/></button>
@@ -386,9 +444,9 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
               {item.type === 'link' && !readOnly && <button className={button} aria-label={t('編輯連結')} title={t('編輯連結')} onClick={() => beginEditor('link', undefined, item)}><Pencil size={16}/></button>}
               <button className={button} style={{ transform: `scale(${1 / view.zoom})`, transformOrigin: 'top right' }} aria-label={t('開啟內容')} title={t('開啟內容')} onFocus={() => setSelected(item.id)} onClick={() => openDetail(item)}><FileText size={16}/></button>
             </div>
-            {editing ? renderEditor() : <div className="min-h-0 flex-1 overflow-auto p-3 pb-11 text-base">
+            {editing ? renderEditor() : <div className={cn('min-h-0 flex-1 overflow-auto p-3 pb-11 text-base', selected === item.id && !readOnly && 'touch-none')}>
               {checklist && checklist.total > 0 && <p className="mb-2 text-xs text-muted-foreground">{t('已完成 {checked} / {total} 項', { checked: checklist.checked, total: checklist.total })}</p>}
-              {item.type === 'image' ? <img src={item.content} alt={item.title || t('畫布圖片')} draggable={false} className="h-full w-full object-contain"/> : item.type === 'link' ? <a href={/^https?:\/\//i.test(item.content) ? item.content : undefined} target="_blank" rel="noopener noreferrer" className="break-all text-primary underline">{item.title || item.content}</a> : <div className="flex items-start gap-2">{item.type === 'todo' && !rich && <label className="flex min-h-11 min-w-11 shrink-0 items-center justify-center" style={{ transform: `scale(${1 / view.zoom})`, transformOrigin: 'top left' }}><span className="sr-only">{t('完成畫布待辦')}</span><input type="checkbox" aria-label={t('完成畫布待辦')} checked={!!item.isChecked} disabled={readOnly} className="h-6 w-6" onChange={e => onUpdateItem(item.id, { isChecked: e.target.checked })}/></label>}<p tabIndex={readOnly ? undefined : 0} role={readOnly ? undefined : 'button'} aria-label={readOnly ? undefined : t('編輯{type}：{content}', { type: item.type === 'todo' ? t('待辦') : t('文字'), content: item.content })} onKeyDown={e => { if (!readOnly && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); beginEditor(item.type as CanvasEditor['type'], undefined, item) } }} className={cn('min-h-11 min-w-0 flex-1 whitespace-pre-wrap break-words leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-primary [overflow-wrap:anywhere]', !readOnly && 'cursor-text', !rich && item.isChecked && 'text-muted-foreground line-through')}>{previewText || (checklist?.total ? t('開啟內容，開始編輯檢查清單') : t('開啟內容，開始寫筆記'))}</p></div>}
+              {item.type === 'image' ? <img src={item.content} alt={item.title || t('畫布圖片')} draggable={false} className="h-full w-full object-contain"/> : item.type === 'link' ? <a href={/^https?:\/\//i.test(item.content) ? item.content : undefined} target="_blank" rel="noopener noreferrer" className="break-all text-primary underline">{item.title || item.content}</a> : <div className="flex items-start gap-2">{item.type === 'todo' && !rich && <label className="flex min-h-11 min-w-11 shrink-0 items-center justify-center" style={{ transform: `scale(${1 / view.zoom})`, transformOrigin: 'top left' }}><span className="sr-only">{t('完成畫布待辦')}</span><input type="checkbox" aria-label={t('完成畫布待辦')} checked={!!item.isChecked} disabled={readOnly} className="h-6 w-6" onChange={e => onUpdateItem(item.id, { isChecked: e.target.checked })}/></label>}<p tabIndex={readOnly ? undefined : 0} role={readOnly ? undefined : 'button'} aria-label={readOnly ? undefined : t('編輯{type}：{content}', { type: item.type === 'todo' ? t('待辦') : t('文字'), content: item.content })} onKeyDown={e => { if (!readOnly && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); beginEditor(item.type as CanvasEditor['type'], undefined, item) } }} className={cn('min-h-11 min-w-0 flex-1 whitespace-pre-wrap break-words leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-primary [overflow-wrap:anywhere]', !rich && item.isChecked && 'text-muted-foreground line-through')} style={cardTextCss(getCardStyle(item))}>{previewText ? <span style={cardHighlightCss(getCardStyle(item))}>{previewText}</span> : (checklist?.total ? t('開啟內容，開始編輯檢查清單') : t('開啟內容，開始寫筆記'))}</p></div>}
             </div>}
             {!readOnly && !editing && <button data-testid="canvas-resize-handle" aria-label={t('調整卡片大小')} className={cn(button, 'absolute bottom-0 right-0 touch-none cursor-se-resize text-muted-foreground/60', !active && 'opacity-0 focus:opacity-100')} style={{ transform: `scale(${1 / view.zoom})`, transformOrigin: 'bottom right' }} onFocus={() => setSelected(item.id)} onPointerDown={e => start(e, 'resize', item)} onKeyDown={e => { if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return; e.preventDefault(); changeGeometryWithKeyboard(item, b, 'resize', e.key) }}><Maximize2 size={15}/></button>}
           </article>
@@ -403,6 +461,8 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
         <button type="button" className={cn(button, 'rounded-full')} aria-label={t('顯示全部')} title={t('顯示全部')} onClick={fit}><Scan size={16}/></button>
       </div>
       {selectedItem && !readOnly && !editor && <button type="button" className={cn(button, 'absolute bottom-2 left-2 z-panel rounded-full border border-border/60 bg-background/85 text-muted-foreground backdrop-blur-sm max-md:left-3')} aria-label={t('刪除選取的畫布卡片')} onClick={() => { if (window.confirm(t('確定刪除這張畫布卡片？'))) { onDeleteItem(selectedItem.id); setSelected(null) } }}><Trash2 size={16}/></button>}
+      {selectedItem && !readOnly && (selectedItem.type === 'text' || selectedItem.type === 'todo') && (!editor || editor.id === selectedItem.id) &&
+        <CardFormatToolbar style={getCardStyle(selectedItem)} onChange={patch => saveStyle(selectedItem, patch)}/>}
       {!items.length && !stroke.length && !editor && <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">{readOnly ? t('這天還沒有白板內容') : pen ? t('在空白處開始畫圖') : t('按兩下這裡直接寫字，或點「文字」開始。')}</div>}
     </div>
     {detailItem && <WhiteboardDetail key={detailItem.id} item={detailItem} readOnly={readOnly} onUpdateItem={onUpdateItem} onClose={() => setDetailId(null)} container={full ? sectionEl : undefined}/>}
