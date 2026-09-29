@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, NotebookPen, BarChart3, Settings, Sparkles, MoreHorizontal, Download, Users, Bell, CircleUser, Eye, EyeOff, StickyNote as StickyNoteIcon, Plus } from 'lucide-react'
+import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, NotebookPen, BarChart3, Settings, Sparkles, MoreHorizontal, Download, Users, Bell, CircleUser, Eye, EyeOff, StickyNote as StickyNoteIcon, Plus, Archive } from 'lucide-react'
 import { UndoRedoButtons } from '@/components/undo-redo-buttons'
 import {
   DropdownMenu,
@@ -470,6 +470,16 @@ export function CalendarHeader({
                       <span>{t('新增便條紙')}</span>
                     </button>
                   )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-sticky-drawer-trigger
+                    onClick={() => { setOverflowOpen(false); stickyNotes.toggleDrawer() }}
+                    className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 pl-9 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                  >
+                    <Archive className="w-4 h-4" />
+                    <span>{t('便條紙收納')}</span>
+                  </button>
                   {onOpenMeetings && <button type="button" onClick={() => { setOverflowOpen(false); onOpenMeetings() }} className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60"><Users className="h-4 w-4"/><span>{lang === 'en' ? 'Find a time' : '約交集'}</span>{pendingMeetingCount > 0 && <span className="rounded-full bg-primary px-1.5 text-primary-foreground">{pendingMeetingCount}</span>}</button>}
                   {onOpenSharing && (
                     <button
@@ -669,6 +679,23 @@ export function CalendarHeader({
               <Plus className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           )}
+          <button
+            type="button"
+            data-sticky-drawer-trigger
+            data-testid="sticky-drawer-toggle"
+            onClick={() => stickyNotes.toggleDrawer()}
+            aria-pressed={stickyNotes.drawerOpen}
+            aria-label={t('便條紙收納')}
+            title={t('便條紙收納')}
+            className={cn(
+              'flex items-center justify-center w-7 h-7 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              stickyNotes.drawerOpen
+                ? 'bg-secondary text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+            )}
+          >
+            <Archive className="w-3.5 h-3.5" aria-hidden="true" />
+          </button>
           {onOpenSharing && (
             <button
               type="button"

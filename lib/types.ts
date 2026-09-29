@@ -55,8 +55,17 @@ export interface StickyNote {
   height: number // px
   color: StickyNoteColor
   zIndex: number
+  folderId: string | null // sticky_note_folders FK; null = 未分類
+  onScreen: boolean // false = put away in the drawer (not deleted)
   createdAt: string
   updatedAt: string
+}
+
+// A folder for put-away sticky notes — separate from the notebook's folders.
+export interface StickyNoteFolder {
+  id: string
+  name: string
+  sortOrder: number
 }
 
 // A notebook-only folder (independent of task workspaces/categories).

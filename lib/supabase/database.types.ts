@@ -172,8 +172,19 @@ type StickyNotesRow = {
   height: number
   color: string
   z_index: number
+  // Migration 20260929120000_sticky_note_folders.sql
+  folder_id: string | null
+  on_screen: boolean
   created_at: string
   updated_at: string
+}
+
+type StickyNoteFoldersRow = {
+  id: string
+  user_id: string
+  name: string
+  sort_order: number
+  created_at: string
 }
 
 type TimeBlocksRow = {
@@ -484,7 +495,16 @@ type StickyNotesInsert = {
   height?: number
   color?: string
   z_index?: number
+  folder_id?: string | null
+  on_screen?: boolean
   updated_at?: string
+}
+
+type StickyNoteFoldersInsert = {
+  id?: string
+  user_id: string
+  name: string
+  sort_order?: number
 }
 
 type TimeBlocksInsert = {
@@ -608,6 +628,7 @@ export type Database = {
       notebook_notes: Tbl<NotebookNotesRow, NotebookNotesInsert>
       notebook_categories: Tbl<NotebookCategoriesRow, NotebookCategoriesInsert>
       sticky_notes: Tbl<StickyNotesRow, StickyNotesInsert>
+      sticky_note_folders: Tbl<StickyNoteFoldersRow, StickyNoteFoldersInsert>
       time_blocks: Tbl<TimeBlocksRow, TimeBlocksInsert>
       slot_types: Tbl<SlotTypesRow, SlotTypesInsert>
       user_settings: Tbl<UserSettingsRow, UserSettingsInsert>

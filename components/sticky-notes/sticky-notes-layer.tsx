@@ -20,7 +20,9 @@ interface StickyNotesLayerProps {
  * double-click anywhere" and "let clicks through to the app below" at once.
  */
 export function StickyNotesLayer({ store }: StickyNotesLayerProps) {
-  const { notes, setPosition, setSize, setColor, bringToFront, saveNoteContent, deleteNote } = store
+  const { setPosition, setSize, setColor, bringToFront, saveNoteContent, deleteNote, stowNote } = store
+  // Put-away notes live in the drawer (sticky-notes-drawer.tsx), not on the glass.
+  const notes = store.notes.filter((n) => n.onScreen)
   const resizeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Keep every note fully on-screen when the window is resized (rotate,
@@ -58,6 +60,7 @@ export function StickyNotesLayer({ store }: StickyNotesLayerProps) {
           onResize={setSize}
           onColor={setColor}
           onDelete={deleteNote}
+          onStow={stowNote}
           onContentChange={(id: string, content: TiptapDoc) => saveNoteContent(id, content)}
         />
       ))}
