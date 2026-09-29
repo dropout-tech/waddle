@@ -5,6 +5,7 @@ import { useAuth } from '@/components/auth/auth-provider'
 import { useStickyNotes } from '@/hooks/use-sticky-notes'
 import { clampNotePosition } from './sticky-note-card'
 import { StickyNotesLayer } from './sticky-notes-layer'
+import { StickyNotesDrawer } from './sticky-notes-drawer'
 
 const ENABLED_STORAGE_KEY = 'huddle-sticky-notes-enabled-v1'
 
@@ -23,6 +24,9 @@ interface StickyNotesContextValue {
   toggle: () => void
   /** Drop a new note near the middle of the screen (used by the "+" control). */
   addNote: () => void
+  /** Whether the 收納 drawer (put-away notes + folders) is open. */
+  drawerOpen: boolean
+  toggleDrawer: () => void
 }
 
 const StickyNotesContext = createContext<StickyNotesContextValue | null>(null)
@@ -52,6 +56,7 @@ export function StickyNotesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [enabled, setEnabled] = useState(false)
   const [hydrated, setHydrated] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   // Read the persisted on/off state after mount only (localStorage isn't
   // available during SSR and a hydration-time read here would risk a
@@ -62,19 +67,32 @@ export function StickyNotesProvider({ children }: { children: ReactNode }) {
     setHydrated(true)
   }, [])
 
-  const toggle = useCallback(() => {
-    setEnabled((prev) => {
-      const next = !prev
-      try {
-        window.localStorage.setItem(ENABLED_STORAGE_KEY, next ? '1' : '0')
-      } catch {
-        /* private mode / storage disabled — the toggle still works this session */
-      }
-      return next
-    })
+  const setEnabledPersisted = useCallback((next: boolean) => {
+    setEnabled(next)
+    try {
+      window.localStorage.setItem(ENABLED_STORAGE_KEY, next ? '1' : '0')
+    } catch {
+      /* private mode / storage disabled — the toggle still works this session */
+    }
   }, [])
 
-  const store = useStickyNotes(hydrated && enabled && !!user, user?.id ?? null)
+  const toggle = useCallback(() => setEnabledPersisted(!enabled), [enabled, setEnabledPersisted])
+  const toggleDrawer = useCallback(() => setDrawerOpen((v) => !v), [])
+  const closeDrawer = useCallback(() => setDrawerOpen(false), [])
+
+  // The drawer works even while the glass layer is hidden, so opening it
+  // must also trigger the (one-time) load.
+  const store = useStickyNotes(hydrated && (enabled || drawerOpen) && !!user, user?.id ?? null)
+
+  // Pinning a note back only makes sense if the layer is visible.
+  const { restoreNote } = store
+  const restoreFromDrawer = useCallback(
+    (id: string) => {
+      restoreNote(id)
+      if (!enabled) setEnabledPersisted(true)
+    },
+    [restoreNote, enabled, setEnabledPersisted],
+  )
 
   const addNote = useCallback(() => {
     // Small jitter around a comfortable default spot so repeated adds don't
@@ -85,12 +103,18 @@ export function StickyNotesProvider({ children }: { children: ReactNode }) {
     store.createNote({ x: clamped.x, y: clamped.y })
   }, [store])
 
-  const value = useMemo<StickyNotesContextValue>(() => ({ enabled, toggle, addNote }), [enabled, toggle, addNote])
+  const value = useMemo<StickyNotesContextValue>(
+    () => ({ enabled, toggle, addNote, drawerOpen, toggleDrawer }),
+    [enabled, toggle, addNote, drawerOpen, toggleDrawer],
+  )
 
   return (
     <StickyNotesContext.Provider value={value}>
       {children}
       {hydrated && enabled && user && <StickyNotesLayer store={store} />}
+      {hydrated && drawerOpen && user && (
+        <StickyNotesDrawer store={store} onClose={closeDrawer} onRestore={restoreFromDrawer} />
+      )}
     </StickyNotesContext.Provider>
   )
 }

@@ -2,18 +2,25 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { StickyNote, StickyNoteColor, TiptapDoc } from '@/lib/types'
+import type { StickyNote, StickyNoteColor, StickyNoteFolder, TiptapDoc } from '@/lib/types'
 import type { Database } from '@/lib/supabase/database.types'
+import { clampNotePosition } from '@/components/sticky-notes/sticky-note-card'
 
 type StickyNotesRow = Database['public']['Tables']['sticky_notes']['Row']
+type StickyNoteFoldersRow = Database['public']['Tables']['sticky_note_folders']['Row']
 
 // Data layer for the sticky-notes glass overlay (便條紙). Same optimistic
-// update + rollback shape as use-notebook.ts, but simpler: no title/icon/
-// category, just position + size + color + content. Notes are shared across
+// update + rollback shape as use-notebook.ts, but simpler: no title/icon,
+// just position + size + color + content, plus an on-screen flag and an
+// optional folder for notes that have been put away (便條紙收納抽屜). Notes are shared across
 // every page (mounted once at the root layout), so this hook only loads once
 // per session regardless of which route is active.
 
 const SAVE_DEBOUNCE_MS = 600
+
+function rowToFolder(r: StickyNoteFoldersRow): StickyNoteFolder {
+  return { id: r.id, name: r.name, sortOrder: r.sort_order }
+}
 
 function rowToNote(r: StickyNotesRow): StickyNote {
   return {
@@ -25,6 +32,8 @@ function rowToNote(r: StickyNotesRow): StickyNote {
     height: r.height,
     color: (r.color as StickyNoteColor) ?? 'yellow',
     zIndex: r.z_index ?? 0,
+    folderId: r.folder_id ?? null,
+    onScreen: r.on_screen ?? true,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }
@@ -39,6 +48,7 @@ function rowToNote(r: StickyNotesRow): StickyNote {
 export function useStickyNotes(enabled: boolean, userId: string | null) {
   const supabase = createClient()
   const [notes, setNotes] = useState<StickyNote[]>([])
+  const [folders, setFolders] = useState<StickyNoteFolder[]>([])
   const [loading, setLoading] = useState(true)
   const [loaded, setLoaded] = useState(false)
 
@@ -54,12 +64,14 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
     if (!enabled || loaded || !userId) return
     let mounted = true
     ;(async () => {
-      const { data, error } = await supabase
-        .from('sticky_notes')
-        .select('*')
-        .order('z_index', { ascending: true })
+      const [{ data, error }, foldersRes] = await Promise.all([
+        supabase.from('sticky_notes').select('*').order('z_index', { ascending: true }),
+        supabase.from('sticky_note_folders').select('*').order('sort_order', { ascending: true }),
+      ])
 
       if (!mounted) return
+      if (foldersRes.error) console.error('[sticky-notes] folders load failed', foldersRes.error)
+      else setFolders((foldersRes.data ?? []).map(rowToFolder))
       if (error) {
         console.error('[sticky-notes] load failed', error)
         setLoading(false)
@@ -99,6 +111,8 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
         height: partial.height ?? 220,
         color: partial.color ?? 'yellow',
         zIndex: z,
+        folderId: null,
+        onScreen: true,
         createdAt: now,
         updatedAt: now,
       }
@@ -133,7 +147,7 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
   const patchNote = useCallback(
     async (
       id: string,
-      patch: Partial<Pick<StickyNote, 'x' | 'y' | 'width' | 'height' | 'color' | 'zIndex'>>,
+      patch: Partial<Pick<StickyNote, 'x' | 'y' | 'width' | 'height' | 'color' | 'zIndex' | 'folderId' | 'onScreen'>>,
     ) => {
       let snapshot: StickyNote | undefined
       const now = new Date().toISOString()
@@ -155,6 +169,8 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
           ...(patch.height !== undefined ? { height: Math.round(patch.height) } : {}),
           ...(patch.color !== undefined ? { color: patch.color } : {}),
           ...(patch.zIndex !== undefined ? { z_index: patch.zIndex } : {}),
+          ...(patch.folderId !== undefined ? { folder_id: patch.folderId } : {}),
+          ...(patch.onScreen !== undefined ? { on_screen: patch.onScreen } : {}),
           updated_at: now,
         })
         .eq('id', id)
@@ -182,6 +198,90 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
       patchNote(id, { zIndex: z })
     },
     [nextZIndex, patchNote],
+  )
+
+  // ── Put away / pin back / file (收納抽屜) ─────────────────────
+  // Putting a note away keeps its folder, position and size, so pinning it
+  // back drops it exactly where it was (re-clamped in case the window shrank).
+  const stowNote = useCallback((id: string) => patchNote(id, { onScreen: false }), [patchNote])
+  const restoreNote = useCallback(
+    (id: string) => {
+      const n = notes.find((note) => note.id === id)
+      if (!n) return
+      const clamped = clampNotePosition(n.x, n.y, n.width, n.height)
+      patchNote(id, { onScreen: true, zIndex: nextZIndex(), x: clamped.x, y: clamped.y })
+    },
+    [notes, nextZIndex, patchNote],
+  )
+  const moveNoteToFolder = useCallback(
+    (id: string, folderId: string | null) => patchNote(id, { folderId }),
+    [patchNote],
+  )
+
+  // ── Folders ──────────────────────────────────────────────
+  const createFolder = useCallback(
+    async (name: string): Promise<StickyNoteFolder | null> => {
+      const trimmed = name.trim().slice(0, 60)
+      if (!userId || !trimmed) return null
+      const folder: StickyNoteFolder = {
+        id: crypto.randomUUID(),
+        name: trimmed,
+        sortOrder: folders.reduce((max, f) => Math.max(max, f.sortOrder), 0) + 1,
+      }
+      setFolders((prev) => [...prev, folder])
+      const { error } = await supabase
+        .from('sticky_note_folders')
+        .insert({ id: folder.id, user_id: userId, name: folder.name, sort_order: folder.sortOrder })
+      if (error) {
+        console.error('[sticky-notes] folder create failed', error)
+        setFolders((prev) => prev.filter((f) => f.id !== folder.id))
+        return null
+      }
+      return folder
+    },
+    [supabase, userId, folders],
+  )
+
+  const renameFolder = useCallback(
+    async (id: string, name: string) => {
+      const trimmed = name.trim().slice(0, 60)
+      if (!trimmed) return
+      let snapshot: StickyNoteFolder[] = []
+      setFolders((prev) => {
+        snapshot = prev
+        return prev.map((f) => (f.id === id ? { ...f, name: trimmed } : f))
+      })
+      const { error } = await supabase.from('sticky_note_folders').update({ name: trimmed }).eq('id', id)
+      if (error) {
+        console.error('[sticky-notes] folder rename failed', error)
+        setFolders(snapshot)
+      }
+    },
+    [supabase],
+  )
+
+  // Deleting a folder never deletes its notes — the FK is ON DELETE SET NULL,
+  // so they move to 未分類; mirror that locally.
+  const deleteFolder = useCallback(
+    async (id: string) => {
+      let folderSnap: StickyNoteFolder[] = []
+      let noteSnap: StickyNote[] = []
+      setFolders((prev) => {
+        folderSnap = prev
+        return prev.filter((f) => f.id !== id)
+      })
+      setNotes((prev) => {
+        noteSnap = prev
+        return prev.map((n) => (n.folderId === id ? { ...n, folderId: null } : n))
+      })
+      const { error } = await supabase.from('sticky_note_folders').delete().eq('id', id)
+      if (error) {
+        console.error('[sticky-notes] folder delete failed', error)
+        setFolders(folderSnap)
+        setNotes(noteSnap)
+      }
+    },
+    [supabase],
   )
 
   // ── Content autosave (debounced), mirrors use-notebook.ts ────────
@@ -225,6 +325,7 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
 
   return {
     notes,
+    folders,
     loading,
     createNote,
     setPosition,
@@ -233,5 +334,11 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
     bringToFront,
     saveNoteContent,
     deleteNote,
+    stowNote,
+    restoreNote,
+    moveNoteToFolder,
+    createFolder,
+    renameFolder,
+    deleteFolder,
   }
 }

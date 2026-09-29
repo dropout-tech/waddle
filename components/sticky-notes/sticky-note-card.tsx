@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useRef, useState } from 'react'
-import { GripHorizontal, X } from 'lucide-react'
+import { Archive, GripHorizontal, X } from 'lucide-react'
 import type { StickyNote, StickyNoteColor, TiptapDoc } from '@/lib/types'
 import { StickyNoteEditor } from './sticky-note-editor'
 import { cn } from '@/lib/utils'
@@ -36,6 +36,8 @@ interface StickyNoteCardProps {
   onResize: (id: string, width: number, height: number) => void
   onColor: (id: string, color: StickyNoteColor) => void
   onDelete: (id: string) => void
+  /** Take the note off the screen without deleting it (goes to the drawer). */
+  onStow: (id: string) => void
   onContentChange: (id: string, content: TiptapDoc) => void
 }
 
@@ -46,6 +48,7 @@ export function StickyNoteCard({
   onResize,
   onColor,
   onDelete,
+  onStow,
   onContentChange,
 }: StickyNoteCardProps) {
   const { t } = useI18n()
@@ -206,6 +209,17 @@ export function StickyNoteCard({
               </div>
             )}
           </div>
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => onStow(note.id)}
+            aria-label={t('收起便條紙')}
+            title={t('收起便條紙')}
+            data-testid="sticky-note-stow"
+            className="flex h-11 w-11 min-h-11 min-w-11 items-center justify-center rounded-full hover:bg-black/5"
+          >
+            <Archive className="h-3.5 w-3.5 text-foreground/50" aria-hidden />
+          </button>
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}

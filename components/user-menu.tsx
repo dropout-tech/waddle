@@ -7,7 +7,7 @@ import type { Membership } from '@/lib/operations/types'
 import { Gift } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { LogOut, Mail, User, Loader2, Moon, Sun, FileText, StickyNote as StickyNoteIcon, Plus } from 'lucide-react'
+import { LogOut, Mail, User, Loader2, Moon, Sun, FileText, StickyNote as StickyNoteIcon, Plus, Archive } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { AccountRegistrationDate } from '@/components/auth/account-registration-date'
@@ -270,6 +270,15 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
               <span>{t('新增便條紙')}</span>
             </button>
           )}
+          <button
+            data-sticky-drawer-trigger
+            onClick={() => { setOpen(false); stickyNotes.toggleDrawer() }}
+            className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 pl-10 text-sm hover:bg-muted/60 transition-colors text-foreground"
+            role="menuitem"
+          >
+            <Archive className="w-4 h-4" />
+            <span>{t('便條紙收納')}</span>
+          </button>
 
           <div className="border-t border-border" />
 
