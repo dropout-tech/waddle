@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom'
 import { isNative } from '@/lib/platform'
 import { WhiteboardDetail } from './whiteboard-detail'
 import { createChecklistDocument, getWhiteboardDocument, hasWhiteboardDocument, replaceWhiteboardSourceLink, whiteboardChecklistSummary, whiteboardDocumentText } from '@/lib/whiteboard-document'
+import { completeMathAtCaret } from '@/lib/inline-math'
 
 interface ScratchpadCanvasProps {
   items: ScratchpadItem[]
@@ -310,8 +311,25 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
     }}>
     <textarea key={editor.id} autoFocus aria-label={editor.type === 'link' ? t('連結網址') : t('畫布內容')} placeholder={editor.type === 'link' ? t('貼上網址…') : editor.type === 'todo' ? t('輸入待辦…') : t('直接寫下想法…')}
       className="min-h-11 w-full flex-1 resize-none bg-transparent text-base leading-relaxed outline-none placeholder:text-muted-foreground"
-      value={editor.content} onChange={e => { const current = editorRef.current; if (current) setEditor({ ...current, content: e.target.value }) }}
-      onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false; if (!editorElement.current?.contains(document.activeElement)) saveEditor() }}/>
+      value={editor.content} onChange={e => {
+        const current = editorRef.current
+        if (!current) return
+        const typed = (e.nativeEvent as InputEvent).inputType === 'insertText' && !composing.current
+        const math = typed && current.type !== 'link' ? completeMathAtCaret(e.target.value, e.target.selectionStart) : null
+        // Write the result into the DOM and place the caret synchronously: React
+        // then sees DOM === state and leaves the caret alone. (A deferred caret
+        // fix loses to fast typing and drags the caret back mid-word.)
+        if (math) { e.target.value = math.value; e.target.setSelectionRange(math.caret, math.caret) }
+        setEditor({ ...current, content: math?.value ?? e.target.value })
+      }}
+      onCompositionStart={() => { composing.current = true }} onCompositionEnd={e => {
+        composing.current = false
+        // IME-committed "＝" doesn't go through the insertText branch above.
+        const current = editorRef.current, el = e.currentTarget
+        const math = current && current.type !== 'link' ? completeMathAtCaret(el.value, el.selectionStart) : null
+        if (current && math) { el.value = math.value; el.setSelectionRange(math.caret, math.caret); setEditor({ ...current, content: math.value }) }
+        if (!editorElement.current?.contains(document.activeElement)) saveEditor()
+      }}/>
     {editor.type === 'link' && <input aria-label={t('連結標題')} placeholder={t('連結標題（選填）')} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-base" value={editor.title} onChange={e => { const current = editorRef.current; if (current) setEditor({ ...current, title: e.target.value }) }}/>}
     <div className="flex shrink-0 items-center justify-between gap-1 text-xs text-muted-foreground/70"><span>{t('點空白處儲存')}</span><button type="button" className={button} onPointerDown={e => e.preventDefault()} onClick={() => { setEditor(null); setError(''); viewport.current?.focus() }}>{t('取消')}</button></div>
   </form>
