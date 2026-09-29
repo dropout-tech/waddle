@@ -125,8 +125,11 @@ export function StickyNoteCard({
       const clamped = clampNotePosition(nextX, nextY, g.startWidth, g.startHeight)
       setLive({ x: clamped.x, y: clamped.y, width: g.startWidth, height: g.startHeight })
     } else {
-      const nextWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, g.startWidth + dx))
-      const nextHeight = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, g.startHeight + dy))
+      // Round: Mac trackpads / Retina report fractional clientX/Y, but
+      // sticky_notes.width/height are integer columns — a 312.5 is rejected
+      // by Postgres and the optimistic resize rolls back to the old size.
+      const nextWidth = Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, g.startWidth + dx)))
+      const nextHeight = Math.round(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, g.startHeight + dy)))
       const clamped = clampNotePosition(g.startX, g.startY, nextWidth, nextHeight)
       setLive({ x: clamped.x, y: clamped.y, width: nextWidth, height: nextHeight })
     }
