@@ -7,6 +7,7 @@ import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-detai
 import type { Extensions } from '@tiptap/react'
 import { t } from '@/lib/i18n'
 import { SlashCommand } from './slash-command'
+import { InlineMath } from './inline-math'
 import type { UploadImageFn } from './upload-image'
 
 // Shared editor vocabulary for the notebook. StarterKit (v3) already bundles
@@ -35,6 +36,7 @@ export function notebookExtensions(uploadImage: UploadImageFn): Extensions {
     DetailsContent,
     Image.configure({ allowBase64: false, HTMLAttributes: { class: 'nb-image' } }),
     SlashCommand.configure({ uploadImage }),
+    InlineMath,
     Placeholder.configure({
       placeholder: ({ node }) => {
         if (node.type.name === 'heading') return t('標題')
