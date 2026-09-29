@@ -35,7 +35,8 @@ const cspDirectives = [
   `default-src 'self'`,
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
   `style-src 'self' 'unsafe-inline'`,
-  `img-src 'self' data: blob: ${supabaseOrigin}`,
+  // Google sign-in profile photos (user_metadata.avatar_url → lh3.googleusercontent.com).
+  `img-src 'self' data: blob: ${supabaseOrigin} https://*.googleusercontent.com`,
   `font-src 'self' data:`,
   // Marketing videos (intro gate, promo film, promo loop) stream from the Supabase CDN bucket marketing-media.
   `media-src 'self' ${supabaseOrigin}`,
