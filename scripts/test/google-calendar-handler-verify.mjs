@@ -94,6 +94,7 @@ async function setup(o = {}) {
   }
   return { send, tables, calls, callerCalls, counts: () => ({ eventGets, tokenCalls }) }
 }
+const busyRange = () => ({ time_min: new Date(Date.now() + 3600000).toISOString(), time_max: new Date(Date.now() + 10 * 86400000).toISOString() })
 const range = (days = 60) => { const a = new Date('2026-09-01T00:00:00+08:00'); return { time_min: a.toISOString(), time_max: new Date(a.getTime() + days * 86400000).toISOString() } }
 
 // ── auth ──
@@ -244,7 +245,7 @@ const pages = {
     pages: { '': { items: secretItems('own') } },
     userItems: { [P1]: secretItems('p1'), [P2]: secretItems('p2'), [P3]: secretItems('p3'), [P4]: secretItems('p4') },
   })
-  const r = await m.send({ action: 'busy', peer_ids: [uid, P1, P2, P3, P4, P5], ...range() })
+  const r = await m.send({ action: 'busy', peer_ids: [uid, P1, P2, P3, P4, P5], ...busyRange() })
   const who = new Set((r.busy || []).map((b) => b.user_id))
   ok(r.http === 200 && who.has(uid) && who.has(P1) && who.size === 2, `busy: returns only caller + authorised partner (${[...who].join(',')})`)
   ok(!who.has(P2) && !who.has(P3), 'busy: non-partner and partner-without-grant-on-this-share ignored')
@@ -264,19 +265,30 @@ const pages = {
 {
   const P1 = '00000000-0000-4000-8000-0000000000b1'
   const m = await setup({ others: [{ user_id: P1 }], sharePeers: [{ share_id: 's1', peer_id: P1 }], grants: [{ share_id: 's1', owner_id: P1 }], userItems: { [P1]: [{ status: 'confirmed', start: { dateTime: '2026-09-10T10:00:00Z' }, end: { dateTime: '2026-09-10T11:00:00Z' } }] } })
-  const r = await m.send({ action: 'busy', peer_ids: [uid, P1], ...range() })
+  const r = await m.send({ action: 'busy', peer_ids: [uid, P1], ...busyRange() })
   ok(r.http === 200 && r.busy.length === 1 && r.busy[0].user_id === P1, 'busy: works when the caller has no Google connection (partner connected)')
 }
 {
   const m = await setup({ connected: true })
   const stranger = '00000000-0000-4000-8000-0000000000c9'
-  const r = await m.send({ action: 'busy', peer_ids: [stranger], ...range() })
+  const r = await m.send({ action: 'busy', peer_ids: [stranger], ...busyRange() })
   ok(r.http === 200 && r.busy.length === 0 && r.unavailable.length === 0 && m.counts().tokenCalls === 0, 'busy: only unauthorised ids → empty answer, no Google call')
-  ok((await m.send({ action: 'busy', peer_ids: Array.from({ length: 12 }, (_, i) => `00000000-0000-4000-8000-0000000000${String(i).padStart(2, '0')}`), ...range() })).error === 'invalid_peers', 'busy: more than 11 people → invalid_peers')
-  ok((await m.send({ action: 'busy', peer_ids: ['not-a-uuid'], ...range() })).error === 'invalid_peers', 'busy: non-uuid id → invalid_peers')
+  ok((await m.send({ action: 'busy', peer_ids: Array.from({ length: 12 }, (_, i) => `00000000-0000-4000-8000-0000000000${String(i).padStart(2, '0')}`), ...busyRange() })).error === 'invalid_peers', 'busy: more than 11 people → invalid_peers')
+  ok((await m.send({ action: 'busy', peer_ids: ['not-a-uuid'], ...busyRange() })).error === 'invalid_peers', 'busy: non-uuid id → invalid_peers')
   ok((await m.send({ action: 'busy', peer_ids: [uid], ...range(121) })).error === 'invalid_range', 'busy: >120-day window → invalid_range')
+  // strict 約交集 window: no history, ≤ 92 days ahead, ≤ 16 days wide
+  const at = (days) => new Date(Date.now() + days * 86400000).toISOString()
+  const before = m.counts().tokenCalls
+  ok((await m.send({ action: 'busy', peer_ids: [uid], time_min: at(-30), time_max: at(-20) })).error === 'invalid_range', 'busy: past window (30 days ago) → invalid_range')
+  ok((await m.send({ action: 'busy', peer_ids: [uid], time_min: at(-1.2), time_max: at(3) })).error === 'invalid_range', 'busy: starting >1 day before now → invalid_range')
+  ok((await m.send({ action: 'busy', peer_ids: [uid], time_min: at(200), time_max: at(210) })).error === 'invalid_range', 'busy: far future (200 days ahead) → invalid_range')
+  ok((await m.send({ action: 'busy', peer_ids: [uid], time_min: at(85), time_max: at(93) })).error === 'invalid_range', 'busy: ending past the 90+2-day horizon → invalid_range')
+  ok((await m.send({ action: 'busy', peer_ids: [uid], time_min: at(1), time_max: at(18) })).error === 'invalid_range', 'busy: 17-day-wide window → invalid_range')
+  ok(m.counts().tokenCalls === before, 'busy: rejected windows never touch Google')
+  ok((await m.send({ action: 'busy', peer_ids: [uid], time_min: at(-0.5), time_max: at(14.5) })).http === 200 && (await m.send({ action: 'busy', peer_ids: [uid], time_min: at(76), time_max: at(91.5) })).http === 200, 'busy: real 約交集 windows (today+14d, last 15 days before the 90-day horizon) accepted')
+  ok((await m.send({ action: 'events', time_min: at(-100), time_max: at(-10) })).status === 'connected', 'events (own calendar) keeps the plain 120-day rule — past months still readable')
 }
-{ const m = await setup({ env: { GOOGLE_CALENDAR_CLIENT_SECRET: '' } }); const r = await m.send({ action: 'busy', peer_ids: [uid], ...range() }); ok(r.http === 503 && r.error === 'not_configured', 'busy: unconfigured → 503 not_configured (front end treats as "no Google")') }
+{ const m = await setup({ env: { GOOGLE_CALENDAR_CLIENT_SECRET: '' } }); const r = await m.send({ action: 'busy', peer_ids: [uid], ...busyRange() }); ok(r.http === 503 && r.error === 'not_configured', 'busy: unconfigured → 503 not_configured (front end treats as "no Google")') }
 
 // ── share_busy toggle ──
 {

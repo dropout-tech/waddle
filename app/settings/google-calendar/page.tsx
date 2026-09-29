@@ -90,7 +90,7 @@ export default function GoogleCalendarSettingsPage() {
         {t('Google 日曆')}
       </h1>
       <p className="mt-3 text-sm text-muted-foreground">
-        {t('只讀取你的 Google 主日曆，不會修改；共享夥伴看不到這些會議。')}
+        {t('只讀取你的 Google 主日曆，不會修改。共享夥伴看不到會議內容；若開啟下方選項，他們約時間時只會知道你那段時間忙碌。')}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">
         {t('別人寄給你的 Google 會議邀請，會自動出現在 Huddle 行事曆上。')}
@@ -102,7 +102,7 @@ export default function GoogleCalendarSettingsPage() {
         ) : !user ? (
           <Link href="/login" className="inline-flex min-h-11 items-center text-sm text-primary underline">{t('登入後才能連結 Google 日曆')}</Link>
         ) : state === 'unconfigured' ? (
-          <p className="text-sm">{t('Google 日曆整合尚未啟用。')}</p>
+          <p className="text-sm">{t('此功能尚未開放')}</p>
         ) : (
           <>
             <p className="text-sm font-medium">

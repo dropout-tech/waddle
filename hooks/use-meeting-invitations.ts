@@ -169,7 +169,8 @@ export function useMeetingInvitations(
       !Number.isFinite(+from) ||
       !Number.isFinite(+to) ||
       +to < +from ||
-      Date.parse(search.to) - Date.parse(search.from) >= 14 * 86400000
+      Date.parse(search.to) - Date.parse(search.from) >= 14 * 86400000 ||
+      search.to > meetingMaxDate()
     )
       throw new Error('range')
     const [peers, grants, busyResult, ownTasks, ownBlocks, ownSettings, google] =
@@ -228,11 +229,15 @@ export function useMeetingInvitations(
         // Google meetings (mine + partners who allow it) as busy — start/end
         // only. A failure never throws: slots are still computed and the UI
         // shows 「部分 Google 行程未納入」 (google.incomplete).
-        fetchGoogleBusy(
-          [user.id, ...search.peerIds],
-          new Date(from.getFullYear(), from.getMonth(), from.getDate() - 1).toISOString(),
-          to.toISOString(),
-        ).catch(() => ({ busy: [], incomplete: true })),
+        // Past time can never become a slot, so the window starts no earlier
+        // than 12h ago (the server refuses anything before now − 1 day).
+        +to <= Date.now()
+          ? Promise.resolve({ busy: [], incomplete: false })
+          : fetchGoogleBusy(
+              [user.id, ...search.peerIds],
+              new Date(Math.max(+new Date(from.getFullYear(), from.getMonth(), from.getDate() - 1), Date.now() - 12 * 3600000)).toISOString(),
+              to.toISOString(),
+            ).catch(() => ({ busy: [], incomplete: true })),
       ])
     if (busyResult.error || ownSettings.error) throw new Error('availability')
     const rows = await Promise.all(
@@ -435,3 +440,10 @@ export function useMeetingInvitations(
   }
 }
 export type MeetingController = ReturnType<typeof useMeetingInvitations>
+
+/** 約交集 may look at most this many days ahead (kept in sync with the
+ *  google-calendar Edge Function's BUSY_MAX_AHEAD_DAYS = this + 2). */
+export const MEETING_MAX_AHEAD_DAYS = 90
+export function meetingMaxDate(now = new Date()): string {
+  return toDateString(new Date(now.getFullYear(), now.getMonth(), now.getDate() + MEETING_MAX_AHEAD_DAYS))
+}

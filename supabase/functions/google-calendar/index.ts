@@ -19,7 +19,7 @@
 // with the PARTNER's own Google grant (only if they left share_busy on) and
 // returns start/end pairs only — never a title, place, link or event id.
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.105.1'
-import { SCOPE, MAX_PAGES, PAGE_SIZE, MAX_BUSY_PEOPLE, b64, hash, seal, unseal, parseRange, normalizeEvents, normalizeBusy } from './core.mjs'
+import { SCOPE, MAX_PAGES, PAGE_SIZE, MAX_BUSY_PEOPLE, b64, hash, seal, unseal, parseRange, parseBusyRange, normalizeEvents, normalizeBusy } from './core.mjs'
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
@@ -136,7 +136,9 @@ export async function handler(req: Request) {
     }
 
     if (body.action === 'busy') {
-      const range = parseRange(body.time_min, body.time_max)
+      // Strict window (not the 120-day `events` rule): no history, ≤ ~3 months
+      // ahead, ≤ 16 days wide — a partner cannot page through a whole calendar.
+      const range = parseBusyRange(body.time_min, body.time_max)
       const ids = body.peer_ids
       if (!Array.isArray(ids) || !ids.length || ids.length > MAX_BUSY_PEOPLE || ids.some((x: unknown) => typeof x !== 'string' || !UUID.test(x))) throw Error('invalid_peers')
       const requested = [...new Set(ids.map((x: string) => x.toLowerCase()))] as string[]

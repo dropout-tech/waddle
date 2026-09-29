@@ -56,6 +56,9 @@ try {
     }
     if (body.action === 'set_share_busy') { mock.shareBusy = body.value; return reply({ share_busy: body.value }) }
     if (body.action === 'busy') {
+      // Same strict window as the real function (core.mjs parseBusyRange).
+      const a = Date.parse(body.time_min), z = Date.parse(body.time_max), D = 86400000
+      if (!(a >= Date.now() - D && z <= Date.now() + 92 * D && z - a <= 16 * D && z > a)) { mock.badBusyWindow = (mock.badBusyWindow || 0) + 1; return reply({ error: 'invalid_range' }, 400) }
       if (mock.busyMode === 'fail') return reply({ error: 'integration_failed' }, 500)
       if (mock.busyMode === 'unavailable') return reply({ busy: [], unavailable: [PEER] })
       if (mock.busyMode === 'block') return reply({ busy: [{ user_id: PEER, start: mock.busyWindow[0], end: mock.busyWindow[1] }], unavailable: [] })
@@ -112,6 +115,13 @@ try {
   ok(lateToday ? lateTodayTxt.includes(lateToday) : (await lateTodayEl.count()) === 0, `week: overnight event today piece = ${lateToday ?? 'outside visible hours → not drawn'} (rendered: "${lateTodayTxt}")`)
   const evCalls = mock.calls.filter((c) => c.action === 'events')
   ok(evCalls.length >= 2 && evCalls.every((c) => Date.parse(c.body.time_max) - Date.parse(c.body.time_min) <= 120 * 86400000), `events requested in ≤120-day halves (${evCalls.length} calls)`)
+  ok((await page.locator('[data-google-event] [data-google-badge]').count()) >= 4 && (await page.locator('[data-google-all-day] [data-google-badge]').count()) >= 1, 'week: every Google block / all-day chip carries the "G" badge')
+  const syncBlk = gcal('GCAL Weekly Sync').first()
+  const syncLayout = await syncBlk.getAttribute('data-google-layout')
+  const syncClip = await syncBlk.locator('span.break-words').evaluate((el) => ({ clipped: el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1 }))
+  ok(syncLayout === 'tall' && !syncClip.clipped && (await syncBlk.innerText()).includes('10:00-11:00'), `week: 1-hour block shows full title on up to 2 lines + time row (layout ${syncLayout}, clipped ${syncClip.clipped})`)
+  const pendBlk = gcal('GCAL Pending Invite').first()
+  ok((await pendBlk.locator('[data-google-reply-tag]').innerText()) === '未回覆' && Number(await pendBlk.evaluate((el) => getComputedStyle(el).opacity)) <= 0.56, 'week: needsAction block shows「未回覆」and is lighter (opacity ≤ .55)')
   await page.screenshot({ path: path.join(SHOTS, '1-week-desktop.png') })
 
   // click → read-only popover, never the task editor
@@ -138,6 +148,7 @@ try {
   await page.getByRole('button', { name: '日檢視' }).click(); await sleep(800)
   ok(await gcal('GCAL Weekly Sync').first().isVisible(), 'day: Google meeting visible')
   ok(await page.locator('[data-google-all-day]', { hasText: 'GCAL Offsite Day' }).first().isVisible(), 'day: all-day chip visible')
+  ok((await page.locator('[data-google-event] [data-google-badge]').count()) >= 2, 'day: Google blocks carry the "G" badge')
   await page.screenshot({ path: path.join(SHOTS, '3-day-desktop.png') })
   const tomorrowPiece = page.locator(`[data-day-date="${tomorrow}"] [data-google-event]`, { hasText: 'GCAL Late Call' })
   if (!(await tomorrowPiece.count())) { await page.getByRole('button', { name: '後一天' }).click(); await sleep(800) }
@@ -150,6 +161,9 @@ try {
   const monthChips = page.locator('[data-google-event]')
   await monthChips.first().waitFor({ timeout: 10000 })
   ok((await monthChips.count()) >= 2 && (await page.locator('[data-google-event]', { hasText: 'GCAL' }).count()) >= 2, `month: Google chips shown (${await monthChips.count()})`)
+  const allDayMonth = page.locator('[data-google-month-all-day]', { hasText: 'GCAL Offsite Day' }).first()
+  ok(await allDayMonth.isVisible(), 'month: Google all-day event visible in the day cell (not folded into +N)')
+  ok(await allDayMonth.evaluate((el) => el.parentElement.firstElementChild === el), 'month: all-day event is first in its cell')
   await page.screenshot({ path: path.join(SHOTS, '4-month-desktop.png') })
   ok(errors.length === 0, `0 pageerror in week/day/month (${errors.join(' | ') || 'none'})`)
 
@@ -163,15 +177,16 @@ try {
   const section = page.locator('[data-gcal-state]')
   const settingsState = async () => { await page.waitForFunction(() => { const s = document.querySelector('[data-gcal-state]')?.getAttribute('data-gcal-state'); return s && s !== 'loading' }, null, { timeout: 30000 }); return section.getAttribute('data-gcal-state') }
   ok((await settingsState()) === 'connected' && (await page.getByText('已連結').count()) > 0 && (await page.getByRole('button', { name: '解除連結' }).count()) === 1, 'settings page: connected state (已連結 + 解除連結)')
-  ok((await page.locator('main').innerText()).includes('只讀取你的 Google 主日曆，不會修改；共享夥伴看不到這些會議。'), 'settings page: read-only + not-shared explanation shown')
+  ok((await page.locator('main').innerText()).includes('只讀取你的 Google 主日曆，不會修改。共享夥伴看不到會議內容；若開啟下方選項，他們約時間時只會知道你那段時間忙碌。'), 'settings page: read-only + busy-only explanation shown')
   await page.screenshot({ path: path.join(SHOTS, '5-settings-connected.png') })
   mock.mode = 'disconnected'; await page.reload()
   ok((await settingsState()) === 'disconnected' && (await page.getByRole('button', { name: '連結 Google 日曆' }).count()) === 1, 'settings page: not-connected state (連結 Google 日曆 button)')
   await page.screenshot({ path: path.join(SHOTS, '6-settings-disconnected.png') })
   mock.mode = 'reauth'; await page.reload()
   ok((await settingsState()) === 'reauth' && (await page.locator('main [role=alert]').count()) === 1 && (await page.getByRole('button', { name: '重新連結 Google 日曆' }).count()) === 1, 'settings page: reauth_required state (alert + reconnect)')
+  await page.screenshot({ path: path.join(SHOTS, '6b-settings-reauth.png') })
   mock.mode = 'unconfigured'; await page.reload()
-  ok((await settingsState()) === 'unconfigured' && (await page.getByText('Google 日曆整合尚未啟用。').count()) === 1 && (await page.getByRole('button', { name: '連結 Google 日曆' }).count()) === 0, 'settings page: unconfigured state (尚未啟用, no connect button)')
+  ok((await settingsState()) === 'unconfigured' && (await page.getByText('此功能尚未開放').count()) === 1 && (await page.getByRole('button', { name: '連結 Google 日曆' }).count()) === 0, 'settings page: unconfigured state (尚未啟用, no connect button)')
   await page.screenshot({ path: path.join(SHOTS, '7-settings-unconfigured.png') })
 
   // unconfigured → calendar makes NO events request and shows nothing
@@ -222,7 +237,11 @@ try {
   await page.screenshot({ path: path.join(SHOTS, '13-meet-google-busy-avoided.png') })
   mock.busyMode = 'fail'
   const failed = await searchOnce()
-  ok(failed.starts.length === base.starts.length && failed.hint === 1 && (await dlg.locator('[data-testid="google-busy-incomplete"]').innerText()).includes('部分 Google 行程未納入'), 'meet: busy call fails → slots still computed + hint 「部分 Google 行程未納入」')
+  const hintTxt = await dlg.locator('[data-testid="google-busy-incomplete"]').innerText()
+  const hintBox = await dlg.locator('[data-testid="google-busy-incomplete"]').boundingBox(), firstSlot = await dlg.locator('section[aria-label="共同空檔"] button[data-start]').first().boundingBox()
+  ok(failed.starts.length === base.starts.length && failed.hint === 1 && hintTxt.includes('部分 Google 行程未納入') && hintTxt.includes('這些時段可能與部分人的 Google 會議衝突，送出前請先確認。'), 'meet: busy call fails → slots still computed + hint with consequence text')
+  ok(hintBox.y + hintBox.height <= firstSlot.y && (await dlg.locator('[data-testid="google-busy-incomplete"] p').last().evaluate((el) => parseFloat(getComputedStyle(el).fontSize))) >= 14, 'meet: hint sits above the result list at body text size (≥14px)')
+  ok((await dlg.innerText()).includes('已連結 Google 日曆的人，其 Google 會議會算成忙碌；未共享的行事曆不包含。'), 'meet: dialog scope text mentions Google meetings count as busy')
   await page.screenshot({ path: path.join(SHOTS, '14-meet-google-busy-failed.png') })
   mock.busyMode = 'unavailable'
   ok((await searchOnce()).hint === 1, 'meet: a partner in `unavailable` → hint shown')
@@ -243,6 +262,20 @@ try {
   ok(!CJK.test(labels), 'EN: Google blocks / aria-labels have no Chinese')
   await page.screenshot({ path: path.join(SHOTS, '8-week-english.png') })
   await closePopovers()
+  // EN 約交集 dialog with the Google hint
+  mock.meeting = true; mock.busyMode = 'fail'
+  await page.reload(); await page.getByRole('button', { name: 'Week view' }).waitFor({ timeout: 60000 }); await sleep(1500)
+  await page.getByRole('button', { name: 'More tools' }).first().click()
+  await page.getByRole('menuitem', { name: /Find a time/ }).click()
+  await dlg.getByLabel('GCAL Peer').check()
+  await dlg.locator('input[type=date]').first().fill(day); await dlg.locator('input[type=date]').nth(1).fill(day)
+  await dlg.getByRole('button', { name: 'Find common times' }).click()
+  await dlg.locator('[data-testid="google-busy-incomplete"]').waitFor({ timeout: 30000 })
+  const enDlg = await dlg.innerText()
+  ok(!CJK.test(enDlg) && enDlg.includes('Please check before sending') && enDlg.includes('their Google meetings count as busy'), `EN: 約交集 dialog (scope + Google hint) has no Chinese`)
+  await page.screenshot({ path: path.join(SHOTS, '15-meet-english-hint.png') })
+  for (let i = 0; i < 4 && (await page.getByRole('dialog').count()); i++) { await page.keyboard.press('Escape'); await sleep(250) }
+  mock.meeting = false; mock.busyMode = 'empty'
   await page.getByRole('button', { name: 'Settings', exact: true }).first().click()
   await entry.waitFor({ timeout: 10000 }); await entry.scrollIntoViewIfNeeded()
   const entryBlock = await entry.locator('xpath=..').innerText()
@@ -252,6 +285,7 @@ try {
     mock.mode = m; if (m !== 'connected') await page.reload(); await settingsState()
     const txt = await page.locator('main').innerText()
     ok(!CJK.test(txt), `EN: settings page (${m}) has no Chinese`)
+    if (m === 'connected' || m === 'unconfigured') await page.screenshot({ path: path.join(SHOTS, `16-settings-english-${m}.png`) })
   }
   await page.goto(`${BASE}/settings/google-calendar/callback?error=access_denied`)
   await page.locator('[data-gcal-callback="denied"]').waitFor({ timeout: 30000 })
@@ -282,6 +316,7 @@ try {
   const btn = await page.getByRole('button', { name: '解除連結' }).boundingBox(); ok(btn.height >= 44, `390 settings button ${btn.height}px ≥ 44`)
   await page.screenshot({ path: path.join(SHOTS, '12-settings-390.png') })
 
+  ok(!mock.badBusyWindow, `every busy request stayed inside the strict 約交集 window (${mock.badBusyWindow || 0} rejected)`)
   ok(errors.length === 0, `0 pageerror overall (${errors.join(' | ') || 'none'})`)
 } catch (e) {
   fail++; console.log('FAIL: script aborted —', e.message)

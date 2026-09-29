@@ -22,7 +22,9 @@ Edge Function supabase/functions/google-calendar（index.ts + core.mjs）
   └─ events：GET calendars/primary/events?singleEvents=true&orderBy=startTime（完整分頁、401 refresh、
              invalid_grant → 標 reauth_required 並回 200），濾掉 cancelled / 自己 declined / workingLocation，
              只回 id、title、start、end、all_day、location、response_status、html_link。**事件內容不落 DB。**
-  └─ busy（約交集）：peer_ids（可含自己，最多 11 人）＋ time_min/time_max（≤120 天）
+  └─ busy（約交集）：peer_ids（可含自己，最多 11 人）＋ time_min/time_max，嚴格窗口（core.mjs parseBusyRange）：
+             time_min ≥ 現在−1 天、time_max ≤ 現在＋92 天（前端上限 90 天＋緩衝）、窗寬 ≤ 16 天（前端 14 天＋前一天＋緩衝）
+             → 夥伴無法一段段翻出對方多年的忙碌時段。events（自己看自己）仍是 120 天規則
              ① 用「呼叫者自己的 JWT」呼叫 get_share_peers ＋讀 calendar_share_grants（RLS 下），
                 只留「有共享、且對方在這個共享上有開放項目」的人——與前端約交集的 sharing_required 規則相同；其他 id 一律忽略
              ② 對每位有 Google 連線的人：自己一律納入；夥伴只在 share_busy=true 時納入
@@ -101,4 +103,5 @@ supabase secrets list --project-ref <已確認的專案 ref>   # 只確認名稱
 - 不在行事曆可見時段內（例如設定從 06:00 開始）的片段不畫；點其他片段的詳情仍顯示完整時間。
 - `workingLocation`（上班地點標記）不顯示，因為它不是會議。
 - busy 每次約交集搜尋會替每位納入的人各換一次 access token、讀一次 Google（最多 11 人，平行）；夥伴多、事件多時搜尋會變慢。
-- 約交集對話框既有說明文字「未共享或外部日曆不包含」在連了 Google 後已不精確，改文案需老闆審（本分支未改）。
+- 約交集搜尋日期上限改為「今天起 90 天內」（前端 date input max＋findSlots 檢查，後端同步限制）；原本前端沒有上限。
+- 約交集對話框既有說明文字已改為「已連結 Google 日曆的人，其 Google 會議會算成忙碌；未共享的行事曆不包含。」（中英，待老闆審）。

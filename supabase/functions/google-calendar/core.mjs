@@ -38,6 +38,26 @@ export function parseRange(timeMin, timeMax) {
   return { timeMin: from.toISOString(), timeMax: to.toISOString() }
 }
 
+// 約交集 (free-slot search) limits — must match the front end
+// (hooks/use-meeting-invitations.ts MEETING_MAX_AHEAD_DAYS / 14-day search):
+// a search may end at most 90 days ahead and spans at most 14 days, plus the
+// day before (overnight events) → 15 days. Each limit gets 1 day of slack.
+// Without these a share partner could page through years of someone's busy
+// times (past or future) and reconstruct their routine.
+export const BUSY_MAX_PAST_DAYS = 1
+export const BUSY_MAX_AHEAD_DAYS = 90 + 1 + 1
+export const BUSY_MAX_WINDOW_DAYS = 15 + 1
+
+/** parseRange + the strict 約交集 window. Throws 'invalid_range'. */
+export function parseBusyRange(timeMin, timeMax, now = new Date()) {
+  const range = parseRange(timeMin, timeMax)
+  const from = Date.parse(range.timeMin), to = Date.parse(range.timeMax), day = 86400000
+  if (from < now.getTime() - BUSY_MAX_PAST_DAYS * day) throw Error('invalid_range')
+  if (to > now.getTime() + BUSY_MAX_AHEAD_DAYS * day) throw Error('invalid_range')
+  if (to - from > BUSY_MAX_WINDOW_DAYS * day) throw Error('invalid_range')
+  return range
+}
+
 const RESPONSES = new Set(['accepted', 'tentative', 'needsAction'])
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 // Only Google's own calendar web links are passed through (never javascript: etc.).

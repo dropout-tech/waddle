@@ -5,10 +5,10 @@ export const dict: Record<string, string> = {
   'Google 日曆': 'Google Calendar',
   '在 Huddle 行事曆顯示你 Google 主日曆上的會議（唯讀）': 'Show the meetings on your primary Google Calendar in Huddle (read-only)',
   '連結與管理': 'Connect & manage',
-  '只讀取你的 Google 主日曆，不會修改；共享夥伴看不到這些會議。': 'Huddle only reads your primary Google Calendar and never changes it. People you share your calendar with cannot see these meetings.',
+  '只讀取你的 Google 主日曆，不會修改。共享夥伴看不到會議內容；若開啟下方選項，他們約時間時只會知道你那段時間忙碌。': 'Huddle only reads your primary Google Calendar and never changes it. Share partners cannot see what your meetings are; if the option below is on, they only learn that you are busy at those times when looking for a meeting time.',
   '別人寄給你的 Google 會議邀請，會自動出現在 Huddle 行事曆上。': 'Google meeting invitations sent to you appear on your Huddle calendar automatically.',
   '登入後才能連結 Google 日曆': 'Sign in to connect Google Calendar',
-  'Google 日曆整合尚未啟用。': 'Google Calendar integration is not enabled yet.',
+  '此功能尚未開放': 'This feature is not available yet',
   '已連結': 'Connected',
   '尚未連結': 'Not connected',
   '需要重新授權': 'Needs re-authorization',
@@ -47,4 +47,6 @@ export const dict: Record<string, string> = {
   // 約交集 (free-slot search) — Google meetings count as busy
   '讓共享夥伴約時間時避開我的 Google 會議（對方只看到忙碌，看不到標題）': 'When share partners look for a meeting time, avoid my Google meetings (they only see “busy”, never the titles)',
   '部分 Google 行程未納入': 'Some Google Calendar events could not be included',
+  '這些時段可能與部分人的 Google 會議衝突，送出前請先確認。': 'These times may clash with some people’s Google meetings. Please check before sending.',
+  '未回覆': 'Not answered',
 }

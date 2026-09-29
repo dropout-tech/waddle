@@ -2,7 +2,7 @@
 // event projection. Keys are generated per run; no network.
 //   node scripts/test/google-calendar-core-verify.mjs
 import { randomBytes } from 'node:crypto'
-import { SCOPE, MAX_RANGE_DAYS, seal, unseal, hash, parseRange, normalizeEvents } from '../../supabase/functions/google-calendar/core.mjs'
+import { SCOPE, MAX_RANGE_DAYS, seal, unseal, hash, parseRange, parseBusyRange, normalizeEvents } from '../../supabase/functions/google-calendar/core.mjs'
 
 let pass = 0, fail = 0
 const ok = (cond, msg) => { if (cond) pass++; else fail++; console.log(`${cond ? 'PASS' : 'FAIL'}: ${msg}`) }
@@ -30,6 +30,14 @@ ok(throws(() => parseRange(t0, plus(MAX_RANGE_DAYS + 0.01))), 'just over 120 day
 ok(throws(() => parseRange('2026-09-01', plus(3))), 'date-only (no time/offset) rejected')
 ok(throws(() => parseRange(plus(3), t0)), 'reversed window rejected')
 ok(throws(() => parseRange(undefined, plus(3))), 'missing time_min rejected')
+
+const now = new Date('2026-09-29T12:00:00+08:00'), at = (d) => new Date(now.getTime() + d * 86400000).toISOString()
+ok(!throws(() => parseBusyRange(at(-0.5), at(14.5), now)), 'busy window: yesterday-evening → +14.5 days accepted')
+ok(throws(() => parseBusyRange(at(-365), at(-351), now)), 'busy window: a past year rejected (no history paging)')
+ok(throws(() => parseBusyRange(at(-1.01), at(5), now)), 'busy window: starting more than 1 day ago rejected')
+ok(throws(() => parseBusyRange(at(300), at(310), now)), 'busy window: 300 days ahead rejected')
+ok(throws(() => parseBusyRange(at(80), at(92.01), now)) && !throws(() => parseBusyRange(at(80), at(92), now)), 'busy window: horizon = 90 days + 2 slack')
+ok(throws(() => parseBusyRange(at(1), at(17.01), now)) && !throws(() => parseBusyRange(at(1), at(17), now)), 'busy window: width ≤ 16 days')
 
 const ev = normalizeEvents([
   { id: 'x', status: 'confirmed', summary: 'A', start: { dateTime: '2026-09-02T23:00:00+08:00' }, end: { dateTime: '2026-09-03T01:00:00+08:00' }, attendees: [{ self: true, responseStatus: 'tentative' }], description: 'secret notes', organizer: { email: 'boss@example.com' } },

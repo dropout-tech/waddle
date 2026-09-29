@@ -29,6 +29,34 @@ function isPending(ev: PeerEvent) {
   return r === 'needsAction' || r === 'tentative'
 }
 
+/** Unanswered invitations are the lightest; "maybe" sits between them and accepted. */
+function pendingLook(ev: PeerEvent, color: string) {
+  const r = ev.google?.responseStatus
+  if (r === 'needsAction') return { className: 'border border-dashed opacity-[.55]', background: `${color}0A` }
+  if (r === 'tentative') return { className: 'border border-dashed opacity-75', background: `${color}10` }
+  return { className: '', background: `${color}24` }
+}
+
+/** Small "G" mark so a Google meeting is recognisable without reading anything. */
+function GoogleBadge({ size = 12 }: { size?: number }) {
+  return (
+    <span
+      data-google-badge
+      aria-hidden
+      className="inline-flex flex-shrink-0 items-center justify-center rounded-[3px] font-bold leading-none text-white"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.7), backgroundColor: '#1A73E8' }}
+    >
+      G
+    </span>
+  )
+}
+
+function useReplyTag(ev: PeerEvent) {
+  const { t } = useI18n()
+  const r = ev.google?.responseStatus
+  return r === 'needsAction' ? t('未回覆') : r === 'tentative' ? t('暫定') : null
+}
+
 function useTitle(ev: PeerEvent) {
   const { t } = useI18n()
   return ev.title.trim() ? ev.title : t('（無標題）')
@@ -111,40 +139,49 @@ export function GoogleEventBlock({
 }) {
   const { t } = useI18n()
   const title = useTitle(event)
+  const replyTag = useReplyTag(event)
   const widthPct = 100 / Math.max(totalColumns, 1)
   const leftPct = column * widthPct
   const pending = isPending(event)
   const color = event.calendarColor
+  const look = pendingLook(event, color)
+  // Use the height we are given: ≥44px → title may wrap to 2 lines + time
+  // row; ≥26px → 1-line title + time row; smaller → title only.
+  const h = typeof height === 'number' ? height : 0
+  const layout = h >= 44 ? 'tall' : h >= 26 ? 'mid' : 'short'
   return (
     <GoogleEventDetails event={event}>
       <button
         type="button"
         data-block
         data-google-event={event.google?.responseStatus ?? 'none'}
+        data-google-layout={layout}
         aria-label={t('Google 日曆：{title}', { title })}
         title={t('Google 日曆：{title}', { title })}
         onClick={stop}
         className={cn(
-          'absolute overflow-hidden rounded border-l-[3px] px-1.5 py-0.5 text-left text-[10px] font-medium select-none pointer-events-auto',
-          pending && 'border border-dashed border-l-[3px] opacity-70',
+          'absolute flex flex-col overflow-hidden rounded border-l-[3px] px-1.5 py-0.5 text-left text-[10px] font-medium leading-[12px] select-none pointer-events-auto',
+          look.className,
         )}
         style={{
           top,
           height,
           left: `calc(${leftPct}% + 2px)`,
           width: `calc(${widthPct}% - 4px)`,
-          backgroundColor: pending ? `${color}10` : `${color}24`,
+          backgroundColor: look.background,
           borderColor: color,
+          borderLeftStyle: 'solid',
           color: 'var(--foreground)',
         }}
       >
-        <div className="flex items-center gap-1 truncate">
-          <CalendarDays className="h-2.5 w-2.5 flex-shrink-0" style={{ color }} aria-hidden />
-          <span className={cn('truncate', pending && 'italic')}>{title}</span>
+        <div className="flex min-w-0 items-start gap-1">
+          <span className="mt-px"><GoogleBadge /></span>
+          <span className={cn('min-w-0 break-words', layout === 'tall' ? 'line-clamp-2' : 'truncate', pending && 'italic')}>{title}</span>
         </div>
-        {event.scheduledStartTime && event.scheduledEndTime && (
-          <div className="text-[9px] font-mono opacity-60">
-            {event.scheduledStartTime}-{event.scheduledEndTime}
+        {layout !== 'short' && event.scheduledStartTime && event.scheduledEndTime && (
+          <div className="flex min-w-0 items-center gap-1 text-[9px] leading-[11px]">
+            <span className="font-mono opacity-60">{event.scheduledStartTime}-{event.scheduledEndTime}</span>
+            {replyTag && <span data-google-reply-tag className="truncate font-semibold opacity-80">{replyTag}</span>}
           </div>
         )}
       </button>
@@ -157,6 +194,7 @@ export function GoogleAgendaRow({ event }: { event: PeerEvent }) {
   const { t } = useI18n()
   const title = useTitle(event)
   const pending = isPending(event)
+  const replyTag = useReplyTag(event)
   const color = event.calendarColor
   return (
     <GoogleEventDetails event={event}>
@@ -165,7 +203,7 @@ export function GoogleAgendaRow({ event }: { event: PeerEvent }) {
         data-google-event={event.google?.responseStatus ?? 'none'}
         aria-label={t('Google 日曆：{title}', { title })}
         onClick={stop}
-        className={cn('flex w-full items-center gap-3 px-2 min-h-[44px] py-1 text-left', pending && 'opacity-70')}
+        className={cn('flex w-full items-center gap-3 px-2 min-h-[44px] py-1 text-left', event.google?.responseStatus === 'needsAction' ? 'opacity-[.55]' : pending && 'opacity-75')}
       >
         <span
           className={cn('w-1 self-stretch rounded-full flex-shrink-0', pending && 'border border-dashed bg-transparent')}
@@ -175,8 +213,9 @@ export function GoogleAgendaRow({ event }: { event: PeerEvent }) {
           {event.scheduledStartTime && event.scheduledEndTime ? `${event.scheduledStartTime}–${event.scheduledEndTime}` : t('全天')}
         </span>
         <span className={cn('text-sm text-foreground/80 truncate flex-1', pending && 'italic')}>{title}</span>
+        {replyTag && <span data-google-reply-tag className="text-[10px] font-semibold text-muted-foreground flex-shrink-0">{replyTag}</span>}
         <span className="flex items-center gap-1 text-[10px] text-muted-foreground flex-shrink-0">
-          <CalendarDays className="h-3 w-3" style={{ color }} aria-hidden />
+          <GoogleBadge />
           Google
         </span>
       </button>
@@ -190,16 +229,16 @@ export function GoogleMonthChip({ event }: { event: PeerEvent }) {
   const title = useTitle(event)
   const pending = isPending(event)
   const color = event.calendarColor
+  const look = pendingLook(event, color)
   return (
     <div
       data-google-event={event.google?.responseStatus ?? 'none'}
+      data-google-month-all-day={event.scheduledStartTime ? undefined : ''}
       title={t('Google 日曆：{title}', { title })}
-      className={cn(
-        'flex items-center gap-1 px-1 py-0.5 rounded text-[9px] border-l-2 select-none',
-        pending && 'border border-dashed border-l-2 opacity-70',
-      )}
-      style={{ borderColor: color, backgroundColor: pending ? `${color}10` : `${color}22` }}
+      className={cn('flex items-center gap-1 px-1 py-0.5 rounded text-[9px] border-l-2 select-none', look.className)}
+      style={{ borderColor: color, borderLeftStyle: 'solid', backgroundColor: look.background }}
     >
+      <GoogleBadge size={10} />
       <span className={cn('truncate text-foreground/80', pending && 'italic')}>{title}</span>
     </div>
   )
@@ -211,6 +250,7 @@ export function GoogleAllDayChip({ event, size = 'sm' }: { event: PeerEvent; siz
   const title = useTitle(event)
   const pending = isPending(event)
   const color = event.calendarColor
+  const look = pendingLook(event, color)
   return (
     <GoogleEventDetails event={event}>
       <button
@@ -224,11 +264,11 @@ export function GoogleAllDayChip({ event, size = 'sm' }: { event: PeerEvent; siz
         className={cn(
           'w-full flex-shrink-0 flex items-center gap-1 rounded border-l-[3px] text-left font-medium leading-tight select-none',
           size === 'md' ? 'px-2 py-1 text-[11px]' : 'px-1.5 py-[3px] text-[10px]',
-          pending && 'border border-dashed border-l-[3px] opacity-70',
+          look.className,
         )}
-        style={{ backgroundColor: pending ? `${color}10` : `${color}24`, borderColor: color, color: 'var(--foreground)' }}
+        style={{ backgroundColor: look.background, borderColor: color, borderLeftStyle: 'solid', color: 'var(--foreground)' }}
       >
-        <CalendarDays className="h-2.5 w-2.5 flex-shrink-0" style={{ color }} aria-hidden />
+        <GoogleBadge />
         <span className={cn('truncate', pending && 'italic')}>{title}</span>
       </button>
     </GoogleEventDetails>
