@@ -138,7 +138,6 @@ export function WaterReminderModal({ isOpen, onDrink, onSnooze, onDisable }: Wat
       <h2
         id="water-reminder-title"
         className="mt-3 text-[1.35rem] font-semibold text-foreground tracking-wide"
-        style={{ fontFamily: "'Caveat', 'Patrick Hand', 'Noto Sans TC', cursive" }}
       >
         {t('該喝水囉～')}
       </h2>
