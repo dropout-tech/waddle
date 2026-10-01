@@ -6,7 +6,7 @@
 
 - **總開關**：全部上鎖行為由 `huddle_ops.settings.limits_enforced` 控制，**預設 false**。關著時所有人行為與今天完全相同（免費用戶照常用）。內購上線那天才打開。
 - 用量門檻＝積極版：免費「進行中任務 150、記事本筆記 100、圖片 200MB」；Pro 任務／筆記無上限、圖片 20GB。
-- AI 會議整理：開關打開後免費每月 5 次、Pro 每月 40 次；**開關關著時維持現在的每月 20 次**。
+- AI 會議整理：開關打開後免費每月 5 次、Pro 每月 20 次；**開關關著時維持現在的每月 20 次**。
 - Google 日曆串接改 Pro；**開關打開前已連結過的帳號永久保留**（grandfather）。
 - 建立組織併進總開關：開關關著時免費也能建；打開後才要 Pro。
 - 舊用戶（開關打開前註冊）送 Pro 60 天，在「打開開關」那一步由伺服器自動發。
@@ -27,7 +27,7 @@
 1. `huddle_ops.settings` 加 `limits_enforced boolean not null default false`、`limits_enforced_at timestamptz`。
 2. `huddle_ops.limits_enforced() returns boolean`（stable、security definer、search_path=''）。
 3. `huddle_ops.plan_allows(p_user uuid) returns boolean` ＝ `not limits_enforced() or has_pro(p_user)`。
-4. 常數集中在一個函式 `huddle_ops.plan_limits(p_user uuid) returns jsonb`：`{active_tasks, notes, image_bytes, meeting_imports}`；Pro 時任務／筆記為 null（無上限）、image_bytes=21474836480、meeting_imports=40；免費 150／100／209715200／5；開關關著時全部 null 但 meeting_imports=20。
+4. 常數集中在一個函式 `huddle_ops.plan_limits(p_user uuid) returns jsonb`：`{active_tasks, notes, image_bytes, meeting_imports}`；Pro 時任務／筆記為 null（無上限）、image_bytes=21474836480、meeting_imports=20；免費 150／100／209715200／5；開關關著時全部 null 但 meeting_imports=20。
 5. **任務**：`tasks` BEFORE INSERT trigger。只在 `current_user = 'authenticated'`（使用者直接寫入；security definer 流程如接受會議指派、service role 的會議匯入不受影響）、新列本身是進行中、開關開、非 Pro、且已有進行中 ≥ 150 時 `raise exception 'TASK_LIMIT'`。若能辨識「重複任務拆分」產生的列，豁免它（不擋編輯既有資料）；辨識不了就在報告寫明。
 6. **筆記**：`notebook_notes` BEFORE INSERT trigger，同上規則，≥ 100 時 `raise exception 'NOTE_LIMIT'`。
 7. **圖片**：`storage.objects` 對 bucket `notebook-images` 加一條 RESTRICTIVE insert policy：開關開且非 Pro 時，該使用者「既有」物件總大小 ≥ 200MB 就拒絕（不需要知道新檔大小；最多超出單檔 5MB 可接受）。Pro 上限 20GB 同理。
@@ -37,7 +37,7 @@
 11. **用量查詢 RPC**：`public.my_plan_usage() returns jsonb`（security definer，grant authenticated）：`{enforced, pro, limits:{...plan_limits}, used:{active_tasks, notes, image_bytes, meeting_imports_this_month}, grandfathered:{google_calendar:bool}}`。
 12. **打開開關的程序**：`huddle_ops.enable_pro_limits(p_gift_days integer default 60)`，只給 service_role：(a) 回填 grandfather；(b) 對 `launched_at` 起、開關打開前註冊、且目前無 Pro 的每個使用者用 `huddle_ops.give_days(..., 'manual', 'pro-limits-launch-gift:'||user_id, ...)` 送 60 天（source_key 冪等）；(c) 設 `limits_enforced=true, limits_enforced_at=now()`。**migration 不呼叫它**；要不要跑由老闆決定。另附 `huddle_ops.disable_pro_limits()` 回滾開關（不收回已送天數）。
 13. 權限：新函式一律 `revoke all from public, anon, authenticated`，再明確 grant 需要的；照既有 migration 風格。
-14. 測試：仿 main 上 `scripts/tests/*.sh` 的本機拋棄式 Postgres 做法，新增 `scripts/tests/pro-limits.sh`，涵蓋：開關關→全部照舊（含會議 20 次、免費可建組織）；開關開→免費第 151 個進行中任務 TASK_LIMIT、完成一個後可再建、Pro 無上限、已完成任務不受限、definer 流程不受限；筆記 101 NOTE_LIMIT；圖片 policy；會議 5/40；grandfather 回填；enable_pro_limits 冪等、送天數冪等；disable 回滾。
+14. 測試：仿 main 上 `scripts/tests/*.sh` 的本機拋棄式 Postgres 做法，新增 `scripts/tests/pro-limits.sh`，涵蓋：開關關→全部照舊（含會議 20 次、免費可建組織）；開關開→免費第 151 個進行中任務 TASK_LIMIT、完成一個後可再建、Pro 無上限、已完成任務不受限、definer 流程不受限；筆記 101 NOTE_LIMIT；圖片 policy；會議 5/20；grandfather 回填；enable_pro_limits 冪等、送天數冪等；disable 回滾。
 
 ## 3. 前端合約（`feat/pro-limits-ui` 負責）
 
