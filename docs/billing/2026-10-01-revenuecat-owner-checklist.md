@@ -28,7 +28,7 @@
 3. 簽完協議後申請 **小型企業方案**（抽成 30%→15%）。
 4. 產生 **In-App Purchase Key（.p8）**：Users and Access → Integrations → In-App Purchase → 產生。**只能下載一次**，下載後本人上傳到 RevenueCat（App Store app 設定頁，連同 Issuer ID）。
 5. 在 RevenueCat 新增 App Store app：Bundle ID `com.lazylazy.huddle`。加完會產生正式公開金鑰（`appl_` 開頭）→ TestFlight／正式版用這把。
-6. 建商品（工程師可帶）：訂閱群組＋`huddle_pro_monthly`（NT$149）、`huddle_pro_annual`（NT$990），各加 2 週免費試用（Introductory Offer）。第一個訂閱要**跟 App 版本一起送審**。
+6. 建商品（工程師可帶）：訂閱群組＋`huddle_pro_monthly`（NT$150）、`huddle_pro_annual`（NT$990），各加 2 週免費試用（Introductory Offer）。第一個訂閱要**跟 App 版本一起送審**。
 
 ## 四、Xcode 加 In-App Purchase（老闆本人，約 3 分鐘）
 指令列沒有 Apple 帳號（會報 No Accounts），所以這步要在 Xcode 視窗做。
