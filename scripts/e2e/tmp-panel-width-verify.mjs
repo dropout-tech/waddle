@@ -111,7 +111,7 @@ async function main() {
   // Turbopack dev occasionally 404s the very first request or two right
   // after "Ready" — retry the initial navigation instead of racing it.
   for (let attempt = 0; attempt < 5; attempt++) {
-    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE_URL}/login?method=email`, { waitUntil: 'domcontentloaded' })
     if (await page.locator('#email').count() > 0) break
     await sleep(1000)
   }

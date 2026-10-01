@@ -13,7 +13,7 @@ const envFile = Object.fromEntries(
 
 const browser = await chromium.launch()
 const page = await browser.newPage()
-await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.goto(`${BASE}/login?method=email`, { waitUntil: 'domcontentloaded' })
 await page.locator('#email').fill(envFile.E2E_EMAIL)
 await page.locator('#password').fill(envFile.E2E_PASSWORD)
 await page.getByRole('button', { name: '登入', exact: true }).click()

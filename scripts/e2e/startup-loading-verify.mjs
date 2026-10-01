@@ -94,7 +94,7 @@ const dispatchFocus = () => page.evaluate(() => {
   document.dispatchEvent(new Event('visibilitychange'))
 })
 try {
-  await page.goto(base + '/login', { waitUntil: 'domcontentloaded', timeout: 60000 })
+  await page.goto(base + '/login?method=email', { waitUntil: 'domcontentloaded', timeout: 60000 })
   await page.locator('#email').fill(env.E2E_EMAIL)
   await page.locator('#password').fill(env.E2E_PASSWORD)
   await page.locator('button[type=submit]').click()

@@ -33,7 +33,7 @@ try {
   await ctx.addInitScript(() => { try { localStorage.setItem('huddle-sticky-notes-enabled-v1', '1'); if (!localStorage.getItem('waddle-language-v1')) localStorage.setItem('waddle-language-v1', 'zh-TW') } catch {} })
   const page = await ctx.newPage()
   const errors = []; page.on('pageerror', (e) => errors.push(e.message))
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login?method=email`, { waitUntil: 'domcontentloaded' })
   await page.locator('#email').waitFor({ timeout: 90000 }); await page.waitForLoadState('networkidle').catch(() => {})
   await page.locator('#email').fill(env.E2E_EMAIL); await page.locator('#password').fill(env.E2E_PASSWORD)
   await page.locator('#password').press('Enter')
