@@ -119,6 +119,30 @@ export function isSeriesStart(task: Pick<Task, 'scheduledDate'>, targetDate?: st
 }
 
 /**
+ * "All occurrences" after dragging one occurrence from `targetDate` to `date`:
+ * move the whole series by the drag's day offset. Writing the dropped day as
+ * the series start would erase every occurrence before it, and a weekly
+ * series with chosen weekdays (每週一、三) must move its weekdays too — the
+ * rule fires on `daysOfWeek`, so shifting only the start left the series on
+ * the old weekdays plus a stray occurrence on the new start day.
+ */
+export function shiftSeries(
+  task: Pick<Task, 'scheduledDate' | 'recurrence'>,
+  targetDate: string,
+  date: string,
+): { scheduledDate: string; daysOfWeek?: number[] } {
+  const offset = Math.round(
+    (parseDateString(date).getTime() - parseDateString(targetDate).getTime()) / 86_400_000,
+  )
+  const start = parseDateString(task.scheduledDate ?? targetDate)
+  start.setDate(start.getDate() + offset)
+  const dow = task.recurrence?.type === 'weekly' ? task.recurrence.daysOfWeek : undefined
+  if (!dow || dow.length === 0) return { scheduledDate: toDateString(start) }
+  const shifted = [...new Set(dow.map((d) => (((d + offset) % 7) + 7) % 7))].sort((a, b) => a - b)
+  return { scheduledDate: toDateString(start), daysOfWeek: shifted }
+}
+
+/**
  * True iff the date is a *future* (virtual) occurrence — i.e. the task
  * recurs on this date but `task.scheduledDate` is a different day. Use
  * this to disable drag/resize on derived instances and to render a

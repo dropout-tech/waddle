@@ -14,7 +14,7 @@ import {
   timeBlockToRow,
   rowToSettings,
 } from '@/lib/supabase/mappers'
-import { toDateString, parseDateString, isSeriesStart } from '@/lib/calendar-utils'
+import { toDateString, parseDateString, isSeriesStart, shiftSeries } from '@/lib/calendar-utils'
 import { playTaskCompleteSound } from '@/lib/task-sound'
 import { hapticTaskComplete } from '@/lib/haptics'
 import { pushUndoableAction } from '@/lib/undo-stack'
@@ -2342,15 +2342,15 @@ export function useWaddleData(): UseWaddleData {
     // "This and following" from the series' first day IS the whole series.
     if (recurrenceChoice === 'this_and_following' && isSeriesStart(task, targetDate)) recurrenceChoice = 'all'
 
-    // "All occurrences" after dragging one occurrence: move the series by the
-    // drag's day offset. Writing the dropped day as the series start would
-    // erase every occurrence before it.
+    // "All occurrences" after dragging one occurrence: move the series (its
+    // start and, for 每週幾 series, its weekdays) by the drag's day offset.
+    let seriesShifted = false
+    let shiftedDays: number[] | undefined
     if (task.isRecurring && recurrenceChoice === 'all' && date && targetDate && task.scheduledDate) {
-      const shifted = parseDateString(task.scheduledDate)
-      shifted.setDate(shifted.getDate() + Math.round(
-        (parseDateString(date).getTime() - parseDateString(targetDate).getTime()) / 86_400_000,
-      ))
-      date = toDateString(shifted)
+      const shifted = shiftSeries(task, targetDate, date)
+      date = shifted.scheduledDate
+      shiftedDays = shifted.daysOfWeek
+      seriesShifted = true
     }
 
     // Non-recurring or "all" or missing choice
@@ -2367,6 +2367,7 @@ export function useWaddleData(): UseWaddleData {
                     scheduledStartTime: startTime,
                     scheduledEndTime: endTime,
                     ...(date ? { scheduledDate: date } : {}),
+                    ...(shiftedDays && t.recurrence ? { recurrence: { ...t.recurrence, daysOfWeek: shiftedDays } } : {}),
                     updatedAt: new Date().toISOString(),
                   }
                 : t
@@ -2375,11 +2376,17 @@ export function useWaddleData(): UseWaddleData {
         }))
       )
 
-      const update: { scheduled_start_time: string; scheduled_end_time: string; scheduled_date?: string } = {
+      const update: {
+        scheduled_start_time: string
+        scheduled_end_time: string
+        scheduled_date?: string
+        recurrence_days_of_week?: number[]
+      } = {
         scheduled_start_time: startTime,
         scheduled_end_time: endTime,
       }
       if (date) update.scheduled_date = date
+      if (shiftedDays) update.recurrence_days_of_week = shiftedDays
 
       pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
@@ -2421,16 +2428,20 @@ export function useWaddleData(): UseWaddleData {
         const beforeEnd = task.scheduledEndTime
         const title = task.title
         const newDate = date ?? beforeDate
+        // A shifted series is undone/redone as the opposite shift, so its
+        // weekdays move back too (passing the old start alone wouldn't).
+        const shiftFrom = seriesShifted ? newDate : undefined
+        const shiftBackFrom = seriesShifted ? beforeDate : undefined
         pushUndoableAction({
           label: translate('重排「{title}」', { title }),
           undo: () => {
             if (beforeStart && beforeEnd) {
-              return rescheduleTask(taskId, beforeDate, beforeStart, beforeEnd, 'all', undefined, false)
+              return rescheduleTask(taskId, beforeDate, beforeStart, beforeEnd, 'all', shiftFrom, false)
             }
             // Task was pending before — undo by unscheduling.
             return unscheduleTask(taskId, beforeDate, 'all', undefined, false)
           },
-          redo: () => rescheduleTask(taskId, newDate, startTime, endTime, 'all', undefined, false),
+          redo: () => rescheduleTask(taskId, newDate, startTime, endTime, 'all', shiftBackFrom, false),
         })
       }
       return
