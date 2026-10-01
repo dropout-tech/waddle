@@ -7,11 +7,11 @@ import { useI18n } from '@/lib/i18n/react'
  * app/not-found.tsx.
  *
  * It deliberately styles itself with inline styles + a tiny <style> block
- * instead of Tailwind classes: app/global-error.tsx replaces the root layout,
- * so globals.css (and the theme provider) may not be loaded there. Colors read
- * the app's CSS variables when they exist (so a segment error page follows
- * the active theme) and fall back to the paper palette from DESIGN.md
- * (light: paper #f6f3e9 / ink #292b24; dark: charcoal #22231e / cream).
+ * instead of Tailwind classes, and uses its own fixed palette from DESIGN.md
+ * (light: paper #f6f3e9 / ink #292b24 / terracotta #b8482a; dark, when the app
+ * root carries the `dark` class like next-themes sets it: charcoal #22231e /
+ * cream / mustard). app/global-error.tsx replaces the root layout, so
+ * globals.css variables and the theme provider cannot be relied on there.
  *
  * Must stay a client component with no server-only APIs — the Capacitor build
  * statically exports this code into the iOS app.
@@ -26,8 +26,8 @@ export type ErrorScreenProps = {
 }
 
 const CSS = `
-.hd-err{--e-bg:var(--background,#f6f3e9);--e-fg:var(--foreground,#292b24);--e-mute:var(--muted-foreground,#6b6a5c);--e-pri:var(--primary,#b8482a);--e-pri-fg:var(--primary-foreground,#fbf9f2);--e-line:var(--border,#d9d3bd)}
-@media (prefers-color-scheme:dark){.hd-err{--e-bg:var(--background,#22231e);--e-fg:var(--foreground,#f3eedd);--e-mute:var(--muted-foreground,#b9b3a0);--e-pri:var(--primary,#edc747);--e-pri-fg:var(--primary-foreground,#292b24);--e-line:var(--border,#45463d)}}
+.hd-err{--e-bg:#f6f3e9;--e-fg:#292b24;--e-mute:#6b6a5c;--e-pri:#b8482a;--e-pri-fg:#fbf9f2}
+html.dark .hd-err{--e-bg:#22231e;--e-fg:#f3eedd;--e-mute:#b9b3a0;--e-pri:#edc747;--e-pri-fg:#292b24}
 .hd-err{box-sizing:border-box;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:max(24px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom));background:var(--e-bg);color:var(--e-fg);font-family:var(--font-sans,"Noto Sans TC",system-ui,-apple-system,"Segoe UI",sans-serif)}
 .hd-err *{box-sizing:border-box}
 .hd-err-card{width:100%;max-width:420px;text-align:center}
