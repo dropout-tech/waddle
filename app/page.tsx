@@ -488,7 +488,10 @@ function HuddlePage() {
       createdAt: now,
       updatedAt: now,
     }
-    await createTask(newTask)
+    // Refused (offline, plan limit…): createTask already explained why and
+    // took the row off the screen — don't open an editor for a task that
+    // doesn't exist (its edits would update 0 rows).
+    if (!(await createTask(newTask))) return
     // The task is already persisted — open the modal in EDIT mode so the
     // follow-up Save goes through updateTask, not a second createTask with
     // the same id (which would hit a tasks_pkey 23505 duplicate). taskMode is
