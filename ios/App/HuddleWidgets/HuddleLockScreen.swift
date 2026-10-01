@@ -4,7 +4,7 @@ import AppIntents
 
 // MARK: Lock Screen (accessory) faces.
 //
-// Five Lock-Screen-only widgets (今日任務／下一個行程／當週日曆／月份／喝水) live
+// Four Lock-Screen-only widgets (今日任務／下一個行程／當週日曆／月份) live
 // here as their own kinds; where a family has two looks the widget gets an
 // on/off option (長按 → 編輯小工具). 今天三件事、專注計時、我的 Huddle、便條紙 add
 // the accessory families to their existing kinds instead. The legacy
@@ -21,10 +21,10 @@ import AppIntents
 // device language (Localizable.xcstrings).
 
 enum LockKind:String {
-    case today,next,week,month,water
+    case today,next,week,month
     var widgetKind:String {"HuddleWidget.lock-\(rawValue)"}
     /// Where a tap lands (lib/widgets/model.ts widgetPath).
-    var link:Kind {switch self {case .today:return .tasks;case .next:return .agenda;case .week:return .week;case .month:return .calendar;case .water:return .water}}
+    var link:Kind {switch self {case .today:return .tasks;case .next:return .agenda;case .week:return .week;case .month:return .calendar}}
 }
 
 /// Look identifiers the faces switch on (Entry.circleStyle / rectStyle).
@@ -32,7 +32,6 @@ enum TodayCircle:String {case ring,count}
 enum TodayRect:String {case next,list}
 enum WeekRect:String {case dots,twoDays="two-days"}
 enum MonthRect:String {case grid,summary}
-enum WaterCircle:String {case cups,countdown}
 
 protocol LockIntent:WidgetConfigurationIntent {static var lockKind:LockKind {get};var circleStyle:String {get};var rectStyle:String {get}}
 struct TodayLook:LockIntent {
@@ -67,17 +66,6 @@ struct MonthLook:LockIntent {
         When(widgetFamily:.equalTo,.accessoryRectangular){Summary{\.$summary}} otherwise:{Summary()}
     }
 }
-struct WaterLook:LockIntent {
-    static var title:LocalizedStringResource="喝水樣式"
-    static var description=IntentDescription("圓形可選今天幾杯或下次提醒倒數。")
-    static var lockKind:LockKind {.water}
-    @Parameter(title:"圓形顯示下次提醒倒數",default:false) var countdown:Bool
-    var circleStyle:String {(countdown ? WaterCircle.countdown:.cups).rawValue};var rectStyle:String {""}
-    static var parameterSummary:some ParameterSummary {
-        When(widgetFamily:.equalTo,.accessoryCircular){Summary{\.$countdown}} otherwise:{Summary()}
-    }
-}
-
 // MARK: Providers
 func lockEntry(_ lock:LockKind,circle:String="",rect:String="",now:Date=Date())->Entry {
     var e=loadEntry(kind:lock.link,now:now);e.lock=lock;e.circleStyle=circle;e.rectStyle=rect;return e
@@ -95,7 +83,7 @@ struct LockFixedProvider:TimelineProvider {
     func getTimeline(in context:Context,completion:@escaping(Timeline<Entry>)->Void) {completion(makeTimeline(lockEntry(lock)))}
 }
 /// Glances change on their own: at midnight (today / week / month roll over),
-/// a minute after each upcoming plan starts (下一個行程 moves on), and when water comes due.
+/// a minute after each upcoming plan starts (下一個行程 moves on).
 func glanceTimeline(_ e:Entry)->Timeline<Entry> {
     let now=e.date,cal=Calendar.current
     var at:[Date]=[]
@@ -106,7 +94,6 @@ func glanceTimeline(_ e:Entry)->Timeline<Entry> {
             let p=t.split(separator:":").compactMap{Int($0)}
             if p.count >= 2,let start=cal.date(bySettingHour:p[0],minute:p[1],second:0,of:day) {at.append(start.addingTimeInterval(60))}
         }
-        if s.water.enabled,let next=s.water.nextAt {at.append(Date(timeIntervalSince1970:next/1000+1))}
     }
     let future=Array(Set(at.filter{$0 > now && $0 < now.addingTimeInterval(12*3600)})).sorted().prefix(12)
     let entries=[e]+future.map{d->Entry in
@@ -143,29 +130,22 @@ struct LockMonthWidget:Widget {
             .configurationDisplayName("月份").description("今天幾號、這個月還有幾天有安排。").supportedFamilies(lockFamilies)
     }
 }
-struct LockWaterWidget:Widget {
-    var body:some WidgetConfiguration {
-        AppIntentConfiguration(kind:LockKind.water.widgetKind,intent:WaterLook.self,provider:LockProvider<WaterLook>()){WidgetView(entry:$0)}
-            .configurationDisplayName("喝水").description("今天喝了幾杯、下次提醒還有多久。").supportedFamilies(lockFamilies)
-    }
-}
 
 // MARK: Faces
-enum Glance {case today,next,week,month,water,topThree,focus,sticky,pet,none}
+enum Glance {case today,next,week,month,topThree,focus,sticky,pet,none}
 extension WidgetView {
     var isEN:Bool {(entry.snapshot?.pet?.lang ?? entry.snapshot?.locale) == "en"}
     func L(_ zh:String,_ en:String)->String {isEN ? en:zh}
     var isAccessory:Bool {family == .accessoryCircular || family == .accessoryRectangular || family == .accessoryInline}
     var todayKey:String {huddleDayFormat.string(from:entry.date)}
     var glance:Glance {
-        if let l=entry.lock {switch l {case .today:return .today;case .next:return .next;case .week:return .week;case .month:return .month;case .water:return .water}}
+        if let l=entry.lock {switch l {case .today:return .today;case .next:return .next;case .week:return .week;case .month:return .month}}
         // The legacy configurable widget maps its 類型 onto the nearest face.
         switch kind {
         case .tasks:return .today
         case .agenda:return .next
         case .week:return .week
         case .calendar,.overview,.month:return .month
-        case .water:return .water
         case .topThree:return .topThree
         case .focus:return .focus
         case .sticky:return .sticky
@@ -180,7 +160,6 @@ extension WidgetView {
             case .next: nextGlance(s)
             case .week: weekGlance(s)
             case .month: monthGlance(s)
-            case .water: waterGlance(s)
             case .topThree: topThreeGlance(s)
             case .focus: focusGlance(s)
             case .sticky: stickyGlance(s)
@@ -454,33 +433,6 @@ extension WidgetView {
                     }}
                 }
             }
-        }
-    }
-
-    // MARK: 喝水
-    @ViewBuilder func waterGlance(_ s:Snapshot)->some View {
-        let cups=max(entry.waterCount,s.water.count)
-        let next=s.water.enabled ? s.water.nextAt.map{Date(timeIntervalSince1970:$0/1000)}:nil
-        let due=next.map{$0 <= entry.date} ?? false
-        let nextText = !s.water.enabled ? L("提醒還沒開啟","Reminders off"):due ? L("該喝口水了","Time for a sip"):next.map{L("下次提醒 \(WidgetView.clockFormat.string(from:$0))","Next at \(WidgetView.clockFormat.string(from:$0))")} ?? L("喝口水，休息一下","Sip, then breathe")
-        switch family {
-        case .accessoryCircular:
-            if entry.circleStyle == WaterCircle.countdown.rawValue {
-                disc{VStack(spacing:0){
-                    Image(systemName:"drop.fill").font(.system(size:11,weight:.semibold))
-                    if let next,!due {Text(next,style:.timer).font(.system(size:14,weight:.semibold,design:.rounded)).monospacedDigit().multilineTextAlignment(.center).lineLimit(1).minimumScaleFactor(0.6)}
-                    else {Text(s.water.enabled ? L("喝水","Sip"):L("未開","Off")).font(.system(size:15,weight:.semibold,design:.rounded))}
-                    Text(!s.water.enabled ? L("提醒","alerts"):due ? L("時間到","now"):L("下一杯","next")).font(.system(size:8,weight:.medium))
-                }.padding(.horizontal,5)}.widgetURL(url(.water))
-            } else {discStack(icon:"drop.fill",value:"\(cups)",caption:L("杯","cups")).widgetURL(url(.water))}
-        case .accessoryInline:
-            Label(L("今天 \(cups) 杯 · ","\(cups) today · ")+nextText,systemImage:"drop.fill").widgetURL(url(.water))
-        default:
-            rect{
-                rectHeader("drop.fill",L("喝水","Water"))
-                Text(L("今天 \(cups) 杯","\(cups) glasses today")).font(.system(size:16,weight:.semibold,design:.rounded)).lineLimit(1)
-                Text(nextText).font(.system(size:13)).foregroundStyle(.secondary).lineLimit(1)
-            }.widgetURL(url(.water))
         }
     }
 

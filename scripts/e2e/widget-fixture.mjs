@@ -63,7 +63,7 @@ snapshot.focus = focusState === 'running'
     : { state: 'idle', title: T('慢慢來，先專心一件事', 'One thing at a time'), endAt: null, seconds: 1500, note: '' }
 snapshot.water = { enabled: true, nextAt: now.getTime() + 48 * 60000, count: 0 }
 snapshot.pet = { adopted: true, name: T('豆豆', 'Bean'), color: 'ink', accessory: 'scarf', lang: en ? 'en' : 'zh-TW', overdue: 0, overdueLine: '', lines: [T('今天也慢慢來。', 'Slow and steady today.')] }
-const state = { accountId: 'demo-account', epoch: 'demo-epoch', actions: [], snapshot, waterLog: { day: key(0), count: 3, last: now.getTime() - 35 * 60000 } }
+const state = { accountId: 'demo-account', epoch: 'demo-epoch', actions: [], snapshot }
 mkdirSync(dir, { recursive: true })
 writeFileSync(join(dir, 'widgets.json'), JSON.stringify(state))
 console.log(`wrote ${join(dir, 'widgets.json')} (${JSON.stringify(state).length} bytes, focus=${focusState}, lang=${en ? 'en' : 'zh-TW'})`)

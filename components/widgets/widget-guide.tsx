@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, CalendarRange, CalendarClock, ListChecks, Star, PanelsTopLeft, NotebookPen, PencilLine, Timer, Droplets, LayoutGrid, Bird, CalendarCheck, Smartphone, StickyNote, Calendar, Lock, type LucideIcon } from 'lucide-react'
+import { CalendarDays, CalendarRange, CalendarClock, ListChecks, Star, PanelsTopLeft, NotebookPen, PencilLine, Timer, LayoutGrid, Bird, CalendarCheck, Smartphone, StickyNote, Calendar, Lock, type LucideIcon } from 'lucide-react'
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { useI18n } from '@/lib/i18n/react'
 import { isNative } from '@/lib/platform'
@@ -18,7 +18,6 @@ const WIDGETS: { name: string; body: string; Icon: LucideIcon }[] = [
   { name: '記事本', body: '最近的筆記，點一下打開', Icon: NotebookPen },
   { name: '專注記事', body: '專注時冒出的想法，先記下來', Icon: PencilLine },
   { name: '專注計時', body: '在主畫面直接開始、暫停、結束', Icon: Timer },
-  { name: '喝水提醒', body: '喝了一杯就按一下，App 幫你重新計時', Icon: Droplets },
   { name: '隨手記入口', body: '白板、記事本、專注記事一鍵直達', Icon: LayoutGrid },
   { name: '我的 Huddle', body: '你領養的企鵝，會提醒你接下來的事', Icon: Bird },
   { name: '大型月曆', body: '三週大月曆，每天的任務和行程一格一格看清楚', Icon: Calendar },
@@ -33,7 +32,6 @@ const LOCK_WIDGETS: { name: string; body: string; Icon: LucideIcon }[] = [
   { name: '當週日曆', body: '一到日七天，每天有幾件事；也可改看今明兩天行程', Icon: CalendarRange },
   { name: '月份', body: '迷你月曆，或今天日期加上本月還有幾天有安排', Icon: CalendarDays },
   { name: '專注計時', body: '專注時即時倒數，暫停時顯示剩餘時間', Icon: Timer },
-  { name: '喝水', body: '今天喝了幾杯，或下次提醒倒數', Icon: Droplets },
   { name: '便條紙', body: '像備忘錄：標題一行、內文灰字', Icon: StickyNote },
   { name: '今天三件事', body: '今天最重要的三件事', Icon: Star },
   { name: '我的 Huddle', body: '企鵝本人，或牠現在想跟你說的話', Icon: Bird },
