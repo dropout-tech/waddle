@@ -19,8 +19,9 @@ const supabaseWsOrigin = supabaseOrigin.replace(/^http/, 'ws')
 // Content-Security-Policy for the server-hosted web build only (see note on
 // headers() below — it doesn't apply to the Capacitor static export).
 // Sources actually used by the app (verified by grep before writing this):
-//  - Fonts: next/font/google self-hosts Geist/Noto Sans TC/Barlow Condensed
-//    under /_next/static, so no fonts.gstatic.com/fonts.googleapis.com needed.
+//  - Fonts: Geist/Noto Sans TC/Barlow Condensed are committed under app/fonts/
+//    and served from /_next/static, so no fonts.gstatic.com/fonts.googleapis.com
+//    needed — at runtime or at build time.
 //  - Images: local /public assets, plus data: (inline SVG data URIs in the
 //    scratchpad) and blob: (object URLs for uploads/exports), plus the
 //    Supabase Storage origin (notebook-images bucket public URLs).
