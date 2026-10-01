@@ -1,13 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { Building2, Copy, Crown, Link2, Loader2, LogOut, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/components/auth/auth-provider'
 import { useI18n } from '@/lib/i18n/react'
 import { PersonAvatar } from '@/components/assignments/task-assign-section'
+import { UpgradePrompt } from '@/components/billing/upgrade-prompt'
 import {
   getMyOrganizations,
   createOrganization,
@@ -122,11 +122,11 @@ function CreateOrg({ canCreate, onCreated, onCancel }: { canCreate: boolean; onC
           </div>
         </form>
       ) : (
-        <div data-testid="org-upgrade" className="rounded-xl bg-muted/60 p-4">
-          <p className="text-sm">{t('建立組織是 Pro 會員功能。升級後就能建立組織、產生邀請連結。')}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{t('收到別人的邀請連結？直接打開連結即可免費加入。')}</p>
-          <Link href="/membership" className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm text-primary-foreground">{t('查看 Pro 會員')}</Link>
-        </div>
+        <UpgradePrompt
+          testId="org-upgrade"
+          message={t('建立組織是 Pro 會員功能。升級後就能建立組織、產生邀請連結。')}
+          hint={t('收到別人的邀請連結？直接打開連結即可免費加入。')}
+        />
       )}
     </section>
   )

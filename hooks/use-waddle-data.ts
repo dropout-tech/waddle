@@ -32,6 +32,8 @@ import { normalizePet, type PetSettings } from '@/lib/pet/types'
 // Aliased: this file uses `t` pervasively as the loop variable for "task"
 // (c.tasks.map((t) => ...)), so importing the translator as `t` would shadow it.
 import { t as translate, translateFor, getLang } from '@/lib/i18n'
+import { planLimitCode } from '@/lib/billing/plan-errors'
+import { showPlanLimitToast } from '@/lib/billing/plan-limit-toast'
 import { demoWorkspaces } from '@/lib/demo-data'
 import { canResetWorkspaces, collectDemoTaskInfo } from '@/lib/onboarding/can-reset-workspaces'
 import {
@@ -816,6 +818,10 @@ export function useWaddleData(): UseWaddleData {
 
   const handleDbError = (op: string) => (err: unknown) => {
     console.error(`[${op}]`, err)
+    // Plan limits (TASK_LIMIT etc.) are not failures to retry: say so plainly
+    // and point at Pro instead of showing "錯誤代碼 P0001".
+    const limitCode = planLimitCode(err)
+    if (limitCode) return showPlanLimitToast(limitCode)
     // Say why, not just that it failed: an expired login and a dropped
     // connection need different things from the user.
     const reason = classifyDbError(err)
