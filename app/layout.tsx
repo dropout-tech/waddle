@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Noto_Sans_TC } from 'next/font/google'
 import './globals.css'
 import './art-theme.css'
+import { SITE_ORIGIN } from '@/lib/site'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { NativeShell } from '@/components/native/native-shell'
 import { PwaSetup } from '@/components/pwa/pwa-setup'
@@ -32,7 +33,7 @@ const notoSansTC = Noto_Sans_TC({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://waddle.zeabur.app'),
+  metadataBase: new URL(SITE_ORIGIN),
   title: BRAND_TITLE,
   description:
     '把任務、行程、專注與筆記收進同一張桌面。Huddle 是一個溫柔、不催促的個人工作空間。',

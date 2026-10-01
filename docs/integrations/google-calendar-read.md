@@ -49,7 +49,7 @@ busy 呼叫失敗或有人 unavailable → 空檔照算，對話框顯示「部�
 | `GOOGLE_CALENDAR_CLIENT_ID` | Google Cloud OAuth「網頁應用程式」用戶端 ID |
 | `GOOGLE_CALENDAR_CLIENT_SECRET` | 同上的用戶端密鑰 |
 | `GOOGLE_CALENDAR_TOKEN_KEY` | 32 bytes 隨機值，base64url。產生：`node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` |
-| `GOOGLE_CALENDAR_REDIRECT_URI` | `https://<正式站網域>/settings/google-calendar/callback`（必須 https，且與 Google Cloud 設定逐字相同） |
+| `GOOGLE_CALENDAR_REDIRECT_URI` | `https://<正式站網域>/settings/google-calendar/callback`（必須 https，且與 Google Cloud 設定逐字相同）。**可用逗號分隔填多個**（每個網域一個，例如新舊網域並行時 `https://huddle.lazy72.com/settings/google-calendar/callback,https://waddle.zeabur.app/settings/google-calendar/callback`）：`start`／`finish` 依請求的 `Origin` 從清單挑 origin 相同的那個，Origin 不在清單或沒帶時用**第一個**（所以把主網域放第一個）。任何一個格式不合就整體 `configured:false`。Origin 只用來「挑選」，不會被拼進網址。 |
 
 四個缺任何一個 → `status` 回 `configured:false`，設定頁顯示「尚未啟用」，行事曆不發任何 events 請求。**這就是功能開關。**
 `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY` 由平台自動提供。
@@ -62,7 +62,7 @@ busy 呼叫失敗或有人 unavailable → 空檔照算，對話框顯示「部�
 4. 「測試使用者」加入老闆自己與要試用的 Google 帳號（Testing 模式只有列在這裡的帳號能授權）。
    驗 busy（約交集）至少要兩個互為共享夥伴、且都連了 Google 的測試帳號。
 5. 「憑證」→ 建立 OAuth 用戶端 ID → 類型「網頁應用程式」→「已授權的重新導向 URI」填
-   `https://<正式站網域>/settings/google-calendar/callback`（目前 repo 內已知正式站為 `https://waddle.zeabur.app`，若有自訂網域以實際網域為準）。
+   `https://<正式站網域>/settings/google-calendar/callback`（正式站為 `https://huddle.lazy72.com`；舊網域 `https://waddle.zeabur.app` 仍保留並行，**兩個網址都要各加一條**到「已授權的重新導向 URI」）。
    本機測試可另加 `http://localhost:3000/settings/google-calendar/callback`（但 Edge Function 目前只接受 https 的 redirect，本機要真跑 OAuth 需另議）。
 6. 把用戶端 ID／密鑰交給工程端（不要貼在聊天或 commit 裡）。
 7. 之後要開放給所有使用者：送 Google 驗證（此範圍屬敏感範圍，通常需要說明用途與示範影片）。
@@ -73,7 +73,7 @@ supabase secrets set --project-ref <已確認的專案 ref> \
   GOOGLE_CALENDAR_CLIENT_ID='<client-id>.apps.googleusercontent.com' \
   GOOGLE_CALENDAR_CLIENT_SECRET='<client-secret>' \
   GOOGLE_CALENDAR_TOKEN_KEY='<32-byte-base64url>' \
-  GOOGLE_CALENDAR_REDIRECT_URI='https://<正式站網域>/settings/google-calendar/callback'
+  GOOGLE_CALENDAR_REDIRECT_URI='https://huddle.lazy72.com/settings/google-calendar/callback,https://waddle.zeabur.app/settings/google-calendar/callback'
 supabase secrets list --project-ref <已確認的專案 ref>   # 只確認名稱存在
 ```
 
