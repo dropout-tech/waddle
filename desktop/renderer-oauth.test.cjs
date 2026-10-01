@@ -8,7 +8,7 @@ function setup() {
   const data = new Map(); const calls = []; const exports = {}
   const auth = {signInWithOAuth: async options => { calls.push(['signIn',options]); return {data:{url:'https://auth.example/oauth'}} }, exchangeCodeForSession: async code => { calls.push(['exchange',code]); return { data:{session:{user:{id:'test'}}}, error:null } }}
   const bridge = {isDesktop:true,beginOAuth:async()=> 'nonce',openOAuth:async url => { calls.push(['open',url]) },cancelOAuth:async()=>calls.push(['cancel'])}
-  vm.runInNewContext(source,{exports,require:()=>({createClient:()=>({auth})}),window:{huddleDesktop:bridge,location:{origin:'https://waddle.zeabur.app'}},localStorage:{getItem:k=>data.get(k),setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)},URL,Date,setTimeout,clearTimeout,Map,Error})
+  vm.runInNewContext(source,{exports,require:()=>({createClient:()=>({auth})}),window:{huddleDesktop:bridge,location:{origin:'https://huddle.lazy72.com'}},localStorage:{getItem:k=>data.get(k),setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)},URL,Date,setTimeout,clearTimeout,Map,Error})
   return {api:exports,data,calls,auth}
 }
 test('renderer opens external PKCE flow and cancellation permits retry', async()=>{
