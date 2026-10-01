@@ -130,38 +130,6 @@
         }
       }
     },
-    "喝水": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Water"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "喝水"
-          }
-        }
-      }
-    },
-    "今天喝了幾杯、下次提醒還有多久。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Glasses today and time until the next reminder."
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "今天喝了幾杯、下次提醒還有多久。"
-          }
-        }
-      }
-    },
     "大型月曆": {
       "localizations": {
         "en": {
@@ -322,38 +290,6 @@
         }
       }
     },
-    "喝水樣式": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Water style"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "喝水樣式"
-          }
-        }
-      }
-    },
-    "圓形可選今天幾杯或下次提醒倒數。": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Circular: glasses today or countdown to the next reminder."
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "圓形可選今天幾杯或下次提醒倒數。"
-          }
-        }
-      }
-    },
     "圓形只顯示剩餘件數": {
       "localizations": {
         "en": {
@@ -414,22 +350,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "長方形改看日期＋本月有事天數"
-          }
-        }
-      }
-    },
-    "圓形顯示下次提醒倒數": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Circular: next reminder countdown"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "圓形顯示下次提醒倒數"
           }
         }
       }

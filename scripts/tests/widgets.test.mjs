@@ -87,3 +87,9 @@ test('new widget kinds deep-link to real screens; sticky ids never become task i
  assert.equal(widgetPath({kind:'sticky',id:'3f2a-11'}),'/?widget=sticky&note=3f2a-11')
  assert.equal(widgetPath({kind:'month'}),'/?widget=month')
 })
+test('water widgets are gone: no water kind; an old huddle://widget/water tap is ignored safely; snapshot keeps water for older widget builds',()=>{
+ assert.ok(!mod.widgetKinds.includes('water'));assert.equal(mod.widgetNames.water,undefined)
+ assert.equal(parseWidgetURL('huddle://widget/water'),null)
+ assert.equal(parseWidgetURL('huddle://widget/water?accountId=a&epoch=e'),null)
+ assert.deepEqual(makeSnapshot(args).water,{enabled:false,nextAt:null,count:0})
+})

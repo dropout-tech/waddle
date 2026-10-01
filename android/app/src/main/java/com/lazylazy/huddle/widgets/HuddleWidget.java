@@ -11,8 +11,8 @@ import com.lazylazy.huddle.MainActivity;
 import com.lazylazy.huddle.R;
 
 public class HuddleWidget extends AppWidgetProvider {
-    public static final String[] KINDS={"overview","calendar","agenda","tasks","top-three","whiteboard","notebook","focus-note","focus","water","shortcuts"};
-    public static final String[] NAMES={"月曆＋今日任務","可視化小月曆","近期行程","任務清單","今天三件事","白板","記事本","專注記事","專注計時","喝水提醒","隨手記入口"};
+    public static final String[] KINDS={"overview","calendar","agenda","tasks","top-three","whiteboard","notebook","focus-note","focus","shortcuts"};
+    public static final String[] NAMES={"月曆＋今日任務","可視化小月曆","近期行程","任務清單","今天三件事","白板","記事本","專注記事","專注計時","隨手記入口"};
     public static void refresh(Context c){AppWidgetManager m=AppWidgetManager.getInstance(c);for(int id:m.getAppWidgetIds(new ComponentName(c,HuddleWidget.class)))render(c,m,id);}
     @Override public void onUpdate(Context c,AppWidgetManager m,int[] ids){for(int id:ids)render(c,m,id);}
     @Override public void onAppWidgetOptionsChanged(Context c,AppWidgetManager m,int id,Bundle options){render(c,m,id);}
@@ -64,7 +64,6 @@ public class HuddleWidget extends AppWidgetProvider {
                 case "whiteboard":rows(c,v,id,kind,s,s.optJSONArray("boards"),1,false,pending);addText(c,v,"開啟白板 ↗","",open(c,id,kind,s,null,null));break;
                 case "focus-note":JSONObject f=s.optJSONObject("focus");addText(c,v,f==null?"想法來了，先留下來。":f.optString("title"),f==null?"":f.optString("note"),open(c,id,kind,s,null,null));addText(c,v,"記一筆 ↗","",open(c,id,kind,s,null,null));break;
                 case "focus":JSONObject focus=s.optJSONObject("focus");int seconds=focus==null?1500:focus.optInt("seconds",1500);if(focus!=null&&focus.optString("state").equals("running")&&!focus.isNull("endAt"))seconds=(int)Math.max(0,(focus.optDouble("endAt")-System.currentTimeMillis())/1000);addText(c,v,String.format(java.util.Locale.ROOT,"%02d:%02d",seconds/60,seconds%60),focus==null?"專注":focus.optString("title"),open(c,id,kind,s,null,null));addText(c,v,"開啟計時控制 ↗","",open(c,id,kind,s,null,null));break;
-                case "water":addText(c,v,"喝口水，休息一下","喝了 ／ 稍後提醒 ↗",open(c,id,kind,s,null,null));break;
                 case "shortcuts":for(String k:new String[]{"whiteboard","notebook","focus-note"})addText(c,v,NAMES[java.util.Arrays.asList(KINDS).indexOf(k)]+" ↗","",open(c,id,k,s,null,null));break;
             }
             text(v,R.id.widget_updated,pending.length()>0?"待同步 · 開啟 Huddle":"更新 "+s.optString("generatedAt").substring(0,10));

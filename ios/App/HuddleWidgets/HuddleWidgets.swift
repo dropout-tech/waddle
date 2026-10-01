@@ -30,10 +30,10 @@ struct Snapshot:Decodable {
 }
 struct PetInfo:Decodable {var adopted:Bool;var name:String;var color:String;var accessory:String;var lang:String;var overdue:Int;var overdueLine:String;var lines:[String]}
 enum Kind:String,AppEnum,CaseIterable {
-    case overview,calendar,agenda,week,tasks,topThree="top-three",whiteboard,notebook,focusNote="focus-note",focus,water,shortcuts,pet,month,sticky
+    case overview,calendar,agenda,week,tasks,topThree="top-three",whiteboard,notebook,focusNote="focus-note",focus,shortcuts,pet,month,sticky
     static var typeDisplayRepresentation:TypeDisplayRepresentation="小工具類型"
-    static var caseDisplayRepresentations:[Kind:DisplayRepresentation]=[.overview:"月曆＋今日任務",.calendar:"可視化小月曆",.agenda:"近期行程",.week:"本週時間表",.tasks:"任務清單",.topThree:"今天三件事",.whiteboard:"白板",.notebook:"記事本",.focusNote:"專注記事",.focus:"專注計時",.water:"喝水提醒",.shortcuts:"隨手記入口",.pet:"我的 Huddle",.month:"大型月曆",.sticky:"便條紙"]
-    var title:String {switch self {case .overview:return "月曆＋今日任務";case .calendar:return "可視化小月曆";case .agenda:return "近期行程";case .week:return "本週時間表";case .tasks:return "任務清單";case .topThree:return "今天三件事";case .whiteboard:return "白板";case .notebook:return "記事本";case .focusNote:return "專注記事";case .focus:return "專注計時";case .water:return "喝水提醒";case .shortcuts:return "隨手記入口";case .pet:return "我的 Huddle";case .month:return "大型月曆";case .sticky:return "便條紙"}}
+    static var caseDisplayRepresentations:[Kind:DisplayRepresentation]=[.overview:"月曆＋今日任務",.calendar:"可視化小月曆",.agenda:"近期行程",.week:"本週時間表",.tasks:"任務清單",.topThree:"今天三件事",.whiteboard:"白板",.notebook:"記事本",.focusNote:"專注記事",.focus:"專注計時",.shortcuts:"隨手記入口",.pet:"我的 Huddle",.month:"大型月曆",.sticky:"便條紙"]
+    var title:String {switch self {case .overview:return "月曆＋今日任務";case .calendar:return "可視化小月曆";case .agenda:return "近期行程";case .week:return "本週時間表";case .tasks:return "任務清單";case .topThree:return "今天三件事";case .whiteboard:return "白板";case .notebook:return "記事本";case .focusNote:return "專注記事";case .focus:return "專注計時";case .shortcuts:return "隨手記入口";case .pet:return "我的 Huddle";case .month:return "大型月曆";case .sticky:return "便條紙"}}
     /// Gallery blurb (「新增小工具」畫面每款各自的說明).
     var blurb:String {switch self {
         case .overview:return "本月月曆，加上今天要做的事，直接打勾。"
@@ -46,7 +46,6 @@ enum Kind:String,AppEnum,CaseIterable {
         case .notebook:return "最近的筆記；長按編輯可釘選一篇。"
         case .focusNote:return "專注時冒出的想法，先記下來。"
         case .focus:return "在主畫面直接開始、暫停、結束專注。"
-        case .water:return "喝了一杯就按一下，App 會幫你重新計時提醒。"
         case .shortcuts:return "白板、記事本、專注記事，一鍵打開。"
         case .pet:return "你領養的企鵝：提醒你接下來的事，點牠會呱一聲。"
         case .month:return "三週大月曆：任務、行程一格一格看清楚。"
@@ -59,7 +58,7 @@ enum Kind:String,AppEnum,CaseIterable {
         case .overview:return [.systemMedium,.systemLarge]
         case .calendar:return [.systemSmall,.systemLarge]
         case .week:return [.systemMedium,.systemLarge]
-        case .focusNote,.water:return [.systemSmall,.systemMedium]
+        case .focusNote:return [.systemSmall,.systemMedium]
         // Lock Screen versions (HuddleLockScreen.swift) ride on the same kinds.
         case .topThree:return [.systemSmall,.systemMedium,.accessoryCircular,.accessoryRectangular,.accessoryInline]
         case .shortcuts:return [.systemMedium]
@@ -105,15 +104,6 @@ struct CompleteTask:AppIntent {
     init(_ id:String,_ account:String,_ epoch:String){taskId=id;accountId=account;self.epoch=epoch}
     func perform() async throws -> some IntentResult {try WidgetStore.toggleTask(taskId:taskId,accountId:accountId,epoch:epoch);WidgetCenter.shared.reloadAllTimelines();return .result()}
 }
-struct LogWater:AppIntent {
-    static var title:LocalizedStringResource="喝了一杯水"
-    static var isDiscoverable=false
-    @Parameter(title:"帳號") var accountId:String
-    @Parameter(title:"版本") var epoch:String
-    init(){}
-    init(_ account:String,_ epoch:String){accountId=account;self.epoch=epoch}
-    func perform() async throws -> some IntentResult {try WidgetStore.logWater(accountId:accountId,epoch:epoch,day:huddleDayFormat.string(from:Date()));WidgetCenter.shared.reloadAllTimelines();return .result()}
-}
 struct FocusControl:AppIntent {
     static var title:LocalizedStringResource="專注計時控制"
     static var isDiscoverable=false
@@ -156,8 +146,6 @@ struct Entry:TimelineEntry {
     /// Queued-but-unsynced task changes: task id → target completed state (optimistic UI).
     var pendingTasks:[String:Bool]=[:]
     var focusOps:[FocusOp]=[]
-    /// Today's glasses logged from the widget, and when the last one was.
-    var waterCount:Int=0;var waterLast:Date?=nil
     var pendingCount:Int=0
     var window:WeekWindow = .all
     /// Penguin taps so far and when the last one was (「我的 Huddle」).
@@ -181,9 +169,6 @@ func loadEntry(kind:Kind,category:String?=nil,noteID:String?=nil,now:Date=Date()
     e.focusOps=actions.filter{$0["type"] as? String == "focus"}.compactMap{a in
         guard let op=a["op"] as? String,let at=a["at"] as? Double else {return nil}
         return FocusOp(op:op,at:Date(timeIntervalSince1970:at/1000))}
-    if let log=state["waterLog"] as? [String:Any],log["day"] as? String == huddleDayFormat.string(from:now) {
-        e.waterCount=log["count"] as? Int ?? 0;e.waterLast=(log["last"] as? Double).map{Date(timeIntervalSince1970:$0/1000)}
-    }
     if let w=state["weekWindow"] as? [String:Any],let v=(w["value"] as? String).flatMap(WeekWindow.init(rawValue:)),let at=w["at"] as? Double,
        now.timeIntervalSince1970-at/1000 < weekWindowLifetime {e.window=v}
     if let poke=state["petPoke"] as? [String:Any] {e.petPokeN=poke["n"] as? Int ?? 0;e.petPokeAt=(poke["at"] as? Double).map{Date(timeIntervalSince1970:$0/1000)}}
@@ -226,7 +211,11 @@ struct FixedProvider:TimelineProvider {
 struct WidgetView:View {
     var entry:Entry
     @Environment(\.widgetFamily) var family
-    @Environment(\.colorScheme) var scheme
+    @Environment(\.colorScheme) private var systemScheme
+    /// Home Screen widgets stay on the light (cream) look in dark mode — owner's call
+    /// (2026-10-02). Lock Screen faces (accessory families) keep the system scheme, which
+    /// tints them itself. iOS 18's 著色／透明 icon mode still overrides colours and cannot be blocked.
+    var scheme:ColorScheme {(entry.lock != nil || isAccessory) ? systemScheme:.light}
     var kind:Kind{entry.kind}
     var ink:Color{scheme == .dark ? Color(red:0.94,green:0.92,blue:0.86):Color(red:0.23,green:0.23,blue:0.19)}
     var paper:Color{scheme == .dark ? Color(red:0.16,green:0.16,blue:0.14):Color(red:0.99,green:0.98,blue:0.94)}
@@ -256,9 +245,9 @@ struct WidgetView:View {
                 // footer unless there's something pending, or the grid overflows
                 // and iOS clips the top edge.
                 let dense = kind == .overview || kind == .calendar || kind == .week || kind == .month || kind == .sticky
-                // Focus / water are button panels: no title row or "updated"
-                // footer (they'd push the 44pt buttons out of a small widget).
-                let panel = kind == .focus || kind == .water
+                // Focus is a button panel: no title row or "updated"
+                // footer (it'd push the 44pt buttons out of a small widget).
+                let panel = kind == .focus
                 VStack(alignment:.leading,spacing:dense || panel ? 4:8){
                     if !dense && !panel {HStack{
                         Text(kind.title).font(.caption.weight(.semibold));Spacer()
@@ -271,7 +260,7 @@ struct WidgetView:View {
                     if (!dense && !panel) || entry.pendingCount>0 {HStack(spacing:3){Image(systemName:"clock");Text(entry.pendingCount == 0 ? "更新 \(String(s.generatedAt.prefix(10)))":"待同步 · 開啟 Huddle")}.font(.system(size:9)).foregroundStyle(ink.opacity(0.7)).lineLimit(1)}
                 }.foregroundStyle(ink).widgetURL(kind == .sticky ? stickyURL(s.stickies?.first):url(kind)).privacySensitive()
             } else {Link(destination:url(kind)){VStack(spacing:8){Image("Huddle").resizable().scaledToFit().frame(width:55,height:55);Text(emptyTitle).font(.caption).multilineTextAlignment(.center);Text(emptyHint).font(.caption2).multilineTextAlignment(.center).foregroundStyle(ink.opacity(0.7))}.foregroundStyle(ink)}}
-        }.containerBackground(paper,for:.widget)
+        }.containerBackground(paper,for:.widget).environment(\.colorScheme,scheme)
     }
     @ViewBuilder func content(_ s:Snapshot)->some View {
         switch kind {
@@ -292,7 +281,6 @@ struct WidgetView:View {
             rows(Array(s.boards.prefix(1)),s);Link("開啟白板 ↗",destination:url(.whiteboard,s.boards.first)).font(.caption)
         case .focusNote: Text(s.focus.title).font(.subheadline);Text(s.focus.note.isEmpty ? "想法來了，先留下來。":s.focus.note).font(.caption).lineLimit(3);Link("記一筆 ↗",destination:url(.focusNote)).font(.headline).foregroundStyle(clay)
         case .focus: focusPanel(s)
-        case .water: waterPanel(s)
         case .shortcuts: Text("想法來了，先留下來。").font(.caption);shortcuts
         case .pet: petPanel(s)
         case .month: if family == .systemLarge || family == .systemExtraLarge {bigMonth(s)} else {calendar(s)}
@@ -474,24 +462,6 @@ struct WidgetView:View {
             HStack(alignment:.center,spacing:12){VStack(alignment:.leading,spacing:4){Image("Huddle").resizable().scaledToFit().frame(width:25,height:25);face}.frame(maxWidth:.infinity,alignment:.leading);controls.frame(width:150)}.frame(maxHeight:.infinity)
         } else {face;Spacer(minLength:0);controls}
     }
-    // MARK: 喝水提醒 — +1 glass on the widget; the tally is local, the app re-arms its reminder.
-    @ViewBuilder func waterPanel(_ s:Snapshot)->some View {
-        let time=entry.waterLast.map{Self.clockFormat.string(from:$0)}
-        let tally=HStack(spacing:8){
-            Image(systemName:"drop.fill").font(.title2).foregroundStyle(clay)
-            VStack(alignment:.leading,spacing:1){
-                Text("今天 \(entry.waterCount) 杯").font(.headline).monospacedDigit()
-                Text(time.map{"上次 \($0)"} ?? (s.water.enabled ? "喝口水，休息一下":"提醒尚未開啟")).font(.caption2).foregroundStyle(ink.opacity(0.7)).lineLimit(1)
-            }
-        }
-        let button=Button(intent:LogWater(s.accountId,s.epoch)){
-            Label("喝了一杯",systemImage:"plus").font(.caption.weight(.semibold)).frame(maxWidth:.infinity,minHeight:44)
-                .background(clay,in:RoundedRectangle(cornerRadius:12)).foregroundStyle(Color.white).contentShape(Rectangle())
-        }.buttonStyle(.plain)
-        if family == .systemMedium {
-            HStack(spacing:12){VStack(alignment:.leading,spacing:6){Image("Huddle").resizable().scaledToFit().frame(width:25,height:25);tally}.frame(maxWidth:.infinity,alignment:.leading);button.frame(width:150)}.frame(maxHeight:.infinity)
-        } else {Image("Huddle").resizable().scaledToFit().frame(width:25,height:25);tally;Spacer(minLength:0);button}
-    }
     static let clockFormat:DateFormatter={let f=DateFormatter();f.locale=Locale(identifier:"en_US_POSIX");f.dateFormat="HH:mm";return f}()
 }
 // MARK: 我的 Huddle — the adopted penguin and its speech bubble.
@@ -585,8 +555,7 @@ extension WidgetView {
         let open=s.tasks.filter{!(entry.pendingTasks[$0.id] ?? ($0.completed == true))}.count
         if open > 0 {return PetBubble(text:en ? "\(open) left on today's list. Honk.":"今天還有 \(open) 件事，呱。先挑最小的？",link:url(.tasks))}
         let waterDue=s.water.enabled && (s.water.nextAt.map{$0/1000 <= now.timeIntervalSince1970} ?? false)
-        let sipped=entry.waterLast.map{now.timeIntervalSince($0) < 3600} ?? false
-        if waterDue && !sipped {return PetBubble(text:en ? "It's been a while since your last sip. Honk.":"好一陣子沒喝水了，喝一口吧，呱。",link:url(.water))}
+        if waterDue {return PetBubble(text:en ? "It's been a while since your last sip. Honk.":"好一陣子沒喝水了，喝一口吧，呱。",link:url(.pet))}
         if p.lines.isEmpty {return PetBubble(text:en ? "Honk.":"呱。",link:url(.pet))}
         return PetBubble(text:p.lines[Int(now.timeIntervalSince1970/3600) % p.lines.count],link:url(.pet))
     }
@@ -669,7 +638,7 @@ struct HuddleWidgets:Widget {
     var body:some WidgetConfiguration {
         AppIntentConfiguration(kind:"HuddleWidgets",intent:Configuration.self,provider:IntentProvider<Configuration>()){entry in WidgetView(entry:entry)}
             .configurationDisplayName("Huddle 小工具（可自訂）")
-            .description("一個小工具切換 15 款內容：長按 → 編輯小工具 → 類型。")
+            .description("一個小工具切換 14 款內容：長按 → 編輯小工具 → 類型。")
             .supportedFamilies([.systemSmall,.systemMedium,.systemLarge,.accessoryCircular,.accessoryRectangular,.accessoryInline])
     }
 }
@@ -692,7 +661,6 @@ struct WhiteboardWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.
 struct NotebookWidget:Widget {var body:some WidgetConfiguration {filteredWidget(.notebook,NotePick.self)}}
 struct FocusNoteWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.focusNote)}}
 struct FocusWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.focus)}}
-struct WaterWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.water)}}
 struct ShortcutsWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.shortcuts)}}
 struct PetWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.pet)}}
 
@@ -737,11 +705,11 @@ struct HuddlePlanWidgets:WidgetBundle {
     var body:some Widget {PetWidget();OverviewWidget();CalendarWidget();AgendaWidget();WeekWidget();TasksWidget();TopThreeWidget()}
 }
 struct HuddleCaptureWidgets:WidgetBundle {
-    var body:some Widget {WhiteboardWidget();NotebookWidget();FocusNoteWidget();FocusWidget();WaterWidget();ShortcutsWidget()}
+    var body:some Widget {WhiteboardWidget();NotebookWidget();FocusNoteWidget();FocusWidget();ShortcutsWidget()}
 }
 /// Lock Screen glances + 便條紙 + 大型月曆 (HuddleLockScreen.swift, HuddleMonthSticky.swift).
 struct HuddleGlanceWidgets:WidgetBundle {
-    var body:some Widget {LockTodayWidget();LockNextWidget();LockWeekWidget();LockMonthWidget();LockWaterWidget();StickyWidget();MonthWidget()}
+    var body:some Widget {LockTodayWidget();LockNextWidget();LockWeekWidget();LockMonthWidget();StickyWidget();MonthWidget()}
 }
 @main struct HuddleWidgetBundle: WidgetBundle {
     var body: some Widget { HuddlePlanWidgets().body; HuddleCaptureWidgets().body; HuddleGlanceWidgets().body; HuddleWidgets(); HuddleFocusLiveActivity() }

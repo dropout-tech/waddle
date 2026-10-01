@@ -2,7 +2,6 @@
 import { useEffect, useRef } from 'react'
 import { useFocusTimer } from '@/components/timer/focus-timer-provider'
 import { takeWidgetLaunch, WIDGET_LAUNCH_EVENT, STICKY_OPEN_EVENT } from '@/lib/widgets/launch'
-import { WATER_OPEN_EVENT } from '@/hooks/use-water-reminder'
 import { toDateString } from '@/lib/calendar-utils'
 import type { Task, Workspace } from '@/lib/types'
 
@@ -24,7 +23,7 @@ function findTask(workspaces: Workspace[], id: string) {
  * Consumes `/?widget=<kind>&date=&task=` (see widgetPath in lib/widgets/model.ts)
  * and lands on the real screen: calendar kinds → 日曆 tab (week view, or month
  * for the plain 小月曆 tap), tasks → 任務 tab, whiteboard → 白板 overlay,
- * focus → expanded timer, water → the water-break popup, sticky → the 便條紙
+ * focus → expanded timer, sticky → the 便條紙
  * overlay (StickyNotesProvider), month → month view. A task id is held
  * until the board has loaded and the task exists.
  */
@@ -53,7 +52,6 @@ export function useWidgetLaunch(targets: WidgetLaunchTargets) {
       } else if (kind === 'tasks' || kind === 'top-three') t.setMobileTab('tasks')
       else if (kind === 'whiteboard') t.openWhiteboard()
       else if (kind === 'focus') ft.setIsExpanded(true)
-      else if (kind === 'water') window.dispatchEvent(new Event(WATER_OPEN_EVENT))
       else if (kind === 'new-task') t.createTask?.(toDateString(new Date()))
       else if (kind === 'sticky') {
         const note = q.get('note')
