@@ -916,11 +916,25 @@ export function useWaddleData(): UseWaddleData {
     return false
   }
 
+  // Put tasks that were optimistically removed back on screen (their DELETE
+  // failed, so the server still has them).
+  const putTasksBack = (tasks: Task[]) => {
+    setWorkspaces((prev) => prev.map((w) => ({
+      ...w,
+      categories: w.categories.map((c) => {
+        const add = tasks.filter((t) => t.categoryId === c.id && !c.tasks.some((x) => x.id === t.id))
+        return add.length ? { ...c, tasks: [...c.tasks, ...add] } : c
+      }),
+    })))
+  }
+
   // Deleting a recurring series must take its "only this" overrides along:
   // tasks.parent_id is ON DELETE SET NULL, so they used to stay on the
   // calendar as orphans. `fromDate` limits it to occurrences on/after that
   // day ("delete this and following"). Returns the removed overrides so an
-  // undo can restore them.
+  // undo can restore them. Callers delete/cap the master FIRST: if this
+  // second request fails, the overrides are still on the server — they go
+  // back on screen and the undo restores the master only.
   const deleteSeriesOverrides = async (masterId: string, fromDate?: string): Promise<Task[]> => {
     const overrides: Task[] = []
     for (const w of workspacesRef.current) for (const c of w.categories) for (const t of c.tasks) {
@@ -933,7 +947,11 @@ export function useWaddleData(): UseWaddleData {
       categories: w.categories.map((c) => ({ ...c, tasks: c.tasks.filter((t) => !ids.has(t.id)) })),
     })))
     const { error } = await supabase.from('tasks').delete().in('id', [...ids])
-    if (error) handleDbError('刪除任務')(error)
+    if (error) {
+      handleDbError('刪除任務')(error)
+      putTasksBack(overrides)
+      return []
+    }
     return overrides
   }
 
@@ -2051,9 +2069,31 @@ export function useWaddleData(): UseWaddleData {
       pendingWritesRef.current += 1; mutationSeqRef.current += 1
       let removedOverrides: Task[] = []
       try {
-        if (task.isRecurring && !task.parentId) removedOverrides = await deleteSeriesOverrides(taskId)
+        // Master first, overrides second: the reverse order left the series'
+        // excluded days blank whenever the second request failed.
         const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-        if (error) handleDbError('刪除任務')(error)
+        if (error) {
+          handleDbError('刪除任務')(error)
+          // Nothing was deleted — show it again; no undo entry needed.
+          putTasksBack([task])
+          if (parentExdateCleanup) {
+            const cleanup = parentExdateCleanup
+            const parentBefore = task.parentId
+            setWorkspaces((prev) => prev.map((w) => ({
+              ...w,
+              categories: w.categories.map((c) => ({
+                ...c,
+                tasks: c.tasks.map((t) =>
+                  t.id === cleanup.parentId && parentBefore && task.scheduledDate
+                    ? { ...t, exdates: [...(t.exdates ?? []), task.scheduledDate] }
+                    : t,
+                ),
+              })),
+            })))
+          }
+          return
+        }
+        if (task.isRecurring && !task.parentId) removedOverrides = await deleteSeriesOverrides(taskId)
         if (parentExdateCleanup) {
           await supabase
             .from('tasks')
@@ -2210,9 +2250,14 @@ export function useWaddleData(): UseWaddleData {
         pendingWritesRef.current += 1; mutationSeqRef.current += 1
         let removedOverrides: Task[] = []
         try {
-          removedOverrides = await deleteSeriesOverrides(taskId)
+          // Master first (see the "all" branch above).
           const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-          if (error) handleDbError('刪除任務')(error)
+          if (error) {
+            handleDbError('刪除任務')(error)
+            putTasksBack([snapshot])
+            return
+          }
+          removedOverrides = await deleteSeriesOverrides(taskId)
         } finally {
           pendingWritesRef.current -= 1
         }
