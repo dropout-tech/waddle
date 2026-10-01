@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { EnrollmentFields } from '@/components/operations/enrollment-fields'
 import Link from 'next/link'
 import { Loader2, AlertCircle } from 'lucide-react'
+import { LegalConsent } from '@/components/auth/legal-consent'
 import { DesktopLoginPending } from '@/components/auth/desktop-login-pending'
 import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
 import { useBrowserFinished } from '@/lib/auth/use-browser-finished'
@@ -74,10 +75,11 @@ export default function SignupPage() {
 
   return (
     <div className="bg-card border border-border rounded-2xl shadow-ceramic p-8">
-      <div className="mb-6">
+      <div className="mb-3">
         <h1 className="text-2xl font-semibold tracking-tight">{t('建立帳號')}</h1>
         <p className="text-sm text-muted-foreground mt-1">{t('幾秒鐘就能開始使用 Huddle')}</p>
       </div>
+      <LegalConsent mode="signup" />
 
       <EnrollmentFields />
       <div className="space-y-2.5">

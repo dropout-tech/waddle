@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { pendingMeetingPath } from '@/lib/auth/meeting-return'
 import { createClient } from '@/lib/supabase/client'
+import { LegalConsent } from '@/components/auth/legal-consent'
 import { DesktopLoginPending } from '@/components/auth/desktop-login-pending'
 import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
 import { useBrowserFinished } from '@/lib/auth/use-browser-finished'
@@ -150,10 +151,11 @@ function LoginForm() {
 
   return (
     <div className="bg-card border border-border rounded-2xl shadow-ceramic p-8">
-      <div className="mb-6">
+      <div className="mb-3">
         <h1 className="text-2xl font-semibold tracking-tight">{t('歡迎回來')}</h1>
         <p className="text-sm text-muted-foreground mt-1">{t('登入以繼續使用 Huddle')}</p>
       </div>
+      <LegalConsent mode="login" />
 
       <div className="space-y-2.5">
         <Button
