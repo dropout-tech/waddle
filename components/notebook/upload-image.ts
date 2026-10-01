@@ -2,6 +2,7 @@ import type { EditorView } from '@tiptap/pm/view'
 import { toast } from 'sonner'
 import { planLimitCode } from '@/lib/billing/plan-errors'
 import { showPlanLimitToast } from '@/lib/billing/plan-limit-toast'
+import { t } from '@/lib/i18n'
 
 // Shared "pick a file → upload → insert an image node" plumbing, used by the
 // slash command, the mobile toolbar button, and paste/drop. Operates at the
@@ -44,15 +45,15 @@ export async function insertImage(
   atPos?: number,
 ) {
   if (!file.type.startsWith('image/')) {
-    toast.error('只能插入圖片檔')
+    toast.error(t('只能插入圖片檔'))
     return
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    toast.error('圖片太大，上限 5MB')
+    toast.error(t('圖片太大，上限 5MB'))
     return
   }
 
-  const toastId = toast.loading('上傳圖片中…')
+  const toastId = toast.loading(t('上傳圖片中…'))
   try {
     const src = await uploadImage(file)
     const { schema } = view.state
@@ -66,11 +67,11 @@ export async function insertImage(
     }
     view.dispatch(tr)
     view.focus()
-    toast.success('圖片已插入', { id: toastId })
+    toast.success(t('圖片已插入'), { id: toastId })
   } catch (e) {
     console.error('[notebook] image insert failed', e)
     const limitCode = planLimitCode(e)
     if (limitCode) showPlanLimitToast(limitCode, { id: toastId })
-    else toast.error('圖片上傳失敗，請再試一次', { id: toastId })
+    else toast.error(t('圖片上傳失敗，請再試一次'), { id: toastId })
   }
 }

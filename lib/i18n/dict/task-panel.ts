@@ -309,4 +309,13 @@ export const dict: Record<string, string> = {
   "離開編輯區自動儲存，Esc 取消": "Changes save when you leave the editor. Esc to cancel.",
   "重試": "Retry",
   "已還原上次未儲存的草稿，請確認後再送出": "Restored your unsaved draft from last time. Please review before it saves.",
+
+  // full-screen-task-view / focus-board / overdue-task-review (2026-10 i18n sweep)
+  '保持這個節奏': 'Keep it going',
+  '今日': 'Today',
+  '依優先度': 'By priority',
+  '過期': 'Overdue',
+  '清單': 'List',
+  '儲存中…': 'Saving…',
+  '回到日曆': 'Back to calendar',
 }
