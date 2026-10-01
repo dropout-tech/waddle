@@ -63,6 +63,18 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
   // note must await this first (same race guard as use-notebook.ts).
   const pendingCreates = useRef<Record<string, Promise<void>>>({})
 
+  // The provider lives in the root layout and never unmounts, and signing
+  // out / into another account doesn't reload the page. When the user
+  // changes, drop the previous account's notes and load the new one's —
+  // otherwise B kept seeing (and failing to edit) A's notes.
+  const [stateUserId, setStateUserId] = useState(userId)
+  if (stateUserId !== userId) {
+    setStateUserId(userId)
+    setNotes([])
+    setFolders([])
+    setLoading(true)
+    setLoaded(false)
+  }
   // Load once, the first time the overlay is switched on (and we have a
   // user id) — not on every mount, so flipping the toggle off/on mid-session
   // doesn't refetch.
@@ -338,6 +350,19 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
       flushAllContent()
     }
   }, [flushAllContent])
+
+  // Declared after the flush effect on purpose: on unmount that one runs
+  // first and sends pending text; this only discards on an account switch.
+  useEffect(() => {
+    const timers = saveTimers.current
+    const pending = pendingContent.current
+    return () => {
+      // Unsent text of the previous account can't be saved under the new
+      // session (RLS would refuse it); drop it with its timers.
+      Object.values(timers).forEach(clearTimeout)
+      for (const id of Object.keys(pending)) delete pending[id]
+    }
+  }, [userId])
 
   // ── Delete ───────────────────────────────────────────────
   const deleteNote = useCallback(
