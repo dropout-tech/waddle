@@ -10,6 +10,7 @@ import type { Density, MetaField } from './task-panel'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { useI18n } from '@/lib/i18n/react'
 import { isImeComposing } from '@/lib/ime'
+import { WorkspaceIcon, ICON_MAP } from '@/lib/workspace-icons'
 
 interface WorkspaceSectionProps {
   workspace: Workspace
@@ -155,7 +156,10 @@ export function WorkspaceSection({
         />
         <div className="flex-1 flex items-center gap-2">
           <h3 className="text-sm font-bold text-foreground">
-            {workspace.icon && <span className="mr-1">{workspace.icon}</span>}
+            {/* Preset icons are stored by name ("star"); draw them, don't print the name. */}
+            {workspace.icon && (ICON_MAP[workspace.icon]
+              ? <WorkspaceIcon icon={workspace.icon} color={wsColor} size="xs" className="mr-1 align-[-2px]" />
+              : <span className="mr-1">{workspace.icon}</span>)}
             {workspace.name}
           </h3>
           <span

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2, Globe2, Link2, Copy, Share2, RefreshCw, Users, Loader2, Type } from 'lucide-react'
 import { toast } from 'sonner'
@@ -93,7 +93,12 @@ interface SettingsModalProps {
   timeBlocks: TimeBlock[]
   workspaces: Workspace[]
   onClose: () => void
-  onSave: (settings: UserSettings, timeBlocks: TimeBlock[]) => void
+  /** `removed`: ids this modal took out (the only rows the save may delete). */
+  onSave: (
+    settings: UserSettings,
+    timeBlocks: TimeBlock[],
+    removed: { timeBlockIds: string[]; slotTypeIds: string[] },
+  ) => void
   /** Sets the ONE global default category (null clears it). */
   onSetDefaultCategory: (categoryId: string | null) => Promise<void>
   /** Penguin pet — saved immediately via the narrow setter, not the 儲存 draft. */
@@ -160,13 +165,32 @@ export function SettingsModal({
   timeBlocks,
   workspaces,
   onClose,
-  onSave,
+  onSave: onSaveProp,
   onSetDefaultCategory,
   onSetPet,
 }: SettingsModalProps) {
   const { lang, setLang, t } = useI18n()
   const [localSettings, setLocalSettings] = useState<UserSettings>(settings)
   const [localTimeBlocks, setLocalTimeBlocks] = useState<TimeBlock[]>(timeBlocks)
+  // Ids known to exist: what the modal opened with plus whatever it saved
+  // since. A save reports as removed only known ids missing from the new
+  // lists — so rows this modal never saw are never deleted by it.
+  const knownIdsRef = useRef({
+    timeBlocks: new Set(timeBlocks.map((tb) => tb.id)),
+    slotTypes: new Set(settings.slotTypes.filter((s) => !s.isBuiltIn).map((s) => s.id)),
+  })
+  const onSave = (nextSettings: UserSettings, nextBlocks: TimeBlock[]) => {
+    const known = knownIdsRef.current
+    const blockIds = new Set(nextBlocks.map((tb) => tb.id))
+    const slotIds = new Set(nextSettings.slotTypes.filter((s) => !s.isBuiltIn).map((s) => s.id))
+    const removed = {
+      timeBlockIds: [...known.timeBlocks].filter((id) => !blockIds.has(id)),
+      slotTypeIds: [...known.slotTypes].filter((id) => !slotIds.has(id)),
+    }
+    blockIds.forEach((id) => known.timeBlocks.add(id))
+    slotIds.forEach((id) => known.slotTypes.add(id))
+    onSaveProp(nextSettings, nextBlocks, removed)
+  }
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
   // Task-complete sound is a per-device pref stored in localStorage (same
   // pattern as timer sound), so it lives outside localSettings/UserSettings.

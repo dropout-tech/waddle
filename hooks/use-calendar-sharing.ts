@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { t } from '@/lib/i18n'
 import { toast } from 'sonner'
 import { toDateString } from '@/lib/calendar-utils'
@@ -548,8 +549,14 @@ export function usePeerCalendarEvents(opts: {
         const key = `${peer.peerId}|${windowKey}`
         let promise = fetchPromises.current.get(key)
         if (force || !promise) {
-          promise = Promise.resolve(
-            supabase.rpc('get_shared_calendar', { p_peer: peer.peerId, p_from: fromISO, p_to: toISO }),
+          // Paged: the RPC returns a table, so PostgREST caps it at 1000
+          // rows like any select. source + id is unique, so the order is total.
+          promise = fetchAllRows((from, to) =>
+            supabase
+              .rpc('get_shared_calendar', { p_peer: peer.peerId, p_from: fromISO, p_to: toISO }, { count: 'exact' })
+              .order('source')
+              .order('id')
+              .range(from, to),
           ).then(({ data, error }) => {
             if (error) {
               console.error('[calendar-sharing] peer calendar fetch failed', error)

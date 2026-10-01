@@ -169,7 +169,14 @@ export function TaskDetailModal({
     )
   }
 
+  // End at or before start (e.g. 23:00 → 22:00): the schedule section shows
+  // 「結束需晚於開始」; saving is blocked until it's fixed.
+  const startMinutes = parseTime(scheduledStartTime || '')
+  const endMinutes = parseTime(scheduledEndTime || '')
+  const timeRangeInvalid = startMinutes !== null && endMinutes !== null && endMinutes <= startMinutes
+
   const handleSave = () => {
+    if (timeRangeInvalid) return
     if (!isCreate && task.isRecurring) {
       setRecurrenceModal({ isOpen: true, type: 'save' })
       return
@@ -261,6 +268,8 @@ export function TaskDetailModal({
           isOpen={recurrenceModal.isOpen}
           onClose={() => setRecurrenceModal(null)}
           onConfirm={handleRecurrenceConfirm}
+          mode={recurrenceModal.type === 'delete' ? 'delete' : 'edit'}
+          actionLabel={recurrenceModal.type === 'delete' ? t('刪除') : undefined}
           title={recurrenceModal.type === 'save' ? t('儲存重複任務') : t('刪除重複任務')}
         />
       )}
@@ -635,7 +644,12 @@ export function TaskDetailModal({
           <Button variant="secondary" onClick={onClose}>
             {t('取消')}
           </Button>
-          <Button onClick={handleSave} className="gap-2">
+          <Button
+            onClick={handleSave}
+            disabled={timeRangeInvalid}
+            title={timeRangeInvalid ? t('結束需晚於開始') : undefined}
+            className="gap-2"
+          >
             <Save className="w-4 h-4" />
             {isCreate ? t('建立任務') : t('儲存')}
           </Button>

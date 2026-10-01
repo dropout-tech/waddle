@@ -35,9 +35,15 @@ function detect(): Lang {
   }
 }
 
+/** <html lang> for a page: /en/* pages are English content regardless of
+ *  the UI language; every other page follows the UI language. */
+export function htmlLangFor(lang: Lang, pathname: string): Lang {
+  return pathname === '/en' || pathname.startsWith('/en/') ? 'en' : lang
+}
+
 function applyHtmlLang(lang: Lang) {
   try {
-    document.documentElement.lang = lang
+    document.documentElement.lang = htmlLangFor(lang, window.location.pathname)
   } catch {
     /* SSR / no DOM */
   }
@@ -87,6 +93,11 @@ export function translateFor(
 ): string {
   let out = lang === 'en' ? (en[text] ?? text) : text
   if (vars) {
+    // Plural forms for dictionary values: '{count} {count|task|tasks}' picks
+    // the first word when count is 1, the second otherwise.
+    out = out.replace(/\{(\w+)\|([^|{}]*)\|([^|{}]*)\}/g, (token, key: string, one: string, other: string) =>
+      key in vars ? (Number(vars[key]) === 1 ? one : other) : token,
+    )
     for (const [key, value] of Object.entries(vars)) {
       out = out.split(`{${key}}`).join(String(value))
     }

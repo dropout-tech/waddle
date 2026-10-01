@@ -9,6 +9,12 @@ import { t } from '@/lib/i18n'
 import { planLimitCode } from '@/lib/billing/plan-errors'
 import { showPlanLimitToast } from '@/lib/billing/plan-limit-toast'
 import { assertImageQuota, explainUploadError } from '@/lib/billing/plan-usage'
+import {
+  saveNotebookDraft,
+  clearNotebookDraftField,
+  clearNotebookDraft,
+  takeNewerNotebookDrafts,
+} from '@/lib/notebook-draft'
 
 type NotebookNotesRow = Database['public']['Tables']['notebook_notes']['Row']
 type NotebookCategoriesRow = Database['public']['Tables']['notebook_categories']['Row']
@@ -59,6 +65,10 @@ export function useNotebook() {
   // Per-note debounce timers for content autosave, so typing in one note
   // doesn't reset another note's pending save.
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  // Latest not-yet-sent content per note. Kept beside the timer so leaving
+  // (unmount, pagehide, tab hidden) can send it right away instead of
+  // dropping it together with the cancelled timer.
+  const pendingContent = useRef<Record<string, TiptapDoc>>({})
 
   // In-flight INSERTs keyed by note id. Any UPDATE/DELETE for a just-created
   // note must await this first — otherwise it can reach the server before the
@@ -98,6 +108,10 @@ export function useNotebook() {
         setLoading(false)
         return
       }
+      // Edits that were only backed up locally (the page unloaded before the
+      // save landed) and are newer than the server copy: show them and re-send.
+      const recovered = takeNewerNotebookDrafts(user.id, (data ?? []).map(rowToNote))
+      const recoveredById = new Map(recovered.map((r) => [r.noteId, r]))
       if (catsRes.error) console.error('[notebook] category load failed', catsRes.error)
       else
         setCategories((prev) => {
@@ -115,7 +129,15 @@ export function useNotebook() {
         // initial fetch was in flight only exists (or is newer) in `prev`.
         // Replacing wholesale unmounts the editor mid-typing (create → type
         // → late response wipes the note → focus drops to <body>).
-        const server = (data ?? []).map(rowToNote)
+        const server = (data ?? []).map(rowToNote).map((n) => {
+          const r = recoveredById.get(n.id)
+          if (!r) return n
+          return {
+            ...n,
+            ...(r.title !== undefined ? { title: r.title } : {}),
+            ...(r.content !== undefined ? { content: r.content } : {}),
+          }
+        })
         if (prev.length === 0) return server
         const local = new Map(prev.map((n) => [n.id, n]))
         const serverIds = new Set(server.map((n) => n.id))
@@ -123,12 +145,32 @@ export function useNotebook() {
         return [...localOnly, ...server.map((n) => local.get(n.id) ?? n)]
       })
       setLoading(false)
+
+      for (const r of recovered) {
+        void (async () => {
+          const { error: saveError } = await supabase
+            .from('notebook_notes')
+            .update({
+              ...(r.title !== undefined ? { title: r.title } : {}),
+              ...(r.content !== undefined ? { content: r.content as unknown as never } : {}),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', r.noteId)
+          if (saveError) {
+            // Keep the draft; the next load tries again.
+            console.error('[notebook] draft restore failed', saveError)
+            return
+          }
+          if (r.title !== undefined) clearNotebookDraftField(user.id, r.noteId, 'title', r.title)
+          if (r.content !== undefined && !(r.noteId in pendingContent.current)) {
+            clearNotebookDraftField(user.id, r.noteId, 'content')
+          }
+        })()
+      }
     })()
 
-    const timers = saveTimers.current
     return () => {
       mounted = false
-      Object.values(timers).forEach(clearTimeout)
     }
   }, [supabase])
 
@@ -194,6 +236,9 @@ export function useNotebook() {
         }),
       )
 
+      const userId = userIdRef.current
+      if (patch.title !== undefined && userId) saveNotebookDraft(userId, id, 'title', patch.title)
+
       await pendingCreates.current[id]
       const { error } = await supabase
         .from('notebook_notes')
@@ -205,6 +250,7 @@ export function useNotebook() {
         })
         .eq('id', id)
 
+      if (!error && patch.title !== undefined && userId) clearNotebookDraftField(userId, id, 'title', patch.title)
       if (error && snapshot) {
         console.error('[notebook] patch failed', error)
         const prevSnapshot = snapshot
@@ -225,25 +271,66 @@ export function useNotebook() {
   // ── Content autosave (debounced) ─────────────────────────
   // Updates local state immediately (so switching notes never loses keystrokes)
   // and flushes to Supabase after a short idle window.
+  const flushContent = useCallback(
+    async (id: string) => {
+      clearTimeout(saveTimers.current[id])
+      delete saveTimers.current[id]
+      if (!(id in pendingContent.current)) return
+      const content = pendingContent.current[id]
+      delete pendingContent.current[id]
+      await pendingCreates.current[id]
+      const { error } = await supabase
+        .from('notebook_notes')
+        .update({ content: content as unknown as never, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      setSaveStatus(error ? 'error' : 'saved')
+      // Server has it — drop the local backup unless newer text is queued.
+      if (!error && userIdRef.current && !(id in pendingContent.current)) {
+        clearNotebookDraftField(userIdRef.current, id, 'content')
+      }
+      if (error) {
+        console.error('[notebook] content save failed', error)
+        // Keep it queued (unless newer text arrived) so the next flush —
+        // leaving the page, hiding the tab — tries again.
+        if (!(id in pendingContent.current)) pendingContent.current[id] = content
+      }
+    },
+    [supabase],
+  )
+
   const saveNoteContent = useCallback(
     (id: string, content: TiptapDoc) => {
       const now = new Date().toISOString()
       setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content, updatedAt: now } : n)))
       setSaveStatus('saving')
 
+      pendingContent.current[id] = content
+      if (userIdRef.current) saveNotebookDraft(userIdRef.current, id, 'content', content)
       clearTimeout(saveTimers.current[id])
-      saveTimers.current[id] = setTimeout(async () => {
-        await pendingCreates.current[id]
-        const { error } = await supabase
-          .from('notebook_notes')
-          .update({ content: content as unknown as never, updated_at: new Date().toISOString() })
-          .eq('id', id)
-        setSaveStatus(error ? 'error' : 'saved')
-        if (error) console.error('[notebook] content save failed', error)
-      }, SAVE_DEBOUNCE_MS)
+      saveTimers.current[id] = setTimeout(() => void flushContent(id), SAVE_DEBOUNCE_MS)
     },
-    [supabase],
+    [flushContent],
   )
+
+  // Send everything still waiting for its debounce. Runs when the editor goes
+  // away (overlay closed, route change), on pagehide and when the tab/app is
+  // hidden — the last keystrokes used to be lost with the cancelled timer.
+  const flushAllContent = useCallback(() => {
+    for (const id of Object.keys(pendingContent.current)) void flushContent(id)
+  }, [flushContent])
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushAllContent()
+    }
+    window.addEventListener('pagehide', flushAllContent)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flushAllContent)
+      document.removeEventListener('visibilitychange', onVisibility)
+      flushAllContent()
+    }
+  }, [flushAllContent])
 
   // ── Delete ───────────────────────────────────────────────
   const deleteNote = useCallback(
@@ -254,6 +341,8 @@ export function useNotebook() {
         return prev.filter((n) => n.id !== id)
       })
       clearTimeout(saveTimers.current[id])
+      delete pendingContent.current[id]
+      if (userIdRef.current) clearNotebookDraft(userIdRef.current, id)
 
       await pendingCreates.current[id]
       const { error } = await supabase.from('notebook_notes').delete().eq('id', id)
@@ -297,28 +386,33 @@ export function useNotebook() {
           .filter((n): n is NotebookNote => n !== null)
       })
 
-      const rows = orderedIds
+      // Write only what the gesture changed: sort_order, plus category_id for
+      // the note dragged into another folder. Upserting whole rows wrote this
+      // tab's possibly hours-old title/content over edits made elsewhere and
+      // re-inserted notes another device had deleted.
+      const patches = orderedIds
         .map((id, i) => {
           const n = byId.get(id)
           if (!n) return null
           const isMovedNote = move?.id === id
+          // Every row is written (not just "changed" ones): local sortOrder
+          // can drift from the DB (createNote bumps others locally only).
           return {
             id,
-            user_id: userId,
-            title: n.title,
-            content: (n.content as unknown as never) ?? null,
-            // upsert writes the whole row. Carry category_id through for
-            // ordinary reorders, and update it atomically for cross-folder
-            // drags so a failed request can roll the whole gesture back.
-            category_id: isMovedNote ? move.categoryId : n.categoryId,
-            sort_order: i * 10,
-            updated_at: isMovedNote ? now : n.updatedAt,
+            patch: isMovedNote
+              ? { sort_order: i * 10, category_id: move.categoryId, updated_at: now }
+              : { sort_order: i * 10 },
           }
         })
         .filter((r): r is NonNullable<typeof r> => r !== null)
 
       await Promise.all(orderedIds.map((id) => pendingCreates.current[id]))
-      const { error } = await supabase.from('notebook_notes').upsert(rows)
+      const results = await Promise.all(
+        patches.map(({ id, patch }) =>
+          supabase.from('notebook_notes').update(patch).eq('id', id).eq('user_id', userId),
+        ),
+      )
+      const error = results.find((r) => r.error)?.error
       if (error) {
         console.error('[notebook] reorder failed', error)
         setNotes(snapshot)
@@ -448,14 +542,21 @@ export function useNotebook() {
           })
           .filter((c): c is NotebookCategory => c !== null)
       })
-      const rows = orderedIds
+      // sort_order only — same reason as reorderNotes (no stale name/color
+      // overwrites, no resurrecting folders deleted on another device).
+      const orders = orderedIds
         .map((id, i) => {
           const c = byId.get(id)
-          if (!c) return null
-          return { id, user_id: userId, name: c.name, color: c.color, sort_order: i * 10 }
+          return c ? { id, sort_order: i * 10 } : null
         })
         .filter((r): r is NonNullable<typeof r> => r !== null)
-      const { error } = await supabase.from('notebook_categories').upsert(rows)
+      await Promise.all(orders.map(({ id }) => pendingCreates.current[id]))
+      const results = await Promise.all(
+        orders.map(({ id, sort_order }) =>
+          supabase.from('notebook_categories').update({ sort_order }).eq('id', id).eq('user_id', userId),
+        ),
+      )
+      const error = results.find((r) => r.error)?.error
       if (error) {
         console.error('[notebook] category reorder failed', error)
         setCategories(snapshot)

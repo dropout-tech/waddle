@@ -126,11 +126,15 @@ export function PenguinPet(props: PenguinPetProps) {
   const { pet, onSetPet, canAdopt } = props
   const { lang } = useI18n()
   const adopted = !!pet?.adopted
+  // Desktop: open the card where the penguin will live (calendar's left
+  // edge), not over the task list, whose buttons it used to cover.
+  const adoptLeft = useDesktopAnchor(!props.isMobile && !adopted && canAdopt)
   return (
     <>
       {!adopted && canAdopt && (
         <PetAdoptCard
           isMobile={props.isMobile}
+          desktopLeft={adoptLeft}
           onAdopt={async (look, skipped) => {
             await onSetPet({
               adopted: true,

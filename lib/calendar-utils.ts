@@ -53,8 +53,14 @@ export function taskOccursOnDate(task: Task, date: Date): boolean {
   // If this date is explicitly excluded, it never occurs.
   if (task.exdates?.includes(dateStr)) return false
 
-  // Original occurrence — always counts.
-  if (task.scheduledDate === dateStr) return true
+  // Original occurrence — always counts, unless the series was cut off
+  // before it even started (endDate < start). That was left behind by a
+  // "this and following" split on a series' first day, which also showed
+  // the new series on that day: two entries for one occurrence.
+  if (task.scheduledDate === dateStr) {
+    const end = task.isRecurring ? task.recurrence?.endDate : undefined
+    return !end || end >= dateStr
+  }
 
   if (!task.isRecurring || !task.recurrence) return false
 
@@ -101,6 +107,15 @@ export function taskOccursOnDate(task: Task, date: Date): boolean {
   }
 
   return false
+}
+
+/**
+ * True when `targetDate` is the first occurrence of the series (or earlier).
+ * "This and following" from there means the whole series: splitting would
+ * end the old master the day before it starts and duplicate that first day.
+ */
+export function isSeriesStart(task: Pick<Task, 'scheduledDate'>, targetDate?: string): boolean {
+  return !!targetDate && !!task.scheduledDate && targetDate <= task.scheduledDate
 }
 
 /**

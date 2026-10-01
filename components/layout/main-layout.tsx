@@ -448,6 +448,17 @@ export function MainLayout({
     if (task.id.startsWith('meeting:')) { setMeetingInviteId(task.id.slice(8,44)); setMeetingsOpen(true); return }
     onSelectTask(task, occurrenceDate)
   }
+  const exportModal = (
+    <CalendarExportModal
+      isOpen={exportModalOpen}
+      onClose={() => setExportModalOpen(false)}
+      workspaces={workspaces}
+      timeBlocks={timeBlocks}
+      startHour={startHour}
+      endHour={endHour}
+      selectedDate={selectedDate}
+    />
+  )
   const meetingDialog = <MeetingDialog open={meetingsOpen} onOpenChange={setMeetingsOpen} controller={meetingController} peers={sharePeers} tasks={allTasks} timeBlocks={timeBlocks} initialDate={selectedDate} inviteId={meetingInviteId}/>
 
 
@@ -892,6 +903,9 @@ export function MainLayout({
           workspaces={workspaces}
           onCreateTimeBlock={onCreateCalendarTimeBlock}
         />
+
+        {/* ⋯ → 匯出行程 opens this; it used to be mounted on desktop only. */}
+        {exportModal}
       </div>
     )
   }
@@ -1202,15 +1216,7 @@ export function MainLayout({
       />
 
       {/* Calendar Export Modal — image-of-schedule generator. */}
-      <CalendarExportModal
-        isOpen={exportModalOpen}
-        onClose={() => setExportModalOpen(false)}
-        workspaces={workspaces}
-        timeBlocks={timeBlocks}
-        startHour={startHour}
-        endHour={endHour}
-        selectedDate={selectedDate}
-      />
+      {exportModal}
     </div>
   )
 }

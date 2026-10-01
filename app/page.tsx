@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
-import { Toaster, toast } from 'sonner'
+import { toast } from 'sonner'
 import { WidgetSync } from '@/components/widgets/widget-sync'
 import { petVoiceName, setPetVoice } from '@/lib/pet/voice'
 import { MainLayout } from '@/components/layout/main-layout'
@@ -48,6 +48,8 @@ function HuddlePage() {
     timeBlocks,
     settings,
     isLoading,
+    loadError,
+    retryLoad,
     onboardingCompleted,
     completeOnboarding,
     applyOnboardingChoice,
@@ -172,7 +174,13 @@ function HuddlePage() {
   const [isOverdueReviewOpen, setIsOverdueReviewOpen] = useState(false)
   const [selectedTimeBlock, setSelectedTimeBlock] = useState<TimeBlock | null>(null)
 
+  // Calendar quick-create saves 「新任務」 before its editor opens. If that
+  // editor is closed without saving (取消／✕／Esc) while the task is still
+  // exactly as created, the user didn't want it: delete it again.
+  const quickCreatedRef = useRef<Task | null>(null)
+
   const handleSelectTask = useCallback((task: Task, occurrenceDate?: string) => {
+    quickCreatedRef.current = null
     setTaskMode('edit')
     setSelectedTask(task)
     setSelectedOccurrenceDate(occurrenceDate)
@@ -248,6 +256,9 @@ function HuddlePage() {
   // Save handler shared by edit + create modes.
   const handleSaveTask = useCallback(async (updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string, assignTo?: AssignablePerson) => {
     if (!selectedTask) return
+    // Saved → keep it (cleared before any await: the modal calls onClose
+    // synchronously right after firing onSave).
+    quickCreatedRef.current = null
 
     if (taskMode === 'create') {
       // Snapshot the promote source NOW, before any await. The modal fires
@@ -276,10 +287,10 @@ function HuddlePage() {
         updatedAt: now,
       }
       const inserted = await createTask(newTask)
-      // Task persisted — now it's safe to remove the source scratchpad note
-      // (if this create came from a "promote to task"). On a thrown createTask
-      // we skip the delete, so the note survives.
-      if (promotedId) deleteScratchpadItem(promotedId)
+      // Remove the source scratchpad note (for a "promote to task") only once
+      // the task really exists. createTask reports failure by returning
+      // false, not by throwing — a failed create must leave the note alone.
+      if (promotedId && inserted) deleteScratchpadItem(promotedId)
       // Picked someone in the create modal: assign only after the row exists.
       // A failed assignment never undoes the (already saved) task.
       if (assignTo && inserted && !newTask.isRecurring) {
@@ -486,24 +497,41 @@ function HuddlePage() {
       createdAt: now,
       updatedAt: now,
     }
-    await createTask(newTask)
+    // Refused (offline, plan limit…): createTask already explained why and
+    // took the row off the screen — don't open an editor for a task that
+    // doesn't exist (its edits would update 0 rows).
+    if (!(await createTask(newTask))) return
     // The task is already persisted — open the modal in EDIT mode so the
     // follow-up Save goes through updateTask, not a second createTask with
     // the same id (which would hit a tasks_pkey 23505 duplicate). taskMode is
     // sticky, so without this it could still be 'create' from a prior action.
     setTaskMode('edit')
     setSelectedTask(newTask)
+    quickCreatedRef.current = newTask
   }, [workspaces, createTask, t, settings.defaultCategoryEnabled])
 
   if (isLoading) {
     return (
       <main className="h-screen w-full flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4 text-muted-foreground">
-          <HuddleMascot className="w-20 h-20 animate-waddle-bob" />
-          <div className="flex items-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-sm">{t('載入中...')}</span>
-          </div>
+          <HuddleMascot className={loadError ? 'w-20 h-20' : 'w-20 h-20 animate-waddle-bob'} />
+          {loadError ? (
+            <div role="alert" className="flex flex-col items-center gap-3 px-6 text-center">
+              <span className="text-sm">{t('資料沒有載入完整，請檢查網路後重試。你的資料沒有遺失。')}</span>
+              <button
+                type="button"
+                onClick={retryLoad}
+                className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+              >
+                {t('重試')}
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">{t('載入中...')}</span>
+            </div>
+          )}
         </div>
       </main>
     )
@@ -590,12 +618,20 @@ function HuddlePage() {
           onClose={() => {
             // Cancelling a promote: drop the pending link, keep the note.
             promotedScratchpadIdRef.current = null
+            const fresh = quickCreatedRef.current
+            quickCreatedRef.current = null
+            if (fresh && liveSelectedTask.id === fresh.id && isUntouchedQuickTask(liveSelectedTask, fresh)) {
+              void deleteTask(fresh.id)
+            }
             setSelectedTask(null)
             setSelectedOccurrenceDate(undefined)
           }}
           onSave={handleSaveTask}
           onToggleComplete={taskMode === 'edit' ? toggleTaskComplete : undefined}
-          onDelete={taskMode === 'edit' ? deleteTask : undefined}
+          onDelete={taskMode === 'edit' ? (...args: Parameters<typeof deleteTask>) => {
+            quickCreatedRef.current = null
+            return deleteTask(...args)
+          } : undefined}
         />
       )}
 
@@ -627,12 +663,12 @@ function HuddlePage() {
       {!isMobile && <UserMenu />}
       <OnboardingTour
         open={!onboardingCompleted}
+        paused={!!liveSelectedTask}
         onComplete={completeOnboarding}
         onChoose={applyOnboardingChoice}
       />
       <KeyboardShortcutsHint />
       <DailyClearCelebration />
-      <Toaster position="bottom-right" richColors closeButton />
       <WaterReminderModal
         isOpen={water.isOpen}
         onDrink={water.dismiss}
@@ -663,5 +699,19 @@ export default function Page() {
 
   return (
     <HuddlePage key={session.user.id} />
+  )
+}
+
+/** A calendar quick-created task nobody has changed since it was created. */
+function isUntouchedQuickTask(live: Task, created: Task): boolean {
+  return (
+    live.title === created.title &&
+    !live.isCompleted &&
+    !live.assignment &&
+    !live.description &&
+    live.categoryId === created.categoryId &&
+    live.scheduledDate === created.scheduledDate &&
+    (live.scheduledStartTime ?? '') === (created.scheduledStartTime ?? '') &&
+    (live.scheduledEndTime ?? '') === (created.scheduledEndTime ?? '')
   )
 }

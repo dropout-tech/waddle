@@ -104,7 +104,7 @@ export function NotebookWorkspace({ onExit, exitVariant, launchNote }: NotebookW
       const targetCategory = targetWorkspace?.categories.find((c) => c.id === targetCategoryId)
       if (!targetWorkspace || !targetCategory) return
       const now = new Date().toISOString()
-      await createTask({
+      const created = await createTask({
         ...draftTask,
         ...updates,
         categoryId: targetCategoryId,
@@ -116,7 +116,8 @@ export function NotebookWorkspace({ onExit, exitVariant, launchNote }: NotebookW
         createdAt: now,
         updatedAt: now,
       })
-      toast.success(t('已建立任務'))
+      // On failure createTask has already shown why; don't also claim success.
+      if (created) toast.success(t('已建立任務'))
     },
     [draftTask, workspaces, createTask, t],
   )

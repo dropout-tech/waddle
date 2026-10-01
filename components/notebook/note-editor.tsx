@@ -122,8 +122,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note.id])
 
+  // A title still waiting for its debounce, with the callback it belongs to,
+  // so closing the editor sends it instead of dropping it with the timer.
+  const pendingTitle = useRef<(() => void) | null>(null)
+
   const commitTitle = (value: string) => {
     clearTimeout(titleTimer.current)
+    pendingTitle.current = null
     if (!readOnly) onTitleChange(value)
   }
 
@@ -131,10 +136,32 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     setTitle(value)
     clearTimeout(titleTimer.current)
     if (immediateTitleChanges) { onTitleChange(value); return }
-    titleTimer.current = setTimeout(() => onTitleChange(value), TITLE_DEBOUNCE_MS)
+    const send = () => { pendingTitle.current = null; onTitleChange(value) }
+    pendingTitle.current = send
+    titleTimer.current = setTimeout(send, TITLE_DEBOUNCE_MS)
   }
 
-  useEffect(() => () => clearTimeout(titleTimer.current), [])
+  useEffect(() => () => {
+    clearTimeout(titleTimer.current)
+    pendingTitle.current?.()
+  }, [])
+
+  // A reload/close doesn't unmount React, so also send the pending title when
+  // the page is hidden or unloaded (the notebook hook backs it up locally first).
+  useEffect(() => {
+    const flush = () => {
+      if (!pendingTitle.current) return
+      clearTimeout(titleTimer.current)
+      pendingTitle.current()
+    }
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush() }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
 
   return (
     <div className="flex h-full flex-col">

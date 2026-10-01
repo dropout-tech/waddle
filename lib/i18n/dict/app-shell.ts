@@ -94,6 +94,8 @@ export const dict: Record<string, string> = {
   '連結已失效': 'This link has expired',
   '重設連結可能已過期或已被使用。請重新申請一封。': 'The reset link may have expired or already been used. Request a new one below.',
   '重新申請重設連結': 'Request a new reset link',
+  '密碼登入已停用。請改用 Google 或 Apple 登入，或聯絡客服。':
+    'Password sign-in is no longer available. Please sign in with Google or Apple, or contact support.',
   '密碼已更新': 'Password updated',
   '正在帶你回到 Huddle⋯': 'Taking you back to Huddle…',
 }

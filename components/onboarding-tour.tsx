@@ -544,6 +544,12 @@ function Confetti({ x, y }: { x: number; y: number }) {
 
 interface OnboardingTourProps {
   open: boolean
+  /**
+   * Temporarily hide the tour without losing its place — e.g. while the task
+   * detail drawer the user opened from an interactive step is on screen, so
+   * the next spotlight isn't drawn underneath it. It resumes on close.
+   */
+  paused?: boolean
   /** Called when the user dismisses the tour (skip / close / final button). */
   onComplete: () => void
   /**
@@ -556,7 +562,9 @@ interface OnboardingTourProps {
 const subscribeNever = () => () => {}
 const hubUnavailableOnServer = () => false
 
-export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourProps) {
+export function OnboardingTour({ open, paused = false, onComplete, onChoose }: OnboardingTourProps) {
+  // Visible and listening. `open` alone still owns the reset-on-close below.
+  const active = open && !paused
   const { t } = useI18n()
   const [stepIndex, setStepIndex] = useState(0)
   const [rect, setRect] = useState<Rect | null>(null)
@@ -585,7 +593,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
   // Re-compute spotlight rect on step change / resize / scroll. useLayoutEffect
   // so the tooltip is positioned before paint to avoid flicker.
   useLayoutEffect(() => {
-    if (!open) return
+    if (!active) return
 
     // Measured box of the *currently rendered* tooltip. This layout effect runs
     // after React commits the new step's DOM, so the height we read here is the
@@ -669,7 +677,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
       window.removeEventListener('scroll', onViewportChange, true)
       timers.forEach(clearTimeout)
     }
-  }, [open, step, isMobile])
+  }, [active, step, isMobile])
 
   // Animate in / reset on close
   useEffect(() => {
@@ -701,7 +709,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
   // gets credit for trying the actual feature. The "Next" button still works
   // as a fallback if they prefer to read.
   useEffect(() => {
-    if (!open || !step.interactive || !step.target) return
+    if (!active || !step.interactive || !step.target) return
 
     const el = findTourTarget(step.target)
     if (!el) return
@@ -714,11 +722,11 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
 
     el.addEventListener('click', onClick, { once: true })
     return () => el.removeEventListener('click', onClick)
-  }, [open, step, advance])
+  }, [active, step, advance])
 
   // Keyboard nav
   useEffect(() => {
-    if (!open) return
+    if (!active) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.preventDefault()
@@ -735,7 +743,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, isFirst, isLast, advance, onComplete])
+  }, [active, isFirst, isLast, advance, onComplete])
 
   // Final-step choice handler
   const handleChoose = useCallback(async (choice: 'template' | 'blank') => {
@@ -749,7 +757,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
     }
   }, [onChoose, onComplete, fireConfetti])
 
-  if (!open) return null
+  if (!active) return null
 
   const isCenter = !step.target || tooltipPos.placement === 'center'
   // The target was looked for and is not on screen → the card is centred and

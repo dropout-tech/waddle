@@ -67,7 +67,7 @@ export const dict: Record<string, string> = {
 
   // task-panel.tsx
   '已完成': 'Completed',
-  '已完成 {count} 項任務': '{count} tasks completed',
+  '已完成 {count} 項任務': '{count} {count|task|tasks} completed',
   '依分類': 'By category',
   '依時間': 'By time',
   '依急迫程度': 'By urgency',
