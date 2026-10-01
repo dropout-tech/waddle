@@ -105,7 +105,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
     return () => { cancelled = true }
   }, [open])
 
-  // Close on outside click
+  // Close on outside click or Escape
   useEffect(() => {
     if (!open) return
     function handleClick(e: MouseEvent) {
@@ -113,8 +113,20 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
         setOpen(false)
       }
     }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      setOpen(false)
+      // Give focus back to the avatar button when it had moved into the menu.
+      if (ref.current?.contains(document.activeElement)) {
+        ref.current.querySelector<HTMLElement>('[data-tour="user-menu"]')?.focus()
+      }
+    }
     document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
   }, [open, setOpen])
 
   async function handleSignOut() {
