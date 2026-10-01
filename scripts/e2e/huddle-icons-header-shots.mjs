@@ -79,6 +79,9 @@ async function setTheme(page, theme) {
 }
 
 async function openCalendar(page) {
+  // Logged-out "/" is the marketing page (no redirect), so log in up front
+  // whenever there's no cached session.
+  if (!existsSync(STATE)) await login(page)
   await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' })
   await sleep(2500)
   if (await page.evaluate(() => location.pathname.startsWith('/login'))) await login(page)
@@ -101,6 +104,27 @@ async function headerRect(page) {
 
 async function main() {
   const browser = await chromium.launch()
+
+  // ONLY_DPR1=1 → just the 1x header strip (used to re-shoot the "before" at 1x).
+  if (process.env.ONLY_DPR1) {
+    const c = await browser.newContext({
+      viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, locale: 'zh-TW',
+      ...(existsSync(STATE) ? { storageState: STATE } : {}),
+    })
+    const p = await c.newPage()
+    await openCalendar(p)
+    await c.storageState({ path: STATE })
+    await p.locator('[data-tour="sticky-notes-toggle"]').first().click()
+    await sleep(500)
+    const r = await headerRect(p)
+    for (const theme of ['light', 'dark']) {
+      await setTheme(p, theme)
+      await p.screenshot({ path: out(`header-1280-${theme}-dpr1`), clip: r })
+    }
+    await browser.close()
+    console.log(`done (${MODE}, dpr1 only)`)
+    return
+  }
 
   // ───────── desktop 1280, DPR 2 ─────────
   const ctx = await browser.newContext({

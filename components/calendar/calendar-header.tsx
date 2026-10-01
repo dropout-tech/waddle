@@ -5,8 +5,10 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
 // Toolbar icons are the Huddle hand-inked set, not lucide (DESIGN.md → 圖示).
+// They're drawn at 16px (lucide was 14): where an icon sits beside a label a
+// 1px negative margin keeps its layout footprint — button sizes are unchanged.
 import {
-  InkZoomIn, InkZoomOut, InkClock, InkChevronDown, InkChevronLeft, InkChevronRight, InkBookOpen, InkNotebook,
+  InkMinus, InkClock, InkChevronDown, InkChevronLeft, InkChevronRight, InkBookOpen, InkNotebook,
   InkBarChart, InkSettings, InkSparkles, InkMore, InkDownload, InkUsers, InkBell, InkUser, InkEye, InkEyeOff,
   InkStickyNote, InkPlus, InkArchive,
 } from '@/components/icons/huddle-icons'
@@ -283,7 +285,7 @@ export function CalendarHeader({
                 )}
               >
                 <span>{viewModeLabel}</span>
-                <InkChevronDown className={cn('w-3.5 h-3.5 transition-transform', viewPickerOpen && 'rotate-180')} />
+                <InkChevronDown className={cn('w-4 h-4 -mx-px transition-transform', viewPickerOpen && 'rotate-180')} />
               </button>
               {viewPickerOpen && (
                 <div className="absolute left-0 top-full mt-1 w-32 max-w-[calc(100vw-1.5rem)] bg-card border border-border rounded-xl shadow-lg overflow-hidden z-popover" role="menu">
@@ -569,7 +571,7 @@ export function CalendarHeader({
                     zoomLevel <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
                   )}
                 >
-                  <InkZoomOut className="w-3.5 h-3.5" aria-hidden="true" />
+                  <InkMinus className="w-4 h-4 -m-px" aria-hidden="true" />
                 </button>
                 <span className="text-[10px] text-muted-foreground min-w-[30px] text-center" aria-live="polite">
                   {t(ZOOM_LABELS[zoomLevel - 1])}
@@ -584,13 +586,13 @@ export function CalendarHeader({
                     zoomLevel >= 4 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
                   )}
                 >
-                  <InkZoomIn className="w-3.5 h-3.5" aria-hidden="true" />
+                  <InkPlus className="w-4 h-4 -m-px" aria-hidden="true" />
                 </button>
               </div>
 
               {/* Time Range Display */}
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background border border-border/50 text-[10px] text-muted-foreground">
-                <InkClock className="w-3 h-3" />
+                <InkClock className="w-3.5 h-3.5 -m-px" />
                 <span>{String(startHour).padStart(2, '0')}:00 - {String(endHour).padStart(2, '0')}:00</span>
               </div>
             </div>
@@ -625,7 +627,7 @@ export function CalendarHeader({
                       // eslint-disable-next-line @next/next/no-img-element -- static export has no image optimizer
                       <img src={peer.avatarUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <InkUser className="w-3 h-3 text-primary" aria-hidden="true" />
+                      <InkUser className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
                     )}
                   </button>
                 )
@@ -654,7 +656,7 @@ export function CalendarHeader({
             onClick={openNotebook}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <InkNotebook className="w-3.5 h-3.5" aria-hidden="true" />
+            <InkNotebook className="w-4 h-4 -mx-px" aria-hidden="true" />
             {t('記事本')}
           </button>
           <button
@@ -670,7 +672,7 @@ export function CalendarHeader({
                 : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
             )}
           >
-            <InkStickyNote className="w-3.5 h-3.5" aria-hidden="true" />
+            <InkStickyNote className="w-4 h-4 -mx-px" aria-hidden="true" />
             {t('便條紙')}
           </button>
           {stickyNotes.enabled && (
@@ -680,7 +682,7 @@ export function CalendarHeader({
               aria-label={t('新增便條紙')}
               className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <InkPlus className="w-3.5 h-3.5" aria-hidden="true" />
+              <InkPlus className="w-4 h-4" aria-hidden="true" />
             </button>
           )}
           <button
@@ -698,7 +700,7 @@ export function CalendarHeader({
                 : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
             )}
           >
-            <InkArchive className="w-3.5 h-3.5" aria-hidden="true" />
+            <InkArchive className="w-4 h-4" aria-hidden="true" />
           </button>
           {onOpenSharing && (
             <button
@@ -706,7 +708,7 @@ export function CalendarHeader({
               onClick={onOpenSharing}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <InkUsers className="w-3.5 h-3.5" aria-hidden="true" />
+              <InkUsers className="w-4 h-4 -mx-px" aria-hidden="true" />
               {t('共享')}
             </button>
           )}
@@ -723,7 +725,7 @@ export function CalendarHeader({
               >
                 <InkChevronDown
                   className={cn(
-                    'w-3.5 h-3.5 transition-transform duration-200 motion-reduce:transition-none',
+                    'w-4 h-4 transition-transform duration-200 motion-reduce:transition-none',
                     toolsOpen && 'rotate-180'
                   )}
                   aria-hidden="true"
@@ -778,7 +780,7 @@ export function CalendarHeader({
               aria-label={t('設定')}
               className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <InkSettings className="w-3.5 h-3.5" aria-hidden="true" />
+              <InkSettings className="w-4 h-4" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -868,9 +870,9 @@ function TodayProgressRing({ workspaces }: TodayProgressRingProps) {
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
         {stats.total === 0 ? (
-          <InkSparkles className="w-3.5 h-3.5 text-muted-foreground/50" aria-hidden="true" />
+          <InkSparkles className="w-4 h-4 text-muted-foreground/50" aria-hidden="true" />
         ) : stats.allDone ? (
-          <InkSparkles className="w-3.5 h-3.5 text-success" aria-hidden="true" />
+          <InkSparkles className="w-4 h-4 text-success" aria-hidden="true" />
         ) : (
           <span className="text-[9px] font-semibold text-foreground tabular-nums">
             {stats.completed}/{stats.total}

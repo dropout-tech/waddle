@@ -54,7 +54,7 @@ export function HubLauncherButton({ className }: { className?: string }) {
         className,
       )}
     >
-      <InkFloatingWindow className="w-3.5 h-3.5" aria-hidden="true" />
+      <InkFloatingWindow className="w-4 h-4" aria-hidden="true" />
     </button>
   )
 }

@@ -59,11 +59,23 @@ const closeup = `<!doctype html><meta charset="utf-8"><style>${css} body{width:1
 <h1>「/」選單放大 4 倍</h1><p class="lead">左：淺色；右：深色。第一列是選中狀態。</p>
 <div class="row">${img('after-menu-light-zoom4x', 480)}${img('after-menu-dark-zoom4x', 480)}</div>`
 
+// Toolbar-only strips. 1x = the DPR1 screenshots at their native pixels (no
+// scaling — the page itself is rendered at DPR1); 2x = the Retina screenshots.
+const strip = (suffix) => `<!doctype html><meta charset="utf-8"><style>${css}
+  body{width:876px;padding:14px 16px 18px} figcaption{margin:10px 0 4px} img{border-radius:0;box-shadow:none}</style>
+<figure><figcaption class="b">改前（淺色）</figcaption>${img(`before-header-1280-light${suffix}`, 876)}</figure>
+<figure><figcaption class="a">改後（淺色）</figcaption>${img(`after-header-1280-light${suffix}`, 876)}</figure>
+<figure><figcaption class="b">改前（深色）</figcaption>${img(`before-header-1280-dark${suffix}`, 876)}</figure>
+<figure><figcaption class="a">改後（深色）</figcaption>${img(`after-header-1280-dark${suffix}`, 876)}</figure>`
+
 const browser = await chromium.launch()
-for (const [name, html, w, dpr] of [['compare-before-after', compare, 1244, 2], ['closeup-menu-4x', closeup, 1064, 2]]) {
+for (const [name, html, w, dpr] of [
+  ['compare-before-after', compare, 1244, 2], ['closeup-menu-4x', closeup, 1064, 2],
+  ['toolbar-before-after-1x', strip('-dpr1'), 908, 1], ['toolbar-before-after-2x', strip(''), 908, 2],
+]) {
   const file = path.join(os.tmpdir(), `huddle-icons-${name}.html`)
   writeFileSync(file, html)
-  const page = await browser.newPage({ viewport: { width: w, height: 800 }, deviceScaleFactor: dpr })
+  const page = await browser.newPage({ viewport: { width: w, height: 200 }, deviceScaleFactor: dpr })
   await page.goto(pathToFileURL(file).href)
   await page.waitForLoadState('networkidle')
   await page.screenshot({ path: path.join(DIR, `${name}.png`), fullPage: true })

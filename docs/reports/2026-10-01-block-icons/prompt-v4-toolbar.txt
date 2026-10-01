@@ -1,0 +1,59 @@
+Use your image generation tool to create ONE new image, then save it as a PNG file at exactly this absolute path:
+__OUT__
+Do not modify, create or delete any other file. Do not write code. When done, reply with only the saved path and the pixel size.
+
+WHAT TO DRAW
+A single sheet of 24 tiny DOODLES for a calendar and task app toolbar, arranged in a strict grid of 6 columns x 4 rows on a landscape 3:2 canvas (1536 x 1024 px).
+
+The attached image is a STYLE REFERENCE FOR LINE QUALITY ONLY: copy the feel of its thick, soft, rounded, slightly wobbly hand-inked outline. Do NOT draw the character, any animal, any face, or any mascot. Only abstract UI symbols.
+
+HAND-DRAWN CHARACTER (the most important rule: these will be shown at only 16 px, and must STILL look obviously drawn by hand, never like a clean icon font)
+- Draw each symbol the way a person doodles it quickly in a notebook margin with ONE fat round-tip marker.
+- The marker tip is 24 px wide, and every doodle is SMALL: only about 120 px tall or wide. So the line is one fifth of the doodle: chunky like a poster marker or a fat crayon, as thick as the dots in the "More" doodle. A doodle is never more than five line-widths across.
+- Because the line is so fat, every shape is reduced to its simplest form (two to four strokes), and every hole or inner gap is at least one full line-width wide. If a detail would not fit, leave it out.
+- Imperfect on purpose: boxes are a little lopsided and lean a few degrees; at corners the strokes cross and overshoot slightly, or leave a small gap; circles are one quick loop whose two ends overlap or do not quite meet; straight lines bow slightly; nothing is symmetrical, nothing is ruler-straight, there are no perfect circles and no neat uniform rounded rectangles.
+- The stroke swells and thins a little like a brush pen pressed harder in places, with blunt rounded ends.
+- Outline doodles only. Do not fill shapes solid black, except small dots where listed.
+- Even so, each symbol must be instantly recognisable.
+
+FLAT INK RULES
+- Pure solid black ink (#000000) on an opaque pure flat white background (#FFFFFF). No transparency, no gray, no color, no paper texture, no shading, no gradients, no drop shadows, no hatching.
+- Every doodle is centered in its own 256 x 256 px cell and is SMALL inside it (about 120 px, less than half the cell), surrounded by wide empty white margins.
+- NO grid lines, NO cell borders, NO frames around doodles, NO captions, NO labels, NO numbering of cells, no letters, no digits.
+- All 24 the same visual size and the same marker weight, one family drawn by one hand in one sitting.
+
+THE 24 DOODLES, in reading order (left to right, top row first)
+
+Row 1
+1. Chevron left: a single fat angle stroke shaped like "<".
+2. Chevron right: a single fat angle stroke shaped like ">".
+3. Chevron down: a single fat angle stroke shaped like "v".
+4. More: three round marker dots in a slightly uneven horizontal row.
+5. Plus: two crossing marker strokes, a little crooked.
+6. Minus: one short horizontal marker stroke, slightly bowed.
+
+Row 2
+7. Bell: a simple bell outline drawn in one stroke (dome and flared rim, open at the bottom corners is fine) with a small round dot under it.
+8. Person: a small loop for the head above a wide shoulders arch, open at the bottom.
+9. Two people: two of the person doodles side by side, the second one smaller.
+10. Eye: an almond eye outline made of two curved strokes that cross at the corners, with one big round dot for the pupil.
+11. Hidden: the same eye with one fat diagonal slash across it.
+12. Clock: one quick loop for the face with two hands, one short and one long, both starting from the exact centre.
+
+Row 3
+13. Notebook: an upright lopsided rectangle with three little ring loops poking out of its left side.
+14. Sticky note: a lopsided square whose bottom-right corner is folded over (one short diagonal stroke across that corner).
+15. Storage box: a wide flat lid drawn as a squashed rectangle, on top of an open box body (a "U" shape), with one short handle stroke in the middle of the body.
+16. Open book: two pages spreading from a centre spine, drawn as two arcs meeting in a "V" at the middle, like a bird in flight over a base line.
+17. Bar chart: three separate vertical marker strokes of clearly increasing height, standing side by side (plain strokes, not filled blocks, no axes).
+18. Download: a fat arrow pointing straight down, above a shallow tray drawn as a wide flat "U".
+
+Row 4
+19. Gear: a fat ring with six stubby bumps around the outside and one clear round hole in the middle (hole as wide as the line).
+20. Sparkle: one four-pointed star drawn as four curved strokes meeting at sharp points, with one tiny plus-shaped twinkle at its upper right.
+21. Floating window: a lopsided rectangle outline with one small solid marker blob (a little filled square) sitting inside its bottom-right corner.
+22. Undo: a curved arrow hooking back towards the left, with a clear two-stroke arrowhead.
+23. Redo: the mirror image, a curved arrow hooking towards the right.
+24. Collapsible section: a small solid triangle pointing DOWN at the left, one horizontal stroke to its right, and one shorter horizontal stroke below that, indented.
+
+Double-check before saving: exactly 24 doodles, exactly 6 per row, each one small (about 120 px) with a 24 px fat marker line, opaque white background, visibly hand-drawn and wonky, nothing else on the canvas.

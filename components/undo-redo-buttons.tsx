@@ -1,6 +1,6 @@
 'use client'
 
-import { InkUndo, InkRedo } from '@/components/icons/huddle-icons'
+import { InkUndoSm, InkRedoSm } from '@/components/icons/huddle-icons'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { performRedo, performUndo, useUndoStack } from '@/lib/undo-stack'
@@ -51,7 +51,7 @@ export function UndoRedoButtons({ className }: { className?: string }) {
         aria-label={t('復原')}
         className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <InkUndo className="w-3.5 h-3.5" aria-hidden="true" />
+        <InkUndoSm className="w-4 h-4" aria-hidden="true" />
       </button>
       <button
         type="button"
@@ -61,7 +61,7 @@ export function UndoRedoButtons({ className }: { className?: string }) {
         aria-label={t('重做')}
         className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <InkRedo className="w-3.5 h-3.5" aria-hidden="true" />
+        <InkRedoSm className="w-4 h-4" aria-hidden="true" />
       </button>
     </div>
   )

@@ -2,11 +2,14 @@
 /**
  * Huddle hand-inked icons: icon sheet PNG(s) → components/icons/huddle-icons.tsx
  *
- * The sheets are drawn by an image model (prompts + originals live next to
- * them in docs/reports/2026-10-01-block-icons/). This script cuts each sheet
- * into icons, thickens the ink a touch so it survives 14–20px, traces it to
- * vector paths and writes one React component per icon (24×24 viewBox,
- * fill="currentColor").
+ * The sheets are drawn by an image model (prompts, originals and the log of
+ * rejected tries live in docs/reports/2026-10-01-block-icons/). This script
+ * cuts each sheet into icons, offsets the ink to the sheet's pen weight (the
+ * same drawn line, a fatter or thinner pen), traces it to vector paths and
+ * writes one React component per icon (24×24 viewBox, fill="currentColor").
+ *
+ * Two optical grades, both ≈2px of ink on screen: the notebook set (18–20px)
+ * at 2.5 units, the toolbar set (14–16px) at 3.1 units.
  *
  * potrace + sharp are NOT project dependencies — install them in a throwaway
  * folder and point ICON_TOOLS_DIR at it:
@@ -33,61 +36,76 @@ const OUT_FILE = 'components/icons/huddle-icons.tsx'
 
 // ── tuning ────────────────────────────────────────────────────────────────
 const BOX = 24            // viewBox units
-const TARGET_STROKE = 2.5 // units; lucide is 2 — the brush pen is a bit fatter
+const TARGET_STROKE = 2.5 // units; default pen (lucide is 2). Sheets override with { target }
 const MAX_EXTENT = 22.5   // longest side an icon may take inside the box
 const UP = 3              // supersampling before tracing
 
 /**
- * Per-sheet grid + cell → icon name. `null` = cell not used.
- * Per-icon options: { fit } longest side in units (optical size), { grow }
- * extra ink in source px on top of the sheet default, { dx, dy } nudge.
+ * Per-sheet grid + cell → icon name (`null` = cell not used), plus the pen:
+ * { target } stroke in units, { scale } units per source px, { maxExtent }
+ * longest side allowed, { blur, tol } how much the tracing smooths.
  */
 const SHEETS = [
+  // Both sheets are the same sketchy marker idiom (corners that cross and
+  // stick out, leaning boxes, loops that overshoot). Earlier tries are kept
+  // beside them for the record and are not used: v1 (notebook) and v2
+  // (toolbar) were too clean/geometric — at 14–16px they read as "just
+  // another line-icon set"; v3/v4 had wobble, but too subtle to survive 16px.
+  //
+  // Notebook set: shown at 18–20px.
   {
-    file: 'sheet-v1.png', cols: 6, rows: 4,
+    file: 'sheet-v6-notebook.png', cols: 6, rows: 4, target: 2.5, scale: 0.122, maxExtent: 22, blur: 0.8, tol: 1.2,
     cells: [
       'Text', 'Heading1', 'Heading2', 'Heading3', 'Todo', 'BulletList',
-      'NumberedList', 'Toggle', 'Quote', 'CodeBlock', 'Divider', 'Image',
+      'NumberedList', 'Toggle', 'Quote', 'CodeBlock', null /* divider drawn as a wave: see extra */, 'Image',
       'Bold', 'Italic', 'Underline', 'Strikethrough', 'InlineCode', 'Link',
-      'Undo', 'Redo', 'AddTask', null, null, null,
+      'Undo', 'Redo', null /* "≡+" */, 'AddTask', null /* table */, null /* marker pen */,
     ],
   },
+  // Toolbar set = the SMALL optical grade: shown at 14–16px, so the pen is
+  // fatter in units — the same ~2px of ink on screen as the notebook set.
   {
-    file: 'sheet-v2-toolbar.png', cols: 6, rows: 4,
+    file: 'sheet-v5-toolbar.png', cols: 6, rows: 4, target: 3.1, scale: 0.125, maxExtent: 22, blur: 0.8, tol: 1.2,
     cells: [
-      'ChevronLeft', 'ChevronRight', 'ChevronDown', 'More', 'Plus', 'Bell',
-      'User', null /* person-in-circle came out as a sad face */, 'Users', 'Eye', 'EyeOff', 'Clock',
+      'ChevronLeft', 'ChevronRight', 'ChevronDown', 'More', 'Plus', 'Minus',
+      'Bell', 'User', 'Users', 'Eye', 'EyeOff', 'Clock',
       'Notebook', 'StickyNote', 'Archive', 'BookOpen', 'BarChart', 'Download',
-      'Settings', 'ZoomIn', 'ZoomOut', 'Sparkles', 'FloatingWindow', null,
+      'Settings', 'Sparkles', 'FloatingWindow', 'UndoSm', 'RedoSm', null /* toggle: the notebook sheet's is used */,
     ],
+    // same drawing again at another weight: { from, name } + OPTIONS[name].target
+    extra: [{ from: 'Bell', name: 'BellLg' }, { from: 'Minus', name: 'Divider' }],
   },
 ]
 
+/**
+ * Per-icon hand-fixes. { scale } relative to the sheet scale, { fit } longest
+ * side in units, { grow } extra ink in source px, { stroke } the drawing's
+ * real line width when the measurement is off, { solid } mostly-filled shape,
+ * { target } pen weight in units, { remix } rebuild from the icon's own blobs.
+ */
 const OPTIONS = {
-  // Letter glyphs are drawn smaller than the pictograms — bring them up a bit.
-  Text: { scale: 1.12 },
-  Heading1: { scale: 1.1 }, Heading2: { scale: 1.1 }, Heading3: { scale: 1.1 },
-  Bold: { scale: 1.15 }, Italic: { scale: 1.15 }, Underline: { scale: 1.1 }, Strikethrough: { scale: 1.1 },
-  Quote: { scale: 1.15 },
-  // Single-stroke symbols came out with a fatter pen than the rest: say so,
-  // and the script thins them back to the family weight.
-  ChevronLeft: { stroke: 31 }, ChevronRight: { stroke: 31 }, ChevronDown: { stroke: 31 }, Plus: { stroke: 27 },
-  // The "1 2" were drawn too small to survive 16px: enlarge the digits (which
-  // also brings their thin stroke up to weight) and thicken the two lines.
+  // The "1 2" are drawn too small to survive 16–20px: enlarge the digits.
   NumberedList: {
     fit: 21.5,
-    remix: (parts) => parts.map((part) => (part.w < 50
-      ? { part, scale: 1.35, dx: -6, dy: part.cy < 70 ? -9 : 9 }
-      : { part, grow: 3, dx: 4, dy: part.cy < 70 ? -9 : 9 })),
-  },
-  // Bigger triangle so the toggle doesn't read as "= with a dot".
-  Toggle: {
-    fit: 22,
     remix: (parts) => {
-      const tri = parts.reduce((a, b) => (a.cx < b.cx ? a : b))
-      return parts.map((part) => (part === tri ? { part, scale: 1.4, dx: -8 } : { part, dx: 6 }))
+      const mid = parts.reduce((a, p) => a + p.cy, 0) / parts.length
+      return parts.map((part) => (part.w < 55
+        ? { part, scale: 1.3, dx: -6, dy: part.cy < mid ? -8 : 8 }
+        : { part, dx: 5, dy: part.cy < mid ? -8 : 8 }))
     },
   },
+  Quote: { solid: true, scale: 1.1 },
+  // Letters are drawn smaller than the pictograms — bring them up a little.
+  Text: { scale: 1.12 }, Bold: { scale: 1.15 }, Italic: { scale: 1.1 }, Underline: { scale: 1.1 },
+  // The notebook sheet's divider came out as a "~" wave. A divider is a plain
+  // rule: reuse the toolbar sheet's single straight-ish stroke, full width,
+  // thinned to the notebook weight.
+  Divider: { target: 2.5, fit: 22 },
+  Toggle: { stroke: 16 },
+  // Single-stroke arrows were drawn larger than the pictograms.
+  ChevronLeft: { scale: 0.85 }, ChevronRight: { scale: 0.85 }, ChevronDown: { scale: 0.85 },
+  // The bell trigger is drawn at 20px, so it gets the 20px weight.
+  BellLg: { target: 2.6 },
 }
 
 // ── raster helpers ────────────────────────────────────────────────────────
@@ -223,9 +241,9 @@ function strokeWidth(mask, w, h) {
   return edge ? (2 * area) / edge : 0
 }
 
-function trace(pngBuffer) {
+function trace(pngBuffer, optTolerance = 0.6) {
   return new Promise((resolve, reject) => {
-    const t = new potrace.Potrace({ threshold: 128, turdSize: 20, optTolerance: 0.6, alphaMax: 1.1 })
+    const t = new potrace.Potrace({ threshold: 128, turdSize: 20, optTolerance, alphaMax: 1.1 })
     t.loadImage(pngBuffer, (err) => (err ? reject(err) : resolve(t.getPathTag())))
   })
 }
@@ -304,13 +322,18 @@ for (const sheet of SHEETS) {
     for (let i = 0; i < W * H; i++) mask[i] = up[i] < 128 ? 1 : 0
     raw.push({ name, mask, W, H, bw: b.maxX - b.minX + 1, bh: b.maxY - b.minY + 1, stroke: strokeWidth(mask, W, H) / UP })
   }
+  for (const e of sheet.extra ?? []) {
+    const src = raw.find((r) => r.name === e.from)
+    if (src) raw.push({ ...src, name: e.name })
+  }
   const strokes = raw.map((r) => r.stroke).sort((a, b) => a - b)
   const median = strokes[Math.floor(strokes.length / 2)]
   const maxSide = Math.max(...raw.map((r) => Math.max(r.bw, r.bh)))
   // One scale for the sheet (so every icon keeps the same pen), chosen so the
   // biggest drawing fits; then grow the ink until the stroke hits the target.
-  const scale = sheet.scale ?? MAX_EXTENT / maxSide // units per source px
-  const sheetGrow = (TARGET_STROKE / scale - median) / 2
+  const scale = sheet.scale ?? (sheet.maxExtent ?? MAX_EXTENT) / maxSide // units per source px
+  const sheetTarget = sheet.target ?? TARGET_STROKE
+  const sheetGrow = (sheetTarget / scale - median) / 2
   console.log(`\n${sheet.file}: median stroke ${median.toFixed(1)}px, biggest ${maxSide}px → scale ${scale.toFixed(4)} u/px, grow ${sheetGrow.toFixed(1)}px/side`)
 
   for (const r of raw) {
@@ -323,11 +346,15 @@ for (const sheet of SHEETS) {
       for (let y = 0; y < r.H; y++) for (let x = 0; x < r.W; x++) if (r.mask[y * r.W + x]) { if (x < a) a = x; if (x > c) c = x; if (y < b) b = y; if (y > e) e = y }
       r.bw = (c - a + 1) / UP; r.bh = (e - b + 1) / UP
     }
-    const s = opt.fit ? opt.fit / Math.max(r.bw, r.bh) : scale * (opt.scale ?? 1)
-    // Same pen everywhere: thin drawings get thickened, drawings scaled up on
-    // their own get thinned. Solid shapes measure "fat", so cap at the median.
-    const own = opt.stroke ?? Math.min(r.stroke, median)
-    const grow = (TARGET_STROKE / s - own) / 2 + (opt.grow ?? 0)
+    // sheet scale, unless the icon asks for its own fit — and never let a
+    // drawing overflow the box (the widest doodles get capped individually)
+    const cap = (sheet.maxExtent ?? MAX_EXTENT) / Math.max(r.bw, r.bh)
+    const s = opt.fit ? opt.fit / Math.max(r.bw, r.bh) : Math.min(scale * (opt.scale ?? 1), cap)
+    // Same pen everywhere: drawings with a thinner line get thickened, fatter
+    // ones (single-stroke chevrons, plus…) get thinned. Icons that are mostly
+    // solid ink measure "fat" without being so — mark them { solid: true }.
+    const own = opt.stroke ?? (opt.solid ? median : r.stroke)
+    const grow = ((opt.target ?? sheetTarget) / s - own) / 2 + (opt.grow ?? 0)
     const fat = grow >= 0 ? dilate(r.mask, r.W, r.H, grow * UP) : erode(r.mask, r.W, r.H, -grow * UP)
     // bbox after growing
     let minX = r.W, minY = r.H, maxX = 0, maxY = 0
@@ -336,8 +363,8 @@ for (const sheet of SHEETS) {
     }
     const px = Buffer.alloc(r.W * r.H)
     for (let i = 0; i < r.W * r.H; i++) px[i] = fat[i] ? 0 : 255
-    const png = await sharp(px, { raw: { width: r.W, height: r.H, channels: 1 } }).blur(UP * 0.9).png().toBuffer()
-    const tag = await trace(png)
+    const png = await sharp(px, { raw: { width: r.W, height: r.H, channels: 1 } }).blur(UP * (sheet.blur ?? 0.9)).png().toBuffer()
+    const tag = await trace(png, sheet.tol)
     const d0 = /d="([^"]+)"/.exec(tag)[1]
     const k = s / UP
     const wU = (maxX - minX + 1) * k, hU = (maxY - minY + 1) * k

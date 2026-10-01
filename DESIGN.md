@@ -246,8 +246,8 @@ App 繼續使用既有 `--radius: 0.75rem` 與陶瓷表面規則，不能將海�
   - **記事本編輯器**：「/」區塊選單 12 項（列上不再有「邊框小方塊」縮圖——那是 Notion 的招牌；圖示 20px 直接落在紙面、跟著該列文字顏色）、手機鍵盤上方工具列整排、桌機選取文字後的浮動格式列。
   - **行事曆上方工具列整排**（桌機兩列＋手機「⋯」選單）：日期箭頭、縮放、時間範圍、共享對象、復原／重做、懸浮小視窗、記事本、便條紙（含＋與收納）、共享、「▾」選單內各項、設定、通知鈴、今日進度的星星、白板拉環的箭頭。同一入口在別處也跟著換：⌘K「開記事本」、使用者選單的便條紙三項。`HuddleFootprints` 原本就是自製的，不動。
   - **其餘維持 Lucide**：左側任務欄、行事曆格子、各 modal、手機底部分頁、懸浮小視窗內的分頁。原則是「同一排不混用」——要擴大範圍就整排一起換。
-  - **筆觸規格**：24 單位格線、墨線約 2.5 單位（Lucide 是 2）、圓頭、略帶手抖、造型極簡（最小顯示 12–14px）。它是符號，不是企鵝。
-  - **再生／加新圖示**：原始 sheet 與 prompt 在 `docs/reports/2026-10-01-block-icons/`（`sheet-v1.png` 記事本那批、`sheet-v2-toolbar.png` 工具列那批、`prompt.txt` 說明指令）。用 Codex CLI 產新 sheet（參考圖只准 `public/huddle-mascot.png`、沿用同一段 STYLE RULES 文字、不拿生成圖當參考），在 `scripts/icons/build-huddle-icons.mjs` 的 `SHEETS` 填「格子→名稱」後跑該腳本，重新產生 `huddle-icons.tsx`（產出檔不要手改；個別圖示的放大、加粗、重組寫在腳本的 `OPTIONS`）。
+  - **筆觸規格**：粗頭麥克筆的塗鴉——方框四筆交叉、角會凸出去、整個微歪，圈是一筆帶尾巴，直線微彎；造型極簡。24 單位格線，分兩級筆重，螢幕上都是約 2px 的墨線：記事本那批顯示 18–20px、線寬 2.5 單位；工具列那批顯示 14–16px、線寬 3.1 單位（Lucide 是 2）。工具列圖示一律 16px（Lucide 原本 14px），按鈕尺寸不變。它是符號，不是企鵝。
+  - **再生／加新圖示**：原始 sheet 與 prompt 在 `docs/reports/2026-10-01-block-icons/`（採用 `sheet-v6-notebook.png` 記事本那批、`sheet-v5-toolbar.png` 工具列那批；`prompt.txt` 有每一張的取捨紀錄與指令）。用 Codex CLI 產新 sheet（參考圖只准 `public/huddle-mascot.png`、沿用同一段「HAND-DRAWN CHARACTER」文字、不拿生成圖當參考），在 `scripts/icons/build-huddle-icons.mjs` 的 `SHEETS` 填「格子→名稱」後跑該腳本，重新產生 `huddle-icons.tsx`（產出檔不要手改；個別圖示的放大、加粗、重組寫在腳本的 `OPTIONS`）。教訓：太乾淨的線條圖示縮到 14–16px 會被看成「另一款 icon font」，手感要靠誇張的歪斜與凸角，不是靠細微抖動。
 
 ### 手機小工具預覽（2026-09-25）
 
