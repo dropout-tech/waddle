@@ -146,6 +146,23 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     pendingTitle.current?.()
   }, [])
 
+  // A reload/close doesn't unmount React, so also send the pending title when
+  // the page is hidden or unloaded (the notebook hook backs it up locally first).
+  useEffect(() => {
+    const flush = () => {
+      if (!pendingTitle.current) return
+      clearTimeout(titleTimer.current)
+      pendingTitle.current()
+    }
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush() }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
+
   return (
     <div className="flex h-full flex-col">
       {!readOnly && <EditorToolbar editor={editor} onPromote={onPromote} uploadImage={uploadImage} />}

@@ -9,6 +9,12 @@ import { t } from '@/lib/i18n'
 import { planLimitCode } from '@/lib/billing/plan-errors'
 import { showPlanLimitToast } from '@/lib/billing/plan-limit-toast'
 import { assertImageQuota, explainUploadError } from '@/lib/billing/plan-usage'
+import {
+  saveNotebookDraft,
+  clearNotebookDraftField,
+  clearNotebookDraft,
+  takeNewerNotebookDrafts,
+} from '@/lib/notebook-draft'
 
 type NotebookNotesRow = Database['public']['Tables']['notebook_notes']['Row']
 type NotebookCategoriesRow = Database['public']['Tables']['notebook_categories']['Row']
@@ -102,6 +108,10 @@ export function useNotebook() {
         setLoading(false)
         return
       }
+      // Edits that were only backed up locally (the page unloaded before the
+      // save landed) and are newer than the server copy: show them and re-send.
+      const recovered = takeNewerNotebookDrafts(user.id, (data ?? []).map(rowToNote))
+      const recoveredById = new Map(recovered.map((r) => [r.noteId, r]))
       if (catsRes.error) console.error('[notebook] category load failed', catsRes.error)
       else
         setCategories((prev) => {
@@ -119,7 +129,15 @@ export function useNotebook() {
         // initial fetch was in flight only exists (or is newer) in `prev`.
         // Replacing wholesale unmounts the editor mid-typing (create → type
         // → late response wipes the note → focus drops to <body>).
-        const server = (data ?? []).map(rowToNote)
+        const server = (data ?? []).map(rowToNote).map((n) => {
+          const r = recoveredById.get(n.id)
+          if (!r) return n
+          return {
+            ...n,
+            ...(r.title !== undefined ? { title: r.title } : {}),
+            ...(r.content !== undefined ? { content: r.content } : {}),
+          }
+        })
         if (prev.length === 0) return server
         const local = new Map(prev.map((n) => [n.id, n]))
         const serverIds = new Set(server.map((n) => n.id))
@@ -127,6 +145,28 @@ export function useNotebook() {
         return [...localOnly, ...server.map((n) => local.get(n.id) ?? n)]
       })
       setLoading(false)
+
+      for (const r of recovered) {
+        void (async () => {
+          const { error: saveError } = await supabase
+            .from('notebook_notes')
+            .update({
+              ...(r.title !== undefined ? { title: r.title } : {}),
+              ...(r.content !== undefined ? { content: r.content as unknown as never } : {}),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', r.noteId)
+          if (saveError) {
+            // Keep the draft; the next load tries again.
+            console.error('[notebook] draft restore failed', saveError)
+            return
+          }
+          if (r.title !== undefined) clearNotebookDraftField(user.id, r.noteId, 'title', r.title)
+          if (r.content !== undefined && !(r.noteId in pendingContent.current)) {
+            clearNotebookDraftField(user.id, r.noteId, 'content')
+          }
+        })()
+      }
     })()
 
     return () => {
@@ -196,6 +236,9 @@ export function useNotebook() {
         }),
       )
 
+      const userId = userIdRef.current
+      if (patch.title !== undefined && userId) saveNotebookDraft(userId, id, 'title', patch.title)
+
       await pendingCreates.current[id]
       const { error } = await supabase
         .from('notebook_notes')
@@ -207,6 +250,7 @@ export function useNotebook() {
         })
         .eq('id', id)
 
+      if (!error && patch.title !== undefined && userId) clearNotebookDraftField(userId, id, 'title', patch.title)
       if (error && snapshot) {
         console.error('[notebook] patch failed', error)
         const prevSnapshot = snapshot
@@ -240,6 +284,10 @@ export function useNotebook() {
         .update({ content: content as unknown as never, updated_at: new Date().toISOString() })
         .eq('id', id)
       setSaveStatus(error ? 'error' : 'saved')
+      // Server has it — drop the local backup unless newer text is queued.
+      if (!error && userIdRef.current && !(id in pendingContent.current)) {
+        clearNotebookDraftField(userIdRef.current, id, 'content')
+      }
       if (error) {
         console.error('[notebook] content save failed', error)
         // Keep it queued (unless newer text arrived) so the next flush —
@@ -257,6 +305,7 @@ export function useNotebook() {
       setSaveStatus('saving')
 
       pendingContent.current[id] = content
+      if (userIdRef.current) saveNotebookDraft(userIdRef.current, id, 'content', content)
       clearTimeout(saveTimers.current[id])
       saveTimers.current[id] = setTimeout(() => void flushContent(id), SAVE_DEBOUNCE_MS)
     },
@@ -293,6 +342,7 @@ export function useNotebook() {
       })
       clearTimeout(saveTimers.current[id])
       delete pendingContent.current[id]
+      if (userIdRef.current) clearNotebookDraft(userIdRef.current, id)
 
       await pendingCreates.current[id]
       const { error } = await supabase.from('notebook_notes').delete().eq('id', id)
