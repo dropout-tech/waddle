@@ -237,7 +237,16 @@ interface UseWaddleData {
   updateTimeBlock: (id: string, updates: Partial<TimeBlock>) => Promise<void>
   deleteTimeBlock: (id: string) => Promise<void>
   // Settings
-  saveSettings: (newSettings: UserSettings, newTimeBlocks: TimeBlock[]) => Promise<void>
+  /**
+   * `removed` lists the ids the caller (the settings modal) actually took
+   * out. Only those are deleted — rows the caller never saw (not loaded,
+   * added on another device meanwhile) are left alone.
+   */
+  saveSettings: (
+    newSettings: UserSettings,
+    newTimeBlocks: TimeBlock[],
+    removed?: { timeBlockIds?: string[]; slotTypeIds?: string[] },
+  ) => Promise<void>
   /**
    * Narrow mutation for the bottom quick-links bar. Updates only the
    * `quick_links` column so we don't pay the time-block-replace cost on
@@ -340,6 +349,11 @@ export function useWaddleData(): UseWaddleData {
   // same hook instance sees it already claimed and bails immediately.
   const initialLoadClaimedRef = useRef(false)
 
+  // Whether the time_blocks / slot_types lists on screen came from a
+  // successful read. When they didn't, their real contents are unknown and
+  // saveSettings must not delete anything from those tables.
+  const listsLoadedRef = useRef({ timeBlocks: false, slotTypes: false })
+
   // Mirrors `workspaces` so mutation callbacks can read the current task
   // tree without listing `workspaces` in their dependency arrays — which
   // would re-create the callbacks on every state change and bust the
@@ -383,10 +397,13 @@ export function useWaddleData(): UseWaddleData {
         fetchAllRows((from, to) => supabase.from('tasks').select('*', { count: 'exact' })
           .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
           .order('id', { ascending: true }).range(from, to)),
-        supabase.from('time_blocks').select('*').order('date', { ascending: true }),
+        // Paged like tasks (1000-row cap); id makes the order total.
+        fetchAllRows((from, to) => supabase.from('time_blocks').select('*', { count: 'exact' })
+          .order('date', { ascending: true }).order('id', { ascending: true }).range(from, to)),
         supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
         supabase.from('slot_types').select('*').order('sort_order', { ascending: true }),
-        supabase.from('scratchpad_items').select('*').order('created_at', { ascending: false }),
+        fetchAllRows((from, to) => supabase.from('scratchpad_items').select('*', { count: 'exact' })
+          .order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)),
       ])
       const { data: { session: localSession } } = await supabase.auth.getSession()
       const localUserId = localSession?.user.id ?? null
@@ -748,6 +765,7 @@ export function useWaddleData(): UseWaddleData {
       assignedTasksRef.current = builtAssigned
       setAssignedTasks(builtAssigned)
       setTimeBlocks(builtTimeBlocks)
+      listsLoadedRef.current = { timeBlocks: !reads[3].error, slotTypes: !reads[5].error }
       petRef.current = builtSettings.pet
       notificationsRef.current = builtSettings.notifications
       setSettings(builtSettings)
@@ -2880,6 +2898,7 @@ export function useWaddleData(): UseWaddleData {
   const saveSettings = useCallback(async (
     newSettings: UserSettings,
     newTimeBlocks: TimeBlock[],
+    removed?: { timeBlockIds?: string[]; slotTypeIds?: string[] },
   ) => {
     const userId = requireUserId()
     // The pet is owned by setPet — always keep the latest one.
@@ -2979,17 +2998,17 @@ export function useWaddleData(): UseWaddleData {
       return
     }
 
-    // Non-destructive write for time blocks: upsert all the rows we want
-    // present, then delete only the rows whose id is NOT in that list. The
-    // previous DELETE-then-INSERT pattern wiped everything if the INSERT
-    // failed for any reason (constraint, RLS, malformed row), and left a
-    // window where the user's DB had zero rows — if a refetch landed there,
-    // the UI flashed empty too.
-    if (newTimeBlocks.length === 0) {
-      const { error: tbError } = await supabase
-        .from('time_blocks').delete().eq('user_id', userId)
-      if (tbError) handleDbError('儲存時間區塊')(tbError)
-    } else {
+    // Time blocks: upsert what the caller holds, then delete only the ids
+    // it reports as removed. Never "delete everything not in this list" — the
+    // list can be short because a read failed, was capped, or another device
+    // added rows while the settings modal was open, and every such row would
+    // be destroyed. Nothing is deleted while the on-screen list is unknown.
+    const keptTimeBlockIds = new Set(newTimeBlocks.map((tb) => tb.id))
+    const removedTimeBlockIds = listsLoadedRef.current.timeBlocks
+      ? (removed?.timeBlockIds ?? []).filter((id) => id && !keptTimeBlockIds.has(id))
+      : []
+    let timeBlocksUpserted = true
+    if (newTimeBlocks.length > 0) {
       const rows = newTimeBlocks.map((tb) => ({
         id: tb.id || crypto.randomUUID(),
         user_id: userId,
@@ -3005,28 +3024,29 @@ export function useWaddleData(): UseWaddleData {
       const { error: upsertError } = await supabase
         .from('time_blocks').upsert(rows, { onConflict: 'id' })
       if (upsertError) {
+        timeBlocksUpserted = false
         handleDbError('儲存時間區塊')(upsertError)
-      } else {
-        const keepIds = rows.map((r) => r.id).join(',')
-        const { error: pruneError } = await supabase
-          .from('time_blocks').delete()
-          .eq('user_id', userId)
-          .not('id', 'in', `(${keepIds})`)
-        if (pruneError) handleDbError('儲存時間區塊')(pruneError)
       }
     }
+    if (timeBlocksUpserted && removedTimeBlockIds.length > 0) {
+      const { error: pruneError } = await supabase
+        .from('time_blocks').delete()
+        .eq('user_id', userId)
+        .in('id', removedTimeBlockIds)
+      if (pruneError) handleDbError('儲存時間區塊')(pruneError)
+    }
 
-    // Slot types: same non-destructive pattern. Only persist user-customs —
-    // built-in types (workspace tabs, 時間區塊/午休/緩衝/專注) are
-    // synthesized at runtime in app/page.tsx, so we don't write them.
+    // Slot types: same rule. Only persist user-customs — built-in types
+    // (workspace tabs, 時間區塊/午休/緩衝/專注) are synthesized at runtime in
+    // app/page.tsx, so we don't write them; built-in rows that exist as
+    // calendar-sharing grant anchors are never deleted here.
     const customSlotTypes = newSettings.slotTypes.filter((s) => !s.isBuiltIn)
-    if (customSlotTypes.length === 0) {
-      // Built-in rows may exist as calendar-sharing grant anchors (seeded on
-      // grant); wiping them would orphan those grants, so only clear customs.
-      const { error: stError } = await supabase
-        .from('slot_types').delete().eq('user_id', userId).eq('is_built_in', false)
-      if (stError) handleDbError('儲存時間區塊類型')(stError)
-    } else {
+    const keptSlotTypeIds = new Set(customSlotTypes.map((s) => s.id))
+    const removedSlotTypeIds = listsLoadedRef.current.slotTypes
+      ? (removed?.slotTypeIds ?? []).filter((id) => id && !keptSlotTypeIds.has(id))
+      : []
+    let slotTypesUpserted = true
+    if (customSlotTypes.length > 0) {
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       const slotRows = customSlotTypes.map((s) => {
         // parent_id has a uuid FK to slot_types.id, so it can only hold
@@ -3052,18 +3072,17 @@ export function useWaddleData(): UseWaddleData {
       const { error: upsertError } = await supabase
         .from('slot_types').upsert(slotRows, { onConflict: 'id' })
       if (upsertError) {
+        slotTypesUpserted = false
         handleDbError('儲存時間區塊類型')(upsertError)
-      } else {
-        const keepIds = slotRows.map((r) => r.id).join(',')
-        // Built-ins (is_built_in = true) live in the same table; don't prune
-        // them. We only prune user-custom rows that are no longer present.
-        const { error: pruneError } = await supabase
-          .from('slot_types').delete()
-          .eq('user_id', userId)
-          .eq('is_built_in', false)
-          .not('id', 'in', `(${keepIds})`)
-        if (pruneError) handleDbError('儲存時間區塊類型')(pruneError)
       }
+    }
+    if (slotTypesUpserted && removedSlotTypeIds.length > 0) {
+      const { error: pruneError } = await supabase
+        .from('slot_types').delete()
+        .eq('user_id', userId)
+        .eq('is_built_in', false)
+        .in('id', removedSlotTypeIds)
+      if (pruneError) handleDbError('儲存時間區塊類型')(pruneError)
     }
     } finally {
       pendingWritesRef.current -= 1

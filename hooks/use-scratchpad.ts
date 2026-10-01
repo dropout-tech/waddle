@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import type { Database } from '@/lib/supabase/database.types'
 import type { ScratchpadItem } from '@/lib/types'
 
@@ -50,10 +51,13 @@ export function useScratchpad() {
       userIdRef.current = auth.user?.id ?? null
       if (!auth.user) { setLoading(false); return }
 
-      const { data: rows, error } = await supabase
+      // Paged (PostgREST 1000-row cap), same as use-waddle-data.
+      const { data: rows, error } = await fetchAllRows((from, to) => supabase
         .from('scratchpad_items')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to))
       if (cancelled) return
       if (error) { console.error('[scratchpad] load failed', error); setLoading(false); return }
 
