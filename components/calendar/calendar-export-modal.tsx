@@ -354,7 +354,7 @@ export function CalendarExportModal({
               <Button
                 onClick={handleDownload}
                 disabled={isExporting || !isRangeValid}
-                className="w-full gap-2"
+                className="w-full gap-2 max-md:h-11"
               >
                 {isExporting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -367,7 +367,7 @@ export function CalendarExportModal({
                 onClick={handleCopy}
                 disabled={isExporting || !isRangeValid}
                 variant="outline"
-                className="w-full gap-2"
+                className="w-full gap-2 max-md:h-11"
               >
                 {justCopied ? (
                   <Check className="w-4 h-4 text-success" />
