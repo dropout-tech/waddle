@@ -116,6 +116,7 @@
 .plans article > p:not(.price) { max-width: 32em; font-size: 18px; line-height: 1.8; }
 .plans .primary { margin-top: 28px; }
 .annual { margin: -8px 0 12px; font-weight: 800; }
+.priceNote { max-width: 56em; margin: 40px 0 0; font-size: 15px; line-height: 1.8; color: #54564a; }
 
 /* ── Download: ink slab ─────────────────────────────────────────────────── */
 .download { display: grid; grid-template-columns: 1fr 1.1fr; gap: 80px; align-items: center; padding: 130px max(4%, calc((100vw - 1400px) / 2)); background: var(--ink); color: var(--paper); }
@@ -138,6 +139,8 @@
 .footer { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 35px; padding: 48px 4%; border-top: 3px solid var(--ink); }
 .footer .brand { font-size: 52px; }
 .footer p { margin: 12px 0 0; font-size: 15px; color: #54564a; }
+.footer .operatorLine { max-width: 34em; font-size: 14px; line-height: 1.7; }
+.footer .operatorLine a { text-decoration: underline; text-underline-offset: 4px; }
 .footer nav { display: flex; flex-wrap: wrap; gap: 12px 28px; max-width: 620px; font-size: 15px; }
 .footer nav a { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; }
 .footer a:hover { text-decoration: underline; text-underline-offset: 4px; }

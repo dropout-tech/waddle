@@ -16,7 +16,7 @@ const authenticatedUserId = 'e33d985b-4bcb-456f-9658-9cc1085185ab'
 const otherUserId = '0b6f6a57-5f0e-4a57-9d5c-2f6f3c1f7a11'
 const storePackages = [
   { identifier: '$rc_annual', localizedPrice: 'NT$990.00', subscriptionPeriod: 'P1Y' },
-  { identifier: '$rc_monthly', localizedPrice: 'NT$149.00', subscriptionPeriod: 'P1M' },
+  { identifier: '$rc_monthly', localizedPrice: 'NT$150.00', subscriptionPeriod: 'P1M' },
 ]
 /** A store whose every answer the test can script. */
 function fakeStore(overrides = {}) {
@@ -68,7 +68,7 @@ test('loading products, then two plans with the store price and the store period
   const ready = run(loading, { type: 'packages_result', result: await session.packages() })
   assert.equal(ready.phase, 'ready')
   assert.deepEqual(ready.plans, [
-    { identifier: '$rc_monthly', period: 'month', localizedPrice: 'NT$149.00', trial: null },
+    { identifier: '$rc_monthly', period: 'month', localizedPrice: 'NT$150.00', trial: null },
     { identifier: '$rc_annual', period: 'year', localizedPrice: 'NT$990.00', trial: null },
   ])
   assert.equal(ready.selected, '$rc_monthly')
@@ -83,7 +83,7 @@ test('checkout price only ever comes from the store, never from the reference am
     [{ identifier: '$rc_monthly', period: 'year', localizedPrice: '¥9,800', trial: null }])
   // No period, an unsupported period, or no price: not offered at all.
   assert.deepEqual(toPlans([
-    { identifier: '$rc_monthly', localizedPrice: 'NT$149.00' },
+    { identifier: '$rc_monthly', localizedPrice: 'NT$150.00' },
     { identifier: '$rc_weekly', localizedPrice: 'NT$50.00', subscriptionPeriod: 'P1W' },
     { identifier: '$rc_annual', localizedPrice: ' ', subscriptionPeriod: 'P1Y' },
   ]), [])
@@ -440,27 +440,27 @@ test('free trial lengths and billing periods are composed from store values, sin
     assert.equal(trialLength(trial, en), english)
   }
   const [monthly, yearly] = toPlans(storePackages)
-  assert.equal(planPrice(monthly, zh), 'NT$149.00／月')
+  assert.equal(planPrice(monthly, zh), 'NT$150.00／月')
   assert.equal(planPrice(yearly, zh), 'NT$990.00／年')
-  assert.equal(planPrice(monthly, en), 'NT$149.00 / month')
+  assert.equal(planPrice(monthly, en), 'NT$150.00 / month')
   assert.equal(planPrice(yearly, en), 'NT$990.00 / year')
 })
 
 test('plan with a free trial the user may take: length and the price after it are stated everywhere', () => {
   const [monthly, yearly] = toPlans([
-    { identifier: '$rc_monthly', localizedPrice: 'NT$149.00', subscriptionPeriod: 'P1M', freeTrial: { unit: 'WEEK', count: 2 } },
+    { identifier: '$rc_monthly', localizedPrice: 'NT$150.00', subscriptionPeriod: 'P1M', freeTrial: { unit: 'WEEK', count: 2 } },
     { identifier: '$rc_annual', localizedPrice: 'NT$990.00', subscriptionPeriod: 'P1Y', freeTrial: { unit: 'DAY', count: 14 } },
   ])
   assert.deepEqual(monthly.trial, { unit: 'WEEK', count: 2 })
   const chinese = planCopy(monthly, zh)
-  assert.equal(chinese.detail, '前 2 週免費，之後 NT$149.00／月')
+  assert.equal(chinese.detail, '前 2 週免費，之後 NT$150.00／月')
   assert.equal(chinese.cta, '開始 2 週免費試用')
-  assert.equal(chinese.price, 'NT$149.00／月')
-  assert.ok(chinese.terms.includes('免費試用 2 週') && chinese.terms.includes('試用結束後會自動以 NT$149.00／月') && chinese.terms.includes('試用結束前至少 24 小時取消'))
+  assert.equal(chinese.price, 'NT$150.00／月')
+  assert.ok(chinese.terms.includes('免費試用 2 週') && chinese.terms.includes('試用結束後會自動以 NT$150.00／月') && chinese.terms.includes('試用結束前至少 24 小時取消'))
   const english = planCopy(monthly, en)
-  assert.equal(english.detail, 'Free for 2 weeks, then NT$149.00 / month')
+  assert.equal(english.detail, 'Free for 2 weeks, then NT$150.00 / month')
   assert.equal(english.cta, 'Try free for 2 weeks')
-  assert.ok(english.terms.includes('charged NT$149.00 / month automatically') && english.terms.includes('at least 24 hours before the trial ends'))
+  assert.ok(english.terms.includes('charged NT$150.00 / month automatically') && english.terms.includes('at least 24 hours before the trial ends'))
   assert.equal(/[㐀-鿿]/.test(JSON.stringify(english)), false)
   // The yearly plan carries its own trial and its own price.
   assert.equal(planCopy(yearly, zh).detail, '前 14 天免費，之後 NT$990.00／年')
@@ -470,15 +470,15 @@ test('plan with a free trial the user may take: length and the price after it ar
 
 test('no free trial reported for the plan: the regular price screen, no mention of a trial', () => {
   for (const freeTrial of [undefined, null, { unit: 'FORTNIGHT', count: 1 }, { unit: 'WEEK', count: 0 }, { unit: 'WEEK', count: 1.5 }, { unit: 'DAY', count: NaN }]) {
-    const [monthly] = toPlans([{ identifier: '$rc_monthly', localizedPrice: 'NT$149.00', subscriptionPeriod: 'P1M', freeTrial }])
+    const [monthly] = toPlans([{ identifier: '$rc_monthly', localizedPrice: 'NT$150.00', subscriptionPeriod: 'P1M', freeTrial }])
     assert.equal(monthly.trial, null)
     for (const t of [zh, en]) {
       const copy = planCopy(monthly, t)
       assert.equal(/試用|免費|free|trial/i.test(JSON.stringify(copy)), false, JSON.stringify(freeTrial))
     }
-    assert.equal(planCopy(monthly, zh).cta, '訂閱 · NT$149.00／月')
+    assert.equal(planCopy(monthly, zh).cta, '訂閱 · NT$150.00／月')
     assert.equal(planCopy(monthly, zh).detail, '每月自動續訂')
-    assert.equal(planCopy(monthly, en).cta, 'Subscribe · NT$149.00 / month')
+    assert.equal(planCopy(monthly, en).cta, 'Subscribe · NT$150.00 / month')
   }
 })
 

@@ -43,7 +43,7 @@ enum WidgetStore {
     // acknowledges) the next time it runs — components/widgets/widget-sync.tsx
     // via lib/widgets/actions.ts. Shapes:
     //   task:  {type?:"task", taskId, revision, completed?}  (no type/completed = legacy "complete")
-    //   water: {type:"water", at}                             (ms since epoch)
+    //   (legacy) water: {type:"water", at} — no longer written; the app still replays leftovers
     //   focus: {type:"focus", op:"start|pause|resume|stop", at}
     static let queueLimit = 50
     static func isTaskAction(_ a: [String: Any]) -> Bool { (a["type"] as? String ?? "task") == "task" }
@@ -80,20 +80,6 @@ enum WidgetStore {
             guard !actions.contains(where:{isTaskAction($0) && $0["taskId"] as? String == taskId}), actions.count < queueLimit else {return}
             actions.append(["id":UUID().uuidString,"type":"task","taskId":taskId,"revision":revision,"completed":true,"accountId":accountId,"epoch":epoch])
             state["actions"]=actions
-        }
-    }
-    /// One glass of water: queue it for the app (which re-arms its reminder)
-    /// and keep today's local tally for the widget face.
-    static func logWater(accountId: String, epoch: String, day: String, at: Date = Date()) throws {
-        try transaction { state in
-            guard owns(state, accountId, epoch) else {return}
-            var actions=state["actions"] as? [[String:Any]] ?? []
-            guard actions.count < queueLimit else {return}
-            actions.append(["id":UUID().uuidString,"type":"water","at":(at.timeIntervalSince1970*1000).rounded(),"accountId":accountId,"epoch":epoch])
-            state["actions"]=actions
-            let log=state["waterLog"] as? [String:Any]
-            let count=(log?["day"] as? String == day ? log?["count"] as? Int : nil) ?? 0
-            state["waterLog"]=["day":day,"count":count+1,"last":(at.timeIntervalSince1970*1000).rounded()]
         }
     }
     static func queueFocus(op: String, accountId: String, epoch: String, at: Date = Date()) throws {

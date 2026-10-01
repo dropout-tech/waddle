@@ -442,7 +442,7 @@ try {
     const page = await context.newPage()
     page.on('pageerror', (error) => console.error('PAGE ERROR', error.message))
     const login = async (expected = '/') => {
-      await page.goto(base + '/login', { waitUntil: 'domcontentloaded' })
+      await page.goto(base + '/login?method=email', { waitUntil: 'domcontentloaded' })
       await page.waitForLoadState('networkidle')
       await page.locator('#email').fill(user.email)
       await page.locator('#password').fill('Mock-password-123')

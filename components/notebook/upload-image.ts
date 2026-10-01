@@ -1,5 +1,7 @@
 import type { EditorView } from '@tiptap/pm/view'
 import { toast } from 'sonner'
+import { planLimitCode } from '@/lib/billing/plan-errors'
+import { showPlanLimitToast } from '@/lib/billing/plan-limit-toast'
 
 // Shared "pick a file → upload → insert an image node" plumbing, used by the
 // slash command, the mobile toolbar button, and paste/drop. Operates at the
@@ -67,6 +69,8 @@ export async function insertImage(
     toast.success('圖片已插入', { id: toastId })
   } catch (e) {
     console.error('[notebook] image insert failed', e)
-    toast.error('圖片上傳失敗，請再試一次', { id: toastId })
+    const limitCode = planLimitCode(e)
+    if (limitCode) showPlanLimitToast(limitCode, { id: toastId })
+    else toast.error('圖片上傳失敗，請再試一次', { id: toastId })
   }
 }

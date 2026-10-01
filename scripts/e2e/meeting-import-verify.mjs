@@ -57,7 +57,7 @@ try{
  let ready=false
  for(let i=0;i<60;i++){try{if((await fetch('http://localhost:3172/login')).ok){ready=true;break}}catch{}await new Promise(r=>setTimeout(r,500))}
  assert(ready,'Production server did not start')
- await page.goto('http://localhost:3172/login');await page.locator('#email').fill(env.E2E_EMAIL);await page.locator('#password').fill(env.E2E_PASSWORD)
+ await page.goto('http://localhost:3172/login?method=email');await page.locator('#email').fill(env.E2E_EMAIL);await page.locator('#password').fill(env.E2E_PASSWORD)
  await page.locator('button[type=submit]').click();await page.waitForURL(u=>!u.pathname.includes('/login'),{timeout:60000})
  await page.goto('http://localhost:3172/meetings');await page.getByText('本月已用 0 / 20 次',{exact:false}).waitFor()
  await page.getByLabel('會議名稱',{exact:true}).fill('測試驗收會議');await page.getByLabel('會議日期',{exact:true}).fill('2026-09-25')

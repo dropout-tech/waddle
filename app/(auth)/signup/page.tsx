@@ -1,21 +1,15 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { EnrollmentFields } from '@/components/operations/enrollment-fields'
 import { useIosPurchaseSurface } from '@/components/billing/billing-session'
-import { readEnrollment } from '@/lib/operations/invites'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react'
-import { pendingMeetingPath } from '@/lib/auth/meeting-return'
-import { pendingOrgInvitePath } from '@/lib/pending-org-invite'
-import { createClient } from '@/lib/supabase/client'
+import { Loader2, AlertCircle } from 'lucide-react'
+import { LegalConsent } from '@/components/auth/legal-consent'
 import { DesktopLoginPending } from '@/components/auth/desktop-login-pending'
 import { signInWithGoogle, signInWithApple } from '@/lib/auth/oauth'
 import { useBrowserFinished } from '@/lib/auth/use-browser-finished'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
 import { t } from '@/lib/i18n'
@@ -40,8 +34,6 @@ function AppleIcon({ className }: { className?: string }) {
 }
 
 export default function SignupPage() {
-  const router = useRouter()
-  const supabase = createClient()
   // Subscribes this component to language changes; translations below use the
   // plain `t` import (same underlying function) so the helper translateError
   // outside this component can share it without a naming clash.
@@ -51,57 +43,16 @@ export default function SignupPage() {
   // App Store guideline 3.1.1: no typed-in referral/coupon codes in the native iOS app (same rule as the membership page).
   const codeEntry = !useIosPurchaseSurface()
 
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
+  // Google / Apple only (owner decision 2026-10-01). Enrollment codes in
+  // EnrollmentFields are picked up after OAuth by EnrollmentBridge.
   const [googleLoading, setGoogleLoading] = useState(false)
   const [appleLoading, setAppleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [needsConfirmation, setNeedsConfirmation] = useState(false)
-  const oauthBusy = loading || googleLoading || appleLoading
+  const oauthBusy = googleLoading || appleLoading
 
   // Native: user closed the OAuth browser sheet without completing → unstick
   // the spinner (it otherwise waits for a deep link that never comes).
   useBrowserFinished(() => setGoogleLoading(false))
-
-  async function handleEmailSignup(e: FormEvent) {
-    e.preventDefault()
-    setError(null)
-
-    if (password.length < 6) {
-      setError(t('密碼至少需要 6 個字元'))
-      return
-    }
-
-    setLoading(true)
-
-    const { data, error: err } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-        data: { huddle_enrollment: readEnrollment() },
-      },
-    })
-
-    if (err) {
-      setError(translateError(err.message))
-      setLoading(false)
-      return
-    }
-
-    // If "Confirm email" is OFF in Supabase, session is created immediately.
-    // If ON, user needs to click the email link first.
-    if (data.session) {
-      router.push(pendingMeetingPath() || pendingOrgInvitePath() || '/')
-      router.refresh()
-      return
-    }
-
-    setNeedsConfirmation(true)
-    setLoading(false)
-  }
 
   async function handleGoogleSignup() {
     setError(null)
@@ -125,36 +76,13 @@ export default function SignupPage() {
     }
   }
 
-  if (needsConfirmation) {
-    return (
-      <div className="bg-card border border-border rounded-2xl shadow-ceramic p-8">
-        <div className="flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t('檢查你的信箱')}</h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            {t('我們已寄出驗證連結到')} <span className="font-medium text-foreground">{email}</span>
-            <br />
-            {t('點擊連結後即可登入。')}
-          </p>
-          <Link
-            href="/login"
-            className="mt-6 text-sm text-foreground font-medium hover:underline"
-          >
-            {t('返回登入')}
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="bg-card border border-border rounded-2xl shadow-ceramic p-8">
-      <div className="mb-6">
+      <div className="mb-3">
         <h1 className="text-2xl font-semibold tracking-tight">{t('建立帳號')}</h1>
         <p className="text-sm text-muted-foreground mt-1">{t('幾秒鐘就能開始使用 Huddle')}</p>
       </div>
+      <LegalConsent mode="signup" />
 
       {codeEntry && <EnrollmentFields />}
       <div className="space-y-2.5">
@@ -189,73 +117,17 @@ export default function SignupPage() {
         </Button>
       </div>
 
-      <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 text-muted-foreground">{t('或使用 Email')}</span>
-        </div>
-      </div>
+      <DesktopLoginPending active={googleLoading || appleLoading} />
 
-      <form onSubmit={handleEmailSignup} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={loading}
-            className="h-11"
-            placeholder="you@example.com"
-          />
+      {error && (
+        <div className={cn(
+          'flex items-start gap-2 p-3 rounded-lg mt-4',
+          'bg-destructive/10 text-destructive text-sm border border-destructive/20'
+        )}>
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>{error}</span>
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="password">{t('密碼')}</Label>
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="new-password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              className="h-11 pr-10"
-              placeholder={t('至少 6 個字元')}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={showPassword ? t('隱藏密碼') : t('顯示密碼')}
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-        <DesktopLoginPending active={googleLoading || appleLoading} />
-          </div>
-          <p className="text-xs text-muted-foreground">{t('至少 6 個字元')}</p>
-        </div>
-
-        {error && (
-          <div className={cn(
-            'flex items-start gap-2 p-3 rounded-lg',
-            'bg-destructive/10 text-destructive text-sm border border-destructive/20'
-          )}>
-            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <Button type="submit" className="w-full h-11" disabled={oauthBusy}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t('建立帳號')}
-        </Button>
-      </form>
+      )}
 
       <p className="text-center text-sm text-muted-foreground mt-6">
         {t('已經有帳號了？')}{' '}

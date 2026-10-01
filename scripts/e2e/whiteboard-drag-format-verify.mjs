@@ -28,7 +28,7 @@ async function open(context) {
   })
   const page = await context.newPage()
   page.errors = []; page.on('pageerror', e => page.errors.push(e.message))
-  await page.goto(base + '/login'); await page.locator('#email').fill(env.E2E_EMAIL); await page.locator('#password').fill(env.E2E_PASSWORD)
+  await page.goto(base + '/login?method=email'); await page.locator('#email').fill(env.E2E_EMAIL); await page.locator('#password').fill(env.E2E_PASSWORD)
   await page.locator('button[type=submit]').click(); await page.waitForURL(u => !u.pathname.includes('/login'), { timeout: 90000 })
   await page.goto(base + '/float/scratchpad'); await page.getByTestId('scratchpad-canvas').waitFor()
   await page.getByTestId('canvas-item').getByText('拖我移動').waitFor()

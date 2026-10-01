@@ -29,6 +29,7 @@ export const dict: Record<string, string> = {
   '我們已寄出驗證連結到': "We've sent a verification link to",
   '點擊連結後即可登入。': 'Click the link to log in.',
   '返回登入': 'Back to login',
+  'Huddle 現在只用 Google 或 Apple 登入。': 'Huddle now signs in with Google or Apple only.',
   '幾秒鐘就能開始使用 Huddle': 'Get started with Huddle in seconds',
   '至少 6 個字元': 'At least 6 characters',
   'Email 格式不正確': 'Invalid email format',

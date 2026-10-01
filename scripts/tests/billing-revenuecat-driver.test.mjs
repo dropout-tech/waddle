@@ -10,7 +10,7 @@ import { createNativeBillingSession } from '../../lib/billing/native-adapter.ts'
 const id = 'e33d985b-4bcb-456f-9658-9cc1085185ab'
 function fixture() {
   const state = { user: '', configured: false, purchases: 0, restored: 0, logins: 0 }
-  const packageObject = { identifier: '$rc_monthly', product: { priceString: 'NT$149.00', subscriptionPeriod: 'P1M' } }
+  const packageObject = { identifier: '$rc_monthly', product: { priceString: 'NT$150.00', subscriptionPeriod: 'P1M' } }
   const sdk = {
     async isConfigured() { return { isConfigured: state.configured } },
     async configure(options) { state.user = options.appUserID; state.configured = true; assert.equal(options.apiKey, 'public-test') },
@@ -26,7 +26,7 @@ function fixture() {
 test('maps real SDK signatures, localized price, package object, restore and login', async () => {
   const { driver, state } = fixture()
   await driver.configure({ publicApiKey: 'public-test', appUserID: id })
-  assert.deepEqual(await driver.listPackages(), [{ identifier: '$rc_monthly', localizedPrice: 'NT$149.00', subscriptionPeriod: 'P1M', freeTrial: null }])
+  assert.deepEqual(await driver.listPackages(), [{ identifier: '$rc_monthly', localizedPrice: 'NT$150.00', subscriptionPeriod: 'P1M', freeTrial: null }])
   await driver.purchase('$rc_monthly'); await driver.restore()
   assert.equal(state.purchases, 1); assert.equal(state.restored, 1)
   await assert.rejects(driver.purchase('invented-product'))
@@ -90,7 +90,7 @@ async function trialFixture({ monthlyIntro = twoWeeksFree, annualIntro = twoWeek
     async getAppUserID() { return { appUserID: state.user } },
     async getOfferings() {
       return { current: { availablePackages: [
-        { identifier: '$rc_monthly', product: product('huddle_pro_monthly', 'NT$149.00', 'P1M', monthlyIntro) },
+        { identifier: '$rc_monthly', product: product('huddle_pro_monthly', 'NT$150.00', 'P1M', monthlyIntro) },
         { identifier: '$rc_annual', product: product('huddle_pro_annual', 'NT$990.00', 'P1Y', annualIntro) },
       ] } }
     },
@@ -112,7 +112,7 @@ test('trial offered and the user is eligible: shown with the store length and th
   assert.deepEqual(asked, [['huddle_pro_monthly', 'huddle_pro_annual']])
   assert.deepEqual(monthly.trial, { unit: 'WEEK', count: 2 })
   assert.deepEqual(yearly.trial, { unit: 'WEEK', count: 2 })
-  assert.equal(copy.monthly.detail, '前 2 週免費，之後 NT$149.00／月')
+  assert.equal(copy.monthly.detail, '前 2 週免費，之後 NT$150.00／月')
   assert.equal(copy.monthly.cta, '開始 2 週免費試用')
   assert.equal(copy.yearly.detail, '前 2 週免費，之後 NT$990.00／年')
 })
@@ -122,7 +122,7 @@ test('trial offered but the user is not eligible (already used it): regular pric
   })
   assert.equal(monthly.trial, null)
   assert.equal(yearly.trial, null)
-  assert.equal(copy.monthly.cta, '訂閱 · NT$149.00／月')
+  assert.equal(copy.monthly.cta, '訂閱 · NT$150.00／月')
   assert.equal(/試用|免費/.test(JSON.stringify(copy)), false)
 })
 test('product has no trial: eligibility is not even asked, regular price screen', async () => {
@@ -148,7 +148,7 @@ test('eligibility unknown, missing or failing: never promise a free trial', asyn
     const { packages, copy } = await trialFixture({ eligibility })
     assert.deepEqual(packages.map((item) => item.freeTrial), [null, null], name)
     assert.equal(/試用|免費/.test(JSON.stringify(copy)), false, name)
-    assert.equal(copy.monthly.cta, '訂閱 · NT$149.00／月', name)
+    assert.equal(copy.monthly.cta, '訂閱 · NT$150.00／月', name)
   }
 })
 test('eligibility is per product; a paid introductory offer is not presented as a trial', async () => {

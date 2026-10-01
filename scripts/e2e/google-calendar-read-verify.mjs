@@ -89,7 +89,7 @@ try {
   page.on('pageerror', (e) => errors.push(e.message))
 
   // ── login once ──
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login?method=email`, { waitUntil: 'domcontentloaded' })
   await page.locator('#email').waitFor({ timeout: 120000 }); await page.waitForLoadState('networkidle').catch(() => {})
   await page.locator('#email').fill(env.E2E_EMAIL); await page.locator('#password').fill(env.E2E_PASSWORD)
   await page.locator('#password').press('Enter')

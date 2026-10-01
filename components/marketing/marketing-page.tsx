@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { ArrowDown, ArrowRight, ChevronDown, Download, Play } from 'lucide-react'
 import { setLang } from '@/lib/i18n'
 import { brandQuote } from '@/lib/brand'
+import { useIsNativeShell } from '@/components/legal/web-only'
+import { SUPPORT_PHONE, SUPPORT_PHONE_TEL } from '@/lib/legal/operator'
 import { FeatureFilm } from './feature-film'
 import { FirstVisitIntro } from './first-visit-intro'
 import { PromoLoop } from './promo-loop'
@@ -46,6 +48,8 @@ const copy = {
       ['影片裡的魔法是真實功能嗎？', '企鵝把便條紙收進螢幕是情境示意，不是拍照或自動辨識功能。整理任務、拖曳排程、調整時間、標記完成與專注計時則是產品功能。'],
       ['我的資料會怎麼處理？', '登入帳號後，任務、行程與筆記會透過雲端服務儲存和同步。蒐集用途、分享、保存與刪除說明可在頁尾的隱私說明查看。'],
     ],
+    priceNote: '價格以新台幣計，已含稅（如適用），沒有其他費用。Pro 開放購買後，預計提供 2 週免費試用（需綁定信用卡，試用結束自動扣款，試用期內取消不收費，每人限一次）；網站以信用卡付款，每月或每年自動續訂，可隨時在帳號設定線上取消，首次扣款後 7 天內可申請全額退款。目前尚未開放購買。',
+    operatorLine: 'Huddle 由個人經營者提供。客服電話：', operatorLink: '營運者資訊',
     footerLine: '把今天，整理成明天的線索。', legal: ['服務條款', '隱私說明', '取消與退款', '使用協助'], all: '回到頁首',
     intro: { tick: '嘀嗒、嘀嗒……', enter: '點一下，進入', enterTap: '點一下，進入', hint: '建議開啟聲音', line: '有東西一直在追你。', play: '看看是什麼', skip: '略過', loading: '載入中…', label: 'Huddle 開場影片' },
   },
@@ -71,6 +75,8 @@ const copy = {
       ['Is the magic in the film a real feature?', 'The penguin gathering paper notes is a visual metaphor, not camera capture or automatic recognition. Task organization, drag-to-schedule, rescheduling, completion and focus timers are product features.'],
       ['How is my data handled?', 'After you sign in, tasks, calendar entries and notes are stored and synced using cloud services. The Privacy page explains data use, sharing, retention and deletion.'],
     ],
+    priceNote: 'Prices are in New Taiwan dollars and include any applicable tax, with no additional fees. Once Pro opens for purchase, it is planned to include a 2-week free trial (credit card required; charged automatically when the trial ends; cancel during the trial and you pay nothing; one trial per person). Website payments are by credit card and renew monthly or yearly until you cancel online in your account settings, and you can get a full refund within 7 days of your first charge. Purchases are not available yet.',
+    operatorLine: 'Huddle is operated by an individual in Taiwan. Customer service phone: ', operatorLink: 'Operator information',
     footerLine: 'A little clarity for today. A thread for tomorrow.', legal: ['Terms of use', 'Privacy', 'Cancellation & refunds', 'Support'], all: 'Back to top',
     intro: { tick: 'Tick, tock…', enter: 'Click to enter', enterTap: 'Tap to enter', hint: 'Best with sound on', line: 'Something has been chasing you.', play: 'See what it is', skip: 'Skip', loading: 'Loading…', label: 'Huddle opening film' },
   },
@@ -97,6 +103,8 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
   const base = en ? '/en' : ''
   const quote = brandQuote(en ? 'en' : 'zh')
   const [boardView, setBoardView] = useState(0)
+  // Website-purchase wording must not appear inside the iOS app (App Review 3.1.1(a)).
+  const native = useIsNativeShell()
   const toLang = () => setLang(en ? 'en' : 'zh-TW')
   useEffect(() => {
     const v = new URLSearchParams(window.location.search).get('hero')
@@ -219,7 +227,8 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
             <img src="/art/film/C-06.webp" width={1280} height={720} alt="" loading="lazy" decoding="async" />
           </picture>
         </div>
-        <div className={styles.plans}><article data-penguin-stop="price" data-penguin-at="0.86 0 0 -3"><h3>{t.free}</h3><p className={styles.price}>NT$0</p><p>{t.freeBody}</p><Link href="/signup" onClick={toLang} className={styles.primary}>{t.start}<ArrowRight size={19} aria-hidden="true" /></Link></article><article className={styles.pro}><h3>Pro <span>{t.soon}</span></h3><p className={styles.price}>NT$149<small>{t.month}</small></p><p className={styles.annual}>{t.year}</p><p>{t.proBody}</p></article></div>
+        <div className={styles.plans}><article data-penguin-stop="price" data-penguin-at="0.86 0 0 -3"><h3>{t.free}</h3><p className={styles.price}>NT$0</p><p>{t.freeBody}</p><Link href="/signup" onClick={toLang} className={styles.primary}>{t.start}<ArrowRight size={19} aria-hidden="true" /></Link></article><article className={styles.pro}><h3>Pro <span>{t.soon}</span></h3><p className={styles.price}>NT$150<small>{t.month}</small></p><p className={styles.annual}>{t.year}</p><p>{t.proBody}</p></article></div>
+        {native ? null : <p className={styles.priceNote} data-price-note>{t.priceNote}</p>}
       </section>
 
       <div id="promo-loop" className={styles.promo}><PromoLoop locale={locale} /></div>
@@ -236,7 +245,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       </section>
 
       <section className={styles.faq} aria-labelledby="faq-title"><div><h2 id="faq-title">{t.faqTitle}</h2><CheckInToy locale={locale} /></div><div>{t.questions.map(([q, a]) => <details key={q}><summary>{q}<ChevronDown size={22} aria-hidden="true" /></summary><p>{a}</p></details>)}</div></section>
-      <footer className={styles.footer}><Hammock /><div><Link href={`${base}/about`} className={styles.brand}>Huddle.</Link><p>{t.footerLine}</p></div><nav aria-label={en ? 'Service information' : '服務資訊'}>{['terms', 'privacy', 'refunds', 'support'].map((path, i) => <Link href={`${base}/${path}`} key={path}>{t.legal[i]}</Link>)}<a href="#top">{t.all}<ArrowDown className={styles.up} size={15} aria-hidden="true" /></a></nav></footer>
+      <footer className={styles.footer}><Hammock /><div><Link href={`${base}/about`} className={styles.brand}>Huddle.</Link><p>{t.footerLine}</p><p className={styles.operatorLine} data-operator-footer>{t.operatorLine}<a href={SUPPORT_PHONE_TEL}>{SUPPORT_PHONE}</a>{en ? ' · ' : '｜'}<Link href={`${base}/terms#operator`}>{t.operatorLink}</Link></p></div><nav aria-label={en ? 'Service information' : '服務資訊'}>{['terms', 'privacy', 'refunds', 'support'].map((path, i) => <Link href={`${base}/${path}`} key={path}>{t.legal[i]}</Link>)}<a href="#top">{t.all}<ArrowDown className={styles.up} size={15} aria-hidden="true" /></a></nav></footer>
       <RoamingPenguin locale={locale} />
       {/* First visit: the promo film plays first, with sound (portal above everything). */}
       <FirstVisitIntro locale={locale} copy={t.intro} fontClass={posterFonts} />

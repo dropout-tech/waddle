@@ -14,7 +14,8 @@ const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarg
 const uid = '00000000-0000-4000-8000-000000000001', other = '00000000-0000-4000-8000-000000000002'
 const session = '10000000-0000-4000-8000-000000000001'
 const key = randomBytes(32).toString('base64url')
-const REFRESH = 'rt-' + randomBytes(12).toString('hex'), ACCESS = 'at-' + randomBytes(12).toString('hex'), ACCESS2 = 'at2-' + randomBytes(12).toString('hex')
+// 'rt-x…': never starts with 'rt-0', which the token mock reserves for other users' ids (was a 1-in-16 flake).
+const REFRESH = 'rt-x' + randomBytes(12).toString('hex'), ACCESS = 'at-' + randomBytes(12).toString('hex'), ACCESS2 = 'at2-' + randomBytes(12).toString('hex')
 const jwtFor = (sid) => 'x.' + Buffer.from(JSON.stringify({ session_id: sid })).toString('base64url') + '.x'
 const allResponses = []
 
@@ -34,7 +35,10 @@ async function setup(o = {}) {
   }
   const admin = {
     auth: { getUser: async () => ({ data: { user: o.badAuth ? null : { id: uid, is_anonymous: false } }, error: null }) },
-    rpc: async (name) => name === 'account_access_allowed' ? { data: !o.suspended, error: null } : { data: null, error: 'unknown rpc' },
+    rpc: async (name) => name === 'account_access_allowed' ? { data: !o.suspended, error: null }
+      // Pro gate for `start` (default: allowed, i.e. switch off / Pro / grandfathered).
+      : name === 'google_calendar_connect_allowed' ? { data: o.connectAllowed ?? true, error: null }
+      : { data: null, error: 'unknown rpc' },
     from(table) {
       let mode = 'select', patch, single = false
       const filters = []
@@ -119,6 +123,14 @@ for (const k of ['GOOGLE_CALENDAR_CLIENT_SECRET', 'GOOGLE_CALENDAR_TOKEN_KEY', '
   ok(url.searchParams.get('code_challenge') === await core.hash(verifier), 'code_challenge = SHA-256(verifier); verifier only stored sealed')
   ok(row.state_hash === await core.hash(url.searchParams.get('state')) && !JSON.stringify(row).includes(url.searchParams.get('state')), 'state stored only as hash')
   ok(!JSON.stringify(start).includes(verifier), 'start response does not leak the PKCE verifier')
+}
+
+// ── start: Pro gate (limits switch on, free, not grandfathered) ──
+{
+  const m = await setup({ connectAllowed: false })
+  const r = await m.send({ action: 'start' })
+  ok(r.http === 403 && r.error === 'PRO_REQUIRED' && m.tables.google_calendar_oauth_states.length === 0 && m.calls.length === 0,
+    'start not allowed by plan → 403 PRO_REQUIRED, no OAuth state, no outbound call')
 }
 
 // ── finish: expiry / replay / session / user / scope ──

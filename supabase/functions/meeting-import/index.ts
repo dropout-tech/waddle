@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
       return reply({ assignment: data });
     }
     if (body.action === "list") {
-      const [records, quota] = await Promise.all([
+      const [records, quota, plan] = await Promise.all([
         admin
           .from("meeting_imports")
           .select(
@@ -122,6 +122,7 @@ Deno.serve(async (req) => {
           .eq("user_id", user.id)
           .eq("month", taipeiMonth())
           .in("status", ["pending", "succeeded"]),
+        admin.rpc("meeting_import_limit", { p_user: user.id }),
       ]);
       if (records.error || quota.error) throw new Error("DATABASE_ERROR");
       const used = quota.data.filter((r) => r.status === "succeeded").length;
@@ -134,13 +135,15 @@ Deno.serve(async (req) => {
         meetings: records.data,
         used,
         pending,
-        // Display-only mirror of the server-enforced quota. The actual limit
-        // lives in supabase/migrations/20260925081959_meeting_imports.sql
-        // (route_meeting_tasks, `>= 20`) — that RPC is the source of truth;
-        // this number and the MONTHLY_LIMIT message in lib/meeting-import.ts
-        // must be updated together if the quota ever changes. Not read from
-        // the DB here because RPC checks the count at insert time, not on read.
-        limit: 20,
+        // Display value of the server-enforced quota. reserve_meeting_import
+        // enforces huddle_ops.plan_limits(user)->meeting_imports (20 while the
+        // Pro limits switch is off; 5 free / 20 Pro once it is on —
+        // 20261001200000_pro_limits.sql); meeting_import_limit reads the same
+        // number. Display-only, so a failed read falls back to today's 20.
+        limit:
+          !plan.error && Number.isInteger(plan.data) && plan.data > 0
+            ? plan.data
+            : 20,
         month: taipeiMonth(),
         enabled: !!Deno.env.get("OPENAI_API_KEY"),
       });

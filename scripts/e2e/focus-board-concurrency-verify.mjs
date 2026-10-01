@@ -126,7 +126,7 @@ try {
   await page.addInitScript(() => { document.addEventListener('DOMContentLoaded', () => { const style = document.createElement('style'); style.textContent = 'nextjs-portal{display:none!important}'; document.head.appendChild(style) }) })
   page.on('pageerror', (e) => pageErrors.push(String(e)))
   await installRoutes(page)
-  await page.goto(`${BASE}/login`)
+  await page.goto(`${BASE}/login?method=email`)
   await page.locator('#email').fill(EMAIL)
   await page.locator('#password').fill(PASSWORD)
   await page.locator('button[type="submit"]').click()

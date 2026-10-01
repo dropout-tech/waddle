@@ -17,7 +17,7 @@ export function trialLength(trial: PlanTrial, t: Translate): string {
   return trial.count === 1 ? t(one) : t(many, { count: trial.count })
 }
 
-/** "NT$149.00／月" — the store's own price string with the store's own billing period. */
+/** "NT$150.00／月" — the store's own price string with the store's own billing period. */
 export function planPrice(plan: PaywallPlan, t: Translate): string {
   return plan.period === 'month' ? t('{price}／月', { price: plan.localizedPrice }) : t('{price}／年', { price: plan.localizedPrice })
 }

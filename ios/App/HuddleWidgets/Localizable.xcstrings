@@ -1,0 +1,358 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    "今日任務": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today's tasks"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日任務"
+          }
+        }
+      }
+    },
+    "下一件要做的事、還剩幾件。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "What's next and how many are left."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一件要做的事、還剩幾件。"
+          }
+        }
+      }
+    },
+    "下一個行程": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up next"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一個行程"
+          }
+        }
+      }
+    },
+    "接下來最近的一個行程與時間。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your next plan and when it starts."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接下來最近的一個行程與時間。"
+          }
+        }
+      }
+    },
+    "當週日曆": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This week"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "當週日曆"
+          }
+        }
+      }
+    },
+    "這週一到週日，每天有幾件事。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monday to Sunday, how much is on each day."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "這週一到週日，每天有幾件事。"
+          }
+        }
+      }
+    },
+    "月份": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Month"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "月份"
+          }
+        }
+      }
+    },
+    "今天幾號、這個月還有幾天有安排。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today's date and how many busy days are left this month."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天幾號、這個月還有幾天有安排。"
+          }
+        }
+      }
+    },
+    "大型月曆": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Big calendar"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "大型月曆"
+          }
+        }
+      }
+    },
+    "三週大月曆：任務、行程一格一格看清楚。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Three weeks at a glance: tasks and plans, day by day."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "三週大月曆：任務、行程一格一格看清楚。"
+          }
+        }
+      }
+    },
+    "便條紙": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sticky notes"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "便條紙"
+          }
+        }
+      }
+    },
+    "最近的便條紙，像備忘錄一樣放在手邊。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your latest sticky notes, right at hand like Notes."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近的便條紙，像備忘錄一樣放在手邊。"
+          }
+        }
+      }
+    },
+    "今日任務樣式": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today's tasks style"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今日任務樣式"
+          }
+        }
+      }
+    },
+    "圓形、長方形各有兩種樣式。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Two looks each for the circular and rectangular sizes."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "圓形、長方形各有兩種樣式。"
+          }
+        }
+      }
+    },
+    "當週日曆樣式": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This week style"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "當週日曆樣式"
+          }
+        }
+      }
+    },
+    "長方形可選七天點點或今明兩天行程。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rectangular: seven-day dots or today and tomorrow."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "長方形可選七天點點或今明兩天行程。"
+          }
+        }
+      }
+    },
+    "月份樣式": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Month style"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "月份樣式"
+          }
+        }
+      }
+    },
+    "長方形可選迷你月格或今天日期＋本月有事天數。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rectangular: mini month or today's date with busy days left."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "長方形可選迷你月格或今天日期＋本月有事天數。"
+          }
+        }
+      }
+    },
+    "圓形只顯示剩餘件數": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Circular: tasks left only"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "圓形只顯示剩餘件數"
+          }
+        }
+      }
+    },
+    "長方形改成前三件清單": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rectangular: top three list"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "長方形改成前三件清單"
+          }
+        }
+      }
+    },
+    "長方形改看今明兩天行程": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rectangular: today & tomorrow"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "長方形改看今明兩天行程"
+          }
+        }
+      }
+    },
+    "長方形改看日期＋本月有事天數": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rectangular: date + busy days left"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "長方形改看日期＋本月有事天數"
+          }
+        }
+      }
+    }
+  }
+}

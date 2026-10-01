@@ -85,7 +85,7 @@ async function main() {
       // NOT networkidle — the app can hold persistent connections
       // (Supabase), so networkidle may never fire. DOM ready + a settle
       // wait is enough for the provider's mount effect to install the hook.
-      await probe.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 45000 })
+      await probe.goto(`${BASE_URL}/login?method=email`, { waitUntil: 'domcontentloaded', timeout: 45000 })
       await sleep(4000)
       const fp = await probe.evaluate(() => typeof window.__waddleTimerDebug?.ambientStates === 'function')
       if (fp) { live = true; await ctx.close(); break }
@@ -147,7 +147,7 @@ async function main() {
   }
 
   await step('login (prod)', async () => {
-    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE_URL}/login?method=email`, { waitUntil: 'domcontentloaded' })
     await page.locator('#email').fill(EMAIL)
     await page.locator('#password').fill(PASSWORD)
     await page.getByRole('button', { name: '登入', exact: true }).click()

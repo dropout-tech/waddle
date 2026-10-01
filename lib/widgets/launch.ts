@@ -5,6 +5,10 @@
 // is parked here and announced with an event; MainLayout takes it on mount
 // and on every event. Plain `/?widget=…` URLs (web, tests) work the same way.
 export const WIDGET_LAUNCH_EVENT = 'huddle-widget-launch'
+/** 便條紙 widget tap → StickyNotesProvider shows the overlay (detail: note id or null). */
+export const STICKY_OPEN_EVENT = 'huddle-sticky-open'
+/** A sticky note was saved / deleted → WidgetSync re-reads the newest notes. */
+export const STICKY_CHANGED_EVENT = 'huddle-sticky-changed'
 let queued: string | null = null
 
 export function queueWidgetLaunch(search: string) {

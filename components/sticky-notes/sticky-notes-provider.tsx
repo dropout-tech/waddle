@@ -6,6 +6,7 @@ import { useStickyNotes } from '@/hooks/use-sticky-notes'
 import { clampNotePosition } from './sticky-note-card'
 import { StickyNotesLayer } from './sticky-notes-layer'
 import { StickyNotesDrawer } from './sticky-notes-drawer'
+import { STICKY_OPEN_EVENT } from '@/lib/widgets/launch'
 
 const ENABLED_STORAGE_KEY = 'huddle-sticky-notes-enabled-v1'
 
@@ -93,6 +94,26 @@ export function StickyNotesProvider({ children }: { children: ReactNode }) {
     },
     [restoreNote, enabled, setEnabledPersisted],
   )
+
+  // 便條紙 widget tap (use-widget-launch.ts): show the overlay; a note that was
+  // put away opens the drawer instead. (No bringToFront: that would write the row
+  // and bump updated_at, reshuffling the widget's "newest" order.)
+  const [openRequest, setOpenRequest] = useState<{ id: string | null } | null>(null)
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      setEnabledPersisted(true)
+      setOpenRequest({ id: (e as CustomEvent<string | null>).detail ?? null })
+    }
+    window.addEventListener(STICKY_OPEN_EVENT, onOpen)
+    return () => window.removeEventListener(STICKY_OPEN_EVENT, onOpen)
+  }, [setEnabledPersisted])
+  const storeNotes = store.notes
+  useEffect(() => {
+    if (!openRequest?.id || store.loading) return
+    const note = storeNotes.find((n) => n.id === openRequest.id)
+    if (note && !note.onScreen) setDrawerOpen(true)
+    setOpenRequest(null)
+  }, [openRequest, storeNotes, store.loading])
 
   const addNote = useCallback(() => {
     // Small jitter around a comfortable default spot so repeated adds don't

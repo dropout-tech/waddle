@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { StickyNote, StickyNoteColor, StickyNoteFolder, TiptapDoc } from '@/lib/types'
 import type { Database } from '@/lib/supabase/database.types'
 import { clampNotePosition } from '@/components/sticky-notes/sticky-note-card'
+import { STICKY_CHANGED_EVENT } from '@/lib/widgets/launch'
 
 type StickyNotesRow = Database['public']['Tables']['sticky_notes']['Row']
 type StickyNoteFoldersRow = Database['public']['Tables']['sticky_note_folders']['Row']
@@ -298,6 +299,7 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
           .update({ content: content as unknown as never, updated_at: new Date().toISOString() })
           .eq('id', id)
         if (error) console.error('[sticky-notes] content save failed', error)
+        else window.dispatchEvent(new Event(STICKY_CHANGED_EVENT)) // refresh the 便條紙 widget
       }, SAVE_DEBOUNCE_MS)
     },
     [supabase],
@@ -318,7 +320,7 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
       if (error) {
         console.error('[sticky-notes] delete failed', error)
         setNotes(snapshot)
-      }
+      } else window.dispatchEvent(new Event(STICKY_CHANGED_EVENT))
     },
     [supabase],
   )
