@@ -7,9 +7,11 @@
 
 ---
 
+> **決策紀錄（2026-10-02）**：老闆對 D1–D10 回覆「照建議」，全部採用下表建議欄。D7 已由 PR #128（main 62574cf）定案：月繳 NT$150、年繳 NT$990，網站與 App 一致。老闆已向 SLP 窗口確認個人戶可收 SaaS 訂閱、月收款無上限（§9 第 2 題已答）。
+
 ## 0. 給老闆的一頁摘要
 
-**要做什麼**：讓客人在 Huddle 網站用信用卡訂閱 Pro。月繳 NT$149（或 150，見決策 D7）／年繳 NT$990，第一次訂閱可以先免費用 2 週（要先綁卡，2 週到了自動扣第一期）。客人在「設定 → 訂閱」可以自己取消續訂、換卡、7 天內申請退款。
+**要做什麼**：讓客人在 Huddle 網站用信用卡訂閱 Pro。月繳 NT$150／年繳 NT$990，第一次訂閱可以先免費用 2 週（要先綁卡，2 週到了自動扣第一期）。客人在「設定 → 訂閱」可以自己取消續訂、換卡、7 天內申請退款。
 
 **怎麼做（白話）**：
 1. 卡號由 SHOPLINE 的付款框直接收，我們只拿到一組「代碼」和卡號末四碼，碰不到完整卡號。
@@ -425,7 +427,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 | R6 | Webhook 偽造／重放 | 高 | 攻擊者 POST 假的 `trade.succeeded` 讓自己免費開通；或重送舊事件 | HMAC＋5 分鐘時間窗＋事件 id 去重；更重要的是**不信任 payload，一律回查 SLP**，所以就算簽章金鑰外洩也偽造不出成功付款 |
 | R7 | 越權 | 高 | A 用 B 的訂閱 id 呼叫取消／退款 | user id 只取自 JWT；DB 函式以 `user_id = 呼叫者` 為條件；表無 authenticated 權限；RLS 測試 |
 | R8 | 金鑰外洩 | 高 | `SHOPLINE_API_KEY` 進前端 bundle 或 log → 他人可對我們的客人扣款／退款 | 只放 Edge Function secret；前端只有可公開的 `clientKey`；CI grep bundle 不得出現 apiKey 前綴；log 白名單 |
-| R9 | 金額單位錯 | 高 | 寫成 149 而不是 14900，扣 NT$1.49；或 ×100 兩次扣 NT$14,900 | 欄位一律 `_minor`；core.mjs 單一換算函式＋測試；DB check `amount_minor in (價格表值)`；sandbox 對帳 |
+| R9 | 金額單位錯 | 高 | 寫成 150 而不是 15000，扣 NT$1.50；或 ×100 兩次扣 NT$15,000 | 欄位一律 `_minor`；core.mjs 單一換算函式＋測試；DB check `amount_minor in (價格表值)`；sandbox 對帳 |
 | R10 | CSP 擋 3D 驗證或 SDK | 中 | 正式站 3D 跳轉被 `form-action 'self'` 擋，客人卡在付款中 | `/billing/*` 專屬 CSP；sandbox 用 3 的倍數金額實測 3D；上線後以 console CSP 錯誤數為驗收項（lessons 2026-09-28） |
 | R11 | 時區錯 | 中 | 用 UTC 算錨點日，台北 00:30 開始試用的人扣款日差一天；31 號錨點漂移成 28 號 | §2.3 規則＋邊界測試 |
 | R12 | sandbox 共用帳號 | 中 | 共用特店的 webhook URL 被別人改掉，收不到事件或收到別人的事件；共用帳號沒開通 Recurring，根本無法測 | 前綴過濾；`status` 動作與排程都會主動查詢不依賴 webhook；問 SLP 能否給專屬沙盒（Q7） |
@@ -445,7 +447,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 - 單元（`node --test scripts/tests/web-billing-*.test.mjs`）：驗簽（自造向量＋SLP 實際 webhook 樣本）、時間窗、訂單號（≤32、決定性、前綴）、日期（§2.3 清單）、退款截止、狀態轉換表、錯誤碼對照、金額換算。
 - DB（新增 `scripts/tests/web-billing-database.sh`，照 `billing-database.sh` 用拋棄式本機 PG，**不讀任何專案連線字串**）：所有 migration 依序套用；網站表空時 `has_pro`／`pro_until`／`give_days`／`defer_gifts`／dispatch 與改前等價；RLS（他人讀不到、client 不能寫）；兩個 session 同時 claim 不會產生兩筆 pending；同期兩筆成功被唯一約束擋下；webhook 重放冪等；刪人後帳務紀錄保留；開關關閉時 claim 回 0 筆；既有 4 份 DB 測試照跑。
 - Sandbox E2E（在 D8 的測試專案）：Playwright 跑購買頁（Visa／MC／JCB 測試卡、3D 成功／失敗、非 3D 失敗用偶數金額）；排程用「測試專用時間平移」（只在 `SHOPLINE_API_BASE` 為 sandbox 時允許的 DB 函式，把 `trial_end` 拉到現在）測首扣、失敗、重試、寬限結束、退款；寄信寄到測試信箱實收。
-- sandbox 限制：共用帳號、webhook 可能被覆蓋、「3 的倍數」規則以元或分計不確定、Recurring 是否已開通未知 → 這些測不到的部分，P6 用老闆本人真卡在正式環境實刷 NT$149＋立刻退款收尾。
+- sandbox 限制：共用帳號、webhook 可能被覆蓋、「3 的倍數」規則以元或分計不確定、Recurring 是否已開通未知 → 這些測不到的部分，P6 用老闆本人真卡在正式環境實刷 NT$150＋立刻退款收尾。
 
 **回滾**
 - 前端：`NEXT_PUBLIC_WEB_BILLING_ENABLED` 移除即隱藏全部入口（需重新部署）。
@@ -477,7 +479,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 
 ## 9. 待向 SLP 窗口確認的問題（老闆可直接轉貼）
 
-> 您好，我們是 Huddle（個人經營者），準備用 SHOPLINE Payments 內嵌式付款做網站訂閱（月繳 NT$149／年繳 NT$990，2 週免費試用需綁卡，試用結束自動扣款）。想請教以下問題：
+> 您好，我們是 Huddle（個人經營者），準備用 SHOPLINE Payments 內嵌式付款做網站訂閱（月繳 NT$150／年繳 NT$990，2 週免費試用需綁卡，試用結束自動扣款）。想請教以下問題：
 >
 > 1. 我們的特店要怎麼開通「綁卡」與「定期扣款（Recurring）」？需要另外簽約或審核嗎？大約多久？
 > 2. 個人戶（非公司）可以使用綁卡與定期扣款嗎？
@@ -496,7 +498,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 > 15. 持卡人帳單上顯示的商店名稱是什麼？可以設定成「HUDDLE」嗎？
 > 16. 同一張卡綁在多個會員帳號是否允許？是否提供可辨識同一張卡的識別碼（用於限制每人一次試用）？
 > 17. 沙盒「金額為 3 的倍數走 3D」的規則，是以「元」還是「分」計算？
-> 18. 年繳 NT$990 一次扣款、月繳 NT$149，金額上有沒有限制？
+> 18. 年繳 NT$990 一次扣款、月繳 NT$150，金額上有沒有限制？
 > 19. `customerToken` 的有效期多久？
 > 20. 網站上是否需要放特定的「定期扣款代扣協議」文字？SDK 顯示的 subscribeAgreement 文字內容是什麼？
 > 21. 未來如需開立電子發票，SHOPLINE Payments 有沒有合作方案？
