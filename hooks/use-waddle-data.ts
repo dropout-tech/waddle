@@ -14,7 +14,7 @@ import {
   timeBlockToRow,
   rowToSettings,
 } from '@/lib/supabase/mappers'
-import { toDateString, parseDateString } from '@/lib/calendar-utils'
+import { toDateString, parseDateString, isSeriesStart } from '@/lib/calendar-utils'
 import { playTaskCompleteSound } from '@/lib/task-sound'
 import { hapticTaskComplete } from '@/lib/haptics'
 import { pushUndoableAction } from '@/lib/undo-stack'
@@ -916,6 +916,27 @@ export function useWaddleData(): UseWaddleData {
     return false
   }
 
+  // Deleting a recurring series must take its "only this" overrides along:
+  // tasks.parent_id is ON DELETE SET NULL, so they used to stay on the
+  // calendar as orphans. `fromDate` limits it to occurrences on/after that
+  // day ("delete this and following"). Returns the removed overrides so an
+  // undo can restore them.
+  const deleteSeriesOverrides = async (masterId: string, fromDate?: string): Promise<Task[]> => {
+    const overrides: Task[] = []
+    for (const w of workspacesRef.current) for (const c of w.categories) for (const t of c.tasks) {
+      if (t.parentId === masterId && (!fromDate || (!!t.scheduledDate && t.scheduledDate >= fromDate))) overrides.push(t)
+    }
+    if (overrides.length === 0) return []
+    const ids = new Set(overrides.map((t) => t.id))
+    setWorkspaces((prev) => prev.map((w) => ({
+      ...w,
+      categories: w.categories.map((c) => ({ ...c, tasks: c.tasks.filter((t) => !ids.has(t.id)) })),
+    })))
+    const { error } = await supabase.from('tasks').delete().in('id', [...ids])
+    if (error) handleDbError('刪除任務')(error)
+    return overrides
+  }
+
   // ─── Assigned-to-me tasks ────────────────────────────
   // The assignee may only change these fields (DB trigger
   // tasks_assignment_guard enforces the same whitelist); anything else in
@@ -1505,6 +1526,8 @@ export function useWaddleData(): UseWaddleData {
       if (t) { existing = t; break }
     }
     if (!existing) return
+    // "This and following" from the series' first day IS the whole series.
+    if (recurrenceChoice === 'this_and_following' && isSeriesStart(existing, targetDate)) recurrenceChoice = 'all'
 
     // Non-recurring or "all" or missing choice
     if (!existing.isRecurring || recurrenceChoice === 'all' || !recurrenceChoice) {
@@ -2026,7 +2049,9 @@ export function useWaddleData(): UseWaddleData {
         }))
       )
       pendingWritesRef.current += 1; mutationSeqRef.current += 1
+      let removedOverrides: Task[] = []
       try {
+        if (task.isRecurring && !task.parentId) removedOverrides = await deleteSeriesOverrides(taskId)
         const { error } = await supabase.from('tasks').delete().eq('id', taskId)
         if (error) handleDbError('刪除任務')(error)
         if (parentExdateCleanup) {
@@ -2050,6 +2075,7 @@ export function useWaddleData(): UseWaddleData {
           label: translate('刪除「{title}」', { title: snapshot.title }),
           undo: async () => {
             await restoreDeletedTask(snapshot)
+            for (const o of removedOverrides) await restoreDeletedTask(o)
             if (exdateRestore) {
               // Re-add the date back to parent's exdates so the master skips
               // it again (matching the pre-delete state).
@@ -2182,7 +2208,9 @@ export function useWaddleData(): UseWaddleData {
           }))
         )
         pendingWritesRef.current += 1; mutationSeqRef.current += 1
+        let removedOverrides: Task[] = []
         try {
+          removedOverrides = await deleteSeriesOverrides(taskId)
           const { error } = await supabase.from('tasks').delete().eq('id', taskId)
           if (error) handleDbError('刪除任務')(error)
         } finally {
@@ -2191,7 +2219,10 @@ export function useWaddleData(): UseWaddleData {
         if (recordUndo) {
           pushUndoableAction({
             label: translate('刪除「{title}」', { title: snapshot.title }),
-            undo: () => restoreDeletedTask(snapshot),
+            undo: async () => {
+              await restoreDeletedTask(snapshot)
+              for (const o of removedOverrides) await restoreDeletedTask(o)
+            },
             redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
           })
         }
@@ -2219,16 +2250,15 @@ export function useWaddleData(): UseWaddleData {
       )
 
       pendingWritesRef.current += 1; mutationSeqRef.current += 1
+      let removedOverrides: Task[] = []
       try {
         const { error } = await supabase
           .from('tasks')
           .update({ recurrence_end_date: endDate })
           .eq('id', taskId)
         if (error) handleDbError('更新重複任務結束日')(error)
-        
-        // 2. We don't need to create a new task since it's a delete.
-        // But we should re-parent or delete detached tasks past targetDate.
-        // For simplicity, we just delete the master's "future" via endDate.
+        // 2. Overrides on/after targetDate belong to the deleted part.
+        else removedOverrides = await deleteSeriesOverrides(taskId, targetDate)
       } finally {
         pendingWritesRef.current -= 1
       }
@@ -2260,6 +2290,7 @@ export function useWaddleData(): UseWaddleData {
               .from('tasks')
               .update({ recurrence_end_date: previousEndDate || null })
               .eq('id', taskId)
+            for (const o of removedOverrides) await restoreDeletedTask(o)
           },
           redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
         })
@@ -2308,6 +2339,8 @@ export function useWaddleData(): UseWaddleData {
     }
 
     if (!task) return
+    // "This and following" from the series' first day IS the whole series.
+    if (recurrenceChoice === 'this_and_following' && isSeriesStart(task, targetDate)) recurrenceChoice = 'all'
 
     // Non-recurring or "all" or missing choice
     if (!task.isRecurring || recurrenceChoice === 'all' || !recurrenceChoice) {
@@ -2577,6 +2610,8 @@ export function useWaddleData(): UseWaddleData {
       if (task) break
     }
     if (!task) return
+    // "This and following" from the series' first day IS the whole series.
+    if (recurrenceChoice === 'this_and_following' && isSeriesStart(task, targetDate)) recurrenceChoice = 'all'
 
     // Non-recurring or "all" → clear the master's time fields (and date if
     // fully unscheduled). Earlier delegation to rescheduleTask with `''`
