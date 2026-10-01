@@ -10,6 +10,7 @@ import { setWidgetAccount } from '@/lib/widgets/native'
 import { WidgetLinks } from '@/components/widgets/widget-links'
 import { DeepLinkHandler } from './deep-link-handler'
 import { resetSharedSelf } from '@/lib/operations/client'
+import { resetPlanUsage } from '@/lib/billing/plan-usage'
 
 // Client-side auth state shared across the app. Replaces the deleted server
 // middleware (proxy.ts) as the single source of truth for "is the user logged
@@ -53,7 +54,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return
       setDesktopNotificationAccount(nextSession?.user.id ?? null)
       if (_event !== 'TOKEN_REFRESHED') {
-        if (_event !== 'INITIAL_SESSION') resetSharedSelf()
+        if (_event !== 'INITIAL_SESSION') {
+          resetSharedSelf()
+          resetPlanUsage()
+        }
         void setWidgetAccount(nextSession?.user.id ?? null).catch(() => {})
         void clearWidgetReminders(nextSession?.user.id ?? null).catch(() => {})
       }

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { t } from "@/lib/i18n";
 
 export interface MeetingTaskDraft {
   title: string;
@@ -73,7 +74,6 @@ export interface MeetingList {
 const messages: Record<string, string> = {
   INVALID_PARTICIPANTS: "與會者帳號重複或已無共享關係，請重新選擇。",
   ASSIGNMENT_RESPONSE_FAILED: "未能處理指派，請確認共享關係與目標分類後重試。",
-  MONTHLY_LIMIT: "本月已使用 20 次，下個月 1 日（台北時間）會重新開放。",
   RATE_LIMIT: "短時間內嘗試較多，請稍後再試。",
   REQUEST_CONFLICT: "這份內容已變更，請開始新的整理。",
   AI_NOT_CONFIGURED: "AI 整理尚未啟用，請稍後再試。",
@@ -84,6 +84,18 @@ const messages: Record<string, string> = {
   GENERATION_FAILED: "這次未能完成整理，沒有扣除次數。請重試。",
   IMPORT_FAILED: "任務未能建立，請確認目標分類仍可使用後重試。",
 };
+// The monthly quota is whatever the server says (free vs Pro, limits on or
+// off), so this message is built from the last `list` answer instead of a
+// hard-coded number. Already translated; the catching component's t() leaves
+// an unknown (already-English) string alone.
+let knownMonthlyLimit: number | null = null
+function monthlyLimitMessage(fromError: unknown) {
+  const limit =
+    typeof fromError === "number" && fromError > 0 ? fromError : knownMonthlyLimit;
+  return limit
+    ? t("本月已使用 {limit} 次，下個月 1 日（台北時間）會重新開放。", { limit })
+    : t("本月次數已用完，下個月 1 日（台北時間）會重新開放。");
+}
 export async function meetingRequest<T>(
   userId: string,
   body: Record<string, unknown>,
@@ -102,15 +114,22 @@ export async function meetingRequest<T>(
     throw new Error("帳號已切換，請重新開啟會議轉任務。");
   if (error) {
     let code = "";
+    let body: { error?: string; limit?: unknown } | null = null;
     try {
-      code = (await error.context?.json())?.error ?? "";
+      body = await error.context?.json();
+      code = body?.error ?? "";
     } catch {
       /* offline */
     }
+    if (code === "MONTHLY_LIMIT") throw new Error(monthlyLimitMessage(body?.limit));
     throw new Error(
       messages[code] ||
         "暫時無法連線。內容仍留在此頁，可稍後重試或重新整理紀錄狀態。",
     );
+  }
+  if (body.action === "list") {
+    const limit = (data as { limit?: unknown } | null)?.limit;
+    if (typeof limit === "number" && limit > 0) knownMonthlyLimit = limit;
   }
   return data as T;
 }

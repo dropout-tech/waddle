@@ -22,15 +22,15 @@ export const dict: Record<string, string> = {
   // '返回工作面板' and '會議轉任務' already translated in dict/account.ts — reused as-is.
   '貼上逐字稿或會議筆記，整理重點，留下接下來要做的事。':
     'Paste a transcript or meeting notes to summarize the key points and capture what to do next.',
-  '本月已用 {used} / 20 次': 'Used {used} / 20 this month',
+  '本月已用 {used} / {limit} 次': 'Used {used} / {limit} this month',
   ' · {pending} 份處理中': ' · {pending} processing',
   '正在讀取額度…': 'Loading quota…',
   '額度暫時無法讀取': 'Quota temporarily unavailable',
   '每月 1 日重置 · 台北時間': 'Resets on the 1st of each month · Taipei time',
   'AI 整理尚未啟用。已有會議紀錄仍可查看與建立任務。':
     'AI summarizing is not enabled yet. Existing meeting notes can still be viewed and turned into tasks.',
-  '本月 20 次已用完，下個月 1 日（台北時間）會重新開放。已整理的紀錄仍可建立任務。':
-    "This month's 20 summaries are used up and will reset on the 1st of next month (Taipei time). Already-processed notes can still be turned into tasks.",
+  '本月 {limit} 次已用完，下個月 1 日（台北時間）會重新開放。已整理的紀錄仍可建立任務。':
+    "This month's {limit} summaries are used up and will reset on the 1st of next month (Taipei time). Already-processed notes can still be turned into tasks.",
   '剩餘額度正在處理中，完成後會更新。': 'Remaining quota is being processed and will update once done.',
   '整理另一份會議': 'Summarize another meeting',
   '新增會議紀錄': 'Add meeting notes',
@@ -128,8 +128,10 @@ export const dict: Record<string, string> = {
     'Participant accounts are duplicated or no longer shared. Please choose again.',
   '未能處理指派，請確認共享關係與目標分類後重試。':
     'Could not process the assignment. Please check the sharing relationship and target category, then try again.',
-  '本月已使用 20 次，下個月 1 日（台北時間）會重新開放。':
-    "You've used all 20 this month. It resets on the 1st of next month (Taipei time).",
+  '本月已使用 {limit} 次，下個月 1 日（台北時間）會重新開放。':
+    "You've used all {limit} this month. It resets on the 1st of next month (Taipei time).",
+  '本月次數已用完，下個月 1 日（台北時間）會重新開放。':
+    "You've used all of this month's summaries. It resets on the 1st of next month (Taipei time).",
   '短時間內嘗試較多，請稍後再試。': 'Too many attempts in a short time. Please try again later.',
   '這份內容已變更，請開始新的整理。': 'This content has changed. Please start a new summary.',
   'AI 整理尚未啟用，請稍後再試。': 'AI summarizing is not enabled yet. Please try again later.',
