@@ -54,10 +54,10 @@ const SHEETS = [
   //
   // Notebook set: shown at 18–20px.
   {
-    file: 'sheet-v6-notebook.png', cols: 6, rows: 4, target: 2.5, scale: 0.122, maxExtent: 22, blur: 0.8, tol: 1.2,
+    file: 'sheet-v6-notebook.png', cols: 6, rows: 4, pen: 18.123859649122807, target: 2.5, scale: 0.122, maxExtent: 22, blur: 0.8, tol: 1.2,
     cells: [
       'Text', 'Heading1', 'Heading2', 'Heading3', 'Todo', 'BulletList',
-      'NumberedList', 'Toggle', 'Quote', 'CodeBlock', null /* divider drawn as a wave: see extra */, 'Image',
+      'NumberedList', 'Toggle', 'Quote', 'CodeBlock', 'Divider', 'Image',
       'Bold', 'Italic', 'Underline', 'Strikethrough', 'InlineCode', 'Link',
       'Undo', 'Redo', null /* "≡+" */, 'AddTask', null /* table */, null /* marker pen */,
     ],
@@ -65,7 +65,7 @@ const SHEETS = [
   // Toolbar set = the SMALL optical grade: shown at 14–16px, so the pen is
   // fatter in units — the same ~2px of ink on screen as the notebook set.
   {
-    file: 'sheet-v5-toolbar.png', cols: 6, rows: 4, target: 3.1, scale: 0.125, maxExtent: 22, blur: 0.8, tol: 1.2,
+    file: 'sheet-v5-toolbar.png', cols: 6, rows: 4, pen: 18.418977705274607, target: 3.1, scale: 0.125, maxExtent: 22, blur: 0.8, tol: 1.2,
     cells: [
       'ChevronLeft', 'ChevronRight', 'ChevronDown', 'More', 'Plus', 'Minus',
       'Bell', 'User', 'Users', 'Eye', 'EyeOff', 'Clock',
@@ -73,7 +73,19 @@ const SHEETS = [
       'Settings', 'Sparkles', 'FloatingWindow', 'UndoSm', 'RedoSm', null /* toggle: the notebook sheet's is used */,
     ],
     // same drawing again at another weight: { from, name } + OPTIONS[name].target
-    extra: [{ from: 'Bell', name: 'BellLg' }, { from: 'Minus', name: 'Divider' }],
+    extra: [{ from: 'Bell', name: 'BellLg' }, { from: 'Sparkles', name: 'SparklesLg' }, { from: 'Plus', name: 'PlusLg' }],
+  },
+  // Navigation + user menu. Same style text as v5, word for word. The user-menu
+  // icons are the small grade (16px); the three bottom-tab icons are shown at
+  // 20px and get the 20px weight through OPTIONS. Rows 3–4 are spares.
+  {
+    file: 'sheet-v7-nav.png', cols: 6, rows: 4, pen: 16.83923431203224, target: 3.1, scale: 0.125, maxExtent: 22, blur: 0.8, tol: 1.2,
+    cells: [
+      'Focus', 'Tasks', 'Calendar', 'Mail', 'Gift', 'Document',
+      'Clipboard', 'Building', 'Sun', 'Moon', 'LogOut', 'Phone',
+      null, null, null, null, null, null,
+      null, null, null, null, null, null,
+    ],
   },
 ]
 
@@ -96,16 +108,42 @@ const OPTIONS = {
   },
   Quote: { solid: true, scale: 1.1 },
   // Letters are drawn smaller than the pictograms — bring them up a little.
-  Text: { scale: 1.12 }, Bold: { scale: 1.15 }, Italic: { scale: 1.1 }, Underline: { scale: 1.1 },
-  // The notebook sheet's divider came out as a "~" wave. A divider is a plain
-  // rule: reuse the toolbar sheet's single straight-ish stroke, full width,
-  // thinned to the notebook weight.
-  Divider: { target: 2.5, fit: 22 },
+  // { grow } here corrects the pen: the quick stroke estimate reads these
+  // glyphs as fatter than they are, so they came out at 2.1–2.4u instead of
+  // 2.5u (measured on the output with a distance transform) and looked like
+  // a thinner pen next to the "/" menu icons.
+  Text: { scale: 1.12 }, Bold: { scale: 1.15, grow: 1.3 }, Italic: { scale: 1.1, grow: 0.45 }, Underline: { scale: 1.1, grow: -0.5 },
+  InlineCode: { grow: 1.3 }, Link: { grow: 0.8 }, Undo: { grow: 1.2 }, Redo: { grow: 1.3 },
+  // Divider: the sheet's long wavy rule, full width. (A plain dash was the
+  // same shape as the zoom "−"; a rule between two short "text" strokes read
+  // as a scribbled paragraph.)
+  Divider: { fit: 22.5, grow: -0.55 },
   Toggle: { stroke: 16 },
   // Single-stroke arrows were drawn larger than the pictograms.
   ChevronLeft: { scale: 0.85 }, ChevronRight: { scale: 0.85 }, ChevronDown: { scale: 0.85 },
   // The bell trigger is drawn at 20px, so it gets the 20px weight.
   BellLg: { target: 2.6 },
+  // Bottom tabs are 20px and the FAB plus 24px: same ~2px of ink on screen.
+  Focus: { target: 2.5, grow: -1 }, Tasks: { target: 2.5 }, Calendar: { target: 2.5, grow: 0.5 }, SparklesLg: { target: 2.5, grow: 1 }, PlusLg: { target: 2.3 },
+  Gift: { grow: 1.4 }, Sun: { grow: -1 },
+  // Floating window = two overlapping windows: the big frame plus a small
+  // frame that breaks out of its bottom-right corner. (Frame + solid square
+  // inside was being read as "picture".) Built from the drawing's own blobs:
+  // rub a gap around where the small window goes, stamp the square at 2×,
+  // then hollow it into an outline.
+  FloatingWindow: {
+    stroke: 16.5, fit: 20.5,
+    remix: (parts) => {
+      const frame = parts.reduce((a, b) => (a.w > b.w ? a : b))
+      const box = parts.find((p) => p !== frame)
+      const at = { part: box, scale: 2, dx: 50, dy: 49 }
+      return [{ part: frame }, { ...at, grow: 12, erase: true }, at, { ...at, grow: -8, erase: true }]
+    },
+  },
+  // The arrow-into-tray is an open, airy shape between heavier neighbours in
+  // the "more tools" menu; its pen measured the same as theirs (≈3.0u) but it
+  // read thinner, so it gets a touch more ink.
+  Download: { grow: 1.2 },
 }
 
 // ── raster helpers ────────────────────────────────────────────────────────
@@ -178,8 +216,11 @@ function erode(mask, w, h, r) {
 /**
  * Hand-fix hook: rebuild an icon from its own ink blobs. `fn(parts)` gets the
  * blobs (sorted left→right, top→bottom; cx/cy/w/h in SOURCE px) and returns
- * [{ part, scale?, dx?, dy?, grow? }] — each blob is thickened, scaled about
- * its own centre, moved, and stamped onto a fresh canvas.
+ * [{ part, scale?, dx?, dy?, grow?, erase? }] — each blob is thickened (or
+ * thinned), scaled about its own centre, moved, and stamped onto a fresh
+ * canvas in order. `erase: true` rubs that shape out instead (to cut a gap
+ * around something, or to hollow a solid blob into an outline). The same
+ * blob may be used several times.
  */
 function remix(mask, W, H, fn) {
   const label = new Int32Array(W * H)
@@ -219,11 +260,11 @@ function remix(mask, W, H, fn) {
     else if (op.grow < 0) m = erode(m, W, H, -op.grow * UP)
     const cx = (p.minX + p.maxX) / 2, cy = (p.minY + p.maxY) / 2
     const tx = cx + (op.dx ?? 0) * UP + M, ty = cy + (op.dy ?? 0) * UP + M
-    const hw = ((p.maxX - p.minX) / 2 + 12 * UP) * sc, hh = ((p.maxY - p.minY) / 2 + 12 * UP) * sc
+    const hw = ((p.maxX - p.minX) / 2 + 24 * UP) * sc, hh = ((p.maxY - p.minY) / 2 + 24 * UP) * sc
     for (let y = Math.max(0, Math.floor(ty - hh)); y < Math.min(OH, ty + hh); y++) {
       for (let x = Math.max(0, Math.floor(tx - hw)); x < Math.min(OW, tx + hw); x++) {
         const sx = Math.round(cx + (x - tx) / sc), sy = Math.round(cy + (y - ty) / sc)
-        if (sx >= 0 && sy >= 0 && sx < W && sy < H && m[sy * W + sx]) out[y * OW + x] = 1
+        if (sx >= 0 && sy >= 0 && sx < W && sy < H && m[sy * W + sx]) out[y * OW + x] = op.erase ? 0 : 1
       }
     }
   }
@@ -327,7 +368,9 @@ for (const sheet of SHEETS) {
     if (src) raw.push({ ...src, name: e.name })
   }
   const strokes = raw.map((r) => r.stroke).sort((a, b) => a - b)
-  const median = strokes[Math.floor(strokes.length / 2)]
+  // The sheet's typical line width. Pinned per sheet ({ pen }) once icons
+  // are in use, so adding a cell later can't nudge every existing path.
+  const median = sheet.pen ?? strokes[Math.floor(strokes.length / 2)]
   const maxSide = Math.max(...raw.map((r) => Math.max(r.bw, r.bh)))
   // One scale for the sheet (so every icon keeps the same pen), chosen so the
   // biggest drawing fits; then grow the ink until the stroke hits the target.

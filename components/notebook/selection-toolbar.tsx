@@ -44,31 +44,31 @@ export function SelectionToolbar({ editor }: SelectionToolbarProps) {
     >
       <div className="flex items-center gap-0.5 rounded-lg border border-border bg-popover p-1 shadow-md">
         <Btn label={t('粗體')} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
-          <InkBold className="h-[18px] w-[18px]" />
+          <InkBold className="h-5 w-5" />
         </Btn>
         <Btn label={t('斜體')} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
-          <InkItalic className="h-[18px] w-[18px]" />
+          <InkItalic className="h-5 w-5" />
         </Btn>
         <Btn
           label={t('底線')}
           active={editor.isActive('underline')}
           onClick={() => editor.chain().focus().toggleUnderline().run()}
         >
-          <InkUnderline className="h-[18px] w-[18px]" />
+          <InkUnderline className="h-5 w-5" />
         </Btn>
         <Btn
           label={t('刪除線')}
           active={editor.isActive('strike')}
           onClick={() => editor.chain().focus().toggleStrike().run()}
         >
-          <InkStrikethrough className="h-[18px] w-[18px]" />
+          <InkStrikethrough className="h-5 w-5" />
         </Btn>
         <Btn label={t('行內程式碼')} active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
-          <InkInlineCode className="h-[18px] w-[18px]" />
+          <InkInlineCode className="h-5 w-5" />
         </Btn>
         <span className="mx-0.5 h-5 w-px bg-muted-foreground/45" aria-hidden />
         <Btn label={t('連結')} active={editor.isActive('link')} onClick={setLink}>
-          <InkLink className="h-[18px] w-[18px]" />
+          <InkLink className="h-5 w-5" />
         </Btn>
       </div>
     </BubbleMenu>

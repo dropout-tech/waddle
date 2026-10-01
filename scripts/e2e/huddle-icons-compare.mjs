@@ -51,6 +51,7 @@ ${pair('記事本「/」區塊選單（淺色）', img('before-menu-light-dpr2',
 ${pair('工具列「▾」選單展開', img('before-header-1280-light-menu-open', 520), img('after-header-1280-light-menu-open', 520))}
 ${pair('手機 390：「⋯」選單（淺色）', crop('before-header-390-light-more-open', 390, 690), crop('after-header-390-light-more-open', 390, 690))}
 ${pair('手機 390：「⋯」選單（深色）', crop('before-header-390-dark-more-open', 390, 690), crop('after-header-390-dark-more-open', 390, 690))}
+<section><h2>記事本：選取文字後的浮動格式列（改後，淺色／深色）</h2><div class="row">${img('after-bubble-light', 251)}${img('after-bubble-dark', 251)}</div></section>
 ${pair('手機記事本：鍵盤上方工具列（三段橫向捲動）',
     stack(['before-mobile-toolbar-light-a', 'before-mobile-toolbar-light-b', 'before-mobile-toolbar-light-c'], 390),
     stack(['after-mobile-toolbar-light-a', 'after-mobile-toolbar-light-b', 'after-mobile-toolbar-light-c'], 390))}
@@ -68,10 +69,28 @@ const strip = (suffix) => `<!doctype html><meta charset="utf-8"><style>${css}
 <figure><figcaption class="b">改前（深色）</figcaption>${img(`before-header-1280-dark${suffix}`, 876)}</figure>
 <figure><figcaption class="a">改後（深色）</figcaption>${img(`after-header-1280-dark${suffix}`, 876)}</figure>`
 
+// Mobile bottom tab bar + user menu.
+const tabStates = (mode, theme) => stack([1, 2, 3, 4, 5].map((i) => `${mode}-nav-390-${theme}-tab${i}`), 390)
+const navSheet = `<!doctype html><meta charset="utf-8"><style>${css} body{width:900px}</style>
+<h1>手機底部分頁列＋使用者選單 — 改前 vs 改後</h1>
+<p class="lead">左：原本的 Lucide 圖示；右：Huddle 手繪版。實機截圖（Retina 兩倍）。</p>
+${pair('底部分頁列（日曆頁，淺色）', img('before-nav-390-light', 390), img('after-nav-390-light', 390))}
+${pair('底部分頁列（日曆頁，深色）', img('before-nav-390-dark', 390), img('after-nav-390-dark', 390))}
+${pair('五個分頁各自選中時（重點／任務／白板／日曆／連結，淺色）', tabStates('before', 'light'), tabStates('after', 'light'))}
+${pair('五個分頁各自選中時（深色）', tabStates('before', 'dark'), tabStates('after', 'dark'))}
+${pair('右下角「＋」新增任務', img('before-nav-390-fab', 80), img('after-nav-390-fab', 80))}
+${pair('整個畫面（上方「⋯」旁的圖示與底部分頁同一支筆）', crop('before-nav-390-light-page', 390, 844), crop('after-nav-390-light-page', 390, 844))}
+${pair('使用者選單（桌機，淺色）', img('before-user-menu-1280-light', 380), img('after-user-menu-1280-light', 380))}
+${pair('使用者選單（桌機，深色）', img('before-user-menu-1280-dark', 380), img('after-user-menu-1280-dark', 380))}
+${pair('使用者選單（手機，淺色）', crop('before-user-menu-390-light', 390, 760), crop('after-user-menu-390-light', 390, 760))}
+${pair('使用者選單（手機，深色）', crop('before-user-menu-390-dark', 390, 760), crop('after-user-menu-390-dark', 390, 760))}
+`
+
 const browser = await chromium.launch()
 for (const [name, html, w, dpr] of [
   ['compare-before-after', compare, 1244, 2], ['closeup-menu-4x', closeup, 1064, 2],
   ['toolbar-before-after-1x', strip('-dpr1'), 908, 1], ['toolbar-before-after-2x', strip(''), 908, 2],
+  ['nav-before-after', navSheet, 964, 2],
 ]) {
   const file = path.join(os.tmpdir(), `huddle-icons-${name}.html`)
   writeFileSync(file, html)
