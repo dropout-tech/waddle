@@ -234,6 +234,59 @@ export function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val))
 }
 
+/**
+ * Live start/end (minutes from midnight) for a block being dragged on the
+ * time grid. `pointerY` / `grabOffsetY` are PIXELS — converted through
+ * `hourHeight`, so the result is right at every zoom level (the old inline
+ * math treated pixels as minutes and was only correct at 60 px/hour).
+ * A move keeps the block's length and stops flush with the grid's bottom
+ * instead of being squeezed to 15 minutes.
+ */
+export function computeDragRange(p: {
+  dragType: 'move' | 'resize-top' | 'resize-bottom'
+  /** Pointer Y in px, measured from the grid's top (minute `min`). */
+  pointerY: number
+  /** Where inside the block it was grabbed, in px (move only). */
+  grabOffsetY: number
+  hourHeight: number
+  min: number
+  max: number
+  originalStart: number
+  originalEnd: number
+  currentStart: number
+  currentEnd: number
+}): { start: number; end: number } {
+  const pxToMin = (px: number) => (px * 60) / (p.hourHeight > 0 ? p.hourHeight : 60)
+  const pointer = snap(p.min + pxToMin(p.pointerY))
+  if (p.dragType === 'move') {
+    const duration = clamp(p.originalEnd - p.originalStart, SNAP_MINUTES, Math.max(SNAP_MINUTES, p.max - p.min))
+    const start = clamp(snap(p.min + pxToMin(p.pointerY - p.grabOffsetY)), p.min, p.max - duration)
+    return { start, end: start + duration }
+  }
+  if (p.dragType === 'resize-top') {
+    return { start: clamp(pointer, p.min, p.currentEnd - SNAP_MINUTES), end: p.currentEnd }
+  }
+  return { start: p.currentStart, end: clamp(pointer, p.currentStart + SNAP_MINUTES, p.max) }
+}
+
+/** How many days `date` is past the start of its week (0-6). */
+export function daysSinceWeekStart(date: Date, weekStartDay: number): number {
+  const start = ((Math.trunc(weekStartDay) % 7) + 7) % 7
+  return (date.getDay() - start + 7) % 7
+}
+
+/** Weekday indexes (0=Sun) in display order for a week starting on `weekStartDay`. */
+export function orderedWeekdays(weekStartDay: number): number[] {
+  const start = ((Math.trunc(weekStartDay) % 7) + 7) % 7
+  return Array.from({ length: 7 }, (_, i) => (start + i) % 7)
+}
+
+/** A usable calendar hour range: 0 ≤ start < end ≤ 24. */
+export function isValidHourRange(startHour: number, endHour: number): boolean {
+  return Number.isInteger(startHour) && Number.isInteger(endHour) &&
+    startHour >= 0 && endHour <= 24 && startHour < endHour
+}
+
 export function overlaps(a: Task, b: Task): boolean {
   if (!a.scheduledStartTime || !a.scheduledEndTime || !b.scheduledStartTime || !b.scheduledEndTime) {
     return false
