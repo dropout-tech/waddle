@@ -64,8 +64,10 @@ interface MainLayoutProps {
   onCreatePendingTask?: (title: string) => void
   onCreateCalendarTimeBlock?: (date: string, startTime: string, endTime: string, type: string, label: string, color: string, notes?: string, description?: string) => void
   onOpenCreateTask?: (slotType: SlotType, date: string, startTime: string, endTime: string) => void
-  onRescheduleTask?: (taskId: string, newStart: string, newEnd: string) => void
-  onUnscheduleTask?: (taskId: string, date?: string) => void
+  // Must stay identical to CalendarPanel's signatures: the week / day views
+  // call these with the date and the recurrence choice as trailing args.
+  onRescheduleTask?: (taskId: string, newStartOrDate: string, newEndOrStart: string, newEnd?: string, recurrenceChoice?: import('../modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => void
+  onUnscheduleTask?: (taskId: string, date?: string, recurrenceChoice?: import('../modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string) => void
   onUpdateTimeBlock?: (id: string, updates: Partial<TimeBlock>) => void
   onDeleteTimeBlock?: (id: string) => void
   onTimeBlockSelect?: (block: TimeBlock) => void
@@ -663,8 +665,8 @@ export function MainLayout({
                 onCreatePendingTask={onCreatePendingTask}
                 onCreateTimeBlock={onCreateCalendarTimeBlock}
                 onOpenCreateTask={onOpenCreateTask}
-                onRescheduleTask={(id, start, end) => { if (!id.startsWith('meeting:')) onRescheduleTask?.(id, start, end) }}
-                onUnscheduleTask={(id, date) => { if (!id.startsWith('meeting:')) onUnscheduleTask?.(id, date) }}
+                onRescheduleTask={(id, ...rest) => { if (!id.startsWith('meeting:')) onRescheduleTask?.(id, ...rest) }}
+                onUnscheduleTask={(id, ...rest) => { if (!id.startsWith('meeting:')) onUnscheduleTask?.(id, ...rest) }}
                 onUpdateTimeBlock={onUpdateTimeBlock}
                 onDeleteTimeBlock={onDeleteTimeBlock}
                 onTimeBlockSelect={onTimeBlockSelect}
@@ -1040,8 +1042,8 @@ export function MainLayout({
                   onCreatePendingTask={onCreatePendingTask}
                   onCreateTimeBlock={onCreateCalendarTimeBlock}
                   onOpenCreateTask={onOpenCreateTask}
-                  onRescheduleTask={(id, start, end) => { if (!id.startsWith('meeting:')) onRescheduleTask?.(id, start, end) }}
-                  onUnscheduleTask={(id, date) => { if (!id.startsWith('meeting:')) onUnscheduleTask?.(id, date) }}
+                  onRescheduleTask={(id, ...rest) => { if (!id.startsWith('meeting:')) onRescheduleTask?.(id, ...rest) }}
+                  onUnscheduleTask={(id, ...rest) => { if (!id.startsWith('meeting:')) onUnscheduleTask?.(id, ...rest) }}
                   onUpdateTimeBlock={onUpdateTimeBlock}
                   onDeleteTimeBlock={onDeleteTimeBlock}
                   onTimeBlockSelect={onTimeBlockSelect}

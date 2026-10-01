@@ -7,6 +7,10 @@ export const dict: Record<string, string> = {
   '完成 {count} 個任務': 'Complete {count} tasks',
   // ── use-waddle-data.ts: generic save-error wrapper ──
   '儲存失敗：{op}': 'Save failed: {op}',
+  '儲存失敗：{op}（{reason}）': 'Save failed: {op} ({reason})',
+  '登入已過期，請重新整理頁面': 'your sign-in expired — please reload the page',
+  '網路連線不穩，請稍後再試': 'connection problem — please try again shortly',
+  '錯誤代碼 {code}': 'error code {code}',
   '初始化資料失敗，請重新整理': 'Failed to set up your data — please refresh.',
 
   // handleDbError operation labels (used both for the toast above and,
