@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { t as translate } from '@/lib/i18n'
 import { createClient } from '@/lib/supabase/client'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import type { Database } from '@/lib/supabase/database.types'
@@ -91,7 +92,7 @@ export function useScratchpad() {
 
   const addItem = useCallback(async (date: string, item: ScratchpadItem) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const existing = scratchpadRef.current[date] ?? []
     const nextOrder = existing.length ? Math.max(...existing.map((i) => i.sortOrder)) + 10 : 0
     const placed = { ...item, sortOrder: nextOrder }
@@ -116,15 +117,15 @@ export function useScratchpad() {
         [date]: (prev[date] ?? []).filter((i) => i.id !== placed.id),
       }))
       console.error('[scratchpad] add failed', error)
-      toast.error('儲存失敗：新增白板項目')
+      toast.error(translate('儲存失敗：{op}', { op: translate('新增白板項目') }))
     }
   }, [supabase, setScratchpadByDate, enqueueScratchpadWrite])
 
   const updateItem = useCallback(async (id: string, patch: Partial<ScratchpadItem>) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const entry = Object.entries(scratchpadRef.current).find(([, items]) => items.some((i) => i.id === id))
-    if (!entry) { toast.error('儲存失敗：找不到白板項目，請重新整理'); return }
+    if (!entry) { toast.error(translate('儲存失敗：找不到白板項目，請重新整理')); return }
     const [date, items] = entry
     const previous = items.find((i) => i.id === id)!
     const optimistic = { ...previous, ...patch }
@@ -161,13 +162,13 @@ export function useScratchpad() {
         }),
       }))
       console.error('[scratchpad] update failed', error)
-      toast.error('儲存失敗：編輯白板項目')
+      toast.error(translate('儲存失敗：{op}', { op: translate('編輯白板項目') }))
     }
   }, [supabase, setScratchpadByDate, enqueueScratchpadWrite])
 
   const deleteItem = useCallback(async (id: string) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const entry = Object.entries(scratchpadRef.current).find(([, items]) => items.some((i) => i.id === id))
     if (!entry) return
     const [date, items] = entry
@@ -185,13 +186,13 @@ export function useScratchpad() {
           : [...(prev[date] ?? []), removed].sort((a, b) => a.sortOrder - b.sortOrder),
       }))
       console.error('[scratchpad] 刪除白板項目 failed', error)
-      toast.error('儲存失敗：刪除白板項目')
+      toast.error(translate('儲存失敗：{op}', { op: translate('刪除白板項目') }))
     }
   }, [supabase, setScratchpadByDate, enqueueScratchpadWrite])
 
   const reorderItems = useCallback(async (date: string, items: ScratchpadItem[]) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const previousOrders = new Map((scratchpadRef.current[date] ?? []).map((i) => [i.id, i.sortOrder]))
     const orders = new Map(items.filter((i) => previousOrders.has(i.id)).map((i) => [i.id, i.sortOrder]))
     // The caller may hold stale content/geometry or omit newly created items.
@@ -216,7 +217,7 @@ export function useScratchpad() {
               ? { ...i, sortOrder: previousOrders.get(id)! } : i).sort((a, b) => a.sortOrder - b.sortOrder),
           }))
           console.error('[scratchpad] 重新排序白板 failed', error)
-          toast.error('儲存失敗：重新排序白板')
+          toast.error(translate('儲存失敗：{op}', { op: translate('重新排序白板') }))
         }
       }))
     })
@@ -224,7 +225,7 @@ export function useScratchpad() {
 
   const clearDate = useCallback(async (date: string) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const snapshot = scratchpadRef.current[date] ?? []
     setScratchpadByDate((prev) => {
       const next = { ...prev }
@@ -243,7 +244,7 @@ export function useScratchpad() {
           .sort((a, b) => a.sortOrder - b.sortOrder) }
       })
       console.error('[scratchpad] 清空白板 failed', error)
-      toast.error('儲存失敗：清空白板')
+      toast.error(translate('儲存失敗：{op}', { op: translate('清空白板') }))
     }
   }, [supabase, setScratchpadByDate, enqueueScratchpadWrite])
 

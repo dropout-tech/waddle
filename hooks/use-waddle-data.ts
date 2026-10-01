@@ -3307,7 +3307,7 @@ export function useWaddleData(): UseWaddleData {
 
   const addScratchpadItem = useCallback(async (date: string, item: ScratchpadItem) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const existing = scratchpadRef.current[date] ?? []
     const nextOrder = existing.length ? Math.max(...existing.map((i) => i.sortOrder)) + 10 : 0
     const placed = { ...item, sortOrder: nextOrder }
@@ -3340,7 +3340,7 @@ export function useWaddleData(): UseWaddleData {
 
   const deleteScratchpadItem = useCallback(async (id: string) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const entry = Object.entries(scratchpadRef.current).find(([, items]) => items.some((i) => i.id === id))
     if (!entry) return
     const [date, items] = entry
@@ -3366,9 +3366,9 @@ export function useWaddleData(): UseWaddleData {
 
   const updateScratchpadItem = useCallback(async (id: string, patch: Partial<ScratchpadItem>) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const entry = Object.entries(scratchpadRef.current).find(([, items]) => items.some((i) => i.id === id))
-    if (!entry) { toast.error('儲存失敗：找不到白板項目，請重新整理'); return }
+    if (!entry) { toast.error(translate('儲存失敗：找不到白板項目，請重新整理')); return }
     const [date, items] = entry
     const previous = items.find((i) => i.id === id)!
     const optimistic = { ...previous, ...patch }
@@ -3413,7 +3413,7 @@ export function useWaddleData(): UseWaddleData {
 
   const reorderScratchpadItems = useCallback(async (date: string, items: ScratchpadItem[]) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const previousOrders = new Map((scratchpadRef.current[date] ?? []).map((i) => [i.id, i.sortOrder]))
     const orders = new Map(items.filter((i) => previousOrders.has(i.id)).map((i) => [i.id, i.sortOrder]))
     // The caller may hold stale content/geometry or omit newly created items.
@@ -3450,7 +3450,7 @@ export function useWaddleData(): UseWaddleData {
 
   const clearScratchpadDate = useCallback(async (date: string) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const snapshot = scratchpadRef.current[date] ?? []
     setScratchpadByDate((prev) => {
       const next = { ...prev }
