@@ -174,7 +174,13 @@ function HuddlePage() {
   const [isOverdueReviewOpen, setIsOverdueReviewOpen] = useState(false)
   const [selectedTimeBlock, setSelectedTimeBlock] = useState<TimeBlock | null>(null)
 
+  // Calendar quick-create saves 「新任務」 before its editor opens. If that
+  // editor is closed without saving (取消／✕／Esc) while the task is still
+  // exactly as created, the user didn't want it: delete it again.
+  const quickCreatedRef = useRef<Task | null>(null)
+
   const handleSelectTask = useCallback((task: Task, occurrenceDate?: string) => {
+    quickCreatedRef.current = null
     setTaskMode('edit')
     setSelectedTask(task)
     setSelectedOccurrenceDate(occurrenceDate)
@@ -250,6 +256,9 @@ function HuddlePage() {
   // Save handler shared by edit + create modes.
   const handleSaveTask = useCallback(async (updates: Partial<Task>, newCategoryId?: string, recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice, targetDate?: string, assignTo?: AssignablePerson) => {
     if (!selectedTask) return
+    // Saved → keep it (cleared before any await: the modal calls onClose
+    // synchronously right after firing onSave).
+    quickCreatedRef.current = null
 
     if (taskMode === 'create') {
       // Snapshot the promote source NOW, before any await. The modal fires
@@ -498,6 +507,7 @@ function HuddlePage() {
     // sticky, so without this it could still be 'create' from a prior action.
     setTaskMode('edit')
     setSelectedTask(newTask)
+    quickCreatedRef.current = newTask
   }, [workspaces, createTask, t, settings.defaultCategoryEnabled])
 
   if (isLoading) {
@@ -608,12 +618,20 @@ function HuddlePage() {
           onClose={() => {
             // Cancelling a promote: drop the pending link, keep the note.
             promotedScratchpadIdRef.current = null
+            const fresh = quickCreatedRef.current
+            quickCreatedRef.current = null
+            if (fresh && liveSelectedTask.id === fresh.id && isUntouchedQuickTask(liveSelectedTask, fresh)) {
+              void deleteTask(fresh.id)
+            }
             setSelectedTask(null)
             setSelectedOccurrenceDate(undefined)
           }}
           onSave={handleSaveTask}
           onToggleComplete={taskMode === 'edit' ? toggleTaskComplete : undefined}
-          onDelete={taskMode === 'edit' ? deleteTask : undefined}
+          onDelete={taskMode === 'edit' ? (...args: Parameters<typeof deleteTask>) => {
+            quickCreatedRef.current = null
+            return deleteTask(...args)
+          } : undefined}
         />
       )}
 
@@ -682,5 +700,19 @@ export default function Page() {
 
   return (
     <HuddlePage key={session.user.id} />
+  )
+}
+
+/** A calendar quick-created task nobody has changed since it was created. */
+function isUntouchedQuickTask(live: Task, created: Task): boolean {
+  return (
+    live.title === created.title &&
+    !live.isCompleted &&
+    !live.assignment &&
+    !live.description &&
+    live.categoryId === created.categoryId &&
+    live.scheduledDate === created.scheduledDate &&
+    (live.scheduledStartTime ?? '') === (created.scheduledStartTime ?? '') &&
+    (live.scheduledEndTime ?? '') === (created.scheduledEndTime ?? '')
   )
 }
