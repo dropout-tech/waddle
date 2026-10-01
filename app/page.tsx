@@ -276,10 +276,10 @@ function HuddlePage() {
         updatedAt: now,
       }
       const inserted = await createTask(newTask)
-      // Task persisted — now it's safe to remove the source scratchpad note
-      // (if this create came from a "promote to task"). On a thrown createTask
-      // we skip the delete, so the note survives.
-      if (promotedId) deleteScratchpadItem(promotedId)
+      // Remove the source scratchpad note (for a "promote to task") only once
+      // the task really exists. createTask reports failure by returning
+      // false, not by throwing — a failed create must leave the note alone.
+      if (promotedId && inserted) deleteScratchpadItem(promotedId)
       // Picked someone in the create modal: assign only after the row exists.
       // A failed assignment never undoes the (already saved) task.
       if (assignTo && inserted && !newTask.isRecurring) {
