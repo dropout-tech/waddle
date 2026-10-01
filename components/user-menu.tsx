@@ -4,18 +4,21 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { operations } from '@/lib/operations/client'
 import type { Membership } from '@/lib/operations/types'
-import { Gift } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { LogOut, Mail, User, Loader2, Moon, Sun, FileText } from 'lucide-react'
-import { InkStickyNote, InkPlus, InkArchive } from '@/components/icons/huddle-icons'
+import { Loader2 } from 'lucide-react'
+// Every icon in this menu is the Huddle hand-inked set (DESIGN.md → 圖示);
+// only the sign-out spinner stays lucide (it's a loading state, not an icon).
+import {
+  InkStickyNote, InkPlus, InkArchive, InkUser, InkMail, InkGift, InkDocument, InkClipboard, InkBuilding,
+  InkSun, InkMoon, InkLogOut,
+} from '@/components/icons/huddle-icons'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { AccountRegistrationDate } from '@/components/auth/account-registration-date'
 import { useI18n } from '@/lib/i18n/react'
 import { useStickyNotesToggle } from '@/components/sticky-notes/sticky-notes-provider'
 import { listAssignments } from '@/lib/assignments'
-import { Building2, ClipboardList } from 'lucide-react'
 import { InstallAppMenuItem } from '@/components/pwa/install-app-menu-item'
 
 interface SessionInfo {
@@ -178,7 +181,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
                 />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                  <User className="w-4 h-4" />
+                  <InkUser className="w-4 h-4" />
                 </div>
               )}
               <div className="flex flex-col min-w-0">
@@ -186,7 +189,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
                   {publicAlias || session.displayName}
                 </span>
                 <span className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                  <Mail className="w-3 h-3" />
+                  <InkMail className="w-3.5 h-3.5 -m-px" />
                   {session.email}
                 </span>
               </div>
@@ -196,13 +199,13 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
 
           <div className="border-t border-border" />
 
-          <Link href="/membership" role="menuitem" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60" onClick={() => setOpen(false)}><Gift className="h-4 w-4" />{t('會員與推薦')}</Link>
+          <Link href="/membership" role="menuitem" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60" onClick={() => setOpen(false)}><InkGift className="h-4 w-4" />{t('會員與推薦')}</Link>
           <button
             onClick={() => { setOpen(false); router.push('/meetings') }}
             className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
             role="menuitem"
           >
-            <FileText className="w-4 h-4" />
+            <InkDocument className="w-4 h-4" />
             <span>{t('會議轉任務')}</span>
           </button>
 
@@ -211,7 +214,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
             className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
             role="menuitem"
           >
-            <ClipboardList className="w-4 h-4" />
+            <InkClipboard className="w-4 h-4" />
             <span className="flex-1 text-left">{t('指派任務')}</span>
             {assignmentCount > 0 && (
               <span data-testid="assignment-count" className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
@@ -224,7 +227,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
             className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
             role="menuitem"
           >
-            <Building2 className="w-4 h-4" />
+            <InkBuilding className="w-4 h-4" />
             <span>{t('組織')}</span>
           </button>
 
@@ -237,7 +240,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
             role="menuitemcheckbox"
             aria-checked={isDark}
           >
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {isDark ? <InkSun className="w-4 h-4" /> : <InkMoon className="w-4 h-4" />}
             <span>{isDark ? t('切換淺色') : t('切換深色')}</span>
           </button>
 
@@ -295,7 +298,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
             {signingOut ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <LogOut className="w-4 h-4" />
+              <InkLogOut className="w-4 h-4" />
             )}
             <span>{t('登出')}</span>
           </button>
