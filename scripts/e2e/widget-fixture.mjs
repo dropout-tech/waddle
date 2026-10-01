@@ -2,7 +2,11 @@
 // into a booted iOS Simulator's App Group container, so the native widgets can
 // be screenshotted without signing in. Used for docs/reports/2026-10-01-lockscreen-widgets.
 //
-//   node scripts/e2e/widget-fixture.mjs <app-group-container-dir> [--en] [--focus=running|paused|idle]
+//   node scripts/e2e/widget-fixture.mjs <app-group-container-dir> [--en] [--focus=running|paused|idle] [--design=a|b|c]
+//
+// --design writes snapshot.designVariant: the 2026-10-02 Lock Screen design
+// proposals (ios/App/HuddleWidgets/HuddleLockDesigns.swift). Demo-only; the
+// app's real snapshot never carries it, so without the flag you get today's faces.
 //
 // Find the container with:
 //   xcrun simctl get_app_container booted com.lazylazy.huddle group.com.lazylazy.huddle
@@ -16,9 +20,11 @@ registerHooks({resolve(specifier,context,next){if(specifier.startsWith('@/'))ret
 const { makeSnapshot } = await import('../../lib/widgets/model.ts')
 
 const dir = process.argv[2]
-if (!dir) { console.error('usage: widget-fixture.mjs <container-dir> [--en] [--focus=running|paused|idle]'); process.exit(1) }
+if (!dir) { console.error('usage: widget-fixture.mjs <container-dir> [--en] [--focus=running|paused|idle] [--design=a|b|c]'); process.exit(1) }
 const en = process.argv.includes('--en')
 const focusState = (process.argv.find(a => a.startsWith('--focus=')) ?? '--focus=running').slice(8)
+const design = (process.argv.find(a => a.startsWith('--design=')) ?? '').slice(9)
+if (design && !['a', 'b', 'c'].includes(design)) { console.error('--design must be a, b or c'); process.exit(1) }
 const now = new Date()
 const key = (offset) => { const d = new Date(now); d.setDate(d.getDate() + offset); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const hhmm = (minutesFromNow) => { const d = new Date(now.getTime() + minutesFromNow * 60000); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` }
@@ -63,7 +69,8 @@ snapshot.focus = focusState === 'running'
     : { state: 'idle', title: T('慢慢來，先專心一件事', 'One thing at a time'), endAt: null, seconds: 1500, note: '' }
 snapshot.water = { enabled: true, nextAt: now.getTime() + 48 * 60000, count: 0 }
 snapshot.pet = { adopted: true, name: T('豆豆', 'Bean'), color: 'ink', accessory: 'scarf', lang: en ? 'en' : 'zh-TW', overdue: 0, overdueLine: '', lines: [T('今天也慢慢來。', 'Slow and steady today.')] }
+if (design) snapshot.designVariant = design
 const state = { accountId: 'demo-account', epoch: 'demo-epoch', actions: [], snapshot }
 mkdirSync(dir, { recursive: true })
 writeFileSync(join(dir, 'widgets.json'), JSON.stringify(state))
-console.log(`wrote ${join(dir, 'widgets.json')} (${JSON.stringify(state).length} bytes, focus=${focusState}, lang=${en ? 'en' : 'zh-TW'})`)
+console.log(`wrote ${join(dir, 'widgets.json')} (${JSON.stringify(state).length} bytes, focus=${focusState}, design=${design || 'current'}, lang=${en ? 'en' : 'zh-TW'})`)

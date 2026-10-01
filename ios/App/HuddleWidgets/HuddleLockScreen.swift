@@ -154,7 +154,8 @@ extension WidgetView {
         }
     }
     @ViewBuilder var accessoryView:some View {
-        if let s=entry.snapshot {
+        if let s=entry.snapshot,let d=lockDesign,glance != .none {designFace(s,d)}
+        else if let s=entry.snapshot {
             switch glance {
             case .today: todayGlance(s)
             case .next: nextGlance(s)
