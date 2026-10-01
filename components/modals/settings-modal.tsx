@@ -66,6 +66,8 @@ import {
   getTaiwanHolidaysEnabled,
   setTaiwanHolidaysEnabled,
 } from '@/lib/taiwan-holidays'
+import { getShowCompletedTasks, setShowCompletedTasks } from '@/lib/show-completed'
+import { isValidHourRange } from '@/lib/calendar-utils'
 
 // Map icon names to components
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -203,6 +205,7 @@ export function SettingsModal({
   const [waterEnabled, setWaterEnabledState] = useState<boolean>(() => getWaterReminderEnabled())
   const [waterInterval, setWaterIntervalState] = useState<WaterReminderInterval>(() => getWaterReminderInterval())
   const [taiwanHolidaysEnabled, setTaiwanHolidaysEnabledState] = useState<boolean>(() => getTaiwanHolidaysEnabled())
+  const [showCompletedTasks, setShowCompletedTasksState] = useState<boolean>(() => getShowCompletedTasks())
   const [editingSlotType, setEditingSlotType] = useState<SlotType | null>(null)
   // These per-device prefs can change while this (always-mounted) modal is
   // closed — e.g. the water popup's own gear turns the reminder off. Re-read
@@ -214,6 +217,7 @@ export function SettingsModal({
     setWaterEnabledState(getWaterReminderEnabled())
     setWaterIntervalState(getWaterReminderInterval())
     setTaiwanHolidaysEnabledState(getTaiwanHolidaysEnabled())
+    setShowCompletedTasksState(getShowCompletedTasks())
   }, [isOpen, initialTab])
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [newSlotType, setNewSlotType] = useState<Partial<SlotType>>({
@@ -254,14 +258,22 @@ export function SettingsModal({
     isRecurring: false,
   }
 
+  const hourRangeValid = isValidHourRange(localSettings.calendarStartHour, localSettings.calendarEndHour)
+
   const handleSave = () => {
-    // Update time blocks with new settings
+    // 開始 ≥ 結束 would leave the calendar with no hours at all.
+    if (!hourRangeValid) {
+      toast.error(t('日曆顯示時間範圍：結束時間必須晚於開始時間'))
+      return
+    }
+    // Update time blocks with new settings. Only the colour comes from
+    // settings — this modal has no lunch-time field, so re-applying
+    // lunchBreak.startTime/endTime here reset a 午休 the user had dragged
+    // elsewhere back to 12:00-13:00 on every 儲存.
     const updatedBlocks = localTimeBlocks.map(tb => {
       if (tb.type === 'break') {
         return {
           ...tb,
-          startTime: localSettings.lunchBreak.startTime,
-          endTime: localSettings.lunchBreak.endTime,
           color: localSettings.lunchBreak.color,
         }
       }
@@ -560,10 +572,16 @@ export function SettingsModal({
                     ...prev,
                     calendarEndHour: parseInt(e.target.value) || 24
                   }))}
+                  aria-invalid={!hourRangeValid}
                   className="h-9"
                 />
               </div>
             </div>
+            {!hourRangeValid && (
+              <p role="alert" data-testid="settings-hour-range-error" className="text-xs text-destructive">
+                {t('結束時間必須晚於開始時間（0–24 點）')}
+              </p>
+            )}
           </div>
 
           {/* Default View Mode */}
@@ -748,13 +766,17 @@ export function SettingsModal({
                 <div className="text-sm text-foreground">{t('顯示已完成任務')}</div>
                 <div className="text-xs text-muted-foreground">{t('在日曆上顯示已完成的任務')}</div>
               </div>
+              {/* Device-level pref, applied immediately (lib/show-completed.ts).
+                  It used to write bufferTime.enabled, which nothing reads. */}
               <input
                 type="checkbox"
-                checked={localSettings.bufferTime?.enabled ?? true}
-                onChange={(e) => setLocalSettings(prev => ({
-                  ...prev,
-                  bufferTime: { ...prev.bufferTime, enabled: e.target.checked }
-                }))}
+                data-testid="settings-show-completed"
+                checked={showCompletedTasks}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  setShowCompletedTasksState(next)
+                  setShowCompletedTasks(next)
+                }}
                 className="w-4 h-4 rounded border-border accent-primary"
               />
             </label>
@@ -998,7 +1020,7 @@ export function SettingsModal({
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm text-foreground">{t('預設任務時長')}</div>
-                <div className="text-xs text-muted-foreground">{t('拖曳建立任務時的預設持續時間')}</div>
+                <div className="text-xs text-muted-foreground">{t('點一下空白時段建立任務時的預設長度')}</div>
               </div>
               <div className="flex items-center gap-2">
                 <Input

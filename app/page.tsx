@@ -30,6 +30,7 @@ import { MarketingPage } from '@/components/marketing/marketing-page'
 import { isDesktop, isNative } from '@/lib/platform'
 import { AuthGuard } from '@/components/auth/auth-guard'
 import { CategoryPrefixProvider } from '@/components/category-prefix-context'
+import { UserSettingsProvider } from '@/components/user-settings-context'
 import { NotebookOverlayProvider } from '@/components/notebook/notebook-overlay-provider'
 import { useI18n } from '@/lib/i18n/react'
 import { t as translate } from '@/lib/i18n'
@@ -540,6 +541,7 @@ function HuddlePage() {
   return (
     <ErrorBoundary>
       <CategoryPrefixProvider value={settings.showCategoryPrefix ?? true}>
+      <UserSettingsProvider value={settings}>
       <NotebookOverlayProvider>
       {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} pet={settings.pet} />}
       <MainLayout
@@ -594,6 +596,7 @@ function HuddlePage() {
         onPromoteToTask={handlePromoteToTask}
       />
       </NotebookOverlayProvider>
+      </UserSettingsProvider>
       </CategoryPrefixProvider>
 
       <OverdueTaskReview

@@ -57,6 +57,9 @@ const DEFAULT_META_ORDER: MetaField[] = ['duration', 'date', 'time']
 const DRAG_THRESHOLD = 5
 const DELETE_REVEAL_WIDTH = 76
 const DELETE_REVEAL_THRESHOLD = DELETE_REVEAL_WIDTH / 2
+// Phone: how long a dragged row must hover outside every category before the
+// drag hands over to the calendar tab.
+const CALENDAR_SWITCH_HOVER_MS = 450
 
 function TaskRowImpl({
   task,
@@ -197,8 +200,25 @@ function TaskRowImpl({
         }, longPressMs)
       : null
     let stillInThreshold = true
+    let cancelled = false
+    let calendarSwitchTimer: number | null = null
+
+    // Touch: once the long-press drag (or the sideways delete swipe) owns the
+    // gesture, the browser must not turn the same finger movement into a
+    // list scroll — that fires pointercancel and silently drops the drag.
+    // A non-passive touchmove is the only reliable way to veto the scroll;
+    // before activation we leave it alone so a normal swipe still scrolls.
+    // The rows also carry touch-action: pan-y so horizontal moves reach JS.
+    // Also bound to the touched node itself: touch events keep targeting it
+    // after the list unmounts (drag handed over to the calendar tab), and a
+    // detached node's events never bubble up to window.
+    const onTouchMove = (te: TouchEvent) => {
+      if ((activated || horizontalDeleteSwipe) && te.cancelable) te.preventDefault()
+    }
+    const touchTarget = e.target as EventTarget
 
     const onMove = (ev: PointerEvent) => {
+      if (cancelled) return
       const dx = ev.clientX - startX
       const dy = ev.clientY - startY
       const dist = Math.sqrt(dx * dx + dy * dy)
@@ -249,19 +269,57 @@ function TaskRowImpl({
         const categoryId = categoryIdAtPoint(ev.clientX, ev.clientY)
         onCategoryDragHover?.(categoryId === task.categoryId ? null : categoryId)
         if (!categoryId && !calendarDragActivated) {
-          calendarDragActivated = true
-          onDragActivate?.()
+          if (!isTouch) {
+            calendarDragActivated = true
+            onDragActivate?.()
+          } else if (calendarSwitchTimer == null) {
+            // Phone: leaving the categories hands the drag to the calendar
+            // tab, but only after a short hover — a finger sliding across
+            // the gap between two categories must not flip the screen away
+            // mid-move (that killed every category move on phones).
+            calendarSwitchTimer = window.setTimeout(() => {
+              calendarSwitchTimer = null
+              if (cancelled || calendarDragActivated) return
+              calendarDragActivated = true
+              onDragActivate?.()
+            }, CALENDAR_SWITCH_HOVER_MS)
+          }
+        } else if (categoryId && calendarSwitchTimer != null) {
+          window.clearTimeout(calendarSwitchTimer)
+          calendarSwitchTimer = null
         }
       }
+    }
+
+    // Esc while dragging (desktop): drop nothing, row stays where it was.
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape' || !activated || cancelled) return
+      ev.preventDefault()
+      ev.stopImmediatePropagation()
+      cancelled = true
+      setExternalDragActive(false)
+      onCategoryDragHover?.(null)
     }
 
     const onUp = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
+      window.removeEventListener('touchmove', onTouchMove)
+      touchTarget.removeEventListener('touchmove', onTouchMove as EventListener)
+      window.removeEventListener('keydown', onKey, true)
       if (longPressTimer != null) {
         window.clearTimeout(longPressTimer)
         longPressTimer = null
+      }
+      if (calendarSwitchTimer != null) {
+        window.clearTimeout(calendarSwitchTimer)
+        calendarSwitchTimer = null
+      }
+      if (cancelled) {
+        suppressNextClickRef.current = true
+        if (gestureSuppressed) endGestureSuppression()
+        return
       }
 
       if (horizontalDeleteSwipe) {
@@ -321,6 +379,11 @@ function TaskRowImpl({
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
+    window.addEventListener('keydown', onKey, true)
+    if (isTouch) {
+      window.addEventListener('touchmove', onTouchMove, { passive: false })
+      touchTarget.addEventListener('touchmove', onTouchMove as EventListener, { passive: false })
+    }
   }
 
   const categoryIdAtPoint = (x: number, y: number) => {
@@ -432,7 +495,7 @@ function TaskRowImpl({
           onPointerDown={handleMouseDown}
           onClick={handleRowClick}
           className={cn(
-            'group relative flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-all duration-150 ease-quart rounded-md select-none',
+            'group relative flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-all duration-150 ease-quart rounded-md select-none touch-pan-y',
             // Hover feedback beyond the drag handle: wash the row towards the
             // accent (dusty rose) and nudge right. The base color lives in a
             // CSS variable so hover can color-mix it — Tailwind classes can't
@@ -562,7 +625,7 @@ function TaskRowImpl({
       <div
         data-tour="task-row"
         className={cn(
-          'group relative flex items-start gap-3 px-3.5 py-3 rounded-xl transition-all duration-150 ease-quart cursor-pointer select-none border',
+          'group relative flex items-start gap-3 px-3.5 py-3 rounded-xl transition-all duration-150 ease-quart cursor-pointer select-none border touch-pan-y',
           // Hover feedback beyond the drag handle (W2.5): wash the card
           // towards the accent (dusty rose), firm up the border, and keep the
           // gentle lift. Base colors live in CSS variables because Tailwind
