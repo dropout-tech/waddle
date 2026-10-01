@@ -49,7 +49,7 @@ try {
   await hero().waitFor()
   check('About page exposes the full product introduction', await hero().isVisible())
   const pricing = page.locator('#pricing')
-  check('Pricing displays NT$149 monthly and NT$990 yearly', /NT\$149/.test(await pricing.innerText()) && /NT\$990/.test(await pricing.innerText()))
+  check('Pricing displays NT$150 monthly and NT$990 yearly', /NT\$150/.test(await pricing.innerText()) && /NT\$990/.test(await pricing.innerText()))
   check('Pricing explicitly says subscriptions are not yet available', (await pricing.innerText()).includes('尚未開放購買'))
   const pro = pricing.locator('article').filter({ has: page.getByRole('heading', { name: 'Pro 準備中' }) })
   check('Pro has no active purchase control', await pro.count() === 1 && await pro.locator('a,button').count() === 0)

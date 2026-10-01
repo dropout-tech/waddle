@@ -5,7 +5,7 @@
 > 查核日：2026-10-01。行號依本機 repo 檔案核對，與派工單給的 origin/main 行號（legal-page.tsx:24、:27；refunds:10；marketing-page.tsx:28-76、:238）一致；本次沒有執行 `git show origin/main`（工具限制），放稿前請工程師以 origin/main 再對一次行號。
 >
 > **與既有草稿的關係**：`docs/legal/2026-10-01-pro-launch-copy-draft.md`（以下簡稱「IAP 稿」）寫的是「只在 iOS 透過 Apple 賣」。本稿加上「網站用 SHOPLINE Payments 刷卡」這條路，**以下 IAP 稿段落由本稿取代**：B1、T2、T4 第二段、T5、R1、R4、R6、S1–S4、P1、P3、P5（P5 的 Apple／RevenueCat 段落保留，見本稿 3-3）。IAP 稿其餘段落（R2 Apple 退款流程、R5、P2、P4 等）仍有效，與本稿不衝突。
-> 價格與 Pro 內容依 `docs/billing/2026-10-01-pro-scope.md`（月繳 NT$149、年繳 NT$990），用量數字依老闆 2026-10-01 上線決策（免費 AI 5 次／Pro 20 次、積極版門檻 150／100／200 MB、Apple Watch 第一版不帶）。
+> 價格與 Pro 內容依 `docs/billing/2026-10-01-pro-scope.md`（月繳 NT$150、年繳 NT$990），用量數字依老闆 2026-10-01 上線決策（免費 AI 5 次／Pro 20 次、積極版門檻 150／100／200 MB、Apple Watch 第一版不帶）。
 
 ---
 
@@ -40,7 +40,7 @@
 
 | # | 決定 | 選項 | 我的建議 |
 |---|---|---|---|
-| D1 | 網站購買的退款寬鬆度 | **甲（法定底線）**：只有「第一次付款後 7 天內」全額退。**乙（建議）**：甲＋「年繳續訂扣款後 7 天內」也全額退。**丙（最寬）**：每次扣款後 7 天內都全額退，年繳中途不想用了還按比例退。 | **乙**。理由：「續訂扣款是否又有 7 天」法律沒寫清楚（黃燈），年繳一次扣 990 最容易被忘記、最容易被客訴與刷卡爭議；月繳 149 金額小、風險低。丙最安全但最花錢。 |
+| D1 | 網站購買的退款寬鬆度 | **甲（法定底線）**：只有「第一次付款後 7 天內」全額退。**乙（建議）**：甲＋「年繳續訂扣款後 7 天內」也全額退。**丙（最寬）**：每次扣款後 7 天內都全額退，年繳中途不想用了還按比例退。 | **乙**。理由：「續訂扣款是否又有 7 天」法律沒寫清楚（黃燈），年繳一次扣 990 最容易被忘記、最容易被客訴與刷卡爭議；月繳 150 金額小、風險低。丙最安全但最花錢。 |
 | D2 | 網站要不要也有 14 天免費試用 | 有／沒有 | **第一版沒有**。試用目前只在 iOS（Apple 試用優惠）。網站綁卡試用要多做「試用到期前提醒、到期自動扣款」，出錯就是對真卡多扣錢。先不做最穩。 |
 | D3 | 地址怎麼公開 | (a) 商務中心／共享辦公室地址 (b) 郵政信箱 (c) 住家 | **(a)**。(b) 是否算法條的「事務所或營業所」查無主管機關見解（黃燈）；(c) 隱私風險最大。 |
 | D4 | 扣款失敗的寬限期 | 立刻降回免費／寬限幾天 | **寬限 7 天、期間重試扣款最多 3 次**，期間 Pro 照用，失敗就回免費、不追欠款、不刪資料。 |
@@ -56,7 +56,7 @@
 2. **某一個月達到 5 萬元**：要「**立即**」向國稅局申請稅籍登記（財政部北區國稅局 2026-02-26 新聞稿）。登記時要填網站網域與會員帳號；登記後，網站與 App 要在明顯位置放「營業人名稱＋統一編號」（稅籍登記規則§4-1）。月銷售額 5 萬～20 萬之間，由國稅局「查定課徵」，**稅率 1%、每 3 個月寄繳款書**，不用開統一發票。
    - ⚠️ **年繳會讓某個月突然衝高**：一個月內 51 個人買年繳（51 × 990 = 50,490）就破 5 萬，即使平常月繳不多。銷售額怎麼算月份（扣款當月一次算，還是可以分攤），請會計師確認。
    - ⚠️ **可能要辦「行號」**：商業登記法§5 規定「每月銷售額未達營業稅起徵點」的小規模商業可以免辦商業登記；**反過來說，超過了可能就要到縣市政府辦獨資行號登記**。這會讓「個人名義」變成「你本人當負責人的行號」，官網的營運者名稱要改成行號名稱＋負責人。我信心約 7 成，請會計師確認。
-3. **某一個月達到 20 萬元**：國稅局會核定你「使用統一發票」，**稅率 5%、自己申報**，並要開電子發票。SHOPLINE 不內建電子發票，要另外接加值中心（本稿不涵蓋串接）。屆時 149／990 是否「含 5% 營業稅」要先決定：含稅就是你實收少約 4.76%。
+3. **某一個月達到 20 萬元**：國稅局會核定你「使用統一發票」，**稅率 5%、自己申報**，並要開電子發票。SHOPLINE 不內建電子發票，要另外接加值中心（本稿不涵蓋串接）。屆時 150／990 是否「含 5% 營業稅」要先決定：含稅就是你實收少約 4.76%。
 4. **業別分類沒有百分之百確定**：財政部「小規模營業人營業稅起徵點」（113-12-12 修正、114-01-01 施行）把業別分成 10 萬元類與 5 萬元類，表裡**沒有「資訊服務／軟體」**；財政部網路銷售說明一般以「勞務 5 萬」稱之。訂閱制軟體歸哪一類，請國稅局或會計師確認；在確認前，**保守以 5 萬元計算**。
 5. **Apple 那邊的收入要不要合併算進 5 萬**：不確定。Apple 在台灣有代收代繳機制（IAP 稿 7-2 有來源），但對「個人未辦稅籍」時的門檻計算方式，我沒有查到官方說明，請會計師一併確認。
 6. **SHOPLINE 個人戶**：款項撥到你本人存摺。收款紀錄就是你的銷售額依據，請每月自己記一次帳（網站＋Apple 分開記）。
@@ -186,7 +186,7 @@ English：
 >
 > 你可以用兩種方式購買 Huddle Pro，兩者內容相同、權益綁定你的 Huddle 帳號，在網頁版、桌面版與 iOS App 都能使用：
 >
-> 1. **在 Huddle 網站購買**：以信用卡付款，由 SHOPLINE Payments（先科技有限公司）處理刷卡。價格為月繳新台幣 149 元、年繳新台幣 990 元，已含稅（如適用），沒有其他手續費。
+> 1. **在 Huddle 網站購買**：以信用卡付款，由 SHOPLINE Payments（先科技有限公司）處理刷卡。價格為月繳新台幣 150 元、年繳新台幣 990 元，已含稅（如適用），沒有其他手續費。
 > 2. **在 iOS App 內透過 Apple 購買**：由 Apple 向你 Apple 帳號的付款方式收款，價格與幣別以 App Store 畫面顯示為準，並適用 Apple 的條款。
 >
 > 取消、退款與解除契約的方式依購買管道不同，請見〈取消與退款〉（連結 `/refunds`）。
@@ -200,7 +200,7 @@ English：
 >
 > You can buy Huddle Pro in two ways. Both give you the same features, linked to your Huddle account and available on the web, desktop and iOS apps:
 >
-> 1. **On the Huddle website**, by credit card. Card payments are processed by SHOPLINE Payments (S Technology Co., Ltd.). The price is TWD 149 per month or TWD 990 per year, including any applicable tax, with no additional fees.
+> 1. **On the Huddle website**, by credit card. Card payments are processed by SHOPLINE Payments (S Technology Co., Ltd.). The price is TWD 150 per month or TWD 990 per year, including any applicable tax, with no additional fees.
 > 2. **In the iOS app, through Apple.** Apple charges the payment method on your Apple Account. The price and currency shown on the App Store apply, together with Apple’s terms.
 >
 > How to cancel, request a refund or withdraw from the contract depends on where you bought. See Cancellation and refunds (link `/en/refunds`).
@@ -469,8 +469,8 @@ English：
 
 D1 若選**甲**：刪除「**年繳方案續訂扣款**後 7 天內，同樣可以申請全額退款。」一句（英文同步刪 “The same full refund applies within 7 days after an annual plan renewal charge.”）。
 D1 若選**丙**：第一段改為「**每次扣款**（含首次與每次續訂）後 7 天內…」，「超過 7 天」段改為：
-> 繁中：超過 7 天：月繳不退當期；年繳可以隨時申請提前終止，退款金額＝990 元減去「已使用月數 × 149 元」（不足一個月以一個月計，最低為 0 元）。
-> English：After 7 days: monthly periods are not refunded. For annual plans, you can end early at any time and receive TWD 990 minus TWD 149 for each month used (a partial month counts as a full month), but not less than zero.
+> 繁中：超過 7 天：月繳不退當期；年繳可以隨時申請提前終止，退款金額＝990 元減去「已使用月數 × 150 元」（不足一個月以一個月計，最低為 0 元）。
+> English：After 7 days: monthly periods are not refunded. For annual plans, you can end early at any time and receive TWD 990 minus TWD 150 for each month used (a partial month counts as a full month), but not less than zero.
 
 依據：消保法§19 I（接受服務後七日內得解除，無須說明理由及負擔任何費用或對價）、§19-2 II（收到解除通知次日起 15 日內返還對價）、§19 V（違反之約定無效）、施行細則§18（亦得以書面通知解除）；通訊交易解除權合理例外情事適用準則§2(5)（數位內容或「一經提供即為完成之線上服務」＋事先同意＋告知才可排除）；行政院 109-06-19 院臺消保字第 1090092557 號函（判準：即時提供後即已履行完畢、性質上不易返還）。
 
@@ -604,14 +604,14 @@ English：
 | `priceIntro` | :36／:61 | 核心功能免費使用。需要更多 AI 整理、建立組織或串接 Google 日曆時，再升級 Pro。 | Core features are free. Upgrade to Pro when you need more AI summaries, your own organizations or Google Calendar. |
 | `freeBody` | :37／:62 | 任務、行程、專注計時、記事本與白板，跨裝置同步。免費版上限：進行中任務 150 個、筆記 100 則、圖片 200 MB、AI 會議整理每月 5 次。 | Tasks, calendars, focus timers, notebooks and the whiteboard, synced across devices. Free plan limits: 150 open tasks, 100 notes, 200 MB of images and 5 AI meeting summaries a month. |
 | `soon` | :38／:63 | （刪除徽章，改為按鈕文字）升級 Pro | Upgrade to Pro |
-| `year` | :38／:63 | 或 NT$990／年（比月繳一年省 NT$798） | or NT$990 / year (save NT$798 compared with paying monthly) |
+| `year` | :38／:63 | 或 NT$990／年（比月繳一年省 NT$810） | or NT$990 / year (save NT$810 compared with paying monthly) |
 | `proBody` | :38／:63 | 任務與筆記不設數量上限、圖片 20 GB、AI 會議整理每月 20 次、建立組織、Google 日曆串接，以及日後推出的新企鵝造型與音樂包。 | No limit on tasks and notes, 20 GB of images, 20 AI meeting summaries a month, your own organizations, Google Calendar, and new penguin outfits and music packs as they are released. |
 | （新增）`priceNote` | 放在方案卡下方 | 價格以新台幣計，已含稅（如適用），沒有其他費用。網站以信用卡付款，每月或每年自動續訂，可隨時在帳號設定線上取消；首次付款後 7 天內可申請全額退款。網站購買的 Pro 在網頁版、桌面版與 iPhone App 都能使用。詳見〈服務條款〉與〈取消與退款〉。 | Prices are in New Taiwan dollars and include any applicable tax, with no additional fees. Website purchases are paid by credit card and renew monthly or yearly until you cancel online in your account settings. You can get a full refund within 7 days of your first payment. Pro bought on the website works on the web, desktop and iPhone apps. See our Terms of use and Cancellation & refunds. |
 
 `:221` 的 Pro 卡片：把 `<span>{t.soon}</span>` 徽章拿掉，在 `proBody` 下方加一個連到網站結帳頁的按鈕（文字用 `soon` 新值）。
 
 依據：消保法§18 I(2)、§22；公平交易法§21（價格與內容不得虛偽不實或引人錯誤）；SHOPLINE 支付服務條款第五條之一第二款第 4 項（價格含營業稅及幣別、內容、猶豫期間）。
-- 「省 NT$798」＝149 × 12 − 990，用金額不用百分比，避免四捨五入爭議。
+- 「省 NT$810」＝150 × 12 − 990，用金額不用百分比，避免四捨五入爭議。
 - ⚠️「不設數量上限」見 2-3 的工程師提醒（1,000 筆問題修好前不可上線）。
 - ⚠️「已含稅（如適用）」：個人未辦稅籍時沒有營業稅；查定課徵 1% 或使用統一發票 5% 時，價格不變就代表你吸收稅金（見 0-5）。
 
@@ -641,8 +641,8 @@ English：
 
 繁中：
 > **你要購買：Huddle Pro 月繳方案**（年繳則顯示「年繳方案」）
-> - 今天扣款：NT$149（年繳：NT$990），新台幣，已含稅（如適用），沒有其他費用
-> - 自動續訂：之後每月（每年）的【系統帶入：日】日自動扣款 NT$149（NT$990），直到你取消。下次扣款日：【系統帶入：YYYY 年 M 月 D 日】
+> - 今天扣款：NT$150（年繳：NT$990），新台幣，已含稅（如適用），沒有其他費用
+> - 自動續訂：之後每月（每年）的【系統帶入：日】日自動扣款 NT$150（NT$990），直到你取消。下次扣款日：【系統帶入：YYYY 年 M 月 D 日】
 > - 取消：隨時登入 Huddle，到「設定」→「訂閱」線上取消，Pro 用到期末
 > - 退款：首次付款後 7 天內可申請全額退款（〈取消與退款〉連結）
 > - 付款方式：信用卡（【工程師填：可用卡別】），刷卡由 SHOPLINE Payments 處理；Huddle 不會取得完整卡號
@@ -652,8 +652,8 @@ English：
 
 English：
 > **You are buying: Huddle Pro, monthly plan** (or “annual plan”)
-> - Charged today: TWD 149 (annual: TWD 990), including any applicable tax, with no additional fees
-> - Auto-renewal: TWD 149 (TWD 990) is charged automatically on day 【系統帶入：D】 of each month (each year) until you cancel. Next charge: 【系統帶入：Month D, YYYY】
+> - Charged today: TWD 150 (annual: TWD 990), including any applicable tax, with no additional fees
+> - Auto-renewal: TWD 150 (TWD 990) is charged automatically on day 【系統帶入：D】 of each month (each year) until you cancel. Next charge: 【系統帶入：Month D, YYYY】
 > - Cancel: anytime online — sign in, go to Settings → Subscription. Pro stays active until the end of the period
 > - Refunds: full refund within 7 days of your first payment (link to Cancellation & refunds)
 > - Payment: credit card (【工程師填：可用卡別】), processed by SHOPLINE Payments. Huddle never receives your full card number
@@ -668,12 +668,12 @@ English：
 > English：I have read and agree to the Terms of use and the Cancellation & refunds policy, and I have read the Privacy notice.
 
 勾選二（自動扣款授權）：
-> 繁中：我同意 Huddle 以這張信用卡每月（每年）自動扣款 NT$149（NT$990），直到我取消續訂為止。我了解可以隨時在帳號設定線上取消，且首次付款後 7 天內可申請全額退款。
-> English：I authorize Huddle to charge this credit card TWD 149 every month (TWD 990 every year) until I cancel renewal. I understand that I can cancel online at any time in my account settings, and that I can get a full refund within 7 days of my first payment.
+> 繁中：我同意 Huddle 以這張信用卡每月（每年）自動扣款 NT$150（NT$990），直到我取消續訂為止。我了解可以隨時在帳號設定線上取消，且首次付款後 7 天內可申請全額退款。
+> English：I authorize Huddle to charge this credit card TWD 150 every month (TWD 990 every year) until I cancel renewal. I understand that I can cancel online at any time in my account settings, and that I can get a full refund within 7 days of my first payment.
 
 付款按鈕文字：
-> 繁中：同意並付款 NT$149（年繳：同意並付款 NT$990）
-> English：Agree and pay TWD 149 (annual: Agree and pay TWD 990)
+> 繁中：同意並付款 NT$150（年繳：同意並付款 NT$990）
+> English：Agree and pay TWD 150 (annual: Agree and pay TWD 990)
 
 依據：消保法§18 I(2)(3)、§11-1（條款事先可閱）；零售業等網路交易應記載五（訂立前提供種類、數量、價格等重要事項之確認機制）；SHOPLINE 支付服務條款第五條第一款（定期購需消費者同意週期與價金）。
 說明：隱私權政策用「已閱讀」而不用「同意」，因為個資法上這是履行契約所必要的蒐集，靠§8 告知即可，不需要另取同意；把它寫成「同意」反而會讓人誤以為不同意就能拒絕。⚠️ 這是我的判斷，請律師確認。
@@ -769,7 +769,7 @@ iOS App 和網站共用同一份程式碼，以下文案**只能在網站（瀏�
 
 **網站上要看得到（未登入就能看）**
 - [ ] 頁尾有營運者本名、地址、客服電話、客服 Email（1-1）——條款要求「客服電話及 Email」
-- [ ] 方案價格：NT$149／月、NT$990／年，標示新台幣與「已含稅（如適用）」（6-1）——條款要求「交易金額含營業稅及幣別」
+- [ ] 方案價格：NT$150／月、NT$990／年，標示新台幣與「已含稅（如適用）」（6-1）——條款要求「交易金額含營業稅及幣別」
 - [ ] 方案內容：免費版與 Pro 各包含什麼、上限多少（6-1、2-3）——條款要求「商品或服務內容」
 - [ ] 退換貨條件與猶豫期間：〈取消與退款〉頁有網站購買的 7 天全額退款、取消方式（4-3、4-4）——條款要求「退換貨條件」「猶豫期間資訊」
 - [ ] 交付方式：寫明「付款後立即開通、線上提供，無實體寄送」（條款要求「寄送方式」，數位服務要明寫不寄送）——可放在 2-4「付款與開通」，已涵蓋
