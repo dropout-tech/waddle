@@ -1,8 +1,15 @@
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
-import { Noto_Sans_TC } from 'next/font/google'
+import { preload } from 'react-dom'
 import './globals.css'
 import './art-theme.css'
+// Self-hosted fonts (Geist, Geist Mono, Noto Sans TC 400–700). Committed under
+// app/fonts/ so production builds never fetch from Google — see
+// scripts/fonts/vendor-fonts.mjs for how the files were produced.
+import './fonts/app-fonts.css'
+import geistLatin from './fonts/files/caa3a2e1cccd8315.woff2'
+import geistMonoLatin from './fonts/files/797e433ab948586e.woff2'
+import notoSansTCLatin from './fonts/files/fb4edce8a3cbfef3.woff2'
+import barlowLatin from './fonts/files/89232e6535d3b87e.woff2'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { NativeShell } from '@/components/native/native-shell'
 import { PwaSetup } from '@/components/pwa/pwa-setup'
@@ -14,22 +21,6 @@ import { ImageCleanupBridge } from '@/components/storage/image-cleanup-bridge'
 import { FloatingHub } from '@/components/floating/floating-hub'
 import { StickyNotesProvider } from '@/components/sticky-notes/sticky-notes-provider'
 import { BRAND_TITLE } from '@/lib/brand'
-
-const geist = Geist({
-  subsets: ['latin'],
-  variable: '--font-geist',
-})
-
-const geistMono = Geist_Mono({
-  subsets: ['latin'],
-  variable: '--font-geist-mono',
-})
-
-const notoSansTC = Noto_Sans_TC({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-noto-sans-tc',
-})
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://waddle.zeabur.app'),
@@ -95,6 +86,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Same latin slices next/font used to preload, so first paint is unchanged.
+  // Barlow (marketing headline) is preloaded here because the marketing page
+  // renders client-side only — a preload from inside it would come too late.
+  for (const href of [geistLatin, geistMonoLatin, notoSansTCLatin, barlowLatin]) {
+    preload(href, { as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' })
+  }
   // data-art="paper": the app's paper look (app/art-theme.css), on by default.
   // Public marketing opts out via [data-surface='marketing'].
   return (
@@ -111,7 +108,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geist.variable} ${geistMono.variable} ${notoSansTC.variable} font-sans antialiased`}
+        className="huddle-app-fonts font-sans antialiased"
       >
         <template dangerouslySetInnerHTML={{ __html: `<!--
 THESIS: Huddle makes a personal working day tangible as a hand-printed desk poster.
