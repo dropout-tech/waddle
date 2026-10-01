@@ -8,7 +8,9 @@ struct Item: Decodable, Identifiable {
     var thumbnail:String?; var date: String?; var time: String?; var completed: Bool?; var actionable: Bool?
 }
 struct Day: Decodable, Identifiable {var date:String;var day:Int;var inMonth:Bool;var count:Int;var id:String{date}}
-struct FocusInfo:Decodable {var mode:String?;var state:String;var title:String;var endAt:Double?;var seconds:Int;var note:String}
+struct FocusInfo:Decodable {var mode:String?;var state:String;var title:String;var endAt:Double?;var seconds:Int;var note:String
+    /// Session length in seconds (for the lock-screen progress ring). Optional: older app builds don't send it.
+    var total:Int?}
 struct WaterInfo:Decodable {var enabled:Bool;var nextAt:Double?;var count:Int}
 /// One scheduled slot for the 本週時間表 widget (today + 6 days, "HH:mm", "#rrggbb").
 struct Slot:Decodable {var date:String;var start:String;var end:String;var title:String;var color:String}
@@ -19,13 +21,19 @@ struct Snapshot:Decodable {
     var week:[Slot]?
     /// 「我的 Huddle」 (lib/widgets/pet.ts). Optional for the same reason.
     var pet:PetInfo?
+    /// "zh-TW" | "en" — the app's language (pet.lang wins when present). Optional.
+    var locale:String?
+    /// 大型月曆: 21 days from this week's Monday (HuddleMonthSticky.swift). Optional.
+    var span:[SpanDay]?
+    /// 便條紙: newest sticky notes as plain text. Optional.
+    var stickies:[StickyInfo]?
 }
 struct PetInfo:Decodable {var adopted:Bool;var name:String;var color:String;var accessory:String;var lang:String;var overdue:Int;var overdueLine:String;var lines:[String]}
 enum Kind:String,AppEnum,CaseIterable {
-    case overview,calendar,agenda,week,tasks,topThree="top-three",whiteboard,notebook,focusNote="focus-note",focus,water,shortcuts,pet
+    case overview,calendar,agenda,week,tasks,topThree="top-three",whiteboard,notebook,focusNote="focus-note",focus,water,shortcuts,pet,month,sticky
     static var typeDisplayRepresentation:TypeDisplayRepresentation="小工具類型"
-    static var caseDisplayRepresentations:[Kind:DisplayRepresentation]=[.overview:"月曆＋今日任務",.calendar:"可視化小月曆",.agenda:"近期行程",.week:"本週時間表",.tasks:"任務清單",.topThree:"今天三件事",.whiteboard:"白板",.notebook:"記事本",.focusNote:"專注記事",.focus:"專注計時",.water:"喝水提醒",.shortcuts:"隨手記入口",.pet:"我的 Huddle"]
-    var title:String {switch self {case .overview:return "月曆＋今日任務";case .calendar:return "可視化小月曆";case .agenda:return "近期行程";case .week:return "本週時間表";case .tasks:return "任務清單";case .topThree:return "今天三件事";case .whiteboard:return "白板";case .notebook:return "記事本";case .focusNote:return "專注記事";case .focus:return "專注計時";case .water:return "喝水提醒";case .shortcuts:return "隨手記入口";case .pet:return "我的 Huddle"}}
+    static var caseDisplayRepresentations:[Kind:DisplayRepresentation]=[.overview:"月曆＋今日任務",.calendar:"可視化小月曆",.agenda:"近期行程",.week:"本週時間表",.tasks:"任務清單",.topThree:"今天三件事",.whiteboard:"白板",.notebook:"記事本",.focusNote:"專注記事",.focus:"專注計時",.water:"喝水提醒",.shortcuts:"隨手記入口",.pet:"我的 Huddle",.month:"大型月曆",.sticky:"便條紙"]
+    var title:String {switch self {case .overview:return "月曆＋今日任務";case .calendar:return "可視化小月曆";case .agenda:return "近期行程";case .week:return "本週時間表";case .tasks:return "任務清單";case .topThree:return "今天三件事";case .whiteboard:return "白板";case .notebook:return "記事本";case .focusNote:return "專注記事";case .focus:return "專注計時";case .water:return "喝水提醒";case .shortcuts:return "隨手記入口";case .pet:return "我的 Huddle";case .month:return "大型月曆";case .sticky:return "便條紙"}}
     /// Gallery blurb (「新增小工具」畫面每款各自的說明).
     var blurb:String {switch self {
         case .overview:return "本月月曆，加上今天要做的事，直接打勾。"
@@ -41,6 +49,8 @@ enum Kind:String,AppEnum,CaseIterable {
         case .water:return "喝了一杯就按一下，App 會幫你重新計時提醒。"
         case .shortcuts:return "白板、記事本、專注記事，一鍵打開。"
         case .pet:return "你領養的企鵝：提醒你接下來的事，點牠會呱一聲。"
+        case .month:return "三週大月曆：任務、行程一格一格看清楚。"
+        case .sticky:return "最近的便條紙，像備忘錄一樣放在手邊。"
     }}
     /// Each split-out widget's own identifier. The legacy configurable widget
     /// keeps "HuddleWidgets" so copies already on a home screen survive.
@@ -49,10 +59,14 @@ enum Kind:String,AppEnum,CaseIterable {
         case .overview:return [.systemMedium,.systemLarge]
         case .calendar:return [.systemSmall,.systemLarge]
         case .week:return [.systemMedium,.systemLarge]
-        case .topThree,.focusNote,.water:return [.systemSmall,.systemMedium]
+        case .focusNote,.water:return [.systemSmall,.systemMedium]
+        // Lock Screen versions (HuddleLockScreen.swift) ride on the same kinds.
+        case .topThree:return [.systemSmall,.systemMedium,.accessoryCircular,.accessoryRectangular,.accessoryInline]
         case .shortcuts:return [.systemMedium]
-        case .pet:return [.systemSmall,.systemMedium,.systemLarge,.accessoryRectangular]
-        case .focus:return [.systemSmall,.systemMedium,.accessoryCircular,.accessoryRectangular]
+        case .pet:return [.systemSmall,.systemMedium,.systemLarge,.accessoryCircular,.accessoryRectangular,.accessoryInline]
+        case .focus:return [.systemSmall,.systemMedium,.accessoryCircular,.accessoryRectangular,.accessoryInline]
+        case .month:return [.systemLarge,.systemExtraLarge]
+        case .sticky:return [.systemSmall,.systemMedium,.accessoryCircular,.accessoryRectangular,.accessoryInline]
         case .agenda,.tasks,.whiteboard,.notebook:return [.systemSmall,.systemMedium,.systemLarge]
     }}
 }
@@ -149,6 +163,8 @@ struct Entry:TimelineEntry {
     /// Penguin taps so far and when the last one was (「我的 Huddle」).
     var petPokeN:Int=0;var petPokeAt:Date?=nil
     var emptyReason:EmptyReason = .signedOut
+    /// Set for the Lock-Screen-only widgets (HuddleLockScreen.swift), plus their chosen styles.
+    var lock:LockKind?=nil;var circleStyle:String="";var rectStyle:String=""
 }
 /// A chosen window falls back to 全天 after an hour, so the widget never sits on 晚上 the next morning.
 let weekWindowLifetime:TimeInterval=3600
@@ -174,6 +190,7 @@ func loadEntry(kind:Kind,category:String?=nil,noteID:String?=nil,now:Date=Date()
     return e
 }
 func makeTimeline(_ e:Entry)->Timeline<Entry> {
+    if e.lock != nil || e.kind == .month || e.kind == .sticky {return glanceTimeline(e)}
     guard e.kind == .pet else {return Timeline(entries:[e],policy:.after(e.date.addingTimeInterval(900)))}
     // The penguin's bubble changes on its own: when today's next item starts,
     // when water comes due, when a 「呱」 wears off, and hourly for a fresh line.
@@ -228,16 +245,17 @@ struct WidgetView:View {
     }
     var body:some View {
         Group {
-            if kind == .pet && family == .accessoryRectangular {petLockScreen}
+            if kind == .pet && family == .accessoryRectangular && entry.lock == nil {petLockScreen}
+            // Every other Lock Screen face (HuddleLockScreen.swift). Owner chose
+            // "always show" for these, so no privacySensitive here.
+            else if entry.lock != nil || isAccessory {accessoryView}
             else if kind == .pet,let s=entry.snapshot {petPanel(s).foregroundStyle(ink).widgetURL(petLink(s)).privacySensitive()}
-            else if family == .accessoryCircular {Link(destination:url(kind)){Image(systemName:kind == .focus ? "timer":"square.grid.2x2")}}
-            else if family == .accessoryRectangular || family == .accessoryInline {Link(destination:url(kind)){Text("Huddle · \(kind.title)").font(.caption)}}
             else if let s=entry.snapshot {
                 // Calendar-heavy widgets fill the whole frame: drop the title row
                 // (the month label + mascot stand in for it) and the "updated"
                 // footer unless there's something pending, or the grid overflows
                 // and iOS clips the top edge.
-                let dense = kind == .overview || kind == .calendar || kind == .week
+                let dense = kind == .overview || kind == .calendar || kind == .week || kind == .month || kind == .sticky
                 // Focus / water are button panels: no title row or "updated"
                 // footer (they'd push the 44pt buttons out of a small widget).
                 let panel = kind == .focus || kind == .water
@@ -251,7 +269,7 @@ struct WidgetView:View {
                     content(s)
                     Spacer(minLength:0)
                     if (!dense && !panel) || entry.pendingCount>0 {HStack(spacing:3){Image(systemName:"clock");Text(entry.pendingCount == 0 ? "更新 \(String(s.generatedAt.prefix(10)))":"待同步 · 開啟 Huddle")}.font(.system(size:9)).foregroundStyle(ink.opacity(0.7)).lineLimit(1)}
-                }.foregroundStyle(ink).widgetURL(url(kind)).privacySensitive()
+                }.foregroundStyle(ink).widgetURL(kind == .sticky ? stickyURL(s.stickies?.first):url(kind)).privacySensitive()
             } else {Link(destination:url(kind)){VStack(spacing:8){Image("Huddle").resizable().scaledToFit().frame(width:55,height:55);Text(emptyTitle).font(.caption).multilineTextAlignment(.center);Text(emptyHint).font(.caption2).multilineTextAlignment(.center).foregroundStyle(ink.opacity(0.7))}.foregroundStyle(ink)}}
         }.containerBackground(paper,for:.widget)
     }
@@ -277,6 +295,8 @@ struct WidgetView:View {
         case .water: waterPanel(s)
         case .shortcuts: Text("想法來了，先留下來。").font(.caption);shortcuts
         case .pet: petPanel(s)
+        case .month: if family == .systemLarge || family == .systemExtraLarge {bigMonth(s)} else {calendar(s)}
+        case .sticky: stickyPanel(s)
         }
     }
     var shortcuts:some View {HStack{ForEach([Kind.whiteboard,.notebook,.focusNote],id:\.self){k in Link(destination:url(k)){VStack(spacing:5){Image(systemName:k == .whiteboard ? "rectangle.3.group":k == .notebook ? "book":"pencil.line");Text(k.title).font(.system(size:10))}.frame(maxWidth:.infinity).padding(.vertical,8)}}}}
@@ -649,7 +669,7 @@ struct HuddleWidgets:Widget {
     var body:some WidgetConfiguration {
         AppIntentConfiguration(kind:"HuddleWidgets",intent:Configuration.self,provider:IntentProvider<Configuration>()){entry in WidgetView(entry:entry)}
             .configurationDisplayName("Huddle 小工具（可自訂）")
-            .description("一個小工具切換 12 款內容：長按 → 編輯小工具 → 類型。")
+            .description("一個小工具切換 15 款內容：長按 → 編輯小工具 → 類型。")
             .supportedFamilies([.systemSmall,.systemMedium,.systemLarge,.accessoryCircular,.accessoryRectangular,.accessoryInline])
     }
 }
@@ -719,6 +739,10 @@ struct HuddlePlanWidgets:WidgetBundle {
 struct HuddleCaptureWidgets:WidgetBundle {
     var body:some Widget {WhiteboardWidget();NotebookWidget();FocusNoteWidget();FocusWidget();WaterWidget();ShortcutsWidget()}
 }
+/// Lock Screen glances + 便條紙 + 大型月曆 (HuddleLockScreen.swift, HuddleMonthSticky.swift).
+struct HuddleGlanceWidgets:WidgetBundle {
+    var body:some Widget {LockTodayWidget();LockNextWidget();LockWeekWidget();LockMonthWidget();LockWaterWidget();StickyWidget();MonthWidget()}
+}
 @main struct HuddleWidgetBundle: WidgetBundle {
-    var body: some Widget { HuddlePlanWidgets().body; HuddleCaptureWidgets().body; HuddleWidgets(); HuddleFocusLiveActivity() }
+    var body: some Widget { HuddlePlanWidgets().body; HuddleCaptureWidgets().body; HuddleGlanceWidgets().body; HuddleWidgets(); HuddleFocusLiveActivity() }
 }

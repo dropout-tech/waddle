@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, CalendarRange, CalendarClock, ListChecks, Star, PanelsTopLeft, NotebookPen, PencilLine, Timer, Droplets, LayoutGrid, Bird, CalendarCheck, Smartphone, type LucideIcon } from 'lucide-react'
+import { CalendarDays, CalendarRange, CalendarClock, ListChecks, Star, PanelsTopLeft, NotebookPen, PencilLine, Timer, Droplets, LayoutGrid, Bird, CalendarCheck, Smartphone, StickyNote, Calendar, Lock, type LucideIcon } from 'lucide-react'
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { useI18n } from '@/lib/i18n/react'
 import { isNative } from '@/lib/platform'
@@ -21,6 +21,28 @@ const WIDGETS: { name: string; body: string; Icon: LucideIcon }[] = [
   { name: '喝水提醒', body: '喝了一杯就按一下，App 幫你重新計時', Icon: Droplets },
   { name: '隨手記入口', body: '白板、記事本、專注記事一鍵直達', Icon: LayoutGrid },
   { name: '我的 Huddle', body: '你領養的企鵝，會提醒你接下來的事', Icon: Bird },
+  { name: '大型月曆', body: '三週大月曆，每天的任務和行程一格一格看清楚', Icon: Calendar },
+  { name: '便條紙', body: '最近的便條紙，像備忘錄一樣放在手邊', Icon: StickyNote },
+]
+
+// Lock Screen faces (ios/App/HuddleWidgets/HuddleLockScreen.swift). Several come
+// in two looks, picked from 長按 → 編輯小工具.
+const LOCK_WIDGETS: { name: string; body: string; Icon: LucideIcon }[] = [
+  { name: '今日任務', body: '完成進度圈、剩餘件數、下一件要做的事或前三件清單', Icon: ListChecks },
+  { name: '下一個行程', body: '接下來最近的行程與時間，例如「14:00 開會」', Icon: CalendarClock },
+  { name: '當週日曆', body: '一到日七天，每天有幾件事；也可改看今明兩天行程', Icon: CalendarRange },
+  { name: '月份', body: '迷你月曆，或今天日期加上本月還有幾天有安排', Icon: CalendarDays },
+  { name: '專注計時', body: '專注時即時倒數，暫停時顯示剩餘時間', Icon: Timer },
+  { name: '喝水', body: '今天喝了幾杯，或下次提醒倒數', Icon: Droplets },
+  { name: '便條紙', body: '像備忘錄：標題一行、內文灰字', Icon: StickyNote },
+  { name: '今天三件事', body: '今天最重要的三件事', Icon: Star },
+  { name: '我的 Huddle', body: '企鵝本人，或牠現在想跟你說的話', Icon: Bird },
+]
+
+const LOCK_STEPS = [
+  '在鎖定畫面長按，點「自訂」→「鎖定畫面」',
+  '點時間下方的小工具區（或時間上方那一行），找到 Huddle',
+  '選好一款放上去；有兩種樣式的，再點一下它就能切換',
 ]
 
 const STEPS = [
@@ -92,8 +114,32 @@ export function WidgetGuide() {
         </ul>
       </section>
 
+      <section className="mt-8" aria-labelledby="widget-lock">
+        <h2 id="widget-lock" className="flex items-center gap-2 text-lg font-semibold"><Lock className="h-4 w-4 text-primary" aria-hidden="true" />{t('也可以放到鎖定畫面')}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{t('不用解鎖，看一眼就知道今天還剩什麼。')}</p>
+        <ol className="mt-3 space-y-2">
+          {LOCK_STEPS.map((step, i) => (
+            <li key={step} className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground" aria-hidden="true">{i + 1}</span>
+              <span className="pt-0.5 text-sm leading-relaxed">{t(step)}</span>
+            </li>
+          ))}
+        </ol>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+          {LOCK_WIDGETS.map(({ name, body, Icon }) => (
+            <li key={name} className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-muted text-primary"><Icon className="h-5 w-5" aria-hidden="true" /></span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">{t(name)}</span>
+                <span className="block text-xs text-muted-foreground">{t(body)}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <p className="mt-8 text-xs leading-relaxed text-muted-foreground">
-        {t('點小工具會直接打開 Huddle 裡對應的畫面。內容由系統排程更新，打開 Huddle 就會立刻同步；鎖定畫面只顯示安全摘要。')}
+        {t('點小工具會直接打開 Huddle 裡對應的畫面。內容由系統排程更新，打開 Huddle 就會立刻同步。鎖定畫面的小工具會直接顯示任務和行程標題；在意的話，可以選只顯示數字的樣式。')}
         {native && <> {t('專注結束、喝水的背景通知可在「設定」中開啟。')}</>}
       </p>
     </main>
