@@ -14,6 +14,9 @@ export const dict: Record<string, string> = {
   '顯示已完成': 'Show completed',
   '資訊顯示順序': 'Info display order',
   '拖曳調整顯示順序': 'Drag to reorder',
+  '點上下箭頭調整顯示順序': 'Use the arrows to reorder',
+  '上移「{label}」': 'Move "{label}" up',
+  '下移「{label}」': 'Move "{label}" down',
 
   // category-section.tsx
   '刪除分類「{name}」？這會連同 {count} 個任務一起刪除，無法復原。':
