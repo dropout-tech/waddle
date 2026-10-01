@@ -14,6 +14,7 @@ import {
   InkSun, InkMoon, InkLogOut,
 } from '@/components/icons/huddle-icons'
 import { createClient } from '@/lib/supabase/client'
+import { signOutAndClearLocalData } from '@/lib/auth/sign-out'
 import { cn } from '@/lib/utils'
 import { AccountRegistrationDate } from '@/components/auth/account-registration-date'
 import { useI18n } from '@/lib/i18n/react'
@@ -134,8 +135,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
     // Client-side sign-out works on both web and the Capacitor WebView (there
     // is no server route to POST to under static export). Clears the local
     // session, then the AuthGuard / login redirect takes over.
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    await signOutAndClearLocalData()
     router.replace('/login')
   }
 

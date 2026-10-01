@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { signOutAndClearLocalData } from '@/lib/auth/sign-out'
 import { cn } from '@/lib/utils'
 import {
   AlertDialog,
@@ -36,7 +37,7 @@ export function DeleteAccountButton() {
       const supabase = createClient()
       const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' })
       if (error) throw error
-      await supabase.auth.signOut()
+      await signOutAndClearLocalData({ accountDeleted: true })
       router.replace('/login')
     } catch (e) {
       console.error('[delete-account] failed', e)

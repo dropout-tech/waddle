@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { operations } from '@/lib/operations/client'
-import { createClient } from '@/lib/supabase/client'
+import { signOutAndClearLocalData } from '@/lib/auth/sign-out'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
@@ -54,7 +54,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       <h1 className="text-xl font-semibold">{t('帳號已停用')}</h1>
       <p>{t('如有疑問，請聯絡客服。你的資料未因停用而刪除。')}</p>
       <a href="/support" className="min-h-11 underline">{t('聯絡客服')}</a>
-      <button className="min-h-11 rounded-lg bg-secondary px-4" onClick={() => void createClient().auth.signOut()}>{t('登出')}</button>
+      <button className="min-h-11 rounded-lg bg-secondary px-4" onClick={() => void signOutAndClearLocalData()}>{t('登出')}</button>
     </main>
   )
   return <>{children}</>
