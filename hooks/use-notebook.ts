@@ -156,6 +156,12 @@ function enqueueNote<T>(id: string, fn: () => Promise<T>): Promise<T> {
 async function allNoteWork() {
   while (noteChains.size > 0) await Promise.all([...noteChains.values()])
 }
+/** A request that never answers (captive Wi-Fi, stalled tunnel) must not
+ *  hold the notebook or sign-out forever: after `ms`, go on with `fallback`. */
+const NOTE_WAIT_MS = 5000
+function withTimeout<T>(p: Promise<T>, fallback: T, ms = NOTE_WAIT_MS): Promise<T> {
+  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))])
+}
 // Sign-out also waits for saves an already-unmounted instance (overlay just
 // closed) queued on its way out.
 registerPendingWrites(allNoteWork)
@@ -342,12 +348,14 @@ export function useNotebook() {
       // into the local backup — from an earlier page load, or from an
       // earlier mount on this page (the overlay closed while offline).
       // Then wait for every queued write so the list below shows the result.
+      // Each wait is capped: a stalled request counts as "not settled" and
+      // its draft is shown below instead of keeping the notebook loading.
       const restored = await Promise.all(
         readNotebookDrafts(user.id).map(async (d) =>
-          (await restoreDraft(supabase, user.id, d.noteId, owner)) ? null : d.noteId,
+          (await withTimeout(restoreDraft(supabase, user.id, d.noteId, owner), false)) ? null : d.noteId,
         ),
       )
-      await allNoteWork()
+      await withTimeout(allNoteWork(), undefined)
       if (!mounted) return
 
       const [notesRes, catsRes] = await Promise.all([
@@ -544,6 +552,10 @@ export function useNotebook() {
       })
 
       if (!error && patch.title !== undefined && userId) clearNotebookDraftField(userId, id, 'title', patch.title)
+      // The title write is over (saved, or rolled back below): stop telling
+      // other windows this one is editing the note, unless unsent text is
+      // still queued here.
+      if (draftOwners.get(id) === ownerRef.current && !(id in pendingContent.current)) draftOwners.delete(id)
       if (error && snapshot) {
         console.error('[notebook] patch failed', error)
         const prevSnapshot = snapshot

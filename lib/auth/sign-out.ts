@@ -22,7 +22,10 @@ export async function prepareSignOut(): Promise<{ userId: string | null; unsynce
     data: { session },
   } = await supabase.auth.getSession()
   const userId = session?.user.id ?? null
-  await flushAllPendingWrites()
+  // Capped at 5 s: a save that never answers must not freeze sign-out (the
+  // suspended-account screen has no other way out). Whatever didn't land is
+  // still a draft and is counted below, so the user is asked.
+  await Promise.race([flushAllPendingWrites(), new Promise((resolve) => setTimeout(resolve, 5000))])
   return { userId, unsynced: userId ? readNotebookDrafts(userId).length : 0 }
 }
 

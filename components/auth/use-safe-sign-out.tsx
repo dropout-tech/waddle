@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { prepareSignOut, completeSignOut } from '@/lib/auth/sign-out'
 import {
   AlertDialog,
@@ -26,14 +27,27 @@ export function useSafeSignOut(afterSignOut?: () => void) {
 
   const finish = async (userId: string | null) => {
     setAsking(null)
-    await completeSignOut(userId)
+    const { error } = await completeSignOut(userId).catch((e: unknown) => ({ error: e }))
+    setBusy(false) // the button works again if sign-out failed (offline…)
+    if (error) {
+      console.error('[sign-out] failed', error)
+      toast.error(t('登出失敗，請檢查網路後再試一次'))
+      return
+    }
     afterSignOut?.()
   }
 
   const requestSignOut = async () => {
     if (busy) return
     setBusy(true)
-    const state = await prepareSignOut()
+    let state: { userId: string | null; unsynced: number }
+    try {
+      state = await prepareSignOut()
+    } catch (e) {
+      console.error('[sign-out] prepare failed', e)
+      setBusy(false)
+      return
+    }
     if (state.unsynced > 0) {
       setAsking(state)
       return
@@ -55,7 +69,7 @@ export function useSafeSignOut(afterSignOut?: () => void) {
         <AlertDialogHeader>
           <AlertDialogTitle>{t('還有筆記沒有同步')}</AlertDialogTitle>
           <AlertDialogDescription>
-            {t('有 {count} 則筆記還沒同步，現在登出這些內容會遺失。建議連上網路、等同步完成再登出。', {
+            {t('有 {count} 則筆記還沒同步。先打開記事本、確認內容已同步再登出；現在登出，這些內容會遺失。', {
               count: asking?.unsynced ?? 0,
             })}
           </AlertDialogDescription>
