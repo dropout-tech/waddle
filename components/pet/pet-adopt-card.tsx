@@ -13,10 +13,13 @@ import { PetEditor, type PetLook } from './pet-editor'
  */
 export function PetAdoptCard({
   isMobile,
+  desktopLeft = 16,
   lang,
   onAdopt,
 }: {
   isMobile: boolean
+  /** Desktop left offset (px) — the calendar panel's left edge. */
+  desktopLeft?: number
   lang: 'zh-TW' | 'en'
   onAdopt: (look: PetLook, skipped: boolean) => Promise<void> | void
 }) {
@@ -45,10 +48,12 @@ export function PetAdoptCard({
       data-pet-ui
       data-pet-adopt
       className="fixed z-40 rounded-2xl border border-border bg-card text-card-foreground shadow-lg p-4 animate-in fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none"
+      // Phone: sit above the tab bar AND the bottom-right 專注計時 pill
+      // (which used to cover the 先跳過／領養 buttons).
       style={
         isMobile
-          ? { left: 12, right: 12, bottom: 'calc(68px + env(safe-area-inset-bottom))', maxHeight: 'calc(100dvh - 140px)', overflowY: 'auto' }
-          : { left: 16, bottom: 64, width: 360 }
+          ? { left: 12, right: 12, bottom: 'calc(132px + env(safe-area-inset-bottom))', maxHeight: 'calc(100dvh - 204px - env(safe-area-inset-bottom))', overflowY: 'auto' }
+          : { left: desktopLeft, bottom: 64, width: 360 }
       }
     >
       <h2 id={titleId} className="text-base font-semibold tracking-tight">{t('領養你的企鵝')}</h2>
