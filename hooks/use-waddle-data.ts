@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { classifyDbError } from '@/lib/supabase/db-error-reason'
 import { seedUserData } from '@/lib/supabase/seed'
 import type { Database, Json } from '@/lib/supabase/database.types'
 import {
@@ -62,6 +63,8 @@ import type {
 
 /** PGRST204 = "column not found in schema cache". 42703 = "undefined column". */
 const MISSING_COL_CODES = new Set(['PGRST204', '42703'])
+// "09:30" from the calendar grid, "09:30:00" from a stored row.
+const CLOCK_TIME = /^\d{1,2}:\d{2}(:\d{2})?$/
 /** Accent for the synthetic "指派給我" group (assigned tasks aren't in my workspaces). */
 const ASSIGNED_WORKSPACE_COLOR = '#7C8DB5'
 
@@ -801,7 +804,19 @@ export function useWaddleData(): UseWaddleData {
 
   const handleDbError = (op: string) => (err: unknown) => {
     console.error(`[${op}]`, err)
-    toast.error(translate('儲存失敗：{op}', { op: translate(op) }))
+    // Say why, not just that it failed: an expired login and a dropped
+    // connection need different things from the user.
+    const reason = classifyDbError(err)
+    const why =
+      reason.kind === 'auth' ? translate('登入已過期，請重新整理頁面')
+      : reason.kind === 'network' ? translate('網路連線不穩，請稍後再試')
+      : reason.kind === 'code' ? translate('錯誤代碼 {code}', { code: reason.code })
+      : null
+    toast.error(
+      why
+        ? translate('儲存失敗：{op}（{reason}）', { op: translate(op), reason: why })
+        : translate('儲存失敗：{op}', { op: translate(op) })
+    )
   }
 
   // ─── Assigned-to-me tasks ────────────────────────────
@@ -2138,6 +2153,14 @@ export function useWaddleData(): UseWaddleData {
     targetDate?: string,
     recordUndo: boolean = true
   ) => {
+    // A caller that drops an argument shifts the date into the start-time
+    // slot (a wrapper did exactly that from 2026-09-25 to 10-01). Refuse
+    // before the optimistic update so local state never holds a date as a time.
+    if (!CLOCK_TIME.test(startTime) || !CLOCK_TIME.test(endTime)) {
+      console.error('[rescheduleTask] refusing non-time values', { taskId, date, startTime, endTime })
+      handleDbError('重新排程')({ code: 'BAD_TIME' })
+      return
+    }
     const assigned = assignedTasksRef.current.find((x) => x.id === taskId)
     if (assigned) {
       return patchAssignedTask(taskId, {
