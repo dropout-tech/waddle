@@ -2,7 +2,9 @@
 //
 // Actions (POST JSON { action, ... }, user JWT in Authorization):
 //   status          → { configured, connected, status, share_busy }
-//   start           → { url }  Google consent URL (PKCE S256, state stored hashed, 10 min)
+//   start           → { url }  Google consent URL (PKCE S256, state stored hashed, 10 min);
+//                     403 { error: 'PRO_REQUIRED' } when the Pro limits switch is on and the
+//                     caller is neither Pro nor grandfathered
 //   finish          → { connected: true }  one-time state, bound to user + JWT session_id
 //   disconnect      → { connected: false, revoked }
 //   set_share_busy  → { share_busy }
@@ -117,6 +119,12 @@ export async function handler(req: Request) {
 
     if (body.action === 'start') {
       if (connection && !reconnecting) throw Error('already_connected')
+      // Pro feature once the Pro limits switch is on; members who linked while
+      // it was off are grandfathered (20261001200000_pro_limits.sql). Linked
+      // members' events/busy reads are never gated — only starting a link.
+      const { data: mayLink, error: planError } = await admin.rpc('google_calendar_connect_allowed', { p_user: uid })
+      if (planError) throw Error('database_failed')
+      if (mayLink !== true) return json({ error: 'PRO_REQUIRED' }, 403)
       const state = b64(crypto.getRandomValues(new Uint8Array(32))), verifier = b64(crypto.getRandomValues(new Uint8Array(32)))
       check(await admin.from('google_calendar_oauth_states').delete().eq('user_id', uid))
       check(await admin.from('google_calendar_oauth_states').delete().lt('expires_at', new Date().toISOString()))
