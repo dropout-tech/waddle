@@ -633,7 +633,9 @@ export function PanelHeader({
                       : 'border-border hover:border-primary/50'
                   )}
                 >
-                  {value || <span className="text-muted-foreground text-xs">{t('無')}</span>}
+                  {value
+                    ? <WorkspaceIcon icon={value} color="currentColor" size="sm" />
+                    : <span className="text-muted-foreground text-xs">{t('無')}</span>}
                 </button>
               ))}
             </div>
