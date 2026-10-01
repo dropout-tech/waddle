@@ -454,8 +454,18 @@ async function waterReminderTest(browser, storageState) {
   // End the tour (the PATCH that persists it is intercepted — nothing is written).
   await page.getByRole('button', { name: labels.skip, exact: true }).click()
   await page.locator('[data-onboarding-tour]').waitFor({ state: 'detached', timeout: 5000 })
-  const appeared = await waterModal.waitFor({ state: 'visible', timeout: 35000 }).then(() => true).catch(() => false)
-  check('water: reminder shows up once the tour is closed', appeared)
+  // The popup keeps quiet for one more minute after the tour (WATER_GRACE_AFTER_TOUR_MS
+  // in app/page.tsx) — then it must show: deferred, not dropped.
+  const closedAt = Date.now()
+  await page.waitForTimeout(5000)
+  await pokeChecks()
+  await page.waitForTimeout(800)
+  check('water: still quiet right after the tour closes (1-minute grace)', !(await waterModal.isVisible()))
+  check('water: due time untouched during the grace', (await due()) === DUE, `nextDueAt=${await due()} seeded=${DUE}`)
+  const appeared = await waterModal.waitFor({ state: 'visible', timeout: 80000 }).then(() => true).catch(() => false)
+  const waited = Math.round((Date.now() - closedAt) / 1000)
+  check('water: reminder shows up once the grace is over', appeared, `visible=${appeared} after ${waited}s`)
+  check('water: grace lasted about a minute', appeared && waited >= 55 && waited <= 70, `${waited}s after the tour closed`)
   await page.waitForTimeout(500)
   await page.screenshot({ path: path.join(OUT_DIR, 'water_after-tour.jpg'), ...SHOT })
   if (appeared) {
