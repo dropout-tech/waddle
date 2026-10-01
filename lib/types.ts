@@ -36,6 +36,10 @@ export interface NotebookNote {
   isArchived: boolean
   createdAt: string
   updatedAt: string
+  /** Local only, never stored: bumped when this device replaces the note's
+   *  text with the server's version (after a save conflict), so an open
+   *  editor reloads its document. */
+  syncRev?: number
 }
 
 // Sticky note colors — kept in the warm/brand palette (see DESIGN.md), never
@@ -59,6 +63,8 @@ export interface StickyNote {
   onScreen: boolean // false = put away in the drawer (not deleted)
   createdAt: string
   updatedAt: string
+  /** Local only — see NotebookNote.syncRev. */
+  syncRev?: number
 }
 
 // A folder for put-away sticky notes — separate from the notebook's folders.

@@ -5,26 +5,41 @@ import type { TiptapDoc } from '@/lib/types'
 // The notebook autosaves on a short debounce and flushes on pagehide, but a
 // browser (or iOS WebView) may cancel requests started while the page is
 // unloading — so the last keystrokes before a reload/close could be lost.
-// Every pending edit is mirrored here first; the next load re-sends anything
-// newer than the server copy. Keys include the user id so a shared device
-// never replays one account's text into another's.
+// Every pending edit is mirrored here first; the next load re-sends it.
+// Keys include the user id so a shared device never replays one account's
+// text into another's.
+//
+// Each draft remembers `base`: the note's server version token (its
+// updated_at exactly as the server returned it, see lib/note-sync.ts) that
+// the edit was made on top of. On reload the draft is only written back if
+// the server is still at that version; otherwise another device changed the
+// note in between and the draft becomes a conflict copy instead of
+// overwriting it. Device clocks are never compared.
 //
 // localStorage can throw (private mode, quota, disabled storage): every
 // access is wrapped and failure simply means "no backup".
 
 export interface NotebookDraft {
   title?: string
-  titleAt?: string
   content?: TiptapDoc
-  contentAt?: string
+  /** Server version token the edit is based on; missing = unknown. */
+  base?: string
 }
 
 const PREFIX = 'huddle:notebook-draft:'
 const keyOf = (userId: string, noteId: string) => `${PREFIX}${userId}:${noteId}`
 
+function readRaw(userId: string, noteId: string): string | null {
+  try {
+    return window.localStorage.getItem(keyOf(userId, noteId))
+  } catch {
+    return null
+  }
+}
+
 function read(userId: string, noteId: string): NotebookDraft | null {
   try {
-    const raw = window.localStorage.getItem(keyOf(userId, noteId))
+    const raw = readRaw(userId, noteId)
     return raw ? (JSON.parse(raw) as NotebookDraft) : null
   } catch {
     return null
@@ -45,11 +60,23 @@ export function saveNotebookDraft(
   noteId: string,
   field: 'title' | 'content',
   value: string | TiptapDoc,
+  base: string | undefined,
 ) {
   const draft = read(userId, noteId) ?? {}
-  const at = new Date().toISOString()
-  if (field === 'title') write(userId, noteId, { ...draft, title: value as string, titleAt: at })
-  else write(userId, noteId, { ...draft, content: value as TiptapDoc, contentAt: at })
+  const next: NotebookDraft = field === 'title'
+    ? { ...draft, title: value as string }
+    : { ...draft, content: value as TiptapDoc }
+  if (base) next.base = base
+  else delete next.base
+  write(userId, noteId, next)
+}
+
+/** The server accepted a write made on top of the draft's lineage: whatever
+ *  is still in the draft is now based on `token`. */
+export function rebaseNotebookDraft(userId: string, noteId: string, token: string) {
+  const draft = read(userId, noteId)
+  if (!draft || draft.base === token) return
+  write(userId, noteId, { ...draft, base: token })
 }
 
 /** Drop one field after the server confirmed it. For titles, only when the
@@ -60,10 +87,8 @@ export function clearNotebookDraftField(userId: string, noteId: string, field: '
   if (field === 'title') {
     if (draft.title !== savedTitle) return
     delete draft.title
-    delete draft.titleAt
   } else {
     delete draft.content
-    delete draft.contentAt
   }
   write(userId, noteId, draft)
 }
@@ -76,38 +101,61 @@ export function clearNotebookDraft(userId: string, noteId: string) {
   }
 }
 
-/** Drafts that are newer than the server copy, ready to be re-sent. Stale
- *  drafts (server is newer, or the note no longer exists) are removed. */
-export function takeNewerNotebookDrafts(
-  userId: string,
-  serverNotes: { id: string; updatedAt?: string | null }[],
-): { noteId: string; title?: string; content?: TiptapDoc }[] {
-  let keys: string[] = []
+/** Remove the draft only if it is still exactly `raw` (a newer keystroke
+ *  rewrote it otherwise, and that one must survive). */
+export function clearNotebookDraftIfUnchanged(userId: string, noteId: string, raw: string) {
+  if (isNotebookDraftUnchanged(userId, noteId, raw)) clearNotebookDraft(userId, noteId)
+}
+
+export function isNotebookDraftUnchanged(userId: string, noteId: string, raw: string): boolean {
+  return readRaw(userId, noteId) === raw
+}
+
+export interface StoredNotebookDraft {
+  noteId: string
+  draft: NotebookDraft
+  /** The stored JSON, to tell whether the draft changed since it was read. */
+  raw: string
+}
+
+/** Every draft of this user still on the device. */
+export function readNotebookDrafts(userId: string): StoredNotebookDraft[] {
+  const prefix = `${PREFIX}${userId}:`
+  const ids: string[] = []
   try {
-    const prefix = `${PREFIX}${userId}:`
     for (let i = 0; i < window.localStorage.length; i++) {
       const k = window.localStorage.key(i)
-      if (k && k.startsWith(prefix)) keys.push(k.slice(prefix.length))
+      if (k && k.startsWith(prefix)) ids.push(k.slice(prefix.length))
     }
   } catch {
-    keys = []
+    return []
   }
-  const byId = new Map(serverNotes.map((n) => [n.id, n]))
-  const out: { noteId: string; title?: string; content?: TiptapDoc }[] = []
-  for (const noteId of keys) {
+  const out: StoredNotebookDraft[] = []
+  for (const noteId of ids) {
+    const raw = readRaw(userId, noteId)
     const draft = read(userId, noteId)
-    const note = byId.get(noteId)
-    if (!draft || !note) {
+    if (!raw || !draft || (!('title' in draft) && !('content' in draft))) {
       clearNotebookDraft(userId, noteId)
       continue
     }
-    const serverAt = note.updatedAt ? Date.parse(note.updatedAt) : 0
-    const newer = (at?: string) => !!at && Date.parse(at) > serverAt
-    const rec: { noteId: string; title?: string; content?: TiptapDoc } = { noteId }
-    if ('title' in draft && newer(draft.titleAt)) rec.title = draft.title
-    if ('content' in draft && newer(draft.contentAt)) rec.content = draft.content
-    if ('title' in rec || 'content' in rec) out.push(rec)
-    else clearNotebookDraft(userId, noteId)
+    out.push({ noteId, draft, raw })
   }
   return out
+}
+
+/** Sign-out / account deletion: remove this user's drafts (or, when the user
+ *  id is unknown, every notebook draft) so their text doesn't stay readable
+ *  in this browser's storage. */
+export function clearAllNotebookDrafts(userId?: string | null) {
+  const prefix = userId ? `${PREFIX}${userId}:` : PREFIX
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i)
+      if (k && k.startsWith(prefix)) keys.push(k)
+    }
+    keys.forEach((k) => window.localStorage.removeItem(k))
+  } catch {
+    /* ignore */
+  }
 }

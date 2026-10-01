@@ -3,6 +3,8 @@
 export const dict: Record<string, string> = {
   '便條紙': 'Sticky notes',
   '便條紙內容沒有存到，請檢查網路後再試': "Your sticky note wasn't saved. Check your connection and try again.",
+  '這張便條紙在其他裝置上也改過了。那邊的版本留在原處，這台的內容另存成一張新便條紙。':
+    'This sticky note was also changed on another device. That version stays in place; what you wrote here was saved as a new sticky note.',
   '顯示便條紙': 'Show sticky notes',
   '隱藏便條紙': 'Hide sticky notes',
   '新增便條紙': 'New sticky note',

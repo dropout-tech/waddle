@@ -13,11 +13,149 @@ import {
   saveNotebookDraft,
   clearNotebookDraftField,
   clearNotebookDraft,
-  takeNewerNotebookDrafts,
+  clearNotebookDraftIfUnchanged,
+  isNotebookDraftUnchanged,
+  readNotebookDrafts,
+  rebaseNotebookDraft,
+  type StoredNotebookDraft,
 } from '@/lib/notebook-draft'
+import { conflictCopyId, decideAfterMiss } from '@/lib/note-sync'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
+import { toast } from 'sonner'
 
 type NotebookNotesRow = Database['public']['Tables']['notebook_notes']['Row']
 type NotebookCategoriesRow = Database['public']['Tables']['notebook_categories']['Row']
+type SupabaseClient = ReturnType<typeof createClient>
+
+// ── Version-locked saves (see lib/note-sync.ts) ─────────────
+// Content (and restored drafts) are written with
+// `.eq('updated_at', token)`: a save based on a version the server no
+// longer has can't overwrite another device's newer text. On a real
+// conflict the server version stays in the note and this device's text is
+// saved as a new "（衝突副本）" note — nothing is dropped either way.
+
+type NoteSyncResult =
+  | { kind: 'saved'; updatedAt: string }
+  | { kind: 'same'; row: NotebookNotesRow }
+  | { kind: 'copied'; row: NotebookNotesRow | null; copy: NotebookNotesRow }
+  | { kind: 'error'; error: unknown }
+
+async function syncNoteWithLock(
+  supabase: SupabaseClient,
+  a: {
+    userId: string
+    noteId: string
+    title?: string
+    content?: TiptapDoc | null
+    /** Server version the edit is based on; undefined = unknown. */
+    token: string | undefined
+    /** Server content at `token`, when known (lets a title-only change made
+     *  elsewhere be rebased over instead of reported as a conflict). */
+    base?: { content: TiptapDoc | null }
+    /** How the note looks on this device, to name/place the copy. */
+    local?: { title: string; icon?: string; categoryId: string | null }
+  },
+): Promise<NoteSyncResult> {
+  const payload = {
+    ...(a.title !== undefined ? { title: a.title } : {}),
+    ...(a.content !== undefined ? { content: a.content as unknown as never } : {}),
+  }
+  let token = a.token
+  let row: NotebookNotesRow | null = null
+  for (let attempt = 0; ; attempt++) {
+    if (token) {
+      const { data, error } = await supabase
+        .from('notebook_notes')
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq('id', a.noteId)
+        .eq('updated_at', token)
+        .select('updated_at')
+      if (error) return { kind: 'error', error }
+      if (data && data.length > 0) return { kind: 'saved', updatedAt: data[0].updated_at }
+    }
+    // Zero rows: the server is at a version we haven't seen. Look at it.
+    const res = await supabase.from('notebook_notes').select('*').eq('id', a.noteId).maybeSingle()
+    if (res.error) return { kind: 'error', error: res.error }
+    row = res.data
+    const decision = decideAfterMiss(row, { title: a.title, content: a.content }, a.base)
+    if (decision === 'same' && row) return { kind: 'same', row }
+    if (decision === 'rebase' && row) {
+      if (attempt >= 2) return { kind: 'error', error: new Error('note keeps changing; will retry') }
+      token = row.updated_at
+      continue
+    }
+    break // 'conflict' or 'gone'
+  }
+
+  const copyId = conflictCopyId(a.noteId, { title: a.title, content: a.content })
+  const baseTitle = (a.title ?? a.local?.title ?? row?.title ?? '').trim() || t('無標題')
+  const ins = await supabase
+    .from('notebook_notes')
+    .insert({
+      id: copyId,
+      user_id: a.userId,
+      title: t('{title}（衝突副本）', { title: baseTitle }),
+      content: (a.content !== undefined ? a.content : (row?.content ?? null)) as unknown as never,
+      icon: row ? row.icon : (a.local?.icon ?? null),
+      category_id: row ? row.category_id : (a.local?.categoryId ?? null),
+      sort_order: row?.sort_order ?? 0,
+      updated_at: new Date().toISOString(),
+    })
+    .select('*')
+    .single()
+  if (!ins.error && ins.data) return { kind: 'copied', row, copy: ins.data }
+  // Same copy already made (another tab / instance / a retry whose answer
+  // was lost): the deterministic id makes the second INSERT a duplicate.
+  if (ins.error?.code === '23505') {
+    const again = await supabase.from('notebook_notes').select('*').eq('id', copyId).maybeSingle()
+    if (!again.error && again.data) return { kind: 'copied', row, copy: again.data }
+  }
+  return { kind: 'error', error: ins.error }
+}
+
+function notifyNoteConflict(copyTitle: string) {
+  toast.warning(
+    t('這篇筆記在其他裝置上也改過了。那邊的版本留在原筆記，這台的內容另存為「{title}」。', { title: copyTitle }),
+    { duration: 15000, id: `notebook-conflict-${copyTitle}` },
+  )
+}
+
+// Drafts left by an earlier page load are written back once per page per
+// user, BEFORE any notebook instance lists notes (useNotebook is mounted by
+// several components at once) — so every instance sees the outcome and no
+// two instances race each other over the same draft. Resolves to the drafts
+// that could not be settled (offline…); they stay on the device.
+const draftRestores = new Map<string, Promise<StoredNotebookDraft[]>>()
+
+function restoreNotebookDrafts(supabase: SupabaseClient, userId: string): Promise<StoredNotebookDraft[]> {
+  let p = draftRestores.get(userId)
+  if (!p) {
+    p = (async () => {
+      const failed: StoredNotebookDraft[] = []
+      await Promise.all(
+        readNotebookDrafts(userId).map(async (d) => {
+          const r = await syncNoteWithLock(supabase, {
+            userId,
+            noteId: d.noteId,
+            title: d.draft.title,
+            content: d.draft.content,
+            token: d.draft.base,
+          })
+          if (r.kind === 'error') {
+            console.error('[notebook] draft restore failed', r.error)
+            failed.push(d)
+            return
+          }
+          clearNotebookDraftIfUnchanged(userId, d.noteId, d.raw)
+          if (r.kind === 'copied') notifyNoteConflict(r.copy.title)
+        }),
+      )
+      return failed
+    })()
+    draftRestores.set(userId, p)
+  }
+  return p
+}
 
 // Data layer for the notebook (記事本). Mirrors the optimistic-update +
 // rollback pattern used by use-waddle-data for the scratchpad, but lives in its
@@ -75,6 +213,24 @@ export function useNotebook() {
   // INSERT commits, match 0 rows, and silently drop the user's first edits.
   const pendingCreates = useRef<Record<string, Promise<void>>>({})
 
+  // Per note: the server version token this device last read or wrote
+  // (updated_at exactly as returned), and the content the server had at that
+  // version (absent = unknown). See syncNoteWithLock.
+  const versionRef = useRef<Record<string, string>>({})
+  const baseRef = useRef<Record<string, TiptapDoc | null>>({})
+  // Writes that use a note's version token run one at a time per note, so a
+  // second save never goes out with the token the first one is replacing.
+  const noteChains = useRef<Record<string, Promise<unknown>>>({})
+  const enqueue = useCallback(<T,>(id: string, fn: () => Promise<T>): Promise<T> => {
+    const p = (noteChains.current[id] ?? Promise.resolve()).then(fn, fn)
+    noteChains.current[id] = p.catch(() => undefined)
+    return p
+  }, [])
+  const notesRef = useRef<NotebookNote[]>([])
+  useEffect(() => {
+    notesRef.current = notes
+  }, [notes])
+
   // ── Initial load ─────────────────────────────────────────
   useEffect(() => {
     let mounted = true
@@ -88,12 +244,23 @@ export function useNotebook() {
       }
       userIdRef.current = user.id
 
+      // Write back (or turn into conflict copies) edits a previous page load
+      // only managed to back up locally — before listing, so the list below
+      // already shows the outcome.
+      const unsettledDrafts = await restoreNotebookDrafts(supabase, user.id)
+      if (!mounted) return
+
       const [notesRes, catsRes] = await Promise.all([
-        supabase
-          .from('notebook_notes')
-          .select('*')
-          .eq('is_archived', false)
-          .order('sort_order', { ascending: true }),
+        // Paged: PostgREST returns at most 1000 rows per request.
+        fetchAllRows((from, to) =>
+          supabase
+            .from('notebook_notes')
+            .select('*', { count: 'exact' })
+            .eq('is_archived', false)
+            .order('sort_order', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to),
+        ),
         supabase
           .from('notebook_categories')
           .select('*')
@@ -108,10 +275,23 @@ export function useNotebook() {
         setLoading(false)
         return
       }
-      // Edits that were only backed up locally (the page unloaded before the
-      // save landed) and are newer than the server copy: show them and re-send.
-      const recovered = takeNewerNotebookDrafts(user.id, (data ?? []).map(rowToNote))
-      const recoveredById = new Map(recovered.map((r) => [r.noteId, r]))
+      for (const r of data ?? []) {
+        if (r.id in versionRef.current) continue // a save from this tab already moved it on
+        versionRef.current[r.id] = r.updated_at
+        baseRef.current[r.id] = (r.content as TiptapDoc | null) ?? null
+      }
+      // Drafts the restore above couldn't settle (offline…) stay on the
+      // device. Show them, and make the next save of that note carry the
+      // draft's own base version: if the server moved on meanwhile, that
+      // save becomes a conflict copy instead of overwriting the other side.
+      const recoveredById = new Map<string, { title?: string; content?: TiptapDoc }>()
+      for (const d of unsettledDrafts) {
+        if (!isNotebookDraftUnchanged(user.id, d.noteId, d.raw)) continue
+        recoveredById.set(d.noteId, d.draft)
+        if (d.draft.base) versionRef.current[d.noteId] = d.draft.base
+        else delete versionRef.current[d.noteId]
+        delete baseRef.current[d.noteId]
+      }
       if (catsRes.error) console.error('[notebook] category load failed', catsRes.error)
       else
         setCategories((prev) => {
@@ -145,28 +325,6 @@ export function useNotebook() {
         return [...localOnly, ...server.map((n) => local.get(n.id) ?? n)]
       })
       setLoading(false)
-
-      for (const r of recovered) {
-        void (async () => {
-          const { error: saveError } = await supabase
-            .from('notebook_notes')
-            .update({
-              ...(r.title !== undefined ? { title: r.title } : {}),
-              ...(r.content !== undefined ? { content: r.content as unknown as never } : {}),
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', r.noteId)
-          if (saveError) {
-            // Keep the draft; the next load tries again.
-            console.error('[notebook] draft restore failed', saveError)
-            return
-          }
-          if (r.title !== undefined) clearNotebookDraftField(user.id, r.noteId, 'title', r.title)
-          if (r.content !== undefined && !(r.noteId in pendingContent.current)) {
-            clearNotebookDraftField(user.id, r.noteId, 'content')
-          }
-        })()
-      }
     })()
 
     return () => {
@@ -202,15 +360,25 @@ export function useNotebook() {
     // awaiting the INSERT here left the previous note active for a whole
     // round-trip, and the user's first keystrokes landed in the wrong note.
     pendingCreates.current[id] = (async () => {
-      const { error } = await supabase.from('notebook_notes').insert({
-        id,
-        user_id: userId,
-        title: '',
-        content: null,
-        category_id: categoryId,
-        sort_order: 0,
-        updated_at: now,
-      })
+      const { data: created, error } = await supabase
+        .from('notebook_notes')
+        .insert({
+          id,
+          user_id: userId,
+          title: '',
+          content: null,
+          category_id: categoryId,
+          sort_order: 0,
+          updated_at: now,
+        })
+        .select('updated_at')
+        .single()
+      if (!error && created) {
+        versionRef.current[id] = created.updated_at
+        baseRef.current[id] = null
+        // Typing that started before this answer was backed up without a base.
+        rebaseNotebookDraft(userId, id, created.updated_at)
+      }
       if (error) {
         console.error('[notebook] create failed', error)
         setNotes((prev) => prev.filter((n) => n.id !== id))
@@ -237,18 +405,40 @@ export function useNotebook() {
       )
 
       const userId = userIdRef.current
-      if (patch.title !== undefined && userId) saveNotebookDraft(userId, id, 'title', patch.title)
+      if (patch.title !== undefined && userId) {
+        saveNotebookDraft(userId, id, 'title', patch.title, versionRef.current[id])
+      }
 
-      await pendingCreates.current[id]
-      const { error } = await supabase
-        .from('notebook_notes')
-        .update({
-          ...(patch.title !== undefined ? { title: patch.title } : {}),
-          ...(patch.icon !== undefined ? { icon: patch.icon ?? null } : {}),
-          ...(patch.categoryId !== undefined ? { category_id: patch.categoryId } : {}),
-          updated_at: now,
-        })
-        .eq('id', id)
+      const fields = {
+        ...(patch.title !== undefined ? { title: patch.title } : {}),
+        ...(patch.icon !== undefined ? { icon: patch.icon ?? null } : {}),
+        ...(patch.categoryId !== undefined ? { category_id: patch.categoryId } : {}),
+        updated_at: now,
+      }
+      // Title / icon / folder are single fields (last write wins, as before),
+      // but they bump updated_at. Try against our version first so the token
+      // can follow; if the server already moved on, write the field anyway
+      // and leave the token stale — the next content save then re-checks.
+      const error = await enqueue(id, async () => {
+        await pendingCreates.current[id]
+        const token = versionRef.current[id]
+        if (token) {
+          const locked = await supabase
+            .from('notebook_notes')
+            .update(fields)
+            .eq('id', id)
+            .eq('updated_at', token)
+            .select('updated_at')
+          if (locked.error) return locked.error
+          if (locked.data && locked.data.length > 0) {
+            versionRef.current[id] = locked.data[0].updated_at
+            if (userId) rebaseNotebookDraft(userId, id, locked.data[0].updated_at)
+            return null
+          }
+        }
+        const { error: plainError } = await supabase.from('notebook_notes').update(fields).eq('id', id)
+        return plainError
+      })
 
       if (!error && patch.title !== undefined && userId) clearNotebookDraftField(userId, id, 'title', patch.title)
       if (error && snapshot) {
@@ -257,7 +447,7 @@ export function useNotebook() {
         setNotes((prev) => prev.map((n) => (n.id === id ? prevSnapshot : n)))
       }
     },
-    [supabase],
+    [supabase, enqueue],
   )
 
   const renameNote = useCallback((id: string, title: string) => patchNote(id, { title }), [patchNote])
@@ -271,32 +461,110 @@ export function useNotebook() {
   // ── Content autosave (debounced) ─────────────────────────
   // Updates local state immediately (so switching notes never loses keystrokes)
   // and flushes to Supabase after a short idle window.
+  // The ref breaks the flushContent ↔ applyConflict cycle (text typed while a
+  // conflict was being resolved is re-queued on the copy).
+  const flushContentRef = useRef<(id: string) => Promise<void>>(async () => {})
+
+  // A save hit a version this device hadn't seen and the content really
+  // differs: the original note now shows the server's version, this
+  // device's text lives on in the copy, and the user is told.
+  const applyConflict = useCallback(
+    (id: string, userId: string, row: NotebookNotesRow | null, copy: NotebookNotesRow) => {
+      versionRef.current[copy.id] = copy.updated_at
+      baseRef.current[copy.id] = (copy.content as TiptapDoc | null) ?? null
+      if (row) {
+        versionRef.current[id] = row.updated_at
+        baseRef.current[id] = (row.content as TiptapDoc | null) ?? null
+      }
+      // Anything typed while this was resolving continues this device's
+      // version, so it goes to the copy too.
+      const newer = pendingContent.current[id]
+      if (newer !== undefined) {
+        delete pendingContent.current[id]
+        clearTimeout(saveTimers.current[id])
+        delete saveTimers.current[id]
+      }
+      clearNotebookDraft(userId, id)
+      setNotes((prev) => {
+        const orig = prev.find((n) => n.id === id)
+        const copyNote: NotebookNote = { ...rowToNote(copy), ...(newer !== undefined ? { content: newer } : {}) }
+        const rest = prev.filter((n) => n.id !== copy.id)
+        const out: NotebookNote[] = []
+        for (const n of rest) {
+          if (n.id !== id) {
+            out.push(n)
+            continue
+          }
+          out.push(copyNote)
+          // syncRev makes an open editor load the server text (it otherwise
+          // only reloads when the note id changes).
+          if (row) out.push({ ...rowToNote(row), syncRev: (orig?.syncRev ?? 0) + 1 })
+        }
+        if (!orig) out.unshift(copyNote)
+        return out
+      })
+      if (newer !== undefined) {
+        pendingContent.current[copy.id] = newer
+        saveNotebookDraft(userId, copy.id, 'content', newer, copy.updated_at)
+        void flushContentRef.current(copy.id)
+      }
+      notifyNoteConflict(copy.title)
+    },
+    [],
+  )
+
   const flushContent = useCallback(
-    async (id: string) => {
+    (id: string): Promise<void> => {
       clearTimeout(saveTimers.current[id])
       delete saveTimers.current[id]
-      if (!(id in pendingContent.current)) return
+      if (!(id in pendingContent.current)) return Promise.resolve()
+      // Taken synchronously, so pagehide + visibilitychange + unmount firing
+      // together still send it once.
       const content = pendingContent.current[id]
       delete pendingContent.current[id]
-      await pendingCreates.current[id]
-      const { error } = await supabase
-        .from('notebook_notes')
-        .update({ content: content as unknown as never, updated_at: new Date().toISOString() })
-        .eq('id', id)
-      setSaveStatus(error ? 'error' : 'saved')
-      // Server has it — drop the local backup unless newer text is queued.
-      if (!error && userIdRef.current && !(id in pendingContent.current)) {
-        clearNotebookDraftField(userIdRef.current, id, 'content')
-      }
-      if (error) {
-        console.error('[notebook] content save failed', error)
-        // Keep it queued (unless newer text arrived) so the next flush —
-        // leaving the page, hiding the tab — tries again.
-        if (!(id in pendingContent.current)) pendingContent.current[id] = content
-      }
+      return enqueue(id, async () => {
+        await pendingCreates.current[id]
+        const userId = userIdRef.current
+        const local = notesRef.current.find((n) => n.id === id)
+        const r = userId
+          ? await syncNoteWithLock(supabase, {
+              userId,
+              noteId: id,
+              content,
+              token: versionRef.current[id],
+              base: id in baseRef.current ? { content: baseRef.current[id] } : undefined,
+              local: local ? { title: local.title, icon: local.icon, categoryId: local.categoryId } : undefined,
+            })
+          : ({ kind: 'error', error: new Error('not signed in') } as const)
+        if (r.kind === 'error') {
+          console.error('[notebook] content save failed', r.error)
+          setSaveStatus('error')
+          // Keep it queued (unless newer text arrived) so the next flush —
+          // leaving the page, hiding the tab — tries again. The retry is
+          // version-checked too, so it can't overwrite a newer save made on
+          // another device in the meantime.
+          if (!(id in pendingContent.current)) pendingContent.current[id] = content
+          return
+        }
+        setSaveStatus('saved')
+        if (r.kind === 'copied') {
+          applyConflict(id, userId!, r.row, r.copy)
+          return
+        }
+        const token = r.kind === 'saved' ? r.updatedAt : r.row.updated_at
+        versionRef.current[id] = token
+        baseRef.current[id] = content
+        // Server has it — drop the local backup unless newer text is queued
+        // (that one now builds on the version just written).
+        if (!(id in pendingContent.current)) clearNotebookDraftField(userId!, id, 'content')
+        rebaseNotebookDraft(userId!, id, token)
+      })
     },
-    [supabase],
+    [supabase, enqueue, applyConflict],
   )
+  useEffect(() => {
+    flushContentRef.current = flushContent
+  }, [flushContent])
 
   const saveNoteContent = useCallback(
     (id: string, content: TiptapDoc) => {
@@ -305,7 +573,7 @@ export function useNotebook() {
       setSaveStatus('saving')
 
       pendingContent.current[id] = content
-      if (userIdRef.current) saveNotebookDraft(userIdRef.current, id, 'content', content)
+      if (userIdRef.current) saveNotebookDraft(userIdRef.current, id, 'content', content, versionRef.current[id])
       clearTimeout(saveTimers.current[id])
       saveTimers.current[id] = setTimeout(() => void flushContent(id), SAVE_DEBOUNCE_MS)
     },

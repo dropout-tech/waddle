@@ -110,4 +110,9 @@ export const dict: Record<string, string> = {
 
   // upload-image.ts
   '只能插入圖片檔': 'Only image files can be inserted',
+
+  // use-notebook.ts — save conflict between devices (nothing is dropped)
+  '{title}（衝突副本）': '{title} (conflict copy)',
+  '這篇筆記在其他裝置上也改過了。那邊的版本留在原筆記，這台的內容另存為「{title}」。':
+    'This note was also changed on another device. That version stays in the note; what you wrote here was saved as "{title}".',
 }
