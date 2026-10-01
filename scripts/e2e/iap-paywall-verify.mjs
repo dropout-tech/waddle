@@ -54,13 +54,13 @@ function check(name, ok, detail = '') {
  * One isolated browser context. `server` is the mutable fake backend state the
  * route handler reads, so a test can flip paid_until mid-flow.
  */
-async function open({ width, height, lang = 'zh-TW', dark = false, billing = null, server = {}, scale = 2 }) {
+async function open({ width, height, lang = 'zh-TW', dark = false, billing = null, server = {}, scale = 2, route = '/membership', signedIn = true }) {
   const state = { paid_until: null, pro_until: null, selfCalls: 0, unexpected: [], ...server }
   const context = await browser.newContext({
     viewport: { width, height }, locale: 'zh-TW', timezoneId: 'Asia/Taipei',
     deviceScaleFactor: scale, colorScheme: dark ? 'dark' : 'light',
   })
-  await context.addCookies([{ name: `sb-${ref}-auth-token`, value: 'base64-' + Buffer.from(JSON.stringify(session)).toString('base64url'), url: base }])
+  if (signedIn) await context.addCookies([{ name: `sb-${ref}-auth-token`, value: 'base64-' + Buffer.from(JSON.stringify(session)).toString('base64url'), url: base }])
   await context.addInitScript(({ lang, dark, billing }) => {
     try {
       window.localStorage.setItem('waddle-language-v1', lang)
@@ -93,7 +93,7 @@ async function open({ width, height, lang = 'zh-TW', dark = false, billing = nul
     let listCalls = 0
     window.__huddleBillingTest = {
       nativeIos: true,
-      syncMaxWaitMs: billing.syncMaxWaitMs,
+      sync: billing.sync,
       driver: {
         async configure(options) { log.push(['configure', options.appUserID]) },
         async listPackages() {
@@ -155,10 +155,11 @@ async function open({ width, height, lang = 'zh-TW', dark = false, billing = nul
   const page = await context.newPage()
   const pageErrors = []
   page.on('pageerror', (e) => pageErrors.push(String(e)))
-  await page.goto(`${base}/membership`, { waitUntil: 'domcontentloaded' })
+  await page.goto(base + route, { waitUntil: 'domcontentloaded' })
   await page.getByRole('heading', { level: 1 }).waitFor({ timeout: 60000 })
-  // The ledger heading is the last panel; once it is there the data has loaded.
-  await page.locator('main h2').last().waitFor({ timeout: 60000 })
+  // Membership: the ledger heading is the last panel; once it is there the data has loaded.
+  if (route === '/membership') await page.locator('main h2').last().waitFor({ timeout: 60000 })
+  else await page.waitForLoadState('networkidle')
   await page.evaluate(() => document.fonts.ready)
   await page.waitForTimeout(400)
   return { context, page, state, pageErrors }
@@ -174,22 +175,31 @@ async function shot(page, name) {
 }
 
 // ── Flag off, web: must look exactly like it did before the change ─────────
+const exists = (file) => fs.access(file).then(() => true, () => false)
 const FLAG_OFF = [
-  { width: 390, height: 2400 },
-  { width: 1280, height: 1700 },
+  { name: 'flag-off-web-390', width: 390, height: 2400 },
+  { name: 'flag-off-web-1280', width: 1280, height: 1700 },
+  { name: 'flag-off-web-signup-390', width: 390, height: 1100, route: '/signup', signedIn: false },
+  { name: 'flag-off-web-signup-1280', width: 1280, height: 1000, route: '/signup', signedIn: false },
 ]
-for (const size of FLAG_OFF) {
+for (const { name, ...size } of FLAG_OFF) {
+  const before = path.join(outDir, `${name}-before.png`)
+  // A reference shot is taken once, from the code as it was before a change, and never overwritten.
+  if (mode === 'baseline' && (await exists(before))) { console.log(`kept  ${before}`); continue }
   const label = mode === 'baseline' ? 'before' : 'after'
   // Scale 1 keeps the lossless comparison shots small enough to keep in git.
   const { context, page, pageErrors } = await open({ ...size, scale: 1 })
-  const file = await shot(page, `flag-off-web-${size.width}-${label}.png`)
+  const file = await shot(page, `${name}-${label}.png`)
   if (mode !== 'baseline') {
-    check(`flag off / web ${size.width}: no purchase card`, (await page.locator('[data-billing-card]').count()) === 0)
-    check(`flag off / web ${size.width}: coupon and referral inputs still shown`, (await page.locator('main form input[maxlength="32"]').count()) === 2)
-    const before = path.join(outDir, `flag-off-web-${size.width}-before.png`)
+    if (size.route === '/signup') {
+      check(`${name}: referral and coupon fields still shown on the web sign-up page`, (await page.locator('#signup-referral, #signup-coupon').count()) === 2)
+    } else {
+      check(`${name}: no purchase card`, (await page.locator('[data-billing-card]').count()) === 0)
+      check(`${name}: coupon and referral inputs still shown`, (await page.locator('main form input[maxlength="32"]').count()) === 2)
+    }
     const same = Buffer.compare(await fs.readFile(before), await fs.readFile(file)) === 0
-    check(`flag off / web ${size.width}: screenshot identical to the pre-change baseline`, same, same ? 'byte-identical PNG' : `${before} vs ${file}`)
-    check(`flag off / web ${size.width}: no page errors`, pageErrors.length === 0, pageErrors.join(' | '))
+    check(`${name}: screenshot identical to the pre-change baseline`, same, same ? 'byte-identical PNG' : `${before} vs ${file}`)
+    check(`${name}: no page errors`, pageErrors.length === 0, pageErrors.join(' | '))
   }
   await context.close()
 }
@@ -203,8 +213,12 @@ if (mode === 'baseline') {
 const PHONE = { width: 390, height: 844 }
 const PACKAGES = [
   { identifier: '$rc_monthly', localizedPrice: 'NT$149.00', subscriptionPeriod: 'P1M' },
-  { identifier: '$rc_annual', localizedPrice: 'NT$1,290.00', subscriptionPeriod: 'P1Y' },
+  { identifier: '$rc_annual', localizedPrice: 'NT$990.00', subscriptionPeriod: 'P1Y' },
 ]
+const TRIAL_PACKAGES = PACKAGES.map((item) => ({ ...item, freeTrial: { unit: 'WEEK', count: 2 } }))
+/** Shortened wait-for-server schedule (dev hook) so the slow stage is reached in about a second. */
+const QUICK_SYNC = { firstMs: 400, fastMs: 400, delayedAfterMs: 1200, slowMs: 800 }
+const purchases = async (page) => (await calls(page)).filter((call) => call[0] === 'purchase').length
 const CJK = /[㐀-鿿]/
 const card = (page) => page.locator('[data-billing-card]')
 const phase = (page, name) => page.locator(`[data-billing-card][data-phase="${name}"]`).waitFor({ timeout: 15000 })
@@ -242,7 +256,7 @@ for (const lang of ['zh-TW', 'en']) {
   await phase(page, 'ready')
   const text = await card(page).innerText()
   check(`paywall ${tag}: plan name and both plans with the store's price and period`,
-    text.includes('Huddle Pro') && text.includes('NT$149.00') && text.includes('NT$1,290.00')
+    text.includes('Huddle Pro') && text.includes('NT$149.00') && text.includes('NT$990.00')
       && text.includes(english ? 'Monthly' : '月繳') && text.includes(english ? 'Yearly' : '年繳')
       && text.includes(english ? 'Renews monthly' : '每月自動續訂') && text.includes(english ? 'Renews yearly' : '每年自動續訂'))
   check(`paywall ${tag}: auto-renewal disclosure (24 hours, cancel in Apple ID settings)`,
@@ -265,6 +279,13 @@ for (const lang of ['zh-TW', 'en']) {
   await layout(page, `paywall ${tag}`)
   await cardShot(page, `paywall-390-${tag}.jpg`)
 
+  // Choosing the yearly plan: the button names the yearly price and period.
+  await card(page).locator('label[data-plan="year"]').click()
+  const yearlyCta = await card(page).locator('[data-billing-cta]').innerText()
+  check(`paywall ${tag}: with yearly selected the button reads the yearly price`, yearlyCta === (english ? 'Subscribe · NT$990.00 / year' : '訂閱 · NT$990.00／年'), yearlyCta)
+  if (!english) await cardShot(page, 'paywall-yearly-390-zh.jpg')
+  await card(page).locator('label[data-plan="month"]').click()
+
   // Buy the monthly plan. The fake store succeeds; the fake server says nothing yet.
   await card(page).getByRole('button', { name: /NT\$149\.00/ }).click()
   await phase(page, 'syncing')
@@ -285,7 +306,9 @@ for (const lang of ['zh-TW', 'en']) {
   await phase(page, 'ready')
   const done = await card(page).innerText()
   check(`confirmed ${tag}: server was polled, then the card shows the subscription`,
-    state.selfCalls > before && done.includes(english ? 'Huddle Pro is now active.' : 'Huddle Pro 已生效。') && done.includes(english ? "You're subscribed to Huddle Pro" : '你已訂閱 Huddle Pro'))
+    state.selfCalls > before && done.includes(english ? 'Huddle Pro is now active.' : 'Huddle Pro 已生效。'))
+  check(`confirmed ${tag}: subscribed text carries the server's expiry date`,
+    done.includes(english ? "You're subscribed to Huddle Pro, valid until 2027/10/01." : '你已訂閱 Huddle Pro，有效至 2027/10/01。'), done.split('\n')[1])
   check(`confirmed ${tag}: manage-subscription link goes to Apple, plans no longer offered`,
     (await card(page).locator('a[href="https://apps.apple.com/account/subscriptions"]').count()) === 1 && (await card(page).locator('input[type="radio"]').count()) === 0)
   check(`confirmed ${tag}: restore still available`, await card(page).getByRole('button', { name: english ? 'Restore purchases' : '恢復購買' }).isEnabled())
@@ -330,7 +353,7 @@ for (const lang of ['zh-TW', 'en']) {
 
 // Remaining purchase outcomes (assertions only).
 {
-  // Prices are whatever the store returns — never the 149 / 1,290 reference amounts.
+  // Prices are whatever the store returns — never the 149 / 990 reference amounts.
   const foreign = [
     { identifier: '$rc_monthly', localizedPrice: 'US$4.99', subscriptionPeriod: 'P1M' },
     { identifier: '$rc_annual', localizedPrice: 'Rp 1.249.000,00', subscriptionPeriod: 'P1Y' },
@@ -338,7 +361,7 @@ for (const lang of ['zh-TW', 'en']) {
   const { context, page } = await open({ ...PHONE, billing: { packages: foreign, purchase: 'cancel' } })
   await phase(page, 'ready')
   const text = await card(page).innerText()
-  check('price: shows the store price and not the reference amounts', text.includes('US$4.99') && text.includes('Rp 1.249.000,00') && !/149|1,290|1290/.test(text))
+  check('price: shows the store price and not the reference amounts', text.includes('US$4.99') && text.includes('Rp 1.249.000,00') && !/149|990/.test(text))
   await layout(page, 'long price format')
   await card(page).locator('label[data-plan="year"]').click()
   check('plan: choosing yearly updates the subscribe button', (await card(page).getByRole('button', { name: /Rp 1\.249\.000,00/ }).count()) === 1)
@@ -350,14 +373,70 @@ for (const lang of ['zh-TW', 'en']) {
       && (await card(page).locator('[data-billing-notice], [role="alert"]').count()) === 0 && (await card(page).locator('input[type="radio"]').count()) === 2)
   await context.close()
 }
-for (const [outcome, notice, words] of [['fail', 'purchase_failed', '購買沒有完成'], ['pending', 'purchase_pending', '等待核准']]) {
-  const { context, page } = await open({ ...PHONE, billing: { packages: PACKAGES, purchase: outcome } })
+{
+  const { context, page } = await open({ ...PHONE, billing: { packages: PACKAGES, purchase: 'fail' } })
   await phase(page, 'ready')
   await card(page).getByRole('button', { name: /NT\$149\.00/ }).click()
-  await card(page).locator(`[data-billing-notice="${notice}"]`).waitFor({ timeout: 15000 })
+  await card(page).locator('[data-billing-notice="purchase_failed"]').waitFor({ timeout: 15000 })
   const text = await card(page).innerText()
-  check(`${outcome}: message shown, plans still offered, not syncing`, text.includes(words) && (await card(page).getAttribute('data-phase')) === 'ready' && (await card(page).locator('input[type="radio"]').count()) === 2)
-  await layout(page, outcome)
+  check('fail: message shown, plans still offered, not syncing', text.includes('購買沒有完成') && (await card(page).getAttribute('data-phase')) === 'ready' && (await card(page).locator('input[type="radio"]').count()) === 2)
+  await layout(page, 'fail')
+  await context.close()
+}
+/** Leave the membership page inside the app (no reload) and come back. */
+async function leaveAndReturn(page) {
+  await page.getByRole('link', { name: '回工作空間' }).click()
+  await page.waitForURL((url) => url.pathname === '/', { timeout: 60000 })
+  await page.waitForTimeout(600)
+  await page.goBack()
+  await card(page).waitFor({ timeout: 60000 })
+  // Still the same page instance: the fake store's call log was not wiped by a reload.
+  return page.evaluate(() => Array.isArray(window.__billingCalls) && window.__billingCalls.length > 0)
+}
+{
+  // Ask to Buy / bank verification: purchasing stays locked, also after leaving the page.
+  const { context, page, state } = await open({ ...PHONE, billing: { packages: PACKAGES, purchase: 'pending' } })
+  await phase(page, 'ready')
+  await card(page).getByRole('button', { name: /NT\$149\.00/ }).click()
+  await phase(page, 'pending')
+  const text = await card(page).innerText()
+  check('pending: says it is waiting for approval; no plans and no subscribe button',
+    text.includes('等待核准') && (await card(page).locator('input[type="radio"], [data-billing-cta]').count()) === 0)
+  await layout(page, 'pending')
+  const sameInstance = await leaveAndReturn(page)
+  check('pending: after leaving the page and coming back it is still pending and still cannot be bought',
+    sameInstance && (await card(page).getAttribute('data-phase')) === 'pending'
+      && (await card(page).locator('input[type="radio"], [data-billing-cta]').count()) === 0 && (await purchases(page)) === 1)
+  // Approval arrives while the app is in the background. Coming back to the foreground checks at once
+  // (the timer for a pending purchase only fires every 15 s). Wait out the 5 s window in which
+  // operations('self') reuses the read the page made when it opened.
+  await page.waitForTimeout(5200)
+  const beforeForeground = state.selfCalls
+  state.paid_until = FUTURE
+  state.pro_until = FUTURE
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
+  const confirmed = await card(page).locator('[data-billing-notice="activated"]').waitFor({ timeout: 6000 }).then(() => true, () => false)
+  check('pending: once the server confirms, returning to the foreground shows the subscription right away',
+    confirmed && state.selfCalls > beforeForeground && (await card(page).innerText()).includes('你已訂閱 Huddle Pro'), `server reads after foreground: ${state.selfCalls - beforeForeground}`)
+  await context.close()
+}
+{
+  // The double-purchase case: bought monthly, not synced yet, user wanders off and comes back.
+  const { context, page, state } = await open({ ...PHONE, billing: { packages: PACKAGES } })
+  await phase(page, 'ready')
+  await card(page).getByRole('button', { name: /NT\$149\.00/ }).click()
+  await phase(page, 'syncing')
+  const sameInstance = await leaveAndReturn(page)
+  const text = await card(page).innerText()
+  check('leave and return: still shown as syncing', sameInstance && ['syncing', 'sync_delayed'].includes(await card(page).getAttribute('data-phase')) && text.includes('購買已完成，正在同步'), await card(page).getAttribute('data-phase'))
+  check('leave and return: no plan can be chosen and there is no subscribe button to press',
+    (await card(page).locator('input[type="radio"], [data-billing-cta]').count()) === 0 && (await purchases(page)) === 1, `purchases sent to the store: ${await purchases(page)}`)
+  check('leave and return: still the basic plan until the server confirms', (await page.locator('main h2').first().innerText()) === '目前使用基本版')
+  const before = state.selfCalls
+  state.paid_until = FUTURE
+  state.pro_until = FUTURE
+  await card(page).locator('[data-billing-notice="activated"]').waitFor({ timeout: 20000 })
+  check('leave and return: checks resumed and the server confirmation lands', state.selfCalls > before && (await card(page).innerText()).includes('你已訂閱 Huddle Pro，有效至 2027/10/01'))
   await context.close()
 }
 {
@@ -416,18 +495,71 @@ for (const [outcome, notice, words] of [['fail', 'purchase_failed', '購買沒�
   check('restore: server confirmation shows the subscription', (await card(page).innerText()).includes('你已訂閱 Huddle Pro'))
   await context.close()
 }
-{
-  // Server never confirms; the wait limit is shortened through the dev hook.
-  const { context, page } = await open({ ...PHONE, billing: { packages: PACKAGES, syncMaxWaitMs: 1500 } })
+for (const lang of ['zh-TW', 'en']) {
+  // The server stays silent past the fast window (shortened through the dev hook), then confirms.
+  const tag = lang === 'en' ? 'en' : 'zh'
+  const english = lang === 'en'
+  const restoreName = english ? 'Restore purchases' : '恢復購買'
+  const { context, page, state } = await open({ ...PHONE, lang, billing: { packages: PACKAGES, sync: QUICK_SYNC } })
   await phase(page, 'ready')
   await card(page).getByRole('button', { name: /NT\$149\.00/ }).click()
   await phase(page, 'sync_delayed')
   const text = await card(page).innerText()
-  check('slow sync: explains it will apply later and offers restore; still not shown as subscribed',
-    text.includes('稍後會自動生效') && text.includes('恢復購買') && !text.includes('你已訂閱')
-      && (await card(page).getByRole('button', { name: '恢復購買' }).isEnabled()) && (await page.locator('main h2').first().innerText()) === '目前使用基本版')
-  await layout(page, 'slow sync')
-  await cardShot(page, 'sync-delayed-390-zh.jpg')
+  check(`slow sync ${tag}: says it will take effect later and offers restore; not shown as subscribed, nothing to buy`,
+    text.includes(english ? 'it will take effect automatically a little later' : '稍後會自動生效') && !text.includes(english ? "You're subscribed" : '你已訂閱')
+      && (await card(page).getByRole('button', { name: restoreName }).isEnabled())
+      && (await card(page).locator('input[type="radio"], [data-billing-cta]').count()) === 0
+      && (await page.locator('main h2').first().innerText()) === (english ? 'Currently on the free plan' : '目前使用基本版'))
+  if (english) check('slow sync en: no Chinese left in the card', !CJK.test(text), text.match(CJK)?.[0])
+  await layout(page, `slow sync ${tag}`)
+  await cardShot(page, `sync-delayed-390-${tag}.jpg`)
+  // The message has changed but the checks have not stopped. (operations('self') reuses a read for 5 s,
+  // so with the shortened test intervals a fresh request reaches the server about every 5 s.)
+  const atMessage = state.selfCalls
+  await page.waitForTimeout(6500)
+  check(`slow sync ${tag}: server is still being checked after the message changed`, state.selfCalls > atMessage, `${state.selfCalls - atMessage} fresh server read(s) in 6.5 s`)
+  // A restore that finds nothing does not bring the plans back.
+  await card(page).getByRole('button', { name: restoreName }).click()
+  await card(page).locator('[data-billing-notice="restore_nothing"]').waitFor({ timeout: 15000 })
+  check(`slow sync ${tag}: restore finding nothing keeps the purchase locked`,
+    (await card(page).getAttribute('data-phase')) === 'sync_delayed' && (await card(page).locator('input[type="radio"], [data-billing-cta]').count()) === 0)
+  // Only now does the server confirm — the card switches by itself.
+  state.paid_until = FUTURE
+  state.pro_until = FUTURE
+  await card(page).locator('[data-billing-notice="activated"]').waitFor({ timeout: 15000 })
+  const done = await card(page).innerText()
+  check(`slow sync ${tag}: late server confirmation turns the card into subscribed without any tap`,
+    done.includes(english ? "You're subscribed to Huddle Pro, valid until 2027/10/01." : '你已訂閱 Huddle Pro，有效至 2027/10/01。') && (await purchases(page)) === 1)
+  await context.close()
+}
+for (const lang of ['zh-TW', 'en']) {
+  // Free trial: the fake store reports a 2-week free trial this user may take.
+  const tag = lang === 'en' ? 'en' : 'zh'
+  const english = lang === 'en'
+  const { context, page, pageErrors } = await open({ ...PHONE, lang, billing: { packages: TRIAL_PACKAGES } })
+  await phase(page, 'ready')
+  const text = await card(page).innerText()
+  check(`trial ${tag}: each plan states the trial length and the price after it`,
+    english
+      ? text.includes('Free for 2 weeks, then NT$149.00 / month') && text.includes('Free for 2 weeks, then NT$990.00 / year')
+      : text.includes('前 2 週免費，之後 NT$149.00／月') && text.includes('前 2 週免費，之後 NT$990.00／年'))
+  const cta = await card(page).locator('[data-billing-cta]').innerText()
+  check(`trial ${tag}: main button starts the free trial`, cta === (english ? 'Try free for 2 weeks' : '開始 2 週免費試用'), cta)
+  check(`trial ${tag}: disclosure says the trial converts to a paid subscription unless cancelled 24 hours before it ends`,
+    english
+      ? text.includes('When the trial ends, your Apple account is charged NT$149.00 / month automatically') && text.includes('at least 24 hours before the trial ends')
+      : text.includes('試用結束後會自動以 NT$149.00／月 向你的 Apple 帳號扣款') && text.includes('試用結束前至少 24 小時取消'))
+  if (english) check('trial en: no Chinese left in the card', !CJK.test(text), text.match(CJK)?.[0])
+  await layout(page, `trial ${tag}`)
+  await cardShot(page, `paywall-trial-390-${tag}.jpg`)
+  await card(page).locator('label[data-plan="year"]').click()
+  const yearly = await card(page).innerText()
+  check(`trial ${tag}: with yearly selected the disclosure quotes the yearly price`,
+    yearly.includes(english ? 'charged NT$990.00 / year automatically' : '自動以 NT$990.00／年 向你的 Apple 帳號扣款'))
+  await card(page).locator('[data-billing-cta]').click()
+  await phase(page, 'syncing')
+  check(`trial ${tag}: starting the trial buys the selected package and waits for the server like any purchase`,
+    JSON.stringify((await calls(page)).at(-1)) === JSON.stringify(['purchase', '$rc_annual']) && pageErrors.length === 0)
   await context.close()
 }
 {
@@ -438,6 +570,29 @@ for (const [outcome, notice, words] of [['fail', 'purchase_failed', '購買沒�
     (await card(page).count()) === 0 && pageErrors.length === 0 && (await page.locator('main h2').first().innerText()) === '目前使用基本版')
   check('iOS, flag off: code inputs hidden, own referral code kept', (await page.locator('main form input[maxlength="32"]').count()) === 0 && (await page.getByText('H1234567890ABCDEF').count()) === 1)
   await shot(page, 'ios-flag-off-390-zh.jpg')
+  await context.close()
+}
+{
+  // Sign-up page on native iOS: no referral/coupon fields (3.1.1); the rest of the form is intact.
+  const { context, page, pageErrors } = await open({ ...PHONE, height: 1000, billing: { nativeOnly: true }, route: '/signup?ref=FRIEND123', signedIn: false })
+  await page.waitForTimeout(500)
+  const saved = await page.evaluate(() => window.localStorage.getItem('huddle-enrollment-v1'))
+  check('iOS sign-up: referral and coupon fields are not there',
+    (await page.locator('#signup-referral, #signup-coupon').count()) === 0 && (await page.getByText('推薦與優惠（選填）').count()) === 0)
+  check('iOS sign-up: the form itself still works (email, password, Google and Apple buttons)',
+    (await page.locator('input[type="email"]').count()) === 1 && (await page.getByRole('button', { name: /Google/ }).count()) === 1
+      && (await page.getByRole('button', { name: /Apple/ }).count()) === 1 && pageErrors.length === 0, pageErrors.join(' | '))
+  check('iOS sign-up: a ?ref= code in the address is not picked up', saved === null, String(saved))
+  await shot(page, 'ios-signup-390-zh.jpg')
+  await context.close()
+}
+{
+  // Same address on the web: fields shown and the code is picked up, as before.
+  const { context, page } = await open({ ...PHONE, height: 1100, route: '/signup?ref=FRIEND123', signedIn: false })
+  await page.waitForTimeout(500)
+  const saved = await page.evaluate(() => JSON.parse(window.localStorage.getItem('huddle-enrollment-v1') || 'null'))
+  check('web sign-up: fields shown and a ?ref= code is still pre-filled and kept',
+    (await page.locator('#signup-referral').inputValue()) === 'FRIEND123' && saved?.referral === 'FRIEND123', JSON.stringify(saved))
   await context.close()
 }
 {

@@ -1,17 +1,20 @@
 'use client'
+import { useSyncExternalStore } from 'react'
 import { getPlatform, isNative } from '@/lib/platform'
 import { createClient } from '@/lib/supabase/client'
 import { loadNativeBillingSession } from '@/lib/billing/load-native-session'
 import { createNativeBillingSession, type NativeBillingDriver } from '@/lib/billing/native-adapter'
 import { createBillingSessionStore } from '@/lib/billing/session-store'
+import { createPaywallStore } from '@/lib/billing/paywall-store'
+import { initialPaywallState, paywallReducer, type SyncLimits } from '@/lib/billing/paywall-state'
 
 interface BillingTestHook {
   /** Fake store used instead of the RevenueCat SDK. */
   driver?: NativeBillingDriver
   /** Treat this browser as the native iOS shell. */
   nativeIos?: boolean
-  /** Shorten the wait for the server so the slow-sync state can be reached in a test. */
-  syncMaxWaitMs?: number
+  /** Shorten the wait-for-server schedule so its later stages can be reached in a test. */
+  sync?: Partial<SyncLimits>
 }
 declare global {
   interface Window {
@@ -37,25 +40,40 @@ export function isIosPurchaseSurface(): boolean {
   return (isNative() && getPlatform() === 'ios') || billingTestHook()?.nativeIos === true
 }
 
-const store = createBillingSessionStore(async (userId: string) => {
+const never = () => () => {}
+const notOnServer = () => false
+/**
+ * Same check for markup that is prerendered (e.g. the sign-up page): the
+ * server and the first client render both answer false, so hydration matches,
+ * and the native shell switches right after.
+ */
+export function useIosPurchaseSurface(): boolean {
+  return useSyncExternalStore(never, isIosPurchaseSurface, notOnServer)
+}
+
+const sessions = createBillingSessionStore(async (userId: string) => {
   const driver = billingTestHook()?.driver
   if (driver) return createNativeBillingSession({ driver, publicApiKey: 'test', authenticatedUserId: userId, purchasesEnabled: true })
   return loadNativeBillingSession(userId)
 })
+/** Purchase-screen state per signed-in user; survives leaving the membership page. */
+export const paywall = createPaywallStore(paywallReducer, initialPaywallState, { type: 'opened' })
 let watchingAuth = false
 
 /**
  * The store session for this signed-in user (the RevenueCat App User ID is the
- * Supabase user id). Signing out or switching account disposes it, wherever in
- * the app that happens.
+ * Supabase user id). Signing out or switching account disposes it and wipes the
+ * purchase-screen state, wherever in the app that happens.
  */
 export function acquireBillingSession(userId: string) {
   if (!watchingAuth) {
     watchingAuth = true
     createClient().auth.onAuthStateChange((_event, session) => {
-      void store.userChanged(session?.user.id ?? null)
+      const current = session?.user.id ?? null
+      paywall.userChanged(current)
+      void sessions.userChanged(current)
     })
   }
-  return store.acquire(userId)
+  return sessions.acquire(userId)
 }
 export type BillingSession = Awaited<ReturnType<typeof acquireBillingSession>>

@@ -1,8 +1,16 @@
 /** Integration boundary. Store SDK results must never be used as server authorization. */
 export interface NativeBillingDriver {
   configure(options: { publicApiKey: string; appUserID: string }): Promise<void>
-  /** subscriptionPeriod is the store's own ISO 8601 billing period (P1M, P1Y); never infer it from a package name. */
-  listPackages(): Promise<Array<{ identifier: string; localizedPrice: string; subscriptionPeriod?: string | null }>>
+  /**
+   * subscriptionPeriod is the store's own ISO 8601 billing period (P1M, P1Y); never infer it from a package name.
+   * freeTrial is set only when the store offers a free trial AND confirms this user may still take it.
+   */
+  listPackages(): Promise<Array<{
+    identifier: string
+    localizedPrice: string
+    subscriptionPeriod?: string | null
+    freeTrial?: { unit: string; count: number } | null
+  }>>
   /** Reject with { userCancelled: true } or { paymentPending: true } for those two outcomes; anything else is a failure. */
   purchase(packageIdentifier: string): Promise<void>
   /** hasActiveSubscription only picks the message to show; it never grants access. */
