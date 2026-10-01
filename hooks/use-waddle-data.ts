@@ -31,8 +31,9 @@ import type { FocusSettings } from '@/lib/focus'
 import { normalizePet, type PetSettings } from '@/lib/pet/types'
 // Aliased: this file uses `t` pervasively as the loop variable for "task"
 // (c.tasks.map((t) => ...)), so importing the translator as `t` would shadow it.
-import { t as translate, getLang } from '@/lib/i18n'
-import { canResetWorkspaces } from '@/lib/onboarding/can-reset-workspaces'
+import { t as translate, translateFor, getLang } from '@/lib/i18n'
+import { demoWorkspaces } from '@/lib/demo-data'
+import { canResetWorkspaces, collectDemoTaskInfo } from '@/lib/onboarding/can-reset-workspaces'
 import {
   listAssignments,
   toTaskAssignment,
@@ -3318,23 +3319,25 @@ export function useWaddleData(): UseWaddleData {
    * Both options wipe the existing demo workspaces (cascade deletes the
    * categories and tasks under them).
    *
-   * Guarded: the wipe is only for brand-new accounts. If the account already
-   * has any task (or we can't tell), keep everything as is.
+   * Guarded: the wipe only runs when every task is an untouched seeded demo
+   * task. If the account has any other task (or we can't tell), keep it all.
    */
   const applyOnboardingChoice = useCallback(async (choice: 'template' | 'blank') => {
     const userId = requireUserId()
 
-    // Data-layer guard: an existing user who sees the tour again must never
-    // lose workspaces/tasks. Ask the server (not just local state), and
-    // fail safe — any query error also means "don't touch the data".
-    const localTaskCount = workspaces.reduce(
-      (n, ws) => n + ws.categories.reduce((m, c) => m + c.tasks.length, 0),
-      0,
+    // Data-layer guard: the wipe below is meant only for the demo tasks seeded
+    // at signup. An existing user who sees the tour again (any user-made or
+    // edited task) must never lose workspaces/tasks. Ask the server (not just
+    // local state), and fail safe — any query error also means "don't touch".
+    const demo = collectDemoTaskInfo(demoWorkspaces, translateFor)
+    const localTaskTitles = workspaces.flatMap((ws) =>
+      ws.categories.flatMap((c) => c.tasks.map((task) => task.title)),
     )
     const allowed = await canResetWorkspaces({
-      localTaskCount,
-      fetchServerTaskCount: () =>
-        supabase.from('tasks').select('id', { count: 'exact', head: true }),
+      demo,
+      localTaskTitles,
+      fetchServerTasks: () =>
+        supabase.from('tasks').select('title', { count: 'exact' }).limit(demo.count + 1),
     })
     if (!allowed) {
       toast.info(translate('已保留你現有的工作區與任務'))
