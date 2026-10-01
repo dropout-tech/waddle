@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import Link from 'next/link'
 import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2, Globe2, Link2, Copy, Share2, RefreshCw, Users, Loader2, Type } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -672,6 +673,25 @@ export function SettingsModal({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Google Calendar (read-only) — managed on its own page because
+              the OAuth round-trip leaves the app. */}
+          <div className="space-y-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Calendar className="w-4 h-4" />
+              {t('Google 日曆')}
+            </h3>
+            <p className="text-xs text-muted-foreground">{t('在 Huddle 行事曆顯示你 Google 主日曆上的會議（唯讀）')}</p>
+            <Link
+              href="/settings/google-calendar"
+              onClick={onClose}
+              data-testid="settings-google-calendar-link"
+              className="flex min-h-11 items-center justify-between rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-secondary/60"
+            >
+              {t('連結與管理')}
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </Link>
           </div>
 
           {/* Divider */}

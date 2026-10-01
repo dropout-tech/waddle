@@ -34,11 +34,14 @@ export function createClient() {
       },
     })
   } else {
-    // /auth/callback owns its one-use PKCE exchange. Other routes retain URL
-    // detection (including password recovery / email auth links).
+    // /auth/callback owns its one-use PKCE exchange. The Google Calendar
+    // callback's ?code= belongs to the Calendar OAuth (exchanged by the
+    // google-calendar Edge Function) and must never reach Supabase Auth.
+    // Other routes retain URL detection (password recovery / email links).
+    const noDetect = ['/auth/callback', '/settings/google-calendar/callback', '/settings/google-calendar/callback/']
     client = createBrowserClient<Database>(url, anonKey, { auth: {
       flowType: 'pkce',
-      detectSessionInUrl: !(isDesktop() || (typeof window !== 'undefined' && window.location.pathname === '/auth/callback')),
+      detectSessionInUrl: !(isDesktop() || (typeof window !== 'undefined' && noDetect.includes(window.location.pathname))),
     } })
   }
 

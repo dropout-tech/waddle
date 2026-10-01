@@ -2,6 +2,7 @@
 
 import type { PeerEvent } from '@/hooks/use-calendar-sharing'
 import { useDisplayColor } from '@/hooks/use-display-color'
+import { GoogleEventBlock } from './google-event-block'
 
 /**
  * Read-only rendering of a peer's shared event on the timeline views
@@ -32,6 +33,11 @@ export function PeerEventBlock({
   totalColumns?: number
 }) {
   const displayColor = useDisplayColor()
+  // The viewer's own Google Calendar events share this overlay feed but get
+  // their own look + a read-only details popover.
+  if (event.google) {
+    return <GoogleEventBlock event={event} top={top} height={height} column={column} totalColumns={totalColumns} />
+  }
   const color = displayColor(event.calendarColor) ?? event.calendarColor
   const widthPct = 100 / Math.max(totalColumns, 1)
   const leftPct = column * widthPct

@@ -16,6 +16,7 @@ import type {
   MeetingInvitation,
   MeetingResponse,
 } from '@/hooks/use-meeting-invitations'
+import { meetingMaxDate } from '@/hooks/use-meeting-invitations'
 import type { Task, TimeBlock } from '@/lib/types'
 import { toDateString } from '@/lib/calendar-utils'
 import { buildMeetingICS } from '@/lib/meeting-availability'
@@ -23,7 +24,7 @@ const copy = {
   zh: {
     heading: '約交集時間',
     scope:
-      '依對方已共享行程與共同邀請計算，未共享或外部日曆不包含；時間可能在送出後變動。送出前會再次檢查。',
+      '依對方已共享行程與共同邀請計算；已連結 Google 日曆的人，其 Google 會議會算成忙碌；未共享的行事曆不包含。時間可能在送出後變動。送出前會再次檢查。',
     people: '選擇共享夥伴',
     noPeers: '請先在共享設定與夥伴建立共享。',
     from: '開始日期',
@@ -64,7 +65,7 @@ const copy = {
   en: {
     heading: 'Find a time',
     scope:
-      'Availability includes shared calendars and joint invitations. Private and external calendars are not included. Times may change after sending; we check again before sending.',
+      'Availability includes shared calendars and joint invitations. For anyone who has connected Google Calendar, their Google meetings count as busy; calendars that are not shared are not included. Times may change after sending; we check again before sending.',
     people: 'Choose shared partners',
     noPeers: 'Connect with a partner in Sharing settings first.',
     from: 'From date',
@@ -143,9 +144,10 @@ export function MeetingPanel({
   initialDate = new Date(),
   inviteId,
 }: MeetingPanelProps) {
-  const { lang } = useI18n()
+  const { lang, t: tr } = useI18n()
   const t = copy[lang === 'en' ? 'en' : 'zh']
   const english = lang === 'en'
+  const [googleIncomplete, setGoogleIncomplete] = useState(false)
   const [search, setSearch] = useState<MeetingSearch>({
     peerIds: [],
     from: toDateString(initialDate),
@@ -208,10 +210,12 @@ export function MeetingPanel({
     setMessage('')
     setSlots(null)
     setSelected(null)
+    setGoogleIncomplete(false)
     try {
       const found = await controller.findSlots(search, tasks, timeBlocks)
       if (current === generation.current) {
-        setSlots(found)
+        setSlots(found.slots)
+        setGoogleIncomplete(found.googleIncomplete)
         setSelected(null)
       }
     } catch (error) {
@@ -319,6 +323,7 @@ export function MeetingPanel({
             <input
               type="date"
               className={inputClass}
+              max={meetingMaxDate()}
               value={search.from}
               onChange={(e) => update({ from: e.target.value })}
             />
@@ -329,6 +334,7 @@ export function MeetingPanel({
               type="date"
               className={inputClass}
               min={search.from}
+              max={meetingMaxDate()}
               value={search.to}
               onChange={(e) => update({ to: e.target.value })}
             />
@@ -384,6 +390,12 @@ export function MeetingPanel({
       </fieldset>
       {slots && (
         <section aria-label={t.slots}>
+          {googleIncomplete && (
+            <div role="status" data-testid="google-busy-incomplete" className="mb-3 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm text-foreground">
+              <p className="font-medium">{tr('部分 Google 行程未納入')}</p>
+              <p>{tr('這些時段可能與部分人的 Google 會議衝突，送出前請先確認。')}</p>
+            </div>
+          )}
           <h3 className="mb-2 text-sm font-medium">{t.slots}</h3>
           {!slots.length ? (
             <p className="text-sm">{t.none}</p>

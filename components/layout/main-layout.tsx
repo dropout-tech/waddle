@@ -21,6 +21,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { useWideScreen } from '@/hooks/use-wide-screen'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
 import { useCalendarSharing, usePeerCalendarEvents } from '@/hooks/use-calendar-sharing'
+import { useGoogleCalendarEvents } from '@/hooks/use-google-calendar-events'
 import { hapticSelection } from '@/lib/haptics'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, ScratchpadItem } from '@/lib/types'
 import { DEFAULT_FOCUS_SETTINGS, type FocusSettings } from '@/lib/focus'
@@ -388,12 +389,22 @@ export function MainLayout({
     return map
   }, [slotTypes])
 
-  const peerEvents = usePeerCalendarEvents({
+  const sharedPeerEvents = usePeerCalendarEvents({
     peers: sharePeers,
     visiblePeers,
     selectedDate,
     typeLabels: peerTypeLabels,
   })
+
+  // The viewer's own Google Calendar (read-only, never stored or shared)
+  // joins the same display-only overlay so week / day / month all show it.
+  // `peerEvents` below feeds ONLY the calendar views — not the export modal
+  // and not the meeting free-slot search (those take tasks / timeBlocks).
+  const googleEvents = useGoogleCalendarEvents({ selectedDate })
+  const peerEvents = useMemo(
+    () => (googleEvents.length ? [...sharedPeerEvents, ...googleEvents] : sharedPeerEvents),
+    [sharedPeerEvents, googleEvents],
+  )
 
   // Get all tasks flattened
   const getAllTasks = useCallback(() => {

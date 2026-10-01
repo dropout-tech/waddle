@@ -7,6 +7,7 @@ import {
   type SharedCalendarRow,
 } from '@/hooks/use-calendar-sharing'
 import { findCommonSlots } from '@/lib/meeting-availability'
+import { fetchGoogleBusy } from '@/lib/google-calendar'
 import type { Task, TimeBlock } from '@/lib/types'
 import { rowToTask, rowToTimeBlock } from '@/lib/supabase/mappers'
 import { toDateString } from '@/lib/calendar-utils'
@@ -168,10 +169,11 @@ export function useMeetingInvitations(
       !Number.isFinite(+from) ||
       !Number.isFinite(+to) ||
       +to < +from ||
-      Date.parse(search.to) - Date.parse(search.from) >= 14 * 86400000
+      Date.parse(search.to) - Date.parse(search.from) >= 14 * 86400000 ||
+      search.to > meetingMaxDate()
     )
       throw new Error('range')
-    const [peers, grants, busyResult, ownTasks, ownBlocks, ownSettings] =
+    const [peers, grants, busyResult, ownTasks, ownBlocks, ownSettings, google] =
       await Promise.all([
         collectPages(
           (a, b) =>
@@ -224,6 +226,18 @@ export function useMeetingInvitations(
           .select('lunch_break')
           .eq('user_id', user.id)
           .maybeSingle(),
+        // Google meetings (mine + partners who allow it) as busy — start/end
+        // only. A failure never throws: slots are still computed and the UI
+        // shows 「部分 Google 行程未納入」 (google.incomplete).
+        // Past time can never become a slot, so the window starts no earlier
+        // than 12h ago (the server refuses anything before now − 1 day).
+        +to <= Date.now()
+          ? Promise.resolve({ busy: [], incomplete: false })
+          : fetchGoogleBusy(
+              [user.id, ...search.peerIds],
+              new Date(Math.max(+new Date(from.getFullYear(), from.getMonth(), from.getDate() - 1), Date.now() - 12 * 3600000)).toISOString(),
+              to.toISOString(),
+            ).catch(() => ({ busy: [], incomplete: true })),
       ])
     if (busyResult.error || ownSettings.error) throw new Error('availability')
     const rows = await Promise.all(
@@ -303,13 +317,17 @@ export function useMeetingInvitations(
         })
       }
     }
-    return findCommonSlots({
+    const slots = findCommonSlots({
       ...search,
       tasks,
       timeBlocks,
       peerEvents: rows.flat(),
-      busy: (busyResult.data ?? []) as { starts_at: string; ends_at: string }[],
+      busy: [
+        ...((busyResult.data ?? []) as { starts_at: string; ends_at: string }[]),
+        ...google.busy,
+      ],
     })
+    return { slots, googleIncomplete: google.incomplete }
   }
   const create = async (
     search: MeetingSearch,
@@ -325,7 +343,7 @@ export function useMeetingInvitations(
     if (previous.error) throw previous.error
     let id = (previous.data as MeetingInvitation | null)?.id
     if (!id) {
-      const fresh = await findSlots(search, tasks, blocks)
+      const fresh = (await findSlots(search, tasks, blocks)).slots
       if (!fresh.some((s) => s.start === slot.start && s.end === slot.end))
         throw new Error('changed')
     }
@@ -422,3 +440,10 @@ export function useMeetingInvitations(
   }
 }
 export type MeetingController = ReturnType<typeof useMeetingInvitations>
+
+/** 約交集 may look at most this many days ahead (kept in sync with the
+ *  google-calendar Edge Function's BUSY_MAX_AHEAD_DAYS = this + 2). */
+export const MEETING_MAX_AHEAD_DAYS = 90
+export function meetingMaxDate(now = new Date()): string {
+  return toDateString(new Date(now.getFullYear(), now.getMonth(), now.getDate() + MEETING_MAX_AHEAD_DAYS))
+}

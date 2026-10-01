@@ -6,6 +6,7 @@ import type { Task, TimeBlock } from '@/lib/types'
 import { Check, Plus, ChevronRight } from 'lucide-react'
 import { toDateString, taskOccursOnDate, timeToMinutes } from '@/lib/calendar-utils'
 import type { PeerEvent } from '@/hooks/use-calendar-sharing'
+import { GoogleAgendaRow, GoogleMonthChip } from './google-event-block'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -409,7 +410,9 @@ export function MonthView({
 
                 {/* Peer shared events — read-only rows (no tap handlers).
                     Dashed accent + desaturation match the timeline styling. */}
-                {agendaPeerEvents.map((ev) => (
+                {agendaPeerEvents.map((ev) => ev.google ? (
+                  <GoogleAgendaRow key={ev.id} event={ev} />
+                ) : (
                   <div
                     key={ev.id}
                     data-peer-event={ev.detail}
@@ -562,6 +565,9 @@ export function MonthView({
                   const dayTasks = getTasksForDay(day.date, day.dateString)
                   const dayBlocks = blocksByDate[day.dateString] || []
                   const dayPeerEvents = getPeerEventsForDay(day.date)
+                  // Google all-day events lead the cell and are never folded into「+N」.
+                  const dayGoogleAllDay = dayPeerEvents.filter((ev) => ev.google && !ev.scheduledStartTime)
+                  const dayOverlay = dayPeerEvents.filter((ev) => !(ev.google && !ev.scheduledStartTime))
                   const pendingTasks = dayTasks.filter((t) => !t.isCompleted)
                   const completedTasks = dayTasks.filter((t) => t.isCompleted)
                   const holidayName = holidaysEnabled ? getTaiwanHoliday(day.dateString) : null
@@ -622,6 +628,7 @@ export function MonthView({
 
                       {/* Task List */}
                       <div className="flex-1 px-1 pb-1 space-y-0.5 overflow-y-auto">
+                        {dayGoogleAllDay.map((ev) => <GoogleMonthChip key={ev.id} event={ev} />)}
                         {pendingTasks.slice(0, 3).map((task) => {
                           const color = displayColor(task.calendarColor || task.workspaceColor)
                           return (
@@ -672,7 +679,8 @@ export function MonthView({
 
                         {/* Peer shared events — read-only chips (no click
                             handlers), dashed + desaturated like the timeline. */}
-                        {dayPeerEvents.slice(0, 2).map((ev) => {
+                        {dayOverlay.slice(0, 2).map((ev) => {
+                          if (ev.google) return <GoogleMonthChip key={ev.id} event={ev} />
                           const peerColor = displayColor(ev.calendarColor)
                           return (
                             <div
@@ -689,9 +697,9 @@ export function MonthView({
                             </div>
                           )
                         })}
-                        {dayPeerEvents.length > 2 && (
+                        {dayOverlay.length > 2 && (
                           <div className="text-[8px] text-muted-foreground/70 px-1">
-                            +{dayPeerEvents.length - 2}
+                            +{dayOverlay.length - 2}
                           </div>
                         )}
                       </div>

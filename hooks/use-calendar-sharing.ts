@@ -6,6 +6,7 @@ import { t } from '@/lib/i18n'
 import { toast } from 'sonner'
 import { toDateString } from '@/lib/calendar-utils'
 import type { Task } from '@/lib/types'
+import type { GoogleEventInfo } from '@/lib/google-calendar'
 
 // Data layer for calendar sharing.
 // P1: invite → accept → peers → dissolve.
@@ -65,6 +66,12 @@ export interface PeerEvent extends Task {
   peerName: string
   detail: GrantDetail
   source: 'task' | 'time_block'
+  /**
+   * Set only on the viewer's OWN Google Calendar events (lib/google-calendar),
+   * which ride the same read-only overlay. Never produced by
+   * get_shared_calendar and never sent to any sharing / export path.
+   */
+  google?: GoogleEventInfo
 }
 
 /** localStorage key for the per-peer overlay visibility toggles. */
