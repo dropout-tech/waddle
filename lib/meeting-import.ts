@@ -75,6 +75,8 @@ const messages: Record<string, string> = {
   INVALID_PARTICIPANTS: "與會者帳號重複或已無共享關係，請重新選擇。",
   ASSIGNMENT_RESPONSE_FAILED: "未能處理指派，請確認共享關係與目標分類後重試。",
   RATE_LIMIT: "短時間內嘗試較多，請稍後再試。",
+  ATTEMPT_LIMIT: "本月 AI 整理的嘗試次數已達上限，下個月 1 日（台北時間）會重新開放。",
+  AI_PAUSED: "AI 整理目前使用量過高，暫時暫停服務，請稍後再試。",
   REQUEST_CONFLICT: "這份內容已變更，請開始新的整理。",
   AI_NOT_CONFIGURED: "AI 整理尚未啟用，請稍後再試。",
   UNAUTHORIZED: "登入已過期，請重新登入。",
