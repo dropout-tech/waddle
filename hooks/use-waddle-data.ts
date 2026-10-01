@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { classifyDbError } from '@/lib/supabase/db-error-reason'
+import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { seedUserData } from '@/lib/supabase/seed'
 import type { Database, Json } from '@/lib/supabase/database.types'
 import {
@@ -372,7 +373,12 @@ export function useWaddleData(): UseWaddleData {
       const readAll = (userId: string) => Promise.all([
         supabase.from('workspaces').select('*').order('sort_order', { ascending: true }),
         supabase.from('categories').select('*').order('sort_order', { ascending: true }),
-        supabase.from('tasks').select('*').order('sort_order', { ascending: true }),
+        // Paged: PostgREST caps a response at 1000 rows without an error, so
+        // an unranged read loses every task past the 1000th. created_at + id
+        // make the order total, which paging needs (sort_order has ties).
+        fetchAllRows((from, to) => supabase.from('tasks').select('*', { count: 'exact' })
+          .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
+          .order('id', { ascending: true }).range(from, to)),
         supabase.from('time_blocks').select('*').order('date', { ascending: true }),
         supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
         supabase.from('slot_types').select('*').order('sort_order', { ascending: true }),
@@ -414,6 +420,10 @@ export function useWaddleData(): UseWaddleData {
         reads = await readAll(user.id)
         wsRows = reads[0].data
       }
+      // The tasks read spans several requests for a large account, and one
+      // failed page leaves no list at all. On a background refresh, keep what
+      // is on screen rather than blanking every task until the next refresh.
+      if (!initial && reads[2].error) return
 
       const [
         ,
