@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import { useFocusTimer } from '@/components/timer/focus-timer-provider'
-import { takeWidgetLaunch, WIDGET_LAUNCH_EVENT } from '@/lib/widgets/launch'
+import { takeWidgetLaunch, WIDGET_LAUNCH_EVENT, STICKY_OPEN_EVENT } from '@/lib/widgets/launch'
 import { WATER_OPEN_EVENT } from '@/hooks/use-water-reminder'
 import { toDateString } from '@/lib/calendar-utils'
 import type { Task, Workspace } from '@/lib/types'
@@ -24,7 +24,8 @@ function findTask(workspaces: Workspace[], id: string) {
  * Consumes `/?widget=<kind>&date=&task=` (see widgetPath in lib/widgets/model.ts)
  * and lands on the real screen: calendar kinds → 日曆 tab (week view, or month
  * for the plain 小月曆 tap), tasks → 任務 tab, whiteboard → 白板 overlay,
- * focus → expanded timer, water → the water-break popup. A task id is held
+ * focus → expanded timer, water → the water-break popup, sticky → the 便條紙
+ * overlay (StickyNotesProvider), month → month view. A task id is held
  * until the board has loaded and the task exists.
  */
 export function useWidgetLaunch(targets: WidgetLaunchTargets) {
@@ -47,13 +48,17 @@ export function useWidgetLaunch(targets: WidgetLaunchTargets) {
       if (day) t.setSelectedDate(new Date(`${day}T12:00:00`))
       // Widgets only exist on the phone, where the calendar defaults to 週 — a
       // widget tap must not force 日 (owner, 2026-09-28).
-      if (kind === 'calendar' || kind === 'overview' || kind === 'agenda' || kind === 'week') {
-        t.setMobileTab('calendar'); t.setViewMode(kind === 'calendar' && !day ? 'month' : 'week')
+      if (kind === 'calendar' || kind === 'month' || kind === 'overview' || kind === 'agenda' || kind === 'week') {
+        t.setMobileTab('calendar'); t.setViewMode((kind === 'calendar' || kind === 'month') && !day ? 'month' : 'week')
       } else if (kind === 'tasks' || kind === 'top-three') t.setMobileTab('tasks')
       else if (kind === 'whiteboard') t.openWhiteboard()
       else if (kind === 'focus') ft.setIsExpanded(true)
       else if (kind === 'water') window.dispatchEvent(new Event(WATER_OPEN_EVENT))
       else if (kind === 'new-task') t.createTask?.(toDateString(new Date()))
+      else if (kind === 'sticky') {
+        const note = q.get('note')
+        window.dispatchEvent(new CustomEvent(STICKY_OPEN_EVENT, { detail: note && /^[a-zA-Z0-9-]{1,80}$/.test(note) ? note : null }))
+      }
       pendingTask.current = id && /^[a-zA-Z0-9-]{1,80}$/.test(id) ? id : null
       resolveTask()
     }

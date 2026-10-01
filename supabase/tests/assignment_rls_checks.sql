@@ -100,9 +100,18 @@ select public.t_ok((select count(*)=0 from public.tasks),'stranger reads no task
 select public.t_ok((select count(*)=0 from public.list_task_assignments()),'stranger sees no assignments');
 
 -- ── Organizations ─────────────────────────────────────────────────────────
+-- Since 20261001200000 the Pro requirement sits behind huddle_ops.settings.limits_enforced
+-- (off by default: everyone may create). Check both states of the switch.
 set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000e1';
+select public.t_ok((select (public.get_my_organizations()->>'can_create')::boolean),'switch off: non-Pro may create organizations');
+reset role;
+update huddle_ops.settings set limits_enforced = true;
+set role authenticated;
 select public.t_err($$select public.create_organization('E org')$$,'PRO_REQUIRED','non-Pro (expired) cannot create an organization');
 select public.t_ok((select not (public.get_my_organizations()->>'can_create')::boolean),'get_my_organizations reports can_create=false for non-Pro');
+reset role;
+update huddle_ops.settings set limits_enforced = false;
+set role authenticated;
 
 set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000000a1';
 select public.create_organization('Acme') as org_id \gset

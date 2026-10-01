@@ -16,15 +16,16 @@ import { widgetPet } from '@/lib/widgets/pet'
 import { isTaskOverdue } from '@/lib/task-utils'
 import { getLang } from '@/lib/i18n'
 import { checkInDate } from '@/lib/daily-check-in'
+import { STICKY_CHANGED_EVENT } from '@/lib/widgets/launch'
 import type { WidgetSnapshot } from '@/lib/widgets/model'
 import type { PetSettings } from '@/lib/pet/types'
-import type { Workspace, TimeBlock, ScratchpadItem, NotebookNote } from '@/lib/types'
+import type { Workspace, TimeBlock, ScratchpadItem, NotebookNote, StickyNote, StickyNoteColor } from '@/lib/types'
 
 type Timer=ReturnType<typeof useFocusTimer>
 /** Live Activity / focus widget payload, derived from the in-memory timer only (no network). */
 function focusOf(timer:Timer,notes:NotebookNote[],today:string):WidgetSnapshot['focus'] {
   const s=timer.session
-  return {mode:s?.mode,state:timer.state,title:s?.label ?? '慢慢來，先專心一件事',seconds:timer.displayTime,endAt:s && timer.state==='running' && s.mode==='pomodoro' ? s.startedAt.getTime()+s.pausedMs+s.targetSeconds*1000:null,note:focusNoteExcerpt(notes,today,s?.label)}
+  return {mode:s?.mode,state:timer.state,title:s?.label ?? '慢慢來，先專心一件事',seconds:timer.displayTime,endAt:s && timer.state==='running' && s.mode==='pomodoro' ? s.startedAt.getTime()+s.pausedMs+s.targetSeconds*1000:null,note:focusNoteExcerpt(notes,today,s?.label),...(s?.mode==='pomodoro' ? {total:s.targetSeconds} : {})}
 }
 
 export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[];pet?:PetSettings|null}) {
@@ -37,6 +38,9 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{worksp
   useEffect(()=>{
     let alive=true, busy=false, again=false
     let checkIn:{at:number;value?:WidgetSnapshot['checkIn']}|undefined
+    // 便條紙 widget: sticky notes only load in-app when the overlay is open, so read the
+    // newest few straight from the table (RLS: own rows). Cached a minute; edits invalidate it.
+    let stickies:{at:number;rows:Pick<StickyNote,'id'|'content'|'color'|'updatedAt'>[]}|undefined
     const sync=async():Promise<void>=>{
       // A change that lands mid-sync must not be dropped (it used to wait for the 30s tick).
       if(busy) {again=true;return}
@@ -63,7 +67,12 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{worksp
         if(handled.length) {await HuddleWidgets.acknowledge({accountId:source,epoch:auth.epoch,ids:handled});window.dispatchEvent(new Event('huddle-widget-synced'));return}
         if(!alive || widgetAccount().accountId!==source || widgetAccount().epoch!==auth.epoch) return
         const x=latest.current
-        const snapshot=makeSnapshot({accountId:source,epoch:auth.epoch,tasks:x.workspaces.filter(w=>!w.isArchived).flatMap(w=>w.categories.filter(c=>!c.isArchived).flatMap(c=>c.tasks)),blocks:x.timeBlocks,boards:x.boards,notes:x.notes})
+        if(!stickies||Date.now()-stickies.at>60_000) {
+          const {data,error}=await db.from('sticky_notes').select('id,content,color,updated_at').eq('user_id',source).order('updated_at',{ascending:false}).limit(12)
+          if(!alive || widgetAccount().accountId!==source || widgetAccount().epoch!==auth.epoch) return
+          if(!error) stickies={at:Date.now(),rows:(data??[]).map(r=>({id:r.id,content:r.content as StickyNote['content'],color:r.color as StickyNoteColor,updatedAt:r.updated_at}))}
+        }
+        const snapshot=makeSnapshot({accountId:source,epoch:auth.epoch,tasks:x.workspaces.filter(w=>!w.isArchived).flatMap(w=>w.categories.filter(c=>!c.isArchived).flatMap(c=>c.tasks)),blocks:x.timeBlocks,boards:x.boards,notes:x.notes,stickies:stickies?.rows,locale:getLang()})
         // Completion revisions and displayed task content must come from the same server row.
         if(snapshot.tasks.length) {
           const {data:rows,error}=await db.from('tasks').select('*').eq('user_id',source).in('id',snapshot.tasks.map(t=>t.id))
@@ -95,11 +104,13 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{worksp
     let changeTimer: ReturnType<typeof setTimeout> | undefined
     const onChange=()=>{clearTimeout(changeTimer);changeTimer=setTimeout(()=>void sync(),750)}
     window.addEventListener('huddle-widget-refresh',onChange)
+    const onSticky=()=>{stickies=undefined;onChange()}
+    window.addEventListener(STICKY_CHANGED_EVENT,onSticky)
     const onVisible=()=>{if(document.visibilityState==='visible') void sync()}
     const id=window.setInterval(()=>void sync(),30_000)
     const first=window.setTimeout(()=>void sync(),750)
     window.addEventListener('focus',onVisible);document.addEventListener('visibilitychange',onVisible)
-    return ()=>{alive=false;lastSnap.current=null;clearTimeout(changeTimer);window.removeEventListener('huddle-widget-refresh',onChange);clearInterval(id);clearTimeout(first);window.removeEventListener('focus',onVisible);document.removeEventListener('visibilitychange',onVisible)}
+    return ()=>{alive=false;lastSnap.current=null;clearTimeout(changeTimer);window.removeEventListener('huddle-widget-refresh',onChange);window.removeEventListener(STICKY_CHANGED_EVENT,onSticky);clearInterval(id);clearTimeout(first);window.removeEventListener('focus',onVisible);document.removeEventListener('visibilitychange',onVisible)}
   },[user?.id])
   useEffect(()=>{window.dispatchEvent(new Event('huddle-widget-refresh'))},[workspaces,timeBlocks,boards,notebook.notes,notes,timer.state,timer.session,pet])
   // Focus start / pause / resume / stop → push the Live Activity right away from the

@@ -14,6 +14,7 @@ import {
   type MeetingTaskDraft,
 } from "@/lib/meeting-import";
 import { useI18n } from "@/lib/i18n/react";
+import { meetingLimitFrom } from "@/lib/billing/plan-usage-core";
 
 const field =
   "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -274,7 +275,10 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
     setTranscript(text);
     if (!title) setTitle(file.name.replace(/\.[^.]+$/, "").slice(0, 160));
   }
-  const available = list ? Math.max(0, 20 - list.used - list.pending) : 0;
+  // The monthly quota comes from the server (free / Pro / limits off); 20 only
+  // if an older server leaves it out.
+  const monthlyLimit = meetingLimitFrom(list?.limit);
+  const available = list ? Math.max(0, monthlyLimit - list.used - list.pending) : 0;
   const pending = selected?.status === "pending";
   const expired =
     pending && Date.parse(selected.created_at) <= observedAt - 300000;
@@ -298,7 +302,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
           </div>
           <p className="text-sm text-muted-foreground" aria-live="polite">
             {list
-              ? t("本月已用 {used} / 20 次", { used: list.used }) +
+              ? t("本月已用 {used} / {limit} 次", { used: list.used, limit: monthlyLimit }) +
                 (list.pending
                   ? t(" · {pending} 份處理中", { pending: list.pending })
                   : "")
@@ -325,9 +329,10 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
         )}
         {list && available === 0 && (
           <p className="mb-5 text-sm text-muted-foreground">
-            {list.used >= 20
+            {list.used >= monthlyLimit
               ? t(
-                  "本月 20 次已用完，下個月 1 日（台北時間）會重新開放。已整理的紀錄仍可建立任務。",
+                  "本月 {limit} 次已用完，下個月 1 日（台北時間）會重新開放。已整理的紀錄仍可建立任務。",
+                  { limit: monthlyLimit },
                 )
               : t("剩餘額度正在處理中，完成後會更新。")}
           </p>

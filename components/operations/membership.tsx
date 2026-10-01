@@ -14,6 +14,9 @@ import { readEnrollment } from '@/lib/operations/invites'
 import type { Membership, Ranking } from '@/lib/operations/types'
 import { Shell, Feedback, Field, Loading, Empty, styles } from './shared'
 import { useI18n } from '@/lib/i18n/react'
+import { usePlanUsage } from '@/hooks/use-plan-usage'
+import { usageMeters } from '@/lib/billing/plan-usage-core'
+import { UsageMeters } from '@/components/billing/usage-meters'
 
 export function MembershipPage() {
   const { user } = useAuth()
@@ -35,6 +38,7 @@ function MembershipContent() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const { usage } = usePlanUsage()
   const alive = useRef(true)
   const currentUser = useRef(user?.id)
   useEffect(() => {
@@ -90,6 +94,7 @@ function MembershipContent() {
       setError(t('無法自動複製，請選取下方文字手動複製。'))
     }
   }
+  const meters = usageMeters(usage)
   const active = data?.pro_until && Date.parse(data.pro_until) > Date.now()
   const link =
     data?.member.referral_code && typeof window !== 'undefined'
@@ -138,6 +143,16 @@ function MembershipContent() {
               </p>
             )}
           </section>
+          {/* Empty (nothing rendered) while limits are off or unavailable. */}
+          {meters.length > 0 && (
+            <section className={styles.panel} data-testid="plan-usage">
+              <h2>{t('目前用量')}</h2>
+              <p className={styles.muted}>
+                {t('超過上限時只會暫停「新增」，已有的資料都能照常查看、編輯與匯出。')}
+              </p>
+              <UsageMeters meters={meters} />
+            </section>
+          )}
           <div className={styles.grid}>
             <section className={styles.panel}>
               <h2>{t('你的推薦碼')}</h2>

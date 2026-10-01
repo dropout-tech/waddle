@@ -6,6 +6,9 @@ import { scheduleImageCleanupAfterDelete } from '@/lib/image-cleanup'
 import type { NotebookNote, NotebookCategory, TiptapDoc } from '@/lib/types'
 import type { Database } from '@/lib/supabase/database.types'
 import { t } from '@/lib/i18n'
+import { planLimitCode } from '@/lib/billing/plan-errors'
+import { showPlanLimitToast } from '@/lib/billing/plan-limit-toast'
+import { assertImageQuota, explainUploadError } from '@/lib/billing/plan-usage'
 
 type NotebookNotesRow = Database['public']['Tables']['notebook_notes']['Row']
 type NotebookCategoriesRow = Database['public']['Tables']['notebook_categories']['Row']
@@ -169,6 +172,9 @@ export function useNotebook() {
       if (error) {
         console.error('[notebook] create failed', error)
         setNotes((prev) => prev.filter((n) => n.id !== id))
+        // Hitting the free note cap is explained; other failures stay as before.
+        const limitCode = planLimitCode(error)
+        if (limitCode === 'NOTE_LIMIT') showPlanLimitToast(limitCode)
       }
       delete pendingCreates.current[id]
     })()
@@ -468,12 +474,14 @@ export function useNotebook() {
       if (!userId) throw new Error(t('尚未登入'))
       const ext = (file.name.split('.').pop() || 'png').toLowerCase()
       const path = `${userId}/${crypto.randomUUID()}.${ext}`
+      // Friendly pre-check; a no-op unless the server says limits are on.
+      await assertImageQuota()
       const { error } = await supabase.storage
         .from(IMAGE_BUCKET)
         .upload(path, file, { cacheControl: '3600', contentType: file.type || undefined })
       if (error) {
         console.error('[notebook] image upload failed', error)
-        throw error
+        throw await explainUploadError(error)
       }
       const { data } = supabase.storage.from(IMAGE_BUCKET).getPublicUrl(path)
       return data.publicUrl
