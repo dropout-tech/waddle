@@ -32,6 +32,7 @@ import { normalizePet, type PetSettings } from '@/lib/pet/types'
 // Aliased: this file uses `t` pervasively as the loop variable for "task"
 // (c.tasks.map((t) => ...)), so importing the translator as `t` would shadow it.
 import { t as translate, getLang } from '@/lib/i18n'
+import { canResetWorkspaces } from '@/lib/onboarding/can-reset-workspaces'
 import {
   listAssignments,
   toTaskAssignment,
@@ -3316,9 +3317,29 @@ export function useWaddleData(): UseWaddleData {
    *
    * Both options wipe the existing demo workspaces (cascade deletes the
    * categories and tasks under them).
+   *
+   * Guarded: the wipe is only for brand-new accounts. If the account already
+   * has any task (or we can't tell), keep everything as is.
    */
   const applyOnboardingChoice = useCallback(async (choice: 'template' | 'blank') => {
     const userId = requireUserId()
+
+    // Data-layer guard: an existing user who sees the tour again must never
+    // lose workspaces/tasks. Ask the server (not just local state), and
+    // fail safe — any query error also means "don't touch the data".
+    const localTaskCount = workspaces.reduce(
+      (n, ws) => n + ws.categories.reduce((m, c) => m + c.tasks.length, 0),
+      0,
+    )
+    const allowed = await canResetWorkspaces({
+      localTaskCount,
+      fetchServerTaskCount: () =>
+        supabase.from('tasks').select('id', { count: 'exact', head: true }),
+    })
+    if (!allowed) {
+      toast.info(translate('已保留你現有的工作區與任務'))
+      return
+    }
 
     const TEMPLATES: { name: string; color: string; icon: string; categories: string[] }[] =
       choice === 'template'
@@ -3426,7 +3447,7 @@ export function useWaddleData(): UseWaddleData {
       const { error: catError } = await supabase.from('categories').insert(catRows)
       if (catError) return handleDbError('建立分類')(catError)
     }
-  }, [supabase])
+  }, [supabase, workspaces])
 
   return {
     workspaces,

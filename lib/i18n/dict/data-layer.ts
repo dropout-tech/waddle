@@ -12,6 +12,7 @@ export const dict: Record<string, string> = {
   '網路連線不穩，請稍後再試': 'connection problem — please try again shortly',
   '錯誤代碼 {code}': 'error code {code}',
   '初始化資料失敗，請重新整理': 'Failed to set up your data — please refresh.',
+  '已保留你現有的工作區與任務': 'Kept your existing workspaces and tasks.',
 
   // handleDbError operation labels (used both for the toast above and,
   // where reused, as undo-stack action labels)
