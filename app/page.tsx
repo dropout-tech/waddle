@@ -645,6 +645,7 @@ function HuddlePage() {
       {!isMobile && <UserMenu />}
       <OnboardingTour
         open={!onboardingCompleted}
+        paused={!!liveSelectedTask}
         onComplete={completeOnboarding}
         onChoose={applyOnboardingChoice}
       />
