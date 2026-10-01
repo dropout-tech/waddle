@@ -2,26 +2,26 @@
 
 import type { Editor } from '@tiptap/react'
 import {
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
-  Strikethrough,
-  Code,
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  ListChecks,
-  Quote,
-  ChevronRight,
-  Minus,
-  Link2,
-  Undo2,
-  Redo2,
-  ListPlus,
-  Image as ImageIcon,
-} from 'lucide-react'
+  InkBold,
+  InkItalic,
+  InkUnderline,
+  InkStrikethrough,
+  InkInlineCode,
+  InkHeading1,
+  InkHeading2,
+  InkHeading3,
+  InkBulletList,
+  InkNumberedList,
+  InkTodo,
+  InkQuote,
+  InkToggle,
+  InkDivider,
+  InkLink,
+  InkUndo,
+  InkRedo,
+  InkAddTask,
+  InkImage,
+} from '@/components/icons/huddle-icons'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset'
@@ -47,6 +47,9 @@ export function selectionOrLineText(editor: Editor): string {
 
 // Fixed formatting bar above the editor. Each button reflects the active mark/
 // node at the caret (so users can see current state) and toggles it.
+// Icons: the whole strip uses the Huddle hand-inked set (20px) — block icons
+// match the "/" menu, and B/I/U/link/undo… were drawn in the same sheet so the
+// bar isn't a mix of brush strokes and geometric lucide lines.
 //
 // Mobile-only: desktop dropped the fixed toolbar in favour of the "/" block
 // menu + selection bubble menu (Notion's pure-editor layout, no chrome above
@@ -102,74 +105,74 @@ export function EditorToolbar({ editor, onPromote, uploadImage }: EditorToolbarP
       }
     >
       <Btn label={t('標題 1')} active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
-        <Heading1 className="h-4 w-4" />
+        <InkHeading1 className="h-5 w-5" />
       </Btn>
       <Btn label={t('標題 2')} active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
-        <Heading2 className="h-4 w-4" />
+        <InkHeading2 className="h-5 w-5" />
       </Btn>
       <Btn label={t('標題 3')} active={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
-        <Heading3 className="h-4 w-4" />
+        <InkHeading3 className="h-5 w-5" />
       </Btn>
 
       <Divider />
 
       <Btn label={t('粗體')} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
-        <Bold className="h-4 w-4" />
+        <InkBold className="h-5 w-5" />
       </Btn>
       <Btn label={t('斜體')} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
-        <Italic className="h-4 w-4" />
+        <InkItalic className="h-5 w-5" />
       </Btn>
       <Btn label={t('底線')} active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
-        <UnderlineIcon className="h-4 w-4" />
+        <InkUnderline className="h-5 w-5" />
       </Btn>
       <Btn label={t('刪除線')} active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
-        <Strikethrough className="h-4 w-4" />
+        <InkStrikethrough className="h-5 w-5" />
       </Btn>
       <Btn label={t('行內程式碼')} active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()}>
-        <Code className="h-4 w-4" />
+        <InkInlineCode className="h-5 w-5" />
       </Btn>
       <Btn label={t('連結')} active={editor.isActive('link')} onClick={setLink}>
-        <Link2 className="h-4 w-4" />
+        <InkLink className="h-5 w-5" />
       </Btn>
 
       <Divider />
 
       <Btn label={t('項目符號')} active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
-        <List className="h-4 w-4" />
+        <InkBulletList className="h-5 w-5" />
       </Btn>
       <Btn label={t('編號清單')} active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
-        <ListOrdered className="h-4 w-4" />
+        <InkNumberedList className="h-5 w-5" />
       </Btn>
       <Btn label={t('待辦清單')} active={editor.isActive('taskList')} onClick={() => editor.chain().focus().toggleTaskList().run()}>
-        <ListChecks className="h-4 w-4" />
+        <InkTodo className="h-5 w-5" />
       </Btn>
       <Btn label={t('收合區塊（toggle）')} active={editor.isActive('details')} onClick={() => editor.chain().focus().setDetails().run()}>
-        <ChevronRight className="h-4 w-4" />
+        <InkToggle className="h-5 w-5" />
       </Btn>
       <Btn label={t('引言')} active={editor.isActive('blockquote')} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
-        <Quote className="h-4 w-4" />
+        <InkQuote className="h-5 w-5" />
       </Btn>
       <Btn label={t('分隔線')} active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()}>
-        <Minus className="h-4 w-4" />
+        <InkDivider className="h-5 w-5" />
       </Btn>
       <Btn label={t('插入圖片')} active={false} onClick={() => pickAndInsertImage(editor.view, uploadImage)}>
-        <ImageIcon className="h-4 w-4" />
+        <InkImage className="h-5 w-5" />
       </Btn>
 
       <Divider />
 
       <Btn label={t('復原')} active={false} disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
-        <Undo2 className="h-4 w-4" />
+        <InkUndo className="h-5 w-5" />
       </Btn>
       <Btn label={t('重做')} active={false} disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()}>
-        <Redo2 className="h-4 w-4" />
+        <InkRedo className="h-5 w-5" />
       </Btn>
 
       {onPromote && (
         <>
           <Divider />
           <Btn label={t('升級為任務')} active={false} onClick={() => onPromote(selectionOrLineText(editor))}>
-            <ListPlus className="h-4 w-4" />
+            <InkAddTask className="h-5 w-5" />
           </Btn>
         </>
       )}

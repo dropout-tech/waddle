@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { NotificationCenter } from '@/components/notifications/notification-center'
-import { ZoomIn, ZoomOut, Clock, ChevronDown, ChevronLeft, ChevronRight, BookOpen, NotebookPen, BarChart3, Settings, Sparkles, MoreHorizontal, Download, Users, Bell, CircleUser, Eye, EyeOff, StickyNote as StickyNoteIcon, Plus, Archive } from 'lucide-react'
+// Toolbar icons are the Huddle hand-inked set, not lucide (DESIGN.md → 圖示).
+// They're drawn at 16px (lucide was 14): where an icon sits beside a label a
+// 1px negative margin keeps its layout footprint — button sizes are unchanged.
+import {
+  InkMinus, InkClock, InkChevronDown, InkChevronLeft, InkChevronRight, InkBookOpen, InkNotebook,
+  InkBarChart, InkSettings, InkSparkles, InkMore, InkDownload, InkUsers, InkBell, InkUser, InkEye, InkEyeOff,
+  InkStickyNote, InkPlus, InkArchive,
+} from '@/components/icons/huddle-icons'
 import { UndoRedoButtons } from '@/components/undo-redo-buttons'
 import {
   DropdownMenu,
@@ -18,7 +25,6 @@ import { UserMenu } from '@/components/user-menu'
 import { useNotebookOverlay } from '@/components/notebook/notebook-overlay-provider'
 import { useStickyNotesToggle } from '@/components/sticky-notes/sticky-notes-provider'
 import { isPeerVisible, type SharePeer } from '@/hooks/use-calendar-sharing'
-import { User as UserIcon } from 'lucide-react'
 import type { Workspace, Task } from '@/lib/types'
 import { useI18n } from '@/lib/i18n/react'
 import { format } from 'date-fns'
@@ -207,7 +213,7 @@ export function CalendarHeader({
             aria-label={viewMode === 'day' ? t('前一天') : viewMode === 'week' ? t('前一週') : t('前一個月')}
             className="relative flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:content-[''] before:absolute before:inset-0 before:-m-1.5 md:before:hidden"
           >
-            <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+            <InkChevronLeft className="w-4 h-4" aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -215,7 +221,7 @@ export function CalendarHeader({
             aria-label={viewMode === 'day' ? t('後一天') : viewMode === 'week' ? t('後一週') : t('後一個月')}
             className="relative flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:content-[''] before:absolute before:inset-0 before:-m-1.5 md:before:hidden"
           >
-            <ChevronRight className="w-4 h-4" aria-hidden="true" />
+            <InkChevronRight className="w-4 h-4" aria-hidden="true" />
           </button>
 
           {/* Month/date label — companion to the chevrons. */}
@@ -279,7 +285,7 @@ export function CalendarHeader({
                 )}
               >
                 <span>{viewModeLabel}</span>
-                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', viewPickerOpen && 'rotate-180')} />
+                <InkChevronDown className={cn('w-4 h-4 -mx-px transition-transform', viewPickerOpen && 'rotate-180')} />
               </button>
               {viewPickerOpen && (
                 <div className="absolute left-0 top-full mt-1 w-32 max-w-[calc(100vw-1.5rem)] bg-card border border-border rounded-xl shadow-lg overflow-hidden z-popover" role="menu">
@@ -351,7 +357,7 @@ export function CalendarHeader({
                 aria-expanded={overflowOpen}
                 className="relative flex items-center justify-center w-11 h-11 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
+                <InkMore className="w-5 h-5" aria-hidden="true" />
                 {notifCount > 0 && (
                   <span
                     aria-hidden="true"
@@ -389,7 +395,7 @@ export function CalendarHeader({
                     onClick={() => { setOverflowOpen(false); setNotifOpen(true) }}
                     className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                   >
-                    <Bell className="w-4 h-4" />
+                    <InkBell className="w-4 h-4" />
                     <span className="flex-1 text-left">{t('通知')}</span>
                     {notifCount > 0 && (
                       <span className={cn('rounded-full px-1.5 text-[11px] font-semibold text-white', notifHigh ? 'bg-urgency-critical' : 'bg-urgency-high')}>
@@ -404,7 +410,7 @@ export function CalendarHeader({
                     onClick={() => { setOverflowOpen(false); setUserMenuOpen(true) }}
                     className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                   >
-                    <CircleUser className="w-4 h-4" />
+                    <InkUser className="w-4 h-4" />
                     <span>{t('帳號')}</span>
                   </button>
                   {sharePeers.length > 0 && onTogglePeerVisible && (
@@ -430,11 +436,11 @@ export function CalendarHeader({
                                 // eslint-disable-next-line @next/next/no-img-element -- static export has no image optimizer
                                 <img src={peer.avatarUrl} alt="" className="w-full h-full object-cover" />
                               ) : (
-                                <UserIcon className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+                                <InkUser className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
                               )}
                             </span>
                             <span className="flex-1 min-w-0 truncate text-left">{name}</span>
-                            {visible ? <Eye className="w-4 h-4 text-primary" aria-hidden="true" /> : <EyeOff className="w-4 h-4" aria-hidden="true" />}
+                            {visible ? <InkEye className="w-4 h-4 text-primary" aria-hidden="true" /> : <InkEyeOff className="w-4 h-4" aria-hidden="true" />}
                           </button>
                         )
                       })}
@@ -445,7 +451,7 @@ export function CalendarHeader({
                     onClick={() => { setOverflowOpen(false); openNotebook() }}
                     className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                   >
-                    <NotebookPen className="w-4 h-4" />
+                    <InkNotebook className="w-4 h-4" />
                     <span>{t('記事本')}</span>
                   </button>
                   <button
@@ -456,7 +462,7 @@ export function CalendarHeader({
                     onClick={() => stickyNotes.toggle()}
                     className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                   >
-                    <StickyNoteIcon className="w-4 h-4" />
+                    <InkStickyNote className="w-4 h-4" />
                     <span>{stickyNotes.enabled ? t('隱藏便條紙') : t('顯示便條紙')}</span>
                   </button>
                   {stickyNotes.enabled && (
@@ -466,7 +472,7 @@ export function CalendarHeader({
                       onClick={() => { setOverflowOpen(false); stickyNotes.addNote() }}
                       className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 pl-9 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
-                      <Plus className="w-4 h-4" />
+                      <InkPlus className="w-4 h-4" />
                       <span>{t('新增便條紙')}</span>
                     </button>
                   )}
@@ -477,16 +483,16 @@ export function CalendarHeader({
                     onClick={() => { setOverflowOpen(false); stickyNotes.toggleDrawer() }}
                     className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 pl-9 text-sm hover:bg-muted/60 transition-colors text-foreground"
                   >
-                    <Archive className="w-4 h-4" />
+                    <InkArchive className="w-4 h-4" />
                     <span>{t('便條紙收納')}</span>
                   </button>
-                  {onOpenMeetings && <button type="button" onClick={() => { setOverflowOpen(false); onOpenMeetings() }} className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60"><Users className="h-4 w-4"/><span>{lang === 'en' ? 'Find a time' : '約交集'}</span>{pendingMeetingCount > 0 && <span className="rounded-full bg-primary px-1.5 text-primary-foreground">{pendingMeetingCount}</span>}</button>}
+                  {onOpenMeetings && <button type="button" onClick={() => { setOverflowOpen(false); onOpenMeetings() }} className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60"><InkUsers className="h-4 w-4"/><span>{lang === 'en' ? 'Find a time' : '約交集'}</span>{pendingMeetingCount > 0 && <span className="rounded-full bg-primary px-1.5 text-primary-foreground">{pendingMeetingCount}</span>}</button>}
                   {onOpenSharing && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenSharing() }}
                       className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
-                      <Users className="w-4 h-4" />
+                      <InkUsers className="w-4 h-4" />
                       <span>{t('共享')}</span>
                     </button>
                   )}
@@ -495,7 +501,7 @@ export function CalendarHeader({
                       onClick={() => { setOverflowOpen(false); onOpenJournal() }}
                       className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
-                      <BookOpen className="w-4 h-4" />
+                      <InkBookOpen className="w-4 h-4" />
                       <span>{t('日記')}</span>
                     </button>
                   )}
@@ -504,7 +510,7 @@ export function CalendarHeader({
                       onClick={() => { setOverflowOpen(false); onOpenReport() }}
                       className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
-                      <BarChart3 className="w-4 h-4" />
+                      <InkBarChart className="w-4 h-4" />
                       <span>{t('報告')}</span>
                     </button>
                   )}
@@ -522,7 +528,7 @@ export function CalendarHeader({
                       onClick={() => { setOverflowOpen(false); onOpenExport() }}
                       className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
-                      <Download className="w-4 h-4" />
+                      <InkDownload className="w-4 h-4" />
                       <span>{t('匯出行程')}</span>
                     </button>
                   )}
@@ -531,7 +537,7 @@ export function CalendarHeader({
                       onClick={() => { setOverflowOpen(false); onOpenSettings() }}
                       className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
                     >
-                      <Settings className="w-4 h-4" />
+                      <InkSettings className="w-4 h-4" />
                       <span>{t('設定')}</span>
                     </button>
                   )}
@@ -565,7 +571,7 @@ export function CalendarHeader({
                     zoomLevel <= 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
                   )}
                 >
-                  <ZoomOut className="w-3.5 h-3.5" aria-hidden="true" />
+                  <InkMinus className="w-4 h-4 -m-px" aria-hidden="true" />
                 </button>
                 <span className="text-[10px] text-muted-foreground min-w-[30px] text-center" aria-live="polite">
                   {t(ZOOM_LABELS[zoomLevel - 1])}
@@ -580,13 +586,13 @@ export function CalendarHeader({
                     zoomLevel >= 4 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-secondary'
                   )}
                 >
-                  <ZoomIn className="w-3.5 h-3.5" aria-hidden="true" />
+                  <InkPlus className="w-4 h-4 -m-px" aria-hidden="true" />
                 </button>
               </div>
 
               {/* Time Range Display */}
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background border border-border/50 text-[10px] text-muted-foreground">
-                <Clock className="w-3 h-3" />
+                <InkClock className="w-3.5 h-3.5 -m-px" />
                 <span>{String(startHour).padStart(2, '0')}:00 - {String(endHour).padStart(2, '0')}:00</span>
               </div>
             </div>
@@ -621,7 +627,7 @@ export function CalendarHeader({
                       // eslint-disable-next-line @next/next/no-img-element -- static export has no image optimizer
                       <img src={peer.avatarUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      <UserIcon className="w-3 h-3 text-primary" aria-hidden="true" />
+                      <InkUser className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
                     )}
                   </button>
                 )
@@ -650,7 +656,7 @@ export function CalendarHeader({
             onClick={openNotebook}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <NotebookPen className="w-3.5 h-3.5" aria-hidden="true" />
+            <InkNotebook className="w-4 h-4 -mx-px" aria-hidden="true" />
             {t('記事本')}
           </button>
           <button
@@ -666,7 +672,7 @@ export function CalendarHeader({
                 : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
             )}
           >
-            <StickyNoteIcon className="w-3.5 h-3.5" aria-hidden="true" />
+            <InkStickyNote className="w-4 h-4 -mx-px" aria-hidden="true" />
             {t('便條紙')}
           </button>
           {stickyNotes.enabled && (
@@ -676,7 +682,7 @@ export function CalendarHeader({
               aria-label={t('新增便條紙')}
               className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+              <InkPlus className="w-4 h-4" aria-hidden="true" />
             </button>
           )}
           <button
@@ -694,7 +700,7 @@ export function CalendarHeader({
                 : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
             )}
           >
-            <Archive className="w-3.5 h-3.5" aria-hidden="true" />
+            <InkArchive className="w-4 h-4" aria-hidden="true" />
           </button>
           {onOpenSharing && (
             <button
@@ -702,7 +708,7 @@ export function CalendarHeader({
               onClick={onOpenSharing}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <Users className="w-3.5 h-3.5" aria-hidden="true" />
+              <InkUsers className="w-4 h-4 -mx-px" aria-hidden="true" />
               {t('共享')}
             </button>
           )}
@@ -717,9 +723,9 @@ export function CalendarHeader({
                   toolsOpen && 'bg-secondary text-foreground'
                 )}
               >
-                <ChevronDown
+                <InkChevronDown
                   className={cn(
-                    'w-3.5 h-3.5 transition-transform duration-200 motion-reduce:transition-none',
+                    'w-4 h-4 transition-transform duration-200 motion-reduce:transition-none',
                     toolsOpen && 'rotate-180'
                   )}
                   aria-hidden="true"
@@ -730,7 +736,7 @@ export function CalendarHeader({
               {onOpenMeetings && (
                 <DropdownMenuItem onSelect={onOpenMeetings} className="gap-2.5 rounded-lg py-2 text-xs justify-between">
                   <span className="flex items-center gap-2.5">
-                    <Users className="w-3.5 h-3.5" />
+                    <InkUsers className="w-3.5 h-3.5" />
                     {lang === 'en' ? 'Find a time' : '約交集'}
                   </span>
                   {pendingMeetingCount > 0 && (
@@ -740,13 +746,13 @@ export function CalendarHeader({
               )}
               {onOpenJournal && (
                 <DropdownMenuItem onSelect={onOpenJournal} className="gap-2.5 rounded-lg py-2 text-xs">
-                  <BookOpen className="w-3.5 h-3.5" />
+                  <InkBookOpen className="w-3.5 h-3.5" />
                   {t('日記')}
                 </DropdownMenuItem>
               )}
               {onOpenReport && (
                 <DropdownMenuItem onSelect={onOpenReport} className="gap-2.5 rounded-lg py-2 text-xs">
-                  <BarChart3 className="w-3.5 h-3.5" />
+                  <InkBarChart className="w-3.5 h-3.5" />
                   {t('報告')}
                 </DropdownMenuItem>
               )}
@@ -761,7 +767,7 @@ export function CalendarHeader({
                   onSelect={onOpenExport}
                   className="gap-2.5 rounded-lg py-2 text-xs"
                 >
-                  <Download className="w-3.5 h-3.5" />
+                  <InkDownload className="w-3.5 h-3.5" />
                   {t('匯出')}
                 </DropdownMenuItem>
               )}
@@ -774,7 +780,7 @@ export function CalendarHeader({
               aria-label={t('設定')}
               className="flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors ml-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <Settings className="w-3.5 h-3.5" aria-hidden="true" />
+              <InkSettings className="w-4 h-4" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -864,9 +870,9 @@ function TodayProgressRing({ workspaces }: TodayProgressRingProps) {
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
         {stats.total === 0 ? (
-          <Sparkles className="w-3.5 h-3.5 text-muted-foreground/50" aria-hidden="true" />
+          <InkSparkles className="w-4 h-4 text-muted-foreground/50" aria-hidden="true" />
         ) : stats.allDone ? (
-          <Sparkles className="w-3.5 h-3.5 text-success" aria-hidden="true" />
+          <InkSparkles className="w-4 h-4 text-success" aria-hidden="true" />
         ) : (
           <span className="text-[9px] font-semibold text-foreground tabular-nums">
             {stats.completed}/{stats.total}

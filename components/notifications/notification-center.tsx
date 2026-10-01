@@ -14,6 +14,7 @@ import {
   X,
   Sparkles,
 } from 'lucide-react'
+import { InkBellLg } from '@/components/icons/huddle-icons'
 import { cn } from '@/lib/utils'
 import type { Task, Workspace } from '@/lib/types'
 import { getTaskOverdueDate, isTaskOverdue } from '@/lib/task-utils'
@@ -382,7 +383,7 @@ export function NotificationCenter({
           '[@media(hover:none)]:before:content-[""] [@media(hover:none)]:before:absolute [@media(hover:none)]:before:inset-[-4px]',
         )}
       >
-        <Bell className="w-5 h-5 text-muted-foreground" />
+        <InkBellLg className="w-5 h-5 text-muted-foreground" />
         {totalCount > 0 && (
           <span
             role="status"

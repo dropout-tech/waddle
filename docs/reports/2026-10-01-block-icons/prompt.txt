@@ -1,0 +1,58 @@
+Huddle 手繪墨線圖示 — 產圖紀錄（2026-10-01）
+================================================
+
+共產圖 7 次（另有 1 次在沙盒內啟動失敗、沒產圖）。採用 3 張：
+
+  採用  sheet-v6-notebook.png   記事本那批（「/」選單、手機鍵盤工具列、浮動格式列）  prompt-v6-notebook.txt
+  採用  sheet-v5-toolbar.png    行事曆上方工具列那批                                prompt-v5-toolbar.txt
+  採用  sheet-v7-nav.png        手機底部分頁列＋使用者選單那批（前兩排用到，後兩排備用）  prompt-v7-nav.txt
+
+沒採用、留檔備查（每張哪裡不合格 → 下一張 prompt 改了哪一句）：
+
+  sheet-v1.png  (prompt-v1.txt)  記事本第一版。乾淨的粗線圖示，20px 還行，但和 v5 的塗鴉感不是同一支筆 → v6 整批重畫。
+  sheet-v2-toolbar.png (prompt-v2-toolbar.txt)
+      工具列第一版（透明底，直接看會一片黑）。不合格：造型封口、對稱、近乎幾何，14px 下只像「另一款線條圖示」，
+      驗收者以為沒換。→ v3 新增一整段「HAND-DRAWN CHARACTER」（歪、不封口、筆壓粗細），筆畫要求從 1/8 改成 1/6。
+  sheet-v3-toolbar.png (prompt-v3-toolbar.txt)
+      不合格：有手感了，但筆畫仍只有圖示高的 1/10（要求 1/6 沒被理會）。
+      → v4 不再用比例描述，改寫成「筆尖 24px、每個塗鴉只有 120px」（利用模型筆畫絕對粗細幾乎固定的特性）。
+  sheet-v4-toolbar.png (prompt-v4-toolbar.txt)
+      筆畫比例進步到約 1/8，仍不到 1/5。同一個問題連兩張沒到位 → 不再用 prompt 追粗細，
+      改由腳本把墨線等距加粗（同一條筆跡、換粗一點的筆）。另一個新問題：手抖幅度太小，縮到 16px 是次像素、看不出來。
+      → v5 把「Imperfect on purpose」那句改寫成有具體幅度的五條（四筆交叉且凸出一個線寬、整個歪 8–12 度、
+        圈是一筆螺旋尾巴凸出、直線明顯彎、不對稱）。
+  sheet-v5-toolbar.png  合格，採用。
+  sheet-v6-notebook.png 沿用 v5 的同一段風格文字、換成記事本的圖示清單，讓兩批是同一支筆。合格，採用。
+      （第 11 格分隔線畫成波浪「～」沒用，改用 v5 的那一橫；第 21、23、24 格是備用稿沒用。）
+
+  sheet-v7-nav.png      風格文字與 v5 一字不差（diff 驗過），只換圖示清單。一次合格，採用前 12 格。
+
+第三輪小修（沒有重生，全在腳本 OPTIONS，可重現）：
+  - B／I／U／<>／連結／復原／重做：腳本的快速線寬估算把這些字形當成比實際粗，結果只有 2.1–2.4 單位；
+    改用距離變換實測後補到 2.5，浮動格式列圖示 18→20px，螢幕線寬和「/」選單對齊。
+  - 分隔線：改回 v6 第 11 格那條橫貫整格的長波浪線（之前借用縮放的「−」，兩者同形）。
+  - 懸浮小視窗：大框＋右下角凸出去的小框（雙視窗），用原圖自己的兩個墨塊重組，不再像「圖片」。
+  - 下載：實測 3.0 單位，和同選單一樣，但造型鏤空看起來偏細，補到 3.3。
+  - 每張 sheet 的基準線寬釘死（pen），之後加格子不會牽動既有圖示的路徑。
+
+指令（一次一張、不平行；參考圖只用吉祥物原圖；prompt 裡的 __OUT__ 換成要存的絕對路徑）：
+
+  D="$PWD/docs/reports/2026-10-01-block-icons"
+  PROMPT="$(sed "s|__OUT__|$D/sheet-v7.png|" "$D/prompt-v5-toolbar.txt")"
+  codex exec "$PROMPT" -s workspace-write -C "$D" --skip-git-repo-check -i "$PWD/public/huddle-mascot.png" < /dev/null
+
+規矩：加新圖示時「HAND-DRAWN CHARACTER」與「FLAT INK RULES」兩段一字不改，只換「THE 24 DOODLES」清單，
+筆觸才會跟現有的一致。禁止拿任何生成圖當參考去修改；不滿意就改 prompt 從頭重生。
+
+sheet → 程式：
+
+  mkdir /tmp/icon-tools && cd /tmp/icon-tools && npm init -y && npm i potrace sharp
+  ICON_TOOLS_DIR=/tmp/icon-tools node scripts/icons/build-huddle-icons.mjs
+  （加 --preview some.png 會另外輸出 14/16/20px 實際尺寸的總覽圖）
+
+腳本做的事：依格線切圖 → 量每個圖示的線寬、等距加粗或削細到指定筆重 → potrace 向量化 →
+寫出 components/icons/huddle-icons.tsx。筆重分兩級，螢幕上都是約 2px 的墨線：
+  顯示 18–24px 的（記事本、底部分頁、「＋」鈕）線寬 2.5 單位（24 單位格線）；
+  顯示 14–16px 的（上方工具列、使用者選單）線寬 3.1 單位。
+個別手修（編號清單的 1/2 放大、字母放大、箭頭縮小、鈴鐺另出一個 20px 用的版本、分隔線取自工具列那一橫）
+都寫在腳本的 OPTIONS / extra，可重現。

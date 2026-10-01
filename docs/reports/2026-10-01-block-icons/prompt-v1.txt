@@ -1,0 +1,52 @@
+Use your image generation tool to create ONE new image, then save it as a PNG file at exactly this absolute path:
+__OUT__
+Do not modify, create or delete any other file. Do not write code. When done, reply with only the saved path and the pixel size.
+
+WHAT TO DRAW
+A single icon sheet: 24 small hand-drawn ink symbols for a note-taking app, arranged in a strict grid of 6 columns x 4 rows on a landscape 3:2 canvas (1536 x 1024 px).
+
+The attached image is a STYLE REFERENCE FOR LINE QUALITY ONLY: copy the feel of its thick, soft, rounded, slightly wobbly hand-inked outline. Do NOT draw the character, any animal, any face, or any mascot. Only abstract UI symbols.
+
+STYLE RULES (very important, these icons will be shrunk to 16 px)
+- Pure solid black ink (#000000) on a pure flat white background (#FFFFFF). No gray, no color, no paper texture, no shading, no gradients, no drop shadows, no hatching.
+- One brush-pen / fat felt-marker stroke weight for the whole sheet. The stroke is VERY THICK: about one eighth of the icon's height. Round caps, round joins, gently uneven like confident handwriting, never mechanical or perfectly geometric.
+- Extremely simple shapes. Two to four strokes per icon. No fine detail, no thin lines, no tiny gaps that would close up when small. Leave clear white gaps (at least one stroke width) between separate strokes.
+- Every icon is centered in its own cell and fills about 60% of the cell, with wide empty white margins so no icon touches or comes near a neighbour.
+- NO grid lines, NO cell borders, NO frames around icons, NO captions, NO labels, NO numbering of cells. The only letters and digits allowed are the ones explicitly listed below, written as chunky handwriting.
+- All 24 icons the same visual size and weight, like one consistent family drawn by one hand with one pen.
+
+THE 24 ICONS, in reading order (left to right, top row first)
+
+Row 1
+1. A capital letter "T" with tiny serifs (plain text).
+2. The letter "H" followed by a slightly smaller digit "1".
+3. The letter "H" followed by a slightly smaller digit "2".
+4. The letter "H" followed by a slightly smaller digit "3".
+5. One rounded square checkbox with a bold check mark inside it, the tick's tail poking out past the top right corner.
+6. Bulleted list: three rows, each row a round filled dot on the left followed by a horizontal line.
+
+Row 2
+7. Numbered list: two rows only, first row a digit "1" then a horizontal line, second row a digit "2" then a horizontal line.
+8. Toggle / collapsible section: a plump solid filled triangle pointing right, with one horizontal line to its right, and one shorter horizontal line below that line.
+9. Quote: a pair of big solid filled opening quotation marks (two fat comma-like blobs, shaped like 66).
+10. Code block: the three characters  <  /  >  (left angle bracket, slash, right angle bracket).
+11. Divider: one single long horizontal stroke, very slightly wavy, with one small round dot floating to the left of it and one to the right.
+12. Picture: a rounded rectangle frame containing a solid filled mountain peak at the bottom and a small solid round sun in the upper corner.
+
+Row 3
+13. A chunky bold capital letter "B".
+14. A slanted (italic) capital letter "I" with short serifs top and bottom.
+15. A capital letter "U" with a horizontal line underneath it.
+16. A capital letter "S" with a horizontal line striking through its middle.
+17. Inline code: just two angle brackets facing away from each other, "<" and ">", with a clear gap between them.
+18. Link: two rounded chain links interlocked on a diagonal.
+
+Row 4
+19. Undo: a curved arrow hooking back towards the left, with a clear arrowhead.
+20. Redo: the mirror image, a curved arrow hooking towards the right.
+21. Add to tasks: three short horizontal lines stacked on the left, and a bold plus sign on the right.
+22. Paragraph of handwriting: three wavy scribble lines stacked, the last one shorter.
+23. A pair of curly braces "{ }" with a clear gap between them.
+24. Checklist: two rows, each a small check mark followed by a horizontal line.
+
+Double-check before saving: exactly 24 icons, exactly 6 per row, pure black on pure white, nothing else on the canvas.

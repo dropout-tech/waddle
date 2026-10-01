@@ -10,7 +10,7 @@ import { CalendarPanel } from '@/components/calendar/calendar-panel'
 import { MeetingDialog } from '@/components/meetings/meeting-dialog'
 import { useMeetingInvitations } from '@/hooks/use-meeting-invitations'
 import { CalendarExportModal } from '@/components/calendar/calendar-export-modal'
-import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ListChecks, CalendarDays, Sparkles, ChevronLeft, ChevronRight, Focus } from 'lucide-react'
+import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
 import { FocusScratchpad } from '@/components/scratchpad/focus-scratchpad'
 import { FocusTimer } from '@/components/timer/focus-timer'
@@ -27,7 +27,8 @@ import { hapticSelection } from '@/lib/haptics'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, ScratchpadItem } from '@/lib/types'
 import { DEFAULT_FOCUS_SETTINGS, type FocusSettings } from '@/lib/focus'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
-import { Link2, Plus } from 'lucide-react'
+// Mobile bottom tabs + the "+" FAB use the Huddle hand-inked set (DESIGN.md → 圖示).
+import { InkFocus, InkTasks, InkSparklesLg, InkCalendar, InkLink, InkPlusLg } from '@/components/icons/huddle-icons'
 import { useI18n } from '@/lib/i18n/react'
 import { GrowthJourneyDashboard } from '@/components/growth/growth-journey-dashboard'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
@@ -731,7 +732,7 @@ export function MainLayout({
               // so the two surfaces teach the same mental model.
               key: 'focus' as const,
               label: t('重點'),
-              Icon: Focus,
+              Icon: InkFocus,
               active: mobileFocusBoardOpen,
               onClick: () => {
                 hapticSelection()
@@ -745,7 +746,7 @@ export function MainLayout({
               // '任務' doubles as the singular time-block type label ("Task");
               // the tab wants the plural, so it bypasses the shared dict key.
               label: lang === 'en' ? 'Tasks' : '任務',
-              Icon: ListChecks,
+              Icon: InkTasks,
               active: mobileTab === 'tasks' && !overlayOpen,
               onClick: () => {
                 hapticSelection()
@@ -758,7 +759,7 @@ export function MainLayout({
             {
               key: 'scratch' as const,
               label: t('白板'),
-              Icon: Sparkles,
+              Icon: InkSparklesLg,
               active: mobileScratchpadOpen,
               onClick: () => {
                 hapticSelection()
@@ -770,7 +771,7 @@ export function MainLayout({
             {
               key: 'calendar' as const,
               label: t('日曆'),
-              Icon: CalendarDays,
+              Icon: InkCalendar,
               active: mobileTab === 'calendar' && !overlayOpen,
               onClick: () => {
                 hapticSelection()
@@ -784,7 +785,7 @@ export function MainLayout({
               key: 'links' as const,
               // '連結' doubles as the editor "Link" button; tab wants plural.
               label: lang === 'en' ? 'Links' : '連結',
-              Icon: Link2,
+              Icon: InkLink,
               active: mobileLinksOpen,
               onClick: () => {
                 hapticSelection()
@@ -867,7 +868,7 @@ export function MainLayout({
             className="fixed right-3 z-30 flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             style={{ bottom: 'calc(136px + env(safe-area-inset-bottom))' }}
           >
-            <Plus className="w-6 h-6" aria-hidden="true" />
+            <InkPlusLg className="w-6 h-6" aria-hidden="true" />
           </button>
         )}
 

@@ -3,25 +3,26 @@
 import { forwardRef, useEffect, useImperativeHandle, useState, type ComponentType } from 'react'
 import type { Editor, Range } from '@tiptap/react'
 import {
-  Type,
-  Heading1,
-  Heading2,
-  Heading3,
-  ListChecks,
-  List,
-  ListOrdered,
-  ChevronRight,
-  Quote,
-  Code2,
-  Minus,
-  Image as ImageIcon,
-} from 'lucide-react'
+  InkText,
+  InkHeading1,
+  InkHeading2,
+  InkHeading3,
+  InkTodo,
+  InkBulletList,
+  InkNumberedList,
+  InkToggle,
+  InkQuote,
+  InkCodeBlock,
+  InkDivider,
+  InkImage,
+} from '@/components/icons/huddle-icons'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
 import { isImeComposing } from '@/lib/ime'
 import { pickAndInsertImage, type UploadImageFn } from './upload-image'
 
-// Notion-style "/" block menu — item catalogue + the popup list itself.
+// The "/" block menu — item catalogue + the popup list itself. Icons are the
+// Huddle hand-inked set (components/icons/huddle-icons.tsx), not lucide.
 // The Tiptap Suggestion plugin (slash-command.ts) owns positioning/lifecycle;
 // this file only owns "what the 11 items are" and "how the list looks/behaves".
 
@@ -41,7 +42,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     label: '文字',
     aliases: ['text', 'p', 'paragraph'],
     description: '純文字段落',
-    icon: Type,
+    icon: InkText,
     run: (editor, range) => editor.chain().focus().deleteRange(range).setParagraph().run(),
   },
   {
@@ -49,7 +50,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     label: '標題 1',
     aliases: ['h1', 'heading', 'heading1'],
     description: '大標題',
-    icon: Heading1,
+    icon: InkHeading1,
     run: (editor, range) => editor.chain().focus().deleteRange(range).setHeading({ level: 1 }).run(),
   },
   {
@@ -57,7 +58,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     label: '標題 2',
     aliases: ['h2', 'heading2'],
     description: '中標題',
-    icon: Heading2,
+    icon: InkHeading2,
     run: (editor, range) => editor.chain().focus().deleteRange(range).setHeading({ level: 2 }).run(),
   },
   {
@@ -65,7 +66,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     label: '標題 3',
     aliases: ['h3', 'heading3'],
     description: '小標題',
-    icon: Heading3,
+    icon: InkHeading3,
     run: (editor, range) => editor.chain().focus().deleteRange(range).setHeading({ level: 3 }).run(),
   },
   {
@@ -73,7 +74,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     label: '待辦清單',
     aliases: ['todo', 'task'],
     description: '可勾選的待辦事項',
-    icon: ListChecks,
+    icon: InkTodo,
     run: (editor, range) => editor.chain().focus().deleteRange(range).toggleTaskList().run(),
   },
   {
@@ -81,7 +82,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     label: '項目符號清單',
     aliases: ['bullet', 'ul', 'list'],
     description: '無序清單',
-    icon: List,
+    icon: InkBulletList,
     run: (editor, range) => editor.chain().focus().deleteRange(range).toggleBulletList().run(),
   },
   {
@@ -89,7 +90,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     label: '編號清單',
     aliases: ['number', 'ol', 'ordered'],
     description: '有序清單',
-    icon: ListOrdered,
+    icon: InkNumberedList,
     run: (editor, range) => editor.chain().focus().deleteRange(range).toggleOrderedList().run(),
   },
   {
@@ -97,7 +98,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     label: '收合區塊',
     aliases: ['toggle', 'details'],
     description: '可展開收合的內容',
-    icon: ChevronRight,
+    icon: InkToggle,
     run: (editor, range) => editor.chain().focus().deleteRange(range).setDetails().run(),
   },
   {
@@ -105,7 +106,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     label: '引言',
     aliases: ['quote', 'blockquote'],
     description: '引用文字',
-    icon: Quote,
+    icon: InkQuote,
     run: (editor, range) => editor.chain().focus().deleteRange(range).setBlockquote().run(),
   },
   {
@@ -113,7 +114,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     label: '程式碼區塊',
     aliases: ['code', 'codeblock'],
     description: '等寬字型程式碼',
-    icon: Code2,
+    icon: InkCodeBlock,
     run: (editor, range) => editor.chain().focus().deleteRange(range).setCodeBlock().run(),
   },
   {
@@ -121,7 +122,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     label: '分隔線',
     aliases: ['divider', 'hr', 'line'],
     description: '水平分隔線',
-    icon: Minus,
+    icon: InkDivider,
     run: (editor, range) => editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
   },
 ]
@@ -135,7 +136,7 @@ function createImageItem(uploadImage: UploadImageFn): SlashItem {
     label: '圖片',
     aliases: ['image', 'img', 'photo'],
     description: '插入一張圖片',
-    icon: ImageIcon,
+    icon: InkImage,
     run: (editor, range) => pickAndInsertImage(editor.view, uploadImage, { from: range.from, to: range.to }),
   }
 }
@@ -221,8 +222,11 @@ export const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(function Sl
               i === selected ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-secondary',
             )}
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground">
-              <Icon className="h-4 w-4" />
+            {/* No bordered thumbnail tile (that's Notion's signature): the
+                hand-inked mark sits straight on the paper, in the row's own
+                ink colour, so it follows selected / dark states for free. */}
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+              <Icon className="h-5 w-5" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium leading-tight">{t(item.label)}</span>

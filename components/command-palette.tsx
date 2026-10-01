@@ -6,12 +6,12 @@ import {
   Calendar as CalendarIcon,
   CalendarRange,
   CalendarDays,
-  NotebookPen,
   LayoutGrid,
   Settings,
   Plus,
   CheckCircle2,
 } from 'lucide-react'
+import { InkNotebook } from '@/components/icons/huddle-icons'
 import { ModalShell } from '@/components/modals/modal-shell'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { useNotebookOverlay } from '@/components/notebook/notebook-overlay-provider'
@@ -142,7 +142,7 @@ export function CommandPalette({
                 <span>{t('切換為月檢視')}</span>
               </CommandItem>
               <CommandItem value={t('開記事本')} onSelect={() => runAction(openNotebook)}>
-                <NotebookPen />
+                <InkNotebook />
                 <span>{t('開記事本')}</span>
               </CommandItem>
               <CommandItem value={t('返回日曆')} onSelect={() => runAction(onReturnToCalendar)}>
