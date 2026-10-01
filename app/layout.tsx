@@ -23,6 +23,7 @@ import { FloatingHub } from '@/components/floating/floating-hub'
 import { StickyNotesProvider } from '@/components/sticky-notes/sticky-notes-provider'
 import { BRAND_TITLE } from '@/lib/brand'
 import { Toaster } from 'sonner'
+import { DocumentLanguage } from '@/components/i18n/document-language'
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_ORIGIN),
@@ -105,7 +106,7 @@ export default function RootLayout({
             user-menu 「安裝到手機」 row — it can fire before React hydrates. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{if(window.huddleDesktop&&window.huddleDesktop.isDesktop&&window.huddleDesktop.platform==='darwin'&&!window.opener)document.documentElement.dataset.desktopTitlebar='mac';var m=window.matchMedia('(max-width:767px)').matches;document.documentElement.dataset.viewport=m?'mobile':'desktop';if(m)document.documentElement.classList.add('is-mobile');var f=localStorage.getItem('waddle-font-size-v1');var map={sm:'87.5%',lg:'112.5%',xl:'125%'};if(f&&map[f])document.documentElement.style.fontSize=map[f];}catch(e){}try{window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__huddleInstallPrompt=e})}catch(e){}})();`,
+            __html: `(function(){try{if(window.huddleDesktop&&window.huddleDesktop.isDesktop&&window.huddleDesktop.platform==='darwin'&&!window.opener)document.documentElement.dataset.desktopTitlebar='mac';var p=location.pathname;if(p==='/en'||p.indexOf('/en/')===0)document.documentElement.lang='en';var m=window.matchMedia('(max-width:767px)').matches;document.documentElement.dataset.viewport=m?'mobile':'desktop';if(m)document.documentElement.classList.add('is-mobile');var f=localStorage.getItem('waddle-font-size-v1');var map={sm:'87.5%',lg:'112.5%',xl:'125%'};if(f&&map[f])document.documentElement.style.fontSize=map[f];}catch(e){}try{window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__huddleInstallPrompt=e})}catch(e){}})();`,
           }}
         />
       </head>
@@ -156,6 +157,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               the home page, so toasts on /org, /assignments, invites and
               /notebook vanished). */}
           <Toaster position="bottom-right" richColors closeButton />
+          <DocumentLanguage />
         </ThemeProvider>
       </body>
     </html>

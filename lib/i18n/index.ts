@@ -35,9 +35,15 @@ function detect(): Lang {
   }
 }
 
+/** <html lang> for a page: /en/* pages are English content regardless of
+ *  the UI language; every other page follows the UI language. */
+export function htmlLangFor(lang: Lang, pathname: string): Lang {
+  return pathname === '/en' || pathname.startsWith('/en/') ? 'en' : lang
+}
+
 function applyHtmlLang(lang: Lang) {
   try {
-    document.documentElement.lang = lang
+    document.documentElement.lang = htmlLangFor(lang, window.location.pathname)
   } catch {
     /* SSR / no DOM */
   }
