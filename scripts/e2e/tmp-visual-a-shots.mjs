@@ -30,7 +30,7 @@ const PASSWORD = env.E2E_PASSWORD
 if (!EMAIL || !PASSWORD) { console.error('missing E2E creds'); process.exit(1) }
 
 async function login(page) {
-  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE_URL}/login?method=email`, { waitUntil: 'domcontentloaded' })
   await page.locator('#email').fill(EMAIL)
   await page.locator('#password').fill(PASSWORD)
   await page.getByRole('button', { name: '登入', exact: true }).click()

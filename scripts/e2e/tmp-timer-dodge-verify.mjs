@@ -66,7 +66,7 @@ async function waitServer() {
 
 async function login(page) {
   for (let attempt = 1; attempt <= 3; attempt++) {
-    await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE}/login?method=email`, { waitUntil: 'domcontentloaded' })
     await page.locator('#email').waitFor({ timeout: 60000 })
     await sleep(1500)
     await page.locator('#email').fill(EMAIL)

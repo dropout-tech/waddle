@@ -62,7 +62,7 @@ const capture = async filename => {
  await page.screenshot({ path: `public/marketing/${english ? filename.replace('.png', '-en.png') : filename}`, animations: 'disabled' })
 }
 try {
- await page.goto(base + '/login', { waitUntil: 'domcontentloaded' })
+ await page.goto(base + '/login?method=email', { waitUntil: 'domcontentloaded' })
  await page.locator('#email').fill(env.E2E_EMAIL)
  await page.locator('#password').fill(env.E2E_PASSWORD)
  await page.locator('button[type=submit]').click()

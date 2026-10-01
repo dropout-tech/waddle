@@ -152,7 +152,7 @@ async function main() {
   page.on('pageerror', (e) => pageErrors.push(e.message))
   await installRoutes(page)
 
-  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE_URL}/login?method=email`, { waitUntil: 'domcontentloaded' })
   await page.locator('#email').fill(EMAIL)
   await page.locator('#password').fill(PASSWORD)
   await page.getByRole('button', { name: '登入', exact: true }).click()

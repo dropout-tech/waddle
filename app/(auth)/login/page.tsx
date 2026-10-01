@@ -64,6 +64,11 @@ function LoginForm() {
   // Hook-bound t shadows the module-level import inside the component so
   // render output follows the hydration-safe language (SSR = zh first paint).
   const { t } = useI18n()
+  // Sign-in is Google / Apple only (owner decision 2026-10-01: no password
+  // accounts → no forgot-password mail to support). The email form stays
+  // reachable at /login?method=email, unlinked, for the App Review demo
+  // account and the e2e test accounts.
+  const emailMode = searchParams.get('method') === 'email'
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -182,6 +187,19 @@ function LoginForm() {
         </Button>
       </div>
 
+      <DesktopLoginPending active={googleLoading || appleLoading} />
+
+      {error && !emailMode && (
+        <div className={cn(
+          'flex items-start gap-2 p-3 rounded-lg mt-4',
+          'bg-destructive/10 text-destructive text-sm border border-destructive/20'
+        )}>
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {emailMode && (<>
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-border" />
@@ -208,18 +226,7 @@ function LoginForm() {
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">{t('密碼')}</Label>
-            {/* prefetch off: on a slow link the viewport prefetch of these
-                side routes queued ahead of the post-login route warmed below. */}
-            <Link
-              href="/forgot-password"
-              prefetch={false}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {t('忘記密碼？')}
-            </Link>
-          </div>
+          <Label htmlFor="password">{t('密碼')}</Label>
           <div className="relative">
             <Input
               id="password"
@@ -240,7 +247,6 @@ function LoginForm() {
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
-        <DesktopLoginPending active={googleLoading || appleLoading} />
           </div>
         </div>
 
@@ -258,6 +264,7 @@ function LoginForm() {
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t('登入')}
         </Button>
       </form>
+      </>)}
 
       <p className="text-center text-sm text-muted-foreground mt-6">
         {t('還沒有帳號？')}{' '}

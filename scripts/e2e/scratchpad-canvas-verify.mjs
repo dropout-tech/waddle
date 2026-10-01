@@ -44,7 +44,7 @@ try {
   if(r.method()==='DELETE')rows=rows.filter(x=>x.id!==id)
   return route.fulfill({json:r.method()==='PATCH'?{id}:[]})
  })
- await page.goto(base+'/login');await page.locator('#email').fill(env.E2E_EMAIL);await page.locator('#password').fill(env.E2E_PASSWORD);await page.locator('button[type=submit]').click();await page.waitForURL(u=>!u.pathname.includes('/login'),{timeout:60000})
+ await page.goto(base+'/login?method=email');await page.locator('#email').fill(env.E2E_EMAIL);await page.locator('#password').fill(env.E2E_PASSWORD);await page.locator('button[type=submit]').click();await page.waitForURL(u=>!u.pathname.includes('/login?method=email'),{timeout:60000})
  await page.goto(base+'/float/scratchpad');await page.getByTestId('scratchpad-canvas').waitFor();await page.getByTestId('canvas-item').getByText('原本上方的筆記',{exact:true}).waitFor()
  check('Legacy content is visible directly on the whiteboard',await page.getByTestId('canvas-item').getByText('原本上方的筆記',{exact:true}).isVisible())
  check('Loading legacy content preserves its ID and metadata without migration writes',rows.length===1&&rows[0].id==='00000000-0000-4000-8000-000000000001'&&rows[0].metadata.preserved==='yes'&&!rows[0].metadata.canvas&&writes.length===0)

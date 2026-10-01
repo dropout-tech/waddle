@@ -48,7 +48,7 @@ async function main() {
   if (!process.env.E2E_BASE_URL) { startDevServer(); await waitForServerReady() }
   const browser = await chromium.launch()
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
-  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE_URL}/login?method=email`, { waitUntil: 'domcontentloaded' })
   await page.locator('#email').fill(EMAIL)
   await page.locator('#password').fill(PASSWORD)
   await page.getByRole('button', { name: '登入', exact: true }).click()
