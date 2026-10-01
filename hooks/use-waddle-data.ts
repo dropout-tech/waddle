@@ -189,6 +189,12 @@ interface UseWaddleData {
   timeBlocks: TimeBlock[]
   settings: UserSettings
   isLoading: boolean
+  /**
+   * The first load could not read everything. isLoading stays true (nothing
+   * half-loaded is shown or saved over); call retryLoad to try again.
+   */
+  loadError: boolean
+  retryLoad: () => void
   /** True until the spotlight onboarding tour is completed (or skipped). */
   onboardingCompleted: boolean
   /** Mark the onboarding tour as complete and persist it. */
@@ -307,6 +313,7 @@ export function useWaddleData(): UseWaddleData {
     commitScratchpadByDate(next)
   }, [])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [onboardingCompleted, setOnboardingCompleted] = useState(true)
   const userIdRef = useRef<string | null>(null)
   // Monotonic counter so a fresh load() can invalidate any in-flight older
@@ -429,7 +436,9 @@ export function useWaddleData(): UseWaddleData {
       // assume workspaces already exist (user has been using the app).
       // First-run seeding must finish before the data is used: discard the
       // (empty) speculative reads and read everything again afterwards.
-      if (initial && (!wsRows || wsRows.length === 0)) {
+      // A FAILED workspaces read is not an empty account: never seed demo
+      // data into a real account because one request errored.
+      if (initial && !reads[0].error && (!wsRows || wsRows.length === 0)) {
         try {
           await seedUserData(user.id, user.email ?? '', supabase)
         } catch (err) {
@@ -441,10 +450,17 @@ export function useWaddleData(): UseWaddleData {
         reads = await readAll(user.id)
         wsRows = reads[0].data
       }
-      // The tasks read spans several requests for a large account, and one
-      // failed page leaves no list at all. On a background refresh, keep what
-      // is on screen rather than blanking every task until the next refresh.
-      if (!initial && reads[2].error) return
+      // Any failed read means that list's real contents are unknown — never
+      // treat it as empty (a failed categories read hides every task, a failed
+      // settings read would show defaults that the next save writes over the
+      // real ones). On a background refresh keep what is on screen; on the
+      // first load stay on the loading screen and offer a retry.
+      const readErrors = reads.map((r) => r.error).filter(Boolean)
+      if (readErrors.length > 0) {
+        console.error('[loadData] read failed', readErrors)
+        if (initial && !isStale()) setLoadError(true)
+        return
+      }
 
       const [
         ,
@@ -780,6 +796,12 @@ export function useWaddleData(): UseWaddleData {
 
   // ─── Initial load ────────────────────────────────────
   useEffect(() => {
+    void loadData({ initial: true })
+  }, [loadData])
+
+  const retryLoad = useCallback(() => {
+    setLoadError(false)
+    initialLoadClaimedRef.current = false
     void loadData({ initial: true })
   }, [loadData])
 
@@ -3535,6 +3557,8 @@ export function useWaddleData(): UseWaddleData {
     timeBlocks,
     settings,
     isLoading,
+    loadError,
+    retryLoad,
     onboardingCompleted,
     completeOnboarding,
     applyOnboardingChoice,

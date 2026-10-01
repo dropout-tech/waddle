@@ -48,6 +48,8 @@ function HuddlePage() {
     timeBlocks,
     settings,
     isLoading,
+    loadError,
+    retryLoad,
     onboardingCompleted,
     completeOnboarding,
     applyOnboardingChoice,
@@ -499,11 +501,24 @@ function HuddlePage() {
     return (
       <main className="h-screen w-full flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4 text-muted-foreground">
-          <HuddleMascot className="w-20 h-20 animate-waddle-bob" />
-          <div className="flex items-center gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-sm">{t('載入中...')}</span>
-          </div>
+          <HuddleMascot className={loadError ? 'w-20 h-20' : 'w-20 h-20 animate-waddle-bob'} />
+          {loadError ? (
+            <div role="alert" className="flex flex-col items-center gap-3 px-6 text-center">
+              <span className="text-sm">{t('資料沒有載入完整，請檢查網路後重試。你的資料沒有遺失。')}</span>
+              <button
+                type="button"
+                onClick={retryLoad}
+                className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+              >
+                {t('重試')}
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">{t('載入中...')}</span>
+            </div>
+          )}
         </div>
       </main>
     )
