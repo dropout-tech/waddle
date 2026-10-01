@@ -336,28 +336,33 @@ export function useNotebook() {
           .filter((n): n is NotebookNote => n !== null)
       })
 
-      const rows = orderedIds
+      // Write only what the gesture changed: sort_order, plus category_id for
+      // the note dragged into another folder. Upserting whole rows wrote this
+      // tab's possibly hours-old title/content over edits made elsewhere and
+      // re-inserted notes another device had deleted.
+      const patches = orderedIds
         .map((id, i) => {
           const n = byId.get(id)
           if (!n) return null
           const isMovedNote = move?.id === id
+          // Every row is written (not just "changed" ones): local sortOrder
+          // can drift from the DB (createNote bumps others locally only).
           return {
             id,
-            user_id: userId,
-            title: n.title,
-            content: (n.content as unknown as never) ?? null,
-            // upsert writes the whole row. Carry category_id through for
-            // ordinary reorders, and update it atomically for cross-folder
-            // drags so a failed request can roll the whole gesture back.
-            category_id: isMovedNote ? move.categoryId : n.categoryId,
-            sort_order: i * 10,
-            updated_at: isMovedNote ? now : n.updatedAt,
+            patch: isMovedNote
+              ? { sort_order: i * 10, category_id: move.categoryId, updated_at: now }
+              : { sort_order: i * 10 },
           }
         })
         .filter((r): r is NonNullable<typeof r> => r !== null)
 
       await Promise.all(orderedIds.map((id) => pendingCreates.current[id]))
-      const { error } = await supabase.from('notebook_notes').upsert(rows)
+      const results = await Promise.all(
+        patches.map(({ id, patch }) =>
+          supabase.from('notebook_notes').update(patch).eq('id', id).eq('user_id', userId),
+        ),
+      )
+      const error = results.find((r) => r.error)?.error
       if (error) {
         console.error('[notebook] reorder failed', error)
         setNotes(snapshot)
@@ -487,14 +492,21 @@ export function useNotebook() {
           })
           .filter((c): c is NotebookCategory => c !== null)
       })
-      const rows = orderedIds
+      // sort_order only — same reason as reorderNotes (no stale name/color
+      // overwrites, no resurrecting folders deleted on another device).
+      const orders = orderedIds
         .map((id, i) => {
           const c = byId.get(id)
-          if (!c) return null
-          return { id, user_id: userId, name: c.name, color: c.color, sort_order: i * 10 }
+          return c ? { id, sort_order: i * 10 } : null
         })
         .filter((r): r is NonNullable<typeof r> => r !== null)
-      const { error } = await supabase.from('notebook_categories').upsert(rows)
+      await Promise.all(orders.map(({ id }) => pendingCreates.current[id]))
+      const results = await Promise.all(
+        orders.map(({ id, sort_order }) =>
+          supabase.from('notebook_categories').update({ sort_order }).eq('id', id).eq('user_id', userId),
+        ),
+      )
+      const error = results.find((r) => r.error)?.error
       if (error) {
         console.error('[notebook] category reorder failed', error)
         setCategories(snapshot)
