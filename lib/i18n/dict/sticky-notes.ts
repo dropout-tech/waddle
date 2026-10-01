@@ -29,12 +29,4 @@ export const dict: Record<string, string> = {
   '刪除這個資料夾？裡面的便條紙會移到「未分類」，不會被刪掉。': 'Delete this folder? Its notes move to "Uncategorized" — they won\'t be deleted.',
   '這裡還沒有便條紙。在便條紙右上角按「收起」，就會收進這裡。': 'No notes here yet. Tap "Put away" at the top-right of a sticky note to file it here.',
   '（空白便條紙）': '(Empty note)',
-
-  // Onboarding tour copy (folded into the existing "使用者選單" step, since
-  // the toggle itself lives inside a dropdown that's absent from the DOM
-  // until opened — a spotlight can't target it).
-  '點開有你的帳號資訊、深淺色切換與登出。「📌 便條紙」開關現在也在上方工具列（記事本旁邊）就能直接點——開了會出現一片玻璃便條層，貼在畫面上、換頁也不會不見，可以拖曳、選顏色或刪除；按收起鍵會收進旁邊的「收納」抽屜（可分資料夾），之後再貼回來。桌面上按 ⌘K 隨時召喚指令面板（搜任務、切視圖、開記事本）；按 ? 看完整快捷鍵。':
-    'Opens your account info, light/dark toggle, and sign-out. The "📌 Sticky notes" toggle now also lives right in the toolbar above (next to the notebook) — turning it on drops a glass layer of notes over the screen that stays put as you switch pages; drag them, pick a color, or delete them; "Put away" files a note into the drawer next to it (with folders) so you can pin it back later. On desktop, press ⌘K anytime for the command palette (search tasks, switch views, open the notebook); press ? for the full shortcut list.',
-  '日曆頁「⋯」選單裡有「每日簽到」，記錄心情累積連續天數；使用者選單裡有「會議轉任務」，貼上逐字稿自動整理成待辦任務。「📌 便條紙」開關也在日曆工具列（記事本旁邊）或「⋯」選單裡就能直接點開，開了會出現一片玻璃便條層貼在畫面上，換頁也不會不見；用不到的可以收進「收納」抽屜分資料夾放。':
-    'The calendar page\'s "⋯" menu has "Daily check-in" to log your mood and build a streak; the user menu has "Meeting to tasks" to turn a pasted transcript into to-dos automatically. The "📌 Sticky notes" toggle is also right there in the calendar toolbar (next to the notebook) or in the "⋯" menu — turning it on drops a glass layer of notes over the screen that stays put as you switch pages; notes you are done with can be put away into folders in the drawer.',
 }
