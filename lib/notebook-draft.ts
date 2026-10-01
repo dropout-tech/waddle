@@ -24,7 +24,20 @@ export interface NotebookDraft {
   content?: TiptapDoc
   /** Server version token the edit is based on; missing = unknown. */
   base?: string
+  /** contentHash of the server content at `base`, when known — lets a
+   *  reload rebase over a change elsewhere that didn't touch the text
+   *  (title, folder move) instead of reporting a conflict. */
+  baseHash?: string
+  /** Which page (tab / window) wrote it: another window that is still
+   *  typing into the note must not have its backup re-sent or deleted
+   *  under it (see use-notebook.ts ownedInAnotherWindow). */
+  writer?: string
 }
+
+/** Id of this page (JS realm); see NotebookDraft.writer. */
+export const DRAFT_WRITER =
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Math.random())
+
 
 const PREFIX = 'huddle:notebook-draft:'
 const keyOf = (userId: string, noteId: string) => `${PREFIX}${userId}:${noteId}`
@@ -61,6 +74,7 @@ export function saveNotebookDraft(
   field: 'title' | 'content',
   value: string | TiptapDoc,
   base: string | undefined,
+  baseHash?: string,
 ) {
   const draft = read(userId, noteId) ?? {}
   const next: NotebookDraft = field === 'title'
@@ -68,22 +82,31 @@ export function saveNotebookDraft(
     : { ...draft, content: value as TiptapDoc }
   if (base) next.base = base
   else delete next.base
+  if (base && baseHash) next.baseHash = baseHash
+  else delete next.baseHash
+  next.writer = DRAFT_WRITER
   write(userId, noteId, next)
 }
 
+const ownDraft = (draft: NotebookDraft) => !draft.writer || draft.writer === DRAFT_WRITER
+
 /** The server accepted a write made on top of the draft's lineage: whatever
  *  is still in the draft is now based on `token`. */
-export function rebaseNotebookDraft(userId: string, noteId: string, token: string) {
+export function rebaseNotebookDraft(userId: string, noteId: string, token: string, baseHash?: string) {
   const draft = read(userId, noteId)
-  if (!draft || draft.base === token) return
-  write(userId, noteId, { ...draft, base: token })
+  if (!draft || !ownDraft(draft) || (draft.base === token && draft.baseHash === baseHash)) return
+  const next = { ...draft, base: token }
+  if (baseHash) next.baseHash = baseHash
+  else delete next.baseHash
+  write(userId, noteId, next)
 }
 
 /** Drop one field after the server confirmed it. For titles, only when the
- *  saved value is still the backed-up one (a newer keystroke keeps its draft). */
+ *  saved value is still the backed-up one (a newer keystroke keeps its draft).
+ *  Never touches a backup another window wrote. */
 export function clearNotebookDraftField(userId: string, noteId: string, field: 'title' | 'content', savedTitle?: string) {
   const draft = read(userId, noteId)
-  if (!draft) return
+  if (!draft || !ownDraft(draft)) return
   if (field === 'title') {
     if (draft.title !== savedTitle) return
     delete draft.title
@@ -118,6 +141,14 @@ export interface StoredNotebookDraft {
   raw: string
 }
 
+/** One note's draft, if any. */
+export function readNotebookDraft(userId: string, noteId: string): StoredNotebookDraft | null {
+  const raw = readRaw(userId, noteId)
+  const draft = read(userId, noteId)
+  if (!raw || !draft || (!('title' in draft) && !('content' in draft))) return null
+  return { noteId, draft, raw }
+}
+
 /** Every draft of this user still on the device. */
 export function readNotebookDrafts(userId: string): StoredNotebookDraft[] {
   const prefix = `${PREFIX}${userId}:`
@@ -143,11 +174,13 @@ export function readNotebookDrafts(userId: string): StoredNotebookDraft[] {
   return out
 }
 
-/** Sign-out / account deletion: remove this user's drafts (or, when the user
- *  id is unknown, every notebook draft) so their text doesn't stay readable
- *  in this browser's storage. */
-export function clearAllNotebookDrafts(userId?: string | null) {
-  const prefix = userId ? `${PREFIX}${userId}:` : PREFIX
+/** Sign-out (after the user confirmed) / account deletion: remove this
+ *  user's drafts so their text doesn't stay readable in this browser's
+ *  storage. Without a user id nothing is removed — other accounts' unsent
+ *  text on a shared device must survive. */
+export function clearAllNotebookDrafts(userId: string | null | undefined) {
+  if (!userId) return
+  const prefix = `${PREFIX}${userId}:`
   try {
     const keys: string[] = []
     for (let i = 0; i < window.localStorage.length; i++) {

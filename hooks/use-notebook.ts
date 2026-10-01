@@ -14,12 +14,13 @@ import {
   clearNotebookDraftField,
   clearNotebookDraft,
   clearNotebookDraftIfUnchanged,
-  isNotebookDraftUnchanged,
+  readNotebookDraft,
   readNotebookDrafts,
   rebaseNotebookDraft,
-  type StoredNotebookDraft,
+  DRAFT_WRITER,
 } from '@/lib/notebook-draft'
-import { conflictCopyId, decideAfterMiss } from '@/lib/note-sync'
+import { conflictCopyId, contentHash, decideAfterMiss } from '@/lib/note-sync'
+import { registerPendingWrites } from '@/lib/pending-writes'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
 import { toast } from 'sonner'
 
@@ -38,7 +39,12 @@ type NoteSyncResult =
   | { kind: 'saved'; updatedAt: string }
   | { kind: 'same'; row: NotebookNotesRow }
   | { kind: 'copied'; row: NotebookNotesRow | null; copy: NotebookNotesRow }
-  | { kind: 'error'; error: unknown }
+  /** copyBlocked: a conflict copy was needed but the plan's note limit
+   *  refused it — the text stays queued + backed up on this device. */
+  | { kind: 'error'; error: unknown; copyBlocked?: boolean }
+
+/** What the server had at the version an edit is based on, when known. */
+type NoteBase = { content: TiptapDoc | null } | { hash: string }
 
 async function syncNoteWithLock(
   supabase: SupabaseClient,
@@ -49,9 +55,10 @@ async function syncNoteWithLock(
     content?: TiptapDoc | null
     /** Server version the edit is based on; undefined = unknown. */
     token: string | undefined
-    /** Server content at `token`, when known (lets a title-only change made
-     *  elsewhere be rebased over instead of reported as a conflict). */
-    base?: { content: TiptapDoc | null }
+    /** Server content at `token`, when known (lets a change made elsewhere
+     *  that didn't touch the text be rebased over instead of reported as a
+     *  conflict). */
+    base?: NoteBase
     /** How the note looks on this device, to name/place the copy. */
     local?: { title: string; icon?: string; categoryId: string | null }
   },
@@ -110,7 +117,7 @@ async function syncNoteWithLock(
     const again = await supabase.from('notebook_notes').select('*').eq('id', copyId).maybeSingle()
     if (!again.error && again.data) return { kind: 'copied', row, copy: again.data }
   }
-  return { kind: 'error', error: ins.error }
+  return { kind: 'error', error: ins.error, copyBlocked: planLimitCode(ins.error) === 'NOTE_LIMIT' }
 }
 
 function notifyNoteConflict(copyTitle: string) {
@@ -120,39 +127,111 @@ function notifyNoteConflict(copyTitle: string) {
   )
 }
 
-// Drafts left by an earlier page load are written back once per page per
-// user, BEFORE any notebook instance lists notes (useNotebook is mounted by
-// several components at once) — so every instance sees the outcome and no
-// two instances race each other over the same draft. Resolves to the drafts
-// that could not be settled (offline…); they stay on the device.
-const draftRestores = new Map<string, Promise<StoredNotebookDraft[]>>()
+function notifyCopyBlocked() {
+  toast.error(
+    t('這篇筆記在其他裝置上也改過了，但筆記數量已達方案上限，沒辦法另存一份。這台的內容還保留在這台裝置上：刪掉一些筆記或升級後，下次存檔會再試一次；在那之前請不要登出。'),
+    { duration: 20000, id: 'notebook-copy-blocked' },
+  )
+}
 
-function restoreNotebookDrafts(supabase: SupabaseClient, userId: string): Promise<StoredNotebookDraft[]> {
-  let p = draftRestores.get(userId)
+// ── Coordination between useNotebook instances on one page ──
+// The hook is mounted by several components at once (workspace, widget sync)
+// and the notebook overlay remounts it every time it opens, so what one
+// instance leaves behind (an unsent retry, a backed-up draft) must be visible
+// to the next.
+
+// One write at a time per note, across instances: a restore never runs
+// while another instance's save of the same note is still in flight.
+const noteChains = new Map<string, Promise<void>>()
+function enqueueNote<T>(id: string, fn: () => Promise<T>): Promise<T> {
+  const p = (noteChains.get(id) ?? Promise.resolve()).then(fn, fn)
+  const tail = p.then(() => undefined, () => undefined)
+  noteChains.set(id, tail)
+  void tail.then(() => {
+    if (noteChains.get(id) === tail) noteChains.delete(id)
+  })
+  return p
+}
+/** Resolves once every write queued so far (and any queued meanwhile) is done. */
+async function allNoteWork() {
+  while (noteChains.size > 0) await Promise.all([...noteChains.values()])
+}
+// Sign-out also waits for saves an already-unmounted instance (overlay just
+// closed) queued on its way out.
+registerPendingWrites(allNoteWork)
+
+// Note id → the mounted instance still holding unsent text for it (its
+// draft is that instance's live backup, not something to restore).
+const draftOwners = new Map<string, symbol>()
+
+// Other windows of this browser (a second tab, the floating note window)
+// share localStorage but not this module. Before re-sending a draft another
+// window wrote, ask whether that window is still open and holding the note;
+// a reloaded or closed page can't answer, so its drafts are restored.
+const draftChannel =
+  typeof window !== 'undefined' && 'BroadcastChannel' in window ? new BroadcastChannel('huddle-notebook-drafts') : null
+draftChannel?.addEventListener('message', (e: MessageEvent) => {
+  const m = e.data as { type?: string; noteId?: string; ask?: string }
+  if (m?.type === 'holding?' && m.noteId && draftOwners.has(m.noteId)) {
+    draftChannel.postMessage({ type: 'holding', ask: m.ask })
+  }
+})
+function ownedInAnotherWindow(noteId: string): Promise<boolean> {
+  const channel = draftChannel
+  if (!channel) return Promise.resolve(false)
+  const ask = Math.random().toString(36).slice(2)
+  return new Promise((resolve) => {
+    const onMessage = (e: MessageEvent) => {
+      if ((e.data as { type?: string; ask?: string })?.type === 'holding' && e.data.ask === ask) done(true)
+    }
+    const done = (held: boolean) => {
+      clearTimeout(timer)
+      channel.removeEventListener('message', onMessage)
+      resolve(held)
+    }
+    const timer = setTimeout(() => done(false), 250)
+    channel.addEventListener('message', onMessage)
+    channel.postMessage({ type: 'holding?', noteId, ask })
+  })
+}
+
+// In-flight draft restores, by note: concurrent mounts share one.
+const restoring = new Map<string, Promise<boolean>>()
+
+/** Write back (or turn into a conflict copy) one backed-up draft. Resolves
+ *  false when it couldn't be settled (offline, copy refused) — the draft
+ *  stays on the device. Runs on every mount: drafts made earlier in this
+ *  page's life (overlay closed while offline) must come back too. */
+function restoreDraft(supabase: SupabaseClient, userId: string, noteId: string, owner: symbol): Promise<boolean> {
+  const key = `${userId}:${noteId}`
+  let p = restoring.get(key)
   if (!p) {
-    p = (async () => {
-      const failed: StoredNotebookDraft[] = []
-      await Promise.all(
-        readNotebookDrafts(userId).map(async (d) => {
-          const r = await syncNoteWithLock(supabase, {
-            userId,
-            noteId: d.noteId,
-            title: d.draft.title,
-            content: d.draft.content,
-            token: d.draft.base,
-          })
-          if (r.kind === 'error') {
-            console.error('[notebook] draft restore failed', r.error)
-            failed.push(d)
-            return
-          }
-          clearNotebookDraftIfUnchanged(userId, d.noteId, d.raw)
-          if (r.kind === 'copied') notifyNoteConflict(r.copy.title)
-        }),
-      )
-      return failed
-    })()
-    draftRestores.set(userId, p)
+    p = enqueueNote(noteId, async () => {
+      const holder = draftOwners.get(noteId)
+      if (holder && holder !== owner) return true // still being edited here
+      const d = readNotebookDraft(userId, noteId)
+      if (!d) return true
+      if (d.draft.writer && d.draft.writer !== DRAFT_WRITER && (await ownedInAnotherWindow(noteId))) {
+        return true // another open window is still editing it
+      }
+      const r = await syncNoteWithLock(supabase, {
+        userId,
+        noteId,
+        title: d.draft.title,
+        content: d.draft.content,
+        token: d.draft.base,
+        base: d.draft.base && d.draft.baseHash ? { hash: d.draft.baseHash } : undefined,
+      })
+      if (r.kind === 'error') {
+        console.error('[notebook] draft restore failed', r.error)
+        if (r.copyBlocked) notifyCopyBlocked()
+        return false
+      }
+      clearNotebookDraftIfUnchanged(userId, noteId, d.raw)
+      if (r.kind === 'copied') notifyNoteConflict(r.copy.title)
+      return true
+    }).finally(() => restoring.delete(key))
+    restoring.set(key, p)
   }
   return p
 }
@@ -213,27 +292,42 @@ export function useNotebook() {
   // INSERT commits, match 0 rows, and silently drop the user's first edits.
   const pendingCreates = useRef<Record<string, Promise<void>>>({})
 
-  // Per note: the server version token this device last read or wrote
-  // (updated_at exactly as returned), and the content the server had at that
+  // Per note: the server version token this instance last read or wrote
+  // (updated_at exactly as returned), and what the server had at that
   // version (absent = unknown). See syncNoteWithLock.
   const versionRef = useRef<Record<string, string>>({})
-  const baseRef = useRef<Record<string, TiptapDoc | null>>({})
-  // Writes that use a note's version token run one at a time per note, so a
-  // second save never goes out with the token the first one is replacing.
-  const noteChains = useRef<Record<string, Promise<unknown>>>({})
-  const enqueue = useCallback(<T,>(id: string, fn: () => Promise<T>): Promise<T> => {
-    const p = (noteChains.current[id] ?? Promise.resolve()).then(fn, fn)
-    noteChains.current[id] = p.catch(() => undefined)
-    return p
+  const baseRef = useRef<Record<string, NoteBase>>({})
+  // contentHash of baseRef, computed on demand (drafts store it).
+  const baseHashCache = useRef<Record<string, string>>({})
+  const setBase = useCallback((id: string, base: NoteBase | undefined) => {
+    delete baseHashCache.current[id]
+    if (base) baseRef.current[id] = base
+    else delete baseRef.current[id]
   }, [])
+  const baseHashOf = useCallback((id: string): string | undefined => {
+    const b = baseRef.current[id]
+    if (!b) return undefined
+    if ('hash' in b) return b.hash
+    return (baseHashCache.current[id] ??= contentHash(b.content))
+  }, [])
+  // Identifies this instance in draftOwners.
+  const ownerRef = useRef<symbol>(Symbol('useNotebook'))
   const notesRef = useRef<NotebookNote[]>([])
+  // Original note id → its conflict copy, between applyConflict and the
+  // render that swaps the editor to the server text: a keystroke in that
+  // gap still carries this device's text and belongs to the copy.
+  const redirectRef = useRef<Record<string, string>>({})
   useEffect(() => {
     notesRef.current = notes
+    // Runs after the editors' own effects of this commit (children first),
+    // i.e. after they loaded the new syncRev.
+    redirectRef.current = {}
   }, [notes])
 
   // ── Initial load ─────────────────────────────────────────
   useEffect(() => {
     let mounted = true
+    const owner = ownerRef.current
     ;(async () => {
       const {
         data: { user },
@@ -244,10 +338,16 @@ export function useNotebook() {
       }
       userIdRef.current = user.id
 
-      // Write back (or turn into conflict copies) edits a previous page load
-      // only managed to back up locally — before listing, so the list below
-      // already shows the outcome.
-      const unsettledDrafts = await restoreNotebookDrafts(supabase, user.id)
+      // Write back (or turn into conflict copies) edits that only made it
+      // into the local backup — from an earlier page load, or from an
+      // earlier mount on this page (the overlay closed while offline).
+      // Then wait for every queued write so the list below shows the result.
+      const restored = await Promise.all(
+        readNotebookDrafts(user.id).map(async (d) =>
+          (await restoreDraft(supabase, user.id, d.noteId, owner)) ? null : d.noteId,
+        ),
+      )
+      await allNoteWork()
       if (!mounted) return
 
       const [notesRes, catsRes] = await Promise.all([
@@ -276,21 +376,23 @@ export function useNotebook() {
         return
       }
       for (const r of data ?? []) {
-        if (r.id in versionRef.current) continue // a save from this tab already moved it on
+        if (r.id in versionRef.current) continue // a save from this instance already moved it on
         versionRef.current[r.id] = r.updated_at
-        baseRef.current[r.id] = (r.content as TiptapDoc | null) ?? null
+        setBase(r.id, { content: (r.content as TiptapDoc | null) ?? null })
       }
-      // Drafts the restore above couldn't settle (offline…) stay on the
+      // Drafts that couldn't be settled (offline, copy refused) stay on the
       // device. Show them, and make the next save of that note carry the
       // draft's own base version: if the server moved on meanwhile, that
       // save becomes a conflict copy instead of overwriting the other side.
       const recoveredById = new Map<string, { title?: string; content?: TiptapDoc }>()
-      for (const d of unsettledDrafts) {
-        if (!isNotebookDraftUnchanged(user.id, d.noteId, d.raw)) continue
-        recoveredById.set(d.noteId, d.draft)
-        if (d.draft.base) versionRef.current[d.noteId] = d.draft.base
-        else delete versionRef.current[d.noteId]
-        delete baseRef.current[d.noteId]
+      for (const noteId of restored) {
+        if (!noteId) continue
+        const d = readNotebookDraft(user.id, noteId)
+        if (!d) continue
+        recoveredById.set(noteId, d.draft)
+        if (d.draft.base) versionRef.current[noteId] = d.draft.base
+        else delete versionRef.current[noteId]
+        setBase(noteId, d.draft.base && d.draft.baseHash ? { hash: d.draft.baseHash } : undefined)
       }
       if (catsRes.error) console.error('[notebook] category load failed', catsRes.error)
       else
@@ -330,7 +432,7 @@ export function useNotebook() {
     return () => {
       mounted = false
     }
-  }, [supabase])
+  }, [supabase, setBase])
 
   // ── Create ───────────────────────────────────────────────
   // `categoryId` seeds the note into a folder (the sidebar passes the folder
@@ -375,9 +477,9 @@ export function useNotebook() {
         .single()
       if (!error && created) {
         versionRef.current[id] = created.updated_at
-        baseRef.current[id] = null
+        setBase(id, { content: null })
         // Typing that started before this answer was backed up without a base.
-        rebaseNotebookDraft(userId, id, created.updated_at)
+        rebaseNotebookDraft(userId, id, created.updated_at, baseHashOf(id))
       }
       if (error) {
         console.error('[notebook] create failed', error)
@@ -389,7 +491,7 @@ export function useNotebook() {
       delete pendingCreates.current[id]
     })()
     return optimistic
-  }, [supabase])
+  }, [supabase, setBase, baseHashOf])
 
   // ── Patch helpers (title / icon / category) ──────────────
   const patchNote = useCallback(
@@ -406,7 +508,8 @@ export function useNotebook() {
 
       const userId = userIdRef.current
       if (patch.title !== undefined && userId) {
-        saveNotebookDraft(userId, id, 'title', patch.title, versionRef.current[id])
+        saveNotebookDraft(userId, id, 'title', patch.title, versionRef.current[id], baseHashOf(id))
+        draftOwners.set(id, ownerRef.current)
       }
 
       const fields = {
@@ -419,7 +522,7 @@ export function useNotebook() {
       // but they bump updated_at. Try against our version first so the token
       // can follow; if the server already moved on, write the field anyway
       // and leave the token stale — the next content save then re-checks.
-      const error = await enqueue(id, async () => {
+      const error = await enqueueNote(id, async () => {
         await pendingCreates.current[id]
         const token = versionRef.current[id]
         if (token) {
@@ -432,7 +535,7 @@ export function useNotebook() {
           if (locked.error) return locked.error
           if (locked.data && locked.data.length > 0) {
             versionRef.current[id] = locked.data[0].updated_at
-            if (userId) rebaseNotebookDraft(userId, id, locked.data[0].updated_at)
+            if (userId) rebaseNotebookDraft(userId, id, locked.data[0].updated_at, baseHashOf(id))
             return null
           }
         }
@@ -447,7 +550,7 @@ export function useNotebook() {
         setNotes((prev) => prev.map((n) => (n.id === id ? prevSnapshot : n)))
       }
     },
-    [supabase, enqueue],
+    [supabase, baseHashOf],
   )
 
   const renameNote = useCallback((id: string, title: string) => patchNote(id, { title }), [patchNote])
@@ -471,11 +574,13 @@ export function useNotebook() {
   const applyConflict = useCallback(
     (id: string, userId: string, row: NotebookNotesRow | null, copy: NotebookNotesRow) => {
       versionRef.current[copy.id] = copy.updated_at
-      baseRef.current[copy.id] = (copy.content as TiptapDoc | null) ?? null
+      setBase(copy.id, { content: (copy.content as TiptapDoc | null) ?? null })
       if (row) {
         versionRef.current[id] = row.updated_at
-        baseRef.current[id] = (row.content as TiptapDoc | null) ?? null
+        setBase(id, { content: (row.content as TiptapDoc | null) ?? null })
       }
+      // Until the editor shows the server text, keystrokes go to the copy.
+      redirectRef.current[id] = copy.id
       // Anything typed while this was resolving continues this device's
       // version, so it goes to the copy too.
       const newer = pendingContent.current[id]
@@ -485,6 +590,7 @@ export function useNotebook() {
         delete saveTimers.current[id]
       }
       clearNotebookDraft(userId, id)
+      if (draftOwners.get(id) === ownerRef.current) draftOwners.delete(id)
       setNotes((prev) => {
         const orig = prev.find((n) => n.id === id)
         const copyNote: NotebookNote = { ...rowToNote(copy), ...(newer !== undefined ? { content: newer } : {}) }
@@ -505,12 +611,13 @@ export function useNotebook() {
       })
       if (newer !== undefined) {
         pendingContent.current[copy.id] = newer
-        saveNotebookDraft(userId, copy.id, 'content', newer, copy.updated_at)
+        saveNotebookDraft(userId, copy.id, 'content', newer, copy.updated_at, baseHashOf(copy.id))
+        draftOwners.set(copy.id, ownerRef.current)
         void flushContentRef.current(copy.id)
       }
       notifyNoteConflict(copy.title)
     },
-    [],
+    [setBase, baseHashOf],
   )
 
   const flushContent = useCallback(
@@ -522,7 +629,7 @@ export function useNotebook() {
       // together still send it once.
       const content = pendingContent.current[id]
       delete pendingContent.current[id]
-      return enqueue(id, async () => {
+      return enqueueNote(id, async () => {
         await pendingCreates.current[id]
         const userId = userIdRef.current
         const local = notesRef.current.find((n) => n.id === id)
@@ -532,13 +639,14 @@ export function useNotebook() {
               noteId: id,
               content,
               token: versionRef.current[id],
-              base: id in baseRef.current ? { content: baseRef.current[id] } : undefined,
+              base: baseRef.current[id],
               local: local ? { title: local.title, icon: local.icon, categoryId: local.categoryId } : undefined,
             })
-          : ({ kind: 'error', error: new Error('not signed in') } as const)
+          : ({ kind: 'error', error: new Error('not signed in') } as NoteSyncResult)
         if (r.kind === 'error') {
           console.error('[notebook] content save failed', r.error)
           setSaveStatus('error')
+          if (r.copyBlocked) notifyCopyBlocked()
           // Keep it queued (unless newer text arrived) so the next flush —
           // leaving the page, hiding the tab — tries again. The retry is
           // version-checked too, so it can't overwrite a newer save made on
@@ -553,31 +661,39 @@ export function useNotebook() {
         }
         const token = r.kind === 'saved' ? r.updatedAt : r.row.updated_at
         versionRef.current[id] = token
-        baseRef.current[id] = content
+        setBase(id, { content })
         // Server has it — drop the local backup unless newer text is queued
         // (that one now builds on the version just written).
         if (!(id in pendingContent.current)) clearNotebookDraftField(userId!, id, 'content')
-        rebaseNotebookDraft(userId!, id, token)
+        rebaseNotebookDraft(userId!, id, token, baseHashOf(id))
+        if (!readNotebookDraft(userId!, id) && draftOwners.get(id) === ownerRef.current) draftOwners.delete(id)
       })
     },
-    [supabase, enqueue, applyConflict],
+    [supabase, applyConflict, setBase, baseHashOf],
   )
   useEffect(() => {
     flushContentRef.current = flushContent
   }, [flushContent])
 
   const saveNoteContent = useCallback(
-    (id: string, content: TiptapDoc) => {
+    (editedId: string, content: TiptapDoc) => {
+      // The editor may still show this device's text for a note whose
+      // conflict was just resolved (see redirectRef): that edit continues
+      // the copy, not the original that now holds the other device's text.
+      const id = redirectRef.current[editedId] ?? editedId
       const now = new Date().toISOString()
       setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content, updatedAt: now } : n)))
       setSaveStatus('saving')
 
       pendingContent.current[id] = content
-      if (userIdRef.current) saveNotebookDraft(userIdRef.current, id, 'content', content, versionRef.current[id])
+      if (userIdRef.current) {
+        saveNotebookDraft(userIdRef.current, id, 'content', content, versionRef.current[id], baseHashOf(id))
+        draftOwners.set(id, ownerRef.current)
+      }
       clearTimeout(saveTimers.current[id])
       saveTimers.current[id] = setTimeout(() => void flushContent(id), SAVE_DEBOUNCE_MS)
     },
-    [flushContent],
+    [flushContent, baseHashOf],
   )
 
   // Send everything still waiting for its debounce. Runs when the editor goes
@@ -593,12 +709,33 @@ export function useNotebook() {
     }
     window.addEventListener('pagehide', flushAllContent)
     document.addEventListener('visibilitychange', onVisibility)
+    // Signing out sends everything first and waits for it (lib/auth/sign-out).
+    const unregister = registerPendingWrites(async () => {
+      flushAllContent()
+      await allNoteWork()
+    })
     return () => {
       window.removeEventListener('pagehide', flushAllContent)
       document.removeEventListener('visibilitychange', onVisibility)
+      unregister()
       flushAllContent()
     }
   }, [flushAllContent])
+
+  // Declared after the flush effect: on unmount that one queues the last
+  // sends first; only after them does this instance let go of its drafts, so
+  // the next mount (overlay reopened) restores whatever still didn't land.
+  useEffect(() => {
+    const owner = ownerRef.current
+    return () => {
+      for (const [id, holder] of draftOwners) {
+        if (holder !== owner) continue
+        void enqueueNote(id, async () => {
+          if (draftOwners.get(id) === owner) draftOwners.delete(id)
+        })
+      }
+    }
+  }, [])
 
   // ── Delete ───────────────────────────────────────────────
   const deleteNote = useCallback(

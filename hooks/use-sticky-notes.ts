@@ -9,6 +9,7 @@ import { STICKY_CHANGED_EVENT } from '@/lib/widgets/launch'
 import { toast } from 'sonner'
 import { t } from '@/lib/i18n'
 import { conflictCopyId, decideAfterMiss } from '@/lib/note-sync'
+import { registerPendingWrites } from '@/lib/pending-writes'
 
 type StickyNotesRow = Database['public']['Tables']['sticky_notes']['Row']
 type StickyNoteFoldersRow = Database['public']['Tables']['sticky_note_folders']['Row']
@@ -152,8 +153,12 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
   const baseRef = useRef<Record<string, TiptapDoc | null>>({})
   const noteChains = useRef<Record<string, Promise<unknown>>>({})
   const notesRef = useRef<StickyNote[]>([])
+  // Original → conflict copy until the editor shows the server text (same
+  // as use-notebook.ts): a keystroke in that gap belongs to the copy.
+  const redirectRef = useRef<Record<string, string>>({})
   useEffect(() => {
     notesRef.current = notes
+    redirectRef.current = {}
   }, [notes])
 
   // The provider lives in the root layout and never unmounts, and signing
@@ -414,6 +419,7 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
       versionRef.current[id] = row.updated_at
       baseRef.current[id] = (row.content as TiptapDoc | null) ?? null
     }
+    redirectRef.current[id] = copy.id
     // Text typed while this was resolving continues this device's version.
     const newer = pendingContent.current[id]
     if (newer !== undefined) {
@@ -492,7 +498,8 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
   }, [flushContent])
 
   const saveNoteContent = useCallback(
-    (id: string, content: TiptapDoc) => {
+    (editedId: string, content: TiptapDoc) => {
+      const id = redirectRef.current[editedId] ?? editedId
       const now = new Date().toISOString()
       setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content, updatedAt: now } : n)))
 
@@ -515,9 +522,15 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
     }
     window.addEventListener('pagehide', flushAllContent)
     document.addEventListener('visibilitychange', onVisibility)
+    // Signing out sends pending text first and waits for it.
+    const unregister = registerPendingWrites(async () => {
+      flushAllContent()
+      await Promise.all(Object.values(noteChains.current))
+    })
     return () => {
       window.removeEventListener('pagehide', flushAllContent)
       document.removeEventListener('visibilitychange', onVisibility)
+      unregister()
       flushAllContent()
     }
   }, [flushAllContent])

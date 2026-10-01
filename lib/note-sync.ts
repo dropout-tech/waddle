@@ -34,6 +34,15 @@ export function sameContent(a: TiptapDoc | null | undefined, b: TiptapDoc | null
   return stableStringify(a ?? null) === stableStringify(b ?? null)
 }
 
+/** Short fingerprint of a document (key-order-insensitive), stored with a
+ *  draft so a reload can still tell "the server content is the one this
+ *  edit started from" without keeping a second copy of the text. */
+export function contentHash(doc: TiptapDoc | null | undefined): string {
+  return cyrb128(stableStringify(doc ?? null))
+    .map((n) => n.toString(16).padStart(8, '0'))
+    .join('')
+}
+
 export type MissDecision =
   /** The row no longer exists (deleted elsewhere): keep ours as a copy. */
   | 'gone'
@@ -48,23 +57,29 @@ export type MissDecision =
 /**
  * @param server the row as re-read after a missed conditional update (null = gone)
  * @param mine   what this device tried to write (only the present fields count)
- * @param base   the server content this device's edit started from, when known.
- *               Unknown (undefined) for drafts restored after a reload — those
- *               can never be rebased, only saved, matched or copied.
+ * @param base   the server content this device's edit started from, when known
+ *               — the document itself, or its contentHash (drafts). Unknown
+ *               (undefined) means it can never be rebased, only saved,
+ *               matched or copied.
  */
 export function decideAfterMiss(
   server: { title?: string | null; content: TiptapDoc | null | unknown } | null,
   mine: { title?: string; content?: TiptapDoc | null },
-  base?: { content: TiptapDoc | null },
+  base?: { content: TiptapDoc | null } | { hash: string },
 ): MissDecision {
   if (!server) return 'gone'
   const serverContent = server.content as TiptapDoc | null
   const titleSame = mine.title === undefined || mine.title === (server.title ?? '')
   const contentSame = mine.content === undefined || sameContent(serverContent, mine.content)
   if (titleSame && contentSame) return 'same'
-  if (base && mine.content !== undefined && sameContent(serverContent, base.content) && mine.title === undefined) {
-    return 'rebase'
-  }
+  const baseSame = !base
+    ? false
+    : 'hash' in base
+      ? contentHash(serverContent) === base.hash
+      : sameContent(serverContent, base.content)
+  // Only the content is rebased; a title this device changed must still
+  // match the server's, or it's a conflict.
+  if (baseSame && mine.content !== undefined && titleSame) return 'rebase'
   return 'conflict'
 }
 
