@@ -227,7 +227,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
             <img src="/art/film/C-06.webp" width={1280} height={720} alt="" loading="lazy" decoding="async" />
           </picture>
         </div>
-        <div className={styles.plans}><article data-penguin-stop="price" data-penguin-at="0.86 0 0 -3"><h3>{t.free}</h3><p className={styles.price}>NT$0</p><p>{t.freeBody}</p><Link href="/signup" onClick={toLang} className={styles.primary}>{t.start}<ArrowRight size={19} aria-hidden="true" /></Link></article><article className={styles.pro}><h3>Pro <span>{t.soon}</span></h3><p className={styles.price}>NT$149<small>{t.month}</small></p><p className={styles.annual}>{t.year}</p><p>{t.proBody}</p></article></div>
+        <div className={styles.plans}><article data-penguin-stop="price" data-penguin-at="0.86 0 0 -3"><h3>{t.free}</h3><p className={styles.price}>NT$0</p><p>{t.freeBody}</p><Link href="/signup" onClick={toLang} className={styles.primary}>{t.start}<ArrowRight size={19} aria-hidden="true" /></Link></article><article className={styles.pro}><h3>Pro <span>{t.soon}</span></h3><p className={styles.price}>NT$150<small>{t.month}</small></p><p className={styles.annual}>{t.year}</p><p>{t.proBody}</p></article></div>
         {native ? null : <p className={styles.priceNote} data-price-note>{t.priceNote}</p>}
       </section>
 
