@@ -107,4 +107,7 @@ export const dict: Record<string, string> = {
 
   // use-notebook.ts
   '尚未登入': 'Not signed in',
+
+  // upload-image.ts
+  '只能插入圖片檔': 'Only image files can be inserted',
 }

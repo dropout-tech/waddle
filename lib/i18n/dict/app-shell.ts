@@ -98,4 +98,12 @@ export const dict: Record<string, string> = {
     'Password sign-in is no longer available. Please sign in with Google or Apple, or contact support.',
   '密碼已更新': 'Password updated',
   '正在帶你回到 Huddle⋯': 'Taking you back to Huddle…',
+
+  // error / not-found pages (2026-10 i18n sweep)
+  '出了點小狀況': 'Something went wrong',
+  '這一頁暫時打不開。請再試一次；如果還是不行，先回首頁看看。': 'This page couldn\'t load. Please try again. If it still doesn\'t work, head back home.',
+  '回首頁': 'Back to home',
+  '錯誤代碼：{code}': 'Error code: {code}',
+  '找不到這一頁': 'We couldn\'t find that page',
+  '網址可能打錯了，或這一頁已經搬家。': 'The link may be mistyped, or the page may have moved.',
 }
