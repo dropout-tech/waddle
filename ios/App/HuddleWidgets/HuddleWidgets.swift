@@ -27,6 +27,9 @@ struct Snapshot:Decodable {
     var span:[SpanDay]?
     /// 便條紙: newest sticky notes as plain text. Optional.
     var stickies:[StickyInfo]?
+    /// Design-proposal switch for the Lock Screen faces ("a" | "b" | "c", HuddleLockDesigns.swift).
+    /// Only the demo fixture writes it; real snapshots never do, so they get the current faces.
+    var designVariant:String?
 }
 struct PetInfo:Decodable {var adopted:Bool;var name:String;var color:String;var accessory:String;var lang:String;var overdue:Int;var overdueLine:String;var lines:[String]}
 enum Kind:String,AppEnum,CaseIterable {
@@ -234,7 +237,7 @@ struct WidgetView:View {
     }
     var body:some View {
         Group {
-            if kind == .pet && family == .accessoryRectangular && entry.lock == nil {petLockScreen}
+            if kind == .pet && family == .accessoryRectangular && entry.lock == nil && lockDesign == nil {petLockScreen}
             // Every other Lock Screen face (HuddleLockScreen.swift). Owner chose
             // "always show" for these, so no privacySensitive here.
             else if entry.lock != nil || isAccessory {accessoryView}

@@ -44,6 +44,7 @@
 		FB646FF0B6C90A8402F78604 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28C53C00153F913D15DBED25 /* WidgetKit.framework */; };
 		575FD2A8EB69D53C7D08EBA5 /* HuddleLockScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C31B5311AB044DEA94EBDEC /* HuddleLockScreen.swift */; };
 		4F3CAC1E957596B893F8807B /* HuddleMonthSticky.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2977E32109880CFD2BF7C922 /* HuddleMonthSticky.swift */; };
+		5FF15659583550A8F75AA833 /* HuddleLockDesigns.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D86CBA4693DFD74C4E397F7 /* HuddleLockDesigns.swift */; };
 		19EC536E491EAE491892471E /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 9C198AFF8DEC7B02C2019385 /* Localizable.xcstrings */; };
 /* End PBXBuildFile section */
 
@@ -145,6 +146,7 @@
 		F9DEBEB99112D1F7C15415DC /* HuddleWatchWidgets.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = HuddleWatchWidgets.entitlements; sourceTree = "<group>"; };
 		6C31B5311AB044DEA94EBDEC /* HuddleLockScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HuddleLockScreen.swift; sourceTree = "<group>"; };
 		2977E32109880CFD2BF7C922 /* HuddleMonthSticky.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HuddleMonthSticky.swift; sourceTree = "<group>"; };
+		3D86CBA4693DFD74C4E397F7 /* HuddleLockDesigns.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HuddleLockDesigns.swift; sourceTree = "<group>"; };
 		9C198AFF8DEC7B02C2019385 /* Localizable.xcstrings */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -261,6 +263,7 @@
 				BFA7E18F670F8436968B9F81 /* HuddleWidgets.swift */,
 				6C31B5311AB044DEA94EBDEC /* HuddleLockScreen.swift */,
 				2977E32109880CFD2BF7C922 /* HuddleMonthSticky.swift */,
+				3D86CBA4693DFD74C4E397F7 /* HuddleLockDesigns.swift */,
 				9C198AFF8DEC7B02C2019385 /* Localizable.xcstrings */,
 				9927E66813D216AEDF94613A /* Assets.xcassets */,
 				F30509A7AF44C3CD7E4C41F8 /* Info.plist */,
@@ -518,6 +521,7 @@
 				1E8558A547F10BF9CA9BB8B1 /* HuddleWidgets.swift in Sources */,
 				575FD2A8EB69D53C7D08EBA5 /* HuddleLockScreen.swift in Sources */,
 				4F3CAC1E957596B893F8807B /* HuddleMonthSticky.swift in Sources */,
+				5FF15659583550A8F75AA833 /* HuddleLockDesigns.swift in Sources */,
 				B8609CAC6459542D6D5EA6BF /* WidgetStore.swift in Sources */,
 				7DBE0B63E7DAD39857150E13 /* FocusActivity.swift in Sources */,
 			);
