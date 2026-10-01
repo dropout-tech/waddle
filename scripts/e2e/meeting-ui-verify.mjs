@@ -74,6 +74,17 @@ const check = (label, value) => {
   checks++
   console.log('PASS', label)
 }
+// The bell is its own header button on desktop; at phone width it is the
+// first entry of the "更多" overflow menu, so open that first.
+const openBell = async (page) => {
+  const more = page.locator('[data-tour="mobile-more"]')
+  await page
+    .locator('[data-tour="mobile-more"], [data-tour="notification-center"]')
+    .first()
+    .waitFor()
+  if (await more.isVisible()) await more.click()
+  await page.locator('[data-tour="notification-center"]:visible').click()
+}
 const browser = await chromium.launch()
 try {
   for (const locale of ['zh-TW', 'en']) {
@@ -81,6 +92,8 @@ try {
     const labels = en
       ? {
           open: 'Find a time',
+          entry: /Find a time/,
+          tools: 'More tools',
           search: 'Find common times',
           from: 'From date',
           to: 'To date (up to 14 days)',
@@ -98,6 +111,9 @@ try {
         }
       : {
           open: '約交集時間',
+          // The menu entry is shorter than the dialog heading (open).
+          entry: /約交集/,
+          tools: '更多工具',
           search: '尋找共同空檔',
           from: '開始日期',
           to: '結束日期（最多 14 天）',
@@ -126,6 +142,17 @@ try {
       (lang) => localStorage.setItem('waddle-language-v1', lang),
       locale,
     )
+    // The first-run pet adoption card floats over the phone-width layout and
+    // intercepts clicks; it is unrelated to meetings, so keep it out of the way.
+    await context.addInitScript(() => {
+      const add = () => {
+        const style = document.createElement('style')
+        style.textContent = '[data-pet-adopt]{display:none!important}'
+        document.head.appendChild(style)
+      }
+      if (document.head) add()
+      else document.addEventListener('DOMContentLoaded', add)
+    })
     let meetings = initial(),
       failure = '',
       emailFails = true,
@@ -184,6 +211,25 @@ try {
           },
         })
       if (url.pathname === '/auth/v1/user') return route.fulfill({ json: user })
+      // The Google Calendar edge function (2194e33) is not the email service:
+      // answer it as "not connected / nobody busy" so it neither fails the
+      // availability search nor counts as an email send.
+      if (url.pathname.endsWith('/functions/v1/google-calendar')) {
+        const cors = {
+          'access-control-allow-origin': '*',
+          'access-control-allow-headers': 'authorization, x-client-info, apikey, content-type',
+          'access-control-allow-methods': 'POST, OPTIONS',
+        }
+        if (req.method() === 'OPTIONS')
+          return route.fulfill({ status: 200, headers: cors, body: 'ok' })
+        const reply = (json, status = 200) =>
+          route.fulfill({ status, headers: cors, json })
+        if (body.action === 'status')
+          return reply({ configured: false, connected: false, status: 'disconnected' })
+        if (body.action === 'busy') return reply({ busy: [], unavailable: [] })
+        unexpected.push(`google-calendar ${body.action}`)
+        return reply({ error: 'unmocked_action' }, 400)
+      }
       if (url.pathname.includes('/functions/v1/')) {
         emails.push(body)
         if (emailFails)
@@ -227,6 +273,8 @@ try {
                 ? []
                 : { is_admin: false, days_remaining: 30, status: 'active' },
           })
+        // Task assignment (09-27) lists assignments on every load; none here.
+        if (name === 'list_task_assignments') return route.fulfill({ json: [] })
         if (name === 'get_share_peers') return paged(peers)
         if (name === 'get_meeting_invitation_by_request')
           return route.fulfill({
@@ -468,10 +516,9 @@ try {
       new URL(page.url()).pathname === '/meetings/invitations' &&
       new URL(page.url()).searchParams.get('invite') === id(20)
     await page.goto(base + '/', { waitUntil: 'domcontentloaded' })
-    await page
-      .getByRole('button', { name: new RegExp(labels.open) })
-      .first()
-      .click()
+    // Desktop: 約交集 lives in the header's tools disclosure menu.
+    await page.getByRole('button', { name: labels.tools, exact: true }).click()
+    await page.getByRole('menuitem', { name: labels.entry }).click()
     const dialog = page.getByRole('dialog', { name: labels.open, exact: true })
     await dialog.waitFor()
     check(
@@ -650,17 +697,11 @@ try {
     await page.keyboard.press('Escape')
     await page.setViewportSize({ width: 390, height: 844 })
     await page.reload({ waitUntil: 'domcontentloaded' })
-    const direct = page
-      .getByRole('button', { name: new RegExp(labels.open) })
-      .first()
-    if (!(await direct.isVisible()))
-      await page
-        .getByRole('button', { name: en ? 'More' : '更多', exact: true })
-        .click()
+    // Phone width: the entry sits in the "More" overflow list instead.
     await page
-      .getByRole('button', { name: new RegExp(labels.open) })
-      .first()
+      .getByRole('button', { name: en ? 'More' : '更多', exact: true })
       .click()
+    await page.getByRole('button', { name: labels.entry }).first().click()
     await dialog.waitFor()
     check(
       `${locale}: mobile more-menu entry opens meeting dialog`,
@@ -693,8 +734,7 @@ try {
       new URL(page.url()).origin === new URL(base).origin &&
         new URL(page.url()).pathname === '/',
     )
-    await page.waitForSelector('[data-tour="notification-center"]')
-    await page.locator('[data-tour="notification-center"]').click()
+    await openBell(page)
     await page.waitForSelector('[data-meeting-notification]')
     check(
       `${locale}: bell includes invitation, response and cancellation`,
@@ -730,9 +770,8 @@ try {
         (await page.locator('[data-meeting-notification]').count()) === 2,
     )
     await page.reload()
-    await page.waitForSelector('[data-tour="notification-center"]')
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.locator('[data-tour="notification-center"]').click()
+    await openBell(page)
     await page.waitForSelector('[data-meeting-notification]')
     check(
       `${locale}: read survives reload and mobile shows remaining notifications`,
