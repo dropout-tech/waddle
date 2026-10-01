@@ -551,9 +551,12 @@ export function usePeerCalendarEvents(opts: {
         if (force || !promise) {
           // Paged: the RPC returns a table, so PostgREST caps it at 1000
           // rows like any select. source + id is unique, so the order is total.
+          // No exact count here: on an RPC it runs the whole function a second
+          // time, which made this read slow enough to be cut off by ordinary
+          // page changes. fetchAllRows ends on a short page instead.
           promise = fetchAllRows((from, to) =>
             supabase
-              .rpc('get_shared_calendar', { p_peer: peer.peerId, p_from: fromISO, p_to: toISO }, { count: 'exact' })
+              .rpc('get_shared_calendar', { p_peer: peer.peerId, p_from: fromISO, p_to: toISO })
               .order('source')
               .order('id')
               .range(from, to),
