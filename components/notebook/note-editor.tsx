@@ -122,8 +122,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [note.id])
 
+  // A title still waiting for its debounce, with the callback it belongs to,
+  // so closing the editor sends it instead of dropping it with the timer.
+  const pendingTitle = useRef<(() => void) | null>(null)
+
   const commitTitle = (value: string) => {
     clearTimeout(titleTimer.current)
+    pendingTitle.current = null
     if (!readOnly) onTitleChange(value)
   }
 
@@ -131,10 +136,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     setTitle(value)
     clearTimeout(titleTimer.current)
     if (immediateTitleChanges) { onTitleChange(value); return }
-    titleTimer.current = setTimeout(() => onTitleChange(value), TITLE_DEBOUNCE_MS)
+    const send = () => { pendingTitle.current = null; onTitleChange(value) }
+    pendingTitle.current = send
+    titleTimer.current = setTimeout(send, TITLE_DEBOUNCE_MS)
   }
 
-  useEffect(() => () => clearTimeout(titleTimer.current), [])
+  useEffect(() => () => {
+    clearTimeout(titleTimer.current)
+    pendingTitle.current?.()
+  }, [])
 
   return (
     <div className="flex h-full flex-col">

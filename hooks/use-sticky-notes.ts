@@ -6,6 +6,8 @@ import type { StickyNote, StickyNoteColor, StickyNoteFolder, TiptapDoc } from '@
 import type { Database } from '@/lib/supabase/database.types'
 import { clampNotePosition } from '@/components/sticky-notes/sticky-note-card'
 import { STICKY_CHANGED_EVENT } from '@/lib/widgets/launch'
+import { toast } from 'sonner'
+import { t } from '@/lib/i18n'
 
 type StickyNotesRow = Database['public']['Tables']['sticky_notes']['Row']
 type StickyNoteFoldersRow = Database['public']['Tables']['sticky_note_folders']['Row']
@@ -54,6 +56,9 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
   const [loaded, setLoaded] = useState(false)
 
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  // Latest not-yet-sent content per note (see use-notebook.ts): leaving the
+  // page sends it instead of dropping it with the cancelled timer.
+  const pendingContent = useRef<Record<string, TiptapDoc>>({})
   // In-flight INSERTs keyed by note id — any UPDATE/DELETE for a just-created
   // note must await this first (same race guard as use-notebook.ts).
   const pendingCreates = useRef<Record<string, Promise<void>>>({})
@@ -85,11 +90,6 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
     })()
     return () => { mounted = false }
   }, [enabled, loaded, userId, supabase])
-
-  useEffect(() => {
-    const timers = saveTimers.current
-    return () => { Object.values(timers).forEach(clearTimeout) }
-  }, [])
 
   const nextZIndex = useCallback(
     () => notes.reduce((max, n) => Math.max(max, n.zIndex), 0) + 1,
@@ -286,24 +286,58 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
   )
 
   // ── Content autosave (debounced), mirrors use-notebook.ts ────────
+  const flushContent = useCallback(
+    async (id: string) => {
+      clearTimeout(saveTimers.current[id])
+      delete saveTimers.current[id]
+      if (!(id in pendingContent.current)) return
+      const content = pendingContent.current[id]
+      delete pendingContent.current[id]
+      await pendingCreates.current[id]
+      const { error } = await supabase
+        .from('sticky_notes')
+        .update({ content: content as unknown as never, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) {
+        console.error('[sticky-notes] content save failed', error)
+        // Keep it queued (unless newer text arrived) so the next flush retries.
+        if (!(id in pendingContent.current)) pendingContent.current[id] = content
+        toast.error(t('便條紙內容沒有存到，請檢查網路後再試'), { id: 'sticky-save-failed' })
+      } else window.dispatchEvent(new Event(STICKY_CHANGED_EVENT)) // refresh the 便條紙 widget
+    },
+    [supabase],
+  )
+
   const saveNoteContent = useCallback(
     (id: string, content: TiptapDoc) => {
       const now = new Date().toISOString()
       setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content, updatedAt: now } : n)))
 
+      pendingContent.current[id] = content
       clearTimeout(saveTimers.current[id])
-      saveTimers.current[id] = setTimeout(async () => {
-        await pendingCreates.current[id]
-        const { error } = await supabase
-          .from('sticky_notes')
-          .update({ content: content as unknown as never, updated_at: new Date().toISOString() })
-          .eq('id', id)
-        if (error) console.error('[sticky-notes] content save failed', error)
-        else window.dispatchEvent(new Event(STICKY_CHANGED_EVENT)) // refresh the 便條紙 widget
-      }, SAVE_DEBOUNCE_MS)
+      saveTimers.current[id] = setTimeout(() => void flushContent(id), SAVE_DEBOUNCE_MS)
     },
-    [supabase],
+    [flushContent],
   )
+
+  // Send pending text on unmount, pagehide and when the tab/app is hidden
+  // (iOS can suspend the WebView right after the user swipes home).
+  const flushAllContent = useCallback(() => {
+    for (const id of Object.keys(pendingContent.current)) void flushContent(id)
+  }, [flushContent])
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushAllContent()
+    }
+    window.addEventListener('pagehide', flushAllContent)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flushAllContent)
+      document.removeEventListener('visibilitychange', onVisibility)
+      flushAllContent()
+    }
+  }, [flushAllContent])
 
   // ── Delete ───────────────────────────────────────────────
   const deleteNote = useCallback(
@@ -314,6 +348,7 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
         return prev.filter((n) => n.id !== id)
       })
       clearTimeout(saveTimers.current[id])
+      delete pendingContent.current[id]
 
       await pendingCreates.current[id]
       const { error } = await supabase.from('sticky_notes').delete().eq('id', id)

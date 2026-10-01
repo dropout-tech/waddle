@@ -59,6 +59,10 @@ export function useNotebook() {
   // Per-note debounce timers for content autosave, so typing in one note
   // doesn't reset another note's pending save.
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  // Latest not-yet-sent content per note. Kept beside the timer so leaving
+  // (unmount, pagehide, tab hidden) can send it right away instead of
+  // dropping it together with the cancelled timer.
+  const pendingContent = useRef<Record<string, TiptapDoc>>({})
 
   // In-flight INSERTs keyed by note id. Any UPDATE/DELETE for a just-created
   // note must await this first — otherwise it can reach the server before the
@@ -125,10 +129,8 @@ export function useNotebook() {
       setLoading(false)
     })()
 
-    const timers = saveTimers.current
     return () => {
       mounted = false
-      Object.values(timers).forEach(clearTimeout)
     }
   }, [supabase])
 
@@ -225,25 +227,61 @@ export function useNotebook() {
   // ── Content autosave (debounced) ─────────────────────────
   // Updates local state immediately (so switching notes never loses keystrokes)
   // and flushes to Supabase after a short idle window.
+  const flushContent = useCallback(
+    async (id: string) => {
+      clearTimeout(saveTimers.current[id])
+      delete saveTimers.current[id]
+      if (!(id in pendingContent.current)) return
+      const content = pendingContent.current[id]
+      delete pendingContent.current[id]
+      await pendingCreates.current[id]
+      const { error } = await supabase
+        .from('notebook_notes')
+        .update({ content: content as unknown as never, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      setSaveStatus(error ? 'error' : 'saved')
+      if (error) {
+        console.error('[notebook] content save failed', error)
+        // Keep it queued (unless newer text arrived) so the next flush —
+        // leaving the page, hiding the tab — tries again.
+        if (!(id in pendingContent.current)) pendingContent.current[id] = content
+      }
+    },
+    [supabase],
+  )
+
   const saveNoteContent = useCallback(
     (id: string, content: TiptapDoc) => {
       const now = new Date().toISOString()
       setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content, updatedAt: now } : n)))
       setSaveStatus('saving')
 
+      pendingContent.current[id] = content
       clearTimeout(saveTimers.current[id])
-      saveTimers.current[id] = setTimeout(async () => {
-        await pendingCreates.current[id]
-        const { error } = await supabase
-          .from('notebook_notes')
-          .update({ content: content as unknown as never, updated_at: new Date().toISOString() })
-          .eq('id', id)
-        setSaveStatus(error ? 'error' : 'saved')
-        if (error) console.error('[notebook] content save failed', error)
-      }, SAVE_DEBOUNCE_MS)
+      saveTimers.current[id] = setTimeout(() => void flushContent(id), SAVE_DEBOUNCE_MS)
     },
-    [supabase],
+    [flushContent],
   )
+
+  // Send everything still waiting for its debounce. Runs when the editor goes
+  // away (overlay closed, route change), on pagehide and when the tab/app is
+  // hidden — the last keystrokes used to be lost with the cancelled timer.
+  const flushAllContent = useCallback(() => {
+    for (const id of Object.keys(pendingContent.current)) void flushContent(id)
+  }, [flushContent])
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushAllContent()
+    }
+    window.addEventListener('pagehide', flushAllContent)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flushAllContent)
+      document.removeEventListener('visibilitychange', onVisibility)
+      flushAllContent()
+    }
+  }, [flushAllContent])
 
   // ── Delete ───────────────────────────────────────────────
   const deleteNote = useCallback(
@@ -254,6 +292,7 @@ export function useNotebook() {
         return prev.filter((n) => n.id !== id)
       })
       clearTimeout(saveTimers.current[id])
+      delete pendingContent.current[id]
 
       await pendingCreates.current[id]
       const { error } = await supabase.from('notebook_notes').delete().eq('id', id)

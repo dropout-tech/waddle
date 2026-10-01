@@ -2,6 +2,7 @@
 // strings. Sticky-notes glass overlay (便條紙), shared across every page.
 export const dict: Record<string, string> = {
   '便條紙': 'Sticky notes',
+  '便條紙內容沒有存到，請檢查網路後再試': "Your sticky note wasn't saved. Check your connection and try again.",
   '顯示便條紙': 'Show sticky notes',
   '隱藏便條紙': 'Hide sticky notes',
   '新增便條紙': 'New sticky note',
