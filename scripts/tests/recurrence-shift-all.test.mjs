@@ -103,3 +103,32 @@ test('undo is the opposite shift and restores start + weekdays exactly', () => {
   assert.equal(back.scheduledDate, '2026-10-05')
   assert.deepEqual(back.recurrence.daysOfWeek, [1, 3])
 })
+
+// ── every 2+ weeks with several weekdays (review r2 F3) ──
+import { seriesShiftIsExact } from '../../lib/calendar-utils.ts'
+
+test('biweekly Fri+Sat dragged Fri 10/02 → Sat 10/03 is refused (Sun would land in the wrong week)', () => {
+  const t = series('2026-10-02', { type: 'weekly', interval: 2, daysOfWeek: [5, 6] })
+  assert.equal(seriesShiftIsExact(t, '2026-10-02', '2026-10-03'), false)
+  // What saving it anyway would have produced: 10/04 and 10/18 missing.
+  const moved = moveAll(t, '2026-10-02', '2026-10-03')
+  assert.equal(taskOccursOnDate(moved, parseDateString('2026-10-04')), false)
+})
+
+test('biweekly Mon+Wed dragged Wed → Thu stays in the same week: allowed and exact', () => {
+  const t = series('2026-10-05', { type: 'weekly', interval: 2, daysOfWeek: [1, 3] })
+  assert.equal(seriesShiftIsExact(t, '2026-10-07', '2026-10-08'), true)
+  assertWholeSeriesMoved(t, '2026-10-07', '2026-10-08')
+})
+
+test('biweekly single weekday across the weekend is still exact', () => {
+  const t = series('2026-10-03', { type: 'weekly', interval: 2, daysOfWeek: [6] })
+  assert.equal(seriesShiftIsExact(t, '2026-10-03', '2026-10-04'), true)
+  assertWholeSeriesMoved(t, '2026-10-03', '2026-10-04')
+})
+
+test('every-week, daily and monthly series are never refused', () => {
+  assert.equal(seriesShiftIsExact(series('2026-10-02', { type: 'weekly', daysOfWeek: [5, 6] }), '2026-10-02', '2026-10-03'), true)
+  assert.equal(seriesShiftIsExact(series('2026-10-02', { type: 'daily', interval: 2 }), '2026-10-02', '2026-10-03'), true)
+  assert.equal(seriesShiftIsExact(series('2026-10-02', { type: 'monthly', interval: 2 }), '2026-10-02', '2026-10-05'), true)
+})

@@ -7,6 +7,8 @@ export const dict: Record<string, string> = {
   '完成 {count} 個任務': 'Complete {count} tasks',
   // ── use-waddle-data.ts: generic save-error wrapper ──
   '儲存失敗：{op}': 'Save failed: {op}',
+  '這個重複任務是「每隔幾週、選了多個星期幾」，整串拖到這裡會讓部分日期跑到錯的那一週。請打開任務，在編輯視窗調整日期和星期。':
+    'This task repeats every few weeks on several weekdays. Moving the whole series here would put some days in the wrong week. Open the task and change the dates and weekdays in the editor instead.',
   '儲存失敗：{op}（{reason}）': 'Save failed: {op} ({reason})',
   '登入已過期，請重新整理頁面': 'your sign-in expired — please reload the page',
   '網路連線不穩，請稍後再試': 'connection problem — please try again shortly',

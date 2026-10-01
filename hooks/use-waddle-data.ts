@@ -14,7 +14,7 @@ import {
   timeBlockToRow,
   rowToSettings,
 } from '@/lib/supabase/mappers'
-import { toDateString, parseDateString, isSeriesStart, shiftSeries } from '@/lib/calendar-utils'
+import { toDateString, parseDateString, isSeriesStart, shiftSeries, seriesShiftIsExact } from '@/lib/calendar-utils'
 import { playTaskCompleteSound } from '@/lib/task-sound'
 import { hapticTaskComplete } from '@/lib/haptics'
 import { pushUndoableAction } from '@/lib/undo-stack'
@@ -2392,6 +2392,13 @@ export function useWaddleData(): UseWaddleData {
     let seriesShifted = false
     let shiftedDays: number[] | undefined
     if (task.isRecurring && recurrenceChoice === 'all' && date && targetDate && task.scheduledDate) {
+      if (!seriesShiftIsExact(task, targetDate, date)) {
+        // Not expressible as the same rule (every 2+ weeks, several weekdays,
+        // moved across a week boundary): change nothing rather than save a
+        // schedule that puts some days in the wrong week.
+        toast.error(translate('這個重複任務是「每隔幾週、選了多個星期幾」，整串拖到這裡會讓部分日期跑到錯的那一週。請打開任務，在編輯視窗調整日期和星期。'))
+        return
+      }
       const shifted = shiftSeries(task, targetDate, date)
       date = shifted.scheduledDate
       shiftedDays = shifted.daysOfWeek

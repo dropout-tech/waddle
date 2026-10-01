@@ -143,6 +143,45 @@ export function shiftSeries(
 }
 
 /**
+ * Whether shiftSeries can express "every occurrence moved by the drag's
+ * offset". Weekly rules count weeks from the start's Sunday-based week, so
+ * an every-2+-weeks series with several weekdays whose shifted weekdays land
+ * across a Saturday/Sunday boundary would put some of them in the wrong week
+ * (每兩週五、六 dragged one day later is not "every other Sat + Sun"). The
+ * caller refuses those moves instead of saving a wrong schedule. Checked by
+ * comparing the old and new rule over several cycles.
+ */
+export function seriesShiftIsExact(
+  task: Pick<Task, 'scheduledDate' | 'recurrence' | 'isRecurring'>,
+  targetDate: string,
+  date: string,
+): boolean {
+  const r = task.recurrence
+  if (!task.isRecurring || !r || r.type !== 'weekly' || (r.interval || 1) <= 1 || !r.daysOfWeek?.length) return true
+  if (!task.scheduledDate) return true
+  const offset = Math.round(
+    (parseDateString(date).getTime() - parseDateString(targetDate).getTime()) / 86_400_000,
+  )
+  const shifted = shiftSeries(task, targetDate, date)
+  // End date and skipped days aren't moved by shiftSeries; leave them out.
+  const before = { ...task, exdates: undefined, recurrence: { ...r, endDate: undefined } } as Task
+  const after = {
+    ...before,
+    scheduledDate: shifted.scheduledDate,
+    recurrence: { ...before.recurrence!, daysOfWeek: shifted.daysOfWeek ?? r.daysOfWeek },
+  } as Task
+  const days = (r.interval || 1) * 7 * 4 + 14
+  const d = parseDateString(task.scheduledDate)
+  for (let i = 0; i < days; i++) {
+    const moved = new Date(d)
+    moved.setDate(moved.getDate() + offset)
+    if (taskOccursOnDate(before, d) !== taskOccursOnDate(after, moved)) return false
+    d.setDate(d.getDate() + 1)
+  }
+  return true
+}
+
+/**
  * True iff the date is a *future* (virtual) occurrence — i.e. the task
  * recurs on this date but `task.scheduledDate` is a different day. Use
  * this to disable drag/resize on derived instances and to render a
