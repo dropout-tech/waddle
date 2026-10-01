@@ -268,6 +268,8 @@ export function TaskDetailModal({
           isOpen={recurrenceModal.isOpen}
           onClose={() => setRecurrenceModal(null)}
           onConfirm={handleRecurrenceConfirm}
+          mode={recurrenceModal.type === 'delete' ? 'delete' : 'edit'}
+          actionLabel={recurrenceModal.type === 'delete' ? t('刪除') : undefined}
           title={recurrenceModal.type === 'save' ? t('儲存重複任務') : t('刪除重複任務')}
         />
       )}
