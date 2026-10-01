@@ -14,7 +14,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { toast } from 'sonner'
 import { isDesktop } from '@/lib/platform'
-import { PictureInPicture2 } from 'lucide-react'
+import { InkFloatingWindow } from '@/components/icons/huddle-icons'
 import {
   closeFloatingHub, getHubServerState, getHubState, hubAvailable, openFloatingHub, subscribeHub,
 } from '@/lib/floating-hub'
@@ -54,7 +54,7 @@ export function HubLauncherButton({ className }: { className?: string }) {
         className,
       )}
     >
-      <PictureInPicture2 className="w-3.5 h-3.5" aria-hidden="true" />
+      <InkFloatingWindow className="w-3.5 h-3.5" aria-hidden="true" />
     </button>
   )
 }

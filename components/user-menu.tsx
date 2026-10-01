@@ -7,7 +7,8 @@ import type { Membership } from '@/lib/operations/types'
 import { Gift } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { LogOut, Mail, User, Loader2, Moon, Sun, FileText, StickyNote as StickyNoteIcon, Plus, Archive } from 'lucide-react'
+import { LogOut, Mail, User, Loader2, Moon, Sun, FileText } from 'lucide-react'
+import { InkStickyNote, InkPlus, InkArchive } from '@/components/icons/huddle-icons'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { AccountRegistrationDate } from '@/components/auth/account-registration-date'
@@ -257,7 +258,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
             role="menuitemcheckbox"
             aria-checked={stickyNotes.enabled}
           >
-            <StickyNoteIcon className="w-4 h-4" />
+            <InkStickyNote className="w-4 h-4" />
             <span>{stickyNotes.enabled ? t('隱藏便條紙') : t('顯示便條紙')}</span>
           </button>
           {stickyNotes.enabled && (
@@ -266,7 +267,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
               className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 pl-10 text-sm hover:bg-muted/60 transition-colors text-foreground"
               role="menuitem"
             >
-              <Plus className="w-4 h-4" />
+              <InkPlus className="w-4 h-4" />
               <span>{t('新增便條紙')}</span>
             </button>
           )}
@@ -276,7 +277,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
             className="w-full min-h-11 flex items-center gap-2 px-4 py-2.5 pl-10 text-sm hover:bg-muted/60 transition-colors text-foreground"
             role="menuitem"
           >
-            <Archive className="w-4 h-4" />
+            <InkArchive className="w-4 h-4" />
             <span>{t('便條紙收納')}</span>
           </button>
 

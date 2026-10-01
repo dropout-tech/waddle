@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Calendar, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Trash2 } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, ChevronUp, Trash2 } from 'lucide-react'
+import { InkChevronDown } from '@/components/icons/huddle-icons'
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
 import { canvasGeometry, type CanvasGeometry } from '@/lib/scratchpad-canvas'
@@ -102,7 +103,7 @@ export function FocusScratchpad({ initialDate, className, isOpen, onOpenChange, 
     {/* Backdrop only for the desktop pull-down; the phone sheet (hideTrigger) fills the screen above the tab bar, and a backdrop there blurred and blocked the tab bar. */}
     {isExpanded && !fill && !hideTrigger && <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-popover" onClick={() => setIsExpanded(false)} />}
     <div className={cn('relative z-toast', className)}>
-      {!hideTrigger && !isExpanded && <button data-tour="scratchpad" className="absolute left-1/2 top-0 flex min-h-11 -translate-x-1/2 items-center gap-2 rounded-b-xl border border-t-0 border-border bg-card px-4 text-sm" onClick={() => { setSelectedDate(todayKey); setIsExpanded(true) }}>{t('白板')}<ChevronDown size={16} /></button>}
+      {!hideTrigger && !isExpanded && <button data-tour="scratchpad" className="absolute left-1/2 top-0 flex min-h-11 -translate-x-1/2 items-center gap-2 rounded-b-xl border border-t-0 border-border bg-card px-4 text-sm" onClick={() => { setSelectedDate(todayKey); setIsExpanded(true) }}>{t('白板')}<InkChevronDown className="h-4 w-4" /></button>}
       <div className={cn(fill ? 'fixed inset-0 bg-card' : hideTrigger ? 'fixed inset-x-0 top-0 bg-card' : 'absolute inset-x-0 top-0 overflow-hidden border-b border-border bg-card', !isExpanded && !fill && 'hidden')} data-pet-hide={isExpanded || fill ? '' : undefined} data-sheet-above-tabbar={hideTrigger && !fill ? '' : undefined} style={hideTrigger && !fill ? { paddingTop: 'env(safe-area-inset-top)', bottom: 'var(--sheet-bottom, calc(58px + env(safe-area-inset-bottom)))' } : undefined}>
         <div className={cn('overflow-y-auto', fill || hideTrigger ? 'flex h-full flex-col' : 'max-h-[85dvh]')}>
           <div className={cn('mx-auto w-full max-w-6xl px-3 py-2 sm:px-4 md:px-6', (fill || hideTrigger) && 'flex min-h-0 flex-1 flex-col max-md:pb-0')}>
