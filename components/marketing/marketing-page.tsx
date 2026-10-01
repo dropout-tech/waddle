@@ -35,7 +35,7 @@ const copy = {
     focusTitle: '做一件事，\n就好。', focusBody: '用專注計時留住眼前這段時間。計畫改了，就拖動行程；做完了，輕輕勾掉。今天的安排可以跟著你調整。', focusAction: '打開我的工作桌',
     priceTitle: '先用用看。\n找到自己的步調。', priceIntro: '目前核心功能免費開放。Pro 訂閱尚未開放購買，不會自動收費。',
     free: '免費版', freeBody: '任務、行程、專注計時、記事本與白板。同一個帳號，在不同裝置查看與同步。',
-    soon: '準備中', month: '／月', year: 'NT$1,290／年', proBody: '這是已規劃的台灣價格。付費功能與額度會在正式開放前說明，目前沒有訂閱或付款按鈕。',
+    soon: '準備中', month: '／月', year: 'NT$990／年', proBody: '這是已規劃的台灣價格。付費功能與額度會在正式開放前說明，目前沒有訂閱或付款按鈕。',
     downloadTitle: '在你的桌面，\n留個位置。', downloadBody: 'Huddle 的獨立視窗，陪你開始每一天。安裝後使用原本的帳號登入，與網頁版共用資料。',
     downloadNote: 'v0.1.2 測試版・需要網路・尚未完成 Apple 公證。Windows x64 測試版未簽署，安裝時可能顯示安全提示。舊版請重新下載安裝。', release: '版本紀錄與安裝說明',
     faqTitle: '你可能想知道', questions: [
@@ -60,7 +60,7 @@ const copy = {
     focusTitle: 'One thing.\nFor now.', focusBody: 'Set aside a little time with the focus timer. Move a time block when plans change. Check a task off when it’s done. Let today’s plan move with you.', focusAction: 'Open my workspace',
     priceTitle: 'Try it first.\nFind your own pace.', priceIntro: 'Core features are free to use today. Pro subscriptions are not available for purchase, and there are no automatic charges.',
     free: 'Free', freeBody: 'Tasks, calendars, focus timers, notebooks and the whiteboard. Use one account to view and sync your work across devices.',
-    soon: 'Coming later', month: ' / month', year: 'NT$1,290 / year', proBody: 'These are planned Taiwan prices in New Taiwan dollars. Paid features and limits will be announced before launch. Subscriptions and payments are not enabled.',
+    soon: 'Coming later', month: ' / month', year: 'NT$990 / year', proBody: 'These are planned Taiwan prices in New Taiwan dollars. Paid features and limits will be announced before launch. Subscriptions and payments are not enabled.',
     downloadTitle: 'A place\non your desktop.', downloadBody: 'Open Huddle in its own window at the start of your day. Sign in with your existing account to use the same data as the web app.',
     downloadNote: 'v0.1.2 beta · Internet required · Not yet notarized by Apple. Windows x64 beta is unsigned and may show a security warning. Download and reinstall to update an older version.', release: 'Release notes and installation guide',
     faqTitle: 'A few things to know', questions: [
