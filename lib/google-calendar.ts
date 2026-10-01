@@ -55,6 +55,21 @@ export async function invokeGoogleCalendar<T>(body: Record<string, unknown>): Pr
   return data as T
 }
 
+/**
+ * The error code the Edge Function put in a non-2xx body (e.g. `PRO_REQUIRED`
+ * from `start` once limits are on). supabase-js hands the raw Response over as
+ * `error.context`; anything unreadable -> ''.
+ */
+export async function googleCalendarErrorCode(err: unknown): Promise<string> {
+  try {
+    const ctx = (err as { context?: { json?: () => Promise<unknown> } } | null)?.context
+    const body = (await ctx?.json?.()) as { error?: unknown } | null | undefined
+    return typeof body?.error === 'string' ? body.error : ''
+  } catch {
+    return ''
+  }
+}
+
 /** The function answers any failure (not deployed, 503 not_configured…) as "not configured". */
 export async function fetchGoogleCalendarStatus(): Promise<GoogleCalendarStatus> {
   try {

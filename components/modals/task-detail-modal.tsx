@@ -17,6 +17,9 @@ import { CategoryCascadePicker } from '@/components/category/category-cascade-pi
 import { useI18n } from '@/lib/i18n/react'
 import { getLang, t } from '@/lib/i18n'
 import { createClient } from '@/lib/supabase/client'
+import { assertImageQuota, explainUploadError } from '@/lib/billing/plan-usage'
+import { planLimitCode } from '@/lib/billing/plan-errors'
+import { showPlanLimitToast } from '@/lib/billing/plan-limit-toast'
 import { toast } from 'sonner'
 import { TaskAssignButton } from '@/components/assignments/task-assign-section'
 import type { AssignablePerson } from '@/lib/assignments'
@@ -54,13 +57,14 @@ async function uploadTaskNoteImage(file: File): Promise<string> {
   if (!user) throw new Error(t('尚未登入'))
 
   const path = `${user.id}/${crypto.randomUUID()}.${extension}`
+  await assertImageQuota()
   const { error } = await supabase.storage
     .from('notebook-images')
     .upload(path, file, {
       cacheControl: '3600',
       contentType: file.type,
     })
-  if (error) throw error
+  if (error) throw await explainUploadError(error)
 
   return supabase.storage.from('notebook-images').getPublicUrl(path).data.publicUrl
 }
@@ -1291,8 +1295,13 @@ function NotesEditor({ value, onChange }: NotesEditorProps) {
       toast.success(t('圖片已插入'), { id: toastId })
     } catch (error) {
       console.error('[task-notes] image upload failed', error)
-      const message = error instanceof Error ? error.message : t('圖片上傳失敗，請再試一次')
-      toast.error(message, { id: toastId })
+      const limitCode = planLimitCode(error)
+      if (limitCode) {
+        showPlanLimitToast(limitCode, { id: toastId })
+      } else {
+        const message = error instanceof Error ? error.message : t('圖片上傳失敗，請再試一次')
+        toast.error(message, { id: toastId })
+      }
     } finally {
       setIsUploadingImage(false)
       if (imageInputRef.current) imageInputRef.current.value = ''

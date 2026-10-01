@@ -6,6 +6,7 @@ import { NoteEditor } from '@/components/notebook/note-editor'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Dialog, DialogPortal, DialogOverlay, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
+import { assertImageQuota, explainUploadError } from '@/lib/billing/plan-usage'
 import { useI18n } from '@/lib/i18n/react'
 import type { NotebookNote, ScratchpadItem, TiptapDoc } from '@/lib/types'
 import { getWhiteboardDocument, whiteboardDocumentText } from '@/lib/whiteboard-document'
@@ -57,8 +58,9 @@ export function WhiteboardDetail({ item, readOnly, onUpdateItem, onClose, contai
     if (authError || !user) throw new Error(t('尚未登入'))
     const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png'
     const path = `${user.id}/${crypto.randomUUID()}.${ext}`
+    await assertImageQuota()
     const { error } = await supabase.storage.from('notebook-images').upload(path, file, { cacheControl: '3600', contentType: file.type || undefined })
-    if (error) throw error
+    if (error) throw await explainUploadError(error)
     return supabase.storage.from('notebook-images').getPublicUrl(path).data.publicUrl
   }, [t])
   const note: NotebookNote = {

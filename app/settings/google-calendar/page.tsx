@@ -5,7 +5,10 @@ import { CalendarDays, Loader2 } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { useI18n } from '@/lib/i18n/react'
 import { isDesktop, isNative } from '@/lib/platform'
-import { fetchGoogleCalendarStatus, invokeGoogleCalendar, setGoogleShareBusy, type GoogleCalendarStatus } from '@/lib/google-calendar'
+import { fetchGoogleCalendarStatus, googleCalendarErrorCode, invokeGoogleCalendar, setGoogleShareBusy, type GoogleCalendarStatus } from '@/lib/google-calendar'
+import { usePlanUsage } from '@/hooks/use-plan-usage'
+import { googleCalendarLocked } from '@/lib/billing/plan-usage-core'
+import { UpgradePrompt } from '@/components/billing/upgrade-prompt'
 import { Button } from '@/components/ui/button'
 
 /**
@@ -24,6 +27,8 @@ export default function GoogleCalendarSettingsPage() {
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const [message, setMessage] = useState('')
+  const [proRequired, setProRequired] = useState(false)
+  const { usage } = usePlanUsage()
   const uid = user?.id
 
   useEffect(() => { setAppShell(isNative() || isDesktop()) }, [])
@@ -38,8 +43,10 @@ export default function GoogleCalendarSettingsPage() {
       const target = new URL(url)
       if (target.origin !== 'https://accounts.google.com' || !target.pathname.startsWith('/o/oauth2/')) throw new Error('authorization_url')
       window.location.assign(target.href)
-    } catch {
-      setMessage(t('無法開始連結，請稍後再試。'))
+    } catch (err) {
+      // Limits on + free + never connected: the server refuses `start`.
+      if ((await googleCalendarErrorCode(err)) === 'PRO_REQUIRED') setProRequired(true)
+      else setMessage(t('無法開始連結，請稍後再試。'))
       setBusy(false)
     }
   }
@@ -129,7 +136,12 @@ export default function GoogleCalendarSettingsPage() {
               </label>
             )}
             {(state === 'disconnected' || state === 'reauth') && (
-              appShell ? (
+              proRequired || googleCalendarLocked(usage) ? (
+                <UpgradePrompt
+                  testId="gcal-upgrade"
+                  message={t('串接 Google 日曆是 Pro 會員功能。升級後，Google 日曆上的會議就能顯示在 Huddle。')}
+                />
+              ) : appShell ? (
                 <p className="text-sm" data-testid="gcal-use-web">{t('請到網頁版連結，連好後 App 也會顯示。')}</p>
               ) : (
                 <Button className="min-h-11 w-full sm:w-auto" disabled={busy} onClick={connect}>
