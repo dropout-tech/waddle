@@ -8,10 +8,10 @@ test('desktop OAuth state, PKCE, external opening, restart, cancellation, timeou
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'huddle-oauth-'))
   let clock = 1000
   const opened = []
-  const config = { file: path.join(dir,'pending.json'), origin:'https://waddle.zeabur.app', now: () => clock, openExternal: async url => opened.push(url) }
+  const config = { file: path.join(dir,'pending.json'), origin:'https://huddle.lazy72.com', now: () => clock, openExternal: async url => opened.push(url) }
   const flow = createOAuth(config)
   const state = flow.begin()
-  const redirect = `https://waddle.zeabur.app/auth/callback?desktop=1&desktop_state=${state}`
+  const redirect = `https://huddle.lazy72.com/auth/callback?desktop=1&desktop_state=${state}`
   const authorize = new URL('https://jnikcndiexjojgvicohf.supabase.co/auth/v1/authorize')
   for (const [k,v] of Object.entries({provider:'google',redirect_to:redirect,code_challenge:'test',code_challenge_method:'s256'})) authorize.searchParams.set(k,v)
   await flow.open(authorize.href)

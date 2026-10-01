@@ -8,6 +8,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { t } from '@/lib/i18n'
 import { isNative } from '@/lib/platform'
+import { SITE_ORIGIN } from '@/lib/site'
 import type { TaskAssignment } from '@/lib/types'
 
 export {
@@ -199,7 +200,7 @@ export function orgInviteLink(token: string): string {
   // public web origin like enrollmentLink() in lib/operations/client.ts.
   const origin = !isNative() && /^https?:$/.test(window.location.protocol)
     ? window.location.origin
-    : 'https://waddle.zeabur.app'
+    : SITE_ORIGIN
   return `${origin}/org/invite#t=${encodeURIComponent(token)}`
 }
 

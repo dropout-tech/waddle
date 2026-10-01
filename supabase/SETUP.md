@@ -34,8 +34,9 @@
    ```env
    NEXT_PUBLIC_SUPABASE_URL=https://abcdefg.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci...
-   NEXT_PUBLIC_SITE_URL=http://localhost:3000
    ```
+
+   正式站網址不是環境變數：沒有任何程式讀取 `NEXT_PUBLIC_SITE_URL`，不用設。需要網站 origin 的原生殼／信件連結一律用 `lib/site.ts` 的 `SITE_ORIGIN`。
 
 ---
 

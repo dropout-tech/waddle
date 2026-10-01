@@ -99,7 +99,7 @@ export const dict: Record<string, string> = {
 
   // calendar-export-view.tsx
   '（未命名）': '(Untitled)',
-  '以 Huddle 規劃 · huddle.app': 'Planned with Huddle · huddle.app',
+  '以 Huddle 規劃 · huddle.lazy72.com': 'Planned with Huddle · huddle.lazy72.com',
 
   // task-block.tsx
   '{meetingPrefix}{title}，{start} 到 {end}{completedSuffix}': '{meetingPrefix}{title}, {start} to {end}{completedSuffix}',

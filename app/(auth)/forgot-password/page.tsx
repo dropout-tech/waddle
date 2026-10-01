@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Loader2, MailCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isNative } from '@/lib/platform'
+import { SITE_ORIGIN } from '@/lib/site'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,7 +15,7 @@ import { useI18n } from '@/lib/i18n/react'
 // window.location.origin is capacitor://localhost, which is useless in an
 // email opened on any device. (Same reasoning as the OAuth deep-link split
 // in lib/auth/oauth.ts, except email links can only ever be https.)
-const WEB_ORIGIN = 'https://waddle.zeabur.app'
+const WEB_ORIGIN = SITE_ORIGIN
 
 export default function ForgotPasswordPage() {
   const { t } = useI18n()
