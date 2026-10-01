@@ -1,0 +1,31 @@
+Huddle 手繪墨線圖示 — 產圖紀錄（2026-10-01）
+================================================
+
+用了 2 次產圖（上限 6 次），兩張都直接採用：
+
+  sheet-v1.png           記事本：「/」選單 12 個區塊圖示 + 工具列 B/I/U/S/行內程式碼/連結/復原/重做/升級為任務
+                         prompt 原文：prompt-v1.txt
+                         （第 22–24 格是備用稿：手寫段落、大括號、雙列勾選清單，沒有使用）
+  sheet-v2-toolbar.png   行事曆上方工具列 23 個圖示（背景是透明的，直接看會一片黑，疊白底看）
+                         prompt 原文：prompt-v2-toolbar.txt
+                         （第 8 格「圓圈裡的人」畫出來像哭臉，沒有使用，帳號改用第 7 格人形；
+                           第 24 格「滑桿」是設定圖示的備用稿，沒有使用）
+
+指令（一次一張、不平行；參考圖只用吉祥物原圖；prompt 裡的 __OUT__ 換成要存的絕對路徑）：
+
+  D="$PWD/docs/reports/2026-10-01-block-icons"
+  PROMPT="$(sed "s|__OUT__|$D/sheet-v3.png|" "$D/prompt-v1.txt")"
+  codex exec "$PROMPT" -s workspace-write -C "$D" --skip-git-repo-check -i "$PWD/public/huddle-mascot.png" < /dev/null
+
+規矩：兩份 prompt 的「STYLE RULES」那段文字一字不差，兩張 sheet 的筆觸才會一致——
+之後加新圖示請沿用同一段，只改「THE 24 ICONS」清單。禁止拿任何生成圖當參考去修改。
+
+sheet → 程式：
+
+  mkdir /tmp/icon-tools && cd /tmp/icon-tools && npm init -y && npm i potrace sharp
+  ICON_TOOLS_DIR=/tmp/icon-tools node scripts/icons/build-huddle-icons.mjs
+  （加 --preview some.png 會另外輸出 14/16/20px 實際尺寸的總覽圖）
+
+腳本做的事：依格線切圖 → 量筆觸粗細、統一成 24 單位格線裡 2.5 單位的墨線 → potrace 向量化 →
+寫出 components/icons/huddle-icons.tsx。個別圖示的手修（放大字母、把編號清單的 1/2 放大、
+把收合區塊的三角形放大、把箭頭與加號削細）都寫在腳本的 OPTIONS，可重現。

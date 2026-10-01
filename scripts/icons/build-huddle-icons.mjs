@@ -1,0 +1,422 @@
+#!/usr/bin/env node
+/**
+ * Huddle hand-inked icons: icon sheet PNG(s) → components/icons/huddle-icons.tsx
+ *
+ * The sheets are drawn by an image model (prompts + originals live next to
+ * them in docs/reports/2026-10-01-block-icons/). This script cuts each sheet
+ * into icons, thickens the ink a touch so it survives 14–20px, traces it to
+ * vector paths and writes one React component per icon (24×24 viewBox,
+ * fill="currentColor").
+ *
+ * potrace + sharp are NOT project dependencies — install them in a throwaway
+ * folder and point ICON_TOOLS_DIR at it:
+ *
+ *   mkdir /tmp/icon-tools && cd /tmp/icon-tools && npm init -y && npm i potrace sharp
+ *   ICON_TOOLS_DIR=/tmp/icon-tools node scripts/icons/build-huddle-icons.mjs
+ *
+ * Flags: --preview <file.png>  also render a contact sheet at real sizes
+ *        --dry                 measure + preview only, don't write the .tsx
+ */
+import { createRequire } from 'node:module'
+import { writeFileSync } from 'node:fs'
+import path from 'node:path'
+
+const TOOLS = process.env.ICON_TOOLS_DIR
+if (!TOOLS) { console.error('set ICON_TOOLS_DIR (see header comment)'); process.exit(1) }
+const req = createRequire(path.join(TOOLS, 'package.json'))
+const sharp = req('sharp')
+const potrace = req('potrace')
+
+const ROOT = process.cwd()
+const SHEET_DIR = 'docs/reports/2026-10-01-block-icons'
+const OUT_FILE = 'components/icons/huddle-icons.tsx'
+
+// ── tuning ────────────────────────────────────────────────────────────────
+const BOX = 24            // viewBox units
+const TARGET_STROKE = 2.5 // units; lucide is 2 — the brush pen is a bit fatter
+const MAX_EXTENT = 22.5   // longest side an icon may take inside the box
+const UP = 3              // supersampling before tracing
+
+/**
+ * Per-sheet grid + cell → icon name. `null` = cell not used.
+ * Per-icon options: { fit } longest side in units (optical size), { grow }
+ * extra ink in source px on top of the sheet default, { dx, dy } nudge.
+ */
+const SHEETS = [
+  {
+    file: 'sheet-v1.png', cols: 6, rows: 4,
+    cells: [
+      'Text', 'Heading1', 'Heading2', 'Heading3', 'Todo', 'BulletList',
+      'NumberedList', 'Toggle', 'Quote', 'CodeBlock', 'Divider', 'Image',
+      'Bold', 'Italic', 'Underline', 'Strikethrough', 'InlineCode', 'Link',
+      'Undo', 'Redo', 'AddTask', null, null, null,
+    ],
+  },
+  {
+    file: 'sheet-v2-toolbar.png', cols: 6, rows: 4,
+    cells: [
+      'ChevronLeft', 'ChevronRight', 'ChevronDown', 'More', 'Plus', 'Bell',
+      'User', null /* person-in-circle came out as a sad face */, 'Users', 'Eye', 'EyeOff', 'Clock',
+      'Notebook', 'StickyNote', 'Archive', 'BookOpen', 'BarChart', 'Download',
+      'Settings', 'ZoomIn', 'ZoomOut', 'Sparkles', 'FloatingWindow', null,
+    ],
+  },
+]
+
+const OPTIONS = {
+  // Letter glyphs are drawn smaller than the pictograms — bring them up a bit.
+  Text: { scale: 1.12 },
+  Heading1: { scale: 1.1 }, Heading2: { scale: 1.1 }, Heading3: { scale: 1.1 },
+  Bold: { scale: 1.15 }, Italic: { scale: 1.15 }, Underline: { scale: 1.1 }, Strikethrough: { scale: 1.1 },
+  Quote: { scale: 1.15 },
+  // Single-stroke symbols came out with a fatter pen than the rest: say so,
+  // and the script thins them back to the family weight.
+  ChevronLeft: { stroke: 31 }, ChevronRight: { stroke: 31 }, ChevronDown: { stroke: 31 }, Plus: { stroke: 27 },
+  // The "1 2" were drawn too small to survive 16px: enlarge the digits (which
+  // also brings their thin stroke up to weight) and thicken the two lines.
+  NumberedList: {
+    fit: 21.5,
+    remix: (parts) => parts.map((part) => (part.w < 50
+      ? { part, scale: 1.35, dx: -6, dy: part.cy < 70 ? -9 : 9 }
+      : { part, grow: 3, dx: 4, dy: part.cy < 70 ? -9 : 9 })),
+  },
+  // Bigger triangle so the toggle doesn't read as "= with a dot".
+  Toggle: {
+    fit: 22,
+    remix: (parts) => {
+      const tri = parts.reduce((a, b) => (a.cx < b.cx ? a : b))
+      return parts.map((part) => (part === tri ? { part, scale: 1.4, dx: -8 } : { part, dx: 6 }))
+    },
+  },
+}
+
+// ── raster helpers ────────────────────────────────────────────────────────
+async function loadGray(file) {
+  const { data, info } = await sharp(file).flatten({ background: '#ffffff' }).greyscale().raw()
+    .toBuffer({ resolveWithObject: true })
+  return { data, w: info.width, h: info.height }
+}
+
+/** 8-connected components of ink (< 128). Returns [{minX,minY,maxX,maxY,area,cx,cy}] */
+function components({ data, w, h }) {
+  const label = new Int32Array(w * h)
+  const out = []
+  const stack = []
+  for (let i = 0; i < w * h; i++) {
+    if (data[i] >= 128 || label[i]) continue
+    const id = out.length + 1
+    const c = { minX: w, minY: h, maxX: 0, maxY: 0, area: 0, sx: 0, sy: 0 }
+    stack.push(i); label[i] = id
+    while (stack.length) {
+      const p = stack.pop()
+      const x = p % w, y = (p - x) / w
+      c.area++; c.sx += x; c.sy += y
+      if (x < c.minX) c.minX = x
+      if (x > c.maxX) c.maxX = x
+      if (y < c.minY) c.minY = y
+      if (y > c.maxY) c.maxY = y
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue
+        const nx = x + dx, ny = y + dy
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
+        const q = ny * w + nx
+        if (data[q] < 128 && !label[q]) { label[q] = id; stack.push(q) }
+      }
+    }
+    c.cx = c.sx / c.area; c.cy = c.sy / c.area
+    out.push(c)
+  }
+  return out
+}
+
+/** Disk dilation of a binary mask (1 = ink). */
+function dilate(mask, w, h, r) {
+  if (r <= 0) return mask
+  const out = new Uint8Array(w * h)
+  const R = Math.ceil(r)
+  const offs = []
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) if (dx * dx + dy * dy <= r * r) offs.push([dx, dy])
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!mask[y * w + x]) continue
+    for (const [dx, dy] of offs) {
+      const nx = x + dx, ny = y + dy
+      if (nx >= 0 && ny >= 0 && nx < w && ny < h) out[ny * w + nx] = 1
+    }
+  }
+  return out
+}
+
+/** Disk erosion (dilate the background). */
+function erode(mask, w, h, r) {
+  if (r <= 0) return mask
+  const inv = new Uint8Array(w * h)
+  for (let i = 0; i < w * h; i++) inv[i] = mask[i] ? 0 : 1
+  const fat = dilate(inv, w, h, r)
+  const out = new Uint8Array(w * h)
+  for (let i = 0; i < w * h; i++) out[i] = fat[i] ? 0 : 1
+  return out
+}
+
+/**
+ * Hand-fix hook: rebuild an icon from its own ink blobs. `fn(parts)` gets the
+ * blobs (sorted left→right, top→bottom; cx/cy/w/h in SOURCE px) and returns
+ * [{ part, scale?, dx?, dy?, grow? }] — each blob is thickened, scaled about
+ * its own centre, moved, and stamped onto a fresh canvas.
+ */
+function remix(mask, W, H, fn) {
+  const label = new Int32Array(W * H)
+  const parts = []
+  const stack = []
+  for (let i = 0; i < W * H; i++) {
+    if (!mask[i] || label[i]) continue
+    const id = parts.length + 1
+    const p = { id, minX: W, minY: H, maxX: 0, maxY: 0, area: 0 }
+    stack.push(i); label[i] = id
+    while (stack.length) {
+      const q = stack.pop()
+      const x = q % W, y = (q - x) / W
+      p.area++
+      if (x < p.minX) p.minX = x; if (x > p.maxX) p.maxX = x
+      if (y < p.minY) p.minY = y; if (y > p.maxY) p.maxY = y
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, ny = y + dy
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue
+        const n = ny * W + nx
+        if (mask[n] && !label[n]) { label[n] = id; stack.push(n) }
+      }
+    }
+    parts.push(p)
+  }
+  const big = parts.filter((p) => p.area > 30 * UP)
+  for (const p of big) { p.cx = (p.minX + p.maxX) / 2 / UP; p.cy = (p.minY + p.maxY) / 2 / UP; p.w = (p.maxX - p.minX + 1) / UP; p.h = (p.maxY - p.minY + 1) / UP }
+  big.sort((a, b) => (Math.abs(a.cx - b.cx) > 12 ? a.cx - b.cx : a.cy - b.cy))
+  const M = 60 * UP // margin so scaled/moved blobs never clip
+  const OW = W + 2 * M, OH = H + 2 * M
+  const out = new Uint8Array(OW * OH)
+  for (const op of fn(big)) {
+    const p = op.part, sc = op.scale ?? 1
+    let m = new Uint8Array(W * H)
+    for (let i = 0; i < W * H; i++) if (label[i] === p.id) m[i] = 1
+    if (op.grow > 0) m = dilate(m, W, H, op.grow * UP)
+    else if (op.grow < 0) m = erode(m, W, H, -op.grow * UP)
+    const cx = (p.minX + p.maxX) / 2, cy = (p.minY + p.maxY) / 2
+    const tx = cx + (op.dx ?? 0) * UP + M, ty = cy + (op.dy ?? 0) * UP + M
+    const hw = ((p.maxX - p.minX) / 2 + 12 * UP) * sc, hh = ((p.maxY - p.minY) / 2 + 12 * UP) * sc
+    for (let y = Math.max(0, Math.floor(ty - hh)); y < Math.min(OH, ty + hh); y++) {
+      for (let x = Math.max(0, Math.floor(tx - hw)); x < Math.min(OW, tx + hw); x++) {
+        const sx = Math.round(cx + (x - tx) / sc), sy = Math.round(cy + (y - ty) / sc)
+        if (sx >= 0 && sy >= 0 && sx < W && sy < H && m[sy * W + sx]) out[y * OW + x] = 1
+      }
+    }
+  }
+  return { mask: out, W: OW, H: OH }
+}
+
+/** Mean stroke width in px: 2·area / perimeter (exact for long thin strokes). */
+function strokeWidth(mask, w, h) {
+  let area = 0, edge = 0
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!mask[y * w + x]) continue
+    area++
+    if (!mask[y * w + x - 1] || !mask[y * w + x + 1] || !mask[(y - 1) * w + x] || !mask[(y + 1) * w + x]) edge++
+  }
+  return edge ? (2 * area) / edge : 0
+}
+
+function trace(pngBuffer) {
+  return new Promise((resolve, reject) => {
+    const t = new potrace.Potrace({ threshold: 128, turdSize: 20, optTolerance: 0.6, alphaMax: 1.1 })
+    t.loadImage(pngBuffer, (err) => (err ? reject(err) : resolve(t.getPathTag())))
+  })
+}
+
+/** Absolute M/L/C path → transformed, rounded, relative-command path string. */
+function transformPath(d, fn) {
+  const tokens = d.match(/[MLCZ]|-?\d*\.?\d+(?:e-?\d+)?/gi) || []
+  const fmt = (n) => {
+    let s = (Math.round(n * 10) / 10).toString()
+    if (s.startsWith('0.')) s = s.slice(1)
+    else if (s.startsWith('-0.')) s = '-' + s.slice(2)
+    return s
+  }
+  const join = (nums) => nums.map(fmt).reduce((acc, s) => acc + (acc && !s.startsWith('-') ? ' ' : '') + s, '')
+  let out = ''
+  let cmd = ''
+  let i = 0
+  let cx = 0, cy = 0 // current point, already rounded (so rounding never drifts)
+  const rnd = (n) => Math.round(n * 10) / 10 // 0.1u ≈ 0.08px at 20px — invisible, and a third smaller
+  const take = () => { const [x, y] = fn(parseFloat(tokens[i]), parseFloat(tokens[i + 1])); i += 2; return [rnd(x), rnd(y)] }
+  while (i < tokens.length) {
+    const tk = tokens[i]
+    if (/[MLCZ]/i.test(tk)) { cmd = tk.toUpperCase(); i++; if (cmd === 'Z') { out += 'z'; } continue }
+    if (cmd === 'M') { const [x, y] = take(); out += `M${join([x, y])}`; cx = x; cy = y; cmd = 'L' }
+    else if (cmd === 'L') { const [x, y] = take(); out += `l${join([x - cx, y - cy])}`; cx = x; cy = y }
+    else if (cmd === 'C') {
+      const [x1, y1] = take(), [x2, y2] = take(), [x, y] = take()
+      out += `c${join([x1 - cx, y1 - cy, x2 - cx, y2 - cy, x - cx, y - cy])}`; cx = x; cy = y
+    } else throw new Error(`unexpected token ${tk}`)
+  }
+  return out
+}
+
+// ── main ──────────────────────────────────────────────────────────────────
+const args = process.argv.slice(2)
+const previewIdx = args.indexOf('--preview')
+const PREVIEW = previewIdx >= 0 ? args[previewIdx + 1] : null
+const DRY = args.includes('--dry')
+
+const icons = [] // { name, d, w, h }
+
+for (const sheet of SHEETS) {
+  const file = path.join(ROOT, SHEET_DIR, sheet.file)
+  let img
+  try { img = await loadGray(file) } catch { console.warn(`skip ${sheet.file} (not found)`); continue }
+  const cw = img.w / sheet.cols, ch = img.h / sheet.rows
+  const comps = components(img).filter((c) => c.area >= 12)
+
+  // group components into cells by centroid
+  const cells = Array.from({ length: sheet.cols * sheet.rows }, () => [])
+  for (const c of comps) {
+    const col = Math.min(sheet.cols - 1, Math.floor(c.cx / cw)), row = Math.min(sheet.rows - 1, Math.floor(c.cy / ch))
+    cells[row * sheet.cols + col].push(c)
+  }
+
+  // first pass: crop masks + measure stroke so the whole sheet shares one scale
+  const raw = []
+  for (let k = 0; k < cells.length; k++) {
+    const name = sheet.cells[k]
+    if (!name) continue
+    if (!cells[k].length) { console.warn(`${sheet.file} cell ${k + 1} (${name}) is empty`); continue }
+    const b = cells[k].reduce((a, c) => ({
+      minX: Math.min(a.minX, c.minX), minY: Math.min(a.minY, c.minY),
+      maxX: Math.max(a.maxX, c.maxX), maxY: Math.max(a.maxY, c.maxY),
+    }), { minX: 1e9, minY: 1e9, maxX: 0, maxY: 0 })
+    const pad = 14
+    const x0 = Math.max(0, b.minX - pad), y0 = Math.max(0, b.minY - pad)
+    const x1 = Math.min(img.w, b.maxX + pad + 1), y1 = Math.min(img.h, b.maxY + pad + 1)
+    const w = x1 - x0, h = y1 - y0
+    // supersample the grey crop, then threshold → smooth binary mask
+    const up = await sharp(file).flatten({ background: '#ffffff' }).greyscale()
+      .extract({ left: x0, top: y0, width: w, height: h })
+      .resize(w * UP, h * UP, { kernel: 'cubic' }).raw().toBuffer()
+    const W = w * UP, H = h * UP
+    const mask = new Uint8Array(W * H)
+    for (let i = 0; i < W * H; i++) mask[i] = up[i] < 128 ? 1 : 0
+    raw.push({ name, mask, W, H, bw: b.maxX - b.minX + 1, bh: b.maxY - b.minY + 1, stroke: strokeWidth(mask, W, H) / UP })
+  }
+  const strokes = raw.map((r) => r.stroke).sort((a, b) => a - b)
+  const median = strokes[Math.floor(strokes.length / 2)]
+  const maxSide = Math.max(...raw.map((r) => Math.max(r.bw, r.bh)))
+  // One scale for the sheet (so every icon keeps the same pen), chosen so the
+  // biggest drawing fits; then grow the ink until the stroke hits the target.
+  const scale = sheet.scale ?? MAX_EXTENT / maxSide // units per source px
+  const sheetGrow = (TARGET_STROKE / scale - median) / 2
+  console.log(`\n${sheet.file}: median stroke ${median.toFixed(1)}px, biggest ${maxSide}px → scale ${scale.toFixed(4)} u/px, grow ${sheetGrow.toFixed(1)}px/side`)
+
+  for (const r of raw) {
+    const opt = OPTIONS[r.name] || {}
+    if (opt.remix) {
+      const m = remix(r.mask, r.W, r.H, opt.remix)
+      r.mask = m.mask; r.W = m.W; r.H = m.H
+      r.stroke = opt.stroke ?? median
+      let a = r.W, b = r.H, c = 0, e = 0
+      for (let y = 0; y < r.H; y++) for (let x = 0; x < r.W; x++) if (r.mask[y * r.W + x]) { if (x < a) a = x; if (x > c) c = x; if (y < b) b = y; if (y > e) e = y }
+      r.bw = (c - a + 1) / UP; r.bh = (e - b + 1) / UP
+    }
+    const s = opt.fit ? opt.fit / Math.max(r.bw, r.bh) : scale * (opt.scale ?? 1)
+    // Same pen everywhere: thin drawings get thickened, drawings scaled up on
+    // their own get thinned. Solid shapes measure "fat", so cap at the median.
+    const own = opt.stroke ?? Math.min(r.stroke, median)
+    const grow = (TARGET_STROKE / s - own) / 2 + (opt.grow ?? 0)
+    const fat = grow >= 0 ? dilate(r.mask, r.W, r.H, grow * UP) : erode(r.mask, r.W, r.H, -grow * UP)
+    // bbox after growing
+    let minX = r.W, minY = r.H, maxX = 0, maxY = 0
+    for (let y = 0; y < r.H; y++) for (let x = 0; x < r.W; x++) if (fat[y * r.W + x]) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y
+    }
+    const px = Buffer.alloc(r.W * r.H)
+    for (let i = 0; i < r.W * r.H; i++) px[i] = fat[i] ? 0 : 255
+    const png = await sharp(px, { raw: { width: r.W, height: r.H, channels: 1 } }).blur(UP * 0.9).png().toBuffer()
+    const tag = await trace(png)
+    const d0 = /d="([^"]+)"/.exec(tag)[1]
+    const k = s / UP
+    const wU = (maxX - minX + 1) * k, hU = (maxY - minY + 1) * k
+    const ox = (BOX - wU) / 2 - minX * k + (opt.dx ?? 0), oy = (BOX - hU) / 2 - minY * k + (opt.dy ?? 0)
+    const d = transformPath(d0, (x, y) => [x * k + ox, y * k + oy])
+    icons.push({ name: r.name, d, wU, hU })
+    console.log(`  ${r.name.padEnd(15)} src ${String(r.bw).padStart(3)}×${String(r.bh).padEnd(3)} stroke ${r.stroke.toFixed(1)}px grow ${grow.toFixed(1)} → ${wU.toFixed(1)}×${hU.toFixed(1)}u, ${d.length}B`)
+  }
+}
+
+// ── output ────────────────────────────────────────────────────────────────
+if (PREVIEW) {
+  const sizes = [14, 16, 20]
+  const cols = 8, cellW = 150, cellH = 78
+  const rows = Math.ceil(icons.length / cols)
+  const themes = [['#f6f3e9', '#292b24'], ['#22231e', '#f3eedd']]
+  let svg = ''
+  themes.forEach(([bg, fg], t) => {
+    const top = t * (rows * cellH + 20)
+    svg += `<rect x="0" y="${top}" width="${cols * cellW}" height="${rows * cellH + 20}" fill="${bg}"/>`
+    icons.forEach((ic, i) => {
+      const x = (i % cols) * cellW + 10, y = top + Math.floor(i / cols) * cellH + 12
+      let cx = x
+      for (const sz of sizes) {
+        svg += `<svg x="${cx}" y="${y + (20 - sz) / 2}" width="${sz}" height="${sz}" viewBox="0 0 ${BOX} ${BOX}"><path d="${ic.d}" fill="${fg}" fill-rule="evenodd"/></svg>`
+        cx += sz + 12
+      }
+      svg += `<svg x="${cx + 4}" y="${y - 6}" width="44" height="44" viewBox="0 0 ${BOX} ${BOX}"><path d="${ic.d}" fill="${fg}" fill-rule="evenodd"/></svg>`
+      svg += `<text x="${x}" y="${y + 48}" font-family="Helvetica" font-size="10" fill="${fg}" opacity=".6">${ic.name}</text>`
+    })
+  })
+  const Wd = cols * cellW, Hd = themes.length * (rows * cellH + 20)
+  const doc = `<svg xmlns="http://www.w3.org/2000/svg" width="${Wd}" height="${Hd}" viewBox="0 0 ${Wd} ${Hd}">${svg}</svg>`
+  for (const dpr of [1, 2]) {
+    const f = PREVIEW.replace(/\.png$/, `@${dpr}x.png`)
+    await sharp(Buffer.from(doc), { density: 72 * dpr }).png().toFile(f)
+    console.log('preview →', f)
+  }
+}
+
+if (!DRY) {
+  const total = icons.reduce((a, i) => a + i.d.length, 0)
+  const body = icons.map((ic) => `export const Ink${ic.name} = ink(\n  '${ic.name}',\n  '${ic.d}',\n)`).join('\n\n')
+  const tsx = `// AUTO-GENERATED by scripts/icons/build-huddle-icons.mjs — do not edit by hand.
+// Source sheets + prompts: ${SHEET_DIR}/ (see DESIGN.md → 圖示).
+//
+// Huddle's hand-inked icon family: traced from brush-pen drawings so the
+// stroke wobbles like the mascot's outline. Drop-in for lucide icons —
+// same \`className\` sizing, inherits \`currentColor\`, inline SVG (works
+// offline in the Capacitor shell, no network fetch).
+import type { SVGProps } from 'react'
+
+export type InkIconProps = Omit<SVGProps<SVGSVGElement>, 'children'>
+
+function ink(name: string, d: string) {
+  function InkIcon(props: InkIconProps) {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 ${BOX} ${BOX}"
+        width="${BOX}"
+        height="${BOX}"
+        fill="currentColor"
+        fillRule="evenodd"
+        aria-hidden="true"
+        focusable="false"
+        data-ink-icon={name}
+        {...props}
+      >
+        <path d={d} />
+      </svg>
+    )
+  }
+  InkIcon.displayName = \`Ink\${name}\`
+  return InkIcon
+}
+
+${body}
+`
+  writeFileSync(path.join(ROOT, OUT_FILE), tsx)
+  console.log(`\nwrote ${OUT_FILE}: ${icons.length} icons, ${total} bytes of path data`)
+}

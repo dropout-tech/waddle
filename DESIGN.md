@@ -242,6 +242,12 @@ App 繼續使用既有 `--radius: 0.75rem` 與陶瓷表面規則，不能將海�
 - Lucide React 為基準（已含於 shadcn）。
 - 線條 1.5-2px，圓角 cap。
 - **企鵝吉祥物 Huddle** 是手繪風格，出現在 onboarding、empty state、PNG 匯出浮水印；不要在功能性 icon 位置使用吉祥物。
+- **例外：Huddle 手繪墨線圖示（2026-10-01，老闆指示「不要像 Notion」）**。以下位置不用 Lucide，改用 `components/icons/huddle-icons.tsx` 的 `Ink*` 元件（inline SVG、`fill="currentColor"`、離線可用；介面與 lucide 相同，用 `className` 給尺寸）：
+  - **記事本編輯器**：「/」區塊選單 12 項（列上不再有「邊框小方塊」縮圖——那是 Notion 的招牌；圖示 20px 直接落在紙面、跟著該列文字顏色）、手機鍵盤上方工具列整排、桌機選取文字後的浮動格式列。
+  - **行事曆上方工具列整排**（桌機兩列＋手機「⋯」選單）：日期箭頭、縮放、時間範圍、共享對象、復原／重做、懸浮小視窗、記事本、便條紙（含＋與收納）、共享、「▾」選單內各項、設定、通知鈴、今日進度的星星、白板拉環的箭頭。同一入口在別處也跟著換：⌘K「開記事本」、使用者選單的便條紙三項。`HuddleFootprints` 原本就是自製的，不動。
+  - **其餘維持 Lucide**：左側任務欄、行事曆格子、各 modal、手機底部分頁、懸浮小視窗內的分頁。原則是「同一排不混用」——要擴大範圍就整排一起換。
+  - **筆觸規格**：24 單位格線、墨線約 2.5 單位（Lucide 是 2）、圓頭、略帶手抖、造型極簡（最小顯示 12–14px）。它是符號，不是企鵝。
+  - **再生／加新圖示**：原始 sheet 與 prompt 在 `docs/reports/2026-10-01-block-icons/`（`sheet-v1.png` 記事本那批、`sheet-v2-toolbar.png` 工具列那批、`prompt.txt` 說明指令）。用 Codex CLI 產新 sheet（參考圖只准 `public/huddle-mascot.png`、沿用同一段 STYLE RULES 文字、不拿生成圖當參考），在 `scripts/icons/build-huddle-icons.mjs` 的 `SHEETS` 填「格子→名稱」後跑該腳本，重新產生 `huddle-icons.tsx`（產出檔不要手改；個別圖示的放大、加粗、重組寫在腳本的 `OPTIONS`）。
 
 ### 手機小工具預覽（2026-09-25）
 
