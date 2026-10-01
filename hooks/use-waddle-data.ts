@@ -31,7 +31,9 @@ import type { FocusSettings } from '@/lib/focus'
 import { normalizePet, type PetSettings } from '@/lib/pet/types'
 // Aliased: this file uses `t` pervasively as the loop variable for "task"
 // (c.tasks.map((t) => ...)), so importing the translator as `t` would shadow it.
-import { t as translate, getLang } from '@/lib/i18n'
+import { t as translate, translateFor, getLang } from '@/lib/i18n'
+import { demoWorkspaces } from '@/lib/demo-data'
+import { canResetWorkspaces, collectDemoTaskInfo } from '@/lib/onboarding/can-reset-workspaces'
 import {
   listAssignments,
   toTaskAssignment,
@@ -3316,9 +3318,31 @@ export function useWaddleData(): UseWaddleData {
    *
    * Both options wipe the existing demo workspaces (cascade deletes the
    * categories and tasks under them).
+   *
+   * Guarded: the wipe only runs when every task is an untouched seeded demo
+   * task. If the account has any other task (or we can't tell), keep it all.
    */
   const applyOnboardingChoice = useCallback(async (choice: 'template' | 'blank') => {
     const userId = requireUserId()
+
+    // Data-layer guard: the wipe below is meant only for the demo tasks seeded
+    // at signup. An existing user who sees the tour again (any user-made or
+    // edited task) must never lose workspaces/tasks. Ask the server (not just
+    // local state), and fail safe — any query error also means "don't touch".
+    const demo = collectDemoTaskInfo(demoWorkspaces, translateFor)
+    const localTaskTitles = workspaces.flatMap((ws) =>
+      ws.categories.flatMap((c) => c.tasks.map((task) => task.title)),
+    )
+    const allowed = await canResetWorkspaces({
+      demo,
+      localTaskTitles,
+      fetchServerTasks: () =>
+        supabase.from('tasks').select('title', { count: 'exact' }).limit(demo.count + 1),
+    })
+    if (!allowed) {
+      toast.info(translate('已保留你現有的工作區與任務'))
+      return
+    }
 
     const TEMPLATES: { name: string; color: string; icon: string; categories: string[] }[] =
       choice === 'template'
@@ -3426,7 +3450,7 @@ export function useWaddleData(): UseWaddleData {
       const { error: catError } = await supabase.from('categories').insert(catRows)
       if (catError) return handleDbError('建立分類')(catError)
     }
-  }, [supabase])
+  }, [supabase, workspaces])
 
   return {
     workspaces,
