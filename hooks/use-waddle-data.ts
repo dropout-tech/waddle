@@ -877,6 +877,45 @@ export function useWaddleData(): UseWaddleData {
     )
   }
 
+  // Put one task back exactly as it was (rollback after a failed write).
+  const restoreTaskSnapshot = (snapshot: Task) => {
+    setWorkspaces((prev) => prev.map((w) => ({
+      ...w,
+      categories: w.categories.map((c) => ({
+        ...c,
+        tasks: c.tasks.map((t) => (t.id === snapshot.id ? snapshot : t)),
+      })),
+    })))
+  }
+
+  // "Only this" on a virtual occurrence of a recurring master: write the
+  // one-off override FIRST and only then exclude the date from the master.
+  // The reverse order made that occurrence vanish whenever the second
+  // request failed. Any failure undoes what was written, rolls the screen
+  // back (override gone, master's exdates restored) and tells the user.
+  const detachOccurrence = async (master: Task, override: Task, nextExdates: string[], op: string) => {
+    const userId = requireUserId()
+    const { error: insertError } = await supabase.from('tasks').insert(buildTaskInsert(override, userId))
+    let error: unknown = insertError
+    if (!insertError) {
+      const { error: exdateError } = await supabase.from('tasks').update({ exdates: nextExdates }).eq('id', master.id)
+      if (!exdateError) return true
+      error = exdateError
+      await supabase.from('tasks').delete().eq('id', override.id)
+    }
+    setWorkspaces((prev) => prev.map((w) => ({
+      ...w,
+      categories: w.categories.map((c) => ({
+        ...c,
+        tasks: c.tasks
+          .filter((t) => t.id !== override.id)
+          .map((t) => (t.id === master.id ? { ...t, exdates: master.exdates } : t)),
+      })),
+    })))
+    handleDbError(op)(error)
+    return false
+  }
+
   // ─── Assigned-to-me tasks ────────────────────────────
   // The assignee may only change these fields (DB trigger
   // tasks_assignment_guard enforces the same whitelist); anything else in
@@ -1411,8 +1450,15 @@ export function useWaddleData(): UseWaddleData {
         // Idempotent: the row (client UUID) is already in the DB and our
         // optimistic state — swallow the duplicate instead of alarming the user.
         if (error && isDuplicateKeyError(error)) { inserted = true; return }
-        if (error) handleDbError('建立任務')(error)
-        else inserted = true
+        if (error) {
+          handleDbError('建立任務')(error)
+          // The row does not exist: take the optimistic copy off the screen,
+          // or later edits to it silently update 0 rows.
+          setWorkspaces((prev) => prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => ({ ...c, tasks: c.tasks.filter((t) => t.id !== task.id) })),
+          })))
+        } else inserted = true
       } finally {
         pendingWritesRef.current -= 1
         delete pendingTaskCreatesRef.current[task.id]
@@ -1592,7 +1638,10 @@ export function useWaddleData(): UseWaddleData {
         try {
           const dbUpdates = taskToRow(updates)
           const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', taskId)
-          if (error) handleDbError('更新任務')(error)
+          if (error) {
+            restoreTaskSnapshot(existing)
+            handleDbError('更新任務')(error)
+          }
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -1634,9 +1683,7 @@ export function useWaddleData(): UseWaddleData {
 
         pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
-          await supabase.from('tasks').update({ exdates: nextExdates }).eq('id', taskId)
-          const userId = requireUserId()
-          await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
+          await detachOccurrence(existing, newTask, nextExdates, '更新任務')
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -2378,7 +2425,10 @@ export function useWaddleData(): UseWaddleData {
               scheduled_end_time: endTime,
             })
             .eq('id', taskId)
-          if (error) handleDbError('重新排程')(error)
+          if (error) {
+            restoreTaskSnapshot(task)
+            handleDbError('重新排程')(error)
+          }
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -2424,17 +2474,7 @@ export function useWaddleData(): UseWaddleData {
 
         pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
-          const { error: updateError } = await supabase
-            .from('tasks')
-            .update({ exdates: nextExdates })
-            .eq('id', taskId)
-          if (updateError) handleDbError('更新重複任務例外')(updateError)
-
-          const userId = requireUserId()
-          const { error: insertError } = await supabase
-            .from('tasks')
-            .insert(buildTaskInsert(newTask, userId))
-          if (insertError) handleDbError('建立任務例外')(insertError)
+          await detachOccurrence(task, newTask, nextExdates, '建立任務例外')
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -2623,7 +2663,7 @@ export function useWaddleData(): UseWaddleData {
         )
         pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
-          await supabase
+          const { error } = await supabase
             .from('tasks')
             .update({
               scheduled_start_time: null,
@@ -2631,6 +2671,10 @@ export function useWaddleData(): UseWaddleData {
               scheduled_date: date ?? null,
             })
             .eq('id', taskId)
+          if (error) {
+            restoreTaskSnapshot(task)
+            handleDbError('取消排程')(error)
+          }
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -2671,9 +2715,7 @@ export function useWaddleData(): UseWaddleData {
         )
         pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
-          await supabase.from('tasks').update({ exdates: nextExdates }).eq('id', taskId)
-          const userId = requireUserId()
-          await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
+          await detachOccurrence(task, newTask, nextExdates, '取消排程')
         } finally {
           pendingWritesRef.current -= 1
         }
