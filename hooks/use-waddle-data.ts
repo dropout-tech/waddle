@@ -2342,6 +2342,17 @@ export function useWaddleData(): UseWaddleData {
     // "This and following" from the series' first day IS the whole series.
     if (recurrenceChoice === 'this_and_following' && isSeriesStart(task, targetDate)) recurrenceChoice = 'all'
 
+    // "All occurrences" after dragging one occurrence: move the series by the
+    // drag's day offset. Writing the dropped day as the series start would
+    // erase every occurrence before it.
+    if (task.isRecurring && recurrenceChoice === 'all' && date && targetDate && task.scheduledDate) {
+      const shifted = parseDateString(task.scheduledDate)
+      shifted.setDate(shifted.getDate() + Math.round(
+        (parseDateString(date).getTime() - parseDateString(targetDate).getTime()) / 86_400_000,
+      ))
+      date = toDateString(shifted)
+    }
+
     // Non-recurring or "all" or missing choice
     if (!task.isRecurring || recurrenceChoice === 'all' || !recurrenceChoice) {
       setWorkspaces((prev) =>
