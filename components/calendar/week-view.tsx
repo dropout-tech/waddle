@@ -23,6 +23,8 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { CurrentTimeLine } from './current-time-line'
 import { TaskBlock, type TaskDragStart } from './task-block'
 import { PeerEventBlock } from './peer-event-block'
+import { GoogleAllDayChip } from './google-event-block'
+import { clampToGrid } from '@/lib/google-calendar'
 import type { PeerEvent } from '@/hooks/use-calendar-sharing'
 import { SlotIcon } from './slot-icon'
 import { X, ChevronLeft } from 'lucide-react'
@@ -355,11 +357,21 @@ export function WeekView({
 
   // Peer overlay events for a date — same recurring expansion as own tasks
   // (PeerEvent is Task-shaped so taskOccursOnDate works unchanged).
+  // Google pieces are clamped to the visible hour range (a 00:30 piece of an
+  // overnight meeting must not paint above the grid when startHour > 0).
+  // This grid draws rows startHour..endHour INCLUSIVE, so it ends at endHour+1.
   const getPeerEventsForDate = (date: Date) => {
-    return peerEvents.filter(
-      (ev) => taskOccursOnDate(ev, date) && ev.scheduledStartTime && ev.scheduledEndTime
-    )
+    return peerEvents.flatMap((ev) => {
+      if (!taskOccursOnDate(ev, date) || !ev.scheduledStartTime || !ev.scheduledEndTime) return []
+      if (!ev.google) return [ev]
+      const c = clampToGrid(ev.scheduledStartTime, ev.scheduledEndTime, startHour, Math.min(24, endHour + 1))
+      return c ? [{ ...ev, scheduledStartTime: c.start, scheduledEndTime: c.end }] : []
+    })
   }
+
+  // Google all-day events (no times) → chips in the all-day zone.
+  const getGoogleAllDayForDate = (date: Date) =>
+    peerEvents.filter((ev) => ev.google && !ev.scheduledStartTime && taskOccursOnDate(ev, date))
 
   // Calculate position for a time
   const getTimePosition = (time: string) => {
@@ -827,7 +839,7 @@ export function WeekView({
     ? Math.min(
         HEADER_DEFAULT,
         HEADER_DATE_HEIGHT + HEADER_HANDLE_HEIGHT + 6 +
-          Math.max(1, ...allDates.map(d => getAllDayTasksForDate(d).length)) * ALL_DAY_ROW
+          Math.max(1, ...allDates.map(d => getAllDayTasksForDate(d).length + getGoogleAllDayForDate(d).length)) * ALL_DAY_ROW
       )
     : HEADER_DEFAULT)
   const isResizingHeader = useRef(false)
@@ -970,6 +982,9 @@ export function WeekView({
                       }}
                       title={(activeTaskDrag || pendingTaskDrag) ? translate('放開以放到待排程') : translate('點擊新增任務')}
                     >
+                      {getGoogleAllDayForDate(date).map((ev) => (
+                        <GoogleAllDayChip key={ev.id} event={ev} />
+                      ))}
                       {allDayTasks.map((task) => {
                         const isThisTaskBeingDragged = pendingTaskDrag?.task.id === task.id
                         return (
