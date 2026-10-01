@@ -496,11 +496,14 @@ export function PanelHeader({
           </div>
 
           {/* Workspace Badges. Mobile: horizontal scroll on a single row so
-              they don't wrap into messy multi-line clusters. Desktop: wrap. */}
+              they don't wrap into messy multi-line clusters. Desktop: wrap.
+              Mobile padding/negative margin (same layout as pb-1) give the
+              scroll box 48px of height so the gear's 44px tap area isn't
+              clipped by it. */}
           <div
             className={cn(
               'flex items-center gap-2',
-              isMobile ? 'overflow-x-auto -mx-4 px-4 pb-1' : 'flex-wrap'
+              isMobile ? 'overflow-x-auto -mx-4 px-4 pt-2 pb-3 -my-2' : 'flex-wrap'
             )}
             style={isMobile ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : undefined}
           >
@@ -532,13 +535,15 @@ export function PanelHeader({
                       {count}
                     </span>
                     
-                    {/* Settings icon - appears on hover */}
+                    {/* Settings icon - appears on hover. On touch screens an
+                        invisible ::before grows the tap area to 44×44. */}
                     <span
                       onClick={(e) => {
                         e.stopPropagation()
                         setSettingsWorkspaceId(workspace.id)
                       }}
-                      className="ml-0.5 p-0.5 rounded opacity-40 hover:opacity-100 hover:bg-muted/60 transition-all cursor-pointer"
+                      data-workspace-settings
+                      className="relative ml-0.5 p-0.5 rounded opacity-40 hover:opacity-100 hover:bg-muted/60 transition-all cursor-pointer max-md:before:content-[''] max-md:before:absolute max-md:before:-inset-[14px]"
                     >
                       <Settings2 className="w-3 h-3" />
                     </span>
