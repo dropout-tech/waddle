@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react'
 import { EnrollmentFields } from '@/components/operations/enrollment-fields'
+import { useIosPurchaseSurface } from '@/components/billing/billing-session'
 import { readEnrollment } from '@/lib/operations/invites'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -47,6 +48,8 @@ export default function SignupPage() {
   // Hook-bound t shadows the module-level import inside the component so
   // render output follows the hydration-safe language (SSR = zh first paint).
   const { t } = useI18n()
+  // App Store guideline 3.1.1: no typed-in referral/coupon codes in the native iOS app (same rule as the membership page).
+  const codeEntry = !useIosPurchaseSurface()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -153,7 +156,7 @@ export default function SignupPage() {
         <p className="text-sm text-muted-foreground mt-1">{t('幾秒鐘就能開始使用 Huddle')}</p>
       </div>
 
-      <EnrollmentFields />
+      {codeEntry && <EnrollmentFields />}
       <div className="space-y-2.5">
         <Button
           type="button"

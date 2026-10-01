@@ -1,7 +1,7 @@
 import type { PurchasesPlugin } from '@revenuecat/purchases-capacitor'
 import type { NativeBillingDriver } from './native-adapter'
 
-type RevenueCatSDK = Pick<PurchasesPlugin, 'configure' | 'isConfigured' | 'logIn' | 'logOut' | 'getAppUserID' | 'getOfferings' | 'purchasePackage' | 'restorePurchases'>
+type RevenueCatSDK = Pick<PurchasesPlugin, 'configure' | 'isConfigured' | 'logIn' | 'logOut' | 'getAppUserID' | 'getOfferings' | 'purchasePackage' | 'restorePurchases' | 'checkTrialOrIntroductoryPriceEligibility'>
 
 /**
  * The Capacitor bridge rejects with only { message, code } — on iOS there is no
@@ -11,6 +11,8 @@ type RevenueCatSDK = Pick<PurchasesPlugin, 'configure' | 'isConfigured' | 'logIn
  */
 export const PURCHASE_CANCELLED_CODE = '1'
 export const PAYMENT_PENDING_CODE = '20'
+/** INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE — the only status that may be shown as a free trial. */
+export const INTRO_ELIGIBLE_STATUS = 2
 function storeError(error: unknown): unknown {
   const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : ''
   if (code === PURCHASE_CANCELLED_CODE) return { userCancelled: true }
@@ -39,11 +41,32 @@ export function createRevenueCatDriver(sdk: RevenueCatSDK): NativeBillingDriver 
     async listPackages() {
       await verifyIdentity()
       const offerings = await sdk.getOfferings()
-      return (offerings.current?.availablePackages ?? []).map((item) => ({
-        identifier: item.identifier,
-        localizedPrice: item.product.priceString,
-        subscriptionPeriod: item.product.subscriptionPeriod ?? null,
-      }))
+      const packages = offerings.current?.availablePackages ?? []
+      // A free trial is an introductory offer priced at zero. Paid introductory
+      // offers (e.g. half price for the first month) are not presented at all.
+      const trialProducts = packages.filter((item) => item.product.introPrice?.price === 0).map((item) => item.product.identifier)
+      const eligible = new Set<string>()
+      if (trialProducts.length) {
+        try {
+          const answers = await sdk.checkTrialOrIntroductoryPriceEligibility({ productIdentifiers: trialProducts })
+          for (const [productId, answer] of Object.entries(answers ?? {})) {
+            if (answer?.status === INTRO_ELIGIBLE_STATUS) eligible.add(productId)
+          }
+        } catch {
+          // Eligibility unknown: promise nothing and show the regular price.
+        }
+      }
+      return packages.map((item) => {
+        const intro = item.product.introPrice
+        return {
+          identifier: item.identifier,
+          localizedPrice: item.product.priceString,
+          subscriptionPeriod: item.product.subscriptionPeriod ?? null,
+          freeTrial: intro && intro.price === 0 && eligible.has(item.product.identifier)
+            ? { unit: intro.periodUnit, count: intro.periodNumberOfUnits * (intro.cycles || 1) }
+            : null,
+        }
+      })
     },
     async purchase(packageIdentifier) {
       await verifyIdentity()

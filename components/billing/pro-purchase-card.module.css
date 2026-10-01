@@ -76,6 +76,7 @@
 }
 .planName {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
   min-width: 0;
   font-weight: 600;

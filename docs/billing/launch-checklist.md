@@ -15,12 +15,15 @@
 
 ## 2026-10-01 第一階段：iOS 購買畫面（程式已完成，未開啟）
 
-- 位置：會員頁 `/membership` 的「Huddle Pro」卡，元件在 `components/billing/`，狀態邏輯在 `lib/billing/paywall-state.ts`（純函式）、session 生命週期在 `lib/billing/session-store.ts`。
+- 位置：會員頁 `/membership` 的「Huddle Pro」卡，元件在 `components/billing/`，狀態邏輯在 `lib/billing/paywall-state.ts`（純函式）、畫面文字組合在 `paywall-copy.ts`、跨頁狀態在 `paywall-store.ts`、session 生命週期在 `session-store.ts`。
+- 價格定案（2026-10-01）：月繳 NT$149、年繳 NT$990，`plans.ts` 的參考值已同步；官網與條款頁仍寫 NT$1,290，待老闆點頭後再改。實際售價以 App Store Connect 設定為準。
 - 只在「原生 iOS＋`NEXT_PUBLIC_BILLING_ENABLED=true`＋有公開 SDK key＋已登入」顯示；網頁版、桌面版、旗標未開時整張卡不存在。
 - 價格與週期只顯示商店回傳值（週期取商店的 `subscriptionPeriod`，不看 package 名稱）；`plans.ts` 的參考金額不會出現在畫面上。
-- 商店回報成功只會進入「購買已完成，正在同步」，每 5.5 秒重讀一次伺服器的 `paid_until`，90 秒後改顯示「稍後會自動生效／可按恢復購買」。畫面上的「已訂閱」只來自伺服器。
+- 商店回報成功只會進入「購買已完成，正在同步」，每 5.5 秒重讀一次伺服器的 `paid_until`；90 秒後改顯示「同步比平常久，稍後會自動生效」，但仍每 15 秒繼續查，頁面回到前景時立刻查一次，總共查 30 分鐘。畫面上的「已訂閱」與到期日只來自伺服器。
+- 同步中與待核准（家長同意、付款驗證）期間不能再購買，離開會員頁再回來也一樣；登出或換帳號會清掉，App 整個重開後以伺服器為準。**待核准若被拒絕，目前要重開 App 才能再買**（沒有監聽商店的拒絕通知）。
+- 免費試用：商品在 App Store Connect 設了「免費試用」的 Introductory Offer，且 RevenueCat 判定該使用者符合資格（`checkTrialOrIntroductoryPriceEligibility` 回傳 ELIGIBLE）時，方案、按鈕與續訂說明會改成試用版文字，試用長度與之後的價格都取商店回傳值。資格不明、查詢失敗、用過試用或沒設試用，一律顯示一般價格。付費型的 Introductory Offer（例如首月半價）不支援，會照一般價格顯示。伺服器端「新戶 14 天體驗」是另一套機制，這裡沒有用到。
 - **在下面第 5–9 步（webhook、對帳）上線前，沙盒購買會停在「同步中」然後逾時**——這是預期行為，不是壞掉。
-- 原生 iOS 的會員頁不再顯示「兌換優惠碼」「朋友的推薦碼」兩個輸入框（Apple 3.1.1）；註冊頁的同名欄位尚未處理。
+- 原生 iOS 的會員頁與註冊頁都不再顯示推薦碼／優惠碼輸入框（Apple 3.1.1）；網頁版與桌面版不變。
 - 進沙盒前還要：建立商品與 RevenueCat offering（月繳商品週期須為 1 個月、年繳為 1 年）、填 `NEXT_PUBLIC_REVENUECAT_IOS_KEY`、開旗標後重跑 `pnpm cap:sync`、在 Xcode 加 In-App Purchase capability、把 `/terms`、`/privacy`、`/refunds`、`/support` 上「Pro 尚未開放」的文字改掉。
 - 驗證：`node --experimental-strip-types --test scripts/tests/billing-*.test.mjs`；畫面用 `scripts/e2e/iap-paywall-verify.mjs`（假商店、假後端，不連任何真實服務）。真機與沙盒購買尚未做。
 

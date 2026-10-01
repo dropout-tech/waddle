@@ -1,6 +1,6 @@
 /** Approved positioning, not store product IDs or a price to send to a payment SDK. */
 export const BILLING_PLAN = {
-  currency: 'TWD', monthlyReferencePrice: 149, annualReferencePrice: 1290,
+  currency: 'TWD', monthlyReferencePrice: 149, annualReferencePrice: 990,
   entitlement: 'pro', livePurchasesEnabled: false,
 } as const
 
