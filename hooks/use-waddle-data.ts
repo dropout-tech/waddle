@@ -1640,11 +1640,29 @@ export function useWaddleData(): UseWaddleData {
         })
       })))
 
+      const previousRecurrence = existing.recurrence
       pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
         const userId = requireUserId()
-        await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
-        await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
+        // Create the new series FIRST and only cut the old one short once it
+        // exists: if the insert is refused (e.g. TASK_LIMIT) the old series
+        // must keep running, otherwise every later occurrence silently vanishes.
+        const { error: insertError } = await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
+        if (insertError) {
+          setWorkspaces((prev) => prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => ({
+              ...c,
+              tasks: c.tasks
+                .filter((t) => t.id !== newTask.id)
+                .map((t) => t.id === taskId ? { ...t, recurrence: previousRecurrence } : t),
+            })),
+          })))
+          handleDbError('更新任務')(insertError)
+          return
+        }
+        const { error: endError } = await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
+        if (endError) handleDbError('更新重複任務結束日')(endError)
       } finally {
         pendingWritesRef.current -= 1
       }
@@ -2427,11 +2445,28 @@ export function useWaddleData(): UseWaddleData {
         }))
       )
 
+      const previousRecurrence = task.recurrence
       pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
         const userId = requireUserId()
-        await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
-        await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
+        // New series first; cut the old one short only after it exists (see
+        // updateTask): a refused insert must not end the old series.
+        const { error: insertError } = await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
+        if (insertError) {
+          setWorkspaces((prev) => prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => ({
+              ...c,
+              tasks: c.tasks
+                .filter((t) => t.id !== newTask.id)
+                .map((t) => t.id === taskId ? { ...t, recurrence: previousRecurrence } : t),
+            })),
+          })))
+          handleDbError('重新排程')(insertError)
+          return
+        }
+        const { error: endError } = await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
+        if (endError) handleDbError('更新重複任務結束日')(endError)
       } finally {
         pendingWritesRef.current -= 1
       }
@@ -2643,11 +2678,28 @@ export function useWaddleData(): UseWaddleData {
         }))
       )
 
+      const previousRecurrence = task.recurrence
       pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
         const userId = requireUserId()
-        await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
-        await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
+        // Continuation first; cap the master only after it exists (see
+        // updateTask): a refused insert must not end the old series.
+        const { error: insertError } = await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
+        if (insertError) {
+          setWorkspaces((prev) => prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => ({
+              ...c,
+              tasks: c.tasks
+                .filter((t) => t.id !== newTask.id)
+                .map((t) => t.id === taskId ? { ...t, recurrence: previousRecurrence } : t),
+            })),
+          })))
+          handleDbError('取消排程')(insertError)
+          return
+        }
+        const { error: endError } = await supabase.from('tasks').update({ recurrence_end_date: endDate }).eq('id', taskId)
+        if (endError) handleDbError('更新重複任務結束日')(endError)
       } finally {
         pendingWritesRef.current -= 1
       }

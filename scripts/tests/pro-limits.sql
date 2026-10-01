@@ -122,7 +122,10 @@ select public.t_ok(not has_function_privilege('authenticated','huddle_ops.plan_l
   and not has_function_privilege('authenticated','huddle_ops.plan_allows(uuid)','EXECUTE')
   and not has_function_privilege('authenticated','huddle_ops.limits_enforced()','EXECUTE')
   and not has_function_privilege('authenticated','huddle_ops.active_task_count(uuid)','EXECUTE')
-  and not has_function_privilege('authenticated','huddle_ops.image_bytes_used(uuid)','EXECUTE'),'clients cannot call the plan helpers for arbitrary users');
+  and not has_function_privilege('authenticated','huddle_ops.image_bytes_used(uuid)','EXECUTE')
+  and not has_function_privilege('authenticated','huddle_ops.pro_until(uuid)','EXECUTE')
+  and not has_function_privilege('authenticated','huddle_ops.days_to_reach(uuid,timestamptz)','EXECUTE')
+  and not has_function_privilege('anon','huddle_ops.is_own_recurring_parent(uuid)','EXECUTE'),'clients cannot call the plan helpers for arbitrary users');
 select public.t_ok(not has_function_privilege('authenticated','public.meeting_import_limit(uuid)','EXECUTE')
   and not has_function_privilege('authenticated','public.google_calendar_connect_allowed(uuid)','EXECUTE')
   and has_function_privilege('service_role','public.meeting_import_limit(uuid)','EXECUTE')
@@ -134,26 +137,77 @@ select public.t_ok(not has_table_privilege('authenticated','huddle_ops.feature_g
 select public.t_ok((select bool_and(p.proconfig @> array['search_path=""']) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
   where p.prosecdef and p.proname in ('limits_enforced','plan_allows','plan_limits','active_task_count','note_count','image_bytes_used',
     'check_insert_quota','image_upload_allowed','google_calendar_grandfather','enable_pro_limits','disable_pro_limits',
-    'meeting_import_limit','google_calendar_connect_allowed','my_plan_usage')),'every new SECURITY DEFINER function pins search_path to empty');
+    'meeting_import_limit','google_calendar_connect_allowed','my_plan_usage',
+    'is_own_recurring_parent','pro_until','days_to_reach','grant_early_pro')),'every new SECURITY DEFINER function pins search_path to empty');
 set role authenticated;
 set request.jwt.claim.sub = :'F';
 select public.t_err('select huddle_ops.enable_pro_limits()','permission denied','authenticated call to enable_pro_limits is refused');
 reset role;
 
+-- ════ Early Pro (grant_early_pro) — run in a transaction, then rolled back ═
+\set SU '00000000-0000-4000-8000-0000000000f7'
+select public.t_ok(not has_function_privilege('authenticated','huddle_ops.grant_early_pro(timestamptz)','EXECUTE')
+  and not has_function_privilege('anon','huddle_ops.grant_early_pro(timestamptz)','EXECUTE')
+  and has_function_privilege('service_role','huddle_ops.grant_early_pro(timestamptz)','EXECUTE'),'grant_early_pro: service_role only');
+select public.t_ok((select position('grant_early_pro' in string_agg(pg_get_functiondef(p.oid),''))=0 from pg_proc p
+  where p.proname in ('reserve_meeting_import','create_organization','get_my_organizations')),'grant_early_pro is not wired into any client RPC');
+begin;
+insert into auth.users(id,email,created_at) values (:'SU','suspended@example.invalid',now()-interval '30 days');
+insert into huddle_ops.members(user_id,alias,suspended) values (:'SU','停權測試',true);
+select huddle_ops.pro_until(:'P') as p_until_before \gset
+set role service_role;
+select public.t_err('select huddle_ops.grant_early_pro(now()-interval ''1 day'')','INVALID_EARLY_PRO_UNTIL','grant_early_pro refuses a date in the past');
+select huddle_ops.grant_early_pro(now()+interval '10 days') as e1 \gset
+reset role;
+select public.t_ok(:'e1'::int=5,'grant_early_pro: gives the 5 members whose Pro ends earlier (F,G,H,M1,S)');
+select public.t_ok((select bool_and(huddle_ops.pro_until(u) >= now()+interval '10 days' and huddle_ops.pro_until(u) < now()+interval '11 days')
+  from unnest(array[:'F',:'G',:'H',:'M1',:'S']::uuid[]) u),'grant_early_pro: their Pro now lasts until the date (whole days, rounded up)');
+select public.t_ok((select bool_and(g.source='manual' and g.days=10 and g.source_key like 'early-pro:'||g.user_id||':%') from huddle_ops.grants g
+  where g.source_key like 'early-pro:%'),'grant_early_pro: manual grants with a per-member source key');
+select public.t_ok(not exists(select 1 from huddle_ops.grants where source_key like 'early-pro:%' and user_id in (:'P',:'Q',:'AN',:'SU')),
+  'grant_early_pro: paid (30 days), trial (14 days), anonymous and suspended members get nothing');
+select public.t_ok(huddle_ops.pro_until(:'P')=:'p_until_before'::timestamptz,'grant_early_pro: paid member is not shortened');
+set role service_role;
+select huddle_ops.grant_early_pro(now()+interval '10 days') as e2 \gset
+reset role;
+select public.t_ok(:'e2'::int=0 and (select count(*)=5 from huddle_ops.grants where source_key like 'early-pro:%'),'grant_early_pro is idempotent (re-run gives nothing)');
+set role service_role;
+select huddle_ops.grant_early_pro(now()+interval '20 days') as e3 \gset
+reset role;
+select public.t_ok(:'e3'::int=6 and huddle_ops.pro_until(:'P')=:'p_until_before'::timestamptz
+  and (select count(*)=2 from huddle_ops.grants where user_id=:'F' and source_key like 'early-pro:%')
+  and huddle_ops.pro_until(:'F') >= now()+interval '20 days','grant_early_pro: a later date extends (F,G,H,M1,S + trial Q), paid member still untouched');
+-- Switch on 2 days later in effect: early Pro (20 days) is shorter than the 60-day promise → topped up.
+set role service_role;
+select huddle_ops.enable_pro_limits() as e4 \gset
+reset role;
+select public.t_ok((select bool_and(huddle_ops.pro_until(au.id) >= now()+interval '60 days') from auth.users au
+  where au.created_at < now() and not coalesce(au.is_anonymous,false)),'enable after early Pro: every old member has Pro for at least 60 days');
+select public.t_ok((select days=40 from huddle_ops.grants where source_key='pro-limits-launch-gift:'||:'F')
+  and huddle_ops.pro_until(:'F')=now()+interval '60 days','enable after early Pro: F (20 days early Pro) is topped up by 40 days, to exactly 60');
+rollback;
+select public.t_ok(not exists(select 1 from huddle_ops.grants where source_key like 'early-pro:%') and (select not limits_enforced from huddle_ops.settings),
+  'early Pro block rolled back (switch off, no grants)');
+
 -- ════ Turning the switch ON ════════════════════════════════════════════════
 set role service_role;
 select huddle_ops.enable_pro_limits() as r \gset
 reset role;
-select public.t_ok((:'r'::jsonb->>'already_enforced')::boolean=false and (:'r'::jsonb->>'gifted')::int=5,'enable: gifts the 5 old free members (F,G,H,M1,S)');
+select public.t_ok((:'r'::jsonb->>'already_enforced')::boolean=false and (:'r'::jsonb->>'gifted')::int=7,'enable: tops up the 7 old members below 60 days (F,G,H,M1,S + paid P, trial Q)');
 select public.t_ok((select limits_enforced and limits_enforced_at is not null from huddle_ops.settings),'enable: switch is on with a timestamp');
 select public.t_ok(exists(select 1 from huddle_ops.feature_grandfathers where user_id=:'H'),'enable: backfills grandfather rows for current links');
-select public.t_ok((select count(*)=5 from huddle_ops.grants where source_key like 'pro-limits-launch-gift:%' and source='manual' and days=60),'enable: 60-day manual grants with idempotent source keys');
-select public.t_ok(not exists(select 1 from huddle_ops.grants where source_key in ('pro-limits-launch-gift:'||:'P','pro-limits-launch-gift:'||:'Q','pro-limits-launch-gift:'||:'AN')),'enable: paid Pro, active trial and anonymous users get no gift');
+select public.t_ok((select count(*)=5 from huddle_ops.grants where source_key like 'pro-limits-launch-gift:%' and source='manual' and days=60),'enable: free members get 60-day manual grants with idempotent source keys');
+select public.t_ok(not exists(select 1 from huddle_ops.grants where source_key='pro-limits-launch-gift:'||:'AN'),'enable: anonymous users get no gift');
 select limits_enforced_at as first_at from huddle_ops.settings \gset
+select public.t_ok((select bool_and(huddle_ops.pro_until(u) >= :'first_at'::timestamptz+interval '60 days'
+                                 and huddle_ops.pro_until(u) <  :'first_at'::timestamptz+interval '61 days')
+  from unnest(array[:'P',:'Q']::uuid[]) u)
+  and (select max(days) between 30 and 31 from huddle_ops.grants where source_key='pro-limits-launch-gift:'||:'P'),
+  'enable: paid P (30 days left) and trial Q (14 days left) are topped up to 60 days, not stacked');
 set role service_role;
 select huddle_ops.enable_pro_limits() as r2 \gset
 reset role;
-select public.t_ok((:'r2'::jsonb->>'already_enforced')::boolean and (select count(*)=5 from huddle_ops.grants where source_key like 'pro-limits-launch-gift:%')
+select public.t_ok((:'r2'::jsonb->>'already_enforced')::boolean and (select count(*)=7 from huddle_ops.grants where source_key like 'pro-limits-launch-gift:%')
   and (select limits_enforced_at=:'first_at'::timestamptz from huddle_ops.settings),'enable is idempotent (no extra gifts, timestamp kept)');
 
 -- Members registered after the switch (no gift).
@@ -165,6 +219,9 @@ select public.t_ok(huddle_ops.plan_limits(:'N1')='{"active_tasks":150,"notes":10
 select public.t_ok(huddle_ops.plan_limits(:'P')='{"active_tasks":null,"notes":null,"image_bytes":21474836480,"meeting_imports":20}'::jsonb,'on: Pro plan_limits unlimited/unlimited/20GB/20');
 
 -- ── Tasks ──
+\set PREC '30000000-0000-4000-8000-0000000000a9'
+insert into public.tasks(id,user_id,workspace_id,category_id,title,is_recurring) values (:'PREC',:'P',:'WSP',:'CATP','P recurring',true);
+select :'PREC' as prec \gset
 set role authenticated;
 set request.jwt.claim.sub = :'N1';
 select public.t_err(format($$insert into public.tasks(user_id,workspace_id,category_id,title) select %L,%L,%L,'b'||g from generate_series(1,151) g$$,:'N1',:'WSN',:'CATN'),
@@ -177,8 +234,14 @@ insert into public.tasks(user_id,workspace_id,category_id,title,is_completed,com
 insert into public.tasks(user_id,workspace_id,category_id,title,is_archived) values (:'N1',:'WSN',:'CATN','archived',true);
 select public.t_ok(true,'on: completed / archived task rows are not capped');
 select id as master from public.tasks where user_id=:'N1' and title='t1' \gset
+select id as plain from public.tasks where user_id=:'N1' and title='t3' \gset
+select public.t_err(format($$insert into public.tasks(user_id,workspace_id,category_id,title,parent_id) values (%L,%L,%L,'fake override',%L)$$,:'N1',:'WSN',:'CATN',:'plain'),
+  'TASK_LIMIT','on: parent_id pointing at a NON-recurring task does not bypass the cap');
+select public.t_err(format($$insert into public.tasks(user_id,workspace_id,category_id,title,parent_id) values (%L,%L,%L,'foreign override',%L)$$,:'N1',:'WSN',:'CATN',:'prec'),
+  'TASK_LIMIT','on: parent_id pointing at SOMEONE ELSE''s recurring task does not bypass the cap');
+update public.tasks set is_recurring=true where id=:'master';
 insert into public.tasks(user_id,workspace_id,category_id,title,parent_id,show_in_task_list) values (:'N1',:'WSN',:'CATN','only this',:'master',false);
-select public.t_ok(true,'on: recurring "only this" override (parent_id) is not blocked');
+select public.t_ok(true,'on: recurring "only this" override (parent_id → own recurring task) is not blocked');
 insert into public.tasks(id,user_id,workspace_id,category_id,title) values (:'master',:'N1',:'WSN',:'CATN','edited via upsert')
   on conflict (id) do update set title=excluded.title;
 select public.t_ok((select title='edited via upsert' from public.tasks where id=:'master'),'on: upsert of an existing task at the cap is an edit, not blocked');
@@ -192,8 +255,13 @@ insert into public.tasks(user_id,workspace_id,category_id,title) values (:'N1',:
 select public.t_ok(true,'on: completing a task frees a slot; a new task can be created');
 select public.t_err(format($$insert into public.tasks(user_id,workspace_id,category_id,title) values (%L,%L,%L,'again')$$,:'N1',:'WSN',:'CATN'),
   'TASK_LIMIT','on: and the cap applies again at 150');
+update public.tasks set is_completed=true where id=(select id from public.tasks where user_id=:'N1' and title='t4');
+insert into public.tasks(user_id,workspace_id,category_id,title,parent_id) values (:'N1',:'WSN',:'CATN','non-override child',:'plain');
+select public.t_err(format($$insert into public.tasks(user_id,workspace_id,category_id,title) values (%L,%L,%L,'again2')$$,:'N1',:'WSN',:'CATN'),
+  'TASK_LIMIT','on: a parent_id row that is not a recurring override counts toward the cap');
 select public.my_plan_usage() as un \gset
 reset role;
+delete from public.tasks where id=:'PREC';
 set role service_role;
 insert into public.tasks(user_id,workspace_id,category_id,title) values (:'N1',:'WSN',:'CATN','meeting import (service role)');
 select public.t_ok(true,'on: service-role writes (meeting import) are not capped');
@@ -303,7 +371,7 @@ set role service_role;
 select huddle_ops.disable_pro_limits();
 reset role;
 select public.t_ok((select not limits_enforced from huddle_ops.settings),'disable: switch is off');
-select public.t_ok((select count(*)=5 from huddle_ops.grants where source_key like 'pro-limits-launch-gift:%'),'disable: gifted days are not taken back');
+select public.t_ok((select count(*)=7 from huddle_ops.grants where source_key like 'pro-limits-launch-gift:%'),'disable: gifted days are not taken back');
 set role authenticated;
 set request.jwt.claim.sub = :'N1';
 insert into public.tasks(user_id,workspace_id,category_id,title) select :'N1',:'WSN',:'CATN','off again '||g from generate_series(1,5) g;

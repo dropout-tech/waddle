@@ -15,6 +15,16 @@
 --
 -- Over the limit only blocks ADDING. Viewing, editing, completing, deleting
 -- and exporting are never blocked, and no data is hidden or removed.
+--
+-- Known, accepted trade-off (design §0: only ADDING is capped): a member at
+-- the cap can still raise the active count through edits — inserting a task
+-- as completed and then un-completing it, or un-completing / un-archiving an
+-- old task. Those are UPDATEs and are deliberately not blocked.
+
+-- Fail fast instead of queueing every write on tasks / notebook_notes /
+-- storage.objects behind a lock this migration is waiting for.
+set lock_timeout = '5s';
+set statement_timeout = '60s';
 
 -- ── 1. The switch ──────────────────────────────────────────────────────────
 alter table huddle_ops.settings
@@ -48,13 +58,25 @@ end;
 $$;
 
 -- Usage counters. "Active task" = not completed and not archived (lib/focus.ts).
--- Rows with parent_id are single-occurrence overrides materialised from a
--- recurring master ("only this" edits); the recurring task counts once, so
--- they are not counted — and not blocked (see the trigger below).
+-- Single-occurrence overrides materialised from a recurring master ("only
+-- this" edits: parent_id → the member's own is_recurring task) are not
+-- counted — the recurring task counts once — and not blocked (trigger below).
+-- Any other row with a parent_id counts like a normal task.
 create or replace function huddle_ops.active_task_count(p_user uuid) returns integer
 language sql stable security definer set search_path = '' as $$
   select count(*)::integer from public.tasks t
-   where t.user_id = p_user and not t.is_completed and not t.is_archived and t.parent_id is null
+   where t.user_id = p_user and not t.is_completed and not t.is_archived
+     and not (t.parent_id is not null and exists (
+       select 1 from public.tasks p
+        where p.id = t.parent_id and p.user_id = p_user and p.is_recurring))
+$$;
+
+-- Same rule for the insert trigger, for the CALLER only (own rows, no probing).
+create or replace function huddle_ops.is_own_recurring_parent(p_parent uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select p_parent is not null and auth.uid() is not null and exists (
+    select 1 from public.tasks p
+     where p.id = p_parent and p.user_id = auth.uid() and p.is_recurring)
 $$;
 
 create or replace function huddle_ops.note_count(p_user uuid) returns integer
@@ -117,8 +139,13 @@ begin
   if current_user <> 'authenticated' then
     return new;
   end if;
-  -- Not active, or a recurring-occurrence override (counted via its master).
-  if new.is_completed or new.is_archived or new.parent_id is not null then
+  if new.is_completed or new.is_archived then
+    return new;
+  end if;
+  -- A recurring-occurrence override (counted via its master) is exempt only
+  -- when parent_id points at the caller's OWN recurring task; any other
+  -- parent_id is counted and capped like a normal insert.
+  if new.parent_id is not null and huddle_ops.is_own_recurring_parent(new.parent_id) then
     return new;
   end if;
   -- INSERT … ON CONFLICT DO UPDATE fires BEFORE INSERT even when it ends up
@@ -291,7 +318,62 @@ begin
 end;
 $$;
 
--- ── 12. Turning the switch on / off (service_role only; never run here) ────
+-- ── 12. Pro gifts (service_role only; never run here) ──────────────────────
+-- When a member's Pro currently ends: the later of their paid entitlement and
+-- their unrevoked grants, never earlier than now. Same base give_days uses,
+-- so give_days(u, days_to_reach(u, t), …) ends exactly at or just after t.
+create or replace function huddle_ops.pro_until(p_user uuid) returns timestamptz
+language sql stable security definer set search_path = '' as $$
+  select greatest(now(),
+    (select max(g.expires_at) from huddle_ops.grants g where g.user_id = p_user and g.revoked_at is null),
+    (select b.expires_at from public.billing_entitlements b where b.user_id = p_user and b.entitlement = 'pro'))
+$$;
+
+-- Whole days (rounded up) needed for p_user's Pro to reach p_until; 0 if it
+-- already does.
+create or replace function huddle_ops.days_to_reach(p_user uuid, p_until timestamptz) returns integer
+language sql stable security definer set search_path = '' as $$
+  select greatest(0, ceil(extract(epoch from (p_until - huddle_ops.pro_until(p_user))) / 86400.0))::integer
+$$;
+
+-- Early Pro for everyone who is already here (owner decision 2026-10-01; the
+-- end date is the owner's call). For every registered, non-anonymous, not
+-- suspended member whose Pro ends before p_until, add whole days so it lasts
+-- until p_until. Members who already have Pro past p_until (paid or gifted)
+-- are not touched, so nobody is ever shortened. Idempotent: a re-run with the
+-- same date gives nothing (everyone already reaches it) and the source key
+-- (one per member per end date) blocks double grants even under concurrency.
+-- A later run with a LATER date extends again. Returns how many were granted.
+create or replace function huddle_ops.grant_early_pro(p_until timestamptz) returns integer
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_key   text;
+  v_days  integer;
+  v_given integer := 0;
+  u       record;
+begin
+  if p_until is null or p_until <= now() or p_until > now() + interval '3650 days' then
+    raise exception 'INVALID_EARLY_PRO_UNTIL';
+  end if;
+  for u in
+    select au.id from auth.users au
+     where not coalesce(au.is_anonymous, false)
+       and not exists (select 1 from huddle_ops.members m where m.user_id = au.id and m.suspended)
+     order by au.created_at
+  loop
+    v_key := 'early-pro:' || u.id::text || ':' || to_char(p_until at time zone 'UTC', 'YYYYMMDD"T"HH24MISS"Z"');
+    continue when exists (select 1 from huddle_ops.grants g where g.source_key = v_key);
+    v_days := huddle_ops.days_to_reach(u.id, p_until);
+    continue when v_days <= 0;
+    perform huddle_ops.give_days(u.id, v_days, 'manual', v_key,
+      'Pro 搶先送：現有用戶 Pro 延到 ' || to_char(p_until at time zone 'Asia/Taipei', 'YYYY-MM-DD HH24:MI') || '（台北時間）');
+    v_given := v_given + 1;
+  end loop;
+  return v_given;
+end;
+$$;
+
+-- ── 13. Turning the switch on / off (service_role only; never run here) ────
 create or replace function huddle_ops.enable_pro_limits(p_gift_days integer default 60) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -299,6 +381,8 @@ declare
   v_cutoff     timestamptz := now();
   v_backfilled integer := 0;
   v_gifted     integer := 0;
+  v_target     timestamptz;
+  v_days       integer;
   u            record;
 begin
   if p_gift_days is null or p_gift_days not between 0 and 365 then
@@ -314,9 +398,13 @@ begin
   select c.user_id, 'google_calendar' from public.google_calendar_connections c
   on conflict do nothing;
   get diagnostics v_backfilled = row_count;
-  -- (b) Members who registered before this moment and are not Pro get the gift.
-  -- The source key makes it once per member, ever (also across off/on cycles).
+  -- (b) Every member registered before this moment ends up with Pro until at
+  -- least v_cutoff + p_gift_days: members with less (including early-Pro
+  -- grants about to run out) are topped up to exactly that, members already
+  -- covered longer are left alone. The source key makes it once per member,
+  -- ever (also across off/on cycles).
   if p_gift_days > 0 then
+    v_target := v_cutoff + make_interval(days => p_gift_days);
     for u in
       select au.id from auth.users au
        where au.created_at < v_cutoff and not coalesce(au.is_anonymous, false)
@@ -324,9 +412,11 @@ begin
                           where g.source_key = 'pro-limits-launch-gift:' || au.id::text)
        order by au.created_at
     loop
-      if not huddle_ops.has_pro(u.id) then
-        perform huddle_ops.give_days(u.id, p_gift_days, 'manual',
-          'pro-limits-launch-gift:' || u.id::text, 'Pro 上線贈送：舊用戶 ' || p_gift_days || ' 天');
+      v_days := huddle_ops.days_to_reach(u.id, v_target);
+      if v_days > 0 then
+        perform huddle_ops.give_days(u.id, v_days, 'manual',
+          'pro-limits-launch-gift:' || u.id::text,
+          'Pro 上線贈送：舊用戶 Pro 保證至少 ' || p_gift_days || ' 天');
         v_gifted := v_gifted + 1;
       end if;
     end loop;
@@ -349,7 +439,7 @@ begin
 end;
 $$;
 
--- ── 13. Privileges ─────────────────────────────────────────────────────────
+-- ── 14. Privileges ─────────────────────────────────────────────────────────
 revoke all on function
   huddle_ops.limits_enforced(),
   huddle_ops.plan_allows(uuid),
@@ -358,8 +448,12 @@ revoke all on function
   huddle_ops.note_count(uuid),
   huddle_ops.image_bytes_used(uuid),
   huddle_ops.check_insert_quota(text),
+  huddle_ops.is_own_recurring_parent(uuid),
   huddle_ops.image_upload_allowed(),
   huddle_ops.google_calendar_grandfather(),
+  huddle_ops.pro_until(uuid),
+  huddle_ops.days_to_reach(uuid, timestamptz),
+  huddle_ops.grant_early_pro(timestamptz),
   huddle_ops.enable_pro_limits(integer),
   huddle_ops.disable_pro_limits(),
   public.tasks_plan_limit_guard(),
@@ -371,6 +465,7 @@ from public, anon, authenticated;
 
 -- Triggers / RLS run as the client: they need these two (own id only).
 grant execute on function huddle_ops.check_insert_quota(text) to authenticated;
+grant execute on function huddle_ops.is_own_recurring_parent(uuid) to authenticated;
 grant execute on function huddle_ops.image_upload_allowed() to authenticated;
 -- reserve_meeting_import is SECURITY INVOKER, executed by the service role.
 grant execute on function huddle_ops.plan_limits(uuid) to service_role;
@@ -378,4 +473,8 @@ grant execute on function public.meeting_import_limit(uuid) to service_role;
 grant execute on function public.google_calendar_connect_allowed(uuid) to service_role;
 grant execute on function huddle_ops.enable_pro_limits(integer) to service_role;
 grant execute on function huddle_ops.disable_pro_limits() to service_role;
+grant execute on function huddle_ops.grant_early_pro(timestamptz) to service_role;
 grant execute on function public.my_plan_usage() to authenticated;
+
+reset statement_timeout;
+reset lock_timeout;

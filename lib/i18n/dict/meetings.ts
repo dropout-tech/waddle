@@ -130,8 +130,8 @@ export const dict: Record<string, string> = {
     'Could not process the assignment. Please check the sharing relationship and target category, then try again.',
   '本月已使用 {limit} 次，下個月 1 日（台北時間）會重新開放。':
     "You've used all {limit} this month. It resets on the 1st of next month (Taipei time).",
-  '本月次數已用完，下個月 1 日（台北時間）會重新開放。':
-    "You've used all of this month's summaries. It resets on the 1st of next month (Taipei time).",
+  '本月已使用 20 次，下個月 1 日（台北時間）會重新開放。':
+    "You've used all 20 this month. It resets on the 1st of next month (Taipei time).",
   '短時間內嘗試較多，請稍後再試。': 'Too many attempts in a short time. Please try again later.',
   '這份內容已變更，請開始新的整理。': 'This content has changed. Please start a new summary.',
   'AI 整理尚未啟用，請稍後再試。': 'AI summarizing is not enabled yet. Please try again later.',

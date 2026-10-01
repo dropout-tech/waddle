@@ -85,16 +85,18 @@ const messages: Record<string, string> = {
   IMPORT_FAILED: "任務未能建立，請確認目標分類仍可使用後重試。",
 };
 // The monthly quota is whatever the server says (free vs Pro, limits on or
-// off), so this message is built from the last `list` answer instead of a
-// hard-coded number. Already translated; the catching component's t() leaves
-// an unknown (already-English) string alone.
+// off), learnt from the last `list` answer. While it is 20 (always the case
+// with the limits switch off) the message is EXACTLY today's text, untranslated
+// here like every other entry in `messages` (the catching component's t()
+// translates it). Only a different limit uses the {limit} sentence, already
+// translated (t() on an unknown, already-English string leaves it alone).
+const MONTHLY_LIMIT_20 = "本月已使用 20 次，下個月 1 日（台北時間）會重新開放。";
 let knownMonthlyLimit: number | null = null
 function monthlyLimitMessage(fromError: unknown) {
   const limit =
     typeof fromError === "number" && fromError > 0 ? fromError : knownMonthlyLimit;
-  return limit
-    ? t("本月已使用 {limit} 次，下個月 1 日（台北時間）會重新開放。", { limit })
-    : t("本月次數已用完，下個月 1 日（台北時間）會重新開放。");
+  if (limit === null || limit === 20) return MONTHLY_LIMIT_20;
+  return t("本月已使用 {limit} 次，下個月 1 日（台北時間）會重新開放。", { limit });
 }
 export async function meetingRequest<T>(
   userId: string,

@@ -167,6 +167,7 @@ for (const limit of [5, 20]) {
   check(`list passes the server limit through (${limit})`, list.limit === limit)
   const msg = await meeting.meetingRequest('u1', { action: 'generate' }).then(() => '', (e) => e.message)
   check(`MONTHLY_LIMIT message uses the server limit (${limit})`, msg.includes(String(limit)) && (limit === 5 ? !msg.includes('20') : true), msg)
+  if (limit === 20) check('MONTHLY_LIMIT at limit 20 is byte-identical to main', msg === '本月已使用 20 次，下個月 1 日（台北時間）會重新開放。', msg)
 }
 globalThis.__fakeSupabase = () => fakeMeetingClient(5, { error: 'MONTHLY_LIMIT', limit: 7 })
 check('MONTHLY_LIMIT body.limit wins when present', (await meeting.meetingRequest('u1', { action: 'generate' }).then(() => '', (e) => e.message)).includes('7'))
@@ -174,16 +175,31 @@ const ws = readFileSync(new URL('../components/meetings/meeting-workspace.tsx', 
 check('meeting-workspace.tsx has no hard-coded 20 quota', !/\/ 20 次|20 - list|list\.used >= 20|本月 20 次/.test(ws))
 check('meeting-workspace.tsx reads list.limit via meetingLimitFrom', /meetingLimitFrom\(list\?\.limit\)/.test(ws))
 const mi = readFileSync(new URL('../lib/meeting-import.ts', import.meta.url), 'utf8')
-check('meeting-import.ts has no hard-coded "20 次"', !/20 次/.test(mi))
+// Limits off (limit 20, or not known yet): the MONTHLY_LIMIT text must be main's exact string.
+check('meeting-import.ts keeps main\'s exact "本月已使用 20 次…" text for limit 20', mi.includes('"本月已使用 20 次，下個月 1 日（台北時間）會重新開放。"') && /limit === null \|\| limit === 20\) return MONTHLY_LIMIT_20/.test(mi))
+
+// ── 5b. Recurring "this and following": new series first, old one cut short only after ──
+{
+  const wd = readFileSync(new URL('../hooks/use-waddle-data.ts', import.meta.url), 'utf8')
+  const cuts = [...wd.matchAll(/update\(\{ recurrence_end_date: endDate \}\)/g)].map((m) => m.index)
+  const splitCuts = cuts.filter((i) => /recurrenceChoice === 'this_and_following'/.test(wd.slice(Math.max(0, i - 4000), i)) && !/deleteTask/.test(wd.slice(Math.max(0, i - 4000), i)))
+  const ordered = splitCuts.filter((i) => {
+    const before = wd.slice(Math.max(0, i - 1500), i)
+    const ins = before.lastIndexOf("from('tasks').insert(buildTaskInsert(newTask, userId))")
+    return ins >= 0 && before.indexOf('if (insertError) {', ins) > ins && /return\n\s*\}/.test(before.slice(ins))
+  })
+  check(`use-waddle-data: all ${splitCuts.length} "this and following" splits insert the new series before ending the old one (and stop if it fails)`, splitCuts.length === 3 && ordered.length === 3, `${ordered.length}/${splitCuts.length}`)
+}
 
 // ── 6. i18n: every new limit string has an English entry ─────────────────
 const { en } = await import('../lib/i18n/en.ts')
 const newKeys = Object.keys((await import('../lib/i18n/dict/billing.ts')).dict)
 check(`billing dict: ${newKeys.length} entries, all with English and no Chinese in it`, newKeys.every((k) => en[k] && !hasCjk(en[k])), newKeys.filter((k) => !en[k] || hasCjk(en[k])).join(' | '))
-for (const k of ['本月已用 {used} / {limit} 次', '本月 {limit} 次已用完，下個月 1 日（台北時間）會重新開放。已整理的紀錄仍可建立任務。', '本月已使用 {limit} 次，下個月 1 日（台北時間）會重新開放。'])
+for (const k of ['本月已用 {used} / {limit} 次', '本月 {limit} 次已用完，下個月 1 日（台北時間）會重新開放。已整理的紀錄仍可建立任務。', '本月已使用 {limit} 次，下個月 1 日（台北時間）會重新開放。', '本月已使用 20 次，下個月 1 日（台北時間）會重新開放。'])
   check(`meetings dict has English for "${k.slice(0, 14)}…"`, !!en[k] && !hasCjk(en[k]))
 // Limits off: the zh text a user sees must equal today's text.
 check('limit=20 renders the same zh text as before', translateFor('zh-TW', '本月已用 {used} / {limit} 次', { used: 3, limit: 20 }) === '本月已用 3 / 20 次')
+check('limit=20 MONTHLY_LIMIT English is the same as main', en['本月已使用 20 次，下個月 1 日（台北時間）會重新開放。'] === "You've used all 20 this month. It resets on the 1st of next month (Taipei time).")
 
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`)
 process.exit(failed === 0 ? 0 : 1)
