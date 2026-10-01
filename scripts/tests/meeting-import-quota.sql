@@ -1,4 +1,4 @@
--- AI meeting summary attempt quota + site-wide fuse (20261002120000_meeting_import_attempt_quota.sql).
+-- AI meeting summary attempt quota + site-wide fuse (20261002100000_meeting_import_attempt_quota.sql).
 -- DISPOSABLE DATABASE ONLY. Run with: bash scripts/tests/meeting-import-quota.sh
 \set ON_ERROR_STOP on
 \set QUIET on

@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
   if (allowed !== true) return reply({ error: "ACCOUNT_SUSPENDED" }, 403);
   let claimedId: string | null = null;
   // Failure accounting once the model may have been called (see quota.mjs and
-  // 20261002120000_meeting_import_attempt_quota.sql): unknown counts as charged.
+  // 20261002100000_meeting_import_attempt_quota.sql): unknown counts as charged.
   let billable = true;
   let usage: Record<string, unknown> | null = null;
   try {
