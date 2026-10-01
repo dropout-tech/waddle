@@ -62,6 +62,12 @@ export const dict: Record<string, string> = {
   '切換淺色': 'Switch to light mode',
   '切換深色': 'Switch to dark mode',
   '登出': 'Log out',
+  // use-safe-sign-out.tsx — notes that only exist on this device
+  '還有筆記沒有同步': 'Some notes haven\'t synced',
+  '有 {count} 則筆記還沒同步，現在登出這些內容會遺失。建議連上網路、等同步完成再登出。':
+    '{count} {count|note hasn\'t|notes haven\'t} synced yet. If you log out now, that text will be lost. Reconnect and wait for syncing to finish first.',
+  '先不要登出': 'Don\'t log out yet',
+  '仍要登出': 'Log out anyway',
 
   // components/error-boundary.tsx
   '這個區塊發生錯誤': 'Something went wrong here',

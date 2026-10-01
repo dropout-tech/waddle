@@ -14,7 +14,7 @@ import {
   InkSun, InkMoon, InkLogOut,
 } from '@/components/icons/huddle-icons'
 import { createClient } from '@/lib/supabase/client'
-import { signOutAndClearLocalData } from '@/lib/auth/sign-out'
+import { useSafeSignOut } from '@/components/auth/use-safe-sign-out'
 import { cn } from '@/lib/utils'
 import { AccountRegistrationDate } from '@/components/auth/account-registration-date'
 import { useI18n } from '@/lib/i18n/react'
@@ -54,7 +54,6 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
     if (onOpenChange) onOpenChange(value)
     else setInnerOpen(value)
   }, [open, onOpenChange])
-  const [signingOut, setSigningOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const { resolvedTheme, setTheme } = useTheme()
   const { t } = useI18n()
@@ -130,14 +129,12 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
     }
   }, [open, setOpen])
 
-  async function handleSignOut() {
-    setSigningOut(true)
-    // Client-side sign-out works on both web and the Capacitor WebView (there
-    // is no server route to POST to under static export). Clears the local
-    // session, then the AuthGuard / login redirect takes over.
-    await signOutAndClearLocalData()
-    router.replace('/login')
-  }
+  // Client-side sign-out works on both web and the Capacitor WebView (there
+  // is no server route to POST to under static export). Pending notes are
+  // sent first; unsynced ones make it ask (use-safe-sign-out.tsx). Then the
+  // AuthGuard / login redirect takes over.
+  const { requestSignOut, busy: signingOut, dialog: signOutDialog } = useSafeSignOut(() => router.replace('/login'))
+  const handleSignOut = () => void requestSignOut()
 
   if (!session) return null
 
@@ -316,6 +313,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
           </button>
         </div>
       )}
+      {signOutDialog}
     </div>
   )
 }

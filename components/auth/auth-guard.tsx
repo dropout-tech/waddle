@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { operations } from '@/lib/operations/client'
-import { signOutAndClearLocalData } from '@/lib/auth/sign-out'
+import { useSafeSignOut } from './use-safe-sign-out'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
@@ -19,6 +19,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth()
   const router = useRouter()
   const [suspendedUser, setSuspendedUser] = useState<string | null>(null)
+  // Same unsynced-notes check as the user menu's sign-out.
+  const { requestSignOut, busy: signingOut, dialog: signOutDialog } = useSafeSignOut()
   useEffect(() => {
     if (!session?.user.id) return
     let active = true
@@ -54,7 +56,8 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       <h1 className="text-xl font-semibold">{t('帳號已停用')}</h1>
       <p>{t('如有疑問，請聯絡客服。你的資料未因停用而刪除。')}</p>
       <a href="/support" className="min-h-11 underline">{t('聯絡客服')}</a>
-      <button className="min-h-11 rounded-lg bg-secondary px-4" onClick={() => void signOutAndClearLocalData()}>{t('登出')}</button>
+      <button className="min-h-11 rounded-lg bg-secondary px-4" disabled={signingOut} onClick={() => void requestSignOut()}>{t('登出')}</button>
+      {signOutDialog}
     </main>
   )
   return <>{children}</>
