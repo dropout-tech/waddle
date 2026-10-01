@@ -22,6 +22,7 @@ import { ImageCleanupBridge } from '@/components/storage/image-cleanup-bridge'
 import { FloatingHub } from '@/components/floating/floating-hub'
 import { StickyNotesProvider } from '@/components/sticky-notes/sticky-notes-provider'
 import { BRAND_TITLE } from '@/lib/brand'
+import { Toaster } from 'sonner'
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_ORIGIN),
@@ -151,6 +152,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
               <StickyNotesProvider>{children}</StickyNotesProvider>
             </FocusTimerProvider>
           </AuthProvider>
+          {/* The one toast outlet for every route (it used to live only on
+              the home page, so toasts on /org, /assignments, invites and
+              /notebook vanished). */}
+          <Toaster position="bottom-right" richColors closeButton />
         </ThemeProvider>
       </body>
     </html>

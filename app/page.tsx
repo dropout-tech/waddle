@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { Loader2 } from 'lucide-react'
-import { Toaster, toast } from 'sonner'
+import { toast } from 'sonner'
 import { WidgetSync } from '@/components/widgets/widget-sync'
 import { petVoiceName, setPetVoice } from '@/lib/pet/voice'
 import { MainLayout } from '@/components/layout/main-layout'
@@ -669,7 +669,6 @@ function HuddlePage() {
       />
       <KeyboardShortcutsHint />
       <DailyClearCelebration />
-      <Toaster position="bottom-right" richColors closeButton />
       <WaterReminderModal
         isOpen={water.isOpen}
         onDrink={water.dismiss}
