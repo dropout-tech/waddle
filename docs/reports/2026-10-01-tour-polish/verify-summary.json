@@ -1,0 +1,1200 @@
+{
+  "pass": 4795,
+  "fail": 0,
+  "failures": [],
+  "warnings": [
+    "WARN — mobile-390/zh-TW step 02「「任務」分頁」 card sits on a full-panel target — 25% covered (the panel fills the screen)",
+    "WARN — mobile-390/zh-TW step 06「日曆：上面待排程，下面時間軸」 card sits on a full-panel target — 27% covered (the panel fills the screen)",
+    "WARN — mobile-390/en step 02「The Tasks tab」 card sits on a full-panel target — 27% covered (the panel fills the screen)",
+    "WARN — mobile-390/en step 06「Calendar: unscheduled on top, timeline below」 card sits on a full-panel target — 39% covered (the panel fills the screen)"
+  ],
+  "steps": {
+    "desktop-1280/zh-TW": [
+      {
+        "n": 1,
+        "target": null,
+        "title": "歡迎來到 Huddle",
+        "body": "任務、行事曆、專注計時和日記，都放在同一個地方。花一兩分鐘帶你走一圈，隨時可以略過。",
+        "hint": null
+      },
+      {
+        "n": 2,
+        "target": "[data-tour=\"left-panel\"]",
+        "title": "左邊：任務清單",
+        "body": "所有任務都收在這裡，分成三層：工作區 → 分類 → 任務。最上面的「未分類」是收件匣，還沒決定放哪的任務會先到這裡。",
+        "hint": null
+      },
+      {
+        "n": 3,
+        "target": "[data-tour=\"task-row\"]",
+        "title": "完成任務、打開任務",
+        "body": "點左邊的圓圈，任務就完成了。點任務名稱可以打開編輯：改時間、寫備註，或把它設成「會議」。",
+        "hint": "👉 試試點一下這個任務"
+      },
+      {
+        "n": 4,
+        "target": "[data-tour=\"task-shortcut-row\"]",
+        "title": "會議、整理、完成",
+        "body": "「會議」列出今天的會議，可以直接加入視訊。有任務過了原訂時間，這裡會出現「整理」，讓你逐一重新安排。「完成」可以回顧做完的任務和統計。",
+        "hint": null
+      },
+      {
+        "n": 5,
+        "target": null,
+        "title": "🔄 左邊 = 右邊",
+        "body": "左邊的清單和右邊的日曆，看的是同一批任務。在任何一邊完成、修改或刪除，另一邊會立刻跟著變。",
+        "hint": null
+      },
+      {
+        "n": 6,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "日曆：上面待排程，下面時間軸",
+        "body": "每天最上面那一格，放「有日期、還沒排時間」的任務；下面的時間軸，放排好時間的任務。任務前面會標出所屬分類，方便一眼分辨。想和夥伴互看行事曆，按上方工具列的「共享」。",
+        "hint": null
+      },
+      {
+        "n": 7,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "🤚 拖曳就是排程",
+        "body": "把任務拖到時間軸，就排好時間；拖回最上面那一格，就取消時間。在時間軸空白處點兩下，可以直接新增任務。重複的任務換時間時，Huddle 會問你只改這一天，還是之後也一起改。",
+        "hint": null
+      },
+      {
+        "n": 8,
+        "target": "[data-tour=\"view-modes\"]",
+        "title": "切換日、週、月",
+        "body": "看細節用「日」，排一週用「週」，看整個月用「月」。",
+        "hint": "👉 點點看，切換不同檢視"
+      },
+      {
+        "n": 9,
+        "target": "[data-tour=\"scratchpad\"]",
+        "title": "白板",
+        "body": "工作到一半冒出想法？拉開白板，隨手記下文字、待辦、圖片或連結。每天一張新的，之前的也翻得回去。",
+        "hint": "👉 點開試試"
+      },
+      {
+        "n": 10,
+        "target": "[data-tour=\"notebook-entry\"]",
+        "title": "記事本",
+        "body": "想寫長一點的筆記，點這裡。打字時輸入「/」，可以插入標題、待辦清單、圖片等區塊；選取文字，會跳出粗體、連結等格式按鈕。",
+        "hint": null
+      },
+      {
+        "n": 11,
+        "target": "[data-tour=\"sticky-notes-toggle\"]",
+        "title": "便條紙",
+        "body": "按一下，畫面上會多一層便條紙，換頁也不會消失。便條紙可以拖動、換顏色；暫時用不到的，收進旁邊的「收納」。",
+        "hint": null
+      },
+      {
+        "n": 12,
+        "target": "[data-tour=\"calendar-export\"]",
+        "title": "更多工具",
+        "body": "這個小箭頭裡收著日記、報告、每日簽到、匯出等功能。「匯出」可以把行程存成圖片分享；開啟隱私模式，就只顯示時段、不顯示任務名稱。",
+        "hint": null
+      },
+      {
+        "n": 13,
+        "target": "[data-tour=\"calendar-export\"]",
+        "title": "📅 每日簽到",
+        "body": "同一個選單裡的「每日簽到」：每天簽到一次，累積分數。頁面下方有匿名排行榜，只顯示小企鵝編號，不顯示帳號。",
+        "hint": null
+      },
+      {
+        "n": 14,
+        "target": "[data-tour=\"notification-center\"]",
+        "title": "通知中心",
+        "body": "鈴鐺會提醒你快到期、已過期，或放了很久沒動的任務。有新提醒時，鈴鐺上會出現數字。",
+        "hint": null
+      },
+      {
+        "n": 15,
+        "target": "[data-tour=\"user-menu\"]",
+        "title": "右上角：帳號選單",
+        "body": "點頭像打開選單：帳號資料、會員與推薦、深色模式和登出都在這裡。另外，按 ⌘K 或 Ctrl+K 可以快速搜尋任務，按「?」可以看所有快捷鍵。",
+        "hint": null
+      },
+      {
+        "n": 16,
+        "target": "[data-tour=\"user-menu\"]",
+        "title": "🗒️ 會議轉任務",
+        "body": "同一個選單裡的「會議轉任務」：貼上會議逐字稿或筆記，Huddle 會幫你整理出待辦，並標出負責人和期限。",
+        "hint": null
+      },
+      {
+        "n": 17,
+        "target": null,
+        "title": "🤝 指派任務 ＆ 組織",
+        "body": "打開任務，按右上角的小人圖示，就能把任務交給共享夥伴或組織成員。任務會出現在對方的清單和日曆；對方完成或退回，你都看得到。進度在帳號選單的「指派任務」；建立組織需要 Pro 會員。",
+        "hint": null
+      },
+      {
+        "n": 18,
+        "target": "[data-tour=\"focus-timer\"]",
+        "title": "專注計時",
+        "body": "設定一段時間，專心做一件事；預設是 25 分鐘的番茄鐘。可以搭配背景音樂或環境音，例如雨聲、海浪、咖啡廳。結束後會自動記到今天的日曆。",
+        "hint": "👉 點開計時器"
+      },
+      {
+        "n": 19,
+        "target": "[data-hub-launcher]",
+        "title": "懸浮小視窗",
+        "body": "按這個按鈕，會跳出一個永遠在最上層的小視窗，切到別的軟體也看得到。裡面有計時器、記事本和白板三個分頁。",
+        "hint": null
+      },
+      {
+        "n": 20,
+        "target": null,
+        "title": "💧 喝水小提醒",
+        "body": "每 60 分鐘，Huddle 會提醒你喝口水。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。",
+        "hint": null
+      },
+      {
+        "n": 21,
+        "target": "[data-tour=\"quick-links-bar\"]",
+        "title": "常用連結",
+        "body": "把常開的網址放在這裡，例如 Notion、GitHub、Gmail。點一下，就在新分頁打開。",
+        "hint": null
+      },
+      {
+        "n": 22,
+        "target": "[data-tour=\"pet\"]",
+        "title": "🐧 你的企鵝",
+        "body": "角落這隻企鵝是你專屬的。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。牠偶爾會提醒你會議和過期的任務，但多半只是在說些荒謬的話。",
+        "hint": null
+      },
+      {
+        "n": 23,
+        "target": null,
+        "title": "✨ 你準備好了！",
+        "body": "最後一步：你想怎麼開始？",
+        "hint": null
+      }
+    ],
+    "desktop-1280/en": [
+      {
+        "n": 1,
+        "target": null,
+        "title": "Welcome to Huddle",
+        "body": "Tasks, calendar, focus timer and journal, all in one place. Take a minute or two to look around; you can skip at any time.",
+        "hint": null
+      },
+      {
+        "n": 2,
+        "target": "[data-tour=\"left-panel\"]",
+        "title": "Left side: your task list",
+        "body": "Every task lives here, in three layers: workspace → category → task. \"Uncategorized\" at the top is your inbox: tasks you have not filed yet land there first.",
+        "hint": null
+      },
+      {
+        "n": 3,
+        "target": "[data-tour=\"task-row\"]",
+        "title": "Check off or open a task",
+        "body": "Click the circle on the left to mark a task done. Click its name to open it and change the time, add notes, or mark it as a meeting.",
+        "hint": "👉 Try clicking this task"
+      },
+      {
+        "n": 4,
+        "target": "[data-tour=\"task-shortcut-row\"]",
+        "title": "Meeting, Review, Done",
+        "body": "\"Meeting\" lists today's meetings so you can join the call directly. When tasks slip past their planned time, \"Review\" appears here so you can reschedule them one by one. \"Done\" lets you look back at finished tasks and your stats.",
+        "hint": null
+      },
+      {
+        "n": 5,
+        "target": null,
+        "title": "🔄 Left = right",
+        "body": "The list on the left and the calendar on the right show the same tasks. Complete, edit or delete something on one side and the other updates right away.",
+        "hint": null
+      },
+      {
+        "n": 6,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "Calendar: unscheduled on top, timeline below",
+        "body": "The strip at the top of each day holds tasks that have a date but no time yet; the timeline below holds tasks with a set time. Each task is labelled with its category so you can tell them apart at a glance. To see each other's calendars with a partner, use \"Sharing\" in the toolbar above.",
+        "hint": null
+      },
+      {
+        "n": 7,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "🤚 Drag to schedule",
+        "body": "Drag a task onto the timeline to give it a time; drag it back to the top strip to clear the time. Double-click an empty spot on the timeline to add a task right there. When you move a repeating task, Huddle asks whether to change just that day or the later ones too.",
+        "hint": null
+      },
+      {
+        "n": 8,
+        "target": "[data-tour=\"view-modes\"]",
+        "title": "Switch between Day, Week and Month",
+        "body": "Day for the details, Week for planning, Month for the big picture.",
+        "hint": "👉 Click to try another view"
+      },
+      {
+        "n": 9,
+        "target": "[data-tour=\"scratchpad\"]",
+        "title": "Whiteboard",
+        "body": "Had an idea mid-task? Pull down the whiteboard and jot text, to-dos, images or links. You get a fresh board each day, and can flip back to earlier ones.",
+        "hint": "👉 Give it a try"
+      },
+      {
+        "n": 10,
+        "target": "[data-tour=\"notebook-entry\"]",
+        "title": "Notebook",
+        "body": "For longer notes, click here. Type \"/\" while writing to insert blocks such as headings, to-do lists and images; select text to bring up formatting like bold and links.",
+        "hint": null
+      },
+      {
+        "n": 11,
+        "target": "[data-tour=\"sticky-notes-toggle\"]",
+        "title": "Sticky notes",
+        "body": "Click to lay sticky notes over the screen; they stay put when you change pages. Drag them around or change their color, and tuck the ones you do not need right now into the drawer next to this button.",
+        "hint": null
+      },
+      {
+        "n": 12,
+        "target": "[data-tour=\"calendar-export\"]",
+        "title": "More tools",
+        "body": "This little arrow holds Journal, Reports, Daily check-in, Export and more. Export saves your schedule as an image to share; turn on privacy mode to show time blocks without task names.",
+        "hint": null
+      },
+      {
+        "n": 13,
+        "target": "[data-tour=\"calendar-export\"]",
+        "title": "📅 Daily check-in",
+        "body": "\"Daily check-in\" is in the same menu: check in once a day to earn points. Further down that page is an anonymous leaderboard that shows penguin numbers, never account names.",
+        "hint": null
+      },
+      {
+        "n": 14,
+        "target": "[data-tour=\"notification-center\"]",
+        "title": "Notification Center",
+        "body": "The bell flags tasks that are due soon, overdue, or have sat untouched for a while. A number appears on it when there is something new.",
+        "hint": null
+      },
+      {
+        "n": 15,
+        "target": "[data-tour=\"user-menu\"]",
+        "title": "Top right: account menu",
+        "body": "Click your avatar to open the menu: account details, Membership & Referrals, dark mode and log out are all here. Also, press ⌘K or Ctrl+K to search your tasks quickly, and \"?\" to see every shortcut.",
+        "hint": null
+      },
+      {
+        "n": 16,
+        "target": "[data-tour=\"user-menu\"]",
+        "title": "🗒️ Meetings to tasks",
+        "body": "\"Meetings to tasks\" is in the same menu: paste a meeting transcript or notes and Huddle turns them into to-dos, picking out owners and due dates.",
+        "hint": null
+      },
+      {
+        "n": 17,
+        "target": null,
+        "title": "🤝 Assignments & organizations",
+        "body": "Open a task and use the person icon at the top right to hand it to a sharing partner or an organization member. It shows up in their list and calendar, and you can see when they finish it or send it back. Track progress under \"Assignments\" in the account menu; creating an organization requires Pro.",
+        "hint": null
+      },
+      {
+        "n": 18,
+        "target": "[data-tour=\"focus-timer\"]",
+        "title": "Focus timer",
+        "body": "Set a stretch of time and focus on one thing; the default is a 25-minute Pomodoro. Add music or ambient sound such as rain, waves or a cafe. When it ends, the session is logged on today's calendar automatically.",
+        "hint": "👉 Open the timer"
+      },
+      {
+        "n": 19,
+        "target": "[data-hub-launcher]",
+        "title": "Floating window",
+        "body": "This button opens a small window that always stays on top, even when you switch to another app. Inside are three tabs: Timer, Notebook and Whiteboard.",
+        "hint": null
+      },
+      {
+        "n": 20,
+        "target": null,
+        "title": "💧 Water reminder",
+        "body": "Every 60 minutes, Huddle reminds you to drink some water. Not now? Press \"Snooze\" and it comes back in five minutes. Change the interval in Settings, or turn it off entirely.",
+        "hint": null
+      },
+      {
+        "n": 21,
+        "target": "[data-tour=\"quick-links-bar\"]",
+        "title": "Quick Links",
+        "body": "Keep the sites you open most here, such as Notion, GitHub or Gmail. One click opens them in a new tab.",
+        "hint": null
+      },
+      {
+        "n": 22,
+        "target": "[data-tour=\"pet\"]",
+        "title": "🐧 Your penguin",
+        "body": "The penguin in the corner is yours. Tap it for a joke; to quiet it down, long-press (right-click on a computer) to open its menu. Now and then it reminds you about meetings and overdue tasks, but mostly it just says absurd things.",
+        "hint": null
+      },
+      {
+        "n": 23,
+        "target": null,
+        "title": "✨ You're all set!",
+        "body": "Last step: how do you want to start?",
+        "hint": null
+      }
+    ],
+    "desktop-1440/zh-TW": [
+      {
+        "n": 1,
+        "target": null,
+        "title": "歡迎來到 Huddle",
+        "body": "任務、行事曆、專注計時和日記，都放在同一個地方。花一兩分鐘帶你走一圈，隨時可以略過。",
+        "hint": null
+      },
+      {
+        "n": 2,
+        "target": "[data-tour=\"left-panel\"]",
+        "title": "左邊：任務清單",
+        "body": "所有任務都收在這裡，分成三層：工作區 → 分類 → 任務。最上面的「未分類」是收件匣，還沒決定放哪的任務會先到這裡。",
+        "hint": null
+      },
+      {
+        "n": 3,
+        "target": "[data-tour=\"task-row\"]",
+        "title": "完成任務、打開任務",
+        "body": "點左邊的圓圈，任務就完成了。點任務名稱可以打開編輯：改時間、寫備註，或把它設成「會議」。",
+        "hint": "👉 試試點一下這個任務"
+      },
+      {
+        "n": 4,
+        "target": "[data-tour=\"task-shortcut-row\"]",
+        "title": "會議、整理、完成",
+        "body": "「會議」列出今天的會議，可以直接加入視訊。有任務過了原訂時間，這裡會出現「整理」，讓你逐一重新安排。「完成」可以回顧做完的任務和統計。",
+        "hint": null
+      },
+      {
+        "n": 5,
+        "target": null,
+        "title": "🔄 左邊 = 右邊",
+        "body": "左邊的清單和右邊的日曆，看的是同一批任務。在任何一邊完成、修改或刪除，另一邊會立刻跟著變。",
+        "hint": null
+      },
+      {
+        "n": 6,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "日曆：上面待排程，下面時間軸",
+        "body": "每天最上面那一格，放「有日期、還沒排時間」的任務；下面的時間軸，放排好時間的任務。任務前面會標出所屬分類，方便一眼分辨。想和夥伴互看行事曆，按上方工具列的「共享」。",
+        "hint": null
+      },
+      {
+        "n": 7,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "🤚 拖曳就是排程",
+        "body": "把任務拖到時間軸，就排好時間；拖回最上面那一格，就取消時間。在時間軸空白處點兩下，可以直接新增任務。重複的任務換時間時，Huddle 會問你只改這一天，還是之後也一起改。",
+        "hint": null
+      },
+      {
+        "n": 8,
+        "target": "[data-tour=\"view-modes\"]",
+        "title": "切換日、週、月",
+        "body": "看細節用「日」，排一週用「週」，看整個月用「月」。",
+        "hint": "👉 點點看，切換不同檢視"
+      },
+      {
+        "n": 9,
+        "target": "[data-tour=\"scratchpad\"]",
+        "title": "白板",
+        "body": "工作到一半冒出想法？拉開白板，隨手記下文字、待辦、圖片或連結。每天一張新的，之前的也翻得回去。",
+        "hint": "👉 點開試試"
+      },
+      {
+        "n": 10,
+        "target": "[data-tour=\"notebook-entry\"]",
+        "title": "記事本",
+        "body": "想寫長一點的筆記，點這裡。打字時輸入「/」，可以插入標題、待辦清單、圖片等區塊；選取文字，會跳出粗體、連結等格式按鈕。",
+        "hint": null
+      },
+      {
+        "n": 11,
+        "target": "[data-tour=\"sticky-notes-toggle\"]",
+        "title": "便條紙",
+        "body": "按一下，畫面上會多一層便條紙，換頁也不會消失。便條紙可以拖動、換顏色；暫時用不到的，收進旁邊的「收納」。",
+        "hint": null
+      },
+      {
+        "n": 12,
+        "target": "[data-tour=\"calendar-export\"]",
+        "title": "更多工具",
+        "body": "這個小箭頭裡收著日記、報告、每日簽到、匯出等功能。「匯出」可以把行程存成圖片分享；開啟隱私模式，就只顯示時段、不顯示任務名稱。",
+        "hint": null
+      },
+      {
+        "n": 13,
+        "target": "[data-tour=\"calendar-export\"]",
+        "title": "📅 每日簽到",
+        "body": "同一個選單裡的「每日簽到」：每天簽到一次，累積分數。頁面下方有匿名排行榜，只顯示小企鵝編號，不顯示帳號。",
+        "hint": null
+      },
+      {
+        "n": 14,
+        "target": "[data-tour=\"notification-center\"]",
+        "title": "通知中心",
+        "body": "鈴鐺會提醒你快到期、已過期，或放了很久沒動的任務。有新提醒時，鈴鐺上會出現數字。",
+        "hint": null
+      },
+      {
+        "n": 15,
+        "target": "[data-tour=\"user-menu\"]",
+        "title": "右上角：帳號選單",
+        "body": "點頭像打開選單：帳號資料、會員與推薦、深色模式和登出都在這裡。另外，按 ⌘K 或 Ctrl+K 可以快速搜尋任務，按「?」可以看所有快捷鍵。",
+        "hint": null
+      },
+      {
+        "n": 16,
+        "target": "[data-tour=\"user-menu\"]",
+        "title": "🗒️ 會議轉任務",
+        "body": "同一個選單裡的「會議轉任務」：貼上會議逐字稿或筆記，Huddle 會幫你整理出待辦，並標出負責人和期限。",
+        "hint": null
+      },
+      {
+        "n": 17,
+        "target": null,
+        "title": "🤝 指派任務 ＆ 組織",
+        "body": "打開任務，按右上角的小人圖示，就能把任務交給共享夥伴或組織成員。任務會出現在對方的清單和日曆；對方完成或退回，你都看得到。進度在帳號選單的「指派任務」；建立組織需要 Pro 會員。",
+        "hint": null
+      },
+      {
+        "n": 18,
+        "target": "[data-tour=\"focus-timer\"]",
+        "title": "專注計時",
+        "body": "設定一段時間，專心做一件事；預設是 25 分鐘的番茄鐘。可以搭配背景音樂或環境音，例如雨聲、海浪、咖啡廳。結束後會自動記到今天的日曆。",
+        "hint": "👉 點開計時器"
+      },
+      {
+        "n": 19,
+        "target": "[data-hub-launcher]",
+        "title": "懸浮小視窗",
+        "body": "按這個按鈕，會跳出一個永遠在最上層的小視窗，切到別的軟體也看得到。裡面有計時器、記事本和白板三個分頁。",
+        "hint": null
+      },
+      {
+        "n": 20,
+        "target": null,
+        "title": "💧 喝水小提醒",
+        "body": "每 60 分鐘，Huddle 會提醒你喝口水。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。",
+        "hint": null
+      },
+      {
+        "n": 21,
+        "target": "[data-tour=\"quick-links-bar\"]",
+        "title": "常用連結",
+        "body": "把常開的網址放在這裡，例如 Notion、GitHub、Gmail。點一下，就在新分頁打開。",
+        "hint": null
+      },
+      {
+        "n": 22,
+        "target": "[data-tour=\"pet\"]",
+        "title": "🐧 你的企鵝",
+        "body": "角落這隻企鵝是你專屬的。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。牠偶爾會提醒你會議和過期的任務，但多半只是在說些荒謬的話。",
+        "hint": null
+      },
+      {
+        "n": 23,
+        "target": null,
+        "title": "✨ 你準備好了！",
+        "body": "最後一步：你想怎麼開始？",
+        "hint": null
+      }
+    ],
+    "desktop-1440/en": [
+      {
+        "n": 1,
+        "target": null,
+        "title": "Welcome to Huddle",
+        "body": "Tasks, calendar, focus timer and journal, all in one place. Take a minute or two to look around; you can skip at any time.",
+        "hint": null
+      },
+      {
+        "n": 2,
+        "target": "[data-tour=\"left-panel\"]",
+        "title": "Left side: your task list",
+        "body": "Every task lives here, in three layers: workspace → category → task. \"Uncategorized\" at the top is your inbox: tasks you have not filed yet land there first.",
+        "hint": null
+      },
+      {
+        "n": 3,
+        "target": "[data-tour=\"task-row\"]",
+        "title": "Check off or open a task",
+        "body": "Click the circle on the left to mark a task done. Click its name to open it and change the time, add notes, or mark it as a meeting.",
+        "hint": "👉 Try clicking this task"
+      },
+      {
+        "n": 4,
+        "target": "[data-tour=\"task-shortcut-row\"]",
+        "title": "Meeting, Review, Done",
+        "body": "\"Meeting\" lists today's meetings so you can join the call directly. When tasks slip past their planned time, \"Review\" appears here so you can reschedule them one by one. \"Done\" lets you look back at finished tasks and your stats.",
+        "hint": null
+      },
+      {
+        "n": 5,
+        "target": null,
+        "title": "🔄 Left = right",
+        "body": "The list on the left and the calendar on the right show the same tasks. Complete, edit or delete something on one side and the other updates right away.",
+        "hint": null
+      },
+      {
+        "n": 6,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "Calendar: unscheduled on top, timeline below",
+        "body": "The strip at the top of each day holds tasks that have a date but no time yet; the timeline below holds tasks with a set time. Each task is labelled with its category so you can tell them apart at a glance. To see each other's calendars with a partner, use \"Sharing\" in the toolbar above.",
+        "hint": null
+      },
+      {
+        "n": 7,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "🤚 Drag to schedule",
+        "body": "Drag a task onto the timeline to give it a time; drag it back to the top strip to clear the time. Double-click an empty spot on the timeline to add a task right there. When you move a repeating task, Huddle asks whether to change just that day or the later ones too.",
+        "hint": null
+      },
+      {
+        "n": 8,
+        "target": "[data-tour=\"view-modes\"]",
+        "title": "Switch between Day, Week and Month",
+        "body": "Day for the details, Week for planning, Month for the big picture.",
+        "hint": "👉 Click to try another view"
+      },
+      {
+        "n": 9,
+        "target": "[data-tour=\"scratchpad\"]",
+        "title": "Whiteboard",
+        "body": "Had an idea mid-task? Pull down the whiteboard and jot text, to-dos, images or links. You get a fresh board each day, and can flip back to earlier ones.",
+        "hint": "👉 Give it a try"
+      },
+      {
+        "n": 10,
+        "target": "[data-tour=\"notebook-entry\"]",
+        "title": "Notebook",
+        "body": "For longer notes, click here. Type \"/\" while writing to insert blocks such as headings, to-do lists and images; select text to bring up formatting like bold and links.",
+        "hint": null
+      },
+      {
+        "n": 11,
+        "target": "[data-tour=\"sticky-notes-toggle\"]",
+        "title": "Sticky notes",
+        "body": "Click to lay sticky notes over the screen; they stay put when you change pages. Drag them around or change their color, and tuck the ones you do not need right now into the drawer next to this button.",
+        "hint": null
+      },
+      {
+        "n": 12,
+        "target": "[data-tour=\"calendar-export\"]",
+        "title": "More tools",
+        "body": "This little arrow holds Journal, Reports, Daily check-in, Export and more. Export saves your schedule as an image to share; turn on privacy mode to show time blocks without task names.",
+        "hint": null
+      },
+      {
+        "n": 13,
+        "target": "[data-tour=\"calendar-export\"]",
+        "title": "📅 Daily check-in",
+        "body": "\"Daily check-in\" is in the same menu: check in once a day to earn points. Further down that page is an anonymous leaderboard that shows penguin numbers, never account names.",
+        "hint": null
+      },
+      {
+        "n": 14,
+        "target": "[data-tour=\"notification-center\"]",
+        "title": "Notification Center",
+        "body": "The bell flags tasks that are due soon, overdue, or have sat untouched for a while. A number appears on it when there is something new.",
+        "hint": null
+      },
+      {
+        "n": 15,
+        "target": "[data-tour=\"user-menu\"]",
+        "title": "Top right: account menu",
+        "body": "Click your avatar to open the menu: account details, Membership & Referrals, dark mode and log out are all here. Also, press ⌘K or Ctrl+K to search your tasks quickly, and \"?\" to see every shortcut.",
+        "hint": null
+      },
+      {
+        "n": 16,
+        "target": "[data-tour=\"user-menu\"]",
+        "title": "🗒️ Meetings to tasks",
+        "body": "\"Meetings to tasks\" is in the same menu: paste a meeting transcript or notes and Huddle turns them into to-dos, picking out owners and due dates.",
+        "hint": null
+      },
+      {
+        "n": 17,
+        "target": null,
+        "title": "🤝 Assignments & organizations",
+        "body": "Open a task and use the person icon at the top right to hand it to a sharing partner or an organization member. It shows up in their list and calendar, and you can see when they finish it or send it back. Track progress under \"Assignments\" in the account menu; creating an organization requires Pro.",
+        "hint": null
+      },
+      {
+        "n": 18,
+        "target": "[data-tour=\"focus-timer\"]",
+        "title": "Focus timer",
+        "body": "Set a stretch of time and focus on one thing; the default is a 25-minute Pomodoro. Add music or ambient sound such as rain, waves or a cafe. When it ends, the session is logged on today's calendar automatically.",
+        "hint": "👉 Open the timer"
+      },
+      {
+        "n": 19,
+        "target": "[data-hub-launcher]",
+        "title": "Floating window",
+        "body": "This button opens a small window that always stays on top, even when you switch to another app. Inside are three tabs: Timer, Notebook and Whiteboard.",
+        "hint": null
+      },
+      {
+        "n": 20,
+        "target": null,
+        "title": "💧 Water reminder",
+        "body": "Every 60 minutes, Huddle reminds you to drink some water. Not now? Press \"Snooze\" and it comes back in five minutes. Change the interval in Settings, or turn it off entirely.",
+        "hint": null
+      },
+      {
+        "n": 21,
+        "target": "[data-tour=\"quick-links-bar\"]",
+        "title": "Quick Links",
+        "body": "Keep the sites you open most here, such as Notion, GitHub or Gmail. One click opens them in a new tab.",
+        "hint": null
+      },
+      {
+        "n": 22,
+        "target": "[data-tour=\"pet\"]",
+        "title": "🐧 Your penguin",
+        "body": "The penguin in the corner is yours. Tap it for a joke; to quiet it down, long-press (right-click on a computer) to open its menu. Now and then it reminds you about meetings and overdue tasks, but mostly it just says absurd things.",
+        "hint": null
+      },
+      {
+        "n": 23,
+        "target": null,
+        "title": "✨ You're all set!",
+        "body": "Last step: how do you want to start?",
+        "hint": null
+      }
+    ],
+    "mobile-390/zh-TW": [
+      {
+        "n": 1,
+        "target": null,
+        "title": "歡迎來到 Huddle",
+        "body": "任務、行事曆、專注計時和日記，都放在同一個地方。花一兩分鐘帶你走一圈，隨時可以略過。",
+        "hint": null
+      },
+      {
+        "n": 2,
+        "target": "[data-tour=\"left-panel\"]",
+        "title": "「任務」分頁",
+        "body": "所有任務都收在這裡，分成三層：工作區 → 分類 → 任務。最上面的「未分類」是收件匣，還沒決定放哪的任務會先到這裡。",
+        "hint": null
+      },
+      {
+        "n": 3,
+        "target": "[data-tour=\"task-row\"]",
+        "title": "點一下編輯，長按拖到日曆",
+        "body": "點左邊的圓圈完成任務，點任務名稱打開編輯。長按任務再拖動，可以直接排進日曆。",
+        "hint": null
+      },
+      {
+        "n": 4,
+        "target": "[data-tour=\"task-shortcut-row\"]",
+        "title": "會議、整理、完成",
+        "body": "「會議」列出今天的會議，可以直接加入視訊。有任務過了原訂時間，這裡會出現「整理」，讓你逐一重新安排。「完成」可以回顧做完的任務和統計。",
+        "hint": null
+      },
+      {
+        "n": 5,
+        "target": null,
+        "title": "🤚 左右滑動",
+        "body": "在「任務」分頁往左滑，會切到日曆。在日曆裡左右滑，可以往前、往後翻日期。",
+        "hint": null
+      },
+      {
+        "n": 6,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "日曆：上面待排程，下面時間軸",
+        "body": "每天最上面那一格，放「有日期、還沒排時間」的任務；下面的時間軸，放排好時間的任務。任務前面會標出所屬分類，方便一眼分辨。想和夥伴互看行事曆，到右上角「⋯」裡的「共享」。",
+        "hint": null
+      },
+      {
+        "n": 7,
+        "target": "[data-tour=\"mobile-more\"]",
+        "title": "更多工具都在「⋯」",
+        "body": "通知、帳號、記事本、便條紙和設定，都收在右上角的「⋯」。有新通知時，「⋯」上會出現數字。",
+        "hint": null
+      },
+      {
+        "n": 8,
+        "target": "[data-tour=\"mobile-add-task\"]",
+        "title": "新增任務",
+        "body": "按這顆「＋」新增任務。也可以在時間軸的空白處點兩下，直接在那個時段建立。",
+        "hint": null
+      },
+      {
+        "n": 9,
+        "target": "[data-tour=\"mobile-tabs\"]",
+        "title": "底部五個分頁",
+        "body": "「重點」看各分類的進度，「任務」是完整清單，「白板」隨手記想法，「日曆」排時間，「連結」放常開的網址。",
+        "hint": null
+      },
+      {
+        "n": 10,
+        "target": "[data-tour=\"focus-timer\"]",
+        "title": "專注計時",
+        "body": "設定一段時間，專心做一件事；預設是 25 分鐘的番茄鐘。可以搭配背景音樂或環境音，例如雨聲、海浪、咖啡廳。結束後會自動記到今天的日曆。",
+        "hint": "👉 點開試試"
+      },
+      {
+        "n": 11,
+        "target": null,
+        "title": "💧 喝水小提醒",
+        "body": "每 60 分鐘，Huddle 會提醒你喝口水。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。",
+        "hint": null
+      },
+      {
+        "n": 12,
+        "target": "[data-tour=\"pet\"]",
+        "title": "🐧 你的企鵝",
+        "body": "角落這隻企鵝是你專屬的。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。牠偶爾會提醒你會議和過期的任務，但多半只是在說些荒謬的話。",
+        "hint": null
+      },
+      {
+        "n": 13,
+        "target": "[data-tour=\"mobile-more\"]",
+        "title": "📅 每日簽到 ＆ 會議轉任務",
+        "body": "「⋯」裡的「每日簽到」：每天簽到一次，累積分數。「⋯」→「帳號」→「會議轉任務」：貼上會議逐字稿，Huddle 會幫你整理出待辦。",
+        "hint": null
+      },
+      {
+        "n": 14,
+        "target": null,
+        "title": "🤝 指派任務 ＆ 組織",
+        "body": "打開任務，按右上角的小人圖示，就能把任務交給共享夥伴或組織成員。任務會出現在對方的清單和日曆；對方完成或退回，你都看得到。進度在帳號選單的「指派任務」；建立組織需要 Pro 會員。",
+        "hint": null
+      },
+      {
+        "n": 15,
+        "target": null,
+        "title": "✨ 你準備好了！",
+        "body": "最後一步：你想怎麼開始？",
+        "hint": null
+      }
+    ],
+    "mobile-390/en": [
+      {
+        "n": 1,
+        "target": null,
+        "title": "Welcome to Huddle",
+        "body": "Tasks, calendar, focus timer and journal, all in one place. Take a minute or two to look around; you can skip at any time.",
+        "hint": null
+      },
+      {
+        "n": 2,
+        "target": "[data-tour=\"left-panel\"]",
+        "title": "The Tasks tab",
+        "body": "Every task lives here, in three layers: workspace → category → task. \"Uncategorized\" at the top is your inbox: tasks you have not filed yet land there first.",
+        "hint": null
+      },
+      {
+        "n": 3,
+        "target": "[data-tour=\"task-row\"]",
+        "title": "Tap to edit, long-press to drag to the calendar",
+        "body": "Tap the circle on the left to mark a task done, or tap its name to open it. Long-press a task and drag to put it straight onto the calendar.",
+        "hint": null
+      },
+      {
+        "n": 4,
+        "target": "[data-tour=\"task-shortcut-row\"]",
+        "title": "Meeting, Review, Done",
+        "body": "\"Meeting\" lists today's meetings so you can join the call directly. When tasks slip past their planned time, \"Review\" appears here so you can reschedule them one by one. \"Done\" lets you look back at finished tasks and your stats.",
+        "hint": null
+      },
+      {
+        "n": 5,
+        "target": null,
+        "title": "🤚 Swipe left and right",
+        "body": "Swipe left on the Tasks tab to switch to the calendar. Inside the calendar, swipe left or right to move between dates.",
+        "hint": null
+      },
+      {
+        "n": 6,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "Calendar: unscheduled on top, timeline below",
+        "body": "The strip at the top of each day holds tasks that have a date but no time yet; the timeline below holds tasks with a set time. Each task is labelled with its category so you can tell them apart at a glance. To see each other's calendars with a partner, open \"Sharing\" under \"⋯\" at the top right.",
+        "hint": null
+      },
+      {
+        "n": 7,
+        "target": "[data-tour=\"mobile-more\"]",
+        "title": "More tools live in \"⋯\"",
+        "body": "Notifications, Account, Notebook, Sticky notes and Settings are all tucked into \"⋯\" at the top right. A number appears on \"⋯\" when there is something new.",
+        "hint": null
+      },
+      {
+        "n": 8,
+        "target": "[data-tour=\"mobile-add-task\"]",
+        "title": "Add task",
+        "body": "Tap \"+\" to add a task. Or double-tap an empty spot on the timeline to create one right in that slot.",
+        "hint": null
+      },
+      {
+        "n": 9,
+        "target": "[data-tour=\"mobile-tabs\"]",
+        "title": "Five tabs at the bottom",
+        "body": "Focus shows progress by category, Tasks is the full list, Whiteboard is for quick notes, Calendar is for scheduling, and Links holds the sites you open most.",
+        "hint": null
+      },
+      {
+        "n": 10,
+        "target": "[data-tour=\"focus-timer\"]",
+        "title": "Focus timer",
+        "body": "Set a stretch of time and focus on one thing; the default is a 25-minute Pomodoro. Add music or ambient sound such as rain, waves or a cafe. When it ends, the session is logged on today's calendar automatically.",
+        "hint": "👉 Give it a try"
+      },
+      {
+        "n": 11,
+        "target": null,
+        "title": "💧 Water reminder",
+        "body": "Every 60 minutes, Huddle reminds you to drink some water. Not now? Press \"Snooze\" and it comes back in five minutes. Change the interval in Settings, or turn it off entirely.",
+        "hint": null
+      },
+      {
+        "n": 12,
+        "target": "[data-tour=\"pet\"]",
+        "title": "🐧 Your penguin",
+        "body": "The penguin in the corner is yours. Tap it for a joke; to quiet it down, long-press (right-click on a computer) to open its menu. Now and then it reminds you about meetings and overdue tasks, but mostly it just says absurd things.",
+        "hint": null
+      },
+      {
+        "n": 13,
+        "target": "[data-tour=\"mobile-more\"]",
+        "title": "📅 Daily check-in & Meetings to tasks",
+        "body": "Daily check-in, under \"⋯\": check in once a day to earn points. Meetings to tasks, under \"⋯\" then Account: paste a meeting transcript and Huddle turns it into to-dos.",
+        "hint": null
+      },
+      {
+        "n": 14,
+        "target": null,
+        "title": "🤝 Assignments & organizations",
+        "body": "Open a task and use the person icon at the top right to hand it to a sharing partner or an organization member. It shows up in their list and calendar, and you can see when they finish it or send it back. Track progress under \"Assignments\" in the account menu; creating an organization requires Pro.",
+        "hint": null
+      },
+      {
+        "n": 15,
+        "target": null,
+        "title": "✨ You're all set!",
+        "body": "Last step: how do you want to start?",
+        "hint": null
+      }
+    ],
+    "desktop-1280/zh-TW/newuser": [
+      {
+        "n": 1,
+        "target": null,
+        "title": "歡迎來到 Huddle",
+        "body": "任務、行事曆、專注計時和日記，都放在同一個地方。花一兩分鐘帶你走一圈，隨時可以略過。",
+        "hint": null
+      },
+      {
+        "n": 2,
+        "target": "[data-tour=\"left-panel\"]",
+        "title": "左邊：任務清單",
+        "body": "所有任務都收在這裡，分成三層：工作區 → 分類 → 任務。最上面的「未分類」是收件匣，還沒決定放哪的任務會先到這裡。",
+        "hint": null
+      },
+      {
+        "n": 3,
+        "target": "[data-tour=\"task-row\"]",
+        "title": "完成任務、打開任務",
+        "body": "點左邊的圓圈，任務就完成了。點任務名稱可以打開編輯：改時間、寫備註，或把它設成「會議」。",
+        "hint": "👉 試試點一下這個任務"
+      },
+      {
+        "n": 4,
+        "target": "[data-tour=\"task-shortcut-row\"]",
+        "title": "會議、整理、完成",
+        "body": "「會議」列出今天的會議，可以直接加入視訊。有任務過了原訂時間，這裡會出現「整理」，讓你逐一重新安排。「完成」可以回顧做完的任務和統計。",
+        "hint": null
+      },
+      {
+        "n": 5,
+        "target": null,
+        "title": "🔄 左邊 = 右邊",
+        "body": "左邊的清單和右邊的日曆，看的是同一批任務。在任何一邊完成、修改或刪除，另一邊會立刻跟著變。",
+        "hint": null
+      },
+      {
+        "n": 6,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "日曆：上面待排程，下面時間軸",
+        "body": "每天最上面那一格，放「有日期、還沒排時間」的任務；下面的時間軸，放排好時間的任務。任務前面會標出所屬分類，方便一眼分辨。想和夥伴互看行事曆，按上方工具列的「共享」。",
+        "hint": null
+      },
+      {
+        "n": 7,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "🤚 拖曳就是排程",
+        "body": "把任務拖到時間軸，就排好時間；拖回最上面那一格，就取消時間。在時間軸空白處點兩下，可以直接新增任務。重複的任務換時間時，Huddle 會問你只改這一天，還是之後也一起改。",
+        "hint": null
+      },
+      {
+        "n": 8,
+        "target": "[data-tour=\"view-modes\"]",
+        "title": "切換日、週、月",
+        "body": "看細節用「日」，排一週用「週」，看整個月用「月」。",
+        "hint": "👉 點點看，切換不同檢視"
+      },
+      {
+        "n": 9,
+        "target": "[data-tour=\"scratchpad\"]",
+        "title": "白板",
+        "body": "工作到一半冒出想法？拉開白板，隨手記下文字、待辦、圖片或連結。每天一張新的，之前的也翻得回去。",
+        "hint": "👉 點開試試"
+      },
+      {
+        "n": 10,
+        "target": "[data-tour=\"notebook-entry\"]",
+        "title": "記事本",
+        "body": "想寫長一點的筆記，點這裡。打字時輸入「/」，可以插入標題、待辦清單、圖片等區塊；選取文字，會跳出粗體、連結等格式按鈕。",
+        "hint": null
+      },
+      {
+        "n": 11,
+        "target": "[data-tour=\"sticky-notes-toggle\"]",
+        "title": "便條紙",
+        "body": "按一下，畫面上會多一層便條紙，換頁也不會消失。便條紙可以拖動、換顏色；暫時用不到的，收進旁邊的「收納」。",
+        "hint": null
+      },
+      {
+        "n": 12,
+        "target": "[data-tour=\"calendar-export\"]",
+        "title": "更多工具",
+        "body": "這個小箭頭裡收著日記、報告、每日簽到、匯出等功能。「匯出」可以把行程存成圖片分享；開啟隱私模式，就只顯示時段、不顯示任務名稱。",
+        "hint": null
+      },
+      {
+        "n": 13,
+        "target": "[data-tour=\"calendar-export\"]",
+        "title": "📅 每日簽到",
+        "body": "同一個選單裡的「每日簽到」：每天簽到一次，累積分數。頁面下方有匿名排行榜，只顯示小企鵝編號，不顯示帳號。",
+        "hint": null
+      },
+      {
+        "n": 14,
+        "target": "[data-tour=\"notification-center\"]",
+        "title": "通知中心",
+        "body": "鈴鐺會提醒你快到期、已過期，或放了很久沒動的任務。有新提醒時，鈴鐺上會出現數字。",
+        "hint": null
+      },
+      {
+        "n": 15,
+        "target": "[data-tour=\"user-menu\"]",
+        "title": "右上角：帳號選單",
+        "body": "點頭像打開選單：帳號資料、會員與推薦、深色模式和登出都在這裡。另外，按 ⌘K 或 Ctrl+K 可以快速搜尋任務，按「?」可以看所有快捷鍵。",
+        "hint": null
+      },
+      {
+        "n": 16,
+        "target": "[data-tour=\"user-menu\"]",
+        "title": "🗒️ 會議轉任務",
+        "body": "同一個選單裡的「會議轉任務」：貼上會議逐字稿或筆記，Huddle 會幫你整理出待辦，並標出負責人和期限。",
+        "hint": null
+      },
+      {
+        "n": 17,
+        "target": null,
+        "title": "🤝 指派任務 ＆ 組織",
+        "body": "打開任務，按右上角的小人圖示，就能把任務交給共享夥伴或組織成員。任務會出現在對方的清單和日曆；對方完成或退回，你都看得到。進度在帳號選單的「指派任務」；建立組織需要 Pro 會員。",
+        "hint": null
+      },
+      {
+        "n": 18,
+        "target": "[data-tour=\"focus-timer\"]",
+        "title": "專注計時",
+        "body": "設定一段時間，專心做一件事；預設是 25 分鐘的番茄鐘。可以搭配背景音樂或環境音，例如雨聲、海浪、咖啡廳。結束後會自動記到今天的日曆。",
+        "hint": "👉 點開計時器"
+      },
+      {
+        "n": 19,
+        "target": null,
+        "title": "💧 喝水小提醒",
+        "body": "每 60 分鐘，Huddle 會提醒你喝口水。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。",
+        "hint": null
+      },
+      {
+        "n": 20,
+        "target": "[data-tour=\"quick-links-bar\"]",
+        "title": "常用連結",
+        "body": "把常開的網址放在這裡，例如 Notion、GitHub、Gmail。點一下，就在新分頁打開。",
+        "hint": null
+      },
+      {
+        "n": 21,
+        "target": "[data-tour=\"pet\"]",
+        "title": "🐧 你的企鵝",
+        "body": "導覽結束後，你可以領養一隻專屬企鵝，牠會住在畫面角落。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。",
+        "hint": null
+      },
+      {
+        "n": 22,
+        "target": null,
+        "title": "✨ 你準備好了！",
+        "body": "最後一步：你想怎麼開始？",
+        "hint": null
+      }
+    ],
+    "desktop-1280/en/newuser": [
+      {
+        "n": 1,
+        "target": null,
+        "title": "Welcome to Huddle",
+        "body": "Tasks, calendar, focus timer and journal, all in one place. Take a minute or two to look around; you can skip at any time.",
+        "hint": null
+      },
+      {
+        "n": 2,
+        "target": "[data-tour=\"left-panel\"]",
+        "title": "Left side: your task list",
+        "body": "Every task lives here, in three layers: workspace → category → task. \"Uncategorized\" at the top is your inbox: tasks you have not filed yet land there first.",
+        "hint": null
+      },
+      {
+        "n": 3,
+        "target": "[data-tour=\"task-row\"]",
+        "title": "Check off or open a task",
+        "body": "Click the circle on the left to mark a task done. Click its name to open it and change the time, add notes, or mark it as a meeting.",
+        "hint": "👉 Try clicking this task"
+      },
+      {
+        "n": 4,
+        "target": "[data-tour=\"task-shortcut-row\"]",
+        "title": "Meeting, Review, Done",
+        "body": "\"Meeting\" lists today's meetings so you can join the call directly. When tasks slip past their planned time, \"Review\" appears here so you can reschedule them one by one. \"Done\" lets you look back at finished tasks and your stats.",
+        "hint": null
+      },
+      {
+        "n": 5,
+        "target": null,
+        "title": "🔄 Left = right",
+        "body": "The list on the left and the calendar on the right show the same tasks. Complete, edit or delete something on one side and the other updates right away.",
+        "hint": null
+      },
+      {
+        "n": 6,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "Calendar: unscheduled on top, timeline below",
+        "body": "The strip at the top of each day holds tasks that have a date but no time yet; the timeline below holds tasks with a set time. Each task is labelled with its category so you can tell them apart at a glance. To see each other's calendars with a partner, use \"Sharing\" in the toolbar above.",
+        "hint": null
+      },
+      {
+        "n": 7,
+        "target": "[data-tour=\"calendar-panel\"]",
+        "title": "🤚 Drag to schedule",
+        "body": "Drag a task onto the timeline to give it a time; drag it back to the top strip to clear the time. Double-click an empty spot on the timeline to add a task right there. When you move a repeating task, Huddle asks whether to change just that day or the later ones too.",
+        "hint": null
+      },
+      {
+        "n": 8,
+        "target": "[data-tour=\"view-modes\"]",
+        "title": "Switch between Day, Week and Month",
+        "body": "Day for the details, Week for planning, Month for the big picture.",
+        "hint": "👉 Click to try another view"
+      },
+      {
+        "n": 9,
+        "target": "[data-tour=\"scratchpad\"]",
+        "title": "Whiteboard",
+        "body": "Had an idea mid-task? Pull down the whiteboard and jot text, to-dos, images or links. You get a fresh board each day, and can flip back to earlier ones.",
+        "hint": "👉 Give it a try"
+      },
+      {
+        "n": 10,
+        "target": "[data-tour=\"notebook-entry\"]",
+        "title": "Notebook",
+        "body": "For longer notes, click here. Type \"/\" while writing to insert blocks such as headings, to-do lists and images; select text to bring up formatting like bold and links.",
+        "hint": null
+      },
+      {
+        "n": 11,
+        "target": "[data-tour=\"sticky-notes-toggle\"]",
+        "title": "Sticky notes",
+        "body": "Click to lay sticky notes over the screen; they stay put when you change pages. Drag them around or change their color, and tuck the ones you do not need right now into the drawer next to this button.",
+        "hint": null
+      },
+      {
+        "n": 12,
+        "target": "[data-tour=\"calendar-export\"]",
+        "title": "More tools",
+        "body": "This little arrow holds Journal, Reports, Daily check-in, Export and more. Export saves your schedule as an image to share; turn on privacy mode to show time blocks without task names.",
+        "hint": null
+      },
+      {
+        "n": 13,
+        "target": "[data-tour=\"calendar-export\"]",
+        "title": "📅 Daily check-in",
+        "body": "\"Daily check-in\" is in the same menu: check in once a day to earn points. Further down that page is an anonymous leaderboard that shows penguin numbers, never account names.",
+        "hint": null
+      },
+      {
+        "n": 14,
+        "target": "[data-tour=\"notification-center\"]",
+        "title": "Notification Center",
+        "body": "The bell flags tasks that are due soon, overdue, or have sat untouched for a while. A number appears on it when there is something new.",
+        "hint": null
+      },
+      {
+        "n": 15,
+        "target": "[data-tour=\"user-menu\"]",
+        "title": "Top right: account menu",
+        "body": "Click your avatar to open the menu: account details, Membership & Referrals, dark mode and log out are all here. Also, press ⌘K or Ctrl+K to search your tasks quickly, and \"?\" to see every shortcut.",
+        "hint": null
+      },
+      {
+        "n": 16,
+        "target": "[data-tour=\"user-menu\"]",
+        "title": "🗒️ Meetings to tasks",
+        "body": "\"Meetings to tasks\" is in the same menu: paste a meeting transcript or notes and Huddle turns them into to-dos, picking out owners and due dates.",
+        "hint": null
+      },
+      {
+        "n": 17,
+        "target": null,
+        "title": "🤝 Assignments & organizations",
+        "body": "Open a task and use the person icon at the top right to hand it to a sharing partner or an organization member. It shows up in their list and calendar, and you can see when they finish it or send it back. Track progress under \"Assignments\" in the account menu; creating an organization requires Pro.",
+        "hint": null
+      },
+      {
+        "n": 18,
+        "target": "[data-tour=\"focus-timer\"]",
+        "title": "Focus timer",
+        "body": "Set a stretch of time and focus on one thing; the default is a 25-minute Pomodoro. Add music or ambient sound such as rain, waves or a cafe. When it ends, the session is logged on today's calendar automatically.",
+        "hint": "👉 Open the timer"
+      },
+      {
+        "n": 19,
+        "target": null,
+        "title": "💧 Water reminder",
+        "body": "Every 60 minutes, Huddle reminds you to drink some water. Not now? Press \"Snooze\" and it comes back in five minutes. Change the interval in Settings, or turn it off entirely.",
+        "hint": null
+      },
+      {
+        "n": 20,
+        "target": "[data-tour=\"quick-links-bar\"]",
+        "title": "Quick Links",
+        "body": "Keep the sites you open most here, such as Notion, GitHub or Gmail. One click opens them in a new tab.",
+        "hint": null
+      },
+      {
+        "n": 21,
+        "target": "[data-tour=\"pet\"]",
+        "title": "🐧 Your penguin",
+        "body": "After the tour you can adopt a penguin of your own, and it will live in the corner of the screen. Tap it for a joke; to quiet it down, long-press (right-click on a computer) to open its menu.",
+        "hint": null
+      },
+      {
+        "n": 22,
+        "target": null,
+        "title": "✨ You're all set!",
+        "body": "Last step: how do you want to start?",
+        "hint": null
+      }
+    ]
+  },
+  "blockedWrites": [
+    "POST /rest/v1/rpc/huddle_operations",
+    "POST /functions/v1/google-calendar",
+    "POST /rest/v1/rpc/get_meeting_notifications",
+    "POST /rest/v1/rpc/get_meeting_invitations",
+    "POST /rest/v1/rpc/get_share_peers",
+    "POST /functions/v1/cleanup-images",
+    "PATCH /rest/v1/user_settings"
+  ]
+}

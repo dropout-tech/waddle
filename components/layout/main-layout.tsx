@@ -20,6 +20,7 @@ import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useWideScreen } from '@/hooks/use-wide-screen'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
+import { TOUR_MOBILE_TAB_EVENT } from '@/components/onboarding-tour'
 import { useCalendarSharing, usePeerCalendarEvents } from '@/hooks/use-calendar-sharing'
 import { useGoogleCalendarEvents } from '@/hooks/use-google-calendar-events'
 import { hapticSelection } from '@/lib/haptics'
@@ -301,6 +302,22 @@ export function MainLayout({
     openWhiteboard: () => { setMobileLinksOpen(false); setMobileFocusBoardOpen(false); setMobileScratchpadOpen(true) },
     selectTask: onSelectTask, createTask: onCreateCalendarTask,
   })
+
+  // The onboarding tour asks for the bottom tab its current step points at
+  // (the task list lives on 任務, the rest on 日曆) — otherwise the spotlight
+  // has nothing to land on. Overlay tabs are closed for the same reason.
+  useEffect(() => {
+    const onTourTab = (e: Event) => {
+      const tab = (e as CustomEvent<unknown>).detail
+      if (tab !== 'tasks' && tab !== 'calendar') return
+      setMobileScratchpadOpen(false)
+      setMobileLinksOpen(false)
+      setMobileFocusBoardOpen(false)
+      setMobileTab(tab)
+    }
+    window.addEventListener(TOUR_MOBILE_TAB_EVENT, onTourTab)
+    return () => window.removeEventListener(TOUR_MOBILE_TAB_EVENT, onTourTab)
+  }, [])
 
   // Calendar zoom level - controls hour height and visible time range
   // Zoom levels: 1 = compact (40px/hour), 2 = normal (60px/hour), 3 = expanded (80px/hour), 4 = detailed (100px/hour)
@@ -779,6 +796,7 @@ export function MainLayout({
           return (
             <nav
               data-hide-on-keyboard
+              data-tour="mobile-tabs"
               className="relative flex-shrink-0 grid grid-cols-5 border-t border-border/70 bg-card/95 backdrop-blur z-sticky pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_0_rgba(0,0,0,0.02)]"
               role="tablist"
               aria-label={t('主要分頁')}
@@ -800,6 +818,7 @@ export function MainLayout({
                 <button
                   key={key}
                   role="tab"
+                  data-tab={key}
                   aria-selected={active}
                   onClick={onClick}
                   className={cn(

@@ -94,7 +94,10 @@ function HuddlePage() {
   useUndoShortcuts()
 
   // Hourly (default) water-break nudge — friendly popup, off via settings.
-  const water = useWaterReminder()
+  // Held back until we know the onboarding tour isn't on screen: the popup's
+  // blurred backdrop used to land on top of the spotlight. Deferred, not
+  // dropped — it shows as soon as the tour is finished or skipped.
+  const water = useWaterReminder(isLoading || !onboardingCompleted)
 
   // Slot types — generated dynamically from current workspaces, plus static
   // built-in time-block types (break/buffer/focus) and any user customs.
