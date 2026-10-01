@@ -87,6 +87,11 @@ export function translateFor(
 ): string {
   let out = lang === 'en' ? (en[text] ?? text) : text
   if (vars) {
+    // Plural forms for dictionary values: '{count} {count|task|tasks}' picks
+    // the first word when count is 1, the second otherwise.
+    out = out.replace(/\{(\w+)\|([^|{}]*)\|([^|{}]*)\}/g, (token, key: string, one: string, other: string) =>
+      key in vars ? (Number(vars[key]) === 1 ? one : other) : token,
+    )
     for (const [key, value] of Object.entries(vars)) {
       out = out.split(`{${key}}`).join(String(value))
     }
