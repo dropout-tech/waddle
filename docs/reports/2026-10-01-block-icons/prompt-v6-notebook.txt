@@ -1,0 +1,64 @@
+Use your image generation tool to create ONE new image, then save it as a PNG file at exactly this absolute path:
+__OUT__
+Do not modify, create or delete any other file. Do not write code. When done, reply with only the saved path and the pixel size.
+
+WHAT TO DRAW
+A single sheet of 24 tiny DOODLES for the formatting menu of a note-taking app, arranged in a strict grid of 6 columns x 4 rows on a landscape 3:2 canvas (1536 x 1024 px).
+
+The attached image is a STYLE REFERENCE FOR LINE QUALITY ONLY: copy the feel of its thick, soft, rounded, slightly wobbly hand-inked outline. Do NOT draw the character, any animal, any face, or any mascot. Only abstract UI symbols.
+
+HAND-DRAWN CHARACTER (the most important rule: these will be shown at only 16 px, and must STILL look obviously drawn by hand, never like a clean icon font)
+- Draw each symbol the way a person doodles it quickly in a notebook margin with ONE fat round-tip marker.
+- The marker tip is 24 px wide, and every doodle is SMALL: only about 120 px tall or wide. So the line is one fifth of the doodle: chunky like a poster marker or a fat crayon, as thick as the dots in the "More" doodle. A doodle is never more than five line-widths across.
+- Because the line is so fat, every shape is reduced to its simplest form (two to four strokes), and every hole or inner gap is at least one full line-width wide. If a detail would not fit, leave it out.
+- EXAGGERATE the imperfection, because at 16 px small wobbles disappear. Concretely:
+  * every box is drawn as four separate strokes that visibly CROSS at the corners and stick out past them by a full line-width, like a hastily sketched "#";
+  * every box or page leans 8 to 12 degrees, some to the left and some to the right, and its sides are not parallel;
+  * every circle or loop is one fast spiral stroke whose end overshoots the start by a quarter turn and pokes out, like a hand-written "6" or "e"; it is egg-shaped, never round;
+  * every "straight" line is visibly bowed or wavy; pairs of lines are never parallel and never the same length;
+  * nothing is symmetrical and nothing is centred precisely.
+- The stroke swells and thins a little like a brush pen pressed harder in places, with blunt rounded ends.
+- Outline doodles only. Do not fill shapes solid black, except small dots where listed.
+- Even so, each symbol must be instantly recognisable.
+
+FLAT INK RULES
+- Pure solid black ink (#000000) on an opaque pure flat white background (#FFFFFF). No transparency, no gray, no color, no paper texture, no shading, no gradients, no drop shadows, no hatching.
+- Every doodle is centered in its own 256 x 256 px cell and is SMALL inside it (about 120 px, less than half the cell), surrounded by wide empty white margins.
+- NO grid lines, NO cell borders, NO frames around doodles, NO captions, NO labels, NO numbering of cells. The only letters and digits allowed are the ones explicitly listed below, written as chunky marker handwriting.
+- All 24 the same visual size and the same marker weight, one family drawn by one hand in one sitting.
+
+THE 24 DOODLES, in reading order (left to right, top row first)
+
+Row 1
+1. A capital letter "T" with tiny serifs (plain text).
+2. The letter "H" followed by the digit "1", the digit almost as tall as the letter.
+3. The letter "H" followed by the digit "2", the digit almost as tall as the letter.
+4. The letter "H" followed by the digit "3", the digit almost as tall as the letter.
+5. One leaning checkbox drawn as four crossing strokes, with a big check mark inside whose tail pokes out past the top right corner.
+6. Bulleted list: three rows, each row a round marker dot on the left followed by a wavy horizontal stroke.
+
+Row 2
+7. Numbered list: two rows only, first row a big digit "1" then a horizontal stroke, second row a big digit "2" then a horizontal stroke.
+8. Collapsible section: a solid triangle pointing DOWN at the left, one horizontal stroke to its right, and one shorter horizontal stroke below that, indented.
+9. Quote: a pair of big solid opening quotation marks (two fat comma-like blobs, shaped like 66).
+10. Code block: the three characters  <  /  >  (left angle bracket, slash, right angle bracket).
+11. Divider: one single long horizontal stroke across the whole doodle, gently wavy, nothing else.
+12. Picture: a leaning rectangle frame drawn as four crossing strokes, containing a zigzag mountain line and a small round sun dot in the upper corner.
+
+Row 3
+13. A chunky capital letter "B".
+14. A slanted (italic) capital letter "I" with short serifs top and bottom.
+15. A capital letter "U" with a horizontal stroke underneath it.
+16. A capital letter "S" with a horizontal stroke striking through its middle.
+17. Inline code: two angle brackets facing away from each other, "<" and ">", with a clear gap between them.
+18. Link: two chain links (two leaning loops) hooked into each other on a diagonal.
+
+Row 4
+19. Undo: a curved arrow hooking back towards the left, with a clear two-stroke arrowhead.
+20. Redo: the mirror image, a curved arrow hooking towards the right.
+21. Add to list: three short horizontal strokes stacked on the left, and a plus sign on the right.
+22. Add task: one round loop with a check mark inside it, and a small plus sign at its upper right.
+23. Table: a leaning box divided into four by one vertical and one horizontal stroke.
+24. Marker pen: a fat pen leaning diagonally with a short squiggle under its tip.
+
+Double-check before saving: exactly 24 doodles, exactly 6 per row, each one small (about 120 px) with a 24 px fat marker line, opaque white background, corners that cross and stick out, leaning boxes, spiral loops with poking ends, nothing else on the canvas.

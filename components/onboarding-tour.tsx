@@ -1,22 +1,35 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
-import { ArrowRight, ArrowLeft, X, Sparkles, LayoutTemplate, FilePlus2 } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback, useSyncExternalStore } from 'react'
+import { ArrowRight, ArrowLeft, X, LayoutTemplate, FilePlus2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useI18n } from '@/lib/i18n/react'
 import { isImeComposing } from '@/lib/ime'
+import { hubAvailable } from '@/lib/floating-hub'
 
 // ─────────────────────────────────────────────────────────
 // Tour step definitions
 // ─────────────────────────────────────────────────────────
+
+/**
+ * Fired on phones when a step's target lives on a specific bottom tab.
+ * MainLayout listens and switches tab, so the spotlight has something to
+ * land on (the task list is not mounted while the calendar tab is showing).
+ */
+export const TOUR_MOBILE_TAB_EVENT = 'huddle:tour-mobile-tab'
 
 interface TourStep {
   /** CSS selector for the element to highlight. Omit for a centered modal. */
   target?: string
   title: string
   body: string
+  /**
+   * Copy to use when `target` is not on screen. The penguin, for one, only
+   * exists after it has been adopted — which happens right after the tour.
+   */
+  bodyWithoutTarget?: string
   /** Where to place the tooltip relative to the spotlight. */
   placement?: 'top' | 'bottom' | 'left' | 'right'
   /** Padding (px) around the spotlight rectangle. */
@@ -28,28 +41,52 @@ interface TourStep {
   interactive?: boolean
   /** Hint text under the body to nudge the user toward the action. */
   hint?: string
+  /** Phones only: the bottom tab this step's target lives on. */
+  mobileTab?: 'tasks' | 'calendar'
+  /** Dropped from the tour when the browser can't offer the feature. */
+  requires?: 'floating-hub'
 }
 
+// Copy rules (2026-10-01 pass): written for a first-time, non-technical
+// reader. One idea per step, about three short sentences, the title names
+// the thing that is lit up, quoted words match the on-screen labels, and no
+// "like product X" comparisons. Lists use 「、」 rather than slashes.
+//
+// Copy shared by the desktop and phone tours (one dictionary entry each).
+const WELCOME_BODY = '任務、行事曆、專注計時和日記，都放在同一個地方。花一兩分鐘帶你走一圈，隨時可以略過。'
+const TASK_LIST_BODY = '所有任務都收在這裡，分成三層：工作區 → 分類 → 任務。最上面的「未分類」是收件匣，還沒決定放哪的任務會先到這裡。'
+const SHORTCUTS_TITLE = '會議、整理、完成'
+const SHORTCUTS_BODY = '「會議」列出今天的會議，可以直接加入視訊。有任務過了原訂時間，這裡會出現「整理」，讓你逐一重新安排。「完成」可以回顧做完的任務和統計。'
+const CALENDAR_TITLE = '日曆：上面待排程，下面時間軸'
+const CALENDAR_BODY = '每天最上面那一格，放「有日期、還沒排時間」的任務；下面的時間軸，放排好時間的任務。任務前面會標出所屬分類，方便一眼分辨。'
+const TIMER_BODY = '設定一段時間，專心做一件事；預設是 25 分鐘的番茄鐘。可以搭配背景音樂或環境音，例如雨聲、海浪、咖啡廳。結束後會自動記到今天的日曆。'
+const WATER_BODY = '每 60 分鐘，Huddle 會提醒你喝口水。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。'
+const PET_BODY = '角落這隻企鵝是你專屬的。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。牠偶爾會提醒你會議和過期的任務，但多半只是在說些荒謬的話。'
+const PET_BODY_BEFORE_ADOPTION = '導覽結束後，你可以領養一隻專屬企鵝，牠會住在畫面角落。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。'
+const ASSIGN_BODY = '打開任務，按右上角的小人圖示，就能把任務交給共享夥伴或組織成員。任務會出現在對方的清單和日曆；對方完成或退回，你都看得到。進度在帳號選單的「指派任務」；建立組織需要 Pro 會員。'
+
 // Mix of:
-// - Center modals for high-level concepts (welcome, sync, drag, finale).
-// - Spotlights for specific UI elements (panel, task row, calendar, view modes, scratchpad, timer, user menu).
+// - Center modals for high-level concepts (welcome, sync, water, assigning, finale).
+// - Spotlights for specific UI elements, ordered so the light sweeps the
+//   screen instead of jumping around: left panel → calendar → top bar from
+//   left to right → the bottom corners.
 // - Interactive steps where the user actually clicks the highlighted element to advance.
 const DESKTOP_STEPS: TourStep[] = [
   {
     title: '歡迎來到 Huddle',
-    body: '整合任務、時間排程、專注計時、日記反思的工作面板。90 秒帶你走過。',
+    body: WELCOME_BODY,
   },
   {
     target: '[data-tour="left-panel"]',
-    title: '左側：三層結構',
-    body: '工作區（工作 / 個人 / 學習）→ 分類（本週 / 待辦…）→ 任務。所有任務都在這。最上面灰色的「未分類」是預設收件匣——在日曆上隨手建立、還沒想好歸屬的任務都會先掉進這裡，之後再拖到對的地方。工作區標題右邊的「＋」可以新增分類；上方篩選列還能切換「精簡 / 舒適」兩種密度，任務多的時候切精簡一次看更多。',
+    title: '左邊：任務清單',
+    body: TASK_LIST_BODY,
     placement: 'right',
     padding: 0,
   },
   {
     target: '[data-tour="task-row"]',
-    title: '勾選 / 點開任務',
-    body: '左邊圈圈 = 完成；點任務本身 = 打開詳細編輯。打開後可以把任務標為「會議」，會多三個欄位（參與者 / 地點 / 視訊連結）。',
+    title: '完成任務、打開任務',
+    body: '點左邊的圓圈，任務就完成了。點任務名稱可以打開編輯：改時間、寫備註，或把它設成「會議」。',
     placement: 'right',
     padding: 4,
     interactive: true,
@@ -57,113 +94,137 @@ const DESKTOP_STEPS: TourStep[] = [
   },
   {
     target: '[data-tour="task-shortcut-row"]',
-    title: '今日會議 ＆ 待整理 ＆ 已完成',
-    body: '左邊 chip 顯示今天還剩幾場會議，點開可一鍵加入視訊。中間「待整理」是過了原本時間的任務，點進去可以一件一件重新決定（完成／排今天／移回任務欄／封存）。右邊「已完成」進到專屬抽屜，內含 KPI 統計（連續天數、平均耗時）。',
+    title: SHORTCUTS_TITLE,
+    body: SHORTCUTS_BODY,
     placement: 'bottom',
     padding: 4,
   },
   {
     title: '🔄 左邊 = 右邊',
-    body: '左側清單和右側日曆是**同一份資料的兩種視圖**。在任一邊改動（完成、編輯、刪除）都會即時同步，不會重複。',
+    body: '左邊的清單和右邊的日曆，看的是同一批任務。在任何一邊完成、修改或刪除，另一邊會立刻跟著變。',
   },
   {
     target: '[data-tour="calendar-panel"]',
-    title: '日曆：上方待排程 / 下方時間軸',
-    body: '每一天上方那條是「待排程」（有日期沒時間）；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let\'s Play｜夏令營），一眼看出屬於哪個分類；不想要可在設定關掉。另外在「設定 → 共享」可以邀請夥伴互看行事曆，對方開放的行程會疊加顯示在這裡。',
+    title: CALENDAR_TITLE,
+    body: `${CALENDAR_BODY}想和夥伴互看行事曆，按上方工具列的「共享」。`,
     placement: 'left',
     padding: 0,
   },
   {
     target: '[data-tour="calendar-panel"]',
     title: '🤚 拖曳就是排程',
-    body: '把任務拖到時間軸 = 排時間。從時間軸拖回上方待排程 = 取消時間（日期保留）。在時間軸空白處點兩下，就直接在那個時段建立任務。每週循環的任務拖到別的時間時，Huddle 會問你：只改這一天、改這天與之後、還是改所有循環 — 像 Google 日曆一樣自由。',
+    body: '把任務拖到時間軸，就排好時間；拖回最上面那一格，就取消時間。在時間軸空白處點兩下，可以直接新增任務。重複的任務換時間時，Huddle 會問你只改這一天，還是之後也一起改。',
     placement: 'left',
     padding: 0,
   },
   {
     target: '[data-tour="view-modes"]',
-    title: '切換 日 / 週 / 月',
-    body: '看細節用日、週計畫用週、看大局用月。試試看。',
+    title: '切換日、週、月',
+    body: '看細節用「日」，排一週用「週」，看整個月用「月」。',
     placement: 'bottom',
     padding: 6,
     interactive: true,
-    hint: '👉 點看看其他視圖',
-  },
-  {
-    target: '[data-tour="calendar-export"]',
-    title: '匯出行程圖檔',
-    body: '挑日期範圍，產出乾淨的 PNG，適合分享到 LINE / IG / Slack。隱私模式可以只顯示時段顏色不洩漏內容。',
-    placement: 'bottom',
-    padding: 6,
-  },
-  {
-    target: '[data-tour="notification-center"]',
-    title: '通知中心',
-    body: '上方鈴鐺集中放 Huddle 要跟你說的事：已逾期、快到期、放太久沒動的任務，偶爾也有小提醒。有事情時會出現數字小標，看完可以逐則關掉。',
-    placement: 'bottom',
-    padding: 4,
-  },
-  {
-    target: '[data-tour="notebook-entry"]',
-    title: '記事本',
-    body: 'Notion 式的長文筆記空間——打字時輸入「/」就能叫出區塊選單（標題／待辦／清單／收合／引言…），選取文字則會跳出格式工具列。跟每天的白板分開存，工具列上有常駐入口，想寫長一點的東西點這裡。',
-    placement: 'bottom',
-    padding: 6,
+    hint: '👉 點點看，切換不同檢視',
   },
   {
     target: '[data-tour="scratchpad"]',
-    title: '專注白板',
-    body: '工作中冒出靈感？拉開白板丟文字、貼圖、連結，事後還能隨手編輯。每天分開存。右上角的「⇱」可以把白板**彈到永遠置頂的懸浮小視窗**——切去別的軟體也蓋不住它（Chrome / Edge）。',
+    title: '白板',
+    body: '工作到一半冒出想法？拉開白板，隨手記下文字、待辦、圖片或連結。每天一張新的，之前的也翻得回去。',
     placement: 'bottom',
     padding: 6,
     interactive: true,
     hint: '👉 點開試試',
   },
   {
+    target: '[data-tour="notebook-entry"]',
+    title: '記事本',
+    body: '想寫長一點的筆記，點這裡。打字時輸入「/」，可以插入標題、待辦清單、圖片等區塊；選取文字，會跳出粗體、連結等格式按鈕。',
+    placement: 'bottom',
+    padding: 6,
+  },
+  {
+    target: '[data-tour="sticky-notes-toggle"]',
+    title: '便條紙',
+    body: '按一下，畫面上會多一層便條紙，換頁也不會消失。便條紙可以拖動、換顏色；暫時用不到的，收進旁邊的「收納」。',
+    placement: 'bottom',
+    padding: 6,
+  },
+  {
+    target: '[data-tour="calendar-export"]',
+    title: '更多工具',
+    body: '這個小箭頭裡收著日記、報告、每日簽到、匯出等功能。「匯出」可以把行程存成圖片分享；開啟隱私模式，就只顯示時段、不顯示任務名稱。',
+    placement: 'bottom',
+    padding: 6,
+  },
+  {
+    target: '[data-tour="calendar-export"]',
+    title: '📅 每日簽到',
+    body: '同一個選單裡的「每日簽到」：每天簽到一次，累積分數。頁面下方有匿名排行榜，只顯示小企鵝編號，不顯示帳號。',
+    placement: 'bottom',
+    padding: 6,
+  },
+  {
+    target: '[data-tour="notification-center"]',
+    title: '通知中心',
+    body: '鈴鐺會提醒你快到期、已過期，或放了很久沒動的任務。有新提醒時，鈴鐺上會出現數字。',
+    placement: 'bottom',
+    padding: 4,
+  },
+  {
+    target: '[data-tour="user-menu"]',
+    title: '右上角：帳號選單',
+    body: '點頭像打開選單：帳號資料、會員與推薦、深色模式和登出都在這裡。另外，按 ⌘K 或 Ctrl+K 可以快速搜尋任務，按「?」可以看所有快捷鍵。',
+    placement: 'bottom',
+    padding: 4,
+  },
+  {
+    target: '[data-tour="user-menu"]',
+    title: '🗒️ 會議轉任務',
+    body: '同一個選單裡的「會議轉任務」：貼上會議逐字稿或筆記，Huddle 會幫你整理出待辦，並標出負責人和期限。',
+    placement: 'bottom',
+    padding: 4,
+  },
+  {
+    title: '🤝 指派任務 ＆ 組織',
+    body: ASSIGN_BODY,
+  },
+  {
     target: '[data-tour="focus-timer"]',
-    title: '專注計時器 ＋ 背景音',
-    body: '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Huddle 會輕輕提醒你。日曆頁右上工具列的「⧉」隨時能打開**永遠置頂的懸浮小視窗**——計時器、記事本、白板三分頁，切去任何軟體都蓋不住（Chrome / Edge）。',
+    title: '專注計時',
+    body: TIMER_BODY,
     placement: 'left',
     padding: 6,
     interactive: true,
     hint: '👉 點開計時器',
   },
   {
+    // Chrome / Edge only — the launcher is not rendered elsewhere, so the
+    // step is dropped rather than pointing at a button that isn't there.
+    target: '[data-hub-launcher]',
+    requires: 'floating-hub',
+    title: '懸浮小視窗',
+    body: '按這個按鈕，會跳出一個永遠在最上層的小視窗，切到別的軟體也看得到。裡面有計時器、記事本和白板三個分頁。',
+    placement: 'bottom',
+    padding: 6,
+  },
+  {
     title: '💧 喝水小提醒',
-    body: '預設每 60 分鐘，Huddle 會跳出來提醒你喝口水。可以選「再過一下」snooze 五分鐘，或在設定裡改成 30/90/120 分鐘，不想要也可以關掉。',
+    body: WATER_BODY,
   },
   {
     target: '[data-tour="quick-links-bar"]',
-    title: '常用連結（最底下）',
-    body: '螢幕底下那條薄薄的「常用連結」可以拉開，放上你常開的網址（Notion、GitHub、Gmail 之類）。點一下開新分頁，編輯按右上角小鉛筆。',
+    title: '常用連結',
+    body: '把常開的網址放在這裡，例如 Notion、GitHub、Gmail。點一下，就在新分頁打開。',
     placement: 'top',
-    padding: 4,
-  },
-  {
-    target: '[data-tour="user-menu"]',
-    title: '右上角：使用者選單',
-    body: '點開有你的帳號資訊、深淺色切換與登出。「📌 便條紙」開關現在也在上方工具列（記事本旁邊）就能直接點——開了會出現一片玻璃便條層，貼在畫面上、換頁也不會不見，可以拖曳、選顏色或刪除；按收起鍵會收進旁邊的「收納」抽屜（可分資料夾），之後再貼回來。桌面上按 ⌘K 隨時召喚指令面板（搜任務、切視圖、開記事本）；按 ? 看完整快捷鍵。',
-    placement: 'bottom',
     padding: 4,
   },
   {
     target: '[data-tour="pet"]',
     title: '🐧 你的企鵝',
-    body: '角落那隻小企鵝是你專屬的。點牠會講笑話，連點有不同反應；長按（手機）或按右鍵（電腦）可以叫牠安靜一下或打開設定。牠偶爾會提醒你會議、逾期任務和簽到，但多半只是在說些荒謬的話。',
+    body: PET_BODY,
+    bodyWithoutTarget: PET_BODY_BEFORE_ADOPTION,
     placement: 'right',
     padding: 6,
-  },
-  {
-    title: '📅 每日簽到 ＆ 排行榜',
-    body: '日曆頁工具列有「每日簽到」，記錄今天的心情與一句話，累積連續天數。想跟朋友比一比？到右上角使用者選單「會員與推薦」設定公開化名，就能上推薦排行榜。',
-  },
-  {
-    title: '🗒️ 會議逐字稿 → 任務',
-    body: '使用者選單「會議轉任務」：貼上會議逐字稿，Huddle 會幫你整理成待辦任務，自動抓出負責人與期限。指派給共享夥伴的任務，對方會在「待接受指派」收到通知。',
-  },
-  {
-    title: '🤝 指派任務 ＆ 組織',
-    body: '任務詳情右上角的小人像按鈕可以把任務指派給共享夥伴或同組織成員：同一張任務會出現在對方的清單與日曆，對方完成時你立刻看得到，對方也能附一句理由退回。進度在使用者選單「指派任務」；Pro 會員可在「組織」用邀請連結建立團隊。',
   },
   {
     title: '✨ 你準備好了！',
@@ -174,87 +235,105 @@ const DESKTOP_STEPS: TourStep[] = [
 // Mobile gets a shorter, layout-appropriate tour. Targets that don't exist
 // on mobile (segmented view-mode picker, scratchpad pull tab) are replaced
 // or dropped; copy is rewritten for the bottom-tab + single-panel layout.
+// The phone opens on the 日曆 tab, so every spotlight step names the tab its
+// target lives on (`mobileTab`) and the tour switches there first.
 const MOBILE_STEPS: TourStep[] = [
   {
     title: '歡迎來到 Huddle',
-    body: '整合任務、時間排程、專注計時、日記反思的工作面板。',
+    body: WELCOME_BODY,
   },
   {
     target: '[data-tour="left-panel"]',
-    title: '任務分頁',
-    body: '工作區 → 分類 → 任務的三層結構。所有任務都在這。最上面灰色的「未分類」是預設收件匣，沒指定分類的新任務都會先掉進這裡。工作區標題右邊的「＋」可以新增分類。',
-    placement: 'top',
+    mobileTab: 'tasks',
+    title: '「任務」分頁',
+    body: TASK_LIST_BODY,
+    placement: 'bottom',
     padding: 0,
   },
   {
     target: '[data-tour="task-row"]',
-    title: '點任務 = 編輯，長按 = 拖到日曆',
-    body: '輕點任務開啟詳細頁；長按 0.3 秒後拖移可以直接排到日曆上的時間。打開後可以把任務標為「會議」，會多參與者 / 地點 / 視訊連結。',
+    mobileTab: 'tasks',
+    title: '點一下編輯，長按拖到日曆',
+    body: '點左邊的圓圈完成任務，點任務名稱打開編輯。長按任務再拖動，可以直接排進日曆。',
     placement: 'bottom',
     padding: 4,
   },
   {
     target: '[data-tour="task-shortcut-row"]',
-    title: '今日會議 ＆ 待整理 ＆ 已完成',
-    body: '今日會議 chip 點開可以一鍵加入視訊；「待整理」收過期任務，進去後可以滑卡片整理——右滑完成、左滑移回任務欄、上滑排今天、下滑封存。已完成抽屜含 KPI（連續天數、平均耗時）。',
+    mobileTab: 'tasks',
+    title: SHORTCUTS_TITLE,
+    body: SHORTCUTS_BODY,
     placement: 'bottom',
     padding: 4,
   },
   {
     title: '🤚 左右滑動',
-    body: '在「任務」分頁向左滑 → 切到日曆。日曆內向左右滑 → 切換昨天 / 明天。',
+    body: '在「任務」分頁往左滑，會切到日曆。在日曆裡左右滑，可以往前、往後翻日期。',
   },
   {
     target: '[data-tour="calendar-panel"]',
-    title: '日曆：上方待排程 / 下方時間軸',
-    body: '上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let\'s Play｜夏令營）讓你一眼分辨，不想要可在設定關掉。每週循環的任務拖到別的時間時，Huddle 會問「只改這一天 / 之後也改 / 全部改」，像 Google 日曆一樣自由。想跟夥伴互看行事曆？「設定 → 共享」邀請對方就能疊加顯示。',
-    placement: 'top',
+    mobileTab: 'calendar',
+    title: CALENDAR_TITLE,
+    body: `${CALENDAR_BODY}想和夥伴互看行事曆，到右上角「⋯」裡的「共享」。`,
+    placement: 'bottom',
     padding: 0,
   },
   {
     target: '[data-tour="mobile-more"]',
-    title: '通知、帳號都在「⋯」',
-    body: '右上角「⋯」收著通知中心、帳號、共享對象與記事本等工具。有新通知時「⋯」會出現數字小標，點開選「通知」查看。',
+    mobileTab: 'calendar',
+    title: '更多工具都在「⋯」',
+    body: '通知、帳號、記事本、便條紙和設定，都收在右上角的「⋯」。有新通知時，「⋯」上會出現數字。',
     placement: 'bottom',
     padding: 4,
   },
   {
     target: '[data-tour="mobile-add-task"]',
-    title: '＋ 新增任務',
-    body: '日曆右下角的「＋」隨時新增任務；在時間軸空白處點兩下，也能直接在那個時段建立任務。',
+    mobileTab: 'calendar',
+    title: '新增任務',
+    body: '按這顆「＋」新增任務。也可以在時間軸的空白處點兩下，直接在那個時段建立。',
     placement: 'top',
     padding: 6,
   },
   {
-    title: '✨ 底部四分頁',
-    body: '任務 / 白板 / 日曆 / 連結。中間「白板」隨時記點子；最右邊「連結」放你常開的網址（Notion、Gmail 等等），點一下開新分頁。想寫長一點的筆記？日曆頁右上角「⋯」選單裡有「**記事本**」（Notion 式排版）。',
+    target: '[data-tour="mobile-tabs"]',
+    title: '底部五個分頁',
+    body: '「重點」看各分類的進度，「任務」是完整清單，「白板」隨手記想法，「日曆」排時間，「連結」放常開的網址。',
+    placement: 'top',
+    padding: 0,
   },
   {
     target: '[data-tour="focus-timer"]',
-    title: '專注計時器 ＋ 背景音',
-    body: '右下角浮動小球是番茄鐘。點開可放大成沉浸模式、配 Lo-fi / 雨聲 / 咖啡店白噪音，結束時 Huddle 輕輕提醒。',
+    mobileTab: 'calendar',
+    title: '專注計時',
+    body: TIMER_BODY,
     placement: 'top',
     padding: 6,
     hint: '👉 點開試試',
   },
   {
     title: '💧 喝水小提醒',
-    body: '預設每 60 分鐘，Huddle 會跳出來提醒你喝口水。可以「再過一下」snooze 五分鐘，或在設定裡改間隔 / 關掉。',
+    body: WATER_BODY,
   },
   {
     target: '[data-tour="pet"]',
+    mobileTab: 'calendar',
     title: '🐧 你的企鵝',
-    body: '底部分頁列上方那隻小企鵝是你專屬的。點牠會講笑話，連點有不同反應；長按可以叫牠安靜一下或打開設定。牠偶爾會提醒你會議、逾期任務和簽到，但多半只是在說些荒謬的話。',
+    body: PET_BODY,
+    bodyWithoutTarget: PET_BODY_BEFORE_ADOPTION,
     placement: 'top',
     padding: 6,
   },
   {
+    target: '[data-tour="mobile-more"]',
+    mobileTab: 'calendar',
     title: '📅 每日簽到 ＆ 會議轉任務',
-    body: '日曆頁「⋯」選單裡有「每日簽到」，記錄心情累積連續天數；使用者選單裡有「會議轉任務」，貼上逐字稿自動整理成待辦任務。「📌 便條紙」開關也在日曆工具列（記事本旁邊）或「⋯」選單裡就能直接點開，開了會出現一片玻璃便條層貼在畫面上，換頁也不會不見；用不到的可以收進「收納」抽屜分資料夾放。',
+    body: '「⋯」裡的「每日簽到」：每天簽到一次，累積分數。「⋯」→「帳號」→「會議轉任務」：貼上會議逐字稿，Huddle 會幫你整理出待辦。',
+    placement: 'bottom',
+    padding: 4,
   },
   {
     title: '🤝 指派任務 ＆ 組織',
-    body: '任務詳情右上角的小人像按鈕可以把任務指派給共享夥伴或同組織成員：同一張任務會出現在對方的清單與日曆，對方完成時你立刻看得到，對方也能附一句理由退回。進度在使用者選單「指派任務」；Pro 會員可在「組織」用邀請連結建立團隊。',
+    body: ASSIGN_BODY,
   },
   {
     title: '✨ 你準備好了！',
@@ -273,11 +352,43 @@ const TOOLTIP_WIDTH = 380
 const TOOLTIP_FALLBACK_HEIGHT = 240
 const EDGE_MARGIN = 8
 /**
- * Extra bottom margin: the 「略過導覽」 pill is absolutely positioned 32px
- * below the card (`-bottom-8`), so the clamp has to reserve room for it or it
- * lands off-screen on bottom-anchored steps.
+ * Extra bottom margin: the 「略過導覽」 pill hangs directly below the card in a
+ * 44px-tall tap target (`top-full h-11`), so the clamp has to reserve room
+ * for it or it lands off-screen on bottom-anchored steps.
  */
-const SKIP_LINK_MARGIN = 32
+const SKIP_LINK_MARGIN = 44
+
+/** iOS notch / home-indicator insets (0 everywhere else). */
+interface SafeArea { top: number; bottom: number }
+const NO_SAFE_AREA: SafeArea = { top: 0, bottom: 0 }
+
+/**
+ * Several elements can carry the same `data-tour` name (a toolbar button and
+ * its twin inside a closed menu), so take the first one that is actually
+ * laid out rather than the first in DOM order.
+ */
+function findTourTarget(selector: string): HTMLElement | null {
+  for (const el of document.querySelectorAll<HTMLElement>(selector)) {
+    const r = el.getBoundingClientRect()
+    if (r.width > 0 && r.height > 0) return el
+  }
+  return null
+}
+
+/**
+ * True while the target (or a container it sits in) is still playing a
+ * one-shot entrance animation — measuring then would freeze the spotlight
+ * on a mid-slide position.
+ */
+function isMidEntrance(el: HTMLElement): boolean {
+  if (typeof document.getAnimations !== 'function') return false
+  return document.getAnimations().some((a) => {
+    if (a.playState !== 'running') return false
+    const effect = a.effect as KeyframeEffect | null
+    const node = effect?.target
+    return !!node && node.contains(el) && effect.getComputedTiming().iterations !== Infinity
+  })
+}
 
 /**
  * Positions the tooltip next to the spotlight and then **hard-clamps it into
@@ -292,20 +403,25 @@ function computeTooltipPosition(
   rect: Rect | null,
   placement: TourStep['placement'],
   size?: { width: number; height: number } | null,
+  safe: SafeArea = NO_SAFE_AREA,
 ): { top: number; left: number; placement: TourStep['placement'] | 'center' } {
   const vw = window.innerWidth
   const vh = window.innerHeight
   const tooltipW = size && size.width > 0 ? size.width : Math.min(TOOLTIP_WIDTH, vw - 24)
   const tooltipH = size && size.height > 0 ? size.height : TOOLTIP_FALLBACK_HEIGHT
+  const minTop = EDGE_MARGIN + safe.top
+  const maxBottom = vh - EDGE_MARGIN - SKIP_LINK_MARGIN - safe.bottom
 
   // Final safety net for every code path below: never let any edge of the
-  // tooltip leave the viewport.
+  // tooltip leave the viewport (or slide under the notch / home indicator).
+  // On a phone the card is nearly as wide as the screen: keep it centred so
+  // it doesn't shuffle a few pixels left and right from step to step.
+  const narrow = vw - tooltipW < 48
   const clamp = (p: { top: number; left: number }) => ({
-    left: Math.max(EDGE_MARGIN, Math.min(Math.max(EDGE_MARGIN, vw - tooltipW - EDGE_MARGIN), p.left)),
-    top: Math.max(
-      EDGE_MARGIN,
-      Math.min(Math.max(EDGE_MARGIN, vh - tooltipH - EDGE_MARGIN - SKIP_LINK_MARGIN), p.top),
-    ),
+    left: narrow
+      ? (vw - tooltipW) / 2
+      : Math.max(EDGE_MARGIN, Math.min(Math.max(EDGE_MARGIN, vw - tooltipW - EDGE_MARGIN), p.left)),
+    top: Math.max(minTop, Math.min(Math.max(minTop, maxBottom - tooltipH), p.top)),
   })
 
   if (!rect) {
@@ -326,30 +442,38 @@ function computeTooltipPosition(
       case 'bottom':
         return { top: rect.top + rect.height + gap, left: rect.left + rect.width / 2 - tooltipW / 2 }
       case 'top':
-        return { top: rect.top - tooltipH - gap, left: rect.left + rect.width / 2 - tooltipW / 2 }
+        // The 略過導覽 pill hangs under the card, i.e. between it and the target.
+        return { top: rect.top - tooltipH - SKIP_LINK_MARGIN - 4, left: rect.left + rect.width / 2 - tooltipW / 2 }
     }
   }
 
   const pref = placement ?? 'bottom'
-  let pos = tryPlacement(pref)
-  let chosen: TourStep['placement'] = pref
-
-  const fits = (p: { top: number; left: number }) =>
-    p.left >= EDGE_MARGIN
-    && p.left + tooltipW <= vw - EDGE_MARGIN
-    && p.top >= EDGE_MARGIN
-    && p.top + tooltipH <= vh - EDGE_MARGIN - SKIP_LINK_MARGIN
-
-  if (!fits(pos)) {
-    const fallbacks: NonNullable<TourStep['placement']>[] = ['bottom', 'top', 'right', 'left']
-    for (const fb of fallbacks) {
-      if (fb === pref) continue
-      const candidate = tryPlacement(fb)
-      if (fits(candidate)) { pos = candidate; chosen = fb; break }
+  // A side placement only has to clear the target along its own axis; the
+  // other axis is clamped into view afterwards.
+  const clears = (p: NonNullable<TourStep['placement']>, pos: { top: number; left: number }) => {
+    switch (p) {
+      case 'right': return pos.left + tooltipW <= vw - EDGE_MARGIN
+      case 'left': return pos.left >= EDGE_MARGIN
+      case 'bottom': return pos.top + tooltipH <= maxBottom
+      case 'top': return pos.top >= minTop
     }
   }
 
-  return { ...clamp(pos), placement: chosen }
+  for (const p of [pref, 'bottom', 'top', 'right', 'left'] as const) {
+    const pos = tryPlacement(p)
+    if (clears(p, pos)) return { ...clamp(pos), placement: p }
+  }
+
+  // Nothing clears the target — it fills the screen (a whole panel on a
+  // phone). Park the card along the target's bottom edge: the top of a panel
+  // is where its header and first rows are, so that is the part worth keeping
+  // in view. Anchoring to the target rather than the viewport keeps the card
+  // and its 略過導覽 pill off the tab bar underneath.
+  const parkBottom = Math.min(maxBottom, rect.top + rect.height - EDGE_MARGIN - SKIP_LINK_MARGIN)
+  return {
+    ...clamp({ top: parkBottom - tooltipH, left: vw / 2 - tooltipW / 2 }),
+    placement: pref,
+  }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -429,6 +553,9 @@ interface OnboardingTourProps {
   onChoose: (choice: 'template' | 'blank') => Promise<void> | void
 }
 
+const subscribeNever = () => () => {}
+const hubUnavailableOnServer = () => false
+
 export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourProps) {
   const { t } = useI18n()
   const [stepIndex, setStepIndex] = useState(0)
@@ -442,12 +569,18 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
   const [confetti, setConfetti] = useState<{ key: number; x: number; y: number } | null>(null)
   const [choosing, setChoosing] = useState<'template' | 'blank' | null>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
+  const safeAreaRef = useRef<HTMLDivElement>(null)
 
   const isMobile = useIsMobile()
-  const STEPS = isMobile ? MOBILE_STEPS : DESKTOP_STEPS
-  const step = STEPS[stepIndex]
+  // The 懸浮小視窗 launcher only exists in Chrome / Edge on a computer.
+  const hubReady = useSyncExternalStore(subscribeNever, hubAvailable, hubUnavailableOnServer)
+  const STEPS = useMemo(
+    () => (isMobile ? MOBILE_STEPS : DESKTOP_STEPS).filter((s) => s.requires !== 'floating-hub' || hubReady),
+    [isMobile, hubReady],
+  )
+  const step = STEPS[Math.min(stepIndex, STEPS.length - 1)]
   const isFirst = stepIndex === 0
-  const isLast = stepIndex === STEPS.length - 1
+  const isLast = stepIndex >= STEPS.length - 1
 
   // Re-compute spotlight rect on step change / resize / scroll. useLayoutEffect
   // so the tooltip is positioned before paint to avoid flicker.
@@ -464,20 +597,49 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
       return r.height > 0 ? { width: r.width, height: r.height } : null
     }
 
-    function update() {
+    // env(safe-area-inset-*) can't be read from JS directly; the probe turns
+    // the insets into paddings we can measure.
+    function safeArea(): SafeArea {
+      const probe = safeAreaRef.current
+      if (!probe) return NO_SAFE_AREA
+      const cs = getComputedStyle(probe)
+      return { top: parseFloat(cs.paddingTop) || 0, bottom: parseFloat(cs.paddingBottom) || 0 }
+    }
+
+    // Phones: bring up the tab the target lives on before looking for it.
+    let switchingTab = false
+    if (isMobile && step.mobileTab) {
+      const current = document.querySelector('[data-tour="mobile-tabs"] [aria-selected="true"]')?.getAttribute('data-tab')
+      if (current !== step.mobileTab) {
+        switchingTab = true
+        window.dispatchEvent(new CustomEvent(TOUR_MOBILE_TAB_EVENT, { detail: step.mobileTab }))
+      }
+    }
+
+    /**
+     * `settling` passes run right after a step change, while the screen may
+     * still be moving (tab switch, entrance animation): they leave the
+     * previous spotlight alone rather than jump to a half-finished position.
+     * The last scheduled pass — and every resize / scroll — is final.
+     */
+    function update(settling: boolean, mayScroll: boolean) {
       const size = tooltipSize()
-      if (!step.target) {
-        setRect(null)
-        setTooltipPos(computeTooltipPosition(null, step.placement, size))
-        return
-      }
-      const el = document.querySelector<HTMLElement>(step.target)
+      const safe = safeArea()
+      const el = step.target ? findTourTarget(step.target) : null
       if (!el) {
+        if (settling && step.target && switchingTab) return
         setRect(null)
-        setTooltipPos(computeTooltipPosition(null, step.placement, size))
+        setTooltipPos(computeTooltipPosition(null, step.placement, size, safe))
         return
       }
-      const r = el.getBoundingClientRect()
+      if (settling && isMidEntrance(el)) return
+      let r = el.getBoundingClientRect()
+      // A target scrolled out of view is brought back before it is lit.
+      // (4px of slack: fixed bars sit a sub-pixel past the edge and must not scroll anything.)
+      if (mayScroll && r.height < window.innerHeight && (r.top < -4 || r.bottom > window.innerHeight + 4)) {
+        el.scrollIntoView({ block: 'center', inline: 'nearest' })
+        r = el.getBoundingClientRect()
+      }
       const pad = step.padding ?? 8
       const next: Rect = {
         top: r.top - pad,
@@ -485,20 +647,29 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
         width: r.width + pad * 2,
         height: r.height + pad * 2,
       }
-      setRect(next)
-      setTooltipPos(computeTooltipPosition(next, step.placement, size))
+      setRect((prev) => (
+        prev && prev.top === next.top && prev.left === next.left && prev.width === next.width && prev.height === next.height
+          ? prev
+          : next
+      ))
+      setTooltipPos(computeTooltipPosition(next, step.placement, size, safe))
     }
 
-    update()
-    window.addEventListener('resize', update)
-    window.addEventListener('scroll', update, true)
-    const t = setTimeout(update, 100)
+    const onViewportChange = () => update(false, false)
+    update(true, true)
+    window.addEventListener('resize', onViewportChange)
+    window.addEventListener('scroll', onViewportChange, true)
+    const timers = [
+      setTimeout(() => update(true, true), 100),
+      setTimeout(() => update(true, true), 260),
+      setTimeout(() => update(false, true), 520),
+    ]
     return () => {
-      window.removeEventListener('resize', update)
-      window.removeEventListener('scroll', update, true)
-      clearTimeout(t)
+      window.removeEventListener('resize', onViewportChange)
+      window.removeEventListener('scroll', onViewportChange, true)
+      timers.forEach(clearTimeout)
     }
-  }, [open, step])
+  }, [open, step, isMobile])
 
   // Animate in / reset on close
   useEffect(() => {
@@ -524,7 +695,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
     if (stepIndex < STEPS.length - 1) {
       setTimeout(() => setStepIndex((i) => i + 1), 120)
     }
-  }, [stepIndex, fireConfetti])
+  }, [stepIndex, fireConfetti, STEPS.length])
 
   // Listen for clicks on the highlighted (interactive) target so the user
   // gets credit for trying the actual feature. The "Next" button still works
@@ -532,7 +703,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
   useEffect(() => {
     if (!open || !step.interactive || !step.target) return
 
-    const el = document.querySelector<HTMLElement>(step.target)
+    const el = findTourTarget(step.target)
     if (!el) return
 
     function onClick(e: MouseEvent) {
@@ -581,6 +752,11 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
   if (!open) return null
 
   const isCenter = !step.target || tooltipPos.placement === 'center'
+  // The target was looked for and is not on screen → the card is centred and
+  // the step may carry copy written for exactly that situation.
+  const targetMissing = !!step.target && !rect && tooltipPos.placement === 'center'
+  const body = targetMissing && step.bodyWithoutTarget ? step.bodyWithoutTarget : step.body
+  const progress = (stepIndex + 1) / STEPS.length
 
   return (
     <div
@@ -590,8 +766,20 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
       // 計時膠囊的「彈窗開啟就閃避到左下」邏輯認 aria-modal；導覽文案指著
       // 膠囊平常待的右下角，所以用這個標記讓它豁免（focus-timer-mini.tsx）。
       data-onboarding-tour
+      // Hooks for scripts/e2e/tour-polish-verify.mjs.
+      data-tour-step={stepIndex + 1}
+      data-tour-total={STEPS.length}
+      data-tour-target={step.target}
       aria-label={t('新手導覽')}
     >
+      {/* Measures the iOS safe-area insets for the viewport clamp. */}
+      <div
+        ref={safeAreaRef}
+        aria-hidden="true"
+        className="pointer-events-none invisible absolute"
+        style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      />
+
       {/* Dim layer.
        *
        * When there's a spotlight (rect), we render a *non-interactive* shape
@@ -602,6 +790,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
        */}
       {rect ? (
         <div
+          data-tour-spotlight
           className={cn(
             'absolute pointer-events-none transition-all duration-300 ease-out',
             mounted ? 'opacity-100' : 'opacity-0'
@@ -633,6 +822,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
       {/* Tooltip */}
       <div
         ref={tooltipRef}
+        data-tour-card
         className={cn(
           'absolute pointer-events-auto bg-card text-card-foreground rounded-2xl shadow-2xl border border-border',
           'p-5 transition-all duration-300',
@@ -646,9 +836,10 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* 44px tap target on phones; a quieter 32px on a pointer device. */}
         <button
           onClick={onComplete}
-          className="absolute top-3 right-3 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+          className="absolute top-1 right-1 grid h-11 w-11 place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors md:top-2.5 md:right-2.5 md:h-8 md:w-8"
           aria-label={t('關閉導覽')}
         >
           <X className="w-4 h-4" />
@@ -666,12 +857,9 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
           </div>
         )}
 
-        <div className="flex items-center gap-2 mb-2 pr-6">
-          {isCenter && !isLast && <Sparkles className="w-4 h-4 text-primary" />}
-          <h3 className="text-base font-semibold tracking-tight">{t(step.title)}</h3>
-        </div>
+        <h3 className="mb-2 pr-9 text-base font-semibold tracking-tight text-balance">{t(step.title)}</h3>
 
-        <p className="text-sm text-muted-foreground leading-relaxed">{t(step.body)}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed">{t(body)}</p>
 
         {step.hint && (
           <div className="mt-3 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20">
@@ -697,7 +885,7 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
               <div>
                 <div className="text-sm font-semibold">{t('套用模板')}</div>
                 <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
-                  {t('工作 / 個人 / 學習 三個工作區，分類已排好，任務你來填')}
+                  {t('工作、個人、學習三個工作區，分類已排好，任務你來填')}
                 </div>
               </div>
             </button>
@@ -723,49 +911,69 @@ export function OnboardingTour({ open, onComplete, onChoose }: OnboardingTourPro
           </div>
         )}
 
-        {/* Nav row (hidden on final step) */}
+        {/* Nav row (hidden on final step).
+         *
+         * Progress is a counter plus a thin track, not one dot per step: 20+
+         * dots used to squeeze 上一步／下一步 until their labels wrapped one
+         * character per line and 下一步 poked out of the card. The track is
+         * the only flexible item in the row — it can shrink to nothing; the
+         * counter and the buttons never shrink or wrap.
+         */}
         {!isLast && (
-          <div className="flex items-center justify-between mt-5">
-            <div className="flex items-center gap-1.5">
-              {STEPS.map((_, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'rounded-full transition-all',
-                    i === stepIndex ? 'w-6 h-1.5 bg-primary' : 'w-1.5 h-1.5 bg-border'
-                  )}
+          <div className="mt-5 flex items-center gap-3">
+            <div
+              data-tour-progress
+              role="progressbar"
+              aria-label={t('導覽進度')}
+              aria-valuemin={1}
+              aria-valuemax={STEPS.length}
+              aria-valuenow={stepIndex + 1}
+              className="flex min-w-0 flex-1 items-center gap-2.5"
+            >
+              <span className="shrink-0 whitespace-nowrap font-mono text-xs tabular-nums text-muted-foreground">
+                <span className="font-semibold text-foreground">{stepIndex + 1}</span>
+                {' / '}
+                {STEPS.length}
+              </span>
+              <span aria-hidden="true" className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-border">
+                <span
+                  className="block h-full w-full rounded-full bg-primary transition-transform duration-300 ease-out motion-reduce:transition-none"
+                  style={{ transform: `translateX(${(progress - 1) * 100}%)` }}
                 />
-              ))}
+              </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
               {!isFirst && (
                 <button
                   onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg text-muted-foreground hover:bg-muted/60 transition-colors"
+                  className="inline-flex h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-3 text-sm font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground transition-colors md:h-9 md:text-xs"
                 >
-                  <ArrowLeft className="w-3 h-3" />
+                  <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
                   {t('上一步')}
                 </button>
               )}
               <button
                 onClick={() => advance()}
-                className="flex items-center gap-1 px-4 py-1.5 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="inline-flex h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors md:h-9 md:text-xs"
               >
                 {t('下一步')}
-                <ArrowRight className="w-3 h-3" />
+                <ArrowRight className="w-3.5 h-3.5 shrink-0" />
               </button>
             </div>
           </div>
         )}
 
-        {/* Skip link */}
+        {/* Skip link — a small pill inside a 44px-tall tap target that hangs
+            just below the card (SKIP_LINK_MARGIN reserves the room). */}
         {!isLast && (
           <button
             onClick={onComplete}
-            className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[11px] px-3 py-1 rounded-full bg-foreground/80 text-background hover:bg-foreground transition-colors backdrop-blur-sm"
+            className="group absolute left-1/2 top-full mt-px flex h-11 -translate-x-1/2 items-center whitespace-nowrap"
           >
-            {t('略過導覽')}
+            <span className="rounded-full bg-foreground/80 px-3 py-1 text-xs text-background backdrop-blur-sm transition-colors group-hover:bg-foreground md:text-[11px]">
+              {t('略過導覽')}
+            </span>
           </button>
         )}
       </div>

@@ -96,109 +96,117 @@ export const dict: Record<string, string> = {
   '還有 {n} 個任務...': '{n} more tasks...',
   '全部歸檔': 'Archive all',
 
-  // onboarding-tour.tsx
+  // onboarding-tour.tsx — chrome
   '新手導覽': 'Onboarding tour',
   '關閉導覽': 'Close tour',
   '上一步': 'Back',
   '下一步': 'Next',
   '略過導覽': 'Skip tour',
+  '導覽進度': 'Tour progress',
   '套用模板': 'Use a template',
-  '工作 / 個人 / 學習 三個工作區，分類已排好，任務你來填':
-    'Three workspaces — Work / Personal / Learning — with categories ready to go; you fill in the tasks',
+  '工作、個人、學習三個工作區，分類已排好，任務你來填':
+    'Three workspaces (Work, Personal, Learning) with categories ready to go; you fill in the tasks',
   '空白開始': 'Start blank',
   '一個空工作區，從零開始打造你自己的結構': 'One empty workspace — build your own structure from scratch',
 
-  // onboarding-tour.tsx — tour step titles
-  '歡迎來到 Huddle': 'Welcome to Huddle',
-  '左側：三層結構': 'Left side: three layers',
-  '勾選 / 點開任務': 'Check off / open a task',
-  '今日會議 ＆ 待整理 ＆ 已完成': "Today's meetings, review & completed",
-  '🔄 左邊 = 右邊': '🔄 Left = right',
-  '日曆：上方待排程 / 下方時間軸': 'Calendar: unscheduled above / timeline below',
-  '🤚 拖曳就是排程': '🤚 Drag to schedule',
-  '切換 日 / 週 / 月': 'Switch Day / Week / Month',
+  // Used outside the tour (kept here from the original tour block).
   '匯出行程圖檔': "Export schedule image",
   '專注白板': "Focus board",
-  '專注計時器 ＋ 背景音': 'Focus timer + background sound',
+
+  // onboarding-tour.tsx — step titles. Titles that are plain feature names
+  // (白板 / 記事本 / 便條紙 / 更多工具 / 通知中心 / 專注計時 / 懸浮小視窗 /
+  // 常用連結 / 新增任務) reuse the feature's own dictionary entry, so the
+  // title always reads the same as the label on screen.
+  '歡迎來到 Huddle': 'Welcome to Huddle',
+  '左邊：任務清單': 'Left side: your task list',
+  '「任務」分頁': 'The Tasks tab',
+  '完成任務、打開任務': 'Check off or open a task',
+  '點一下編輯，長按拖到日曆': 'Tap to edit, long-press to drag to the calendar',
+  '會議、整理、完成': 'Meeting, Review, Done',
+  '🔄 左邊 = 右邊': '🔄 Left = right',
+  '日曆：上面待排程，下面時間軸': 'Calendar: unscheduled on top, timeline below',
+  '🤚 拖曳就是排程': '🤚 Drag to schedule',
+  '🤚 左右滑動': '🤚 Swipe left and right',
+  '切換日、週、月': 'Switch between Day, Week and Month',
+  '📅 每日簽到': '📅 Daily check-in',
+  '📅 每日簽到 ＆ 會議轉任務': '📅 Daily check-in & Meetings to tasks',
+  '右上角：帳號選單': 'Top right: account menu',
+  '🗒️ 會議轉任務': '🗒️ Meetings to tasks',
+  '更多工具都在「⋯」': 'More tools live in "⋯"',
+  '底部五個分頁': 'Five tabs at the bottom',
   '💧 喝水小提醒': '💧 Water reminder',
-  '常用連結（最底下）': 'Quick links (at the very bottom)',
-  '右上角：使用者選單': 'Top right: user menu',
   '✨ 你準備好了！': "✨ You're all set!",
-  '📅 每日簽到 ＆ 排行榜': '📅 Daily check-in & leaderboard',
-  '🗒️ 會議逐字稿 → 任務': '🗒️ Meeting transcript → tasks',
-  '📅 每日簽到 ＆ 會議轉任務': '📅 Daily check-in & meetings-to-tasks',
-  '任務分頁': 'Tasks tab',
-  '點任務 = 編輯，長按 = 拖到日曆': 'Tap a task to edit, long-press to drag to the calendar',
-  '🤚 左右滑動': '🤚 Swipe left / right',
-  '✨ 底部四分頁': '✨ Four tabs at the bottom',
 
-  // onboarding-tour.tsx — tour step bodies & hints (desktop)
-  '整合任務、時間排程、專注計時、日記反思的工作面板。90 秒帶你走過。':
-    'One workspace for tasks, scheduling, focus time, and journaling. Takes about 90 seconds.',
-  '工作區（工作 / 個人 / 學習）→ 分類（本週 / 待辦…）→ 任務。所有任務都在這。最上面灰色的「未分類」是預設收件匣——在日曆上隨手建立、還沒想好歸屬的任務都會先掉進這裡，之後再拖到對的地方。工作區標題右邊的「＋」可以新增分類；上方篩選列還能切換「精簡 / 舒適」兩種密度，任務多的時候切精簡一次看更多。':
-    'Workspaces (Work / Personal / Learning) → categories (This week / To-do…) → tasks. Everything lives here. The grey "Uncategorized" workspace at the top is your default inbox — anything you jot down on the calendar without picking a home lands there first, so you can file it later. The "+" next to a workspace name adds a category; the filter bar above can switch between Compact and Comfortable density — switch to Compact when you have a lot of tasks to see more at once.',
-  '左邊圈圈 = 完成；點任務本身 = 打開詳細編輯。打開後可以把任務標為「會議」，會多三個欄位（參與者 / 地點 / 視訊連結）。':
-    'The circle on the left marks it done; tapping the task itself opens the detail editor. Once open, you can mark it as a Meeting to reveal three more fields (attendees / location / video link).',
-  '👉 試試點一下這個任務': '👉 Try tapping this task',
-  '左邊 chip 顯示今天還剩幾場會議，點開可一鍵加入視訊。中間「待整理」是過了原本時間的任務，點進去可以一件一件重新決定（完成／排今天／移回任務欄／封存）。右邊「已完成」進到專屬抽屜，內含 KPI 統計（連續天數、平均耗時）。':
-    "The chip on the left shows how many meetings are left today — tap it to join the video call with one tap. Review in the middle collects tasks that passed their original time; open it to decide each one again (complete / do it today / back to the task list / archive). Completed on the right opens a dedicated drawer with stats (streak days, average time to finish).",
-  '左側清單和右側日曆是**同一份資料的兩種視圖**。在任一邊改動（完成、編輯、刪除）都會即時同步，不會重複。':
-    'The list on the left and the calendar on the right are **two views of the same data**. Changes on either side (complete, edit, delete) sync instantly — nothing gets duplicated.',
-  "每一天上方那條是「待排程」（有日期沒時間）；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let's Play｜夏令營），一眼看出屬於哪個分類；不想要可在設定關掉。另外在「設定 → 共享」可以邀請夥伴互看行事曆，對方開放的行程會疊加顯示在這裡。":
-    "The strip at the top of each day is Unscheduled (has a date, no time); the timeline below is for Scheduled tasks. Tasks on the calendar automatically get tagged with their category (e.g. Let's Play | Summer Camp) so you can tell at a glance — turn it off in Settings if you don't want it. You can also invite a partner in Settings → Sharing to see each other's calendars — whatever they share overlays right here.",
-  '把任務拖到時間軸 = 排時間。從時間軸拖回上方待排程 = 取消時間（日期保留）。在時間軸空白處點兩下，就直接在那個時段建立任務。每週循環的任務拖到別的時間時，Huddle 會問你：只改這一天、改這天與之後、還是改所有循環 — 像 Google 日曆一樣自由。':
-    'Drag a task onto the timeline to schedule it. Drag it back up to Unscheduled to clear the time (the date stays). Double-click an empty spot on the timeline to create a task right in that slot. Drag a recurring task to a new time and Huddle will ask: just this day, this day and after, or all occurrences — as flexible as Google Calendar.',
-  '看細節用日、週計畫用週、看大局用月。試試看。': 'Day for the details, Week for planning, Month for the big picture. Give it a try.',
-  '👉 點看看其他視圖': '👉 Try switching views',
-  '挑日期範圍，產出乾淨的 PNG，適合分享到 LINE / IG / Slack。隱私模式可以只顯示時段顏色不洩漏內容。':
-    'Pick a date range to generate a clean PNG — great for sharing to LINE / IG / Slack. Privacy mode shows only time-block colors without revealing the content.',
-  '上方鈴鐺集中放 Huddle 要跟你說的事：已逾期、快到期、放太久沒動的任務，偶爾也有小提醒。有事情時會出現數字小標，看完可以逐則關掉。':
-    "The bell up top gathers everything Huddle wants to tell you: overdue, due-soon, and untouched-for-too-long tasks, plus the occasional gentle nudge. A number badge shows up when there's something to see, and you can dismiss each one once you've read it.",
-  'Notion 式的長文筆記空間——打字時輸入「/」就能叫出區塊選單（標題／待辦／清單／收合／引言…），選取文字則會跳出格式工具列。跟每天的白板分開存，工具列上有常駐入口，想寫長一點的東西點這裡。':
-    "A Notion-style space for long-form notes — type / to summon the block menu (heading / to-do / list / toggle / quote…), or select text to bring up the formatting toolbar. It's kept separate from the daily scratchpad, with a permanent toolbar entry whenever you want to write something longer.",
-  '工作中冒出靈感？拉開白板丟文字、貼圖、連結，事後還能隨手編輯。每天分開存。右上角的「⇱」可以把白板**彈到永遠置頂的懸浮小視窗**——切去別的軟體也蓋不住它（Chrome / Edge）。':
-    'Got an idea mid-work? Pull open the scratchpad and drop in text, images, or links — you can tidy it up later. Each day gets its own space. The ⇱ button in the top right pops the board into an **always-on-top floating window** that no other app can cover (Chrome / Edge).',
+  // onboarding-tour.tsx — hints
+  '👉 試試點一下這個任務': '👉 Try clicking this task',
+  '👉 點點看，切換不同檢視': '👉 Click to try another view',
   '👉 點開試試': '👉 Give it a try',
-  '右下角番茄鐘，設定 25 分鐘專心做一件事。展開後可以挑背景音樂（Lo-fi、雨聲、咖啡店白噪音…）配著做事，結束時 Huddle 會輕輕提醒你。日曆頁右上工具列的「⧉」隨時能打開**永遠置頂的懸浮小視窗**——計時器、記事本、白板三分頁，切去任何軟體都蓋不住（Chrome / Edge）。':
-    'A Pomodoro timer in the bottom right — set 25 minutes to focus on one thing. Expand it to pick background sound (Lo-fi, rain, coffee-shop noise…) to work alongside, and Huddle will gently nudge you when time is up. The ⧉ button in the calendar toolbar opens an **always-on-top floating window** any time — Timer, Notebook, and Scratchpad tabs — that stays visible over every other app (Chrome / Edge).',
   '👉 點開計時器': '👉 Open the timer',
-  '預設每 60 分鐘，Huddle 會跳出來提醒你喝口水。可以選「再過一下」snooze 五分鐘，或在設定裡改成 30/90/120 分鐘，不想要也可以關掉。':
-    'Every 60 minutes by default, Huddle will pop up to remind you to drink some water. Choose Snooze for 5 more minutes, change the interval to 30/90/120 minutes in Settings, or turn it off entirely.',
-  '螢幕底下那條薄薄的「常用連結」可以拉開，放上你常開的網址（Notion、GitHub、Gmail 之類）。點一下開新分頁，編輯按右上角小鉛筆。':
-    'That thin strip at the bottom of the screen pulls open into Quick Links — add the URLs you visit often (Notion, GitHub, Gmail, that sort of thing). Tap one to open it in a new tab; edit via the little pencil in the top right.',
-  '點開有你的帳號資訊、深淺色切換與登出。桌面上按 ⌘K 隨時召喚指令面板（搜任務、切視圖、開記事本）；按 ? 看完整快捷鍵。':
-    'Open it for your account info, light/dark mode toggle, and sign out. On desktop, press ⌘K anytime to summon the command palette (search tasks, switch views, open Notebook); press ? to see all keyboard shortcuts.',
-  '最後一步：你想怎麼開始？': 'Last step: how do you want to start?',
-  '日曆頁工具列有「每日簽到」，記錄今天的心情與一句話，累積連續天數。想跟朋友比一比？到右上角使用者選單「會員與推薦」設定公開化名，就能上推薦排行榜。':
-    'The calendar toolbar has Daily check-in — log today\'s mood and a one-line note to build a streak. Want to compare with friends? Set a public alias under the user menu → Membership & referrals to join the referral leaderboard.',
-  '使用者選單「會議轉任務」：貼上會議逐字稿，Huddle 會幫你整理成待辦任務，自動抓出負責人與期限。指派給共享夥伴的任務，對方會在「待接受指派」收到通知。':
-    'User menu → Meetings to tasks: paste a meeting transcript and Huddle organizes it into to-do tasks, automatically picking out the owner and due date. Tasks assigned to a shared peer show up for them under Pending assignments.',
-  '日曆頁「⋯」選單裡有「每日簽到」，記錄心情累積連續天數；使用者選單裡有「會議轉任務」，貼上逐字稿自動整理成待辦任務。':
-    'The calendar page\'s "⋯" menu has Daily check-in to log your mood and build a streak; the user menu has Meetings to tasks — paste a transcript and it\'s organized into to-dos automatically.',
 
-  // onboarding-tour.tsx — tour step bodies (mobile-only variants)
-  '整合任務、時間排程、專注計時、日記反思的工作面板。':
-    'One workspace for tasks, scheduling, focus time, and journaling.',
-  '工作區 → 分類 → 任務的三層結構。所有任務都在這。最上面灰色的「未分類」是預設收件匣，沒指定分類的新任務都會先掉進這裡。工作區標題右邊的「＋」可以新增分類。':
-    'Three layers: workspaces → categories → tasks. Everything lives here. The grey "Uncategorized" workspace at the top is your default inbox — new tasks with no category picked land there. The "+" next to a workspace name adds a category.',
-  '輕點任務開啟詳細頁；長按 0.3 秒後拖移可以直接排到日曆上的時間。打開後可以把任務標為「會議」，會多參與者 / 地點 / 視訊連結。':
-    'Tap a task to open its detail page; long-press for 0.3s then drag to schedule it directly onto the calendar. Once open, you can mark it as a Meeting to add attendees / location / video link.',
-  '今日會議 chip 點開可以一鍵加入視訊；「待整理」收過期任務，進去後可以滑卡片整理——右滑完成、左滑移回任務欄、上滑排今天、下滑封存。已完成抽屜含 KPI（連續天數、平均耗時）。':
-    "Tap the today's-meetings chip to join a video call with one tap. Review collects tasks that are past due — open it and swipe the cards: right to complete, left to send back to the task list, up to do it today, down to archive. The Completed drawer has stats (streak days, average time to finish).",
-  '在「任務」分頁向左滑 → 切到日曆。日曆內向左右滑 → 切換昨天 / 明天。':
-    'Swipe left on the Tasks tab to switch to the calendar. Inside the calendar, swipe left or right to move between yesterday and tomorrow.',
-  "上方是「有日期沒時間」的任務；下方時間軸是「已排時間」的任務。日曆上的任務會自動冠上分類（例：Let's Play｜夏令營）讓你一眼分辨，不想要可在設定關掉。每週循環的任務拖到別的時間時，Huddle 會問「只改這一天 / 之後也改 / 全部改」，像 Google 日曆一樣自由。想跟夥伴互看行事曆？「設定 → 共享」邀請對方就能疊加顯示。":
-    "The top shows tasks with a date but no time; the timeline below is for tasks with a scheduled time. Tasks on the calendar automatically get tagged with their category (e.g. Let's Play | Summer Camp) so you can tell them apart at a glance — turn it off in Settings if you don't want it. Drag a recurring task to a new time and Huddle will ask just this day / this day and after / all occurrences — as flexible as Google Calendar. Want to share calendars with a partner? Settings → Sharing — send an invite and their events overlay here.",
-  '通知、帳號都在「⋯」': 'Notifications & account live in “⋯”',
-  '右上角「⋯」收著通知中心、帳號、共享對象與記事本等工具。有新通知時「⋯」會出現數字小標，點開選「通知」查看。':
-    'The “⋯” in the top right holds the notification center, your account, shared calendars, the notebook and more. When something new arrives, “⋯” shows a number badge — open it and pick Notifications.',
-  '＋ 新增任務': '＋ Add a task',
-  '日曆右下角的「＋」隨時新增任務；在時間軸空白處點兩下，也能直接在那個時段建立任務。':
-    'Tap the “＋” at the bottom right of the calendar to add a task anytime — or double-tap an empty spot on the timeline to create one right in that slot.',
-  '任務 / 白板 / 日曆 / 連結。中間「白板」隨時記點子；最右邊「連結」放你常開的網址（Notion、Gmail 等等），點一下開新分頁。想寫長一點的筆記？日曆頁右上角「⋯」選單裡有「**記事本**」（Notion 式排版）。':
-    'Tasks / Scratchpad / Calendar / Links. Scratchpad in the middle is for jotting ideas anytime; Links on the far right holds the URLs you open often (Notion, Gmail, etc.) — tap one to open it in a new tab. Want to write something longer? The ⋯ menu in the top right of the calendar page has **Notebook** (Notion-style formatting).',
-  '右下角浮動小球是番茄鐘。點開可放大成沉浸模式、配 Lo-fi / 雨聲 / 咖啡店白噪音，結束時 Huddle 輕輕提醒。':
-    'The floating ball in the bottom right is a Pomodoro timer. Tap it to expand into immersive mode with Lo-fi / rain / coffee-shop noise, and Huddle will gently nudge you when time is up.',
-  '預設每 60 分鐘，Huddle 會跳出來提醒你喝口水。可以「再過一下」snooze 五分鐘，或在設定裡改間隔 / 關掉。':
-    'Every 60 minutes by default, Huddle will pop up to remind you to drink some water. Snooze it for 5 more minutes, or change the interval / turn it off in Settings.',
+  // onboarding-tour.tsx — step bodies shared by the desktop and phone tours
+  '任務、行事曆、專注計時和日記，都放在同一個地方。花一兩分鐘帶你走一圈，隨時可以略過。':
+    'Tasks, calendar, focus timer and journal, all in one place. Take a minute or two to look around; you can skip at any time.',
+  '所有任務都收在這裡，分成三層：工作區 → 分類 → 任務。最上面的「未分類」是收件匣，還沒決定放哪的任務會先到這裡。':
+    'Every task lives here, in three layers: workspace → category → task. "Uncategorized" at the top is your inbox: tasks you have not filed yet land there first.',
+  '「會議」列出今天的會議，可以直接加入視訊。有任務過了原訂時間，這裡會出現「整理」，讓你逐一重新安排。「完成」可以回顧做完的任務和統計。':
+    '"Meeting" lists today\'s meetings so you can join the call directly. When tasks slip past their planned time, "Review" appears here so you can reschedule them one by one. "Done" lets you look back at finished tasks and your stats.',
+  '設定一段時間，專心做一件事；預設是 25 分鐘的番茄鐘。可以搭配背景音樂或環境音，例如雨聲、海浪、咖啡廳。結束後會自動記到今天的日曆。':
+    'Set a stretch of time and focus on one thing; the default is a 25-minute Pomodoro. Add music or ambient sound such as rain, waves or a cafe. When it ends, the session is logged on today\'s calendar automatically.',
+  '每 60 分鐘，Huddle 會提醒你喝口水。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。':
+    'Every 60 minutes, Huddle reminds you to drink some water. Not now? Press "Snooze" and it comes back in five minutes. Change the interval in Settings, or turn it off entirely.',
+  '角落這隻企鵝是你專屬的。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。牠偶爾會提醒你會議和過期的任務，但多半只是在說些荒謬的話。':
+    'The penguin in the corner is yours. Tap it for a joke; to quiet it down, long-press (right-click on a computer) to open its menu. Now and then it reminds you about meetings and overdue tasks, but mostly it just says absurd things.',
+  '導覽結束後，你可以領養一隻專屬企鵝，牠會住在畫面角落。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。':
+    'After the tour you can adopt a penguin of your own, and it will live in the corner of the screen. Tap it for a joke; to quiet it down, long-press (right-click on a computer) to open its menu.',
+  '打開任務，按右上角的小人圖示，就能把任務交給共享夥伴或組織成員。任務會出現在對方的清單和日曆；對方完成或退回，你都看得到。進度在帳號選單的「指派任務」；建立組織需要 Pro 會員。':
+    'Open a task and use the person icon at the top right to hand it to a sharing partner or an organization member. It shows up in their list and calendar, and you can see when they finish it or send it back. Track progress under "Assignments" in the account menu; creating an organization requires Pro.',
+  '最後一步：你想怎麼開始？': 'Last step: how do you want to start?',
+
+  // onboarding-tour.tsx — step bodies (desktop)
+  '點左邊的圓圈，任務就完成了。點任務名稱可以打開編輯：改時間、寫備註，或把它設成「會議」。':
+    'Click the circle on the left to mark a task done. Click its name to open it and change the time, add notes, or mark it as a meeting.',
+  '左邊的清單和右邊的日曆，看的是同一批任務。在任何一邊完成、修改或刪除，另一邊會立刻跟著變。':
+    'The list on the left and the calendar on the right show the same tasks. Complete, edit or delete something on one side and the other updates right away.',
+  '每天最上面那一格，放「有日期、還沒排時間」的任務；下面的時間軸，放排好時間的任務。任務前面會標出所屬分類，方便一眼分辨。想和夥伴互看行事曆，按上方工具列的「共享」。':
+    'The strip at the top of each day holds tasks that have a date but no time yet; the timeline below holds tasks with a set time. Each task is labelled with its category so you can tell them apart at a glance. To see each other\'s calendars with a partner, use "Sharing" in the toolbar above.',
+  '把任務拖到時間軸，就排好時間；拖回最上面那一格，就取消時間。在時間軸空白處點兩下，可以直接新增任務。重複的任務換時間時，Huddle 會問你只改這一天，還是之後也一起改。':
+    'Drag a task onto the timeline to give it a time; drag it back to the top strip to clear the time. Double-click an empty spot on the timeline to add a task right there. When you move a repeating task, Huddle asks whether to change just that day or the later ones too.',
+  '看細節用「日」，排一週用「週」，看整個月用「月」。':
+    'Day for the details, Week for planning, Month for the big picture.',
+  '工作到一半冒出想法？拉開白板，隨手記下文字、待辦、圖片或連結。每天一張新的，之前的也翻得回去。':
+    'Had an idea mid-task? Pull down the whiteboard and jot text, to-dos, images or links. You get a fresh board each day, and can flip back to earlier ones.',
+  '想寫長一點的筆記，點這裡。打字時輸入「/」，可以插入標題、待辦清單、圖片等區塊；選取文字，會跳出粗體、連結等格式按鈕。':
+    'For longer notes, click here. Type "/" while writing to insert blocks such as headings, to-do lists and images; select text to bring up formatting like bold and links.',
+  '按一下，畫面上會多一層便條紙，換頁也不會消失。便條紙可以拖動、換顏色；暫時用不到的，收進旁邊的「收納」。':
+    'Click to lay sticky notes over the screen; they stay put when you change pages. Drag them around or change their color, and tuck the ones you do not need right now into the drawer next to this button.',
+  '這個小箭頭裡收著日記、報告、每日簽到、匯出等功能。「匯出」可以把行程存成圖片分享；開啟隱私模式，就只顯示時段、不顯示任務名稱。':
+    'This little arrow holds Journal, Reports, Daily check-in, Export and more. Export saves your schedule as an image to share; turn on privacy mode to show time blocks without task names.',
+  '同一個選單裡的「每日簽到」：每天簽到一次，累積分數。頁面下方有匿名排行榜，只顯示小企鵝編號，不顯示帳號。':
+    '"Daily check-in" is in the same menu: check in once a day to earn points. Further down that page is an anonymous leaderboard that shows penguin numbers, never account names.',
+  '鈴鐺會提醒你快到期、已過期，或放了很久沒動的任務。有新提醒時，鈴鐺上會出現數字。':
+    'The bell flags tasks that are due soon, overdue, or have sat untouched for a while. A number appears on it when there is something new.',
+  '點頭像打開選單：帳號資料、會員與推薦、深色模式和登出都在這裡。另外，按 ⌘K 或 Ctrl+K 可以快速搜尋任務，按「?」可以看所有快捷鍵。':
+    'Click your avatar to open the menu: account details, Membership & Referrals, dark mode and log out are all here. Also, press ⌘K or Ctrl+K to search your tasks quickly, and "?" to see every shortcut.',
+  '同一個選單裡的「會議轉任務」：貼上會議逐字稿或筆記，Huddle 會幫你整理出待辦，並標出負責人和期限。':
+    '"Meetings to tasks" is in the same menu: paste a meeting transcript or notes and Huddle turns them into to-dos, picking out owners and due dates.',
+  '按這個按鈕，會跳出一個永遠在最上層的小視窗，切到別的軟體也看得到。裡面有計時器、記事本和白板三個分頁。':
+    'This button opens a small window that always stays on top, even when you switch to another app. Inside are three tabs: Timer, Notebook and Whiteboard.',
+  '把常開的網址放在這裡，例如 Notion、GitHub、Gmail。點一下，就在新分頁打開。':
+    'Keep the sites you open most here, such as Notion, GitHub or Gmail. One click opens them in a new tab.',
+
+  // onboarding-tour.tsx — step bodies (phone)
+  '點左邊的圓圈完成任務，點任務名稱打開編輯。長按任務再拖動，可以直接排進日曆。':
+    'Tap the circle on the left to mark a task done, or tap its name to open it. Long-press a task and drag to put it straight onto the calendar.',
+  '在「任務」分頁往左滑，會切到日曆。在日曆裡左右滑，可以往前、往後翻日期。':
+    'Swipe left on the Tasks tab to switch to the calendar. Inside the calendar, swipe left or right to move between dates.',
+  '每天最上面那一格，放「有日期、還沒排時間」的任務；下面的時間軸，放排好時間的任務。任務前面會標出所屬分類，方便一眼分辨。想和夥伴互看行事曆，到右上角「⋯」裡的「共享」。':
+    'The strip at the top of each day holds tasks that have a date but no time yet; the timeline below holds tasks with a set time. Each task is labelled with its category so you can tell them apart at a glance. To see each other\'s calendars with a partner, open "Sharing" under "⋯" at the top right.',
+  '通知、帳號、記事本、便條紙和設定，都收在右上角的「⋯」。有新通知時，「⋯」上會出現數字。':
+    'Notifications, Account, Notebook, Sticky notes and Settings are all tucked into "⋯" at the top right. A number appears on "⋯" when there is something new.',
+  '按這顆「＋」新增任務。也可以在時間軸的空白處點兩下，直接在那個時段建立。':
+    'Tap "+" to add a task. Or double-tap an empty spot on the timeline to create one right in that slot.',
+  '「重點」看各分類的進度，「任務」是完整清單，「白板」隨手記想法，「日曆」排時間，「連結」放常開的網址。':
+    'Focus shows progress by category, Tasks is the full list, Whiteboard is for quick notes, Calendar is for scheduling, and Links holds the sites you open most.',
+  '「⋯」裡的「每日簽到」：每天簽到一次，累積分數。「⋯」→「帳號」→「會議轉任務」：貼上會議逐字稿，Huddle 會幫你整理出待辦。':
+    'Daily check-in, under "⋯": check in once a day to earn points. Meetings to tasks, under "⋯" then Account: paste a meeting transcript and Huddle turns it into to-dos.',
 }

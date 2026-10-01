@@ -36,6 +36,9 @@ import { t as translate } from '@/lib/i18n'
 import { assignTask, assignmentErrorMessage, notifyAssignmentsChanged, type AssignablePerson } from '@/lib/assignments'
 import type { Task, SlotType, TimeBlock } from '@/lib/types'
 
+/** How long the water popup keeps quiet after the onboarding tour closes. */
+const WATER_GRACE_AFTER_TOUR_MS = 60 * 1000
+
 function HuddlePage() {
   const isMobile = useIsMobile()
   const { t } = useI18n()
@@ -94,7 +97,23 @@ function HuddlePage() {
   useUndoShortcuts()
 
   // Hourly (default) water-break nudge — friendly popup, off via settings.
-  const water = useWaterReminder()
+  // Held back until we know the onboarding tour isn't on screen: the popup's
+  // blurred backdrop used to land on top of the spotlight. Deferred, not
+  // dropped — and once the tour is finished or skipped we hold it one more
+  // minute, so the first thing after the walkthrough isn't another popup.
+  // The grace only applies when the tour was actually on screen this session;
+  // returning users still get an overdue reminder right on load.
+  const tourOpen = !isLoading && !onboardingCompleted
+  const [tourWasOpen, setTourWasOpen] = useState(false)
+  const [tourGraceDone, setTourGraceDone] = useState(false)
+  if (tourOpen && !tourWasOpen) setTourWasOpen(true)
+  const inTourGrace = tourWasOpen && !tourOpen && !tourGraceDone
+  useEffect(() => {
+    if (!inTourGrace) return
+    const id = window.setTimeout(() => setTourGraceDone(true), WATER_GRACE_AFTER_TOUR_MS)
+    return () => window.clearTimeout(id)
+  }, [inTourGrace])
+  const water = useWaterReminder(isLoading || tourOpen || inTourGrace)
 
   // Slot types — generated dynamically from current workspaces, plus static
   // built-in time-block types (break/buffer/focus) and any user customs.

@@ -119,6 +119,4 @@ export const dict: Record<string, string> = {
 
   // components/onboarding-tour.tsx
   '🤝 指派任務 ＆ 組織': '🤝 Assignments & organizations',
-  '任務詳情右上角的小人像按鈕可以把任務指派給共享夥伴或同組織成員：同一張任務會出現在對方的清單與日曆，對方完成時你立刻看得到，對方也能附一句理由退回。進度在使用者選單「指派任務」；Pro 會員可在「組織」用邀請連結建立團隊。':
-    'Use the small person button at the top right of a task to assign it to a sharing partner or organization member: the same task shows up in their list and calendar, you see it the moment they finish, and they can return it with a short reason. Track progress under "Assignments" in the user menu; Pro members can build a team under "Organizations" with an invite link.',
 }

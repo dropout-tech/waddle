@@ -10,7 +10,7 @@ import { CalendarPanel } from '@/components/calendar/calendar-panel'
 import { MeetingDialog } from '@/components/meetings/meeting-dialog'
 import { useMeetingInvitations } from '@/hooks/use-meeting-invitations'
 import { CalendarExportModal } from '@/components/calendar/calendar-export-modal'
-import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ListChecks, CalendarDays, Sparkles, ChevronLeft, ChevronRight, Focus } from 'lucide-react'
+import { PanelLeftOpen, BookOpen, BarChart3, Minimize2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ReportDashboard } from '@/components/reports/report-dashboard'
 import { FocusScratchpad } from '@/components/scratchpad/focus-scratchpad'
 import { FocusTimer } from '@/components/timer/focus-timer'
@@ -20,13 +20,15 @@ import { toDateString } from '@/lib/calendar-utils'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useWideScreen } from '@/hooks/use-wide-screen'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
+import { TOUR_MOBILE_TAB_EVENT } from '@/components/onboarding-tour'
 import { useCalendarSharing, usePeerCalendarEvents } from '@/hooks/use-calendar-sharing'
 import { useGoogleCalendarEvents } from '@/hooks/use-google-calendar-events'
 import { hapticSelection } from '@/lib/haptics'
 import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, ScratchpadItem } from '@/lib/types'
 import { DEFAULT_FOCUS_SETTINGS, type FocusSettings } from '@/lib/focus'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
-import { Link2, Plus } from 'lucide-react'
+// Mobile bottom tabs + the "+" FAB use the Huddle hand-inked set (DESIGN.md → 圖示).
+import { InkFocus, InkTasks, InkSparklesLg, InkCalendar, InkLink, InkPlusLg } from '@/components/icons/huddle-icons'
 import { useI18n } from '@/lib/i18n/react'
 import { GrowthJourneyDashboard } from '@/components/growth/growth-journey-dashboard'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
@@ -303,6 +305,22 @@ export function MainLayout({
     openWhiteboard: () => { setMobileLinksOpen(false); setMobileFocusBoardOpen(false); setMobileScratchpadOpen(true) },
     selectTask: onSelectTask, createTask: onCreateCalendarTask,
   })
+
+  // The onboarding tour asks for the bottom tab its current step points at
+  // (the task list lives on 任務, the rest on 日曆) — otherwise the spotlight
+  // has nothing to land on. Overlay tabs are closed for the same reason.
+  useEffect(() => {
+    const onTourTab = (e: Event) => {
+      const tab = (e as CustomEvent<unknown>).detail
+      if (tab !== 'tasks' && tab !== 'calendar') return
+      setMobileScratchpadOpen(false)
+      setMobileLinksOpen(false)
+      setMobileFocusBoardOpen(false)
+      setMobileTab(tab)
+    }
+    window.addEventListener(TOUR_MOBILE_TAB_EVENT, onTourTab)
+    return () => window.removeEventListener(TOUR_MOBILE_TAB_EVENT, onTourTab)
+  }, [])
 
   // Calendar zoom level - controls hour height and visible time range
   // Zoom levels: 1 = compact (40px/hour), 2 = normal (60px/hour), 3 = expanded (80px/hour), 4 = detailed (100px/hour)
@@ -714,7 +732,7 @@ export function MainLayout({
               // so the two surfaces teach the same mental model.
               key: 'focus' as const,
               label: t('重點'),
-              Icon: Focus,
+              Icon: InkFocus,
               active: mobileFocusBoardOpen,
               onClick: () => {
                 hapticSelection()
@@ -728,7 +746,7 @@ export function MainLayout({
               // '任務' doubles as the singular time-block type label ("Task");
               // the tab wants the plural, so it bypasses the shared dict key.
               label: lang === 'en' ? 'Tasks' : '任務',
-              Icon: ListChecks,
+              Icon: InkTasks,
               active: mobileTab === 'tasks' && !overlayOpen,
               onClick: () => {
                 hapticSelection()
@@ -741,7 +759,7 @@ export function MainLayout({
             {
               key: 'scratch' as const,
               label: t('白板'),
-              Icon: Sparkles,
+              Icon: InkSparklesLg,
               active: mobileScratchpadOpen,
               onClick: () => {
                 hapticSelection()
@@ -753,7 +771,7 @@ export function MainLayout({
             {
               key: 'calendar' as const,
               label: t('日曆'),
-              Icon: CalendarDays,
+              Icon: InkCalendar,
               active: mobileTab === 'calendar' && !overlayOpen,
               onClick: () => {
                 hapticSelection()
@@ -767,7 +785,7 @@ export function MainLayout({
               key: 'links' as const,
               // '連結' doubles as the editor "Link" button; tab wants plural.
               label: lang === 'en' ? 'Links' : '連結',
-              Icon: Link2,
+              Icon: InkLink,
               active: mobileLinksOpen,
               onClick: () => {
                 hapticSelection()
@@ -781,6 +799,7 @@ export function MainLayout({
           return (
             <nav
               data-hide-on-keyboard
+              data-tour="mobile-tabs"
               className="relative flex-shrink-0 grid grid-cols-5 border-t border-border/70 bg-card/95 backdrop-blur z-sticky pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_0_0_rgba(0,0,0,0.02)]"
               role="tablist"
               aria-label={t('主要分頁')}
@@ -802,6 +821,7 @@ export function MainLayout({
                 <button
                   key={key}
                   role="tab"
+                  data-tab={key}
                   aria-selected={active}
                   onClick={onClick}
                   className={cn(
@@ -848,7 +868,7 @@ export function MainLayout({
             className="fixed right-3 z-30 flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             style={{ bottom: 'calc(136px + env(safe-area-inset-bottom))' }}
           >
-            <Plus className="w-6 h-6" aria-hidden="true" />
+            <InkPlusLg className="w-6 h-6" aria-hidden="true" />
           </button>
         )}
 

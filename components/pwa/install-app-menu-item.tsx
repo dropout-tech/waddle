@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { Share, Smartphone } from 'lucide-react'
+import { Share } from 'lucide-react'
+import { InkPhone } from '@/components/icons/huddle-icons'
 import { useI18n } from '@/lib/i18n/react'
 import {
   getInstallPrompt,
@@ -70,7 +71,7 @@ export function InstallAppMenuItem({ onDone }: { onDone?: () => void }) {
           void promptInstall()
         }}
       >
-        <Smartphone className="w-4 h-4" />
+        <InkPhone className="w-4 h-4" />
         <span>{t('安裝到手機')}</span>
       </button>
     )
@@ -85,7 +86,7 @@ export function InstallAppMenuItem({ onDone }: { onDone?: () => void }) {
         className={itemClass}
         onClick={() => setShowSteps((v) => !v)}
       >
-        <Smartphone className="w-4 h-4" />
+        <InkPhone className="w-4 h-4" />
         <span>{t('安裝到手機')}</span>
       </button>
       {showSteps && (

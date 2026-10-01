@@ -45,6 +45,4 @@ export const dict: Record<string, string> = {
   "儲存企鵝設定": "Save penguin settings",
   // Onboarding tour step
   "🐧 你的企鵝": "🐧 Your penguin",
-  "角落那隻小企鵝是你專屬的。點牠會講笑話，連點有不同反應；長按（手機）或按右鍵（電腦）可以叫牠安靜一下或打開設定。牠偶爾會提醒你會議、逾期任務和簽到，但多半只是在說些荒謬的話。": "The little penguin in the corner is all yours. Tap it for a joke (keep tapping for more reactions); long-press on a phone or right-click on a computer to hush it or open its settings. It will occasionally remind you about meetings, overdue tasks and check-ins, but mostly it says absurd things.",
-  "底部分頁列上方那隻小企鵝是你專屬的。點牠會講笑話，連點有不同反應；長按可以叫牠安靜一下或打開設定。牠偶爾會提醒你會議、逾期任務和簽到，但多半只是在說些荒謬的話。": "The little penguin above the tab bar is all yours. Tap it for a joke (keep tapping for more reactions); long-press to hush it or open its settings. It will occasionally remind you about meetings, overdue tasks and check-ins, but mostly it says absurd things.",
 }

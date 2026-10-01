@@ -28,10 +28,15 @@ import {
  *   is on screen.
  * - `storage` event lets a settings change in another tab disable the
  *   reminder live without a refresh.
+ * - `paused` (the onboarding tour is on screen) *defers* the popup instead of
+ *   dropping it: nothing is checked, notified or rescheduled while paused, so
+ *   the stored due time is untouched and the effect's own re-run picks the
+ *   reminder up the moment the pause lifts. A widget-triggered open that
+ *   arrives while paused is held in state the same way.
  */
 export const WATER_OPEN_EVENT = 'huddle-water-open'
 
-export function useWaterReminder() {
+export function useWaterReminder(paused = false) {
   const [isOpen, setIsOpen] = useState(false)
   const [enabled, setEnabledState] = useState(false)
 
@@ -45,6 +50,7 @@ export function useWaterReminder() {
     }
 
     const check = () => {
+      if (paused) return
       if (!getWaterReminderEnabled()) return
       const due = getWaterNextDueAt()
       if (due === null) return
@@ -80,7 +86,7 @@ export function useWaterReminder() {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('storage', onStorage)
     }
-  }, [])
+  }, [paused])
 
   const dismiss = useCallback(() => {
     scheduleNextWaterReminder()
@@ -100,7 +106,7 @@ export function useWaterReminder() {
     setIsOpen(false)
   }, [])
 
-  return { isOpen, enabled, dismiss, snooze, disable }
+  return { isOpen: isOpen && !paused, enabled, dismiss, snooze, disable }
 }
 
 export { DEFAULT_WATER_INTERVAL }
