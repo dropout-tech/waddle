@@ -1,4 +1,5 @@
 import { isNative } from '@/lib/platform'
+import { SITE_ORIGIN } from '@/lib/site'
 import { createClient } from '@/lib/supabase/client'
 import type { Json } from '@/lib/supabase/database.types'
 import { t } from '@/lib/i18n'
@@ -96,6 +97,6 @@ export function enrollmentLink(kind: 'ref' | 'coupon', code: string): string {
     !isNative() &&
     /^https?:$/.test(window.location.protocol)
       ? window.location.origin
-      : 'https://waddle.zeabur.app'
+      : SITE_ORIGIN
   return `${origin}/signup?${kind}=${encodeURIComponent(code)}`
 }

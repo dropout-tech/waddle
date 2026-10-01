@@ -143,7 +143,7 @@ ScratchpadItem     # 白板卡片（text/image/link/todo），依 date 分組、
 
 ## 發布紀律
 
-此個人專案的有意義變更完成驗證後須 commit、push 並建立 PR；使用者已授權直接合併 PR。`main` 合併會自動部署至 [Zeabur 正式站](https://waddle.zeabur.app)。發布時分別確認提交、遠端推送、PR 合併、該 SHA 的部署結果與線上功能，保留不相關的未完成工作。
+此個人專案的有意義變更完成驗證後須 commit、push 並建立 PR；使用者已授權直接合併 PR。`main` 合併會自動部署至 [Zeabur 正式站](https://huddle.lazy72.com)（舊網域 `https://waddle.zeabur.app` 仍保留並行：已安裝的舊桌面版把它寫死，不可關閉、不可轉址）。發布時分別確認提交、遠端推送、PR 合併、該 SHA 的部署結果與線上功能，保留不相關的未完成工作。
 
 分類進度看板的操作回歸：`node scripts/e2e/focus-progress-verify.mjs`（讀取 `.env.e2e.local` 測試登入；任務與設定寫入全部攔截為 mock，不修改真實資料）。設定沿用 `user_settings.focus_board` JSONB；狀態文字不會自動新增任務，隱藏卡片不刪除其設定或原任務。
 

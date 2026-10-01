@@ -388,7 +388,7 @@ export const CalendarExportView = forwardRef<HTMLDivElement, CalendarExportViewP
             color: textMuted,
           }}
         >
-          <span>{t('以 Huddle 規劃 · huddle.app')}</span>
+          <span>{t('以 Huddle 規劃 · huddle.lazy72.com')}</span>
           <span style={{ fontVariantNumeric: 'tabular-nums' }}>
             {lang === 'en'
               ? `Exported ${format(new Date(), 'M/d/yyyy')}`

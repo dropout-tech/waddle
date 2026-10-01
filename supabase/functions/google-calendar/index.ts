@@ -51,9 +51,17 @@ export async function handler(req: Request) {
     if (allowed !== true) return json({ error: 'account_suspended' }, 403)
 
     const body = await req.json().catch(() => ({}))
-    const clientId = env('GOOGLE_CALENDAR_CLIENT_ID'), secret = env('GOOGLE_CALENDAR_CLIENT_SECRET'), cipherKey = env('GOOGLE_CALENDAR_TOKEN_KEY'), redirect = env('GOOGLE_CALENDAR_REDIRECT_URI')
-    // All four present (and a sane redirect) is also the feature switch.
-    const configured = !!(clientId && secret && cipherKey && /^https:\/\/[^?#]+\/settings\/google-calendar\/callback\/?$/.test(redirect))
+    const clientId = env('GOOGLE_CALENDAR_CLIENT_ID'), secret = env('GOOGLE_CALENDAR_CLIENT_SECRET'), cipherKey = env('GOOGLE_CALENDAR_TOKEN_KEY'), redirectList = env('GOOGLE_CALENDAR_REDIRECT_URI')
+    // GOOGLE_CALENDAR_REDIRECT_URI is one https callback URL, or several separated by commas
+    // (one per site origin). EVERY entry must be well formed, else the feature stays off.
+    const redirects = redirectList.split(',').map((u) => u.trim())
+    // All four present (and sane redirects) is also the feature switch.
+    const configured = !!(clientId && secret && cipherKey && redirects.every((u) => /^https:\/\/[^?#]+\/settings\/google-calendar\/callback\/?$/.test(u)))
+    // start and finish MUST resolve to the same entry (Google compares redirect_uri verbatim),
+    // so both go through this one picker. It only ever returns an entry of the secret's list:
+    // the Origin header selects, it is never copied into the URL. Unknown/absent Origin → first.
+    const origin = req.headers.get('Origin') || ''
+    const redirect = (/^https:\/\/[^/?#]+$/.test(origin) && redirects.find((u) => u.startsWith(origin + '/'))) || redirects[0]
     const check = <T extends { error: unknown }>(r: T) => { if (r.error) throw Error('database_failed'); return r }
     const COLUMNS = 'user_id,refresh_cipher,status,share_busy'
     const { data: connection } = check(await admin.from('google_calendar_connections').select(COLUMNS).eq('user_id', uid).maybeSingle()) as { data: Connection | null }

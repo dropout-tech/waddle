@@ -87,8 +87,8 @@ async function setup(o = {}) {
     throw Error('unexpected fetch ' + url)
   }
   vm.runInNewContext(js, { ...core, Deno: { env: { get: (k) => env[k] }, serve: (fn) => { handler = fn } }, createClient: (_url, k) => (k === 'anon' ? asCaller : admin), crypto, Response, Request, URL, URLSearchParams, AbortSignal, Date, JSON, atob, setTimeout, fetch: fetchMock, Error })
-  const send = async (body, sid = session, headers) => {
-    const res = await handler(new Request('https://fake.invalid', { method: 'POST', headers: headers ?? (o.noToken ? {} : { Authorization: 'Bearer ' + jwtFor(sid) }), body: JSON.stringify(body) }))
+  const send = async (body, sid = session, headers, origin) => {
+    const res = await handler(new Request('https://fake.invalid', { method: 'POST', headers: { ...(headers ?? (o.noToken ? {} : { Authorization: 'Bearer ' + jwtFor(sid) })), ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(body) }))
     const text = await res.text(); allResponses.push(text)
     return { http: res.status, ...JSON.parse(text) }
   }
@@ -297,6 +297,45 @@ const pages = {
   ok((await m.send({ action: 'set_share_busy', value: false })).share_busy === false && m.tables.google_calendar_connections[0].share_busy === false, 'set_share_busy false stored')
   ok((await m.send({ action: 'status' })).share_busy === false, 'status reflects share_busy=false')
   ok((await m.send({ action: 'set_share_busy', value: 'no' })).error === 'invalid_action', 'set_share_busy rejects non-boolean')
+}
+
+// ── multi-origin redirect list (GOOGLE_CALENDAR_REDIRECT_URI = "a,b") ──
+{
+  const A = 'https://old.invalid/settings/google-calendar/callback', B = 'https://new.invalid/settings/google-calendar/callback'
+  const redirectOf = (start) => new URL(start.url).searchParams.get('redirect_uri')
+  const tokenRedirect = (m) => new URLSearchParams(m.calls.find((c) => c.url.includes('oauth2.googleapis.com/token') && new URLSearchParams(c.body).get('grant_type') === 'authorization_code').body).get('redirect_uri')
+  // single URL: unchanged, whatever Origin says
+  for (const origin of [undefined, 'https://old.invalid', 'https://evil.example']) {
+    const m = await setup(); const st = await m.send({ action: 'start' }, session, undefined, origin)
+    ok(redirectOf(st) === 'https://app.invalid/settings/google-calendar/callback', `single URL, Origin ${origin ?? '(none)'} → that one URL (unchanged)`)
+  }
+  { const m = await setup(); const state = new URL((await m.send({ action: 'start' }, session, undefined, 'https://evil.example')).url).searchParams.get('state'); await m.send({ action: 'finish', state, code: 'c' }, session, undefined, 'https://evil.example'); ok(tokenRedirect(m) === 'https://app.invalid/settings/google-calendar/callback', 'single URL: finish exchanges with that same URL') }
+  // two URLs: Origin picks the matching entry; first entry otherwise
+  const two = { GOOGLE_CALENDAR_REDIRECT_URI: `${A}, ${B}` }
+  for (const [origin, want, label] of [['https://old.invalid', A, 'old origin → old URL'], ['https://new.invalid', B, 'new origin → new URL'], [undefined, A, 'no Origin → first entry'], ['https://stranger.invalid', A, 'unknown Origin → first entry'], ['capacitor://localhost', A, 'native shell Origin → first entry'], ['null', A, 'Origin "null" → first entry'], ['https://new.invalid.evil.example', A, 'look-alike suffix Origin → first entry'], ['https://new.invalid/settings/google-calendar/callback', A, 'Origin carrying a path → first entry']]) {
+    const m = await setup({ env: two }); const st = await m.send({ action: 'start' }, session, undefined, origin)
+    ok(redirectOf(st) === want, `two URLs: ${label}`)
+  }
+  // start and finish pick the same entry under the same Origin (Google needs a verbatim match)
+  for (const [origin, want] of [['https://new.invalid', B], ['https://old.invalid', A], [undefined, A]]) {
+    const m = await setup({ env: two }); const st = await m.send({ action: 'start' }, session, undefined, origin)
+    const state = new URL(st.url).searchParams.get('state')
+    const fin = await m.send({ action: 'finish', state, code: 'c' }, session, undefined, origin)
+    ok(fin.connected === true && redirectOf(st) === want && tokenRedirect(m) === want, `start and finish agree on the same redirect_uri (Origin ${origin ?? '(none)'} → ${want})`)
+  }
+  // an entry with a bad shape (or an empty slot) switches the whole feature off
+  for (const bad of [`${A},http://new.invalid/settings/google-calendar/callback`, `${A},https://new.invalid/wrong-path`, `${A},`, `${A},,${B}`]) {
+    const m = await setup({ env: { GOOGLE_CALENDAR_REDIRECT_URI: bad } })
+    const s = await m.send({ action: 'status' }, session, undefined, 'https://new.invalid'), st = await m.send({ action: 'start' }, session, undefined, 'https://new.invalid')
+    ok(s.configured === false && st.http === 503 && st.error === 'not_configured' && m.calls.length === 0, `invalid list "${bad.slice(0, 60)}" → configured:false, start 503`)
+  }
+  // a hostile Origin can never put itself into redirect_uri
+  for (const evil of ['https://evil.example', 'https://evil.example/settings/google-calendar/callback', 'https://old.invalid@evil.example', 'https://evil.example#https://old.invalid']) {
+    const m = await setup({ env: two }); const st = await m.send({ action: 'start' }, session, undefined, evil)
+    const state = new URL(st.url).searchParams.get('state')
+    await m.send({ action: 'finish', state, code: 'c' }, session, undefined, evil)
+    ok(!st.url.includes('evil') && [A, B].includes(redirectOf(st)) && !tokenRedirect(m).includes('evil') && [A, B].includes(tokenRedirect(m)), `hostile Origin "${evil}" → redirect_uri (start and token call) stays inside the secret's list`)
+  }
 }
 
 // ── no secrets in any response ──

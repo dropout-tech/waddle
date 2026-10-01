@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { preload } from 'react-dom'
 import './globals.css'
 import './art-theme.css'
+import { SITE_ORIGIN } from '@/lib/site'
 // Self-hosted fonts (Geist, Geist Mono, Noto Sans TC 400–700). Committed under
 // app/fonts/ so production builds never fetch from Google — see
 // scripts/fonts/vendor-fonts.mjs for how the files were produced.
@@ -23,7 +24,7 @@ import { StickyNotesProvider } from '@/components/sticky-notes/sticky-notes-prov
 import { BRAND_TITLE } from '@/lib/brand'
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://waddle.zeabur.app'),
+  metadataBase: new URL(SITE_ORIGIN),
   title: BRAND_TITLE,
   description:
     '把任務、行程、專注與筆記收進同一張桌面。Huddle 是一個溫柔、不催促的個人工作空間。',

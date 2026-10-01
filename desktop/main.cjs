@@ -1,7 +1,8 @@
 const { app, BrowserWindow, Menu, shell, ipcMain, Notification } = require('electron')
 const path = require('node:path')
 
-const PRODUCTION_URL = 'https://waddle.zeabur.app'
+// Same value as SITE_ORIGIN in lib/site.ts (cannot import TS here). The old waddle.zeabur.app stays live for already-installed apps.
+const PRODUCTION_URL = 'https://huddle.lazy72.com'
 const appUrl = process.env.HUDDLE_APP_URL || PRODUCTION_URL
 const allowedOrigin = new URL(appUrl).origin
 const { createOAuth } = require('./oauth.cjs')
