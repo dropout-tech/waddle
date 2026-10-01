@@ -1,28 +1,43 @@
-import type { Task, TimeBlock, NotebookNote, ScratchpadItem } from '@/lib/types'
+import type { Task, TimeBlock, NotebookNote, ScratchpadItem, StickyNote } from '@/lib/types'
 import { taskOccursOnDate, toDateString } from '@/lib/calendar-utils'
 import type { WidgetPet } from './pet'
 
-export const widgetKinds = ['overview', 'calendar', 'agenda', 'week', 'tasks', 'top-three', 'whiteboard', 'notebook', 'focus-note', 'focus', 'water', 'shortcuts', 'pet'] as const
+export const widgetKinds = ['overview', 'calendar', 'agenda', 'week', 'tasks', 'top-three', 'whiteboard', 'notebook', 'focus-note', 'focus', 'water', 'shortcuts', 'pet', 'month', 'sticky'] as const
 export type WidgetKind = typeof widgetKinds[number]
 export const widgetNames: Record<WidgetKind, string> = {
   overview: '月曆＋今日任務', calendar: '可視化小月曆', agenda: '近期行程', week: '本週時間表', tasks: '任務清單',
   'top-three': '今天三件事', whiteboard: '白板', notebook: '記事本', 'focus-note': '專注記事', focus: '專注計時', water: '喝水提醒', shortcuts: '隨手記入口',
-  pet: '我的 Huddle',
+  pet: '我的 Huddle', month: '大型月曆', sticky: '便條紙',
 }
 export interface WidgetItem { id: string; title: string; subtitle: string; date?: string; time?: string; completed?: boolean; actionable?: boolean; revision?: string; thumbnail?: string }
 /** One scheduled slot for the native 本週時間表 widget (today + next 6 days). */
 export interface WidgetSlot { date: string; start: string; end: string; title: string; color: string }
 export const WEEK_SLOT_LIMIT = 40
+/** One entry in a 大型月曆 day cell: task (checkbox), meeting (event) or time block. */
+export interface WidgetSpanItem { title: string; color: string; type: 'task' | 'event' | 'block'; done?: boolean; time?: string }
+/** A day of the 大型月曆 widget: the first SPAN_ITEMS entries plus the real total (for "+N"). */
+export interface WidgetSpanDay { date: string; total: number; items: WidgetSpanItem[] }
+/** 便條紙 widget: a sticky note reduced to plain text — first line as the title. */
+export interface WidgetSticky { id: string; title: string; body: string; color: string; updatedAt: string }
+export const SPAN_DAYS = 21
+export const SPAN_ITEMS = 4
+export const STICKY_LIMIT = 5
+type StickySource = Pick<StickyNote, 'id' | 'content' | 'color' | 'updatedAt'>
 export interface WidgetSnapshot {
   schemaVersion: 1; accountId: string; epoch: string; generatedAt: string; today: string; locale: string
   tasks: WidgetItem[]; agenda: WidgetItem[]; notes: WidgetItem[]; boards: WidgetItem[]
   /** Added after schemaVersion 1 shipped; the Swift side decodes it as optional. */
   week: WidgetSlot[]
   days: { date: string; day: number; inMonth: boolean; count: number }[]
-  focus: { mode?: 'pomodoro' | 'stopwatch'; state: string; title: string; endAt: number | null; seconds: number; note: string }
+  /** `total` = the pomodoro's full length in seconds (lock-screen ring); optional. */
+  focus: { mode?: 'pomodoro' | 'stopwatch'; state: string; title: string; endAt: number | null; seconds: number; note: string; total?: number }
   water: { enabled: boolean; nextAt: number | null; count: number }
   /** 「我的 Huddle」 widget (lib/widgets/pet.ts). Optional: the Swift side decodes it as optional too. */
   pet?: WidgetPet
+  /** 大型月曆: SPAN_DAYS days from this week's Monday. Optional (older native readers ignore it). */
+  span?: WidgetSpanDay[]
+  /** 便條紙: the most recently edited sticky notes. Optional for the same reason. */
+  stickies?: WidgetSticky[]
   /** Today's daily check-in (Asia/Taipei day); optional so older native readers ignore it. */
   checkIn?: { date: string; checkedIn: boolean; points: number }
 }
@@ -45,7 +60,49 @@ export function monthDays(date: Date) {
     return { date: toDateString(d), day: d.getDate(), inMonth: d.getMonth() === date.getMonth(), count: 0 }
   })
 }
-export function makeSnapshot(input: { accountId: string; epoch: string; tasks: Task[]; blocks: TimeBlock[]; notes?: NotebookNote[]; boards: Record<string, ScratchpadItem[]>; now?: Date; locale?: string }): WidgetSnapshot {
+/** Monday of the week containing `date` (local, noon so DST never shifts the day). */
+export function spanStart(date: Date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12)
+  d.setDate(d.getDate() - (d.getDay() + 6) % 7)
+  return d
+}
+const hexOr = (c: string | undefined, fallback = '#b04f38') => c && /^#[0-9a-f]{6}$/i.test(c) ? c.toLowerCase() : fallback
+/** 大型月曆: per day, timed entries first (by start), then untimed tasks; at most SPAN_ITEMS kept. */
+export function makeSpan(now: Date, tasks: Task[], blocks: TimeBlock[]): WidgetSpanDay[] {
+  const start = spanStart(now)
+  return Array.from({ length: SPAN_DAYS }, (_, i) => {
+    const d = new Date(start); d.setDate(d.getDate() + i)
+    const date = toDateString(d), noon = new Date(`${date}T12:00:00`)
+    const all: WidgetSpanItem[] = [
+      ...tasks.filter(t => taskOccursOnDate(t, noon)).map(t => ({
+        title: t.title.slice(0, 20), color: hexOr(t.calendarColor || t.workspaceColor),
+        type: t.isMeeting ? 'event' as const : 'task' as const,
+        // A recurring master's flag isn't per occurrence — never show it ticked.
+        done: !t.isRecurring && t.isCompleted, time: t.scheduledStartTime?.match(HHMM)?.[0],
+      })),
+      ...blocks.filter(b => b.date === date).map(b => ({ title: b.label.slice(0, 20), color: hexOr(b.color), type: 'block' as const, time: b.startTime?.match(HHMM)?.[0] })),
+    ]
+    all.sort((a, b) => (a.time ? 0 : 1) - (b.time ? 0 : 1) || (a.time ?? '').localeCompare(b.time ?? '') || Number(!!a.done) - Number(!!b.done))
+    return { date, total: all.length, items: all.slice(0, SPAN_ITEMS).map(({ done, time, ...x }) => ({ ...x, ...(done ? { done } : {}), ...(time ? { time } : {}) })) }
+  })
+}
+/** Top-level blocks of a Tiptap doc as plain-text lines (paragraphs, list items, headings). */
+function docLines(doc: unknown): string[] {
+  const n = doc as { content?: unknown[] } | null
+  if (!n || !Array.isArray(n.content)) return []
+  return n.content.flatMap(b => {
+    const x = b as { type?: string; content?: unknown[] }
+    // Lists: one line per item, so a checklist reads like the note itself.
+    return (x?.type === 'bulletList' || x?.type === 'orderedList' || x?.type === 'taskList') && Array.isArray(x.content) ? x.content.map(i => plainText(i)) : [plainText(b)]
+  }).filter(Boolean)
+}
+/** 便條紙 widget: newest first, empty notes skipped, first line → title (≤40), the rest → body (≤140). */
+export function stickySummaries(notes: StickySource[]): WidgetSticky[] {
+  return notes.map(n => ({ n, lines: docLines(n.content) })).filter(x => x.lines.length)
+    .sort((a, b) => b.n.updatedAt.localeCompare(a.n.updatedAt)).slice(0, STICKY_LIMIT)
+    .map(({ n, lines }) => ({ id: n.id, title: lines[0].slice(0, 40), body: lines.slice(1).join(' ').slice(0, 140), color: n.color, updatedAt: n.updatedAt }))
+}
+export function makeSnapshot(input: { accountId: string; epoch: string; tasks: Task[]; blocks: TimeBlock[]; notes?: NotebookNote[]; boards: Record<string, ScratchpadItem[]>; stickies?: StickySource[]; now?: Date; locale?: string }): WidgetSnapshot {
   const now = input.now ?? new Date(), today = toDateString(now)
   const tasks = input.tasks.filter(t => !t.isArchived)
   const toItem = (t: Task, date?: string): WidgetItem => ({ id: t.id, title: t.title.slice(0, 80), subtitle: t.categoryName.slice(0, 40), date: date ?? t.scheduledDate ?? t.dueDate, time: t.scheduledStartTime, completed: t.isCompleted, actionable: !t.isRecurring && !t.isMeeting, revision: t.updatedAt })
@@ -70,6 +127,8 @@ export function makeSnapshot(input: { accountId: string; epoch: string; tasks: T
     agenda: agenda.slice(0, 20), week: week.slice(0, WEEK_SLOT_LIMIT), notes: (input.notes ?? []).filter(n => !n.isArchived).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8).map(n => ({ id:n.id, title:n.title.slice(0,80) || '未命名筆記', subtitle:plainText(n.content) })),
     boards: Object.entries(input.boards).filter(([,items])=>items.length).sort(([a],[b])=>b.localeCompare(a)).slice(0,7).map(([date,items])=>({ id:date,date,title:`${date} 白板`,subtitle:items.filter(i=>i.type === 'text' || i.type === 'todo').map(i=>i.title || i.content).join(' · ').slice(0,160) })),
     focus: { state:'idle',title:'慢慢來，先專心一件事',endAt:null,seconds:1500,note:'' }, water:{enabled:false,nextAt:null,count:0},
+    span: makeSpan(now, tasks, input.blocks),
+    ...(input.stickies ? { stickies: stickySummaries(input.stickies) } : {}),
   }
 }
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)/
@@ -102,6 +161,7 @@ export function parseWidgetURL(raw: string): WidgetDestination | null {
  * send `huddle://widget/<kind>?id=&date=` (HuddleWidgets.swift `url(_:)`);
  * this maps it onto a real screen:
  *   notebook → /notebook/?note=<id|new>   focus-note → /notebook/?note=focus
+ *   sticky → /?widget=sticky&note=<id>     (sticky-note ids are not task ids)
  *   everything else → /?widget=<kind>&date=&task=  (MainLayout, use-widget-launch.ts)
  */
 export function widgetPath(d: Pick<WidgetDestination, 'kind' | 'id' | 'date'>): string {
@@ -109,6 +169,7 @@ export function widgetPath(d: Pick<WidgetDestination, 'kind' | 'id' | 'date'>): 
   if (d.kind === 'focus-note') return '/notebook/?note=focus'
   const q = new URLSearchParams({ widget: d.kind === 'tasks' && d.id === 'new' ? 'new-task' : d.kind })
   if (d.date) q.set('date', d.date)
+  if (d.kind === 'sticky') { if (d.id) q.set('note', d.id); return `/?${q}` }
   // Whiteboard items carry the board date as their id — not a task.
   if (d.id && d.id !== 'new' && d.kind !== 'whiteboard') q.set('task', d.id)
   return `/?${q}`
