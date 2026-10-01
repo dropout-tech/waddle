@@ -24,7 +24,7 @@ shared.setItem(PENDING_ORG_INVITE_KEY, '{not json'); assert.equal(readPendingOrg
 
 const entry = {
   'app/(auth)/login/page.tsx': /pendingOrgInvitePath\(\)/,
-  'app/(auth)/signup/page.tsx': /pendingOrgInvitePath\(\)/,
+  // signup page: email sign-up retired 2026-10-01; OAuth sign-ups resume via auth/callback below.
   'app/auth/callback/page.tsx': /desktop_return[\s\S]*pendingOrgInvitePath\(\)[\s\S]*pendingOrgInvitePath\(\)/,
   'components/auth/deep-link-handler.tsx': /pendingOrgInvitePath\(\)/,
   'components/auth/redirect-if-authed.tsx': /pendingOrgInvitePath\(\)/,

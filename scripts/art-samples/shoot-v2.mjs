@@ -113,7 +113,7 @@ try {
       await q.close()
     }
     if (want('login')) {
-      await p.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+      await p.goto(`${BASE}/login?method=email`, { waitUntil: 'domcontentloaded' })
       await p.locator('#email').waitFor({ timeout: 120000 })
       await sleep(1500)
       await p.screenshot({ path: file(`login-${w}`) })
@@ -131,7 +131,7 @@ try {
         const c = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-TW' })
         await guard(c)
         const lp = await c.newPage()
-        await lp.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+        await lp.goto(`${BASE}/login?method=email`, { waitUntil: 'domcontentloaded' })
         await lp.locator('#email').fill(process.env.E2E_EMAIL)
         await lp.locator('#password').fill(process.env.E2E_PASSWORD)
         await lp.getByRole('button', { name: '登入', exact: true }).click()

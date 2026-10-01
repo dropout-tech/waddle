@@ -100,7 +100,7 @@ try {
     await route.continue()
   })
 
-  await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE_URL}/login?method=email`, { waitUntil: 'domcontentloaded' })
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(password)
   await page.locator('form button[type="submit"]').click()

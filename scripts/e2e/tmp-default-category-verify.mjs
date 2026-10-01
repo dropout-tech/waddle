@@ -181,7 +181,7 @@ try {
   await page.addInitScript(() => { try { localStorage.setItem('waddle-language-v1', 'zh-TW') } catch {} })
 
   // ── login ───────────────────────────────────────────────────────────────
-  await page.goto(`${BASE}/login`, { waitUntil: WAIT })
+  await page.goto(`${BASE}/login?method=email`, { waitUntil: WAIT })
   await page.locator('button[type="submit"]').waitFor({ timeout: 30000 })
   await sleep(3000)
   await fillStable(page, 'input[type="email"]', EMAIL)

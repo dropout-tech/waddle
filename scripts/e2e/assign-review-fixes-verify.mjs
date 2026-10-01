@@ -132,7 +132,7 @@ async function main() {
   ok(!page.url().includes('/org/invite'), `Back from /login does not bounce into the invite again (${new URL(page.url()).pathname})`)
   const tab2 = await ctx.newPage() // e.g. the email-confirmation link opening in a new tab
   tab2.on('pageerror', (e) => errors.push(e.message))
-  await tab2.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await tab2.goto(`${BASE}/login?method=email`, { waitUntil: 'domcontentloaded' })
   ok(await tab2.evaluate(() => sessionStorage.length === 0), 'new tab has an empty sessionStorage')
   await tab2.locator('#email').fill(env.E2E_EMAIL)
   await tab2.locator('#password').fill(env.E2E_PASSWORD)

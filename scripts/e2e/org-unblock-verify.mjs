@@ -64,7 +64,7 @@ async function main() {
   const page = await ctx.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login?method=email`, { waitUntil: 'domcontentloaded' })
   await page.locator('#email').fill(env.E2E_EMAIL)
   await page.locator('#password').fill(env.E2E_PASSWORD)
   await page.getByRole('button', { name: '登入', exact: true }).click()
