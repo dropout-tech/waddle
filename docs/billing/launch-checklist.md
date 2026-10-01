@@ -13,6 +13,17 @@
 
 這次 **未套用 production migration、未部署 Edge Function、未建立商店商品、未啟用原生購買流程**。Web 部署不會自動完成這些步驟。
 
+## 2026-10-01 第一階段：iOS 購買畫面（程式已完成，未開啟）
+
+- 位置：會員頁 `/membership` 的「Huddle Pro」卡，元件在 `components/billing/`，狀態邏輯在 `lib/billing/paywall-state.ts`（純函式）、session 生命週期在 `lib/billing/session-store.ts`。
+- 只在「原生 iOS＋`NEXT_PUBLIC_BILLING_ENABLED=true`＋有公開 SDK key＋已登入」顯示；網頁版、桌面版、旗標未開時整張卡不存在。
+- 價格與週期只顯示商店回傳值（週期取商店的 `subscriptionPeriod`，不看 package 名稱）；`plans.ts` 的參考金額不會出現在畫面上。
+- 商店回報成功只會進入「購買已完成，正在同步」，每 5.5 秒重讀一次伺服器的 `paid_until`，90 秒後改顯示「稍後會自動生效／可按恢復購買」。畫面上的「已訂閱」只來自伺服器。
+- **在下面第 5–9 步（webhook、對帳）上線前，沙盒購買會停在「同步中」然後逾時**——這是預期行為，不是壞掉。
+- 原生 iOS 的會員頁不再顯示「兌換優惠碼」「朋友的推薦碼」兩個輸入框（Apple 3.1.1）；註冊頁的同名欄位尚未處理。
+- 進沙盒前還要：建立商品與 RevenueCat offering（月繳商品週期須為 1 個月、年繳為 1 年）、填 `NEXT_PUBLIC_REVENUECAT_IOS_KEY`、開旗標後重跑 `pnpm cap:sync`、在 Xcode 加 In-App Purchase capability、把 `/terms`、`/privacy`、`/refunds`、`/support` 上「Pro 尚未開放」的文字改掉。
+- 驗證：`node --experimental-strip-types --test scripts/tests/billing-*.test.mjs`；畫面用 `scripts/e2e/iap-paywall-verify.mjs`（假商店、假後端，不連任何真實服務）。真機與沙盒購買尚未做。
+
 ## 啟用順序與缺少項目
 
 1. Apple Developer / App Store Connect 與 Google Play Console 帳號、合約、收款與稅務資料；確認 app bundle/package ID。Android 專案與商店版本仍需建立／驗證。
