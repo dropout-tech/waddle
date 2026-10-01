@@ -90,7 +90,7 @@ async function makeContext({ viewport, mobile = false, petMode, lang = 'zh-TW', 
 }
 
 async function login(page) {
-  await page.goto(BASE + '/login', { waitUntil: 'domcontentloaded' })
+  await page.goto(BASE + '/login?method=email', { waitUntil: 'domcontentloaded' })
   await page.locator('#email').fill(env.E2E_EMAIL)
   await page.locator('#password').fill(env.E2E_PASSWORD)
   await page.locator('button[type=submit]').click()
@@ -98,7 +98,7 @@ async function login(page) {
 }
 
 async function openApp(page) {
-  if (!page.url().startsWith(BASE) || page.url().includes('/login')) await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
+  if (!page.url().startsWith(BASE) || page.url().includes('/login?method=email')) await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
   await page.locator('[data-pet], [data-pet-adopt]').first().waitFor({ timeout: 90000 })
   // Skip the onboarding tour if this account still has it.
   const skip = page.getByRole('button', { name: /略過導覽|Skip tour/ })

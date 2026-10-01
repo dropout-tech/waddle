@@ -42,7 +42,7 @@ await context.route('**/rest/v1/**', async route => {
 await page.addInitScript(()=>{localStorage.setItem('waddle.waterReminder.enabled','0');if(!localStorage.getItem('waddle-language-v1'))localStorage.setItem('waddle-language-v1','zh-TW')})
 mkdirSync(SHOTS,{recursive:true})
 try {
- await page.goto(process.env.E2E_BASE_URL || 'http://localhost:3169/login', {waitUntil:'networkidle'})
+ await page.goto(process.env.E2E_BASE_URL || 'http://localhost:3169/login?method=email', {waitUntil:'networkidle'})
  await page.locator('#email').fill(env.E2E_EMAIL)
  await page.locator('#password').fill(env.E2E_PASSWORD)
  await page.locator('button[type=submit]').click()

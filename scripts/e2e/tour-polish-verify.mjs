@@ -501,7 +501,7 @@ async function main() {
   const loginCtx = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'zh-TW' })
   await installRoutes(loginCtx, { forceTour: { value: false } })
   const loginPage = await loginCtx.newPage()
-  await loginPage.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' })
+  await loginPage.goto(`${BASE_URL}/login?method=email`, { waitUntil: 'domcontentloaded' })
   await loginPage.locator('#email').fill(EMAIL)
   await loginPage.locator('#password').fill(PASSWORD)
   await loginPage.locator('button[type=submit]').click()

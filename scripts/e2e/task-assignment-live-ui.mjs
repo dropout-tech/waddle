@@ -39,7 +39,7 @@ async function login(ctx, email, password) {
       if (claims.sub) page.__auth = { token: jwt, id: claims.sub }
     } catch { /* not a JWT */ }
   })
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${BASE}/login?method=email`, { waitUntil: 'domcontentloaded' })
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(password)
   await page.getByRole('button', { name: '登入', exact: true }).click()

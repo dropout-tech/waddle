@@ -84,7 +84,7 @@ async function main() {
   }
 
   await step('login', async () => {
-    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE_URL}/login?method=email`, { waitUntil: 'domcontentloaded' })
     await page.locator('#email').waitFor({ state: 'visible', timeout: 90000 })
     await page.waitForLoadState('networkidle').catch(() => {})
     for (let i = 0; i < 5; i++) {

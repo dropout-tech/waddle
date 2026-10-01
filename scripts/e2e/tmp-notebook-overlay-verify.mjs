@@ -80,7 +80,7 @@ async function main() {
 
   // ---- login ----
   await step('login', async () => {
-    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' })
+    await page.goto(`${BASE_URL}/login?method=email`, { waitUntil: 'domcontentloaded' })
     await page.locator('#email').waitFor({ state: 'visible', timeout: 90000 })
     await page.waitForLoadState('networkidle').catch(() => {})
     // hydration race: fill can be wiped by React re-render — verify it stuck
