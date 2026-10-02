@@ -3,11 +3,12 @@ import Link from 'next/link'
 import { LegalPage, LegalSection } from '@/components/legal/legal-page'
 import { WebOnly } from '@/components/legal/web-only'
 import { SUPPORT_PHONE, SUPPORT_PHONE_TEL } from '@/lib/legal/operator'
+import { IN_APP_PURCHASE_LIVE } from '@/lib/legal/in-app-purchase'
 
 export const metadata: Metadata = { title: '取消訂閱與退款｜Huddle', alternates: { canonical: '/refunds', languages: { 'zh-TW': '/refunds', en: '/en/refunds' } } }
 export default function RefundsPage() {
   return <LegalPage page="refunds" title="取消訂閱與退款" intro="取消續訂、申請退款與刪除帳號是不同的操作，做法也依購買管道而不同。這裡說明它們的差別與官方入口。">
-    <LegalSection title="目前沒有 Huddle 訂閱扣款"><p>Pro 尚未開放購買，所以現在不會有任何 Huddle 訂閱，也沒有試用結束後的自動扣款。若你看到疑似 Huddle 的扣款，請先確認銀行或商店收據中的商家名稱、商品與購買帳號，並來電 <a href={SUPPORT_PHONE_TEL}>{SUPPORT_PHONE}</a> 詢問；不要在公開問題回報頁貼出收據、卡號或個人資料。</p></LegalSection>
+    <LegalSection title={IN_APP_PURCHASE_LIVE ? 'Huddle Pro 怎麼扣款' : '目前沒有 Huddle 訂閱扣款'}>{IN_APP_PURCHASE_LIVE ? <><p>Huddle Pro 是自動續訂的訂閱，可在 iPhone App 內透過 App Store 購買，由 Apple 向你 Apple 帳號的付款方式扣款，收據也由 Apple 寄發。月繳方案每月扣款一次，年繳方案每年扣款一次；價格與免費試用資格以 App Store 購買畫面顯示的為準。註冊或登入 Huddle 不需要提供任何付款資料。</p><p>若你看到不認得的 Huddle 扣款，請先確認 Apple 收據上的商品與購買帳號，再來電 <a href={SUPPORT_PHONE_TEL}>{SUPPORT_PHONE}</a> 詢問；不要在公開問題回報頁貼出收據、卡號或個人資料。</p></> : <><p>Pro 尚未開放購買，所以現在不會有任何 Huddle 訂閱，也沒有試用結束後的自動扣款。若你看到疑似 Huddle 的扣款，請先確認銀行或商店收據中的商家名稱、商品與購買帳號，並來電 <a href={SUPPORT_PHONE_TEL}>{SUPPORT_PHONE}</a> 詢問；不要在公開問題回報頁貼出收據、卡號或個人資料。</p></>}</LegalSection>
     <WebOnly>
       <LegalSection id="web-trial" title="網站購買：免費試用與取消（網站購買開放後適用）">
         <p><strong>網站購買目前尚未開放。</strong>以下「網站購買」各段只在 Huddle 網站開放購買後適用。</p>
@@ -25,9 +26,9 @@ export default function RefundsPage() {
         <p>續訂扣款失敗時（例如卡片過期、額度不足），我們會寄信通知你，並在 7 天內最多再嘗試扣款 3 次，這段期間 Pro 照常可用。你可以到「設定」→「訂閱」更換信用卡。7 天後仍無法扣款，訂閱會自動結束、帳號回到免費方案；我們不會向你追收這一期的費用，資料也不會被刪除。之後想再使用 Pro，重新購買即可。</p>
       </LegalSection>
     </WebOnly>
-    <LegalSection title="日後透過 Apple 購買時"><p>若未來從 App Store 訂閱，可依 Apple 的<a href="https://support.apple.com/118428" target="_blank" rel="noreferrer">取消訂閱說明</a>在 Apple 帳號中管理續訂。退款申請則使用<a href="https://support.apple.com/118223" target="_blank" rel="noreferrer">Apple 官方退款流程</a>；取消續訂本身不等同已提出退款申請。Apple 的訂閱無法在 Huddle 網站取消或退款。</p></LegalSection>
+    <LegalSection title={IN_APP_PURCHASE_LIVE ? '取消續訂與申請退款（Apple）' : '日後透過 Apple 購買時'}>{IN_APP_PURCHASE_LIVE ? <><p>透過 App Store 購買的訂閱，請在 Apple 帳號中管理續訂（iPhone 或 iPad 的「設定」→ 你的名字 →「訂閱」），也可以參考 Apple 的<a href="https://support.apple.com/118428" target="_blank" rel="noreferrer">取消訂閱說明</a>。取消後不會再續扣，Pro 可以使用到已付費期間結束。退款申請則使用<a href="https://support.apple.com/118223" target="_blank" rel="noreferrer">Apple 官方退款流程</a>，由 Apple 審核；取消續訂本身不等同已提出退款申請。</p></> : <><p>若未來從 App Store 訂閱，可依 Apple 的<a href="https://support.apple.com/118428" target="_blank" rel="noreferrer">取消訂閱說明</a>在 Apple 帳號中管理續訂。退款申請則使用<a href="https://support.apple.com/118223" target="_blank" rel="noreferrer">Apple 官方退款流程</a>；取消續訂本身不等同已提出退款申請。Apple 的訂閱無法在 Huddle 網站取消或退款。</p></>}</LegalSection>
     <LegalSection title="日後透過 Google Play 購買時"><p>若未來從 Google Play 訂閱，可在<a href="https://play.google.com/store/account/subscriptions" target="_blank" rel="noreferrer">Google Play 訂閱中心</a>管理與取消。退款可參考<a href="https://support.google.com/googleplay/answer/2479637?hl=zh-Hant" target="_blank" rel="noreferrer">Google Play 官方退款說明</a>。請確認登入的是原購買帳號；實際可用期間與退款結果依適用法律及原交易平台處理。</p></LegalSection>
-    <LegalSection title="解除契約與你的權利"><p>依消費者保護法，透過網路購買服務的消費者，原則上可以在接受服務後七日內解除契約，不需要說明理由，也不需要負擔費用。持續提供的訂閱服務不能只因屬於數位服務，就一律宣告不退款。Huddle 沒有採用概括放棄解除權或「所有付款均不退款」的條款，也不影響法律保障你的權利。</p><ul><WebOnly><li><strong>網站購買</strong>（開放後）：依上方「網站購買：七日內全額退款」辦理。</li></WebOnly><li><strong>透過 Apple 購買</strong>（開放後）：款項由 Apple 收取，請依上方流程向 Apple 申請退款；需要協助時可來電 <a href={SUPPORT_PHONE_TEL}>{SUPPORT_PHONE}</a>。</li></ul><p>相關規範可查閱<a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=J0170001" target="_blank" rel="noreferrer">消費者保護法第 18、19 與 19-2 條</a>。</p></LegalSection>
+    <LegalSection title="解除契約與你的權利"><p>依消費者保護法，透過網路購買服務的消費者，原則上可以在接受服務後七日內解除契約，不需要說明理由，也不需要負擔費用。持續提供的訂閱服務不能只因屬於數位服務，就一律宣告不退款。Huddle 沒有採用概括放棄解除權或「所有付款均不退款」的條款，也不影響法律保障你的權利。</p><ul><WebOnly><li><strong>網站購買</strong>（開放後）：依上方「網站購買：七日內全額退款」辦理。</li></WebOnly>{IN_APP_PURCHASE_LIVE ? <li><strong>透過 Apple 購買</strong>：款項由 Apple 收取，請依上方流程向 Apple 申請退款；需要協助時可來電 <a href={SUPPORT_PHONE_TEL}>{SUPPORT_PHONE}</a>。</li> : <li><strong>透過 Apple 購買</strong>（開放後）：款項由 Apple 收取，請依上方流程向 Apple 申請退款；需要協助時可來電 <a href={SUPPORT_PHONE_TEL}>{SUPPORT_PHONE}</a>。</li>}</ul><p>相關規範可查閱<a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=J0170001" target="_blank" rel="noreferrer">消費者保護法第 18、19 與 19-2 條</a>。</p></LegalSection>
     <LegalSection title="刪除帳號與訂閱"><p>移除應用程式或刪除 Huddle 帳號，不能代替 Apple 或 Google Play 的取消操作：透過 Apple 購買的訂閱，請先在 Apple 帳號取消續訂，再刪除 Huddle 帳號。</p><WebOnly><p>網站購買開放後，在網站購買的訂閱會在刪除帳號時一併停止續訂，不會再扣款；但已付費期間不因刪除帳號而退款。若仍在 7 天全額退款期間內，請<strong>先申請退款再刪除帳號</strong>，刪除後我們無法確認你的身分。</p></WebOnly><p>使用上的問題請參閱<Link href="/support">使用協助</Link>。</p></LegalSection>
   </LegalPage>
 }
