@@ -22,6 +22,24 @@ export function snapshot(body, userId, entitlementId) {
     observed_at_ms: body.request_date_ms,
   }
 }
+// App Review buys in Apple's sandbox, and RevenueCat Test Store purchases are sandbox data too.
+// Those may unlock Pro for a short while only (owner decision 2026-10-02, E1 option C): they are
+// stored apart from real purchases (billing_sandbox_entitlements) and never last past this cap.
+export const SANDBOX_MAX_MS = 24 * 60 * 60 * 1000
+export function sandboxSnapshot(body, userId, entitlementId) {
+  if (!body?.subscriber || !Number.isFinite(body.request_date_ms)) throw new Error('Invalid subscriber response')
+  const entitlement = body.subscriber.entitlements?.[entitlementId]
+  const subscription = body.subscriber.subscriptions?.[entitlement?.product_identifier]
+  const expiry = Date.parse(entitlement?.expires_date ?? '')
+  const grace = Date.parse(subscription?.grace_period_expires_date ?? '')
+  const eligible = subscription?.is_sandbox === true && !subscription.refunded_at && Number.isFinite(expiry)
+  const end = eligible ? Math.min(Math.max(expiry, Number.isFinite(grace) ? grace : 0), body.request_date_ms + SANDBOX_MAX_MS) : 0
+  return {
+    user_id: userId,
+    expires_at: end > body.request_date_ms ? new Date(end).toISOString() : null,
+    observed_at_ms: body.request_date_ms,
+  }
+}
 async function secretMatches(actual, expected) {
   const digest = async (value) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))
   const [a, b] = await Promise.all([digest(actual), digest(expected)])
@@ -44,13 +62,17 @@ export function createHandler({ config, fetchSubscriber, persist }) {
       if (!event || typeof event.id !== 'string' || !event.id || typeof event.type !== 'string') return reply(400, { error: 'invalid_event' })
       if (event.type === 'TEST') return reply(200, { received: true, test: true })
       if (!config.appIds.includes(event.app_id)) return reply(403, { error: 'unexpected_app' })
-      // TRANSFER may omit environment; authoritative snapshots still reject sandbox products.
-      if (event.environment && event.environment !== 'PRODUCTION') return reply(200, { ignored: 'sandbox' })
+      // PRODUCTION events only touch real purchases, SANDBOX events only the short-lived review/test
+      // rows. TRANSFER may omit environment: then both are recomputed from the authoritative snapshot.
+      const environment = event.environment ?? null
+      if (environment !== null && environment !== 'PRODUCTION' && environment !== 'SANDBOX') return reply(200, { ignored: 'unknown_environment' })
       const ids = subscriberIds(event)
       if (!ids.length) return reply(200, { ignored: 'no_authenticated_user' })
       if (ids.length > 20) return reply(422, { error: 'too_many_identities' })
-      const snapshots = await Promise.all(ids.map(async (id) => snapshot(await fetchSubscriber(id), id, config.entitlementId)))
-      await persist(event.id, snapshots)
+      const bodies = await Promise.all(ids.map(async (id) => [id, await fetchSubscriber(id)]))
+      const snapshots = environment === 'SANDBOX' ? [] : bodies.map(([id, body]) => snapshot(body, id, config.entitlementId))
+      const sandbox = environment === 'PRODUCTION' ? [] : bodies.map(([id, body]) => sandboxSnapshot(body, id, config.entitlementId))
+      await persist(event.id, snapshots, sandbox)
       return reply(200, { received: true })
     } catch {
       // No event is acknowledged until atomic persistence succeeds; RevenueCat can retry.

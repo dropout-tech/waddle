@@ -20,11 +20,11 @@ Deno.serve(createHandler({
     if (!response.ok) throw new Error('Subscriber lookup failed')
     return response.json()
   },
-  async persist(eventId: string, snapshots: unknown[]) {
-    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/apply_billing_snapshot`, {
+  async persist(eventId: string, snapshots: unknown[], sandbox: unknown[]) {
+    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/apply_billing_snapshots`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ p_event_id: eventId, p_snapshots: snapshots }),
+      body: JSON.stringify({ p_event_id: eventId, p_snapshots: snapshots, p_sandbox: sandbox }),
       signal: AbortSignal.timeout(10000),
     })
     if (!response.ok) throw new Error('Snapshot persistence failed')

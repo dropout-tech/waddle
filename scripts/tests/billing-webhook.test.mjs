@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createHandler, snapshot, subscriberIds } from '../../supabase/functions/revenuecat-webhook/core.mjs'
+import { createHandler, snapshot, sandboxSnapshot, subscriberIds, SANDBOX_MAX_MS } from '../../supabase/functions/revenuecat-webhook/core.mjs'
 const id = 'e33d985b-4bcb-456f-9658-9cc1085185ab'
 const other = 'a33d985b-4bcb-456f-9658-9cc1085185ab'
 const now = Date.now()
@@ -20,10 +20,44 @@ test('missing configuration and bad authorization cannot grant anything', async 
 test('production purchase fetches authoritative snapshot and stores one event', async () => {
   const { handler, writes } = setup(); assert.equal((await handler(request())).status, 200)
   assert.equal(writes[0][0], 'evt-1'); assert.equal(writes[0][1][0].user_id, id); assert.ok(writes[0][1][0].expires_at)
+  assert.deepEqual(writes[0][2], [], 'a production event never writes sandbox rows')
 })
-test('untrusted app and sandbox event never write', async () => {
+test('untrusted app and unknown environment never write', async () => {
   const { handler, writes } = setup(); assert.equal((await handler(request({ ...event, app_id: 'wrong' }))).status, 403)
-  assert.equal((await handler(request({ ...event, environment: 'SANDBOX' }))).status, 200); assert.equal(writes.length, 0)
+  assert.equal((await handler(request({ ...event, environment: 'STAGING' }))).status, 200); assert.equal(writes.length, 0)
+})
+const sandboxBody = (expiresInMs) => {
+  const data = body(); data.subscriber.subscriptions.monthly.is_sandbox = true
+  data.subscriber.entitlements.pro.expires_date = new Date(now + expiresInMs).toISOString(); return data
+}
+test('E1: a sandbox purchase (App Review / Test Store) writes only a short-lived sandbox row', async () => {
+  const { handler, writes } = setup({ fetchSubscriber: async () => sandboxBody(5 * 60000) })
+  assert.equal((await handler(request({ ...event, environment: 'SANDBOX' }))).status, 200)
+  assert.deepEqual(writes[0][1], [], 'sandbox never touches real purchases')
+  assert.equal(writes[0][2][0].user_id, id); assert.equal(Date.parse(writes[0][2][0].expires_at), now + 5 * 60000)
+})
+test('E1: sandbox Pro never lasts longer than 24 hours', () => {
+  assert.equal(Date.parse(sandboxSnapshot(sandboxBody(365 * 86400000), id, 'pro').expires_at), now + SANDBOX_MAX_MS)
+  assert.equal(SANDBOX_MAX_MS, 24 * 60 * 60 * 1000)
+})
+test('E1: production purchases, refunds, expiry and missing expiry give no sandbox Pro', () => {
+  assert.equal(sandboxSnapshot(body(), id, 'pro').expires_at, null)
+  const refunded = sandboxBody(60000); refunded.subscriber.subscriptions.monthly.refunded_at = new Date(now).toISOString()
+  assert.equal(sandboxSnapshot(refunded, id, 'pro').expires_at, null)
+  assert.equal(sandboxSnapshot(sandboxBody(-1000), id, 'pro').expires_at, null)
+  const lifetime = sandboxBody(60000); lifetime.subscriber.entitlements.pro.expires_date = null
+  assert.equal(sandboxSnapshot(lifetime, id, 'pro').expires_at, null)
+})
+test('E1: a sandbox event cannot grant real Pro even if the store reports a production product', async () => {
+  const { handler, writes } = setup()
+  assert.equal((await handler(request({ ...event, environment: 'SANDBOX' }))).status, 200)
+  assert.deepEqual(writes[0][1], []); assert.equal(writes[0][2][0].expires_at, null)
+})
+test('E1: TRANSFER without environment recomputes both kinds for every account', async () => {
+  const { handler, writes } = setup()
+  const transfer = { id: 'evt-t', type: 'TRANSFER', app_id: 'app-test', transferred_from: [id], transferred_to: [other] }
+  assert.equal((await handler(request(transfer))).status, 200)
+  assert.deepEqual(writes[0][1].map((s) => s.user_id), [id, other]); assert.deepEqual(writes[0][2].map((s) => s.user_id), [id, other])
 })
 test('transfer reconciles both authenticated account ids, not email or anonymous keys', () => {
   assert.deepEqual(subscriberIds({ type: 'TRANSFER', transferred_from: [id, '$RCAnonymousID:abc'], transferred_to: [other, 'user@example.test'] }), [id, other])
