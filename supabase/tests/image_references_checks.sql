@@ -63,3 +63,27 @@ select public.t_ok((select cardinality(found) = 4 from r), 'exactly the four ref
 select public.t_ok(not has_function_privilege('authenticated','public.notebook_image_references(uuid,text[])','execute'), 'authenticated cannot call it');
 select public.t_ok(not has_function_privilege('anon','public.notebook_image_references(uuid,text[])','execute'), 'anon cannot call it');
 select public.t_ok(has_function_privilege('service_role','public.notebook_image_references(uuid,text[])','execute'), 'service_role can call it');
+
+-- claim_image_cleanup_run(): cleanup-images rate limit (20261003010000).
+select public.t_ok(public.claim_image_cleanup_run('00000000-0000-4000-8000-0000000000a1', 600), 'first claim for an account wins');
+select public.t_ok(not public.claim_image_cleanup_run('00000000-0000-4000-8000-0000000000a1', 600), 'second claim inside the interval is refused');
+select public.t_ok(not public.claim_image_cleanup_run('00000000-0000-4000-8000-0000000000a1', 600), 'repeated claims stay refused');
+select public.t_ok(public.claim_image_cleanup_run('00000000-0000-4000-8000-0000000000b1', 600), 'another account has its own slot');
+update huddle_ops.image_cleanup_runs set last_run_at = clock_timestamp() - interval '601 seconds'
+ where user_id = '00000000-0000-4000-8000-0000000000a1';
+select public.t_ok(public.claim_image_cleanup_run('00000000-0000-4000-8000-0000000000a1', 600), 'claim wins again once the interval has passed');
+select public.t_ok(not public.claim_image_cleanup_run('00000000-0000-4000-8000-0000000000a1', 600), 'and the slot is taken again right after');
+select public.t_ok((select count(*) = 2 from huddle_ops.image_cleanup_runs), 'one row per account');
+do $$ begin
+  perform public.claim_image_cleanup_run(null, 600);
+  raise exception 'FAILED: null user must be rejected';
+exception when others then
+  if sqlerrm like 'FAILED:%' then raise; end if;
+  raise notice 'PASS: null user is rejected';
+end $$;
+select public.t_ok(not has_function_privilege('authenticated','public.claim_image_cleanup_run(uuid,integer)','execute'), 'authenticated cannot claim');
+select public.t_ok(not has_function_privilege('anon','public.claim_image_cleanup_run(uuid,integer)','execute'), 'anon cannot claim');
+select public.t_ok(has_function_privilege('service_role','public.claim_image_cleanup_run(uuid,integer)','execute'), 'service_role can claim');
+select public.t_ok(not has_table_privilege('authenticated','huddle_ops.image_cleanup_runs','select'), 'authenticated cannot read run times');
+delete from auth.users where id = '00000000-0000-4000-8000-0000000000b1';
+select public.t_ok((select count(*) = 1 from huddle_ops.image_cleanup_runs), 'run row disappears with the account');
