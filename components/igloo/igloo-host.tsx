@@ -225,7 +225,12 @@ function IglooDialog({
   return (
     <DialogContent
       showCloseButton={false}
-      className="max-h-[92dvh] gap-0 overflow-y-auto rounded-2xl p-0 sm:max-w-xl"
+      // Focus the dialog itself, not the ✕ (no ring on open; Tab still reaches it).
+      onOpenAutoFocus={(e) => {
+        e.preventDefault()
+        ;(e.currentTarget as HTMLElement | null)?.focus()
+      }}
+      className="max-h-[92dvh] gap-0 overflow-y-auto rounded-2xl p-0 outline-none sm:max-w-xl"
       data-igloo-dialog
       data-igloo-total={state.totalBricks}
       data-igloo-shown={total}

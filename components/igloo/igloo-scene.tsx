@@ -15,23 +15,30 @@ export interface IglooView {
   mood: IglooMood
 }
 
-// Scene geometry (viewBox 0 0 360 220).
+// Scene geometry (viewBox 0 0 360 240, the 3:2 painted plate).
 const W = 360
-const H = 220
-const CX = 218
-const BASE = 178
-const R = 64
+const H = 240
+const CX = 238
+const BASE = 204
+const R = 74
 const COURSE = R / IGLOO_LAYERS.length
 /** Where the penguin holds a brick (in scene units) — the flight starts here. */
-const HANDS = { x: 72, y: 160 }
-/** Back-row spots for finished igloos, nearest-to-main first. */
+const HANDS = { x: 62, y: 190 }
+/** Painted plates (Codex CLI, 2026-10-03; prompts in the feat(igloo) commit message). */
+const BG_SRC = '/art/igloo/igloo-bg.webp'
+const DONE_SRC = '/art/igloo/igloo-done.webp'
+/** The finished-igloo painting: dome width and base line as fractions of the square image. */
+const DONE_DOME_W = 0.776
+const DONE_BASE_Y = 0.84
+const DONE_CX = 0.5
+/** Back-row spots for finished igloos (dome base centre + scale vs the main igloo). */
 const VILLAGE = [
-  { x: 316, y: 140, s: 0.36 },
-  { x: 128, y: 138, s: 0.32 },
-  { x: 350, y: 132, s: 0.26 },
-  { x: 32, y: 136, s: 0.3 },
-  { x: 86, y: 128, s: 0.24 },
-  { x: 274, y: 128, s: 0.22 },
+  { x: 330, y: 142, s: 0.3 },
+  { x: 140, y: 138, s: 0.26 },
+  { x: 290, y: 132, s: 0.22 },
+  { x: 30, y: 140, s: 0.28 },
+  { x: 92, y: 130, s: 0.2 },
+  { x: 190, y: 128, s: 0.18 },
 ]
 export const VILLAGE_MAX = VILLAGE.length
 const FLAKES = Array.from({ length: 9 }, (_, i) => ({
@@ -72,43 +79,29 @@ function brickAt(n: number): BrickGeom {
 }
 
 function Door({ cx, base, s = 1 }: { cx: number; base: number; s?: number }) {
-  const w = 15 * s
-  const h = 22 * s
+  const w = 13 * s
+  const h = 24 * s
+  const o = w + 5 * s
   return (
     <g>
-      <path
-        d={`M${cx - w - 4 * s} ${base} L${cx - w - 4 * s} ${base - h + w * 0.2} A${w + 4 * s} ${w + 4 * s} 0 0 1 ${cx + w + 4 * s} ${base - h + w * 0.2} L${cx + w + 4 * s} ${base} Z`}
-        className={styles.brick}
-        strokeWidth={1.6 * Math.max(0.6, s)}
-      />
-      <path
-        d={`M${cx - w} ${base} L${cx - w} ${base - h + w} A${w} ${w} 0 0 1 ${cx + w} ${base - h + w} L${cx + w} ${base} Z`}
-        fill="var(--ig-door)"
-      />
+      <path d={`M${cx - o} ${base} L${cx - o} ${base - h + o * 0.3} A${o} ${o} 0 0 1 ${cx + o} ${base - h + o * 0.3} L${cx + o} ${base} Z`} className={styles.brick} />
+      <path d={`M${cx - w} ${base} L${cx - w} ${base - h + w} A${w} ${w} 0 0 1 ${cx + w} ${base - h + w} L${cx + w} ${base} Z`} fill="var(--ig-door)" />
     </g>
   )
 }
 
-/** A finished igloo, drawn whole (village + the day one is finished). */
-function FinishedIgloo({ cx, base, s, flag = true }: { cx: number; base: number; s: number; flag?: boolean }) {
-  const r = R * s
-  const courses = IGLOO_LAYERS.length
+/** A finished igloo — the Codex painting, placed so its dome sits on (cx, base) at radius r. */
+function FinishedIgloo({ cx, base, r }: { cx: number; base: number; r: number }) {
+  const size = (2 * r) / DONE_DOME_W
   return (
-    <g>
-      <path d={`M${cx - r} ${base} A${r} ${r} 0 0 1 ${cx + r} ${base} Z`} className={styles.brick} strokeWidth={1.6 * Math.max(0.55, s)} />
-      {Array.from({ length: courses - 1 }, (_, i) => {
-        const yy = (i + 1) * (r / courses)
-        const half = Math.sqrt(r * r - yy * yy)
-        return <path key={i} d={`M${cx - half} ${base - yy} L${cx + half} ${base - yy}`} stroke="var(--ig-line)" strokeOpacity={0.35} strokeWidth={Math.max(0.6, 1.2 * s)} />
-      })}
-      <Door cx={cx + r * 0.05} base={base} s={s} />
-      {flag && (
-        <g>
-          <path d={`M${cx} ${base - r} L${cx} ${base - r - 16 * s}`} stroke="var(--ig-line)" strokeWidth={Math.max(0.8, 1.6 * s)} />
-          <path d={`M${cx} ${base - r - 16 * s} L${cx + 11 * s} ${base - r - 12.5 * s} L${cx} ${base - r - 9 * s} Z`} fill="var(--ig-flag)" stroke="var(--ig-line)" strokeWidth={Math.max(0.6, 1.1 * s)} strokeLinejoin="round" />
-        </g>
-      )}
-    </g>
+    <image
+      href={DONE_SRC}
+      x={cx - size * DONE_CX}
+      y={base - size * DONE_BASE_Y}
+      width={size}
+      height={size}
+      preserveAspectRatio="xMidYMid meet"
+    />
   )
 }
 
@@ -155,6 +148,18 @@ export function IglooScene({
     >
       <svg viewBox={`0 0 ${W} ${H}`} className={styles.svg} aria-hidden="true">
         <defs>
+          {/* Dry-brush look for the live SVG parts: wobble the edges, then sprinkle grain. */}
+          <filter id={`rough-${uid}`} x="-8%" y="-8%" width="116%" height="116%" colorInterpolationFilters="sRGB">
+            <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="7" result="warp" />
+            <feDisplacementMap in="SourceGraphic" in2="warp" scale="2.4" xChannelSelector="R" yChannelSelector="G" result="rough" />
+            <feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="1" seed="3" result="fine" />
+            <feColorMatrix in="fine" type="matrix" values="0 0 0 0 0.36  0 0 0 0 0.28  0 0 0 0 0.2  -1.3 0 0 0 0.63" result="speck" />
+            <feComposite in="speck" in2="rough" operator="in" result="grain" />
+            <feMerge>
+              <feMergeNode in="rough" />
+              <feMergeNode in="grain" />
+            </feMerge>
+          </filter>
           <clipPath id={`dome-${uid}`}>
             <circle cx={CX} cy={BASE} r={R + 0.5} />
           </clipPath>
@@ -163,46 +168,41 @@ export function IglooScene({
           </clipPath>
         </defs>
 
-        {/* sky: sun by day, moon + stars at night */}
-        {sleeping ? (
+        <image href={BG_SRC} x="0" y="0" width={W} height={H} preserveAspectRatio="xMidYMid slice" />
+        {sleeping && (
           <g>
-            <path d="M318 26 A14 14 0 1 0 330 50 A11 11 0 1 1 318 26 Z" fill="var(--ig-sun)" stroke="var(--ig-line)" strokeWidth="1.4" strokeLinejoin="round" />
-            {[[40, 30], [92, 18], [160, 34], [250, 20], [286, 52]].map(([x, y]) => (
-              <path key={`${x}`} d={`M${x} ${y - 3} L${x} ${y + 3} M${x - 3} ${y} L${x + 3} ${y}`} stroke="var(--ig-sun)" strokeWidth="1.4" strokeLinecap="round" />
-            ))}
+            <rect x="0" y="0" width={W} height={H} fill="#3d3024" opacity="0.26" />
+            <g filter={`url(#rough-${uid})`}>
+              <path d="M312 30 A15 15 0 1 0 326 56 A12 12 0 1 1 312 30 Z" fill="var(--ig-sun)" stroke="var(--ig-line)" strokeWidth="2" strokeLinejoin="round" />
+              {[[40, 34], [96, 20], [170, 38], [252, 22], [282, 58]].map(([x, y]) => (
+                <path key={`${x}`} d={`M${x} ${y - 3.5} L${x} ${y + 3.5} M${x - 3.5} ${y} L${x + 3.5} ${y}`} stroke="var(--ig-sun)" strokeWidth="2" strokeLinecap="round" />
+              ))}
+            </g>
           </g>
-        ) : (
-          <circle cx="320" cy="38" r="13" fill="var(--ig-sun)" fillOpacity="0.55" />
         )}
 
-        {/* back hills + village */}
-        <path d="M0 132 Q48 112 110 126 T226 120 T360 124 L360 160 L0 160 Z" fill="var(--ig-hill)" />
+        {/* the village: one painted igloo per finished one */}
         {VILLAGE.slice(0, villageCount).map((v, i) => (
-          <FinishedIgloo key={i} cx={v.x} base={v.y} s={v.s} />
+          <FinishedIgloo key={i} cx={v.x} base={v.y} r={R * v.s} />
         ))}
-
-        {/* ground */}
-        <path d="M0 156 Q80 144 170 152 T360 148 L360 220 L0 220 Z" fill="var(--ig-snow)" />
-        <path d="M0 156 Q80 144 170 152 T360 148" fill="none" stroke="var(--ig-ghost)" strokeWidth="1.4" />
-        <path d="M150 196 Q230 188 320 194" fill="none" stroke="var(--ig-snow-shade)" strokeWidth="2" strokeLinecap="round" />
 
         {/* footprints from the penguin to the igloo */}
         {Array.from({ length: 6 }, (_, i) => (
-          <ellipse key={i} cx={104 + i * 13} cy={190 - (i % 2) * 4} rx="2.4" ry="1.4" fill="var(--ig-snow-shade)" opacity={mood === 'waiting' ? 0.45 : 0.9} />
+          <ellipse key={i} cx={98 + i * 12} cy={222 - (i % 2) * 4} rx="2.6" ry="1.5" fill="var(--ig-snow-shade)" opacity={mood === 'waiting' ? 0.5 : 0.95} />
         ))}
 
         {/* the brick pile next to the penguin */}
-        <g>
-          <rect x="104" y="176" width="16" height="9" rx="2.5" className={styles.brick} />
-          <rect x="121" y="176" width="16" height="9" rx="2.5" className={styles.brick} />
-          <rect x="112" y="167" width="16" height="9" rx="2.5" className={styles.brick} />
+        <g filter={`url(#rough-${uid})`}>
+          <rect x="96" y="208" width="18" height="10" rx="2.5" className={styles.brick} />
+          <rect x="115" y="208" width="18" height="10" rx="2.5" className={styles.brick} />
+          <rect x="105" y="198" width="18" height="10" rx="2.5" className={styles.brick} />
         </g>
 
         {/* the igloo under construction (or today's finished one) */}
         {showFinished ? (
-          <FinishedIgloo cx={CX} base={BASE} s={1} />
+          <FinishedIgloo cx={CX} base={BASE} r={R} />
         ) : (
-          <g>
+          <g filter={`url(#rough-${uid})`}>
             <path d={`M${CX - R} ${BASE} A${R} ${R} 0 0 1 ${CX + R} ${BASE}`} className={styles.ghost} />
             {IGLOO_LAYERS.slice(0, -1).map((_, i) => {
               const yy = (i + 1) * COURSE
@@ -219,12 +219,12 @@ export function IglooScene({
             </g>
             {/* solid dome outline, only around what's built */}
             <g clipPath={`url(#built-${uid})`}>
-              <path d={`M${CX - R} ${BASE} A${R} ${R} 0 0 1 ${CX + R} ${BASE}`} fill="none" stroke="var(--ig-line)" strokeWidth="1.8" />
+              <path d={`M${CX - R} ${BASE} A${R} ${R} 0 0 1 ${CX + R} ${BASE}`} fill="none" stroke="var(--ig-line)" strokeWidth="2.6" />
             </g>
-            {bricks >= IGLOO_LAYERS[0] + IGLOO_LAYERS[1] && <Door cx={CX + 3} base={BASE} />}
+            {bricks >= IGLOO_LAYERS[0] + IGLOO_LAYERS[1] && <Door cx={CX + 3} base={BASE} s={1.1} />}
           </g>
         )}
-        <path d={`M${CX - R - 10} ${BASE + 1} Q${CX} ${BASE + 7} ${CX + R + 12} ${BASE + 1}`} fill="none" stroke="var(--ig-snow-shade)" strokeWidth="2.4" strokeLinecap="round" />
+        {!showFinished && <path d={`M${CX - R - 10} ${BASE + 1} Q${CX} ${BASE + 7} ${CX + R + 12} ${BASE + 1}`} fill="none" stroke="var(--ig-snow-shade)" strokeWidth="3" strokeLinecap="round" />}
 
         {/* the brick in flight */}
         {flying && (
@@ -236,6 +236,7 @@ export function IglooScene({
             height={flying.h}
             rx="2.6"
             className={cn(styles.brick, styles.flying)}
+            filter={`url(#rough-${uid})`}
             style={{ '--dx': `${HANDS.x - flying.x}px`, '--dy': `${HANDS.y - flying.y}px` } as React.CSSProperties}
           />
         )}
@@ -243,14 +244,14 @@ export function IglooScene({
         {/* the finished-igloo moment */}
         {celebrating && (
           <g>
-            {[[CX - 70, 110], [CX + 72, 104], [CX - 40, 92], [CX + 44, 90], [CX, 84], [CX - 86, 140], [CX + 88, 138]].map(([x, y], i) => (
+            {[[CX - 80, BASE - 70], [CX + 82, BASE - 76], [CX - 46, BASE - 94], [CX + 50, BASE - 96], [CX, BASE - 106], [CX - 96, BASE - 34], [CX + 98, BASE - 36]].map(([x, y], i) => (
               <path
                 key={i}
                 className={styles.burst}
                 d={`M${x} ${y - 6} L${x + 1.6} ${y - 1.6} L${x + 6} ${y} L${x + 1.6} ${y + 1.6} L${x} ${y + 6} L${x - 1.6} ${y + 1.6} L${x - 6} ${y} L${x - 1.6} ${y - 1.6} Z`}
                 fill={i % 2 ? 'var(--ig-sun)' : 'var(--ig-flag)'}
                 stroke="var(--ig-line)"
-                strokeWidth="0.9"
+                strokeWidth="1.4"
                 strokeLinejoin="round"
               />
             ))}
@@ -268,10 +269,17 @@ export function IglooScene({
       </svg>
 
       {/* the penguin (the user's own look) */}
-      <div className={styles.penguin} style={{ left: '9%', bottom: '13%', width: '21%' }} data-igloo-penguin>
+      <div className={styles.penguin} style={{ left: '9%', bottom: '8%', width: '16%' }} data-igloo-penguin>
         <div key={hopKey} className={cn(styles.penguinInner, hopKey > 0 && mood !== 'waiting' && styles.hop)}>
           <PetSprite color={look.color} accessory={look.accessory} pose={sleeping ? 'sleep' : 'stand'} blush={mood === 'proud' || celebrating} />
-          {showCarry && <span className={styles.carry} aria-hidden="true" />}
+          {showCarry && (
+            <svg viewBox="0 0 40 18" className={styles.carry} aria-hidden="true">
+              <g filter={`url(#rough-${uid})`}>
+                <rect x="2" y="2" width="36" height="14" rx="3" className={styles.brick} />
+                <rect x="5" y="11.5" width="30" height="2.2" rx="1.1" className={styles.brickShade} />
+              </g>
+            </svg>
+          )}
         </div>
         {mood === 'waiting' && <span className={styles.snowMound} aria-hidden="true" />}
         {mood === 'waiting' && <span className={styles.thinking} aria-hidden="true">…</span>}

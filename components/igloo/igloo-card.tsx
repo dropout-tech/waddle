@@ -32,13 +32,15 @@ export function IglooCard() {
       data-igloo-card
       className="group mt-4 flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left shadow-sm transition-colors hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-4 sm:p-4"
     >
-      <IglooScene
-        compact
-        view={{ completed: state.completedIgloos, bricks: state.bricksInCurrent, per, mood: state.mood }}
-        look={look}
-        className="w-32 shrink-0 rounded-xl sm:w-40"
-        label={t('冰屋場景：第 {n} 座冰屋蓋了 {x}/{per} 塊冰磚，村落裡有 {built} 座蓋好的冰屋。', { n, x, per, built: state.completedIgloos })}
-      />
+      <span className="block w-32 shrink-0 sm:w-44">
+        <IglooScene
+          compact
+          view={{ completed: state.completedIgloos, bricks: state.bricksInCurrent, per, mood: state.mood }}
+          look={look}
+          className="rounded-xl"
+          label={t('冰屋場景：第 {n} 座冰屋蓋了 {x}/{per} 塊冰磚，村落裡有 {built} 座蓋好的冰屋。', { n, x, per, built: state.completedIgloos })}
+        />
+      </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold">{t('企鵝的冰屋')}</span>
         <span className="mt-0.5 block text-xs tabular-nums text-muted-foreground">
