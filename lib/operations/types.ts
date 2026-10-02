@@ -30,7 +30,11 @@ export interface Membership {
   }
   admin: boolean
   settings: OperationsSettings
+  /** Apple (App Store) only — the iOS purchase card relies on this. */
   paid_until: string | null
+  /** Website subscription access end (null when none). */
+  web_paid_until: string | null
+  /** Latest of gifts, Apple and website subscription. */
   pro_until: string | null
   grants: Grant[]
   referral_count: number
@@ -65,6 +69,7 @@ export interface Member {
   last_active: string | null
   suspended: boolean
   paid_until: string | null
+  web_paid_until: string | null
   gift_until: string | null
   referrals: number
 }
