@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Laugh, Moon, Settings2, VolumeX } from 'lucide-react'
+import { Home, Laugh, Moon, Settings2, VolumeX } from 'lucide-react'
 import { useI18n } from '@/lib/i18n/react'
 import { createClient } from '@/lib/supabase/client'
 import { useFocusTimer } from '@/components/timer/focus-timer-provider'
@@ -10,6 +10,7 @@ import { isTaskOverdue } from '@/lib/task-utils'
 import { toDateString } from '@/lib/calendar-utils'
 import { pickLine, renderLine, type PetLineCategory } from '@/lib/pet/lines'
 import { isPetMuted, localDate, readPetLocal, writePetLocal } from '@/lib/pet/local'
+import { getIglooSnapshot, openIgloo } from '@/lib/igloo/store'
 import { CELEBRATE_CHANCE, IDLE_DAILY_CAP, IDLE_MINUTES, type PetSettings } from '@/lib/pet/types'
 import type { Workspace } from '@/lib/types'
 import { PetSprite, type PetPose } from './pet-sprite'
@@ -329,6 +330,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   }, [workspaces])
   const prevCompleted = useRef<Set<string> | null>(null)
   const lastCelebrate = useRef(0)
+  const iglooAnnounced = useRef<number | null>(null)
   useEffect(() => {
     const prev = prevCompleted.current
     prevCompleted.current = completedIds
@@ -337,9 +339,27 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
     for (const id of completedIds) if (!prev.has(id)) { fresh = true; break }
     if (!fresh || Date.now() - lastCelebrate.current < 60_000) return
     if (!shown || quiet || menuOpen || isPetMuted()) return
-    if (Math.random() >= CELEBRATE_CHANCE) return // only now and then
-    lastCelebrate.current = Date.now()
-    say(line(['celebrate']), { auto: true, act: 'jump' })
+    // The igloo state (lib/igloo/store) is republished by IglooHost in the
+    // same commit, after this effect — read it a beat later.
+    const lucky = Math.random() < CELEBRATE_CHANCE
+    const id = window.setTimeout(() => {
+      const igloo = getIglooSnapshot()
+      // Finishing an igloo is rare (about weekly) — always worth one line.
+      if (igloo && igloo.finishedToday && igloo.bricksInCurrent === 0 && iglooAnnounced.current !== igloo.completedIgloos) {
+        iglooAnnounced.current = igloo.completedIgloos
+        lastCelebrate.current = Date.now()
+        say(line(['igloo'], { built: igloo.completedIgloos }), { auto: true, act: 'jump' })
+        return
+      }
+      if (!lucky) return // only now and then
+      lastCelebrate.current = Date.now()
+      if (igloo && Math.random() < 0.5) {
+        say(line(['brick'], { today: igloo.bricksToday, left: igloo.bricksPerIgloo - igloo.bricksInCurrent }), { auto: true, act: 'hop' })
+      } else {
+        say(line(['celebrate']), { auto: true, act: 'jump' })
+      }
+    }, 80)
+    return () => window.clearTimeout(id)
   }, [completedIds, workspaces.length, shown, quiet, menuOpen, say, line])
 
   // Focus timer finished → speak even though we were quiet during it.
@@ -521,9 +541,10 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
     pressStart.current = null
   }
 
-  const menuAction = (kind: 'joke' | 'hour' | 'today' | 'settings') => {
+  const menuAction = (kind: 'joke' | 'igloo' | 'hour' | 'today' | 'settings') => {
     setMenuOpen(false)
     if (kind === 'joke') return say(line(['joke']), { act: 'hop' })
+    if (kind === 'igloo') return openIgloo()
     if (kind === 'hour') {
       writePetLocal({ mutedUntil: Date.now() + 60 * 60 * 1000 })
       return say(t('好，我安靜一小時。'), { act: '' })
@@ -638,6 +659,9 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
           >
             <button type="button" role="menuitem" className={styles.menuItem} onClick={() => menuAction('joke')}>
               <Laugh className="w-4 h-4" aria-hidden="true" />{t('講個笑話')}
+            </button>
+            <button type="button" role="menuitem" className={styles.menuItem} onClick={() => menuAction('igloo')} data-pet-igloo>
+              <Home className="w-4 h-4" aria-hidden="true" />{t('去冰屋看看')}
             </button>
             <button type="button" role="menuitem" className={styles.menuItem} onClick={() => menuAction('hour')}>
               <VolumeX className="w-4 h-4" aria-hidden="true" />{t('安靜 1 小時')}

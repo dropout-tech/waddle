@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { CheckInLeaderboard } from './check-in-leaderboard'
+import { IglooCard } from '@/components/igloo/igloo-card'
 import { useEffect, useState } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
@@ -121,6 +122,8 @@ function DailyCheckIn({ today }: { today: string }) {
       </div>
 
       <p className="mt-3 px-1 text-center text-xs leading-5 text-muted-foreground">{t('每天一小步，慢慢累積。每日台北時間 00:00 換日。')}</p>
+
+      <IglooCard />
 
       <CheckInLeaderboard score={status?.total_points} />
     </section>
