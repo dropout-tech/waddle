@@ -525,14 +525,20 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
       if (document.visibilityState === 'hidden') flushAllContent()
     }
     window.addEventListener('pagehide', flushAllContent)
+    // Text whose save failed offline goes out as soon as the connection is back.
+    window.addEventListener('online', flushAllContent)
     document.addEventListener('visibilitychange', onVisibility)
-    // Signing out sends pending text first and waits for it.
+    // Signing out sends pending text first and waits for it. Sticky text
+    // has no local backup, so whatever still didn't go through is reported
+    // and the user is asked before it's lost.
     const unregister = registerPendingWrites(async () => {
       flushAllContent()
       await Promise.all(Object.values(noteChains.current))
+      return Object.keys(pendingContent.current).length
     })
     return () => {
       window.removeEventListener('pagehide', flushAllContent)
+      window.removeEventListener('online', flushAllContent)
       document.removeEventListener('visibilitychange', onVisibility)
       unregister()
       flushAllContent()

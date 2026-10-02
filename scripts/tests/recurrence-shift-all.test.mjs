@@ -5,7 +5,7 @@
 // weekdays plus a stray occurrence on the new start day.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { shiftSeries, taskOccursOnDate, parseDateString, toDateString } from '../../lib/calendar-utils.ts'
+import { shiftSeries, taskOccursOnDate, parseDateString, toDateString, overridesFollowingShift } from '../../lib/calendar-utils.ts'
 
 const series = (scheduledDate, recurrence) => ({
   id: 's', title: 'series', scheduledDate, isRecurring: true, recurrence: { interval: 1, ...recurrence },
@@ -18,6 +18,7 @@ const moveAll = (task, targetDate, date) => {
     ...task,
     scheduledDate: s.scheduledDate,
     recurrence: { ...task.recurrence, ...(s.daysOfWeek ? { daysOfWeek: s.daysOfWeek } : {}) },
+    ...(s.exdates ? { exdates: s.exdates } : {}),
   }
 }
 
@@ -131,4 +132,37 @@ test('every-week, daily and monthly series are never refused', () => {
   assert.equal(seriesShiftIsExact(series('2026-10-02', { type: 'weekly', daysOfWeek: [5, 6] }), '2026-10-02', '2026-10-03'), true)
   assert.equal(seriesShiftIsExact(series('2026-10-02', { type: 'daily', interval: 2 }), '2026-10-02', '2026-10-03'), true)
   assert.equal(seriesShiftIsExact(series('2026-10-02', { type: 'monthly', interval: 2 }), '2026-10-02', '2026-10-05'), true)
+})
+
+// Skipped days move with the series: a deleted occurrence stays deleted and
+// an overridden one doesn't come back as a second copy.
+test('exdates move with the series (deleted day stays deleted)', () => {
+  // 每週一、三; Wed 10-14 deleted. Drag Mon 10-12 → Tue 10-13 (+1).
+  const t = { ...series('2026-10-05', { type: 'weekly', daysOfWeek: [1, 3] }), exdates: ['2026-10-14'] }
+  const moved = assertWholeSeriesMoved(t, '2026-10-12', '2026-10-13')
+  assert.deepEqual(moved.exdates, ['2026-10-15'])
+  assert.equal(taskOccursOnDate(moved, parseDateString('2026-10-15')), false) // the deleted one, moved
+  assert.equal(taskOccursOnDate(moved, parseDateString('2026-10-22')), true) // its neighbours still there
+  // Undo (opposite shift) restores the skipped day exactly.
+  const back = moveAll(moved, '2026-10-13', '2026-10-12')
+  assert.deepEqual(back.exdates, ['2026-10-14'])
+})
+
+test('series without exdates gets none added', () => {
+  const s = shiftSeries(series('2026-10-01', { type: 'daily' }), '2026-10-03', '2026-10-05')
+  assert.equal(s.exdates, undefined)
+  assert.equal(s.offset, 2)
+})
+
+test('overrides on their original day follow the shift; moved ones stay', () => {
+  const master = { ...series('2026-10-05', { type: 'weekly', daysOfWeek: [1, 3] }), exdates: ['2026-10-14', '2026-10-19'] }
+  const tasks = [
+    master,
+    { id: 'o1', parentId: 's', scheduledDate: '2026-10-14' }, // only the time changed → follows
+    { id: 'o2', parentId: 's', scheduledDate: '2026-10-23' }, // user dragged it to Fri → stays
+    { id: 'x', parentId: 'other', scheduledDate: '2026-10-14' }, // another series' override
+    { id: 'y', scheduledDate: '2026-10-14' }, // ordinary task
+  ]
+  assert.deepEqual(overridesFollowingShift(master, tasks).map((t) => t.id), ['o1'])
+  assert.deepEqual(overridesFollowingShift({ id: 's' }, tasks), [])
 })

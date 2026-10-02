@@ -48,7 +48,7 @@ export function FloatingNote({ initialNoteId }: { initialNoteId?: string }) {
   const {
     notes, loading, saveStatus,
     createNote, renameNote, setNoteIcon, saveNoteContent, uploadImage,
-  } = useNotebook()
+  } = useNotebook({ editor: true })
 
   const [activeId, setActiveId] = useState<string | null>(initialNoteId ?? null)
 

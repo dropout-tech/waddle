@@ -82,6 +82,17 @@ export function dateLabel(value: string | null | undefined) {
       })
     : '—'
 }
+/** Same clock as dateLabel (Taipei), day only: 2027/10/01. */
+export function dayLabel(value: string | null | undefined) {
+  return value
+    ? new Date(value).toLocaleDateString('zh-TW', {
+        timeZone: 'Asia/Taipei',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+    : '—'
+}
 export const sourceLabel: Record<string, string> = {
   trial: '新戶體驗',
   coupon: '活動優惠',

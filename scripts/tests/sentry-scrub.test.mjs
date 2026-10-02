@@ -123,8 +123,14 @@ test('scrubEvent: stack frames, request, user, extra', () => {
   assert.ok(!json.includes('SECRETCODE123'), json)
   assert.ok(!json.includes('Buy milk'))
   assert.ok(!json.includes('secret()'))
-  assert.equal(ev.user, undefined)
+  assert.deepEqual(ev.user, { id: 'u1' }) // uuid only; email stripped
+  assert.ok(!json.includes('a@b.co'))
   assert.equal(ev.extra, undefined)
   assert.deepEqual(ev.request, { url: 'https://huddle.lazy72.com/login', headers: { 'User-Agent': 'UA' } })
   assert.equal(ev.exception.values[0].stacktrace.frames[0].filename, 'https://huddle.lazy72.com/login')
+})
+
+test('scrubEvent: user without an id is dropped entirely', () => {
+  const ev = scrubEvent({ user: { email: 'a@b.co', ip_address: '1.2.3.4' } })
+  assert.equal(ev.user, undefined)
 })

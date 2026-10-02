@@ -13,11 +13,20 @@
 // deleted and the request fails, so a retry can finish the job instead of
 // leaving orphaned, still-public images with no owner to delete them.
 //
+// The member's RevenueCat customer is deleted next (_shared/revenuecat-deletion.mjs):
+// personal data held by that processor goes with the account. A RevenueCat outage
+// never blocks the deletion: after a few quick tries the id is queued
+// (revenuecat_deletion_queue) and retried here and by revenuecat-deletion-retry.
+// Skipped while REVENUECAT_SECRET_API_KEY is not set (billing not launched).
+//
 // Deploy:  supabase functions deploy delete-account
 // (SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY are injected
-//  by the platform — no manual secrets needed.)
+//  by the platform; REVENUECAT_SECRET_API_KEY is the same project secret the
+//  revenuecat-webhook function uses.)
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { releaseRevenueCatCustomer } from '../_shared/revenuecat-deletion.mjs'
+import { drainQueue, enqueueDeletion } from '../_shared/revenuecat-deletion-queue.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -113,9 +122,27 @@ Deno.serve(async (req) => {
       return json({ error: 'Could not delete uploaded images; account was not deleted' }, 500)
     }
 
+    // Delete the member's RevenueCat customer; if RevenueCat is down, queue it and carry on.
+    // Only a failure to even queue it stops here (nothing has been deleted from auth yet).
+    const revenueCatKey = Deno.env.get('REVENUECAT_SECRET_API_KEY') ?? ''
+    try {
+      const outcome = await releaseRevenueCatCustomer({ apiKey: revenueCatKey, userId: user.id, enqueue: enqueueDeletion(admin) })
+      if (outcome === 'queued') console.warn('[delete-account] RevenueCat customer delete queued for retry')
+    } catch (e) {
+      console.error('[delete-account] RevenueCat deletion could not be queued', e instanceof Error ? e.message : String(e))
+      return json({ error: 'Could not remove purchase records; account was not deleted' }, 503)
+    }
+
     // Delete with the service role; FKs cascade-delete all the user's rows.
     const { error: delErr } = await admin.auth.admin.deleteUser(user.id)
     if (delErr) return json({ error: delErr.message }, 500)
+
+    // Best effort: retry a few earlier RevenueCat deletions that were queued.
+    try {
+      await drainQueue(admin, revenueCatKey, 5)
+    } catch (e) {
+      console.error('[delete-account] RevenueCat queue retry failed', e instanceof Error ? e.message : String(e))
+    }
 
     return json({ success: true }, 200)
   } catch (e) {

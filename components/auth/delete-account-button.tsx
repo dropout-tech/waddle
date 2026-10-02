@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { signOutAfterAccountDeletion } from '@/lib/auth/sign-out'
 import { cn } from '@/lib/utils'
+import { buttonVariants } from '@/components/ui/button'
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -19,6 +20,9 @@ import {
   AlertDialogAction,
 } from '@/components/ui/alert-dialog'
 import { useI18n } from '@/lib/i18n/react'
+
+/** Apple's own subscription management page; the native shell hands it to the system. */
+const MANAGE_APPLE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions'
 
 /**
  * In-app account deletion (App Store Guideline 5.1.1(v)). Calls the
@@ -86,9 +90,20 @@ export function DeleteAccountButton({ open, onOpenChange }: DeleteAccountButtonP
           <AlertDialogTitle>{t('確定要刪除帳號嗎？')}</AlertDialogTitle>
           <AlertDialogDescription>
             {t('這會永久刪除你的帳號與所有資料（任務、行程、日記、設定），無法復原。')}
+            {' '}
+            {t('你若透過 iPhone 訂閱 Huddle Pro，扣款由 Apple 處理，刪除帳號不會停止扣款，請先取消訂閱。')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
+          {/* Apple's account-deletion guidance: give subscribers a direct way to cancel first. */}
+          <a
+            href={MANAGE_APPLE_SUBSCRIPTIONS_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(buttonVariants({ variant: 'outline' }), 'mt-2 sm:mt-0')}
+          >
+            {t('管理 Apple 訂閱')}
+          </a>
           <AlertDialogCancel disabled={deleting}>{t('取消')}</AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => {

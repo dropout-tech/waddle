@@ -56,16 +56,19 @@ export const dict: Record<string, string> = {
     'This permanently deletes your account and all your data (tasks, schedule, notes, settings) — this cannot be undone.',
   '取消': 'Cancel',
   '永久刪除': 'Delete permanently',
+  '你若透過 iPhone 訂閱 Huddle Pro，扣款由 Apple 處理，刪除帳號不會停止扣款，請先取消訂閱。':
+    'If you subscribed to Huddle Pro on iPhone, Apple handles the billing — deleting your account does not stop the charges, so cancel the subscription first.',
+  '管理 Apple 訂閱': 'Manage Apple subscription',
 
   // components/user-menu.tsx
   '使用者選單': 'User menu',
   '切換淺色': 'Switch to light mode',
   '切換深色': 'Switch to dark mode',
   '登出': 'Log out',
-  // use-safe-sign-out.tsx — notes that only exist on this device
-  '還有筆記沒有同步': 'Some notes haven\'t synced',
-  '有 {count} 則筆記還沒同步。先打開記事本、確認內容已同步再登出；現在登出，這些內容會遺失。':
-    '{count} {count|note hasn\'t|notes haven\'t} synced yet. Open the notebook and make sure it has synced before logging out — if you log out now, that text will be lost.',
+  // use-safe-sign-out.tsx — notes / sticky notes that only exist on this device
+  '還有內容沒有同步': 'Some changes haven\'t synced',
+  '有 {count} 則筆記或便條紙還沒存到雲端。請連上網路、稍等幾秒再按一次登出（若筆記數量已達方案上限，請先刪掉一些筆記）；現在登出，這些內容會遺失。':
+    '{count} {count|note or sticky note hasn\'t|notes or sticky notes haven\'t} been saved to the cloud yet. Get online, wait a few seconds and log out again (if you\'ve reached your plan\'s note limit, delete a few notes first) — if you log out now, that text will be lost.',
   '登出失敗，請檢查網路後再試一次': 'Couldn\'t log out. Check your connection and try again.',
   '先不要登出': 'Don\'t log out yet',
   '仍要登出': 'Log out anyway',
