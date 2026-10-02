@@ -82,6 +82,10 @@ export const dict: Record<string, string> = {
   // lib/auth/oauth.ts
   'Apple 登入未取得憑證': 'Apple sign-in did not return a credential',
 
+  // lib/auth/google-idtoken.ts
+  'Google 登入未取得憑證': 'Google sign-in did not return a credential',
+  '已取消 Google 登入': 'Google sign-in was cancelled',
+
   // app/(auth)/forgot-password/page.tsx
   '重設密碼': 'Reset password',
   '輸入註冊時的 Email，我們會寄一封重設連結給你。': "Enter the email you signed up with and we'll send you a reset link.",
