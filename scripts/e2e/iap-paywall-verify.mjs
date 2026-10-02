@@ -148,6 +148,8 @@ async function open({ width, height, lang = 'zh-TW', dark = false, billing = nul
       state.unexpected.push(action)
       return route.fulfill({ json: { message: '已儲存' } })
     }
+    // Membership usage meters (Pro limits, main 2026-10-02); limits off → no meters.
+    if (u.pathname.endsWith('/rpc/my_plan_usage')) return route.fulfill({ json: { enforced: false, pro: false, limits: {}, used: {}, grandfathered: {} } })
     if (request.method() === 'GET' || request.method() === 'HEAD') return route.fulfill({ json: [], headers: { 'content-range': '*/0' } })
     state.unexpected.push(`${request.method()} ${u.pathname}`)
     return route.fulfill({ json: [] })
@@ -579,8 +581,9 @@ for (const lang of ['zh-TW', 'en']) {
   const saved = await page.evaluate(() => window.localStorage.getItem('huddle-enrollment-v1'))
   check('iOS sign-up: referral and coupon fields are not there',
     (await page.locator('#signup-referral, #signup-coupon').count()) === 0 && (await page.getByText('推薦與優惠（選填）').count()) === 0)
-  check('iOS sign-up: the form itself still works (email, password, Google and Apple buttons)',
-    (await page.locator('input[type="email"]').count()) === 1 && (await page.getByRole('button', { name: /Google/ }).count()) === 1
+  // Sign-up is Google / Apple only since main f18e097 (PR #124); no email form.
+  check('iOS sign-up: the form itself still works (Google and Apple buttons)',
+    (await page.getByRole('button', { name: /Google/ }).count()) === 1
       && (await page.getByRole('button', { name: /Apple/ }).count()) === 1 && pageErrors.length === 0, pageErrors.join(' | '))
   check('iOS sign-up: a ?ref= code in the address is not picked up', saved === null, String(saved))
   await shot(page, 'ios-signup-390-zh.jpg')
