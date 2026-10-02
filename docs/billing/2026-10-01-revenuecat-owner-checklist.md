@@ -3,6 +3,13 @@
 規矩：密碼、金鑰、銀行資料一律老闆本人貼；工程師只給步驟與變數名。任何「提交以供審查」都不按。
 官方來源見 `2026-10-01-revenuecat-research-notes.md`。
 
+## 現況（2026-10-02 更新，依另一個 session 的交接紀錄）
+- ✅ 老闆本人已做：付費 App 協議「有效」（至 2027-09-28）、銀行（TWD）、台灣稅務表、W-8BEN、小型企業方案已送出（等 Email）、RevenueCat 已註冊、In-App Purchase Key（.p8）已上傳 RevenueCat。
+- ✅ 已建：App Store Connect 訂閱群組 Huddle Pro＋`huddle_pro_monthly`（已設 NT$150）、`huddle_pro_annual`；兩商品已掛到 RevenueCat 權益 **`huddle_planner_pro`**（注意：不是 `pro`）。
+- ⬜ 老闆待做：年繳設價 NT$990、兩商品設「免費 2 週」試賣優惠、RevenueCat Offering `default` 加入 `$rc_monthly`／`$rc_annual`、點 RevenueCat 驗證信、Xcode 加 In-App Purchase（第四節）。
+- ⬜ 工程待做（要先問老闆）：E1 沙盒方案實作、部署 webhook、設 4 把 Supabase secret（`REVENUECAT_PRO_ENTITLEMENT_ID` 要填 `huddle_planner_pro`）。
+→ 下面第一、三節大部分已完成，保留作紀錄。
+
 ## 一、註冊 RevenueCat（老闆本人，約 10 分鐘）
 1. 到 https://app.revenuecat.com 用 email 註冊（建議用公司信箱，之後可邀請工程師進來）。
 2. 信用卡：註冊時會問，**可以先跳過**。每月營收 US$2,500 以下免費；超過收 1%，沒綁卡時部分功能會被鎖。
@@ -13,12 +20,12 @@
 ## 二、專案設定（工程師帶著做；金鑰由老闆貼）
 | 步驟 | 在哪 | 誰貼 | 放到哪 |
 |---|---|---|---|
-| 建 entitlement `pro`、offering `default`、package `$rc_monthly`／`$rc_annual` | RevenueCat → Product catalog | 工程師可操作 | — |
+| 建 entitlement（實際已建為 `huddle_planner_pro`）、offering `default`、package `$rc_monthly`／`$rc_annual` | RevenueCat → Product catalog | 工程師可操作 | — |
 | Test Store 建兩個測試商品（月／年） | RevenueCat → Test Store | 工程師可操作 | — |
 | Test Store 公開金鑰（`test_` 開頭） | Project settings → API keys | 老闆 | 只放本機 `.env.local` 的 `NEXT_PUBLIC_REVENUECAT_IOS_KEY`，**絕不進 TestFlight／正式版**（Release 版會故意當機） |
 | 後端密鑰（V1，`sk_` 開頭） | Project settings → API keys → 新增 secret key，選 **V1** | 老闆 | Supabase secrets：`REVENUECAT_SECRET_API_KEY` |
 | Webhook | Integrations → Webhooks → Add new configuration；網址 `https://<Supabase專案代號>.supabase.co/functions/v1/revenuecat-webhook`；Authorization header 自訂一串長亂碼；環境依 E1 方案選 | 老闆貼亂碼 | 同一串放 Supabase secrets：`REVENUECAT_WEBHOOK_AUTHORIZATION` |
-| Entitlement ID | 上面建的 `pro` | 工程師 | `REVENUECAT_PRO_ENTITLEMENT_ID` |
+| Entitlement ID | `huddle_planner_pro` | 工程師 | `REVENUECAT_PRO_ENTITLEMENT_ID` |
 | App ID（`app` 開頭的識別碼） | Project settings → Apps | 工程師 | `REVENUECAT_APP_IDS`（Test Store 與 App Store 兩個都放，逗號分隔） |
 ※ 設 Supabase secrets、部署 webhook 前，工程師會先問你。
 
