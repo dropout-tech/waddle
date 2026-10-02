@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
+import { useIsNativeShell } from '@/components/legal/web-only'
 import { t } from '@/lib/i18n'
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -70,6 +71,9 @@ function LoginForm() {
   // reachable at /login?method=email, unlinked, for the App Review demo
   // account and the e2e test accounts.
   const emailMode = searchParams.get('method') === 'email'
+  // The native app has no address bar, so App Review gets a small visible
+  // entry to the email form. Web keeps it unlinked.
+  const nativeShell = useIsNativeShell()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -267,6 +271,19 @@ function LoginForm() {
         </Button>
       </form>
       </>)}
+
+      {nativeShell && !emailMode && (
+        <p className="text-center mt-4">
+          <Link
+            href="/login?method=email"
+            replace
+            prefetch={false}
+            className="inline-flex min-h-11 items-center px-2 text-xs text-muted-foreground hover:text-foreground hover:underline"
+          >
+            {t('用 Email 登入')}
+          </Link>
+        </p>
+      )}
 
       <p className="text-center text-sm text-muted-foreground mt-6">
         {t('還沒有帳號？')}{' '}

@@ -23,8 +23,9 @@ const posterFonts = 'huddle-poster-fonts'
 // 'yellow' = the previous yellow hero. Flip this one value to roll back.
 // Preview either without a deploy: /about?hero=yellow or ?hero=ink.
 const HERO_THEME: 'ink' | 'yellow' = 'yellow'
-const release = 'https://github.com/dropout-tech/waddle/releases/tag/v0.1.2-beta.1'
-const download = (arch: string) => `https://github.com/dropout-tech/waddle/releases/download/v0.1.2-beta.1/Huddle-0.1.2-mac-${arch}.dmg`
+const desktopVersion = '0.1.3'
+const release = `https://github.com/dropout-tech/waddle/releases/tag/v${desktopVersion}-beta.1`
+const download = (file: string) => `https://github.com/dropout-tech/waddle/releases/download/v${desktopVersion}-beta.1/Huddle-${desktopVersion}-${file}`
 const copy = {
   zh: {
     nav: ['功能', '方案', '下載', '使用協助'], login: '登入', start: '免費開始使用',
@@ -40,7 +41,7 @@ const copy = {
     free: '免費版', freeBody: '任務、行程、專注計時、記事本與白板。同一個帳號，在不同裝置查看與同步。',
     soon: '準備中', month: '／月', year: 'NT$990／年', proBody: '這是已規劃的台灣價格。付費功能與額度會在正式開放前說明，目前沒有訂閱或付款按鈕。',
     downloadTitle: '在你的桌面，\n留個位置。', downloadBody: 'Huddle 的獨立視窗，陪你開始每一天。安裝後使用原本的帳號登入，與網頁版共用資料。',
-    downloadNote: 'v0.1.2 測試版・需要網路・尚未完成 Apple 公證。Windows x64 測試版未簽署，安裝時可能顯示安全提示。舊版請重新下載安裝。', release: '版本紀錄與安裝說明',
+    downloadNote: 'v0.1.3 測試版・需要網路・尚未完成 Apple 公證。Windows x64 測試版未簽署，安裝時可能顯示安全提示。舊版請重新下載安裝。', release: '版本紀錄與安裝說明',
     faqTitle: '你可能想知道', questions: [
       ['可以免費使用嗎？', '可以。目前核心功能免費開放，註冊帳號不會自動收費。Pro 尚未開放購買，正式推出前會公布完整功能與計費方式。'],
       ['桌面版需要網路嗎？', '需要。登入、讀取雲端內容與同步都需要網路。桌面版讓你用獨立視窗開啟 Huddle，並非完全離線版本。'],
@@ -67,7 +68,7 @@ const copy = {
     free: 'Free', freeBody: 'Tasks, calendars, focus timers, notebooks and the whiteboard. Use one account to view and sync your work across devices.',
     soon: 'Coming later', month: ' / month', year: 'NT$990 / year', proBody: 'These are planned Taiwan prices in New Taiwan dollars. Paid features and limits will be announced before launch. Subscriptions and payments are not enabled.',
     downloadTitle: 'A place\non your desktop.', downloadBody: 'Open Huddle in its own window at the start of your day. Sign in with your existing account to use the same data as the web app.',
-    downloadNote: 'v0.1.2 beta · Internet required · Not yet notarized by Apple. Windows x64 beta is unsigned and may show a security warning. Download and reinstall to update an older version.', release: 'Release notes and installation guide',
+    downloadNote: 'v0.1.3 beta · Internet required · Not yet notarized by Apple. Windows x64 beta is unsigned and may show a security warning. Download and reinstall to update an older version.', release: 'Release notes and installation guide',
     faqTitle: 'A few things to know', questions: [
       ['Can I use Huddle for free?', 'Yes. Core features are currently free, and creating an account does not start a paid subscription. Pro is not yet available; complete features and billing details will be published before launch.'],
       ['Does the desktop app need internet access?', 'Yes. Signing in, reading cloud content and syncing require an internet connection. The desktop app gives Huddle its own window; it is not a fully offline version.'],
@@ -124,7 +125,13 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       return clean + (clean.includes('?') ? '&' : '?') + `r=${n}${Date.now() % 100000}`
     }
     const timers = new Set<number>()
+    // One retry in flight per image. An early failure can be reported twice
+    // (seen in production: one dropped request → two retries, image still
+    // broken); a second retry cancels the first mid-load and burns the whole
+    // budget, leaving the hole it was meant to fix.
+    const queued = new WeakSet<HTMLImageElement>()
     const retry = (img: HTMLImageElement) => {
+      if (queued.has(img)) return
       // The count belongs to one image URL: next/image reuses the same <img>
       // node when the source changes (e.g. switching board tabs), so a new
       // URL starts with a fresh budget of two retries.
@@ -133,18 +140,67 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       const n = Number(img.dataset.retry || 0)
       if (n >= 2) return
       img.dataset.retry = String(n + 1)
+      queued.add(img)
       const id = window.setTimeout(() => {
-        timers.delete(id)
+        timers.delete(id); queued.delete(img)
         img.parentElement?.querySelectorAll('source').forEach(s => { if (s.srcset) s.srcset = bust(s.srcset, n + 1) })
         img.src = bust(img.getAttribute('src') || img.src, n + 1)
       }, 700 * (n + 1))
       timers.add(id)
     }
-    const onError = (e: Event) => { if (e.target instanceof HTMLImageElement) retry(e.target) }
+    // A request can also hang without ever erroring, which the error listener
+    // never sees. Once an image is on screen it gets STALL_MS to finish, then
+    // is retried like a failure (sharing the two-retry budget). Only once per
+    // image URL: a slow-but-alive download that gets cut off restarts from
+    // zero, so a second cut would only make it later. Lazy images further
+    // down and display:none ones never start the clock.
+    const STALL_MS = 15000
+    const visible = new WeakSet<HTMLImageElement>()
+    const stalls = new WeakMap<HTMLImageElement, number>()
+    const disarm = (img: HTMLImageElement) => {
+      const id = stalls.get(img)
+      if (id === undefined) return
+      window.clearTimeout(id); timers.delete(id); stalls.delete(img)
+    }
+    const arm = (img: HTMLImageElement) => {
+      disarm(img)
+      if (!visible.has(img) || !img.getAttribute('src')) return
+      if (img.complete && img.naturalWidth > 0) return // already showing
+      const base = strip(img.getAttribute('src') || img.src)
+      if (img.dataset.stallSrc === base) return // already cut once
+      const id = window.setTimeout(() => {
+        timers.delete(id); stalls.delete(img)
+        if (!img.isConnected || (img.complete && img.naturalWidth > 0)) return
+        img.dataset.stallSrc = base
+        retry(img)
+      }, STALL_MS)
+      stalls.set(img, id); timers.add(id)
+    }
+    const io = new IntersectionObserver(entries => entries.forEach(({ target, isIntersecting }) => {
+      const img = target as HTMLImageElement
+      if (isIntersecting) { visible.add(img); arm(img) } else { visible.delete(img); disarm(img) }
+    }))
+    const watch = (node: Node) => {
+      if (node instanceof HTMLImageElement) io.observe(node)
+      else if (node instanceof Element) node.querySelectorAll('img').forEach(img => io.observe(img))
+    }
+    // New images (tab switches, late sections) get watched; a new src —
+    // including our own retry — restarts that image's clock.
+    const mo = new MutationObserver(records => records.forEach(r => {
+      if (r.type === 'childList') r.addedNodes.forEach(watch)
+      else if (r.target instanceof HTMLImageElement) arm(r.target)
+    }))
+    mo.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] })
+    watch(root)
+    const onError = (e: Event) => { if (e.target instanceof HTMLImageElement) { disarm(e.target); retry(e.target) } }
+    const onLoad = (e: Event) => { if (e.target instanceof HTMLImageElement) disarm(e.target) }
     root.addEventListener('error', onError, true)
+    root.addEventListener('load', onLoad, true)
     root.querySelectorAll('img').forEach(img => { if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) retry(img) })
     return () => {
       root.removeEventListener('error', onError, true)
+      root.removeEventListener('load', onLoad, true)
+      io.disconnect(); mo.disconnect()
       timers.forEach((id) => window.clearTimeout(id))
     }
   }, [])
@@ -237,7 +293,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
 
       {native ? null : <section id="download" className={styles.download} aria-labelledby="download-title">
         <div className={styles.downloadCopy}><h2 id="download-title" data-penguin-stop="download" data-penguin-at="0 0 70 -10" data-penguin-pose="wave">{t.downloadTitle}</h2><p>{t.downloadBody}</p>
-          <div className={styles.downloadOptions}><a href={download('arm64')}><span>Mac · Apple Silicon</span><Download size={24} aria-hidden="true" /></a><a href={download('x64')}><span>Mac · Intel</span><Download size={24} aria-hidden="true" /></a><a href="https://github.com/dropout-tech/waddle/releases/download/v0.1.2-beta.1/Huddle-0.1.2-win-x64.exe"><span>Windows · x64</span><Download size={24} aria-hidden="true" /></a><p>{t.downloadNote}</p><a href={release} className={styles.releaseLink}>{t.release}<ArrowRight size={17} aria-hidden="true" /></a></div>
+          <div className={styles.downloadOptions}><a href={download('mac-arm64.dmg')}><span>Mac · Apple Silicon</span><Download size={24} aria-hidden="true" /></a><a href={download('mac-x64.dmg')}><span>Mac · Intel</span><Download size={24} aria-hidden="true" /></a><a href={download('win-x64.exe')}><span>Windows · x64</span><Download size={24} aria-hidden="true" /></a><p>{t.downloadNote}</p><a href={release} className={styles.releaseLink}>{t.release}<ArrowRight size={17} aria-hidden="true" /></a></div>
         </div>
         <picture className={styles.sceneArt}>
           <source media="(max-width: 760px)" srcSet="/art/film/F-05.webp" width={405} height={720} />

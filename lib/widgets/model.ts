@@ -105,6 +105,21 @@ export function stickySummaries(notes: StickySource[]): WidgetSticky[] {
     .sort((a, b) => b.n.updatedAt.localeCompare(a.n.updatedAt)).slice(0, STICKY_LIMIT)
     .map(({ n, lines }) => ({ id: n.id, title: lines[0].slice(0, 40), body: lines.slice(1).join(' ').slice(0, 140), color: n.color, updatedAt: n.updatedAt }))
 }
+/**
+ * Pull the newest sticky notes in small pages until STICKY_LIMIT *non-blank* ones are in hand
+ * (blank notes are skipped by stickySummaries, so a fixed `limit(12)` could leave the widget short).
+ * `page` returns rows newest-first with a stable tiebreak; returns null if any page fails.
+ */
+export async function loadStickyRows<R extends StickySource>(page: (from: number, to: number) => PromiseLike<{ rows: R[] | null; error: unknown }>, pageSize = 20, maxPages = 5): Promise<R[] | null> {
+  const all: R[] = []
+  for (let i = 0; i < maxPages; i++) {
+    const { rows, error } = await page(i * pageSize, (i + 1) * pageSize - 1)
+    if (error) return null
+    all.push(...(rows ?? []))
+    if ((rows?.length ?? 0) < pageSize || stickySummaries(all).length >= STICKY_LIMIT) break
+  }
+  return all
+}
 /** 本週時間表: same rule as the app's week view — 自動 starts today and rolls forward; a picked 每週開始日 snaps back to it. */
 export function weekGridStart(date: Date, weekStartDay?: number | null) {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12)
