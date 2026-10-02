@@ -11,11 +11,18 @@
 //   - An object is kept if its key appears anywhere in the database, in rows
 //     owned by anyone (findReferencedKeys). If that lookup fails, nothing is
 //     deleted.
+//   - Each account gets at most one run per MIN_RUN_INTERVAL_S, enforced in
+//     the database (claimRun) before anything is listed or scanned — the
+//     reference lookup scans every table, so an unthrottled caller could keep
+//     the database busy. A refused claim does no work at all.
 
 export const BUCKET = 'notebook-images'
 export const MIN_AGE_MS = 24 * 60 * 60 * 1000
 export const MAX_DELETE = 200
 export const MAX_LIST = 5000
+// The app runs this ≤ once a day on launch and ~5 s after a note delete; ten
+// minutes leaves room for a burst of deletes without allowing a loop.
+export const MIN_RUN_INTERVAL_S = 10 * 60
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 // Upload code names objects `{crypto.randomUUID()}.{ext}`.
@@ -66,28 +73,34 @@ export function selectDeletions({ ownerId, objects, referencedKeys, now, minAgeM
     .slice(0, Math.max(0, limit))
 }
 
-function json(body, status) {
+function json(body, status, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', ...extraHeaders },
   })
 }
 
 /**
  * deps:
  *   getCallerId(req)            -> user id from the verified JWT, or null
+ *   claimRun(ownerId, seconds)  -> true if this account may run now (DB-side, atomic)
  *   listObjects(ownerId)        -> [{ name, id, created_at }] directly under `${ownerId}/`
  *   findReferencedKeys(owner, keys) -> subset of keys still referenced anywhere
  *   removeObjects(paths)        -> number of objects removed
  *   now()                       -> ms timestamp
  */
-export function createHandler({ getCallerId, listObjects, findReferencedKeys, removeObjects, now = () => Date.now(), log = console.error }) {
+export function createHandler({ getCallerId, claimRun, listObjects, findReferencedKeys, removeObjects, now = () => Date.now(), log = console.error }) {
   return async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
     if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
     try {
       const ownerId = await getCallerId(req)
       if (!isUuid(ownerId)) return json({ error: 'Invalid session' }, 401)
+
+      const claimed = await claimRun(ownerId, MIN_RUN_INTERVAL_S)
+      if (claimed !== true) {
+        return json({ error: 'Too many requests' }, 429, { 'Retry-After': String(MIN_RUN_INTERVAL_S) })
+      }
 
       const objects = (await listObjects(ownerId)) ?? []
       const at = now()
