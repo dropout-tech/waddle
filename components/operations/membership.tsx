@@ -155,6 +155,9 @@ function MembershipContent() {
             </section>
           )}
           <div className={styles.grid}>
+            {/* Not in the iOS/Android app: referral rewards grant Pro days
+                outside in-app purchase (Apple 3.1.1). Web unchanged. */}
+            <WebOnly>
             <section className={styles.panel}>
               <h2>{t('你的推薦碼')}</h2>
               <p className={styles.muted}>
@@ -207,6 +210,7 @@ function MembershipContent() {
                 })}
               </p>
             </section>
+            </WebOnly>
             <section className={styles.panel}>
               <h2>{t('化名與排行榜')}</h2>
               <p className={styles.muted}>
@@ -279,7 +283,6 @@ function MembershipContent() {
                 </button>
               </form>
             </section>
-            </WebOnly>
             <section className={styles.panel}>
               <h2>{t('朋友的推薦碼')}</h2>
               {data.referred ? (
@@ -313,6 +316,7 @@ function MembershipContent() {
                 </>
               )}
             </section>
+            </WebOnly>
           </div>
           <section className={styles.panel}>
             <h2>{t('推薦排行榜')}</h2>
