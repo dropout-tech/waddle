@@ -127,10 +127,11 @@ try {
   await npage.evaluate(() => { window.__spaMarker = 1; window.Capacitor.isNativePlatform = () => true })
   await npage.locator('footer a[href="/about"]').first().click()
   await npage.waitForURL('**/about')
-  await npage.locator('#pricing').waitFor({ state: 'attached' })
+  await npage.locator('#features').waitFor({ state: 'attached' })
   await npage.waitForTimeout(500)
   check('native shell /about: reached by client-side navigation', await npage.evaluate(() => window.__spaMarker === 1))
   check('native shell /about: price note hidden', (await npage.locator('[data-price-note]').count()) === 0)
+  check('native shell /about: pricing and download sections hidden', (await npage.locator('#pricing, #download, a[href*="releases/download"]').count()) === 0)
   await nctx.close()
 } finally {
   await browser.close()

@@ -1433,6 +1433,14 @@ export function DayScrollView({
                   const height = isDraggingThis && activeBlockDrag
                     ? `${Math.max(activeBlockDrag.currentEnd - activeBlockDrag.currentStart, 30)}px`
                     : getDurationHeight(block.startTime, block.endTime)
+                  // Resize strips scale with the block (~a quarter of its
+                  // height each; phone 4–16px, md+ 3–8px) so a short block keeps a grabbable middle
+                  // for moving. Fixed 16px/8px strips covered a 15-min
+                  // (15px) block completely: every grab became a resize.
+                  const heightPx = parseFloat(height)
+                  const mobileStripPx = Math.max(4, Math.min(16, Math.round(heightPx * 0.25)))
+                  const desktopStripPx = Math.max(3, Math.min(8, Math.round(heightPx * 0.2)))
+                  const stripVars = { ['--rh' as string]: `${mobileStripPx}px`, ['--rhd' as string]: `${desktopStripPx}px` }
                   // Hide the source if the drag has moved to a different day
                   // (the live preview rendered in that day's column is the
                   // visible copy).
@@ -1483,11 +1491,11 @@ export function DayScrollView({
                         touchAction: 'none',
                       }}
                     >
-                      {/* Resize handle — TOP. Larger touch target on mobile. */}
+                      {/* Resize handle — TOP. Thicker on phones; both sizes scale with the block. */}
                       <div
-                        className="absolute top-0 left-0 right-0 h-4 md:h-2 z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        className="absolute top-0 left-0 right-0 h-[var(--rh)] md:h-[var(--rhd)] z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         onPointerDown={(e) => handleTimeBlockDragStart(block, 'resize-top', dayIndex, e)}
-                        style={{ touchAction: 'none' }}
+                        style={{ touchAction: 'none', ...stripVars }}
                       >
                         <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: color, opacity: 0.6 }} />
                       </div>
@@ -1508,9 +1516,9 @@ export function DayScrollView({
 
                       {/* Resize handle — BOTTOM. */}
                       <div
-                        className="absolute bottom-0 left-0 right-0 h-4 md:h-2 z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        className="absolute bottom-0 left-0 right-0 h-[var(--rh)] md:h-[var(--rhd)] z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         onPointerDown={(e) => handleTimeBlockDragStart(block, 'resize-bottom', dayIndex, e)}
-                        style={{ touchAction: 'none' }}
+                        style={{ touchAction: 'none', ...stripVars }}
                       >
                         <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: color, opacity: 0.6 }} />
                       </div>

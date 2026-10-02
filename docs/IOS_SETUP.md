@@ -37,7 +37,8 @@ pnpm cap:open           # 用 Xcode 開啟
 1. **Signing & Capabilities → Team**：選你的 Apple Developer team；確認 Bundle Identifier = `com.lazylazy.huddle`（或你改的）。
 2. **+ Capability** 加入：
    - **Sign in with Apple**
-   - **Push Notifications**（本地通知雖不需 APNs，但加上不會錯；若只用本地通知可略）
+   - ~~Push Notifications~~：**先不要加**。目前只用本地通知，不需要它；免費 Personal Team 也簽不了。
+     要做遠端推播時照 [docs/native/push-notifications.md](native/push-notifications.md) 整套一起開。
 3. **URL Types**（Info → URL Types，或編輯 `ios/App/App/Info.plist`）：新增一個 URL Scheme = `huddle`（對應 deep-link OAuth callback `huddle://auth/callback`）。
 
 ```xml

@@ -21,6 +21,7 @@ import { useI18n } from '@/lib/i18n/react'
 import { useStickyNotesToggle } from '@/components/sticky-notes/sticky-notes-provider'
 import { listAssignments } from '@/lib/assignments'
 import { InstallAppMenuItem } from '@/components/pwa/install-app-menu-item'
+import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 
 interface SessionInfo {
   email: string
@@ -48,6 +49,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [publicAlias, setPublicAlias] = useState<string | null>(null)
   const [innerOpen, setInnerOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const open = controlledOpen ?? innerOpen
   const setOpen = useCallback((next: boolean | ((v: boolean) => boolean)) => {
     const value = typeof next === 'function' ? next(open) : next
@@ -317,9 +319,22 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
             )}
             <span>{t('登出')}</span>
           </button>
+
+          {/* App Store 5.1.1(v): account deletion must be easy to find, not
+              only inside Settings. Kept quiet (small, muted, no icon) since
+              almost nobody needs it; the dialog lives outside the dropdown. */}
+          <button
+            data-testid="user-menu-delete-account"
+            onClick={() => { setOpen(false); setDeleteOpen(true) }}
+            className="w-full min-h-11 flex items-center px-4 py-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors"
+            role="menuitem"
+          >
+            {t('刪除帳號')}
+          </button>
         </div>
       )}
       {signOutDialog}
+      <DeleteAccountButton open={deleteOpen} onOpenChange={setDeleteOpen} />
     </div>
   )
 }
