@@ -543,7 +543,7 @@ function HuddlePage() {
       <CategoryPrefixProvider value={settings.showCategoryPrefix ?? true}>
       <UserSettingsProvider value={settings}>
       <NotebookOverlayProvider>
-      {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} pet={settings.pet} />}
+      {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} pet={settings.pet} weekStartDay={settings.weekStartDay} />}
       <MainLayout
         workspaces={workspaces}
         assignedTasks={assignedTasks}
