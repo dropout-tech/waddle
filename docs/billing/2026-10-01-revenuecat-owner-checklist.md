@@ -49,11 +49,11 @@
 （不用按 Build、不用 Archive、不用上傳。）
 
 ## 五、恢復購買的帳號轉移政策（RevenueCat → Project settings → General → Restore behavior）
-**老闆 2026-10-02 拍板：「綁原帳號，不給換」→ 選 `Keep with original App User ID`。**（之前建議的預設 Transfer 不採用。）
-- 效果：訂閱永遠屬於第一次購買的 Huddle 帳號；同一個 Apple ID 在別的 Huddle 帳號購買或按「恢復購買」，RevenueCat 會拒絕（錯誤碼 7／13）。
-- App 已處理（PR #140，cfdfc60）：這時購買卡顯示「這個 Apple ID 的 Huddle Pro 訂閱已綁定另一個 Huddle 帳號，無法轉移。請登出後改用當初購買時的帳號登入；需要協助請聯絡客服。」
-- 待老闆本人在 RevenueCat 後台把 Restore behavior 改成這個選項（沙盒用同一政策即可）。
-- 已知代價：刪了舊帳號再重辦的人，買過的訂閱找不回來（RevenueCat 仍綁在已刪帳號）。建議補強：刪帳號時順便刪除 RevenueCat 上的顧客紀錄，訂閱就能在新帳號恢復；要改 delete-account 並部署，先問老闆。
+**老闆 2026-10-02 最終拍板：「轉為可以轉」→ 維持預設 `Transfer to new App User ID`。**（中途曾改成「綁原帳號」，看過法規審查後改回。）
+- 效果：同一個 Apple ID 在另一個 Huddle 帳號按「恢復購買」，訂閱移到新帳號，舊帳號失去 Pro；同一時間只有一個帳號享有。
+- RevenueCat 後台**不用改**（預設就是這個）；如果之前已改成 Keep with original，請改回 Transfer to new App User ID。
+- 服務條款已寫明（PR #154）；購買卡的「已綁定另一個帳號」提示已撤回（PR #140，9b88228）。
+- 刪帳號時仍會一併刪除 RevenueCat 顧客紀錄（PR #152，個資法要求），RevenueCat 暫時無法處理時排隊重試，不擋刪帳號。
 
 ## 六、審查沙盒（E1 方案 C，PR #150）上線規矩
 - RevenueCat webhook 的環境選 **both**（正式＋沙盒都送），否則審查員買了不會生效。
