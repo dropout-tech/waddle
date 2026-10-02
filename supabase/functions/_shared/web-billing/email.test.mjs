@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { SUPPORT_PHONE, escapeHtml, formatDate, formatMoney, processOutbox, renderEmail, sendEmail } from './email.mjs'
+import { SUPPORT_EMAIL, SUPPORT_PHONE, escapeHtml, formatDate, formatMoney, processOutbox, renderEmail, sendEmail } from './email.mjs'
 import { PREVIEW_SITE_URL, SAMPLES, previewHtml } from './email.previews.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -136,6 +136,7 @@ test('card_last4 that is not 4 digits is dropped, never printed', () => {
 test('support phone matches lib/legal/operator.ts', () => {
   const src = readFileSync(join(here, '../../../../lib/legal/operator.ts'), 'utf8')
   assert.equal(src.match(/SUPPORT_PHONE = '([^']+)'/)[1], SUPPORT_PHONE)
+  assert.equal(src.match(/SUPPORT_EMAIL = '([^']+)'/)[1], SUPPORT_EMAIL)
 })
 
 test('committed previews in docs/billing/email-previews are up to date', () => {
@@ -163,7 +164,7 @@ test('sendEmail: 200 -> ok with provider id, correct request', async () => {
   assert.equal(calls[0].init.headers.Authorization, 'Bearer re_test_key')
   assert.equal(calls[0].init.headers['Idempotency-Key'], 'id-1')
   assert.equal(calls[0].init.headers['Content-Type'], 'application/json')
-  assert.deepEqual(JSON.parse(calls[0].init.body), { from: mail.from, to: ['a@example.com'], subject: 's', html: '<p>h</p>', text: 't' })
+  assert.deepEqual(JSON.parse(calls[0].init.body), { from: mail.from, to: ['a@example.com'], reply_to: SUPPORT_EMAIL, subject: 's', html: '<p>h</p>', text: 't' })
 })
 
 test('sendEmail: 422 is permanent, 429 and 5xx are retryable', async () => {

@@ -43,7 +43,7 @@ export function writePreviews(dir) {
   for (const name of Object.keys(SAMPLES)) writeFileSync(join(dir, `${name}.html`), previewHtml(name))
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (fileURLToPath(import.meta.url) === process.argv[1]) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../../..')
   writePreviews(join(root, 'docs/billing/email-previews'))
   console.log(`wrote ${Object.keys(SAMPLES).length} previews to docs/billing/email-previews/`)

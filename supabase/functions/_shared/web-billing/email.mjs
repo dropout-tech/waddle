@@ -10,6 +10,7 @@
 
 // Same facts as lib/legal/operator.ts (a test keeps them identical).
 export const SUPPORT_PHONE = '0988-493-026'
+export const SUPPORT_EMAIL = 'hi@lazy72.com'
 
 const INK = '#292b24'
 const PAPER = '#f6f3e9'
@@ -442,8 +443,8 @@ const BUILDERS = {
 // ── rendering ───────────────────────────────────────────────────────────────
 
 const FOOTER = {
-  zh: `你收到這封信，是因為你的 Huddle 帳號有 Pro 訂閱。這是系統自動寄出的信件；帳務問題請來電 ${SUPPORT_PHONE}。`,
-  en: `You are receiving this because your Huddle account has a Pro subscription. This message was sent automatically; for billing questions call ${SUPPORT_PHONE}.`,
+  zh: `你收到這封信，是因為你的 Huddle 帳號有 Pro 訂閱。帳務問題可直接回覆這封信（${SUPPORT_EMAIL}），或來電 ${SUPPORT_PHONE}。`,
+  en: `You are receiving this because your Huddle account has a Pro subscription. For billing questions, reply to this e-mail (${SUPPORT_EMAIL}) or call ${SUPPORT_PHONE}.`,
 }
 
 function sectionHtml(lang, s) {
@@ -520,7 +521,7 @@ function shortError(body, status) {
  * idempotencyKey = outbox id: Resend dedupes for 24h, so a retry after a
  * timeout cannot send the same mail twice.
  */
-export async function sendEmail(fetchFn, { apiKey, from, to, subject, html, text, idempotencyKey } = {}) {
+export async function sendEmail(fetchFn, { apiKey, from, to, subject, html, text, idempotencyKey, replyTo = SUPPORT_EMAIL } = {}) {
   if (!apiKey || !from || !to || !subject || !idempotencyKey) return { ok: false, error: 'invalid_input', retryable: false }
   let res
   let body = ''
@@ -529,7 +530,7 @@ export async function sendEmail(fetchFn, { apiKey, from, to, subject, html, text
     res = await fetchFn(RESEND_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'Idempotency-Key': String(idempotencyKey) },
-      body: JSON.stringify({ from, to: [to], subject, html, text }),
+      body: JSON.stringify({ from, to: [to], reply_to: replyTo, subject, html, text }),
       ...(signal ? { signal } : {}),
     })
     body = await res.text()
