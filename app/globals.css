@@ -905,3 +905,14 @@ html[data-desktop-titlebar='mac'] .fixed.top-4 {
 html[data-desktop-titlebar='mac'] .fixed.top-\[50\%\] {
   top: calc(50% + var(--desktop-titlebar-height) / 2);
 }
+
+/* Whiteboard card inline editor (components/scratchpad/inline-card-editor.tsx):
+ * one paragraph per line, laid out like the read-only card face. */
+.wb-inline-editor p { margin: 0; }
+.wb-inline-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted-foreground);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

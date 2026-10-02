@@ -89,6 +89,8 @@ export interface NotebookCategory {
 // handle instead of `any` at the data boundary.
 export interface TiptapDoc {
   type: 'doc'
+  /** Only set on stored documents: lib/styled-doc.ts packStyledDoc. */
+  attrs?: Record<string, unknown>
   content?: TiptapNode[]
 }
 

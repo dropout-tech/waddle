@@ -20,7 +20,7 @@ export interface CardStyle {
 }
 
 export const CARD_TEXT_SIZES: CardTextSize[] = ['sm', 'md', 'lg', 'xl', '2xl']
-const SIZE_PX: Record<CardTextSize, number> = { sm: 14, md: 16, lg: 20, xl: 26, '2xl': 34 }
+export const SIZE_PX: Record<CardTextSize, number> = { sm: 14, md: 16, lg: 20, xl: 26, '2xl': 34 }
 
 // Mid-tone inks that stay readable on both the cream paper and the dark theme.
 export const CARD_TEXT_COLORS: { key: CardTextColor; label: string; value?: string }[] = [
@@ -72,4 +72,40 @@ export function cardHighlightCss(style: CardStyle): CSSProperties | undefined {
 export function stepCardSize(style: CardStyle, direction: 1 | -1): CardTextSize {
   const index = CARD_TEXT_SIZES.indexOf(style.size ?? 'md')
   return CARD_TEXT_SIZES[Math.max(0, Math.min(CARD_TEXT_SIZES.length - 1, index + direction))]
+}
+
+export function inkColorValue(key: unknown): string | undefined {
+  return CARD_TEXT_COLORS.find(color => color.key === key)?.value
+}
+
+export function inkHighlightValue(key: unknown): string | undefined {
+  return CARD_HIGHLIGHTS.find(highlight => highlight.key === key)?.value
+}
+
+export function inkSizePx(key: unknown): number | undefined {
+  return typeof key === 'string' && key in SIZE_PX ? SIZE_PX[key as CardTextSize] : undefined
+}
+
+/** Inline styles for one text run's marks on a read-only card face. */
+export function markCss(marks: { type: string; attrs?: Record<string, unknown> }[]): CSSProperties | undefined {
+  if (!marks.length) return undefined
+  const css: CSSProperties = {}
+  const lines: string[] = []
+  for (const mark of marks) {
+    if (mark.type === 'bold') css.fontWeight = 700
+    else if (mark.type === 'italic') css.fontStyle = 'italic'
+    else if (mark.type === 'underline') lines.push('underline')
+    else if (mark.type === 'strike') lines.push('line-through')
+    else if (mark.type === 'code') css.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, monospace'
+    else if (mark.type === 'textColor') css.color = inkColorValue(mark.attrs?.color)
+    else if (mark.type === 'textSize') {
+      const px = inkSizePx(mark.attrs?.size)
+      if (px) { css.fontSize = px; if (px >= 26) css.lineHeight = 1.3 }
+    } else if (mark.type === 'textHighlight') {
+      const value = inkHighlightValue(mark.attrs?.color)
+      if (value) Object.assign(css, { backgroundColor: value, borderRadius: 3, padding: '0 2px', boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone' })
+    }
+  }
+  if (lines.length) css.textDecoration = lines.join(' ')
+  return css
 }

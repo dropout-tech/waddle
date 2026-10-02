@@ -249,7 +249,9 @@ async function walkTour(browser, storageState, kase, lang, variant = null) {
   const labels = UI[lang]
   const forceTour = { value: true }
   const context = await browser.newContext({
-    storageState,
+    // The iOS app keeps its session in native storage, not the web cookie,
+    // so the native variant signs in again inside its own context.
+    storageState: variant?.native ? undefined : storageState,
     viewport: kase.viewport,
     locale: lang,
     ...(kase.mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}),
@@ -263,6 +265,11 @@ async function walkTour(browser, storageState, kase, lang, variant = null) {
       try { Object.defineProperty(window, 'documentPictureInPicture', { value: undefined, configurable: true }) } catch {}
     })
   }
+  if (variant?.native) {
+    // Pretend to be the iOS app: Capacitor reports a native platform and every
+    // plugin falls back to its web implementation (Preferences → localStorage).
+    await context.addInitScript(() => { window.CapacitorCustomPlatform = { name: 'ios', plugins: {} } })
+  }
   await context.addInitScript(([l]) => {
     try {
       localStorage.setItem('waddle-language-v1', l)
@@ -273,11 +280,19 @@ async function walkTour(browser, storageState, kase, lang, variant = null) {
   const page = await context.newPage()
   const pageErrors = []
   page.on('pageerror', (e) => pageErrors.push(e.message))
+  if (variant?.native) {
+    await page.goto(`${BASE_URL}/login?method=email`, { waitUntil: 'domcontentloaded' })
+    await page.locator('#email').fill(EMAIL)
+    await page.locator('#password').fill(PASSWORD)
+    await page.locator('button[type=submit]').click()
+    await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 90000 })
+  }
   await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' })
   await page.locator('[data-onboarding-tour]').waitFor({ state: 'visible', timeout: 60000 })
   await page.waitForTimeout(1200) // let the dashboard behind the tour finish its first paint
 
-  const expected = kase.mobile ? EXPECTED_STEPS.mobile : variant?.noPip ? EXPECTED_STEPS.desktopNoHub : EXPECTED_STEPS.desktop
+  const expected = (kase.mobile ? EXPECTED_STEPS.mobile : variant?.noPip ? EXPECTED_STEPS.desktopNoHub : EXPECTED_STEPS.desktop)
+    + (variant?.native ? 1 : 0) // + the app-only background-notification step
   const seenSteps = []
   let index = 0
   for (; index < 40; index += 1) {
@@ -402,6 +417,9 @@ async function walkTour(browser, storageState, kase, lang, variant = null) {
       .catch(() => check(`${where} advances on 下一步`, false, 'title did not change'))
   }
   check(`${tag} step count = ${expected}`, index === expected, `walked ${index}`)
+  const phoneAlerts = seenSteps.filter((s) => s.title?.startsWith('🔔'))
+  check(`${tag} background-notification step ${variant?.native ? 'shown once (app)' : 'hidden (website)'}`,
+    phoneAlerts.length === (variant?.native ? 1 : 0), `seen ${phoneAlerts.length}`)
   check(`${tag} no page errors`, pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '))
   console.log(`[${tag}] walked ${index} steps`)
   await context.close()
@@ -526,6 +544,17 @@ async function main() {
   for (const lang of LANGS) {
     if (only && only !== `desktop-1280/${lang}/newuser`) continue
     steps[`desktop-1280/${lang}/newuser`] = await walkTour(browser, storageState, CASES[0], lang, NEW_USER)
+  }
+  // Inside the iOS app (faked): one extra step about background notifications.
+  // Phone layout, and an iPad-sized screen without the floating window.
+  const NATIVE = { id: 'native', native: true }
+  const NATIVE_TABLET = { id: 'native', native: true, noPip: true }
+  for (const lang of LANGS) {
+    if (only && only !== `mobile-390/${lang}/native`) continue
+    steps[`mobile-390/${lang}/native`] = await walkTour(browser, storageState, CASES[2], lang, NATIVE)
+  }
+  if (!only || only === 'desktop-1280/zh-TW/native') {
+    steps['desktop-1280/zh-TW/native'] = await walkTour(browser, storageState, CASES[0], 'zh-TW', NATIVE_TABLET)
   }
   if (!only || only === 'water') await waterReminderTest(browser, storageState)
   await browser.close()
