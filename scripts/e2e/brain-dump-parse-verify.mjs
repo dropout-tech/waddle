@@ -34,7 +34,7 @@ try {
     writeFileSync(join(dir, `${name}.mjs`), out)
   }
   const { parseBrainDump, splitFragments } = await import(pathToFileURL(join(dir, 'parse.mjs')).href)
-  const { planDay, markConflicts } = await import(pathToFileURL(join(dir, 'plan.mjs')).href)
+  const { planDay, markConflicts, rebaseDrafts } = await import(pathToFileURL(join(dir, 'plan.mjs')).href)
 
   // Saturday 2026-10-03 08:30 local.
   const SAT = new Date(2026, 9, 3, 8, 30)
@@ -265,6 +265,20 @@ try {
     const marked = markConflicts(moved, [{ start: 13 * 60, end: 14 * 60 }], plan.today, () => true)
     assert.equal(marked.find((x) => x.draft.title === '掃地').conflict, true)
     assert.ok(!marked.find((x) => x.draft.title === '澆花').conflict)
+  })
+  check('P12 past midnight: rebaseDrafts moves yesterday\'s items to the new today and re-plans', () => {
+    const late = new Date(2026, 9, 3, 23, 50)
+    const plan = planDay(parseBrainDump('洗碗、明天去銀行、10/9前交報告', late), [], { now: late })
+    assert.equal(plan.late, true)
+    const after = new Date(2026, 9, 4, 0, 5)
+    const drafts = rebaseDrafts(plan.items, after)
+    assert.ok(drafts.every((d) => d.day === 'today'), JSON.stringify(drafts.map((d) => d.day)))
+    const re = planDay(drafts, [], { now: after })
+    assert.equal(re.today, '2026-10-04')
+    assert.ok(re.items.every((x) => x.date === '2026-10-04' && x.status === 'scheduled'), JSON.stringify(re.items))
+    // a later date stays put
+    const far = rebaseDrafts([{ draft: { ...drafts[0] }, date: '2026-10-09', status: 'pending' }], after)
+    assert.equal(far[0].day, '2026-10-09')
   })
 } finally {
   rmSync(dir, { recursive: true, force: true })

@@ -118,7 +118,7 @@ async function noHorizontalOverflow(page) {
   assert.ok(o.sw <= o.cw + 1, `horizontal overflow ${o.sw} > ${o.cw}`)
 }
 
-async function runPanel(page, label, { mobile, write }) {
+async function runPanel(page, label, { mobile, write, failThird = false }) {
   const dialog = page.getByRole('dialog').filter({ has: page.locator('[data-brain-dump-panel]') })
   await step(`${label}: open panel`, async () => {
     if (mobile) await page.locator('[data-tour="mobile-brain-dump"]').click()
@@ -172,11 +172,38 @@ async function runPanel(page, label, { mobile, write }) {
     await dialog.getByRole('button', { name: '完成', exact: true }).click()
   })
   if (!write) return
+  if (failThird) {
+    await step(`${label}: 3rd insert fails → others still written, failed note kept for retry`, async () => {
+      // Make exactly the third task INSERT fail; the rest go through.
+      let posts = 0
+      await page.route('**/rest/v1/tasks*', async (route) => {
+        if (route.request().method() === 'POST' && ++posts === 3) {
+          await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'e2e: simulated outage', code: 'E2E' }) })
+        } else await route.continue()
+      })
+      await dialog.getByRole('button', { name: /放進行事曆（4）/ }).click()
+      await dialog.getByRole('button', { name: '再試一次（1）' }).waitFor({ timeout: 15000 })
+      await dialog.getByText('已放進 3 件；還有 1 件沒放成功').waitFor({ timeout: 3000 })
+      assert.equal(await dialog.locator('[data-bd-note]').count(), 1, 'only the failed note should remain')
+      assert.equal(await dialog.locator('[data-bd-failed]').count(), 1, 'failed note not marked')
+      await page.locator('[data-bd-toast]').first().waitFor({ timeout: 5000 })
+      await shot(page, `${label}-retry`)
+      await page.unroute('**/rest/v1/tasks*')
+      await dialog.getByRole('button', { name: '再試一次（1）' }).click()
+      await dialog.waitFor({ state: 'hidden', timeout: 15000 })
+      assert.equal(await page.locator('#brain-dump-text').count(), 0)
+    })
+  }
   await step(`${label}: write to calendar → toast → tasks visible`, async () => {
-    await dialog.getByRole('button', { name: /放進行事曆（4）/ }).click()
-    const expected = timed.length === 4 ? '企鵝排好了 4 件事' : `企鵝排好了 ${timed.length} 件，${4 - timed.length} 件放進待排`
-    const toastEl = page.locator('[data-bd-toast]')
-    await toastEl.getByText(expected).waitFor({ timeout: 15000 })
+    if (!failThird) {
+      await dialog.getByRole('button', { name: /放進行事曆（4）/ }).click()
+    }
+    const expected = failThird
+      ? null
+      : timed.length === 4 ? '企鵝排好了 4 件事' : `企鵝排好了 ${timed.length} 件，${4 - timed.length} 件放進待排`
+    const toastEl = page.locator('[data-bd-toast]').last()
+    if (expected) await toastEl.getByText(expected).waitFor({ timeout: 15000 })
+    else await toastEl.waitFor({ timeout: 15000 })
     await dialog.waitFor({ state: 'hidden', timeout: 5000 })
     // The new blocks glow once (data-bd-glow is set for the ~600ms animation).
     await page.waitForSelector('[data-task-block][data-bd-glow]', { timeout: 3000 })
@@ -214,6 +241,24 @@ async function edgeStates(page, label) {
     await dialog.getByRole('button', { name: '交給企鵝' }).click()
     await dialog.getByText('企鵝讀不太懂這段').waitFor({ timeout: 5000 })
     await shot(page, `${label}-unparsed`)
+    await page.keyboard.press('Escape')
+    await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+  })
+  await step(`${label}: crossing midnight before confirming → re-planned for the new today`, async () => {
+    const d = new Date()
+    await page.clock.setFixedTime(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 55))
+    await open()
+    await page.locator('#brain-dump-text').fill('洗碗、整理桌面')
+    await dialog.getByRole('button', { name: '交給企鵝' }).click()
+    await page.locator('[data-bd-phase="preview"]').waitFor({ timeout: 10000 })
+    await page.waitForTimeout(1500)
+    await page.clock.setFixedTime(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 5))
+    await dialog.getByRole('button', { name: /放進行事曆/ }).click()
+    await dialog.getByText('已經過午夜了，幫你改排到今天').waitFor({ timeout: 3000 })
+    const tomorrow = localKey(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1))
+    const notes = await readNotes(page)
+    assert.ok(notes.length === 2 && notes.every((n) => n.date === tomorrow && n.status === 'scheduled'), JSON.stringify(notes))
+    await shot(page, `${label}-midnight`)
     await page.keyboard.press('Escape')
     await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
   })
@@ -313,7 +358,7 @@ try {
     await page.keyboard.press('Escape')
     await page.locator('#brain-dump-text').waitFor({ state: 'hidden', timeout: 5000 })
   })
-  await runPanel(page, 'desktop', { mobile: false, write: true })
+  await runPanel(page, 'desktop', { mobile: false, write: true, failThird: true })
 
   await step('desktop: dark mode preview', async () => {
     await page.evaluate(() => document.documentElement.classList.add('dark'))
