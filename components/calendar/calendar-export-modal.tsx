@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Loader2, X, Copy, Check, Sun, Moon } from 'lucide-react'
-import { toPng } from 'html-to-image'
+import { toBlob } from 'html-to-image'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { toDateString } from '@/lib/calendar-utils'
@@ -134,7 +134,10 @@ export function CalendarExportModal({
     if (!node) return null
     // pixelRatio: 2 → roughly retina-quality output (2160px wide for the
     // 1080px view), good for sharing on social without looking soft.
-    const dataUrl = await toPng(node, {
+    // toBlob goes canvas → Blob directly. The old toPng + fetch(dataUrl)
+    // round-trip was blocked by the CSP (connect-src has no data:), so every
+    // web export failed.
+    return await toBlob(node, {
       pixelRatio: 2,
       cacheBust: true,
       // Subtle but important: skip fonts the browser doesn't have access to
@@ -144,8 +147,6 @@ export function CalendarExportModal({
       // belt-and-suspenders against transparent backgrounds.
       backgroundColor: options.theme === 'dark' ? '#1f2024' : '#fffdf7',
     })
-    const res = await fetch(dataUrl)
-    return await res.blob()
   }
 
   const handleDownload = async () => {
@@ -353,7 +354,7 @@ export function CalendarExportModal({
               <Button
                 onClick={handleDownload}
                 disabled={isExporting || !isRangeValid}
-                className="w-full gap-2"
+                className="w-full gap-2 max-md:h-11"
               >
                 {isExporting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -366,7 +367,7 @@ export function CalendarExportModal({
                 onClick={handleCopy}
                 disabled={isExporting || !isRangeValid}
                 variant="outline"
-                className="w-full gap-2"
+                className="w-full gap-2 max-md:h-11"
               >
                 {justCopied ? (
                   <Check className="w-4 h-4 text-success" />

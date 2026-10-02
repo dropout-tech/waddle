@@ -197,6 +197,11 @@ async function installRoutes(page) {
   await page.route('**/rest/v1/**', async (route) => {
     const req = route.request()
     const table = new URL(req.url()).pathname.split('/').pop()
+    // The app drops tasks whose user_id is not the signed-in user (they would
+    // be "assigned to me" by someone else), so the fake rows must belong to
+    // whoever the session's JWT says is signed in.
+    const jwtPayload = (req.headers().authorization || '').split('.')[1]
+    if (jwtPayload) { try { plan.userId = JSON.parse(Buffer.from(jwtPayload, 'base64url').toString()).sub } catch { /* anon or malformed token */ } }
     if (req.method() !== 'GET') {
       const body = req.postDataJSON()
       writes.push({ table, method: req.method(), body })
@@ -215,7 +220,7 @@ async function installRoutes(page) {
     }
     if (table === 'workspaces') return route.fulfill({ json: WS.map(fakeWorkspace) })
     if (table === 'categories') return route.fulfill({ json: CATS.map(fakeCategory) })
-    if (table === 'tasks') return route.fulfill({ json: taskRows })
+    if (table === 'tasks') return route.fulfill({ json: taskRows.map((task) => ({ ...task, user_id: plan.userId })) })
     if (table === 'user_settings') {
       const response = await route.fetch()
       const body = await response.json()

@@ -87,7 +87,7 @@ export const dict: Record<string, string> = {
   '已複製邀請連結': 'Invite link copied',
   '無法自動複製，請手動選取連結': "Couldn't copy automatically — please select the link manually.",
   '你的角色：{role}': 'Your role: {role}',
-  '{count} 位成員': '{count} members',
+  '{count} 位成員': '{count} {count|member|members}',
   '確定解散「{name}」？所有組織內的指派都會解除。': 'Delete "{name}"? All assignments inside the organization will be withdrawn.',
   '組織已解散': 'Organization deleted',
   '解散組織': 'Delete organization',

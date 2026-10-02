@@ -6,7 +6,8 @@
 // fetchAllRows keeps asking for the next range until it holds as many rows as
 // PostgREST's exact count says exist, so it does not depend on knowing the
 // server's limit: a page that comes back shorter than requested just means a
-// smaller next step.
+// smaller next step. If no total comes back at all, a page shorter than
+// FETCH_PAGE_SIZE ends the loop instead.
 //
 // The query passed in must
 //   - select with `{ count: 'exact' }`, and
@@ -38,7 +39,9 @@ export async function fetchAllRows<Row, Err extends { code?: string }>(
     }
     total = count
     rows.push(...(data ?? []))
-    if (!data?.length || (count !== null && rows.length >= count)) break
+    // No total (a proxy or mock that drops Content-Range): the only signal
+    // left is a page shorter than requested, which means the end.
+    if (!data?.length || (count !== null ? rows.length >= count : data.length < FETCH_PAGE_SIZE)) break
   }
   return { data: rows, error: null }
 }

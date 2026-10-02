@@ -100,15 +100,18 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     [editor, onPromote],
   )
 
-  // Swap document when the selected note changes (without emitting an update).
+  // Swap document when the selected note changes (without emitting an update),
+  // or when the hook replaced its text with the server's after a save
+  // conflict (syncRev bump; this device's text went to a conflict copy).
   useEffect(() => {
     if (!editor) return
-    if (loadedIdRef.current === note.id) return
-    loadedIdRef.current = note.id
+    const loadKey = `${note.id}#${note.syncRev ?? 0}`
+    if (loadedIdRef.current === loadKey) return
+    loadedIdRef.current = loadKey
     applyingRef.current = true
     editor.commands.setContent(note.content ?? EMPTY_DOC, { emitUpdate: false })
     applyingRef.current = false
-  }, [editor, note.id, note.content])
+  }, [editor, note.id, note.syncRev, note.content])
 
   // ── Title (local state + debounced commit) ───────────────
   const [title, setTitle] = useState(note.title)
@@ -120,10 +123,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     // the user is typing right now.
     setTitle(note.title)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [note.id])
+  }, [note.id, note.syncRev])
+
+  // A title still waiting for its debounce, with the callback it belongs to,
+  // so closing the editor sends it instead of dropping it with the timer.
+  const pendingTitle = useRef<(() => void) | null>(null)
 
   const commitTitle = (value: string) => {
     clearTimeout(titleTimer.current)
+    pendingTitle.current = null
     if (!readOnly) onTitleChange(value)
   }
 
@@ -131,10 +139,32 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     setTitle(value)
     clearTimeout(titleTimer.current)
     if (immediateTitleChanges) { onTitleChange(value); return }
-    titleTimer.current = setTimeout(() => onTitleChange(value), TITLE_DEBOUNCE_MS)
+    const send = () => { pendingTitle.current = null; onTitleChange(value) }
+    pendingTitle.current = send
+    titleTimer.current = setTimeout(send, TITLE_DEBOUNCE_MS)
   }
 
-  useEffect(() => () => clearTimeout(titleTimer.current), [])
+  useEffect(() => () => {
+    clearTimeout(titleTimer.current)
+    pendingTitle.current?.()
+  }, [])
+
+  // A reload/close doesn't unmount React, so also send the pending title when
+  // the page is hidden or unloaded (the notebook hook backs it up locally first).
+  useEffect(() => {
+    const flush = () => {
+      if (!pendingTitle.current) return
+      clearTimeout(titleTimer.current)
+      pendingTitle.current()
+    }
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush() }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
 
   return (
     <div className="flex h-full flex-col">

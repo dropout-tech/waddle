@@ -71,8 +71,9 @@ export function resolveDefaultWorkspace(
 /**
  * Where a task created with NO workspace/category context should land.
  *
- * - `defaultCategoryEnabled` true → the 未分類 workspace's default category
- *   (or, if none is flagged, its first non-archived category).
+ * - `defaultCategoryEnabled` true → the category flagged as default (any
+ *   workspace — normally 未分類 / 未分類), or, if none is flagged, the 未分類
+ *   workspace's first non-archived category.
  * - No 未分類 workspace (legacy/deleted data) or the setting is off → fall
  *   back to the first non-archived workspace's first non-archived category,
  *   i.e. exactly the pre-未分類 behavior.
@@ -88,6 +89,15 @@ export function resolveGlobalDefaultCategory(
 
   if (defaultCategoryEnabled) {
     const defaultWs = resolveDefaultWorkspace(list)
+    // The flagged category wins wherever it lives: settings lets the user
+    // point the default at any workspace's category (which clears the flag
+    // in 未分類). Same lookup order as the settings picker — 未分類 first,
+    // then the other workspaces in display order.
+    const active = sortWorkspacesForDisplay(list.filter((w) => !w.isArchived))
+    for (const workspace of active) {
+      const flagged = workspace.categories.find((c) => !c.isArchived && c.isDefault)
+      if (flagged) return { workspace, category: flagged }
+    }
     if (defaultWs) {
       const category = resolveDefaultCategory(defaultWs, true)
       if (category) return { workspace: defaultWs, category }
