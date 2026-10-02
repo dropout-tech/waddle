@@ -56,3 +56,18 @@ export function formatDay(date: string, now: Date, lang: string, t: T): string {
   if (date === dateKey(addDays(now, 1))) return t('明天')
   return formatMonthDay(date, lang)
 }
+
+/** The category with the most tasks created in the 7 days before `now`. */
+export function busiestRecentCategory(workspaces: Workspace[], now: number): string | undefined {
+  const since = now - 7 * 24 * 3600 * 1000
+  let best: { id: string; n: number } | undefined
+  for (const w of workspaces) {
+    if (w.isArchived) continue
+    for (const c of w.categories) {
+      if (c.isArchived) continue
+      const n = c.tasks.filter((x) => Date.parse(x.createdAt) >= since).length
+      if (n && (!best || n > best.n)) best = { id: c.id, n }
+    }
+  }
+  return best?.id
+}

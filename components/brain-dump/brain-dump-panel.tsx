@@ -34,6 +34,23 @@ interface PanelProps {
   onCommit: (items: PlannedItem[], today: string, categoryId: string) => Promise<number>
 }
 
+// The category pick is remembered per device (only for this feature).
+const CATEGORY_KEY = 'huddle-brain-dump-category-v1'
+function readStoredCategory(): string | null {
+  try {
+    return window.localStorage.getItem(CATEGORY_KEY)
+  } catch {
+    return null
+  }
+}
+function writeStoredCategory(id: string) {
+  try {
+    window.localStorage.setItem(CATEGORY_KEY, id)
+  } catch {
+    /* private mode — keep in memory only */
+  }
+}
+
 function reducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
@@ -60,7 +77,15 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
       }))),
     [workspaces],
   )
-  const [categoryId, setCategoryId] = useState(defaultCategoryId ?? categories[0]?.id ?? '')
+  const [categoryId, setCategoryIdState] = useState(() => {
+    const stored = readStoredCategory()
+    if (stored && categories.some((c) => c.id === stored)) return stored
+    return defaultCategoryId ?? categories[0]?.id ?? ''
+  })
+  const setCategoryId = (id: string) => {
+    setCategoryIdState(id)
+    writeStoredCategory(id)
+  }
   const textRef = useRef<HTMLTextAreaElement>(null)
   const runRef = useRef(0)
 
@@ -400,21 +425,6 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
               />
             )}
 
-            {categories.length > 0 && (
-              <label className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="flex-shrink-0">{t('放進分類')}</span>
-                <select
-                  data-bd-category
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="h-11 min-w-0 max-w-full rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-8"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.label}</option>
-                  ))}
-                </select>
-              </label>
-            )}
           </div>
         )}
       </div>
@@ -423,10 +433,26 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
       <div className="flex items-center justify-end gap-2 border-t border-border bg-card px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {phase === 'preview' ? (
           <>
+            {categories.length > 0 && (
+              <label className="mr-auto flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                <span className="hidden flex-shrink-0 sm:inline">{t('放進分類')}</span>
+                <select
+                  data-bd-category
+                  aria-label={t('放進分類')}
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="h-11 w-full min-w-0 max-w-[180px] truncate rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9"
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <button
               type="button"
               onClick={restart}
-              className="min-h-11 rounded-lg px-4 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9"
+              className="min-h-11 flex-shrink-0 rounded-lg px-3 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9 md:px-4"
             >
               {t('重來')}
             </button>
@@ -434,7 +460,7 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
               type="button"
               onClick={() => void commit()}
               disabled={!chosen.length || saving}
-              className="min-h-11 rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:min-h-9"
+              className="min-h-11 flex-shrink-0 whitespace-nowrap rounded-lg bg-primary px-4 md:px-5 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:min-h-9"
             >
               {saving ? t('放進去中…') : t('放進行事曆（{n}）', { n: chosen.length })}
             </button>

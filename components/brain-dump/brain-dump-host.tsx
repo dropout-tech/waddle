@@ -12,6 +12,7 @@ import type { Task, TimeBlock, UserSettings, Workspace } from '@/lib/types'
 import { BRAIN_DUMP_OPEN_EVENT, BRAIN_DUMP_SHOW_TODAY_EVENT } from './brain-dump-events'
 import { BrainDumpPanel } from './brain-dump-panel'
 import { BrainDumpToast } from './brain-dump-toast'
+import { busiestRecentCategory } from './brain-dump-utils'
 
 interface HostProps {
   workspaces: Workspace[]
@@ -34,10 +35,17 @@ export function BrainDumpHost({ workspaces, assignedTasks, timeBlocks, settings,
   // Kept across close/reopen so an accidental tap outside doesn't lose the list.
   const [text, setText] = useState('')
 
+  // Default category for this feature, picked at open time: the one the
+  // user filled most in the last 7 days, else the global 未分類 default.
+  const [fallback, setFallback] = useState<string | undefined>()
   const show = useCallback(() => {
+    setFallback(
+      busiestRecentCategory(workspaces, Date.now())
+        ?? resolveGlobalDefaultCategory(workspaces, settings.defaultCategoryEnabled)?.category.id,
+    )
     setSession((s) => s + 1)
     setOpen(true)
-  }, [])
+  }, [workspaces, settings.defaultCategoryEnabled])
 
   useEffect(() => {
     window.addEventListener(BRAIN_DUMP_OPEN_EVENT, show)
@@ -61,7 +69,6 @@ export function BrainDumpHost({ workspaces, assignedTasks, timeBlocks, settings,
 
   const close = useCallback(() => setOpen(false), [])
 
-  const fallback = resolveGlobalDefaultCategory(workspaces, settings.defaultCategoryEnabled)
 
   const commit = useCallback(async (items: PlannedItem[], today: string, categoryId: string): Promise<number> => {
     let target = resolveGlobalDefaultCategory(workspaces, settings.defaultCategoryEnabled)
@@ -120,7 +127,8 @@ export function BrainDumpHost({ workspaces, assignedTasks, timeBlocks, settings,
       {
         duration: 4500,
         style: window.matchMedia('(max-width: 767px)').matches
-          ? { marginBottom: 'calc(64px + env(safe-area-inset-bottom))' }
+          // Clear the tab bar and the stacked 丟給企鵝 / ＋ buttons (top at 252px).
+          ? { marginBottom: 'calc(244px + env(safe-area-inset-bottom))' }
           : undefined,
       },
     )
@@ -167,7 +175,7 @@ export function BrainDumpHost({ workspaces, assignedTasks, timeBlocks, settings,
       text={text}
       onTextChange={setText}
       onClose={close}
-      defaultCategoryId={fallback?.category.id}
+      defaultCategoryId={fallback}
       onCommit={commit}
     />
   )

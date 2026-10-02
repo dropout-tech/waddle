@@ -154,6 +154,10 @@ async function runPanel(page, label, { mobile, write }) {
       assert.ok(box.width >= 44 && box.height >= 44, `tick target ${box.width}x${box.height}`)
     }
     assert.ok(await dialog.locator('[data-bd-category]').inputValue(), 'no default category')
+    // The category picker sits in the always-visible footer, fully on screen.
+    const cat = await dialog.locator('[data-bd-category]').boundingBox()
+    const vp = page.viewportSize()
+    assert.ok(cat.y >= 0 && cat.y + cat.height <= vp.height && cat.x + cat.width <= vp.width, `category picker off screen ${JSON.stringify(cat)}`)
     await noHorizontalOverflow(page)
     await shot(page, `${label}-preview`)
   })
@@ -178,8 +182,10 @@ async function runPanel(page, label, { mobile, write }) {
     await page.waitForSelector('[data-task-block][data-bd-glow]', { timeout: 3000 })
     if (mobile) {
       const tb = await toastEl.boundingBox()
-      const vh = page.viewportSize().height
-      assert.ok(tb.y + tb.height <= vh - 60, `toast covers the tab bar (bottom ${tb.y + tb.height} / ${vh})`)
+      for (const sel of ['[data-tour="mobile-add-task"]', '[data-tour="mobile-brain-dump"]']) {
+        const fab = await page.locator(sel).boundingBox()
+        if (fab) assert.ok(tb.y + tb.height <= fab.y + 1, `toast covers ${sel} (toast bottom ${tb.y + tb.height}, button top ${fab.y})`)
+      }
     }
     await page.waitForTimeout(500)
     await shot(page, `${label}-after-write`)

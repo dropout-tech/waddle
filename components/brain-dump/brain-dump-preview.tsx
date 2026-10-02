@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
 import { toMinutes } from '@/lib/brain-dump/plan'
+import { addDays, dateKey } from '@/lib/brain-dump/parse'
 import type { BusyInterval, DayPlan, PlannedItem } from '@/lib/brain-dump/types'
 import { formatDay, formatDuration, formatMonthDay } from './brain-dump-utils'
 import { PenguinArt, type PenguinPose } from './penguin-art'
@@ -46,6 +47,7 @@ export function BrainDumpPreview({
   const scrollRef = useRef<HTMLDivElement>(null)
   const penguinRef = useRef<HTMLDivElement>(null)
   const [settled, setSettled] = useState(false)
+  const [scrollY, setScrollY] = useState(0)
 
   const pxPerMin = isMobile ? 0.9 : 1
   const timed = useMemo(
@@ -149,6 +151,7 @@ export function BrainDumpPreview({
             role="list"
             aria-label={t('今天的時間軸')}
             className="relative overflow-y-auto overscroll-contain"
+            onScroll={(e) => setScrollY(e.currentTarget.scrollTop)}
             style={{ maxHeight: isMobile ? 'min(46dvh, 460px)' : 'min(52dvh, 460px)' }}
           >
             <div className="relative" style={{ height: contentHeight }}>
@@ -173,8 +176,12 @@ export function BrainDumpPreview({
                       className={cn(styles.busy, 'absolute left-12 right-2 overflow-hidden rounded-md border border-dashed border-border p-0.5')}
                       style={{ top, height: h }}
                     >
-                      {/* Solid chip so the stripes never eat the words. */}
-                      <span className="inline-block max-w-full truncate rounded bg-card/95 px-1.5 text-[10px] leading-[16px] text-muted-foreground">
+                      {/* Solid chip so the stripes never eat the words; it slides
+                          down to stay in view when the band starts above the fold. */}
+                      <span
+                        className="inline-block max-w-full truncate rounded bg-card/95 px-1.5 text-[10px] leading-[16px] text-muted-foreground"
+                        style={{ transform: `translateY(${Math.max(0, Math.min(scrollY - top, h - 20))}px)` }}
+                      >
                         {b.label || t('已有安排')}
                       </span>
                     </div>
@@ -236,6 +243,8 @@ function trayMeta(item: PlannedItem, now: Date, lang: string, t: (s: string, v?:
   const day = formatDay(item.date, now, lang, t)
   const dur = formatDuration(item.draft.estimatedMinutes, t)
   if (item.status === 'scheduled') return `${day} ${item.start}–${item.end} · ${dur}`
+  // Anything waiting for tomorrow reads the same, whatever the reason.
+  if (item.date === dateKey(addDays(now, 1))) return t('明天再排 · {dur}', { dur })
   switch (item.reason) {
     case 'full':
       return t('今天塞不下，先放{day}的待排 · {dur}', { day, dur })
