@@ -593,7 +593,11 @@ end $$;
 select public.t_ok(true, 'module C functions: reported missing when absent, passed through (positional finish args) when present');
 
 -- ── 19. Privileges: nothing new is callable by anon / authenticated ───────
-select public.t_ok((select count(*) = 29 and bool_and(not has_function_privilege('anon', p.oid, 'EXECUTE')
+-- Module C (20261002130000) adds 3 more huddle_ops.web_* functions when present;
+-- they are covered by the same "no anon / authenticated EXECUTE" check.
+select public.t_ok((select count(*) = 29 + (select count(*) from pg_proc p2 join pg_namespace n2 on n2.oid = p2.pronamespace
+        where n2.nspname = 'huddle_ops' and p2.proname in ('web_enqueue_reminders','web_claim_outbox','web_finish_outbox'))
+      and bool_and(not has_function_privilege('anon', p.oid, 'EXECUTE')
       and not has_function_privilege('authenticated', p.oid, 'EXECUTE'))
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where (n.nspname = 'huddle_ops' and p.proname like 'web\_%'
@@ -623,7 +627,8 @@ create table public.t_rows as select (select count(*) from public.web_subscripti
 \ir ../../supabase/rollback/20261002140000_web_billing_transitions_down.sql
 select public.t_ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where (n.nspname = 'huddle_ops' and p.proname like 'web\_%'
-           and p.proname not in ('web_paid_until','web_subscription_guard','web_payment_attempt_guard','web_refund_guard'))
+           and p.proname not in ('web_paid_until','web_subscription_guard','web_payment_attempt_guard','web_refund_guard',
+                                 'web_enqueue_reminders','web_claim_outbox','web_finish_outbox'))  -- P1 / module C, not ours
        or (n.nspname = 'public' and p.proname = 'web_billing_server'))
   and to_regclass('huddle_ops.web_rate_hits') is null
   and (select s = (select count(*) from public.web_subscriptions) and a = (select count(*) from public.web_payment_attempts)
@@ -633,7 +638,8 @@ select public.t_ok(not exists (select 1 from pg_proc p join pg_namespace n on n.
 \ir ../../supabase/migrations/20261002140000_web_billing_transitions.sql
 select public.t_ok((select count(*) = 29 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where (n.nspname = 'huddle_ops' and p.proname like 'web\_%'
-           and p.proname not in ('web_paid_until','web_subscription_guard','web_payment_attempt_guard','web_refund_guard'))
+           and p.proname not in ('web_paid_until','web_subscription_guard','web_payment_attempt_guard','web_refund_guard',
+                                 'web_enqueue_reminders','web_claim_outbox','web_finish_outbox'))
        or (n.nspname = 'public' and p.proname = 'web_billing_server'))
   and not has_function_privilege('authenticated', 'public.web_billing_server(text,jsonb)', 'EXECUTE')
   and (public.t_claim1(3, (public.t_sub(3)).current_period_end + interval '1 minute') -> 0 ->> 'reference_order_id') like '%c0003a01',
