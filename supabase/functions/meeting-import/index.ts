@@ -9,6 +9,7 @@ import {
   taipeiMonth,
   meetingWeekday,
 } from "./contract.ts";
+import { MODEL, usageRecord, reservationError, failureResponse } from "./quota.mjs";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -47,6 +48,10 @@ Deno.serve(async (req) => {
   if (accessError) return reply({ error: "DATABASE_ERROR" }, 503);
   if (allowed !== true) return reply({ error: "ACCOUNT_SUSPENDED" }, 403);
   let claimedId: string | null = null;
+  // Failure accounting once the model may have been called (see quota.mjs and
+  // 20261002100000_meeting_import_attempt_quota.sql): unknown counts as charged.
+  let billable = true;
+  let usage: Record<string, unknown> | null = null;
   try {
     // Bound the actual stream, not just the client-supplied Content-Length.
     const reader = req.body?.getReader();
@@ -204,13 +209,8 @@ Deno.serve(async (req) => {
       },
     );
     if (error) {
-      const code = ["MONTHLY_LIMIT", "RATE_LIMIT", "REQUEST_CONFLICT"].find(
-        (c) => error.message.includes(c),
-      );
-      return reply(
-        { error: code || "DATABASE_ERROR" },
-        code === "MONTHLY_LIMIT" || code === "RATE_LIMIT" ? 429 : 409,
-      );
+      const { code, status } = reservationError(error.message);
+      return reply({ error: code }, status);
     }
     if (!reservation.claimed)
       return reply(
@@ -226,7 +226,7 @@ Deno.serve(async (req) => {
       },
       signal: AbortSignal.timeout(90000),
       body: JSON.stringify({
-        model: "gpt-4.1-mini",
+        model: MODEL,
         temperature: 0.2,
         max_completion_tokens: 6000,
         store: false,
@@ -259,8 +259,13 @@ Deno.serve(async (req) => {
         ],
       }),
     });
-    if (!response.ok) throw new Error("PROVIDER_ERROR");
+    if (!response.ok) {
+      // OpenAI refused the request itself (rate limit, outage): not charged.
+      billable = false;
+      throw new Error("PROVIDER_ERROR");
+    }
     const completion = await response.json();
+    usage = usageRecord(completion.usage);
     if (completion.choices?.[0]?.finish_reason !== "stop")
       throw new Error("INCOMPLETE_RESULT");
     const result = validateResult(
@@ -275,27 +280,32 @@ Deno.serve(async (req) => {
         p_user: user.id,
         p_id: input.id,
         p_result: result,
-        p_usage: completion.usage ?? {},
+        p_usage: usage,
       },
     );
     if (saveError) throw new Error("SAVE_FAILED");
     claimedId = null;
     return reply({ meeting });
   } catch (error) {
-    if (claimedId)
-      await admin.rpc("finish_meeting_import", {
+    if (claimedId) {
+      const failed = await admin.rpc("fail_meeting_import", {
         p_user: user.id,
         p_id: claimedId,
-        p_result: null,
-        p_usage: null,
+        p_usage: usage,
+        p_billable: billable,
       });
+      // Older database without fail_meeting_import: the row still ends failed
+      // (and counted, provider_billable defaults to true).
+      if (failed.error)
+        await admin.rpc("finish_meeting_import", {
+          p_user: user.id,
+          p_id: claimedId,
+          p_result: null,
+          p_usage: usage,
+        });
+    }
     // Never log transcripts, model output, tokens, or upstream error bodies.
-    const invalid =
-      error instanceof SyntaxError ||
-      (error instanceof Error && error.name === "ZodError" && !claimedId);
-    return reply(
-      { error: invalid ? "INVALID_INPUT" : "GENERATION_FAILED" },
-      invalid ? 400 : 502,
-    );
+    const failure = failureResponse(error, !!claimedId);
+    return reply({ error: failure.error }, failure.status);
   }
 });

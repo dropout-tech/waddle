@@ -133,6 +133,10 @@ export const dict: Record<string, string> = {
   '本月已使用 20 次，下個月 1 日（台北時間）會重新開放。':
     "You've used all 20 this month. It resets on the 1st of next month (Taipei time).",
   '短時間內嘗試較多，請稍後再試。': 'Too many attempts in a short time. Please try again later.',
+  '本月 AI 整理的嘗試次數已達上限，下個月 1 日（台北時間）會重新開放。':
+    "You've reached this month's limit of AI summary attempts. It resets on the 1st of next month (Taipei time).",
+  'AI 整理目前使用量過高，暫時暫停服務，請稍後再試。':
+    'AI summaries are temporarily paused due to high demand. Please try again later.',
   '這份內容已變更，請開始新的整理。': 'This content has changed. Please start a new summary.',
   'AI 整理尚未啟用，請稍後再試。': 'AI summarizing is not enabled yet. Please try again later.',
   '登入已過期，請重新登入。': 'Your session has expired. Please sign in again.',

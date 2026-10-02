@@ -17,6 +17,7 @@ import { FocusTimer } from '@/components/timer/focus-timer'
 import { CommandPalette } from '@/components/command-palette'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { toDateString, isValidHourRange } from '@/lib/calendar-utils'
+import { resolveDefaultView } from '@/lib/settings-auto'
 import { useShowCompletedTasks } from '@/lib/show-completed'
 import { readStoredSize, writeStoredSize, PANEL_WIDTH_KEY } from '@/lib/persisted-size'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -166,13 +167,19 @@ export function MainLayout({
   )
   const [selectedDate, setSelectedDate] = useState(new Date())
   // Opens on the saved 預設視圖模式 (settings are loaded before this layout
-  // mounts). New accounts get 週 from the DB default, which also covers the
-  // owner's 2026-09-26 "phones open on 週" request; anyone who picks 日 or 月
-  // in settings gets that on every device.
-  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>(() => {
-    const v = settings?.defaultView
-    return v === 'day' || v === 'week' || v === 'month' ? v : 'day'
-  })
+  // mounts) on every device. 自動 (null, the default) keeps the behaviour from
+  // before the setting existed: desktop 日, phones 週 (owner, 2026-09-26).
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>(() =>
+    resolveDefaultView(settings?.defaultView, isMobile),
+  )
+  // 自動 only: if we learn we're on a phone after mounting, switch the
+  // untouched initial 日 to 週 once — never overriding a pick made since.
+  const mobileAutoViewAppliedRef = useRef(false)
+  useEffect(() => {
+    if (!isMobile || mobileAutoViewAppliedRef.current || settings?.defaultView) return
+    mobileAutoViewAppliedRef.current = true
+    setViewMode((v) => (v === 'day' ? 'week' : v))
+  }, [isMobile, settings?.defaultView])
   // Export-as-image modal — lives here because all the required data
   // (workspaces, timeBlocks, selectedDate, settings.calendarStartHour/EndHour)
   // is already in scope. Toggled by the export button in CalendarHeader.

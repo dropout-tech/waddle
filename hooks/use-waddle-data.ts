@@ -15,6 +15,7 @@ import {
   rowToSettings,
 } from '@/lib/supabase/mappers'
 import { toDateString, parseDateString, isSeriesStart, shiftSeries, seriesShiftIsExact } from '@/lib/calendar-utils'
+import { prefsToRow } from '@/lib/settings-auto'
 import { playTaskCompleteSound } from '@/lib/task-sound'
 import { hapticTaskComplete } from '@/lib/haptics'
 import { pushUndoableAction } from '@/lib/undo-stack'
@@ -128,6 +129,9 @@ function buildTaskInsert(task: Task, userId: string) {
 const SETTINGS_EXT_COL_RE = /day_view_days|week_view_days|keep_completed_today_in_list|quick_links|show_category_prefix|default_category_enabled|focus_board/
 let settingsExtColsKnownMissing = false
 const isMissingSettingsExtColumnError = (err: unknown) => isMissingColumnError(err, SETTINGS_EXT_COL_RE)
+// Pre-20261002110000 DB: default_task_minutes missing, or null into a NOT NULL column.
+const isMissingAutoSettingsError = (err: unknown) =>
+  isMissingColumnError(err, /default_task_minutes/) || (err as { code?: string } | null)?.code === '23502'
 
 // time_blocks.notes — migration 20260824120000_time_blocks_notes.sql (not
 // yet applied to prod as of this writing). Same latch-and-retry shape as the
@@ -145,8 +149,9 @@ const isMissingTimeBlockNotesColumnError = (err: unknown) => isMissingColumnErro
 export const DEFAULT_SETTINGS: UserSettings = {
   calendarStartHour: 0,
   calendarEndHour: 24,
-  defaultView: 'day',
-  weekStartDay: 0,
+  defaultView: null,
+  weekStartDay: null,
+  defaultTaskMinutes: null,
   dayViewDays: 1,
   weekViewDays: 7,
   keepCompletedTodayInList: true,
@@ -3090,8 +3095,14 @@ export function useWaddleData(): UseWaddleData {
       user_id: userId,
       calendar_start_hour: newSettings.calendarStartHour,
       calendar_end_hour: newSettings.calendarEndHour,
-      default_view: newSettings.defaultView,
-      week_start_day: newSettings.weekStartDay,
+      // 自動 = null, or the old defaults on a DB without the migration.
+      ...prefsToRow({
+        defaultView: newSettings.defaultView,
+        weekStartDay: newSettings.weekStartDay,
+        defaultTaskMinutes: newSettings.defaultTaskMinutes,
+        // Unknown (no row was read): try the new schema, fall back below.
+        autoColumns: newSettings.autoColumns ?? true,
+      }),
       weather_city: newSettings.weatherCity,
       weather_unit: newSettings.weatherUnit,
       // JSONB columns — UserSettings shapes are richer than the generic Json
@@ -3160,6 +3171,14 @@ export function useWaddleData(): UseWaddleData {
           focus_board: newSettings.focusBoard as unknown as Json,
         }
     let { error } = await supabase.from('user_settings').upsert(fullSettingsRow)
+    // DB without the 自動 migration (NOT NULL columns, no default_task_minutes):
+    // write 自動 as the old defaults instead.
+    if (error && newSettings.autoColumns !== false && isMissingAutoSettingsError(error)) {
+      const legacy = prefsToRow({ ...newSettings, autoColumns: false })
+      const { default_task_minutes: _drop, ...autoFree } = fullSettingsRow as typeof fullSettingsRow & { default_task_minutes?: unknown }
+      void _drop
+      ;({ error } = await supabase.from('user_settings').upsert({ ...autoFree, ...legacy }))
+    }
     if (error && isMissingSettingsExtColumnError(error)) {
       settingsExtColsKnownMissing = true
       console.warn('[settings] migration columns missing — falling back to localStorage. Run latest migration.', error)

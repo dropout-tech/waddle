@@ -273,8 +273,15 @@ export interface JournalPhoto {
 export interface UserSettings {
   calendarStartHour: number
   calendarEndHour: number
-  defaultView: 'day' | 'week' | 'month'
-  weekStartDay: number
+  /** null = 自動 (desktop 日, phones 週) — see lib/settings-auto.ts. */
+  defaultView: 'day' | 'week' | 'month' | null
+  /** 0 = Sunday … 6; null = 自動 (month grid from Sunday, week view from the selected date). */
+  weekStartDay: number | null
+  /** Length (minutes) of a task created by clicking an empty slot; null = 自動 (30). */
+  defaultTaskMinutes: number | null
+  /** Whether the DB has the nullable 自動 columns (migration 20261002110000).
+   *  Read-only bookkeeping for saving; false = legacy schema. */
+  autoColumns?: boolean
   /** Day-mode visible days (1-3). Focus / planning scope. */
   dayViewDays: number
   /** Week-mode visible days (5-7). Overview scope. */
@@ -312,6 +319,7 @@ export interface UserSettings {
   }
   bufferTime: {
     enabled: boolean
+    /** Buffer-block length — NOT the click-to-create task length (that is defaultTaskMinutes). */
     defaultDuration: number // minutes
     color: string
   }
