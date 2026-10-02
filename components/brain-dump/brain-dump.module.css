@@ -9,6 +9,8 @@
   --note-3: #f2dccd;
   --note-ink: #292b24;
   --note-edge: rgba(41, 43, 36, 0.14);
+  --tape: rgba(237, 199, 71, 0.55);
+  --tape-edge: rgba(41, 43, 36, 0.10);
   --busy-bg: repeating-linear-gradient(135deg, rgba(102, 100, 90, 0.10) 0 6px, rgba(102, 100, 90, 0.04) 6px 12px);
 }
 :global(.dark) .root {
@@ -17,16 +19,47 @@
   --note-3: #4a3a31;
   --note-ink: #f3eedd;
   --note-edge: rgba(243, 238, 221, 0.14);
+  --tape: rgba(237, 199, 71, 0.32);
+  --tape-edge: rgba(243, 238, 221, 0.12);
   --busy-bg: repeating-linear-gradient(135deg, rgba(243, 238, 221, 0.08) 0 6px, rgba(243, 238, 221, 0.03) 6px 12px);
 }
 
 /* ───────── paper note ───────── */
 .note {
+  /* position comes from the caller (absolute on the timeline, relative in
+     the tray) — both anchor the ::before tape and ::after shadow. */
   background: var(--note-tint, var(--note-1));
   color: var(--note-ink);
   border: 1px solid var(--note-edge);
-  box-shadow: 0 1px 0 rgba(41, 43, 36, 0.06), 0 6px 14px -8px rgba(41, 43, 36, 0.35);
+  box-shadow: 0 1px 0 rgba(41, 43, 36, 0.06), 0 4px 10px -7px rgba(41, 43, 36, 0.32);
+  /* Paper never sits square: a small resting tilt per note. */
+  transform: rotate(var(--tilt, 0deg));
   transition: opacity 160ms ease-out, filter 160ms ease-out;
+}
+/* A short strip of hand-torn tape holding the note to the page. */
+.note::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 34px;
+  height: 11px;
+  margin-left: -17px;
+  background: var(--tape);
+  border-left: 1px dashed var(--tape-edge);
+  border-right: 1px dashed var(--tape-edge);
+  transform: rotate(-3deg);
+  pointer-events: none;
+}
+/* Lifted shadow while flying; fades to the resting one on landing (opacity only). */
+.note::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 14px 22px -10px rgba(41, 43, 36, 0.45);
+  opacity: 0;
+  pointer-events: none;
 }
 .note[data-off] {
   opacity: 0.45;
@@ -44,6 +77,14 @@
 .drop {
   animation: bd-drop 600ms var(--bd-ease) var(--delay, 0ms) both;
 }
+.drop::after {
+  animation: bd-shadow 600ms linear var(--delay, 0ms) both;
+}
+@keyframes bd-shadow {
+  0% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
 @keyframes bd-drop {
   0% {
     opacity: 0;
@@ -54,8 +95,16 @@
   }
   100% {
     opacity: 1;
-    transform: none;
+    transform: rotate(var(--tilt, 0deg));
   }
+}
+
+/* ───────── done toast ───────── */
+.toast {
+  background: var(--card);
+  color: var(--card-foreground);
+  border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
+  box-shadow: 0 10px 24px -14px rgba(41, 43, 36, 0.45);
 }
 
 /* ───────── timeline ───────── */
@@ -75,12 +124,14 @@
 :global(.dark) .penguin {
   filter: drop-shadow(0 0 1px rgba(243, 238, 221, 0.45)) drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
 }
-.penguinHop {
-  animation: bd-hop 280ms var(--bd-ease) 220ms var(--hops, 3) alternate both;
+/* One small nod per landing note (220ms = STAGGER in the preview). */
+.penguinNod {
+  animation: bd-nod 220ms ease-in-out var(--nod-delay, 480ms) var(--nods, 3);
 }
-@keyframes bd-hop {
-  from { transform: translateY(0) rotate(0deg); }
-  to { transform: translateY(-6px) rotate(-6deg); }
+@keyframes bd-nod {
+  0% { transform: translateY(0); }
+  40% { transform: translateY(6px); }
+  100% { transform: translateY(0); }
 }
 .penguinThink {
   animation: bd-think 900ms ease-in-out infinite alternate;
@@ -120,7 +171,10 @@
   .drop {
     animation: bd-fade 150ms ease-out both;
   }
-  .penguinHop,
+  .drop::after {
+    animation: none;
+  }
+  .penguinNod,
   .penguinThink,
   .scrap,
   .listening {

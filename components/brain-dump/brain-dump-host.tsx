@@ -11,6 +11,7 @@ import type { PlannedItem } from '@/lib/brain-dump/types'
 import type { Task, TimeBlock, UserSettings, Workspace } from '@/lib/types'
 import { BRAIN_DUMP_OPEN_EVENT, BRAIN_DUMP_SHOW_TODAY_EVENT } from './brain-dump-events'
 import { BrainDumpPanel } from './brain-dump-panel'
+import { BrainDumpToast } from './brain-dump-toast'
 
 interface HostProps {
   workspaces: Workspace[]
@@ -60,14 +61,22 @@ export function BrainDumpHost({ workspaces, assignedTasks, timeBlocks, settings,
 
   const close = useCallback(() => setOpen(false), [])
 
-  const commit = useCallback(async (items: PlannedItem[], today: string): Promise<number> => {
-    const target = resolveGlobalDefaultCategory(workspaces, settings.defaultCategoryEnabled)
+  const fallback = resolveGlobalDefaultCategory(workspaces, settings.defaultCategoryEnabled)
+
+  const commit = useCallback(async (items: PlannedItem[], today: string, categoryId: string): Promise<number> => {
+    let target = resolveGlobalDefaultCategory(workspaces, settings.defaultCategoryEnabled)
+    for (const w of workspaces) {
+      const c = w.categories.find((x) => x.id === categoryId && !x.isArchived)
+      if (c && !w.isArchived) target = { workspace: w, category: c }
+    }
     if (!target) {
       toast.error(t('找不到可以放任務的分類，先建立一個分類再試試。'))
       return 0
     }
     const { workspace, category } = target
     let created = 0
+    let scheduled = 0
+    const newIds: string[] = []
     let firstToday: { id: string; start: string } | null = null
     for (const item of items) {
       const stamp = new Date().toISOString()
@@ -96,32 +105,53 @@ export function BrainDumpHost({ workspaces, assignedTasks, timeBlocks, settings,
       // Refused (offline, plan limit…): createTask already told the user why.
       if (!(await createTask(task))) break
       created++
+      if (item.status === 'scheduled') scheduled++
+      if (item.status === 'scheduled' && item.date === today) newIds.push(task.id)
       if (item.status === 'scheduled' && item.date === today && item.start && (!firstToday || item.start < firstToday.start)) {
         firstToday = { id: task.id, start: item.start }
       }
     }
     if (!created) return 0
 
-    if (created < items.length) toast(t('先放進 {n} 件，其餘的沒放成功。', { n: created }))
-    else toast.success(t('企鵝排好了 {n} 件事', { n: created }))
+    // This feature's own toast (penguin + terracotta) — the global sonner
+    // style is untouched. Lifted above the phone tab bar.
+    toast.custom(
+      () => <BrainDumpToast scheduled={scheduled} pending={created - scheduled} failed={items.length - created} />,
+      {
+        duration: 4500,
+        style: window.matchMedia('(max-width: 767px)').matches
+          ? { marginBottom: 'calc(64px + env(safe-area-inset-bottom))' }
+          : undefined,
+      },
+    )
     setText('')
     setOpen(false)
 
-    // Show today on the calendar and bring the first new task into view.
+    // Show today on the calendar, bring the first new task into view, and
+    // let every new block glow softly once (~600ms) so the eye finds them.
     if (firstToday) {
       const id = firstToday.id
       window.dispatchEvent(new CustomEvent(BRAIN_DUMP_SHOW_TODAY_EVENT))
       window.setTimeout(() => {
         const el = document.querySelector<HTMLElement>(`[data-task-block-id="${id}"]`)
-        if (!el) return
         const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        el.scrollIntoView({ block: 'center', inline: 'nearest', behavior: reduced ? 'auto' : 'smooth' })
-        if (!reduced) {
-          el.animate(
-            [{ filter: 'brightness(1)' }, { filter: 'brightness(1.12) saturate(1.25)' }, { filter: 'brightness(1)' }],
-            { duration: 700, iterations: 2, easing: 'ease-in-out' },
-          )
-        }
+        el?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: reduced ? 'auto' : 'smooth' })
+        if (reduced) return
+        window.setTimeout(() => {
+          for (const newId of newIds) {
+            document.querySelectorAll<HTMLElement>(`[data-task-block-id="${newId}"]`).forEach((block) => {
+              block.setAttribute('data-bd-glow', '')
+              block.animate(
+                [
+                  { filter: 'brightness(1) drop-shadow(0 0 0 rgba(207, 87, 49, 0))' },
+                  { filter: 'brightness(1.18) drop-shadow(0 0 7px rgba(207, 87, 49, 0.75))', offset: 0.35 },
+                  { filter: 'brightness(1) drop-shadow(0 0 0 rgba(207, 87, 49, 0))' },
+                ],
+                { duration: 600, easing: 'ease-out' },
+              ).finished.then(() => block.removeAttribute('data-bd-glow'), () => {})
+            })
+          }
+        }, 350)
       }, 450)
     }
     return created
@@ -137,6 +167,7 @@ export function BrainDumpHost({ workspaces, assignedTasks, timeBlocks, settings,
       text={text}
       onTextChange={setText}
       onClose={close}
+      defaultCategoryId={fallback?.category.id}
       onCommit={commit}
     />
   )

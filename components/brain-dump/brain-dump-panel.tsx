@@ -28,15 +28,17 @@ interface PanelProps {
   text: string
   onTextChange: (text: string) => void
   onClose: () => void
+  /** Category the tasks land in unless the user picks another one. */
+  defaultCategoryId?: string
   /** Writes the chosen items; resolves to how many were created. */
-  onCommit: (items: PlannedItem[], today: string) => Promise<number>
+  onCommit: (items: PlannedItem[], today: string, categoryId: string) => Promise<number>
 }
 
 function reducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile, text, onTextChange, onClose, onCommit }: PanelProps) {
+export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile, text, onTextChange, onClose, defaultCategoryId, onCommit }: PanelProps) {
   const { t, lang } = useI18n()
   const [phase, setPhase] = useState<Phase>('input')
   const [notice, setNotice] = useState<'empty' | 'unparsed' | null>(null)
@@ -50,6 +52,15 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [scraps, setScraps] = useState<string[]>([])
+  const categories = useMemo(
+    () => workspaces.filter((w) => !w.isArchived).flatMap((w) =>
+      w.categories.filter((c) => !c.isArchived).map((c) => ({
+        id: c.id,
+        label: c.name === w.name ? c.name : `${w.name} / ${c.name}`,
+      }))),
+    [workspaces],
+  )
+  const [categoryId, setCategoryId] = useState(defaultCategoryId ?? categories[0]?.id ?? '')
   const textRef = useRef<HTMLTextAreaElement>(null)
   const runRef = useRef(0)
 
@@ -155,7 +166,7 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
   const commit = async () => {
     if (!plan || !chosen.length || saving) return
     setSaving(true)
-    const created = await onCommit(chosen, plan.today)
+    const created = await onCommit(chosen, plan.today, categoryId)
     setSaving(false)
     if (created > 0) onTextChange('')
   }
@@ -194,9 +205,12 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
     <div data-brain-dump-panel className={cn(styles.root, 'flex min-h-0 flex-1 flex-col')}>
       {/* Header */}
       <div className="flex items-start gap-3 px-5 pb-3 pt-4">
-        <div className="h-11 w-11 flex-shrink-0">
-          <PenguinArt pose="stand" />
-        </div>
+        {/* The preview has its own big penguin — one is enough. */}
+        {phase === 'input' && (
+          <div className="h-11 w-11 flex-shrink-0">
+            <PenguinArt pose="stand" />
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-semibold text-foreground">{t('丟給企鵝')}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">{t('亂丟一串待辦，企鵝幫你排進今天的空檔。')}</p>
@@ -345,7 +359,7 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
                       className={cn(styles.scrap, 'absolute block')}
                       style={{ '--sx': `${Math.cos(angle) * r}px`, '--sy': `${Math.sin(angle) * r * 0.55}px`, '--r': `${((i * 37) % 24) - 12}deg`, '--delay': `${i * 70}ms` } as CSSProperties}
                     >
-                      <span className={cn(styles.note, [styles.tint1, styles.tint2, styles.tint3][i % 3], 'block -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md px-2 py-1 text-xs')}>
+                      <span className={cn(styles.note, [styles.tint1, styles.tint2, styles.tint3][i % 3], 'relative block -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md px-2 py-1 text-xs')}>
                         {s.length > 14 ? `${s.slice(0, 14)}…` : s}
                       </span>
                     </span>
@@ -362,15 +376,9 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
 
         {phase === 'preview' && plan && (
           <div>
-            <div role="status" className="mb-1 flex items-center gap-2.5">
-              {headlinePose !== 'happy' && (
-                <div className="h-10 w-10 flex-shrink-0"><PenguinArt pose={headlinePose} /></div>
-              )}
-              <p className="text-sm font-medium text-foreground">{headline}</p>
-            </div>
-            <p className="text-xs text-muted-foreground">{t('點便條可以改標題、時長和時間；不想要的取消勾選就好。')}</p>
-
             <BrainDumpPreview
+              headline={headline}
+              finalPose={headlinePose}
               plan={plan}
               items={items}
               busy={busy}
@@ -390,6 +398,22 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
                 onChange={(patch) => updateItem(selected.draft.id, patch)}
                 onDone={() => setSelectedId(null)}
               />
+            )}
+
+            {categories.length > 0 && (
+              <label className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="flex-shrink-0">{t('放進分類')}</span>
+                <select
+                  data-bd-category
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="h-11 min-w-0 max-w-full rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-8"
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </select>
+              </label>
             )}
           </div>
         )}

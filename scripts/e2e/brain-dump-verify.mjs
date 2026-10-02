@@ -133,16 +133,27 @@ async function runPanel(page, label, { mobile, write }) {
   let timed = []
   await step(`${label}: preview with 4 notes in sane slots`, async () => {
     await page.locator('#brain-dump-text').fill(EXAMPLE)
+    await shot(page, `${label}-input`)
     await dialog.getByRole('button', { name: '交給企鵝' }).click()
     await dialog.getByText('企鵝在整理…').first().waitFor({ timeout: 3000 })
+    await page.waitForTimeout(160)
+    await page.$$eval('[data-bd-phase="thinking"] *', (els) => els.forEach((el) => { el.style.animationPlayState = 'paused' }))
+    await shot(page, `${label}-thinking`)
+    await page.$$eval('[data-bd-phase="thinking"] *', (els) => els.forEach((el) => { el.style.animationPlayState = 'running' }))
     await page.locator('[data-bd-phase="preview"]').waitFor({ timeout: 10000 })
     // Mid-flight frame: freeze the drop animation before shooting.
-    await page.waitForTimeout(380)
+    await page.waitForTimeout(520)
     await page.$$eval('[data-bd-note], [data-bd-note] *', (els) => els.forEach((el) => { el.style.animationPlayState = 'paused' }))
     await shot(page, `${label}-preview-midflight`)
     await page.$$eval('[data-bd-note], [data-bd-note] *', (els) => els.forEach((el) => { el.style.animationPlayState = 'running' }))
-    await page.waitForTimeout(1800)
+    await page.waitForTimeout(2000)
     timed = assertPreview(await readNotes(page))
+    // Every note has a ≥44px tick target; the category picker defaults to something.
+    for (const b of await dialog.getByRole('checkbox').all()) {
+      const box = await b.boundingBox()
+      assert.ok(box.width >= 44 && box.height >= 44, `tick target ${box.width}x${box.height}`)
+    }
+    assert.ok(await dialog.locator('[data-bd-category]').inputValue(), 'no default category')
     await noHorizontalOverflow(page)
     await shot(page, `${label}-preview`)
   })
@@ -159,14 +170,61 @@ async function runPanel(page, label, { mobile, write }) {
   if (!write) return
   await step(`${label}: write to calendar → toast → tasks visible`, async () => {
     await dialog.getByRole('button', { name: /放進行事曆（4）/ }).click()
-    await page.getByText('企鵝排好了 4 件事').waitFor({ timeout: 15000 })
+    const expected = timed.length === 4 ? '企鵝排好了 4 件事' : `企鵝排好了 ${timed.length} 件，${4 - timed.length} 件放進待排`
+    const toastEl = page.locator('[data-bd-toast]')
+    await toastEl.getByText(expected).waitFor({ timeout: 15000 })
     await dialog.waitFor({ state: 'hidden', timeout: 5000 })
-    await page.waitForTimeout(1500)
+    // The new blocks glow once (data-bd-glow is set for the ~600ms animation).
+    await page.waitForSelector('[data-task-block][data-bd-glow]', { timeout: 3000 })
+    if (mobile) {
+      const tb = await toastEl.boundingBox()
+      const vh = page.viewportSize().height
+      assert.ok(tb.y + tb.height <= vh - 60, `toast covers the tab bar (bottom ${tb.y + tb.height} / ${vh})`)
+    }
+    await page.waitForTimeout(500)
+    await shot(page, `${label}-after-write`)
+    await page.waitForTimeout(1000)
     for (const n of timed) {
       const block = page.locator('[data-task-block]').filter({ hasText: n.title })
       assert.ok(await block.count() > 0, `calendar has no block for ${n.title}`)
     }
-    await shot(page, `${label}-after-write`)
+  })
+}
+
+/** States that are hard to reach naturally: unreadable input and late night (mocked clock). */
+async function edgeStates(page, label) {
+  const dialog = page.getByRole('dialog').filter({ has: page.locator('[data-brain-dump-panel]') })
+  await page.evaluate(() => localStorage.setItem('waddle-language-v1', 'zh-TW'))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.locator(label === 'mobile' ? '[data-tour="mobile-brain-dump"]' : '[data-tour="brain-dump"]').waitFor({ timeout: 30000 })
+  const open = async () => {
+    if (label === 'mobile') await page.locator('[data-tour="mobile-brain-dump"]').click()
+    else await page.getByRole('button', { name: '丟給企鵝', exact: true }).click()
+    await dialog.waitFor({ state: 'visible', timeout: 10000 })
+  }
+  await step(`${label}: unreadable input → gentle hint`, async () => {
+    await open()
+    await page.locator('#brain-dump-text').fill('一小時，，')
+    await dialog.getByRole('button', { name: '交給企鵝' }).click()
+    await dialog.getByText('企鵝讀不太懂這段').waitFor({ timeout: 5000 })
+    await shot(page, `${label}-unparsed`)
+    await page.keyboard.press('Escape')
+    await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+  })
+  await step(`${label}: late night → everything to tomorrow`, async () => {
+    const d = new Date()
+    await page.clock.setFixedTime(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 21, 50))
+    await open()
+    await page.locator('#brain-dump-text').fill(EXAMPLE)
+    await dialog.getByRole('button', { name: '交給企鵝' }).click()
+    await page.locator('[data-bd-phase="preview"]').waitFor({ timeout: 10000 })
+    await dialog.getByText('夜深了').waitFor({ timeout: 3000 })
+    await page.waitForTimeout(2000)
+    const notes = await readNotes(page)
+    assert.ok(notes.every((n) => n.status === 'pending'), 'late night should schedule nothing today')
+    await shot(page, `${label}-late`)
+    await page.keyboard.press('Escape')
+    await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
   })
 }
 
@@ -189,7 +247,7 @@ async function englishPass(page, label, { mobile }) {
     // (not UI chrome) — leave them out of the leftover-Chinese check.
     const text = await dialog.evaluate((el) => {
       const copy = el.cloneNode(true)
-      copy.querySelectorAll('[data-bd-busy]').forEach((n) => n.remove())
+      copy.querySelectorAll('[data-bd-busy], [data-bd-category]').forEach((n) => n.remove())
       document.body.appendChild(copy)
       copy.style.position = 'fixed'
       copy.style.left = '-9999px'
@@ -264,6 +322,7 @@ try {
   })
   await englishPass(page, 'desktop', { mobile: false })
   const state = await desktop.storageState()
+  await edgeStates(page, 'desktop')
 
   // ── phone 390 ──
   const phone = await browser.newContext({
@@ -277,8 +336,23 @@ try {
     const box = await m.locator('[data-tour="mobile-brain-dump"]').boundingBox()
     assert.ok(box.width >= 44 && box.height >= 44, `FAB too small ${box.width}x${box.height}`)
   })
+  await step('mobile: floating buttons do not crowd each other', async () => {
+    const boxes = []
+    for (const sel of ['[data-tour="mobile-brain-dump"]', '[data-tour="mobile-add-task"]']) boxes.push(await m.locator(sel).boundingBox())
+    const timer = m.getByText('專注計時').first()
+    if (await timer.count()) boxes.push(await timer.boundingBox())
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i], b = boxes[j]
+        const gap = Math.max(b.y - (a.y + a.height), a.y - (b.y + b.height))
+        assert.ok(gap >= 8 || a.x + a.width < b.x || b.x + b.width < a.x, `floating buttons ${i}/${j} only ${gap}px apart`)
+      }
+    }
+    await shot(m, 'mobile-fabs')
+  })
   await runPanel(m, 'mobile', { mobile: true, write: true })
   await englishPass(m, 'mobile', { mobile: true })
+  await edgeStates(m, 'mobile')
 
   await step('no uncaught page errors', async () => {
     assert.deepEqual(pageErrors, [])

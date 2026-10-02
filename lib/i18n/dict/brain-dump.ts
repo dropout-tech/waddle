@@ -60,6 +60,10 @@ export const dict: Record<string, string> = {
 
   // result
   '企鵝排好了 {n} 件事': 'The penguin planned {n} things',
-  '先放進 {n} 件，其餘的沒放成功。': 'Added {n}; the rest couldn\'t be added.',
+  '企鵝排好了 {n} 件，{m} 件放進待排': 'The penguin planned {n}; {m} wait to be scheduled',
+  '企鵝把 {m} 件放進待排': 'The penguin put {m} in the to-schedule list',
+  '還有 {n} 件沒放成功，可以再試一次。': '{n} couldn\'t be added — you can try again.',
+  '已經在行事曆上了。': 'They\'re on your calendar now.',
+  '放進分類': 'Category',
   '找不到可以放任務的分類，先建立一個分類再試試。': 'There\'s no category to put tasks in yet. Create one and try again.',
 }
