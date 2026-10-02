@@ -55,6 +55,9 @@ importers:
       '@capacitor/status-bar':
         specifier: ^8.0.2
         version: 8.0.2(@capacitor/core@8.3.4)
+      '@capgo/capacitor-social-login':
+        specifier: 8.5.12
+        version: 8.5.12(@capacitor/core@8.3.4)
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -469,6 +472,11 @@ packages:
 
   '@capacitor/synapse@1.0.4':
     resolution: {integrity: sha512-/C1FUo8/OkKuAT4nCIu/34ny9siNHr9qtFezu4kxm6GY1wNFxrCFWjfYx5C1tUhVGz3fxBABegupkpjXvjCHrw==}
+
+  '@capgo/capacitor-social-login@8.5.12':
+    resolution: {integrity: sha512-bkRUxj+yHpqMyxr+zxakYgxJdWftqrEVWVwrIsB0hj5wCW3k9xJ2gkxR4BQ23VedY0ArLShqWQOBM2ILa+NhhQ==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -5815,6 +5823,11 @@ snapshots:
       '@capacitor/core': 8.3.4
 
   '@capacitor/synapse@1.0.4': {}
+
+  '@capgo/capacitor-social-login@8.5.12(@capacitor/core@8.3.4)':
+    dependencies:
+      '@capacitor/core': 8.3.4
+      tslib: 2.8.1
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:

@@ -34,6 +34,12 @@ const config: CapacitorConfig = {
       backgroundColor: '#fdf8ec',
       showSpinner: false,
     },
+    // Native Google sign-in only (lib/auth/google-idtoken.ts). Apple stays on
+    // @capacitor-community/apple-sign-in; false keeps the Facebook SDK (ad-ID,
+    // privacy-manifest baggage) out of the binary — applied on `cap sync`.
+    SocialLogin: {
+      providers: { google: true, facebook: false, apple: false, twitter: false },
+    },
   },
 }
 

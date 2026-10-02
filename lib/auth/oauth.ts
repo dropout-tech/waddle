@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/client'
 import { isNative, isDesktop } from '@/lib/platform'
 import { OAUTH_REDIRECT, APPLE_SERVICES_ID } from '@/lib/native-config'
 import { t } from '@/lib/i18n'
+import { GOOGLE_IOS_CLIENT_ID, nativeGoogleLogin, startGoogleWebLogin } from './google-idtoken'
 
 // Shared OAuth entry points for the login and signup pages. Each branches on
 // platform: web uses the standard browser redirect to /auth/callback; native
@@ -10,32 +11,25 @@ import { t } from '@/lib/i18n'
 // handler (Google), or uses the native Apple sheet + id-token flow (Apple).
 
 /**
- * Google sign-in. On web this navigates away (the callback page finishes the
- * exchange). On native it opens the system browser; the appUrlOpen deep-link
- * handler in deep-link-handler.tsx finishes the exchange.
+ * Google sign-in. Web and iOS use ID-token flows that keep Google's account
+ * chooser on our own domain / app (google-idtoken.ts): web navigates away and
+ * /auth/google finishes; iOS resolves inline. Until the iOS client ID is set,
+ * native falls back to the system browser + deep-link handler.
  */
 export async function signInWithGoogle(): Promise<void> {
   if (isDesktop()) return desktopSignIn('google')
-  const supabase = createClient()
+  if (!isNative()) return startGoogleWebLogin()
+  if (GOOGLE_IOS_CLIENT_ID) return nativeGoogleLogin()
 
-  if (isNative()) {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: OAUTH_REDIRECT, skipBrowserRedirect: true },
-    })
-    if (error) throw error
-    if (data?.url) {
-      const { Browser } = await import('@capacitor/browser')
-      await Browser.open({ url: data.url })
-    }
-    return
-  }
-
-  const { error } = await supabase.auth.signInWithOAuth({
+  const { data, error } = await createClient().auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: `${window.location.origin}/auth/callback` },
+    options: { redirectTo: OAUTH_REDIRECT, skipBrowserRedirect: true },
   })
   if (error) throw error
+  if (data?.url) {
+    const { Browser } = await import('@capacitor/browser')
+    await Browser.open({ url: data.url })
+  }
 }
 
 /**
