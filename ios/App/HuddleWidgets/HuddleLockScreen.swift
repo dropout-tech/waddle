@@ -345,6 +345,11 @@ extension WidgetView {
             Spacer(minLength:0)
         }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading)
     }
+    /// A small one-line caption that takes whatever width is left but asks for none, so
+    /// ViewThatFits judges a candidate by its big line only.
+    func looseLine(_ t:String)->some View {
+        Text(t).font(.system(size:13,weight:.medium)).lineLimit(1).opacity(0.8).frame(minWidth:0,idealWidth:0,maxWidth:.infinity,alignment:.leading)
+    }
     /// The longest of `texts` that fits on one line (ViewThatFits), else the last one.
     @ViewBuilder func fitLine(_ texts:[String])->some View {
         ViewThatFits(in:.horizontal){
@@ -434,10 +439,20 @@ extension WidgetView {
             hCircle(n.item == nil ? L("行程","plans"):n.day){inkIcon(InkPaths.clock,circleIcon)} hero:{hero(n.item == nil ? "—":n.time,size:22)}
                 .widgetURL(url(.agenda,n.item))
         } else {
-            // The time is the hero and is never shortened; 今天／明天 leads the line under it.
-            hRect(n.item.map{"\(n.day) · \($0.title)"} ?? L("接下來七天","Next 7 days")){inkIcon(InkPaths.clock,rectIcon)} hero:{
-                if n.item == nil {hero(L("沒有行程","No plans"),size:24)} else {hero(n.time,size:34)}
-            }.widgetURL(url(.agenda,n.item))
+            if let item=n.item {
+                // The time is never shortened. First choice 「16:57 今天」 on the big line with the
+                // whole title under it; if that line doesn't fit (e.g. "17:28 Today") the big line
+                // is just the time and the day leads the title line instead.
+                HStack(spacing:8){
+                    inkIcon(InkPaths.clock,rectIcon)
+                    ViewThatFits(in:.horizontal){
+                        VStack(alignment:.leading,spacing:-1){hero(n.time,unit:n.day,size:32).fixedSize();looseLine(item.title)}
+                        VStack(alignment:.leading,spacing:-1){hero(n.time,size:34).fixedSize();looseLine("\(n.day) · \(item.title)")}
+                    }
+                }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading).widgetURL(url(.agenda,item))
+            } else {
+                hRect(L("接下來七天","Next 7 days")){inkIcon(InkPaths.clock,rectIcon)} hero:{hero(L("沒有行程","No plans"),size:24)}.widgetURL(url(.agenda))
+            }
         }
     }
 
@@ -474,36 +489,27 @@ extension WidgetView {
         }
     }
 
-    /// 當週日曆's second look: 今天 (up to two rows) and 明天 (one row) beside the ink clock.
-    /// Few rows so each title gets room; untimed items leave the time column blank.
+    /// 當週日曆's second look: two lines, 「今天 HH:MM 名稱」 and 「明天 HH:MM 名稱」 — only the
+    /// first item of each day, each line using the whole width. The time never wraps or
+    /// shrinks; the title takes what's left; how many more that day has goes at the end.
     func twoDaysFace(_ s:Snapshot)->some View {
         let cal=Calendar(identifier:.gregorian)
         let tomorrow=huddleDayFormat.string(from:cal.date(byAdding:.day,value:1,to:entry.date) ?? entry.date)
-        let days=[(L("今天","Today"),todayKey,2),(L("明天","Tmrw"),tomorrow,1)]
-        let dayFont=Font.system(size:12,weight:.bold,design:.rounded)
-        return HStack(alignment:.center,spacing:5){
-            inkIcon(InkPaths.clock,22)
-            VStack(alignment:.leading,spacing:3){
-                ForEach(days,id:\.1){label,key,limit in
-                    let r=dayRows(s,key,max:limit)
-                    HStack(alignment:.firstTextBaseline,spacing:4){
-                        VStack(alignment:.leading,spacing:0){
-                            Text(label).font(dayFont).widgetAccentable()
-                            if r.more > 0 {Text("+\(r.more)").font(dayFont).opacity(0.7)}
-                        }.frame(width:isEN ? 36:26,alignment:.leading)
-                        VStack(alignment:.leading,spacing:0){
-                            if r.rows.isEmpty {Text(L("沒有安排","Free")).font(.system(size:12,weight:.medium)).opacity(0.6)}
-                            ForEach(Array(r.rows.enumerated()),id:\.offset){_,row in
-                                HStack(alignment:.firstTextBaseline,spacing:3){
-                                    Text(row.0 == "•" ? "":row.0).font(.system(size:11,weight:.medium,design:.rounded)).monospacedDigit().opacity(0.7).frame(width:30,alignment:.leading)
-                                    Text(row.1).font(.system(size:12,weight:.medium)).lineLimit(1)
-                                }
-                            }
-                        }
+        let days=[(L("今天","Today"),todayKey),(L("明天","Tmrw"),tomorrow)]
+        return VStack(alignment:.leading,spacing:6){
+            ForEach(days,id:\.1){label,key in
+                let r=dayRows(s,key,max:1),first=r.rows.first
+                HStack(alignment:.firstTextBaseline,spacing:5){
+                    Text(label).font(.system(size:13,weight:.bold,design:.rounded)).lineLimit(1).fixedSize().widgetAccentable()
+                    if let first {
+                        if first.0 != "•" {Text(first.0).font(.system(size:14,weight:.semibold,design:.rounded)).monospacedDigit().lineLimit(1).fixedSize()}
+                        Text(first.1).font(.system(size:14,weight:.medium)).lineLimit(1).frame(minWidth:0,maxWidth:.infinity,alignment:.leading)
+                        if r.more > 0 {Text("+\(r.more)").font(.system(size:13,weight:.bold,design:.rounded)).lineLimit(1).fixedSize().opacity(0.7)}
+                    } else {
+                        Text(L("沒有安排","Free")).font(.system(size:14,weight:.medium)).lineLimit(1).opacity(0.6).frame(maxWidth:.infinity,alignment:.leading)
                     }
                 }
             }
-            Spacer(minLength:0)
         }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading)
     }
     /// 月份's second look: a hand-drawn mini month — Monday first, today circled
