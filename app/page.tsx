@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
-import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { WidgetSync } from '@/components/widgets/widget-sync'
 import { petVoiceName, setPetVoice } from '@/lib/pet/voice'
@@ -14,7 +13,7 @@ import { UserMenu } from '@/components/user-menu'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { OnboardingTour } from '@/components/onboarding-tour'
 import { SettingsModal, type SettingsTab } from '@/components/modals/settings-modal'
-import { HuddleMascot } from '@/components/branding/waddle-mascot'
+import { MascotLoader } from '@/components/branding/mascot-loader'
 import { DailyClearCelebration } from '@/components/celebration/daily-clear-celebration'
 import { OverdueTaskReview } from '@/components/task-panel/overdue-task-review'
 import { useWaddleData } from '@/hooks/use-waddle-data'
@@ -513,28 +512,20 @@ function HuddlePage() {
 
   if (isLoading) {
     return (
-      <main className="h-screen w-full flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4 text-muted-foreground">
-          <HuddleMascot className={loadError ? 'w-20 h-20' : 'w-20 h-20 animate-waddle-bob'} />
-          {loadError ? (
-            <div role="alert" className="flex flex-col items-center gap-3 px-6 text-center">
-              <span className="text-sm">{t('資料沒有載入完整，請檢查網路後重試。你的資料沒有遺失。')}</span>
-              <button
-                type="button"
-                onClick={retryLoad}
-                className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-              >
-                {t('重試')}
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">{t('載入中...')}</span>
-            </div>
-          )}
-        </div>
-      </main>
+      <MascotLoader still={!!loadError}>
+        {loadError ? (
+          <div role="alert" className="flex flex-col items-center gap-3 px-6 text-center">
+            <span className="text-sm">{t('資料沒有載入完整，請檢查網路後重試。你的資料沒有遺失。')}</span>
+            <button
+              type="button"
+              onClick={retryLoad}
+              className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+            >
+              {t('重試')}
+            </button>
+          </div>
+        ) : undefined}
+      </MascotLoader>
     )
   }
 
