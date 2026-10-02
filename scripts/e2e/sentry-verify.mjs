@@ -85,6 +85,10 @@ const SECRETS = {
   email: 'private.person@example.com',
   cjk: '我的機密任務標題',
   jwt: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnop',
+  code: 'SECRETCODE123', // OAuth-style ?code= on the page URL (leaks via stack-frame file names when there is no stack)
+  uuid: '123e4567-e89b-12d3-a456-426614174000', // e.g. a user id in a storage path
+  unclosedCjk: '今天要跟客戶', // truncated ProseMirror-style message: quote never closed
+  quotedAscii: 'Buy milk tomorrow', // quoted ASCII prose
 }
 
 try {
@@ -121,7 +125,7 @@ try {
     return route.abort()
   })
 
-  await page.goto(`${BASE_URL}/login?method=email&q=${SECRETS.query}#${SECRETS.hash}`, { waitUntil: 'load' })
+  await page.goto(`${BASE_URL}/login?method=email&q=${SECRETS.query}&code=${SECRETS.code}#${SECRETS.hash}`, { waitUntil: 'load' })
   await sleep(2500) // let the lazy Sentry chunk init
 
   // A fetch breadcrumb with a secret query + secret body, then three errors.
@@ -131,18 +135,30 @@ try {
     setTimeout(() => { throw new Error(`Cannot find task "${s.cjk}" for ${s.email} using ${s.jwt} ${'lorem ipsum '.repeat(60)}`) }, 0)
     setTimeout(() => { Promise.reject(new TypeError(`unhandled rejection for ${s.email}`)) }, 50)
     setTimeout(() => { throw new RangeError('plain range error') }, 100)
+
+    // Privacy regressions: data: URL payload, UUID in a path, unclosed / ASCII quoted
+    // prose, and a string throw (no stack -> SDK uses location.href as the frame file).
+    await fetch('data:image/png;base64,' + 'A'.repeat(5000)).catch(() => {}) // CSP blocks it; the breadcrumb is still recorded
+    await fetch(`/storage/v1/object/x/${s.uuid}/abc.png`).catch(() => {}) // 404 is fine
+    setTimeout(() => { throw new Error('data and uuid fetched') }, 150)
+    setTimeout(() => { throw new Error(`Cannot find "${s.unclosedCjk}`) }, 200)
+    setTimeout(() => { throw new Error(`Not found: "${s.quotedAscii}"`) }, 250)
+    setTimeout(() => { throw 'string error' }, 300)
   }, SECRETS)
   await sleep(ENABLED ? 4000 : 3000)
 
   const viol = await page.evaluate(() => window.__cspViolations || [])
-  cspViolations.push(...viol)
+  // The deliberate fetch('data:...') above is expected to be blocked by connect-src.
+  cspViolations.push(...viol.filter((v) => !/\bdata\b/.test(v)))
+  const expectedDataBlocks = viol.length - cspViolations.length
+  for (let i = consoleCsp.length - 1; i >= 0; i--) if (/data:/.test(consoleCsp[i])) consoleCsp.splice(i, 1)
 
   if (!ENABLED) {
     assert(sentryRequests.length === 0, 'DSN unset: zero requests to any *sentry* host after 3 thrown errors', `count=${sentryRequests.length}`)
     assert(consoleCsp.length === 0 && cspViolations.length === 0, 'DSN unset: no CSP violations')
   } else {
     assert(sentryRequests.length > 0, 'ingest request attempted (reached the interceptor, so CSP did not block it)', `requests=${sentryRequests.length}`)
-    assert(consoleCsp.length === 0 && cspViolations.length === 0, 'no CSP violations / console CSP errors', JSON.stringify([...consoleCsp, ...cspViolations].slice(0, 3)))
+    assert(consoleCsp.length === 0 && cspViolations.length === 0, `no CSP violations / console CSP errors (excluding ${expectedDataBlocks} deliberate data: fetch block)`, JSON.stringify([...consoleCsp, ...cspViolations].slice(0, 3)))
 
     // Parse envelopes: each is newline-delimited JSON (header, item header, item payload, ...).
     const items = []
@@ -157,12 +173,32 @@ try {
     console.log(`[payload] envelope item types: ${types.join(',')} (events=${items.filter((i) => i.header.type === 'event').length})`)
     assert(types.every((t) => t === 'event' || t === 'client_report'), 'only error events sent (no session/transaction/replay/span/log items)', types.join(','))
     const events = items.filter((i) => i.header.type === 'event').map((i) => i.payload)
-    assert(events.length >= 3, 'all 3 thrown errors captured', `events=${events.length}`)
+    for (const ev of events) console.log(`[payload] event: ${ev.exception?.values?.[0]?.type}: ${(ev.exception?.values?.[0]?.value || '').slice(0, 70)}`)
+    assert(events.length >= 7, 'all 7 thrown errors captured', `events=${events.length}`)
 
     const all = envelopes.map((e) => e.body).join('\n')
     for (const [name, value] of Object.entries(SECRETS)) {
       assert(!all.includes(value), `payload does not contain secret: ${name}`)
     }
+    assert(!all.includes('AAAA') && !all.includes('base64,'), 'data: URL payload (AAAA…/base64,) absent from every payload')
+    assert(!all.includes('Buy milk'), 'quoted ASCII prose ("Buy milk tomorrow") absent')
+    const dataCrumb = events.flatMap((e) => e.breadcrumbs || []).find((b) => /^data:/.test(b.data?.url || ''))
+    console.log(`[payload] data: fetch breadcrumb: ${JSON.stringify(dataCrumb?.data)}`)
+    assert(dataCrumb?.data?.url === 'data:[redacted]', 'data: fetch breadcrumb url is exactly data:[redacted]')
+    const uuidCrumb = events.flatMap((e) => e.breadcrumbs || []).find((b) => /storage\/v1\/object/.test(b.data?.url || ''))
+    console.log(`[payload] uuid-path fetch breadcrumb: ${JSON.stringify(uuidCrumb?.data)}`)
+    assert(!!uuidCrumb && /\/:id\/abc\.png$/.test(uuidCrumb.data.url), 'UUID path segment replaced by :id in the fetch breadcrumb url')
+    const unclosed = events.find((e) => /Cannot find/.test(e.exception?.values?.[0]?.value || '') && !/task/.test(e.exception.values[0].value))
+    console.log(`[payload] unclosed-quote message: ${unclosed?.exception?.values?.[0]?.value}`)
+    assert(!!unclosed && !/[^\x00-\x7F]/.test(unclosed.exception.values[0].value), 'unclosed-quote message has no non-ASCII text left')
+    const quoted = events.find((e) => /Not found/.test(e.exception?.values?.[0]?.value || ''))
+    console.log(`[payload] ascii-quoted message: ${quoted?.exception?.values?.[0]?.value}`)
+    assert(!!quoted && quoted.exception.values[0].value === 'Not found: "[text]"', 'quoted ASCII prose replaced by [text]')
+    const strErr = events.find((e) => e.exception?.values?.some((v) => /string error/.test(v.value || '')))
+    assert(!!strErr, 'string throw captured (stack-less error)')
+    const frameFiles = events.flatMap((e) => (e.exception?.values || []).flatMap((v) => (v.stacktrace?.frames || []).flatMap((f) => [f.filename, f.abs_path]))).filter(Boolean)
+    console.log(`[payload] frame files sampled: ${frameFiles.length}; with '?': ${frameFiles.filter((f) => /[?#]/.test(f)).length}`)
+    assert(frameFiles.length > 0 && frameFiles.every((f) => !/[?#]/.test(f)), 'no stack-frame filename / abs_path carries a query or hash')
     assert(!/ip_address/.test(all), 'payload has no ip_address field')
     assert(!/"cookies?"/i.test(all) && !/"query_string"/.test(all), 'payload has no cookies / query_string')
 

@@ -23,6 +23,11 @@ const DSN = process.env.NEXT_PUBLIC_SENTRY_DSN?.trim() || ''
 
 type SentryModule = typeof import('@sentry/browser')
 let sentryReady: Promise<SentryModule> | null = null
+let sdk: SentryModule | null = null
+let initFailed = false
+// Errors reported before the SDK finished loading (it is a lazy chunk).
+const MAX_QUEUED_ERRORS = 10
+const queue: unknown[] = []
 
 export function isMonitoringEnabled(): boolean {
   return DSN.length > 0
@@ -85,12 +90,33 @@ export function initMonitoring(): void {
 
     Sentry.setTag('app_platform', currentPlatform())
     Sentry.setUser(buildSentryUser(null))
+    sdk = Sentry
+    for (const err of queue.splice(0)) Sentry.captureException(err)
     return Sentry
+  })
+  sentryReady.catch(() => {
+    initFailed = true // chunk blocked / offline: drop the queue, never retry-loop
+    queue.length = 0
   })
 }
 
-/** Report a caught error. No-op when monitoring is disabled. */
+/**
+ * Report a caught error. No-op when monitoring is disabled. Safe to call
+ * before the SDK is ready (up to 10 errors are queued and sent once it loads)
+ * and before initMonitoring() ever ran (e.g. app/global-error.tsx when the
+ * root layout crashed): it starts the initialisation itself.
+ */
 export function captureClientError(error: unknown): void {
-  if (!sentryReady) return
-  void sentryReady.then((Sentry) => Sentry.captureException(error)).catch(() => {})
+  if (!process.env.NEXT_PUBLIC_SENTRY_DSN) return // inlined: dead-code-eliminated without a DSN
+  if (!DSN || initFailed || typeof window === 'undefined') return
+  if (sdk) {
+    try {
+      sdk.captureException(error)
+    } catch {
+      /* never let reporting throw */
+    }
+    return
+  }
+  if (queue.length < MAX_QUEUED_ERRORS) queue.push(error)
+  initMonitoring()
 }
