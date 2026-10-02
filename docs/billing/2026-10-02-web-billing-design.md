@@ -489,6 +489,18 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 - 回滾（down）：`psql -1 -f supabase/rollback/20261002230100_web_billing_foundation_down.sql`。把 5 支函式還原成**逐位元組相同**的舊定義（測試以 md5 驗證）、刪除新函式與觸發器；`web_*` 表與資料**保留**（帳務紀錄）。已有網站訂閱客人時執行 down＝他們立刻失去 Pro，屬商業決定，必問老闆。down 後可再套 up（測試已驗 up→down→up）。
 - P3 前必修（本階段刻意不碰 UI）：`components/operations/announcements.tsx:277-278` 的「贈送即將結束」提醒只排除 Apple，網站訂閱者會被誤提醒——開 `checkout_mode` 之前要加 `!web_paid_until` 條件。
 
+### P2–P5 程式實作紀錄（2026-10-02 晚，分支 feat/web-billing 0ce9ce7；**全部只在本機一次性資料庫與假後端測過，未碰任何遠端**）
+
+- 介面合約：`docs/billing/2026-10-02-web-billing-contracts.md`（三模組平行施工依據）。
+- migration 已改號：P1 `20261002230100`、寄信 `20261002230200`、扣款狀態轉換 `20261002230300`（`140000` 被 PR #141 佔用；iOS 審查沙盒 PR #150 為 `150000`，**#150 必須先合併套用**）。P1 會偵測 `review_sandbox_until` 是否存在，兩種情況都保留 iOS 沙盒條款；回滾也還原對應版本。
+- 伺服器：`supabase/functions/web-billing`（start／status／cancel／resume／card_start／pay_now／customer_token／refund）、`web-billing-webhook`（驗簽、時間窗、前綴過濾、去重、向 SLP 查權威狀態）、`web-billing-cron`（租約、對帳輪替、扣款、到期、提醒入列、寄信佇列、異常清單）；Edge Function 一律經 service_role 專用的 `public.web_billing_server(op,args)` 呼叫資料庫。
+- 寄信：`supabase/functions/_shared/web-billing/email.mjs`＋8 份預覽 `docs/billing/email-previews/`；年繳前 7–8 天、試用前 2 天提醒。
+- 前端：設定→訂閱分頁（取消／恢復／換卡／立即付款／7 天退款，皆二次確認）、`/billing`、`/billing/return`、`/billing/card`、`/billing/pay`；`/billing/*` 專屬 CSP；Capacitor 建置時強制關旗標。
+- 獨立 opus 審查 2 輪：首輪 1 嚴重（單一會員卡住全站續訂）＋2 中＋3 低，全修並複驗；剩「SLP 未回實付金額時用訂單金額比對」待沙盒確認（TODO SLP-Q6）。
+- 證據（總管親跑）：PG17／PG16 各 P1 75（含 #150 情境 81）＋扣款 122＋寄信 50，FAIL=0；#150 沙盒測試 20/20；node 226/226；tsc 0、lint 0 error；`pnpm build` 0；`build:cap`（旗標強開）後 `out/` 購買字樣 0；前端 Playwright（假後端）243/243。
+- 仍未做：`web-billing-admin` 後台、`delete-account` 整合（`web_account_closing`）、`revenuecat-webhook` 記錄 Apple 試用、P7 漲價工具、iOS 模擬器實點、真 SLP／Resend 實測。
+- 已知低風險（沙盒驗）：年繳會員若一直沒對到卡，提醒信照寄但到期不扣且無結束通知；SLP 若沿用舊卡片 ID 又不回傳，換卡會在 1 小時後被判放棄；轉 unknown 的續訂扣款每輪都會查一次 SLP。
+
 ---
 
 ## 9. 待向 SLP 窗口確認的問題（老闆可直接轉貼）
