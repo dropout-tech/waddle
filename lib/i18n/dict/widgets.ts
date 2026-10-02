@@ -68,7 +68,7 @@ export const dict: Record<string, string> = {
   "選好一款放上去；有兩種樣式的，再點一下它就能切換": "Pick one to add. If it has two looks, tap it again to switch",
   "也可以放到鎖定畫面": "On the Lock Screen too",
   "不用解鎖，看一眼就知道今天還剩什麼。": "See what's left today without unlocking.",
-  "點小工具會直接打開 Huddle 裡對應的畫面。內容由系統排程更新，打開 Huddle 就會立刻同步。鎖定畫面的小工具會直接顯示任務和行程標題；在意的話，可以選只顯示數字的樣式。": "Tapping a widget opens the matching screen in Huddle. iOS refreshes widgets on its own schedule; opening Huddle syncs them right away. Lock Screen widgets show task and plan titles; if that matters to you, pick a numbers-only look.",
+  "點小工具會直接打開 Huddle 裡對應的畫面。內容由系統排程更新，打開 Huddle 就會立刻同步。鎖定畫面的小工具會直接顯示任務和行程標題，便條紙的內容也會顯示；在意的話，可以選只顯示數字的樣式。": "Tapping a widget opens the matching screen in Huddle. iOS refreshes widgets on its own schedule; opening Huddle syncs them right away. Lock Screen widgets show task and plan titles, and the text of your sticky notes too; if that matters to you, pick a numbers-only look.",
 
   // widget-sync / widgets actions (2026-10 i18n sweep)
   '慢慢來，先專心一件事': 'Take it slow. Focus on one thing.',

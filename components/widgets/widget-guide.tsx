@@ -137,7 +137,7 @@ export function WidgetGuide() {
       </section>
 
       <p className="mt-8 text-xs leading-relaxed text-muted-foreground">
-        {t('點小工具會直接打開 Huddle 裡對應的畫面。內容由系統排程更新，打開 Huddle 就會立刻同步。鎖定畫面的小工具會直接顯示任務和行程標題；在意的話，可以選只顯示數字的樣式。')}
+        {t('點小工具會直接打開 Huddle 裡對應的畫面。內容由系統排程更新，打開 Huddle 就會立刻同步。鎖定畫面的小工具會直接顯示任務和行程標題，便條紙的內容也會顯示；在意的話，可以選只顯示數字的樣式。')}
         {native && <> {t('專注結束、喝水的背景通知可在「設定」中開啟。')}</>}
       </p>
     </main>
