@@ -311,13 +311,16 @@ extension WidgetView {
     func inkIcon(_ d:String,_ size:CGFloat)->some View {InkGlyph(d:d).fill(style:FillStyle(eoFill:true)).frame(width:size,height:size).widgetAccentable()}
     func hourglass(_ size:CGFloat)->some View {InkHourglass().frame(width:size,height:size).widgetAccentable()}
     func weekGlyph(_ w:WeekStat,_ size:CGFloat)->some View {InkWeek(counts:w.counts,today:w.idx).frame(width:size,height:size).widgetAccentable()}
+    func monthGlyph(_ size:CGFloat)->some View {InkMonth().frame(width:size,height:size).widgetAccentable()}
     func disc<V:View>(@ViewBuilder _ content:()->V)->some View {ZStack{AccessoryWidgetBackground();content()}}
     /// The big rounded number, with small words before / after it on the same baseline.
-    func hero(_ value:String,pre:String="",unit:String="",size:CGFloat)->some View {
-        HStack(alignment:.firstTextBaseline,spacing:size >= 30 ? 3:1){
-            if !pre.isEmpty {Text(pre).font(.system(size:max(10,size*0.42),weight:.semibold,design:.rounded))}
+    /// `small` = size of the words next to the number (default ≈ 0.42 × size), `gap` = space between them.
+    func hero(_ value:String,pre:String="",unit:String="",size:CGFloat,small:CGFloat?=nil,gap:CGFloat?=nil)->some View {
+        let w=small ?? max(10,size*0.42)
+        return HStack(alignment:.firstTextBaseline,spacing:gap ?? (size >= 30 ? 3:1)){
+            if !pre.isEmpty {Text(pre).font(.system(size:w,weight:.semibold,design:.rounded))}
             Text(value).font(.system(size:size,weight:.bold,design:.rounded)).monospacedDigit()
-            if !unit.isEmpty {Text(unit).font(.system(size:max(10,size*0.42),weight:.semibold,design:.rounded))}
+            if !unit.isEmpty {Text(unit).font(.system(size:w,weight:.semibold,design:.rounded))}
         }.lineLimit(1).minimumScaleFactor(0.5)
     }
     /// Circle: ink glyph on top, hero in the middle, what-it-means word underneath.
@@ -326,20 +329,30 @@ extension WidgetView {
             icon()
             hero()
             if let caption {Text(caption).font(.system(size:10,weight:.semibold,design:.rounded)).lineLimit(1).minimumScaleFactor(0.7).opacity(0.85)}
-        }.padding(.horizontal,7)}
+        }.padding(.horizontal,7).offset(y:1.5)}
     }
     /// Rectangle: ink glyph as the subject, hero on the right, one small line under it.
     func hRect<I:View,H:View>(_ caption:String,lines:Int=1,@ViewBuilder icon:()->I,@ViewBuilder hero:()->H)->some View {
+        hRect(icon:icon,hero:hero){Text(caption).lineLimit(lines)}
+    }
+    func hRect<I:View,H:View,C:View>(@ViewBuilder icon:()->I,@ViewBuilder hero:()->H,@ViewBuilder caption:()->C)->some View {
         HStack(spacing:8){
             icon()
             VStack(alignment:.leading,spacing:-1){
                 hero()
-                Text(caption).font(.system(size:13,weight:.medium)).lineLimit(lines).opacity(0.8)
+                caption().font(.system(size:13,weight:.medium)).opacity(0.8)
             }
             Spacer(minLength:0)
         }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading)
     }
-    var circleIcon:CGFloat {20}
+    /// The longest of `texts` that fits on one line (ViewThatFits), else the last one.
+    @ViewBuilder func fitLine(_ texts:[String])->some View {
+        ViewThatFits(in:.horizontal){
+            ForEach(Array(texts.enumerated()),id:\.offset){_,t in Text(t).lineLimit(1).fixedSize(horizontal:true,vertical:false)}
+            Text(texts.last ?? "").lineLimit(1)
+        }
+    }
+    var circleIcon:CGFloat {18}
     var rectIcon:CGFloat {42}
 
     // MARK: Inline — one short line above the clock (system text + SF Symbol only)
@@ -387,10 +400,7 @@ extension WidgetView {
         if family == .accessoryCircular,entry.circleStyle == TodayCircle.ring.rawValue {
             // Second look: 完成進度圈 — the ring fills as today's tasks get done.
             Gauge(value:t.total == 0 ? 0:Double(t.done)/Double(t.total),in:0...1){EmptyView()} currentValueLabel:{
-                VStack(spacing:-1){
-                    inkIcon(InkPaths.todo,12)
-                    hero("\(t.done)",unit:"/\(t.total)",size:20)
-                }.padding(.horizontal,2)
+                hero("\(t.done)",unit:"/\(t.total)",size:26,small:14,gap:0).padding(.horizontal,3)
             }.gaugeStyle(.accessoryCircularCapacity).widgetURL(url(.tasks))
         } else if family == .accessoryCircular {
             hCircle(t.open.isEmpty ? L("今天","today"):L("待辦","to do")){inkIcon(InkPaths.todo,circleIcon)} hero:{
@@ -424,8 +434,9 @@ extension WidgetView {
             hCircle(n.item == nil ? L("行程","plans"):n.day){inkIcon(InkPaths.clock,circleIcon)} hero:{hero(n.item == nil ? "—":n.time,size:22)}
                 .widgetURL(url(.agenda,n.item))
         } else {
-            hRect(n.item?.title ?? L("接下來七天","Next 7 days")){inkIcon(InkPaths.clock,rectIcon)} hero:{
-                if n.item == nil {hero(L("沒有行程","No plans"),size:24)} else {hero(n.time,unit:n.day,size:34)}
+            // The time is the hero and is never shortened; 今天／明天 leads the line under it.
+            hRect(n.item.map{"\(n.day) · \($0.title)"} ?? L("接下來七天","Next 7 days")){inkIcon(InkPaths.clock,rectIcon)} hero:{
+                if n.item == nil {hero(L("沒有行程","No plans"),size:24)} else {hero(n.time,size:34)}
             }.widgetURL(url(.agenda,n.item))
         }
     }
@@ -434,12 +445,13 @@ extension WidgetView {
     @ViewBuilder func weekFace(_ s:Snapshot)->some View {
         let w=weekStat(s)
         if family == .accessoryCircular {
-            hCircle(L("本週","this week")){weekGlyph(w,22)} hero:{hero("\(w.total)",unit:L("件",""),size:26)}
+            hCircle(L("本週","this week")){weekGlyph(w,20)} hero:{hero("\(w.total)",unit:L("件",""),size:26)}
                 .widgetURL(url(.week,date:todayKey))
         } else if entry.rectStyle == WeekRect.twoDays.rawValue {
             twoDaysFace(s).widgetURL(url(.week,date:todayKey))
         } else {
-            hRect(L("本週 · 今天 \(w.today) 件","This week · \(w.today) today")){weekGlyph(w,rectIcon)} hero:{hero("\(w.total)",unit:L("件","things"),size:34)}
+            // 「本週」 rides next to the number so the line under it stays short enough to read whole.
+            hRect(L("今天 \(w.today) 件","\(w.today) today")){weekGlyph(w,rectIcon)} hero:{hero("\(w.total)",unit:L("件 · 本週","this week"),size:34,small:15)}
                 .widgetURL(url(.week,date:todayKey))
         }
     }
@@ -449,40 +461,45 @@ extension WidgetView {
         let m=monthStat(s),wd=weekdayName(entry.date)
         if family == .accessoryCircular {
             disc{VStack(spacing:-2){
-                HStack(spacing:2){inkIcon(InkPaths.calendar,13);Text(m.label).font(.system(size:12,weight:.bold,design:.rounded)).lineLimit(1)}.widgetAccentable()
-                Text("\(m.day)").font(.system(size:30,weight:.bold,design:.rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+                HStack(spacing:2){monthGlyph(12);Text(m.label).font(.system(size:11,weight:.bold,design:.rounded)).lineLimit(1)}.widgetAccentable()
+                Text("\(m.day)").font(.system(size:28,weight:.bold,design:.rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
                 Text(wd).font(.system(size:10,weight:.semibold,design:.rounded)).lineLimit(1).opacity(0.85)
-            }.padding(.horizontal,7)}.widgetURL(url(.calendar))
+            }.padding(.horizontal,7).offset(y:2)}.widgetURL(url(.calendar))
         } else if entry.rectStyle == MonthRect.grid.rawValue {
             inkMonth(s,m).widgetURL(url(.calendar))
         } else {
-            hRect(L("還有 \(m.busyLeft) 天有安排","\(m.busyLeft) busy days left")){inkIcon(InkPaths.calendar,rectIcon)} hero:{
-                hero("\(m.day)",pre:m.label,unit:L("日 \(wd)",wd),size:34)
+            hRect(L("\(m.busyLeft) 天有事","\(m.busyLeft) busy days")){monthGlyph(rectIcon)} hero:{
+                hero("\(m.day)",pre:m.label,unit:wd,size:34,small:17)
             }.widgetURL(url(.calendar))
         }
     }
 
-    /// 當週日曆's second look: 今天／明天, up to two timed rows each, beside the ink clock.
+    /// 當週日曆's second look: 今天 (up to two rows) and 明天 (one row) beside the ink clock.
+    /// Few rows so each title gets room; untimed items leave the time column blank.
     func twoDaysFace(_ s:Snapshot)->some View {
         let cal=Calendar(identifier:.gregorian)
         let tomorrow=huddleDayFormat.string(from:cal.date(byAdding:.day,value:1,to:entry.date) ?? entry.date)
-        let days=[(L("今天","Today"),todayKey),(L("明天","Tmrw"),tomorrow)]
-        return HStack(alignment:.center,spacing:6){
-            inkIcon(InkPaths.clock,26)
-            VStack(alignment:.leading,spacing:2){
-                ForEach(days,id:\.1){label,key in
-                    let r=dayRows(s,key,max:2)
+        let days=[(L("今天","Today"),todayKey,2),(L("明天","Tmrw"),tomorrow,1)]
+        let dayFont=Font.system(size:12,weight:.bold,design:.rounded)
+        return HStack(alignment:.center,spacing:5){
+            inkIcon(InkPaths.clock,22)
+            VStack(alignment:.leading,spacing:3){
+                ForEach(days,id:\.1){label,key,limit in
+                    let r=dayRows(s,key,max:limit)
                     HStack(alignment:.firstTextBaseline,spacing:4){
                         VStack(alignment:.leading,spacing:0){
-                            Text(label).font(.system(size:12,weight:.bold,design:.rounded)).widgetAccentable()
-                            if r.more > 0 {Text("+\(r.more)").font(.system(size:9,weight:.semibold,design:.rounded)).opacity(0.7)}
-                        }.frame(width:isEN ? 38:26,alignment:.leading)
+                            Text(label).font(dayFont).widgetAccentable()
+                            if r.more > 0 {Text("+\(r.more)").font(dayFont).opacity(0.7)}
+                        }.frame(width:isEN ? 36:26,alignment:.leading)
                         VStack(alignment:.leading,spacing:0){
-                            if r.rows.isEmpty {Text(L("沒有安排","Free")).opacity(0.6)}
+                            if r.rows.isEmpty {Text(L("沒有安排","Free")).font(.system(size:12,weight:.medium)).opacity(0.6)}
                             ForEach(Array(r.rows.enumerated()),id:\.offset){_,row in
-                                HStack(spacing:3){Text(row.0).monospacedDigit().opacity(0.7);Text(row.1).lineLimit(1)}
+                                HStack(alignment:.firstTextBaseline,spacing:3){
+                                    Text(row.0 == "•" ? "":row.0).font(.system(size:11,weight:.medium,design:.rounded)).monospacedDigit().opacity(0.7).frame(width:30,alignment:.leading)
+                                    Text(row.1).font(.system(size:12,weight:.medium)).lineLimit(1)
+                                }
                             }
-                        }.font(.system(size:12,weight:.medium))
+                        }
                     }
                 }
             }
@@ -490,7 +507,8 @@ extension WidgetView {
         }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading)
     }
     /// 月份's second look: a hand-drawn mini month — Monday first, today circled
-    /// with a loose pen loop, a dot under every day that has something on it.
+    /// with a loose pen loop, a dot under every day that has something on it (all
+    /// other digits the same weight, so the dots and the loop do the talking).
     func inkMonth(_ s:Snapshot,_ m:MonthStat)->some View {
         let cal=Calendar(identifier:.gregorian),today=entry.date
         let count=cal.range(of:.day,in:.month,for:today)?.count ?? 30
@@ -498,26 +516,26 @@ extension WidgetView {
         let keys=(0..<count).map{huddleDayFormat.string(from:cal.date(byAdding:.day,value:$0,to:start) ?? start)}
         let lead=(cal.component(.weekday,from:start)+5)%7
         let cells:[String?]=Array(repeating:nil,count:lead)+keys.map{Optional($0)}
-        let rows=(cells.count+6)/7,digit:CGFloat=rows >= 6 ? 8.5:9.5
+        let rows=(cells.count+6)/7,digit:CGFloat=rows >= 6 ? 8.5:9
         return HStack(alignment:.top,spacing:5){
             VStack(alignment:.leading,spacing:1){
-                inkIcon(InkPaths.calendar,20)
+                monthGlyph(20)
                 Text(m.label).font(.system(size:13,weight:.bold,design:.rounded)).lineLimit(1).minimumScaleFactor(0.6).widgetAccentable()
                 Spacer(minLength:0)
             }.frame(width:28,alignment:.leading)
             VStack(spacing:0){
                 HStack(spacing:0){ForEach(0..<7,id:\.self){c in
-                    Text(weekLetters[c]).font(.system(size:7,weight:.semibold)).opacity(0.75).frame(maxWidth:.infinity)
-                }}.frame(height:8)
+                    Text(weekLetters[c]).font(.system(size:8.5,weight:.semibold)).opacity(0.75).frame(maxWidth:.infinity)
+                }}.frame(height:10)
                 ForEach(0..<rows,id:\.self){r in
                     HStack(spacing:0){ForEach(0..<7,id:\.self){c in
                         let i=r*7+c
                         if i < cells.count,let key=cells[i] {
                             let isToday=key == todayKey,busy=dayCount(s,key) > 0
                             ZStack{
-                                Text("\(Int(key.suffix(2)) ?? 0)").font(.system(size:digit,weight:isToday ? .heavy:(busy ? .bold:.medium),design:.rounded)).monospacedDigit()
-                                    .opacity(isToday || busy ? 1:0.6).offset(y:-1)
-                                if busy && !isToday {Circle().frame(width:2.2,height:2.2).offset(y:digit*0.55)}
+                                Text("\(Int(key.suffix(2)) ?? 0)").font(.system(size:digit,weight:isToday ? .heavy:.medium,design:.rounded)).monospacedDigit()
+                                    .opacity(isToday ? 1:0.85).offset(y:-1)
+                                if busy && !isToday {Circle().frame(width:2.2,height:2.2).offset(y:digit*0.6)}
                                 if isToday {InkRing().stroke(style:StrokeStyle(lineWidth:1.3,lineCap:.round)).frame(width:digit*1.85,height:digit*1.45).widgetAccentable()}
                             }.frame(maxWidth:.infinity,maxHeight:.infinity)
                         } else {Color.clear.frame(maxWidth:.infinity,maxHeight:.infinity)}
@@ -532,7 +550,7 @@ extension WidgetView {
         let t=topStat(s)
         if family == .accessoryCircular {
             hCircle(L("三件事","top 3")){inkIcon(InkPaths.sparkles,circleIcon)} hero:{
-                if t.open.isEmpty {hero(L("完成","Done"),size:17)} else {hero("\(t.open.count)",pre:L("剩",""),unit:L("","left"),size:28)}
+                if t.open.isEmpty {hero(L("完成","Done"),size:17)} else {hero("\(t.open.count)",pre:L("剩",""),unit:L("","left"),size:28,small:15,gap:3)}
             }.widgetURL(url(.topThree))
         } else {
             hRect(t.open.first?.title ?? L("三件事都完成了","Top three done")){inkIcon(InkPaths.sparkles,rectIcon)} hero:{
@@ -555,7 +573,9 @@ extension WidgetView {
         } else {
             Group {
                 if live {
-                    hRect(st.running ? L("專注中 · \(s.focus.title)","Focusing · \(s.focus.title)"):L("暫停 · \(s.focus.title)","Paused · \(s.focus.title)")){hourglass(rectIcon)} hero:{focusClock(st,32)}
+                    // The task name only when it fits whole; otherwise just 專注中／暫停.
+                    let state=st.running ? L("專注中","Focusing"):L("暫停","Paused")
+                    hRect(icon:{hourglass(rectIcon)},hero:{focusClock(st,32)}){fitLine(s.focus.title.isEmpty ? [state]:["\(state) · \(s.focus.title)",state])}
                 } else if st.expired {
                     hRect(L("打開 Huddle 記下收穫","Open Huddle to jot it down")){hourglass(rectIcon)} hero:{hero(L("專注完成","Done"),size:24)}
                 } else {
@@ -576,12 +596,46 @@ extension WidgetView {
                 inkIcon(InkPaths.sticky,32)
                 VStack(alignment:.leading,spacing:0){
                     Text(first?.title ?? L("還沒有便條","No notes yet")).font(.system(size:15,weight:.bold,design:.rounded)).lineLimit(1)
-                    Text(first.map{$0.body.isEmpty ? stickyTime($0.updatedAt):$0.body} ?? L("在 Huddle 貼一張便條紙","Add a sticky note in Huddle"))
-                        .font(.system(size:13,weight:.medium)).lineLimit(2).opacity(0.8)
+                    stickyBody(first.map{$0.body.isEmpty ? stickyTime($0.updatedAt):$0.body} ?? L("在 Huddle 貼一張便條紙","Add a sticky note in Huddle"))
+                        .font(.system(size:13,weight:.medium)).opacity(0.8)
                 }
                 Spacer(minLength:0)
             }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading).widgetURL(stickyURL(first))
         }
+    }
+
+    /// Up to two lines that never split a word: CJK runs are glued with word joiners
+    /// (U+2060) so lines only break at punctuation / spaces, and when it doesn't fit
+    /// it's cut after the last whole phrase that does, plus 「…」.
+    @ViewBuilder func stickyBody(_ text:String)->some View {
+        let v=phraseCuts(text)
+        ViewThatFits(in:.vertical){
+            ForEach(Array(v.enumerated()),id:\.offset){_,t in Text(t).fixedSize(horizontal:false,vertical:true)}
+            Text(v.last ?? text).lineLimit(2)
+        }.frame(maxHeight:34,alignment:.topLeading)
+    }
+    /// [whole text, text cut after phrase n-1 + "…", …, first phrase + "…"], CJK glued.
+    func phraseCuts(_ text:String)->[String] {
+        let breaks:Set<Character>=["、","，","。","；","：","！","？",",",".",";",":","!","?"," ","\n"]
+        func isCJK(_ c:Character)->Bool {c.unicodeScalars.contains{(0x3000...0x9FFF).contains($0.value) || (0xF900...0xFAFF).contains($0.value) || (0xFF00...0xFFEF).contains($0.value)}}
+        func glue(_ s:String)->String {
+            var out="",prev:Character?=nil
+            for c in s {if let p=prev,isCJK(p),isCJK(c),!breaks.contains(p),!breaks.contains(c) {out.append("\u{2060}")};out.append(c);prev=c}
+            return out
+        }
+        var phrases:[String]=[],cur=""
+        for c in text.replacingOccurrences(of:"\n",with:" ") {cur.append(c);if breaks.contains(c) {phrases.append(cur);cur=""}}
+        if !cur.isEmpty {phrases.append(cur)}
+        var out=[glue(text.replacingOccurrences(of:"\n",with:" "))]
+        if phrases.count > 1 {
+            for n in stride(from:phrases.count-1,through:1,by:-1) {
+                var head=phrases.prefix(n).joined()
+                while let l=head.last,breaks.contains(l) {head.removeLast()}
+                let cut=glue(head)+"…"
+                if !head.isEmpty && out.last != cut {out.append(cut)}
+            }
+        }
+        return out
     }
 
     // MARK: 我的 Huddle — the penguin in one brush line, with its name.

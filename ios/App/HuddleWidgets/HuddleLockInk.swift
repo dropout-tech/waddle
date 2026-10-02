@@ -155,8 +155,9 @@ struct InkHourglassSand:Shape {
 }
 /// 當週日曆: the hand-inked calendar page with this week written inside as one
 /// row of seven dots, Monday first — days with something on them full, free
-/// days faint, today a big dot. (The earlier seven bars of different heights
-/// read as phone signal strength.) The faces also say 「本週」 in words.
+/// days faint, today a big dot — underlined with one pen stroke, so it reads as
+/// "a row of days" (the earlier seven bars read as phone signal; InkMonth is a
+/// grid with one day circled, so the two stay apart side by side).
 struct InkWeek:View {
     var counts:[Int];var today:Int
     var body:some View {
@@ -170,8 +171,10 @@ struct InkWeek:View {
                     let busy=i < counts.count && counts[i] > 0,isToday=i == today
                     let d:CGFloat=isToday ? 2.5:(busy ? 1.6:1.15)
                     Circle().frame(width:d*k,height:d*k).opacity(isToday || busy ? 1:0.4)
-                        .position(x:ox+(5.9+CGFloat(i)*2.1)*k,y:oy+(15.6+wobble[i])*k)
+                        .position(x:ox+(5.9+CGFloat(i)*2.1)*k,y:oy+(14.4+wobble[i])*k)
                 }
+                Path{p in p.move(to:CGPoint(x:ox+5.0*k,y:oy+18.0*k));p.addQuadCurve(to:CGPoint(x:ox+19.4*k,y:oy+17.5*k),control:CGPoint(x:ox+12.0*k,y:oy+18.7*k))}
+                    .stroke(style:StrokeStyle(lineWidth:1.3*k,lineCap:.round))
             }
         }
     }
@@ -218,5 +221,26 @@ struct InkRing:Shape {
         }
         p.addLine(to:pts[pts.count-1])
         return p
+    }
+}
+/// 月份: the hand-inked calendar page with a little grid of days inside and one
+/// of them circled with a pen loop.
+struct InkMonth:View {
+    var body:some View {
+        GeometryReader{g in
+            let k=min(g.size.width,g.size.height)/24
+            let ox=(g.size.width-24*k)/2,oy=(g.size.height-24*k)/2
+            let xs:[CGFloat]=[7.0,10.4,13.8,17.2],ys:[CGFloat]=[13.5,17.5]
+            ZStack(alignment:.topLeading){
+                InkGlyph(d:InkPaths.calendarBlank).fill(style:FillStyle(eoFill:true))
+                ForEach(0..<8,id:\.self){i in
+                    let x=xs[i%4],y=ys[i/4]+(i%2 == 0 ? 0.15:-0.15)
+                    Circle().frame(width:(i == 6 ? 1.7:1.35)*k,height:(i == 6 ? 1.7:1.35)*k).opacity(i == 6 ? 1:0.75)
+                        .position(x:ox+x*k,y:oy+y*k)
+                }
+                InkRing().stroke(style:StrokeStyle(lineWidth:1.2*k,lineCap:.round))
+                    .frame(width:4.6*k,height:4.0*k).position(x:ox+13.8*k,y:oy+17.4*k)
+            }
+        }
     }
 }
