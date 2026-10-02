@@ -5,7 +5,7 @@
 
 ## A. 這週可以先做（不花錢或幾乎不花錢）
 1. **把 SHOPLINE 問題轉給窗口**：整段複製 `docs/billing/2026-10-02-slp-questions-to-send.md` 的「您好…」貼給窗口。★ 前 7 題最急（開通綁卡／定期扣款、個人戶可否、IP 白名單、沙盒帳號）。
-2. **Resend 寄信網域**：照 `docs/guides/2026-10-02-Resend寄信網域設定操作手冊.md` 做（約 20 分鐘、$0）。只在 Cloudflare 加子網域紀錄，**不動 Gandi 的信箱設定**。另含 Apple「隱藏我的 Email」登記。
+2. ✅ **Resend 寄信網域（2026-10-02 21:52 完成）**：Resend 帳號「lazy72」、網域 lazy72.com Verified（東京機房）；Cloudflare 新增 `send`／`rsend` CNAME、`resend._domainkey` DKIM、`_dmarc`（p=none），根網域 MX／SPF 未動；Apple 寄件來源 lazy72.com、send.lazy72.com、billing@lazy72.com 三項 SPF 通過。**剩：Resend API Key 由老闆本人產生並貼進 Supabase（測試專案開好後）。**
 3. **測試用資料庫（Supabase 測試專案）——請選一個**：
    - A. 在 LazyPenguin 組織再開一個專案：約 **US$10／月**（若該組織是付費方案），最單純。【建議】
    - B. 免費專案 $0：但 Supabase 免費專案每個帳號最多 2 個 active，你目前帳號下已有多個專案，可能要先暫停一個（例如 lazy72-personal-site）才開得出來；閒置一週會自動暫停。
@@ -13,9 +13,9 @@
    開好後告訴我專案名稱即可，我來套資料表（只套測試庫，正式庫另外問你）。
 
 ## B. 送件 SHOPLINE 前一定要有（條款與 SHOPLINE 都要求）
-4. 🔑 **本名（中、英）**
+4. ✅ 本名：廖思明／Liao Sih-Ming（已寫進程式 lib/legal/operator.ts）
 5. 🔑 **聯絡地址**（建議用商務中心地址，不必用住家）
-6. **客服 Email**（消保法：客人要能用書面通知解約；SHOPLINE 條款要求電話＋Email 兩者都有）。建議開一個 `support@lazy72.com`（Gandi 信箱）。
+6. ✅ 客服 Email：hi@lazy72.com（信件頁尾與回覆地址已用）
    以上三項提供前，網站一律不放、不留空白欄位。
 
 ## C. 金鑰（到 P2 沙盒實測時才需要，你本人貼）
@@ -23,7 +23,7 @@
 8. 🔑 Resend API Key（`RESEND_API_KEY`）→ 同上。
 9. 正式環境的同一組金鑰：等最後上線（P6）時再說，每一步都會先問你。
 
-## D. 問會計師（建議開賣前問完）
+## D. 問會計師（2026-10-02 老闆：會計師、電子發票先不處理；W-8BEN 已填完）
 10. **稅籍登記**：個人網路銷售單月營收達新台幣 5 萬元要辦稅籍登記。年繳 NT$990 集中在同一個月時可能衝過門檻——該怎麼估、何時去辦、辦了之後要公開什麼（統編、名稱）？
 11. **統一發票**：月營收達 20 萬要開統一發票。SHOPLINE Payments 不內建電子發票，要用哪家加值中心？在那之前「電子收據」是否足夠？收據上要寫什麼？
 12. **美國預扣稅**：Apple App Store（以及 RevenueCat 等美國服務）對台灣開發者的美國銷售收入會預扣稅款，要不要填 W-8BEN、台灣有無適用的租稅協定可降低預扣率、國內申報時這筆怎麼處理？
