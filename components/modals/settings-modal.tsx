@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2, Globe2, Link2, Copy, Share2, RefreshCw, Users, Loader2, Type } from 'lucide-react'
 import { toast } from 'sonner'
@@ -66,6 +66,9 @@ import {
   getTaiwanHolidaysEnabled,
   setTaiwanHolidaysEnabled,
 } from '@/lib/taiwan-holidays'
+import { getShowCompletedTasks, setShowCompletedTasks } from '@/lib/show-completed'
+import { isValidHourRange } from '@/lib/calendar-utils'
+import { AUTO_TASK_MINUTES, MIN_TASK_MINUTES, MAX_TASK_MINUTES } from '@/lib/settings-auto'
 
 // Map icon names to components
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -93,7 +96,12 @@ interface SettingsModalProps {
   timeBlocks: TimeBlock[]
   workspaces: Workspace[]
   onClose: () => void
-  onSave: (settings: UserSettings, timeBlocks: TimeBlock[]) => void
+  /** `removed`: ids this modal took out (the only rows the save may delete). */
+  onSave: (
+    settings: UserSettings,
+    timeBlocks: TimeBlock[],
+    removed: { timeBlockIds: string[]; slotTypeIds: string[] },
+  ) => void
   /** Sets the ONE global default category (null clears it). */
   onSetDefaultCategory: (categoryId: string | null) => Promise<void>
   /** Penguin pet — saved immediately via the narrow setter, not the 儲存 draft. */
@@ -160,13 +168,32 @@ export function SettingsModal({
   timeBlocks,
   workspaces,
   onClose,
-  onSave,
+  onSave: onSaveProp,
   onSetDefaultCategory,
   onSetPet,
 }: SettingsModalProps) {
   const { lang, setLang, t } = useI18n()
   const [localSettings, setLocalSettings] = useState<UserSettings>(settings)
   const [localTimeBlocks, setLocalTimeBlocks] = useState<TimeBlock[]>(timeBlocks)
+  // Ids known to exist: what the modal opened with plus whatever it saved
+  // since. A save reports as removed only known ids missing from the new
+  // lists — so rows this modal never saw are never deleted by it.
+  const knownIdsRef = useRef({
+    timeBlocks: new Set(timeBlocks.map((tb) => tb.id)),
+    slotTypes: new Set(settings.slotTypes.filter((s) => !s.isBuiltIn).map((s) => s.id)),
+  })
+  const onSave = (nextSettings: UserSettings, nextBlocks: TimeBlock[]) => {
+    const known = knownIdsRef.current
+    const blockIds = new Set(nextBlocks.map((tb) => tb.id))
+    const slotIds = new Set(nextSettings.slotTypes.filter((s) => !s.isBuiltIn).map((s) => s.id))
+    const removed = {
+      timeBlockIds: [...known.timeBlocks].filter((id) => !blockIds.has(id)),
+      slotTypeIds: [...known.slotTypes].filter((id) => !slotIds.has(id)),
+    }
+    blockIds.forEach((id) => known.timeBlocks.add(id))
+    slotIds.forEach((id) => known.slotTypes.add(id))
+    onSaveProp(nextSettings, nextBlocks, removed)
+  }
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
   // Task-complete sound is a per-device pref stored in localStorage (same
   // pattern as timer sound), so it lives outside localSettings/UserSettings.
@@ -179,6 +206,7 @@ export function SettingsModal({
   const [waterEnabled, setWaterEnabledState] = useState<boolean>(() => getWaterReminderEnabled())
   const [waterInterval, setWaterIntervalState] = useState<WaterReminderInterval>(() => getWaterReminderInterval())
   const [taiwanHolidaysEnabled, setTaiwanHolidaysEnabledState] = useState<boolean>(() => getTaiwanHolidaysEnabled())
+  const [showCompletedTasks, setShowCompletedTasksState] = useState<boolean>(() => getShowCompletedTasks())
   const [editingSlotType, setEditingSlotType] = useState<SlotType | null>(null)
   // These per-device prefs can change while this (always-mounted) modal is
   // closed — e.g. the water popup's own gear turns the reminder off. Re-read
@@ -190,6 +218,7 @@ export function SettingsModal({
     setWaterEnabledState(getWaterReminderEnabled())
     setWaterIntervalState(getWaterReminderInterval())
     setTaiwanHolidaysEnabledState(getTaiwanHolidaysEnabled())
+    setShowCompletedTasksState(getShowCompletedTasks())
   }, [isOpen, initialTab])
   const [isAddingNew, setIsAddingNew] = useState(false)
   const [newSlotType, setNewSlotType] = useState<Partial<SlotType>>({
@@ -230,14 +259,22 @@ export function SettingsModal({
     isRecurring: false,
   }
 
+  const hourRangeValid = isValidHourRange(localSettings.calendarStartHour, localSettings.calendarEndHour)
+
   const handleSave = () => {
-    // Update time blocks with new settings
+    // 開始 ≥ 結束 would leave the calendar with no hours at all.
+    if (!hourRangeValid) {
+      toast.error(t('日曆顯示時間範圍：結束時間必須晚於開始時間'))
+      return
+    }
+    // Update time blocks with new settings. Only the colour comes from
+    // settings — this modal has no lunch-time field, so re-applying
+    // lunchBreak.startTime/endTime here reset a 午休 the user had dragged
+    // elsewhere back to 12:00-13:00 on every 儲存.
     const updatedBlocks = localTimeBlocks.map(tb => {
       if (tb.type === 'break') {
         return {
           ...tb,
-          startTime: localSettings.lunchBreak.startTime,
-          endTime: localSettings.lunchBreak.endTime,
           color: localSettings.lunchBreak.color,
         }
       }
@@ -250,7 +287,12 @@ export function SettingsModal({
       return tb
     })
 
-    onSave(localSettings, updatedBlocks)
+    // 預設任務時長: keep a typed value inside what the DB accepts (15-240).
+    const minutes = localSettings.defaultTaskMinutes
+    const settingsToSave = minutes == null
+      ? localSettings
+      : { ...localSettings, defaultTaskMinutes: Math.min(MAX_TASK_MINUTES, Math.max(MIN_TASK_MINUTES, Math.round(minutes))) }
+    onSave(settingsToSave, updatedBlocks)
     onClose()
   }
 
@@ -536,10 +578,16 @@ export function SettingsModal({
                     ...prev,
                     calendarEndHour: parseInt(e.target.value) || 24
                   }))}
+                  aria-invalid={!hourRangeValid}
                   className="h-9"
                 />
               </div>
             </div>
+            {!hourRangeValid && (
+              <p role="alert" data-testid="settings-hour-range-error" className="text-xs text-destructive">
+                {t('結束時間必須晚於開始時間（0–24 點）')}
+              </p>
+            )}
           </div>
 
           {/* Default View Mode */}
@@ -549,17 +597,19 @@ export function SettingsModal({
               {t('預設視圖模式')}
             </h3>
             <p className="text-xs text-muted-foreground">{t('開啟日曆時的預設顯示模式')}</p>
-            <div className="flex gap-2">
-              {[
+            <div className="flex flex-wrap gap-2" data-testid="settings-default-view">
+              {([
+                { key: null, label: '自動' },
                 { key: 'day', label: '日' },
                 { key: 'week', label: '週' },
                 { key: 'month', label: '月' },
-              ].map(({ key, label }) => (
+              ] as const).map(({ key, label }) => (
                 <button
-                  key={key}
+                  key={key ?? 'auto'}
+                  data-value={key ?? 'auto'}
                   onClick={() => setLocalSettings(prev => ({
                     ...prev,
-                    defaultView: key as 'day' | 'week' | 'month'
+                    defaultView: key
                   }))}
                   className={cn(
                     'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
@@ -572,6 +622,7 @@ export function SettingsModal({
                 </button>
               ))}
             </div>
+            <p className="text-[11px] text-muted-foreground">{t('自動：電腦開「日」、手機開「週」')}</p>
           </div>
 
           {/* Visible day count per view — keeps day-mode (1-3) and
@@ -651,13 +702,15 @@ export function SettingsModal({
               {t('每週開始日')}
             </h3>
             <p className="text-xs text-muted-foreground">{t('設定週視圖的第一天')}</p>
-            <div className="flex gap-2">
-              {[
+            <div className="flex flex-wrap gap-2" data-testid="settings-week-start">
+              {([
+                { day: null, label: '自動' },
                 { day: 0, label: '週日' },
                 { day: 1, label: '週一' },
-              ].map(({ day, label }) => (
+              ] as const).map(({ day, label }) => (
                 <button
-                  key={day}
+                  key={day ?? 'auto'}
+                  data-value={day ?? 'auto'}
                   onClick={() => setLocalSettings(prev => ({
                     ...prev,
                     weekStartDay: day
@@ -673,6 +726,7 @@ export function SettingsModal({
                 </button>
               ))}
             </div>
+            <p className="text-[11px] text-muted-foreground">{t('自動：月曆從週日開始，週視圖從今天往後排')}</p>
           </div>
 
           {/* Google Calendar (read-only) — managed on its own page because
@@ -701,22 +755,9 @@ export function SettingsModal({
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-foreground">{t('延伸功能')}</h3>
 
-            {/* Auto sync workspace tasks */}
-            <label className="flex items-center justify-between cursor-pointer">
-              <div>
-                <div className="text-sm text-foreground">{t('自動同步工作區任務')}</div>
-                <div className="text-xs text-muted-foreground">{t('從日曆建立任務時自動同步到左側工作區')}</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={localSettings.lunchBreak?.enabled ?? true}
-                onChange={(e) => setLocalSettings(prev => ({
-                  ...prev,
-                  lunchBreak: { ...prev.lunchBreak, enabled: e.target.checked }
-                }))}
-                className="w-4 h-4 rounded border-border accent-primary"
-              />
-            </label>
+            {/* (The old 「自動同步工作區任務」 switch is gone: it actually toggled
+                lunch_break.enabled, which meeting availability reads. That
+                value is kept as stored and written back unchanged.) */}
 
             {/* Show completed tasks */}
             <label className="flex items-center justify-between cursor-pointer">
@@ -724,13 +765,17 @@ export function SettingsModal({
                 <div className="text-sm text-foreground">{t('顯示已完成任務')}</div>
                 <div className="text-xs text-muted-foreground">{t('在日曆上顯示已完成的任務')}</div>
               </div>
+              {/* Device-level pref, applied immediately (lib/show-completed.ts).
+                  It used to write bufferTime.enabled, which nothing reads. */}
               <input
                 type="checkbox"
-                checked={localSettings.bufferTime?.enabled ?? true}
-                onChange={(e) => setLocalSettings(prev => ({
-                  ...prev,
-                  bufferTime: { ...prev.bufferTime, enabled: e.target.checked }
-                }))}
+                data-testid="settings-show-completed"
+                checked={showCompletedTasks}
+                onChange={(e) => {
+                  const next = e.target.checked
+                  setShowCompletedTasksState(next)
+                  setShowCompletedTasks(next)
+                }}
                 className="w-4 h-4 rounded border-border accent-primary"
               />
             </label>
@@ -974,19 +1019,37 @@ export function SettingsModal({
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm text-foreground">{t('預設任務時長')}</div>
-                <div className="text-xs text-muted-foreground">{t('拖曳建立任務時的預設持續時間')}</div>
+                <div className="text-xs text-muted-foreground">{t('點一下空白時段建立任務時的預設長度')}</div>
+                <div className="text-[11px] text-muted-foreground">{t('自動：30 分鐘')}</div>
               </div>
               <div className="flex items-center gap-2">
+                {/* Its own setting (default_task_minutes). It used to write
+                    bufferTime.defaultDuration — the buffer-block length. */}
+                <button
+                  type="button"
+                  data-testid="settings-task-minutes-auto"
+                  onClick={() => setLocalSettings(prev => ({ ...prev, defaultTaskMinutes: null }))}
+                  className={cn(
+                    'h-8 px-3 rounded-md text-xs font-medium transition-colors',
+                    localSettings.defaultTaskMinutes == null
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                  )}
+                >
+                  {t('自動')}
+                </button>
                 <Input
                   type="number"
-                  min={15}
-                  max={240}
+                  data-testid="settings-task-minutes"
+                  min={MIN_TASK_MINUTES}
+                  max={MAX_TASK_MINUTES}
                   step={15}
-                  value={localSettings.bufferTime?.defaultDuration ?? 30}
-                  onChange={(e) => setLocalSettings(prev => ({
-                    ...prev,
-                    bufferTime: { ...prev.bufferTime, defaultDuration: parseInt(e.target.value) || 30 }
-                  }))}
+                  placeholder={String(AUTO_TASK_MINUTES)}
+                  value={localSettings.defaultTaskMinutes ?? ''}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value)
+                    setLocalSettings(prev => ({ ...prev, defaultTaskMinutes: Number.isFinite(n) ? n : null }))
+                  }}
                   className="h-8 w-20 text-center"
                 />
                 <span className="text-xs text-muted-foreground">{t('分鐘')}</span>

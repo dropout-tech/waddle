@@ -133,7 +133,10 @@ function CreateOrg({ canCreate, onCreated, onCancel }: { canCreate: boolean; onC
 }
 
 function OrgDetail({ org, onChanged }: { org: OrgSummary; onChanged: () => Promise<void> }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  // 「成員」 is both the members heading (Members) and a role (Member): the
+  // dictionary can hold one meaning, so the singular role is a lang branch.
+  const roleLabel = (role: OrgMember['role']) => (role === 'member' && lang === 'en' ? 'Member' : t(ROLE_LABEL[role]))
   const { user } = useAuth()
   const [members, setMembers] = useState<OrgMember[] | null>(null)
   const [board, setBoard] = useState<OrgBoardItem[] | null>(null)
@@ -210,7 +213,7 @@ function OrgDetail({ org, onChanged }: { org: OrgSummary; onChanged: () => Promi
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold">{org.name}</h2>
-            <p className="text-xs text-muted-foreground">{t('你的角色：{role}', { role: t(ROLE_LABEL[org.role]) })} · {t('{count} 位成員', { count: org.memberCount })}</p>
+            <p className="text-xs text-muted-foreground">{t('你的角色：{role}', { role: roleLabel(org.role) })} · {t('{count} 位成員', { count: org.memberCount })}</p>
           </div>
           {org.role === 'owner' ? (
             <button disabled={busy} onClick={() => { if (window.confirm(t('確定解散「{name}」？所有組織內的指派都會解除。', { name: org.name }))) void run(() => deleteOrganization(org.id), t('組織已解散'), onChanged) }}
@@ -252,7 +255,7 @@ function OrgDetail({ org, onChanged }: { org: OrgSummary; onChanged: () => Promi
                 <PersonAvatar name={m.displayName} url={m.avatarUrl} size={32} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{m.displayName}{m.userId === user?.id ? ` ${t('（你）')}` : ''}</p>
-                  <p className="flex items-center gap-1 text-xs text-muted-foreground">{m.role === 'owner' && <Crown className="h-3 w-3" />}{t(ROLE_LABEL[m.role])}</p>
+                  <p className="flex items-center gap-1 text-xs text-muted-foreground">{m.role === 'owner' && <Crown className="h-3 w-3" />}{roleLabel(m.role)}</p>
                 </div>
                 {org.role === 'owner' && m.role !== 'owner' && (
                   <button disabled={busy} onClick={() => run(() => setOrgMemberRole(org.id, m.userId, m.role === 'admin' ? 'member' : 'admin'), t('已更新角色'))}

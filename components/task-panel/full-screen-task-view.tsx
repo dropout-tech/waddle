@@ -35,6 +35,7 @@ import { toDateString } from '@/lib/calendar-utils'
 import type { Workspace, Task } from '@/lib/types'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { sortWorkspacesForDisplay } from '@/lib/default-category'
+import { WorkspaceIcon, ICON_MAP } from '@/lib/workspace-icons'
 import type { FocusSettings } from '@/lib/focus'
 import { FocusBoard } from './focus-board'
 import { getLang } from '@/lib/i18n'
@@ -1448,7 +1449,9 @@ function WorkspaceCard({
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="text-2xl flex-shrink-0" aria-hidden="true">
-              {ws.icon || '📁'}
+              {ws.icon && ICON_MAP[ws.icon]
+                ? <WorkspaceIcon icon={ws.icon} color={wsColor} size="lg" />
+                : ws.icon || '📁'}
             </span>
             <div className="min-w-0">
               <h3 className="font-semibold text-foreground truncate">{ws.name}</h3>

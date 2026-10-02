@@ -22,6 +22,7 @@ import { toDateString } from '@/lib/calendar-utils'
 import { useI18n } from '@/lib/i18n/react'
 import { brandQuote } from '@/lib/brand'
 import { t } from '@/lib/i18n'
+import { useUserSettings } from '@/components/user-settings-context'
 
 interface NotificationCenterProps {
   workspaces: Workspace[]
@@ -99,6 +100,17 @@ export function NotificationCenter({
     else setInnerOpen(next)
   }
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
+  // 設定 › 提醒設定: the master switch and each section's on/off decide
+  // which task reminders reach the bell. (Meeting-invite messages below are
+  // not task reminders and always show.) Missing settings = all on.
+  const reminderPrefs = useUserSettings()?.notifications
+  const remindersOn = reminderPrefs?.enabled !== false
+  const overdueOn = remindersOn && reminderPrefs?.overdue?.enabled !== false && reminderPrefs?.overdue?.showInBell !== false
+  const dueSoonOn = remindersOn && reminderPrefs?.dueSoon?.enabled !== false
+  const dueTodayOn = dueSoonOn && reminderPrefs?.dueSoon?.notifyOnDueDay !== false
+  const staleOn = remindersOn && reminderPrefs?.staleTasks?.enabled !== false
+  const tooManyUrgentOn = remindersOn && reminderPrefs?.highPriority?.enabled !== false && reminderPrefs?.highPriority?.alertWhenTooMany !== false
+  const unscheduledOn = remindersOn && reminderPrefs?.scheduling?.enabled !== false && reminderPrefs?.scheduling?.remindUnscheduled !== false
 
   // Gather all tasks from workspaces
   const allTasks = useMemo(() => {
@@ -130,9 +142,9 @@ export function NotificationCenter({
     // 1. Tasks whose calendar slot or due date has passed. Recurring masters
     // and meetings are intentionally excluded by isTaskOverdue so the cleanup
     // flow cannot rewrite an entire series.
-    const overdueTasks = allTasks.filter((task) =>
-      isTaskOverdue(task, todayStr),
-    )
+    const overdueTasks = overdueOn
+      ? allTasks.filter((task) => isTaskOverdue(task, todayStr))
+      : []
 
     if (overdueTasks.length > 0) {
       // Group by how long overdue
@@ -194,7 +206,7 @@ export function NotificationCenter({
 
     // 2. Due soon (within 3 days)
     const dueSoonTasks = allTasks.filter((task) => {
-      if (!task.dueDate) return false
+      if (!dueSoonOn || !task.dueDate) return false
       const dueDate = new Date(task.dueDate)
       dueDate.setHours(0, 0, 0, 0)
       const daysUntil = daysDiff(dueDate, today)
@@ -209,7 +221,7 @@ export function NotificationCenter({
         (t) => daysDiff(new Date(t.dueDate!), today) > 0,
       )
 
-      if (todayTasks.length > 0) {
+      if (dueTodayOn && todayTasks.length > 0) {
         notifs.push({
           id: 'due-today',
           type: 'due_soon',
@@ -240,7 +252,7 @@ export function NotificationCenter({
 
     // 3. Stale tasks (created long ago, no due date, not scheduled)
     const staleTasks = allTasks.filter((task) => {
-      if (task.dueDate || task.scheduledDate) return false
+      if (!staleOn || task.dueDate || task.scheduledDate) return false
       const createdAt = new Date(task.createdAt)
       const daysOld = daysDiff(today, createdAt)
       return daysOld >= 14
@@ -268,7 +280,7 @@ export function NotificationCenter({
       (t) => !t.scheduledDate && !t.dueDate,
     )
 
-    if (highUrgencyTasks.length >= 5) {
+    if (tooManyUrgentOn && highUrgencyTasks.length >= 5) {
       notifs.push({
         id: 'too-many-urgent',
         type: 'insight',
@@ -285,6 +297,7 @@ export function NotificationCenter({
     }
 
     if (
+      unscheduledOn &&
       noScheduleTasks.length > totalPending * 0.5 &&
       noScheduleTasks.length >= 5
     ) {
@@ -307,7 +320,7 @@ export function NotificationCenter({
 
     // Filter out dismissed notifications
     return notifs.filter((n) => !dismissedIds.has(n.id))
-  }, [allTasks, dismissedIds, t])
+  }, [allTasks, dismissedIds, t, overdueOn, dueSoonOn, dueTodayOn, staleOn, tooManyUrgentOn, unscheduledOn])
 
   // Count by priority
   const highPriorityCount = notifications.filter(

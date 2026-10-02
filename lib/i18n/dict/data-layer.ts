@@ -7,11 +7,15 @@ export const dict: Record<string, string> = {
   '完成 {count} 個任務': 'Complete {count} tasks',
   // ── use-waddle-data.ts: generic save-error wrapper ──
   '儲存失敗：{op}': 'Save failed: {op}',
+  '這個重複任務是「每隔幾週、選了多個星期幾」，整串拖到這裡會讓部分日期跑到錯的那一週。請打開任務，在編輯視窗調整日期和星期。':
+    'This task repeats every few weeks on several weekdays. Moving the whole series here would put some days in the wrong week. Open the task and change the dates and weekdays in the editor instead.',
   '儲存失敗：{op}（{reason}）': 'Save failed: {op} ({reason})',
   '登入已過期，請重新整理頁面': 'your sign-in expired — please reload the page',
   '網路連線不穩，請稍後再試': 'connection problem — please try again shortly',
   '錯誤代碼 {code}': 'error code {code}',
   '初始化資料失敗，請重新整理': 'Failed to set up your data — please refresh.',
+  // app/page.tsx — first load had a failed read (useWaddleData.loadError)
+  '資料沒有載入完整，請檢查網路後重試。你的資料沒有遺失。': "Your data didn't load completely. Check your connection and try again — nothing has been lost.",
   '已保留你現有的工作區與任務': 'Kept your existing workspaces and tasks.',
 
   // handleDbError operation labels (used both for the toast above and,
@@ -45,6 +49,9 @@ export const dict: Record<string, string> = {
   '儲存時間區塊類型': 'Save time block types',
   '儲存常用連結': 'Save quick links',
   '儲存白板': 'Save scratchpad',
+  '新增白板項目': 'Add scratchpad item',
+  '請先登入再儲存白板': 'Please sign in before saving your scratchpad.',
+  '儲存失敗：找不到白板項目，請重新整理': 'Save failed: scratchpad item not found — please reload the page.',
   '刪除白板項目': 'Delete scratchpad item',
   '編輯白板項目': 'Edit scratchpad item',
   '重新排序白板': 'Reorder scratchpad',

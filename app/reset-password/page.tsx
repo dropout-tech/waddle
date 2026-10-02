@@ -17,7 +17,7 @@ import { useI18n } from '@/lib/i18n/react'
 // call updateUser. NOT under the (auth) route group on purpose: that layout
 // bounces signed-in users to '/'.
 export default function ResetPasswordPage() {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const router = useRouter()
   const supabase = createClient()
 
@@ -83,15 +83,25 @@ export default function ResetPasswordPage() {
           ) : !hasSession ? (
             <div className="text-center">
               <h1 className="text-xl font-semibold tracking-tight">{t('連結已失效')}</h1>
+              {/* Password sign-in is retired (2026-10-01), so 「重新申請」 led
+                  to /forgot-password → back to a Google/Apple-only login. */}
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                {t('重設連結可能已過期或已被使用。請重新申請一封。')}
+                {t('密碼登入已停用。請改用 Google 或 Apple 登入，或聯絡客服。')}
               </p>
-              <Link
-                href="/forgot-password"
-                className="inline-block mt-6 text-sm text-foreground underline underline-offset-4 hover:text-muted-foreground transition-colors"
-              >
-                {t('重新申請重設連結')}
-              </Link>
+              <div className="mt-6 flex items-center justify-center gap-4 text-sm">
+                <Link
+                  href="/login"
+                  className="inline-flex min-h-11 items-center text-foreground underline underline-offset-4 hover:text-muted-foreground transition-colors"
+                >
+                  {t('返回登入')}
+                </Link>
+                <Link
+                  href={lang === 'en' ? '/en/support' : '/support'}
+                  className="inline-flex min-h-11 items-center text-foreground underline underline-offset-4 hover:text-muted-foreground transition-colors"
+                >
+                  {t('聯絡客服')}
+                </Link>
+              </div>
             </div>
           ) : done ? (
             <div className="text-center py-4">

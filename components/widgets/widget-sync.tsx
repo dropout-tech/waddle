@@ -14,7 +14,7 @@ import { getWaterNextDueAt, getWaterReminderEnabled, recordWaterFromWidget } fro
 import { applyWidgetActions, withWatchFocus, WATCH_FOCUS_TTL_MS } from '@/lib/widgets/actions'
 import { widgetPet } from '@/lib/widgets/pet'
 import { isTaskOverdue } from '@/lib/task-utils'
-import { getLang } from '@/lib/i18n'
+import { getLang, t } from '@/lib/i18n'
 import { checkInDate } from '@/lib/daily-check-in'
 import { STICKY_CHANGED_EVENT } from '@/lib/widgets/launch'
 import type { WidgetSnapshot } from '@/lib/widgets/model'
@@ -25,7 +25,7 @@ type Timer=ReturnType<typeof useFocusTimer>
 /** Live Activity / focus widget payload, derived from the in-memory timer only (no network). */
 function focusOf(timer:Timer,notes:NotebookNote[],today:string):WidgetSnapshot['focus'] {
   const s=timer.session
-  return {mode:s?.mode,state:timer.state,title:s?.label ?? '慢慢來，先專心一件事',seconds:timer.displayTime,endAt:s && timer.state==='running' && s.mode==='pomodoro' ? s.startedAt.getTime()+s.pausedMs+s.targetSeconds*1000:null,note:focusNoteExcerpt(notes,today,s?.label),...(s?.mode==='pomodoro' ? {total:s.targetSeconds} : {})}
+  return {mode:s?.mode,state:timer.state,title:s?.label ?? t('慢慢來，先專心一件事'),seconds:timer.displayTime,endAt:s && timer.state==='running' && s.mode==='pomodoro' ? s.startedAt.getTime()+s.pausedMs+s.targetSeconds*1000:null,note:focusNoteExcerpt(notes,today,s?.label),...(s?.mode==='pomodoro' ? {total:s.targetSeconds} : {})}
 }
 
 export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[];pet?:PetSettings|null}) {
@@ -61,7 +61,7 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{worksp
           isCurrent:()=>alive && widgetAccount().accountId===source && widgetAccount().epoch===auth.epoch,
           focus:(op,at)=>latest.current.timer.applyWidgetFocus(op,at),
           water:at=>recordWaterFromWidget(at),
-          notify:message=>toast.info(message)})
+          notify:message=>toast.info(t(message))})
         if(replay.aborted) return
         const handled=[...dropped,...replay.handled]
         if(handled.length) {await HuddleWidgets.acknowledge({accountId:source,epoch:auth.epoch,ids:handled});window.dispatchEvent(new Event('huddle-widget-synced'));return}

@@ -4,7 +4,8 @@ import { useMemo, useRef, useCallback, useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { Check, Plus, ChevronRight } from 'lucide-react'
-import { toDateString, taskOccursOnDate, timeToMinutes } from '@/lib/calendar-utils'
+import { toDateString, taskOccursOnDate, timeToMinutes, daysSinceWeekStart, orderedWeekdays } from '@/lib/calendar-utils'
+import { useMonthStartDay } from '@/components/user-settings-context'
 import type { PeerEvent } from '@/hooks/use-calendar-sharing'
 import { GoogleAgendaRow, GoogleMonthChip } from './google-event-block'
 import { taskDisplayTitle } from '@/lib/task-display'
@@ -59,6 +60,9 @@ export function MonthView({
   const displayColor = useDisplayColor()
   const { t, lang } = useI18n()
   const holidaysEnabled = useTaiwanHolidaysEnabled()
+  // 每週開始日 — drives both the weekday header and each month's leading days.
+  const weekStartDay = useMonthStartDay()
+  const weekdayOrder = useMemo(() => orderedWeekdays(weekStartDay), [weekStartDay])
 
   // Mobile agenda: the day whose tasks are listed under the compact grid.
   // Follows selectedDate (header navigation, "today" button) but can be
@@ -118,7 +122,7 @@ export function MonthView({
     const month = monthDate.getMonth()
 
     const firstDay = new Date(year, month, 1)
-    const firstDayOfWeek = firstDay.getDay()
+    const firstDayOfWeek = daysSinceWeekStart(firstDay, weekStartDay)
     const lastDay = new Date(year, month + 1, 0)
     const totalDays = lastDay.getDate()
     const prevMonthLastDay = new Date(year, month, 0).getDate()
@@ -165,7 +169,7 @@ export function MonthView({
     }
 
     return days
-  }, [])
+  }, [weekStartDay])
 
   // Lookup tasks for a given day, including recurring expansions.
   // Computing per-day at render time (≤42 days per month × N tasks) is
@@ -276,15 +280,15 @@ export function MonthView({
               >
                 {/* Weekday Headers */}
                 <div className="grid grid-cols-7 mb-1">
-                  {WEEKDAYS.map((day, index) => (
+                  {weekdayOrder.map((index) => (
                     <div
-                      key={day}
+                      key={index}
                       className={cn(
                         'text-center text-[11px] font-medium py-1.5',
                         index === 0 || index === 6 ? 'text-foreground/65' : 'text-muted-foreground'
                       )}
                     >
-                      {lang === 'en' ? WEEKDAYS_EN[index] : day}
+                      {lang === 'en' ? WEEKDAYS_EN[index] : WEEKDAYS[index]}
                     </div>
                   ))}
                 </div>
@@ -546,15 +550,15 @@ export function MonthView({
 
               {/* Weekday Headers */}
               <div className="grid grid-cols-7 mb-2">
-                {WEEKDAYS.map((day, index) => (
+                {weekdayOrder.map((index) => (
                   <div
-                    key={day}
+                    key={index}
                     className={cn(
                       'text-center text-xs font-medium py-2',
                       index === 0 || index === 6 ? 'text-foreground/65' : 'text-muted-foreground'
                     )}
                   >
-                    {lang === 'en' ? WEEKDAYS_EN[index] : `週${day}`}
+                    {lang === 'en' ? WEEKDAYS_EN[index] : `週${WEEKDAYS[index]}`}
                   </div>
                 ))}
               </div>

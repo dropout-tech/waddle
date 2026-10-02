@@ -62,6 +62,13 @@ export const dict: Record<string, string> = {
   '切換淺色': 'Switch to light mode',
   '切換深色': 'Switch to dark mode',
   '登出': 'Log out',
+  // use-safe-sign-out.tsx — notes that only exist on this device
+  '還有筆記沒有同步': 'Some notes haven\'t synced',
+  '有 {count} 則筆記還沒同步。先打開記事本、確認內容已同步再登出；現在登出，這些內容會遺失。':
+    '{count} {count|note hasn\'t|notes haven\'t} synced yet. Open the notebook and make sure it has synced before logging out — if you log out now, that text will be lost.',
+  '登出失敗，請檢查網路後再試一次': 'Couldn\'t log out. Check your connection and try again.',
+  '先不要登出': 'Don\'t log out yet',
+  '仍要登出': 'Log out anyway',
 
   // components/error-boundary.tsx
   '這個區塊發生錯誤': 'Something went wrong here',
@@ -94,6 +101,16 @@ export const dict: Record<string, string> = {
   '連結已失效': 'This link has expired',
   '重設連結可能已過期或已被使用。請重新申請一封。': 'The reset link may have expired or already been used. Request a new one below.',
   '重新申請重設連結': 'Request a new reset link',
+  '密碼登入已停用。請改用 Google 或 Apple 登入，或聯絡客服。':
+    'Password sign-in is no longer available. Please sign in with Google or Apple, or contact support.',
   '密碼已更新': 'Password updated',
   '正在帶你回到 Huddle⋯': 'Taking you back to Huddle…',
+
+  // error / not-found pages (2026-10 i18n sweep)
+  '出了點小狀況': 'Something went wrong',
+  '這一頁暫時打不開。請再試一次；如果還是不行，先回首頁看看。': 'This page couldn\'t load. Please try again. If it still doesn\'t work, head back home.',
+  '回首頁': 'Back to home',
+  '錯誤代碼：{code}': 'Error code: {code}',
+  '找不到這一頁': 'We couldn\'t find that page',
+  '網址可能打錯了，或這一頁已經搬家。': 'The link may be mistyped, or the page may have moved.',
 }

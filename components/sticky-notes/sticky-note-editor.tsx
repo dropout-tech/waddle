@@ -44,14 +44,16 @@ export function StickyNoteEditor({ note, onContentChange }: StickyNoteEditorProp
   // Swap document when the note's stored content changes from elsewhere
   // (e.g. initial load resolving after the card already mounted) without
   // echoing it back as a fresh user edit.
+  // Also after a save conflict replaced the text with the server's (syncRev).
   useEffect(() => {
     if (!editor) return
-    if (loadedIdRef.current === note.id) return
-    loadedIdRef.current = note.id
+    const loadKey = `${note.id}#${note.syncRev ?? 0}`
+    if (loadedIdRef.current === loadKey) return
+    loadedIdRef.current = loadKey
     applyingRef.current = true
     editor.commands.setContent(note.content ?? EMPTY_DOC, { emitUpdate: false })
     applyingRef.current = false
-  }, [editor, note.id, note.content])
+  }, [editor, note.id, note.syncRev, note.content])
 
   return (
     <div
