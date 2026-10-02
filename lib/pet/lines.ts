@@ -27,6 +27,7 @@ export type PetLineCategory =
   | 'meeting' // 提醒模板：會議 {title} {time}
   | 'focusEnd' // 提醒模板：專注結束
   | 'checkIn' // 提醒模板：今天還沒簽到
+  | 'dailyLine' // 人生年曆：晚上問今天最想記住的事（點氣泡開輸入）
   | 'poke' // 連點反應
   | 'hello' // 剛領養
 
@@ -238,6 +239,11 @@ export const PET_LINES: PetLine[] = [
     ['簽到提醒：今天的你還沒留下腳印，企鵝腳印也可以。', 'Check-in reminder: no footprint for today yet. Penguin prints count.'],
     ['今天還沒簽到。連續天數正在門口搓著鰭等你。', 'No check-in yet today. Your streak is waiting by the door, rubbing its flippers.'],
     ['我去簽到本偷看了一下，今天那格還空空的。', 'I peeked at the check-in book. Today\'s box is still empty.'],
+  ]),
+  ...group('dailyLine', [
+    ['今天最想記住的是什麼？一句話就好，我幫你點亮今天那一格。', 'What do you most want to remember about today? One line is enough — I\'ll light up today\'s square.'],
+    ['晚上好。今天最想記住的是什麼？', 'Good evening. What do you most want to remember about today?'],
+    ['我在年曆前面等你。今天最想記住的是什麼？', 'I\'m waiting by your year grid. What do you most want to remember about today?'],
   ]),
   ...group('poke', [
     ['嘿！那是我的肚子。', 'Hey! That\'s my tummy.'],

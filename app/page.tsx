@@ -32,6 +32,7 @@ import { AuthGuard } from '@/components/auth/auth-guard'
 import { CategoryPrefixProvider } from '@/components/category-prefix-context'
 import { UserSettingsProvider } from '@/components/user-settings-context'
 import { NotebookOverlayProvider } from '@/components/notebook/notebook-overlay-provider'
+import { LifeGridOverlayProvider } from '@/components/life-grid/life-grid-overlay-provider'
 import { useI18n } from '@/lib/i18n/react'
 import { t as translate } from '@/lib/i18n'
 import { assignTask, assignmentErrorMessage, notifyAssignmentsChanged, type AssignablePerson } from '@/lib/assignments'
@@ -578,6 +579,7 @@ function HuddlePage() {
       <CategoryPrefixProvider value={settings.showCategoryPrefix ?? true}>
       <UserSettingsProvider value={settings}>
       <NotebookOverlayProvider>
+      <LifeGridOverlayProvider>
       {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} pet={settings.pet} weekStartDay={settings.weekStartDay} />}
       <MainLayout
         workspaces={workspaces}
@@ -630,6 +632,7 @@ function HuddlePage() {
         onClearScratchpadDate={clearScratchpadDate}
         onPromoteToTask={handlePromoteToTask}
       />
+      </LifeGridOverlayProvider>
       </NotebookOverlayProvider>
       </UserSettingsProvider>
       </CategoryPrefixProvider>

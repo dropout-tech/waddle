@@ -11,6 +11,7 @@ import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { useI18n } from '@/lib/i18n/react'
 import { t as translate } from '@/lib/i18n'
 import { AiReviewSection } from '@/components/ai-review/ai-review-section'
+import { LifeGridReportEntry } from '@/components/life-grid/life-grid-report-entry'
 
 interface ReportDashboardProps {
   workspaces: Workspace[]
@@ -379,6 +380,9 @@ export function ReportDashboard({ workspaces }: ReportDashboardProps) {
 
       {/* AI 回顧 — renders nothing until the server enables it (see AiReviewSection). */}
       <AiReviewSection />
+
+      {/* 人生年曆 — one-line doorway (opens the pop-up over the board). */}
+      <LifeGridReportEntry />
 
       {!hasActivity ? (
         <Reveal index={0}>
