@@ -144,8 +144,8 @@ export const dict: Record<string, string> = {
   '👉 點開計時器': '👉 Open the timer',
 
   // onboarding-tour.tsx — step bodies shared by the desktop and phone tours
-  '任務、行事曆、專注計時和日記，都放在同一個地方。花一兩分鐘帶你走一圈，隨時可以略過。':
-    'Tasks, calendar, focus timer and journal, all in one place. Take a minute or two to look around; you can skip at any time.',
+  '任務、行事曆、專注計時和記事本，都放在同一個地方。花一兩分鐘帶你走一圈，隨時可以略過。':
+    'Tasks, calendar, focus timer and notebook, all in one place. Take a minute or two to look around; you can skip at any time.',
   '所有任務都收在這裡，分成三層：工作區 → 分類 → 任務。最上面的「未分類」是收件匣，還沒決定放哪的任務會先到這裡。':
     'Every task lives here, in three layers: workspace → category → task. "Uncategorized" at the top is your inbox: tasks you have not filed yet land there first.',
   '「會議」列出今天的會議，可以直接加入視訊。有任務過了原訂時間，這裡會出現「整理」，讓你逐一重新安排。「完成」可以回顧做完的任務和統計。':
@@ -179,8 +179,8 @@ export const dict: Record<string, string> = {
     'For longer notes, click here. Type "/" while writing to insert blocks such as headings, to-do lists and images; select text to bring up formatting like bold and links.',
   '按一下，畫面上會多一層便條紙，換頁也不會消失。便條紙可以拖動、換顏色；暫時用不到的，收進旁邊的「收納」。':
     'Click to lay sticky notes over the screen; they stay put when you change pages. Drag them around or change their color, and tuck the ones you do not need right now into the drawer next to this button.',
-  '這個小箭頭裡收著日記、報告、每日簽到、匯出等功能。「匯出」可以把行程存成圖片分享；開啟隱私模式，就只顯示時段、不顯示任務名稱。':
-    'This little arrow holds Journal, Reports, Daily check-in, Export and more. Export saves your schedule as an image to share; turn on privacy mode to show time blocks without task names.',
+  '這個小箭頭裡收著報告、每日簽到、匯出等功能。「匯出」可以把行程存成圖片分享；開啟隱私模式，就只顯示時段、不顯示任務名稱。':
+    'This little arrow holds Reports, Daily check-in, Export and more. Export saves your schedule as an image to share; turn on privacy mode to show time blocks without task names.',
   '同一個選單裡的「每日簽到」：每天簽到一次，累積分數。頁面下方有匿名排行榜，只顯示小企鵝編號，不顯示帳號。':
     '"Daily check-in" is in the same menu: check in once a day to earn points. Further down that page is an anonymous leaderboard that shows penguin numbers, never account names.',
   '鈴鐺會提醒你快到期、已過期，或放了很久沒動的任務。有新提醒時，鈴鐺上會出現數字。':

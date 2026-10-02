@@ -64,6 +64,11 @@ test('a block longer than the visible range is shrunk to fit, never past max', (
   assert.deepEqual(r, { start: 8 * 60, end: 10 * 60 })
 })
 
+test('move keeps a short block at its real length (1 min stays 1 min)', () => {
+  const r = computeDragRange({ ...base, originalStart: 21 * 60, originalEnd: 21 * 60 + 1, currentStart: 21 * 60, currentEnd: 21 * 60 + 1, hourHeight: 60, dragType: 'move', grabOffsetY: 0, pointerY: y(22 * 60, 60) })
+  assert.deepEqual(r, { start: 22 * 60, end: 22 * 60 + 1 })
+})
+
 test('resize keeps at least 15 minutes', () => {
   const top = computeDragRange({ ...base, hourHeight: 60, dragType: 'resize-top', grabOffsetY: 0, pointerY: y(11 * 60, 60) })
   assert.deepEqual(top, { start: 9 * 60 + 45, end: 10 * 60 })
