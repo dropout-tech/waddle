@@ -181,7 +181,7 @@ export function ProPurchaseCard({
         <p>{t('你已訂閱 Huddle Pro，有效至 {date}。要變更方案或取消，請到 Apple 的訂閱管理。', { date: dayLabel(paidUntil) })}</p>
       ) : (
         <p className={page.muted}>
-          {t('Huddle Pro 是自動續訂的訂閱。訂閱期間你可以建立組織，用邀請連結邀請成員。任務、行事曆、計時、記事本、白板等個人功能維持免費。')}
+          {t('Huddle Pro 是自動續訂的訂閱。訂閱期間：進行中任務與筆記不限數量、圖片空間 20 GB、每月 20 次 AI 會議整理、可串接 Google 日曆、可建立組織並用邀請連結邀請成員。任務、行事曆、計時、記事本、白板等個人功能維持免費。')}
         </p>
       )}
 

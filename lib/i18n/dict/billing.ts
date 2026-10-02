@@ -29,8 +29,8 @@ export const dict: Record<string, string> = {
   '串接 Google 日曆是 Pro 會員功能。升級後，Google 日曆上的會議就能顯示在 Huddle。':
     'Connecting Google Calendar is a Pro feature. With Pro, the meetings on your Google Calendar show up in Huddle.',
   // components/billing/pro-purchase-card.tsx — native iOS purchase card
-  'Huddle Pro 是自動續訂的訂閱。訂閱期間你可以建立組織，用邀請連結邀請成員。任務、行事曆、計時、記事本、白板等個人功能維持免費。':
-    'Huddle Pro is an auto-renewing subscription. While subscribed you can create organizations and invite members with a link. Personal features — tasks, calendar, timer, notebook and whiteboard — stay free.',
+  'Huddle Pro 是自動續訂的訂閱。訂閱期間：進行中任務與筆記不限數量、圖片空間 20 GB、每月 20 次 AI 會議整理、可串接 Google 日曆、可建立組織並用邀請連結邀請成員。任務、行事曆、計時、記事本、白板等個人功能維持免費。':
+    'Huddle Pro is an auto-renewing subscription. While subscribed you get unlimited active tasks and notes, 20 GB of image storage, 20 AI meeting summaries a month, Google Calendar connection, and organizations you can invite members to with a link. Personal features — tasks, calendar, timer, notebook and whiteboard — stay free.',
   '選擇方案': 'Choose a plan',
   '月繳': 'Monthly',
   '年繳': 'Yearly',
