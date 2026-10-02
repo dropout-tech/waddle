@@ -18,6 +18,7 @@ import { usePlanUsage } from '@/hooks/use-plan-usage'
 import { usageMeters } from '@/lib/billing/plan-usage-core'
 import { UsageMeters } from '@/components/billing/usage-meters'
 import { WebOnly } from '@/components/legal/web-only'
+import { ProPurchaseCard } from '@/components/billing/pro-purchase-card'
 
 export function MembershipPage() {
   const { user } = useAuth()
@@ -61,6 +62,15 @@ function MembershipContent() {
     setRanking(rows)
     setAlias(self.member.alias)
     setVisible(self.member.leaderboard_visible)
+  }, [user?.id])
+  // For the purchase card's wait-for-server check: re-reads the entitlement
+  // only, so a half-typed alias is not reset while it polls.
+  const refreshEntitlement = useCallback(async () => {
+    const uid = user?.id
+    const self = await operations<Membership>('self')
+    if (!alive.current || currentUser.current !== uid) return null
+    setData(self)
+    return self
   }, [user?.id])
   useEffect(() => {
     alive.current = true
@@ -144,6 +154,7 @@ function MembershipContent() {
               </p>
             )}
           </section>
+          <ProPurchaseCard userId={user?.id} paidUntil={data.paid_until} onRefresh={refreshEntitlement} />
           {/* Empty (nothing rendered) while limits are off or unavailable. */}
           {meters.length > 0 && (
             <section className={styles.panel} data-testid="plan-usage">
