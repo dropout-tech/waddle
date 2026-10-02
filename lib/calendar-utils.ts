@@ -125,21 +125,46 @@ export function isSeriesStart(task: Pick<Task, 'scheduledDate'>, targetDate?: st
  * series with chosen weekdays (每週一、三) must move its weekdays too — the
  * rule fires on `daysOfWeek`, so shifting only the start left the series on
  * the old weekdays plus a stray occurrence on the new start day.
+ *
+ * Skipped days (exdates: deleted occurrences, and the original day of every
+ * "only this" override) move by the same offset — left in place they'd no
+ * longer match any occurrence, so a deleted day came back and an overridden
+ * one showed twice. `exdates` is returned only when the series has some.
  */
 export function shiftSeries(
-  task: Pick<Task, 'scheduledDate' | 'recurrence'>,
+  task: Pick<Task, 'scheduledDate' | 'recurrence' | 'exdates'>,
   targetDate: string,
   date: string,
-): { scheduledDate: string; daysOfWeek?: number[] } {
+): { scheduledDate: string; daysOfWeek?: number[]; exdates?: string[]; offset: number } {
   const offset = Math.round(
     (parseDateString(date).getTime() - parseDateString(targetDate).getTime()) / 86_400_000,
   )
-  const start = parseDateString(task.scheduledDate ?? targetDate)
-  start.setDate(start.getDate() + offset)
+  const scheduledDate = shiftDateString(task.scheduledDate ?? targetDate, offset)
+  const exdates = task.exdates?.length ? task.exdates.map((d) => shiftDateString(d, offset)) : undefined
   const dow = task.recurrence?.type === 'weekly' ? task.recurrence.daysOfWeek : undefined
-  if (!dow || dow.length === 0) return { scheduledDate: toDateString(start) }
+  if (!dow || dow.length === 0) return { scheduledDate, exdates, offset }
   const shifted = [...new Set(dow.map((d) => (((d + offset) % 7) + 7) % 7))].sort((a, b) => a - b)
-  return { scheduledDate: toDateString(start), daysOfWeek: shifted }
+  return { scheduledDate, daysOfWeek: shifted, exdates, offset }
+}
+
+/** `YYYY-MM-DD` moved by `days` calendar days (local time, DST-safe). */
+export function shiftDateString(dateStr: string, days: number): string {
+  const d = parseDateString(dateStr)
+  d.setDate(d.getDate() + days)
+  return toDateString(d)
+}
+
+/**
+ * The "only this" overrides that move with a shifted series: the ones still
+ * on their original day (that day is one of the master's exdates). An
+ * override the user dragged to some other day stays where they put it.
+ */
+export function overridesFollowingShift<T extends Pick<Task, 'id' | 'parentId' | 'scheduledDate'>>(
+  master: Pick<Task, 'id' | 'exdates'>,
+  tasks: T[],
+): T[] {
+  const skipped = new Set(master.exdates ?? [])
+  return tasks.filter((t) => t.parentId === master.id && !!t.scheduledDate && skipped.has(t.scheduledDate))
 }
 
 /**
@@ -302,8 +327,8 @@ export function clamp(val: number, min: number, max: number): number {
  * time grid. `pointerY` / `grabOffsetY` are PIXELS — converted through
  * `hourHeight`, so the result is right at every zoom level (the old inline
  * math treated pixels as minutes and was only correct at 60 px/hour).
- * A move keeps the block's length and stops flush with the grid's bottom
- * instead of being squeezed to 15 minutes.
+ * A move keeps the block's exact length (even under 15 minutes) and stops
+ * flush with the grid's bottom instead of being squeezed.
  */
 export function computeDragRange(p: {
   dragType: 'move' | 'resize-top' | 'resize-bottom'
@@ -322,7 +347,9 @@ export function computeDragRange(p: {
   const pxToMin = (px: number) => (px * 60) / (p.hourHeight > 0 ? p.hourHeight : 60)
   const pointer = snap(p.min + pxToMin(p.pointerY))
   if (p.dragType === 'move') {
-    const duration = clamp(p.originalEnd - p.originalStart, SNAP_MINUTES, Math.max(SNAP_MINUTES, p.max - p.min))
+    // Keep the real length — a 1-min timer record stays 1 min. Only the
+    // start snaps to the grid; resizes still floor at SNAP_MINUTES.
+    const duration = clamp(p.originalEnd - p.originalStart, 1, Math.max(1, p.max - p.min))
     const start = clamp(snap(p.min + pxToMin(p.pointerY - p.grabOffsetY)), p.min, p.max - duration)
     return { start, end: start + duration }
   }

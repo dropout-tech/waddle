@@ -28,6 +28,7 @@ let initFailed = false
 // Errors reported before the SDK finished loading (it is a lazy chunk).
 const MAX_QUEUED_ERRORS = 10
 const queue: unknown[] = []
+let currentUser: { id: string } | null = null
 
 export function isMonitoringEnabled(): boolean {
   return DSN.length > 0
@@ -89,7 +90,7 @@ export function initMonitoring(): void {
     })
 
     Sentry.setTag('app_platform', currentPlatform())
-    Sentry.setUser(buildSentryUser(null))
+    Sentry.setUser(currentUser)
     sdk = Sentry
     for (const err of queue.splice(0)) Sentry.captureException(err)
     return Sentry
@@ -98,6 +99,20 @@ export function initMonitoring(): void {
     initFailed = true // chunk blocked / offline: drop the queue, never retry-loop
     queue.length = 0
   })
+}
+
+/**
+ * Called by AuthProvider on every sign-in / sign-out. Only the uuid is kept
+ * (see sentry-user.ts). No-op when monitoring is disabled.
+ */
+export function setMonitoringUser(userId: string | null): void {
+  if (!process.env.NEXT_PUBLIC_SENTRY_DSN) return // inlined: dead-code-eliminated without a DSN
+  currentUser = buildSentryUser(userId)
+  try {
+    sdk?.setUser(currentUser)
+  } catch {
+    /* never let reporting throw */
+  }
 }
 
 /**

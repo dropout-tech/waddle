@@ -8,6 +8,8 @@ import { useAuth } from '@/components/auth/auth-provider'
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/lib/i18n/react'
+import { isNative } from '@/lib/platform'
+import { isIOS } from '@/lib/pwa'
 import {
   savePendingOrgInvite,
   readPendingOrgInvite,
@@ -21,8 +23,13 @@ import {
 // token in the URL fragment (#t=…, never sent to a server), stashed in
 // localStorage (24h TTL, survives the new-tab email confirmation) across the
 // login / sign-up round trip and cleared on return.
+//
+// iPhone / iPad: with Huddle installed, the link normally opens the app
+// directly (Universal Link). When it lands here instead — LINE's in-app
+// browser, long-press → open — a logged-out visitor gets a choice: hand the
+// invite to the app via huddle://, or sign in on the web as before.
 
-type Status = 'resolving' | 'loading-preview' | 'preview' | 'invalid' | 'accepting'
+type Status = 'resolving' | 'ios-choice' | 'loading-preview' | 'preview' | 'invalid' | 'accepting'
 type Preview = NonNullable<Awaited<ReturnType<typeof previewOrgInvite>>>
 
 function readTokenFromHash(): string | null {
@@ -50,6 +57,7 @@ export default function OrgInvitePage() {
     if (!token || authLoading) return
     if (!session) {
       savePendingOrgInvite(token)
+      if (isIOS() && !isNative()) { setStatus('ios-choice'); return }
       // replace, not push: Back from /login must not bounce here again.
       router.replace('/login')
       return
@@ -97,6 +105,26 @@ export default function OrgInvitePage() {
             <div className="flex flex-col items-center gap-3 py-6">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               <p className="text-sm text-muted-foreground">{t('正在確認邀請…')}</p>
+            </div>
+          )}
+          {status === 'ios-choice' && token && (
+            <div data-testid="org-invite-ios-choice" className="flex flex-col items-center gap-4 py-2">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                <Building2 className="h-7 w-7 text-primary" aria-hidden />
+              </div>
+              <div>
+                <p className="text-base font-medium">{t('你收到一個組織邀請')}</p>
+                <p className="mt-1.5 text-sm text-muted-foreground">{t('已經裝了 Huddle App？直接在 App 裡加入。')}</p>
+              </div>
+              <div className="mt-2 flex w-full flex-col gap-2.5">
+                <Button asChild className="h-11 w-full">
+                  <a href={`huddle://org/invite#t=${encodeURIComponent(token)}`}>{t('用 Huddle App 開啟')}</a>
+                </Button>
+                <Button type="button" variant="secondary" className="h-11 w-full" onClick={() => router.replace('/login')}>
+                  {t('用網頁登入')}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{t('還沒裝 App？用網頁登入一樣可以加入，之後在 App 登入同一個帳號就看得到。')}</p>
             </div>
           )}
           {status === 'invalid' && (

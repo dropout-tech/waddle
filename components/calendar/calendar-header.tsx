@@ -30,6 +30,7 @@ import { useI18n } from '@/lib/i18n/react'
 import { format } from 'date-fns'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
 import { HubLauncherButton } from '@/components/floating/hub-launcher-button'
+import { ScratchpadPullTab } from '@/components/scratchpad/focus-scratchpad'
 
 interface CalendarHeaderProps {
   selectedDate: Date
@@ -235,12 +236,17 @@ export function CalendarHeader({
             {getDisplayText()}
           </span>
 
+          {/* Whiteboard pull-tab hangs from the top edge, centred in the gap
+              between the title and the view switcher (desktop only; phones
+              open the whiteboard from the bottom tab bar). */}
+          {!isMobile && <ScratchpadPullTab className="-mt-3 mx-auto self-start" />}
+
           {/* View Mode picker — desktop renders inline segmented control,
               mobile renders a single button + popover so it's tappable. */}
           {!isMobile ? (
             <div
               data-tour="view-modes"
-              className="hidden md:flex items-center border border-border rounded-lg overflow-hidden ml-auto"
+              className="hidden md:flex items-center border border-border rounded-lg overflow-hidden"
               role="group"
               aria-label={t('檢視模式')}
             >
@@ -363,7 +369,7 @@ export function CalendarHeader({
                     aria-hidden="true"
                     className={cn(
                       'absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full text-[9px] font-bold text-white',
-                      notifHigh ? 'bg-urgency-critical' : 'bg-urgency-high',
+                      notifHigh ? 'bg-urgency-critical-strong' : 'bg-urgency-high',
                     )}
                   >
                     {notifCount > 9 ? '9+' : notifCount}
@@ -398,7 +404,7 @@ export function CalendarHeader({
                     <InkBell className="w-4 h-4" />
                     <span className="flex-1 text-left">{t('通知')}</span>
                     {notifCount > 0 && (
-                      <span className={cn('rounded-full px-1.5 text-[11px] font-semibold text-white', notifHigh ? 'bg-urgency-critical' : 'bg-urgency-high')}>
+                      <span className={cn('rounded-full px-1.5 text-[11px] font-semibold text-white', notifHigh ? 'bg-urgency-critical-strong' : 'bg-urgency-high')}>
                         {notifCount > 9 ? '9+' : notifCount}
                       </span>
                     )}

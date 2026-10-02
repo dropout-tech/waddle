@@ -11,6 +11,7 @@ import { WidgetLinks } from '@/components/widgets/widget-links'
 import { DeepLinkHandler } from './deep-link-handler'
 import { resetSharedSelf } from '@/lib/operations/client'
 import { resetPlanUsage } from '@/lib/billing/plan-usage'
+import { setMonitoringUser } from '@/lib/monitoring/sentry'
 
 // Client-side auth state shared across the app. Replaces the deleted server
 // middleware (proxy.ts) as the single source of truth for "is the user logged
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return
       setDesktopNotificationAccount(data.session?.user.id ?? null)
+      setMonitoringUser(data.session?.user.id ?? null)
       void setWidgetAccount(data.session?.user.id ?? null).catch(() => {})
       void clearWidgetReminders(data.session?.user.id ?? null).catch(() => {})
       setSession(data.session)
@@ -53,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return
       setDesktopNotificationAccount(nextSession?.user.id ?? null)
+      setMonitoringUser(nextSession?.user.id ?? null)
       if (_event !== 'TOKEN_REFRESHED') {
         if (_event !== 'INITIAL_SESSION') {
           resetSharedSelf()
