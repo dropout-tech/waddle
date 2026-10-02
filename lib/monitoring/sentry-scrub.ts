@@ -201,7 +201,9 @@ export function scrubEvent(event: ErrorEvent): ErrorEvent {
     out.breadcrumbs = out.breadcrumbs.map((b) => scrubBreadcrumb(b)).filter((b): b is Breadcrumb => b !== null)
   }
 
-  delete out.user
+  // Only the uuid survives (owner decision 2026-10-02); never email / ip / name.
+  if (out.user?.id) out.user = { id: String(out.user.id) }
+  else delete out.user
   delete out.extra
   return out
 }

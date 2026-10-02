@@ -1,16 +1,11 @@
 /**
- * Which identity (if any) is attached to Sentry error reports.
+ * Which identity is attached to Sentry error reports.
  *
- * Currently returns null: reports carry NO user identity, so the team can see
- * *that* an error happened and on which platform/page/version, but not *who*
- * hit it. Attaching an id would make support follow-ups easier but is a
- * privacy / business choice, so it is deliberately left off until decided.
- *
- * If the owner opts in, return `{ id: user.id }` (the Supabase user uuid
- * only — never email, name or any other profile field) and wire this function
- * to the auth state in components/monitoring/sentry-init.tsx.
+ * Owner decision (2026-10-02): attach the Supabase user uuid ONLY, so the team
+ * can tell how many people an error affects and look up a reporter's errors
+ * when they write in. Never email, name or any other profile field — the
+ * uuid means nothing outside our own database.
  */
-export function buildSentryUser(_user: { id: string } | null | undefined): { id: string } | null {
-  // DECISION: 由老闆決定是否附上匿名 user id
-  return null
+export function buildSentryUser(userId: string | null | undefined): { id: string } | null {
+  return userId ? { id: userId } : null
 }
