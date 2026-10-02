@@ -12,6 +12,7 @@ import { dict as operations } from './dict/operations'
 import { dict as account } from './dict/account'
 import { dict as meetings } from './dict/meetings'
 import { dict as pet } from './dict/pet'
+import { dict as igloo } from './dict/igloo'
 import { dict as stickyNotes } from './dict/sticky-notes'
 import { dict as assignments } from './dict/assignments'
 import { dict as pwa } from './dict/pwa'
@@ -39,6 +40,7 @@ export const en: Record<string, string> = {
   ...operations,
   ...meetings,
   ...pet,
+  ...igloo,
   ...stickyNotes,
   ...widgets,
   ...assignments,

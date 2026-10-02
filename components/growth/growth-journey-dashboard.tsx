@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { CheckInLeaderboard } from './check-in-leaderboard'
+import { IglooCard } from '@/components/igloo/igloo-card'
 import { useEffect, useState } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
@@ -70,6 +71,8 @@ function DailyCheckIn({ today }: { today: string }) {
         <h1 id="daily-check-in-title" className="text-xl font-semibold tracking-tight">{t('每日簽到')}</h1>
         <time dateTime={status?.check_in_date ?? today} className="text-sm text-muted-foreground">{dateLabel}</time>
       </header>
+
+      <IglooCard />
 
       <div className="mt-4 flex flex-col items-center rounded-2xl border border-border bg-card px-5 pb-6 pt-5 text-center shadow-sm sm:px-8 sm:pb-8">
         <div className="size-28 sm:size-32" aria-hidden={pose ? undefined : true}>

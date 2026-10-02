@@ -15,6 +15,7 @@ import { OnboardingTour } from '@/components/onboarding-tour'
 import { SettingsModal, type SettingsTab } from '@/components/modals/settings-modal'
 import { MascotLoader } from '@/components/branding/mascot-loader'
 import { DailyClearCelebration } from '@/components/celebration/daily-clear-celebration'
+import { IglooHost } from '@/components/igloo/igloo-host'
 import { OverdueTaskReview } from '@/components/task-panel/overdue-task-review'
 import { useRecurringCompleteConfirm } from '@/components/task-panel/use-recurring-complete-confirm'
 import { useWaddleData } from '@/hooks/use-waddle-data'
@@ -709,6 +710,7 @@ function HuddlePage() {
       />
       <KeyboardShortcutsHint />
       <DailyClearCelebration />
+      <IglooHost workspaces={workspaces} pet={settings.pet} onSetPet={setPet} />
       <WaterReminderModal
         isOpen={water.isOpen}
         onDrink={water.dismiss}
