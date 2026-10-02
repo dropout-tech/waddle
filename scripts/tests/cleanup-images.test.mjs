@@ -1,7 +1,7 @@
 // node --test scripts/tests/cleanup-images.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { candidates, createHandler, referenceKey, selectDeletions, MAX_DELETE } from '../../supabase/functions/cleanup-images/core.mjs'
+import { candidates, createHandler, referenceKey, selectDeletions, MAX_DELETE, MIN_RUN_INTERVAL_S } from '../../supabase/functions/cleanup-images/core.mjs'
 
 const me = 'e33d985b-4bcb-456f-9658-9cc1085185ab'
 const other = 'a33d985b-4bcb-456f-9658-9cc1085185ab'
@@ -60,9 +60,10 @@ test('a missing reference list is an error, not "nothing is referenced"', () => 
 })
 
 function setup(overrides = {}) {
-  const calls = { list: [], lookup: [], remove: [] }
+  const calls = { claim: [], list: [], lookup: [], remove: [] }
   const handler = createHandler({
     getCallerId: async () => me,
+    claimRun: async (owner, seconds) => { calls.claim.push([owner, seconds]); return true },
     listObjects: async (owner) => { calls.list.push(owner); return [img(U1, 2 * DAY), img(U2, 2 * DAY), img(U3, 60 * 1000)] },
     findReferencedKeys: async (owner, keys) => { calls.lookup.push([owner, keys]); return [`${me}/${U2}`] },
     removeObjects: async (paths) => { calls.remove.push(paths); return paths.length },
@@ -108,4 +109,55 @@ test('GET is rejected and OPTIONS answers CORS', async () => {
   const { handler } = setup()
   assert.equal((await handler(new Request('https://example.test', { method: 'GET' }))).status, 405)
   assert.equal((await handler(new Request('https://example.test', { method: 'OPTIONS' }))).status, 200)
+})
+
+test('the run slot is claimed for the JWT caller before anything is listed', async () => {
+  const order = []
+  const { handler, calls, post } = setup({
+    claimRun: async (owner, seconds) => { order.push('claim'); calls.claim.push([owner, seconds]); return true },
+    listObjects: async () => { order.push('list'); return [] },
+  })
+  await handler(post(JSON.stringify({ userId: other })))
+  assert.deepEqual(calls.claim, [[me, MIN_RUN_INTERVAL_S]])
+  assert.deepEqual(order, ['claim', 'list'])
+})
+
+test('a refused claim lists, scans and deletes nothing', async () => {
+  const { handler, calls, post } = setup({ claimRun: async () => false })
+  const res = await handler(post())
+  assert.equal(res.status, 429)
+  assert.equal(res.headers.get('Retry-After'), String(MIN_RUN_INTERVAL_S))
+  assert.deepEqual(await res.json(), { error: 'Too many requests' })
+  assert.equal(calls.list.length + calls.lookup.length + calls.remove.length, 0)
+})
+
+test('a failed claim is a 500 with no work done (never "allowed by default")', async () => {
+  const { handler, calls, post } = setup({ claimRun: async () => { throw new Error('function claim_image_cleanup_run does not exist') } })
+  const res = await handler(post())
+  assert.equal(res.status, 500)
+  assert.deepEqual(await res.json(), { error: 'Cleanup failed' })
+  assert.equal(calls.list.length + calls.lookup.length + calls.remove.length, 0)
+})
+
+test('attack replay: 50 back-to-back calls from one account do the work once', async () => {
+  // Stand-in for the DB upsert: one slot per MIN_RUN_INTERVAL_S per account.
+  let clock = now
+  const lastRun = new Map()
+  const claimRun = async (owner, seconds) => {
+    const prev = lastRun.get(owner)
+    if (prev !== undefined && clock - prev < seconds * 1000) return false
+    lastRun.set(owner, clock)
+    return true
+  }
+  const { handler, calls, post } = setup({ claimRun, now: () => clock })
+  const statuses = []
+  for (let i = 0; i < 50; i++) statuses.push((await handler(post())).status)
+  assert.equal(statuses[0], 200)
+  assert.equal(statuses.filter((s) => s === 200).length, 1, `statuses: ${[...new Set(statuses)]}`)
+  assert.equal(statuses.filter((s) => s === 429).length, 49)
+  assert.equal(calls.list.length, 1)
+  assert.equal(calls.lookup.length, 1)
+  clock += MIN_RUN_INTERVAL_S * 1000
+  await handler(post())
+  assert.equal(calls.list.length, 2, 'a new slot opens once the interval has passed')
 })
