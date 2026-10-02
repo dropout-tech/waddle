@@ -54,3 +54,9 @@
 - App 已處理（PR #140，cfdfc60）：這時購買卡顯示「這個 Apple ID 的 Huddle Pro 訂閱已綁定另一個 Huddle 帳號，無法轉移。請登出後改用當初購買時的帳號登入；需要協助請聯絡客服。」
 - 待老闆本人在 RevenueCat 後台把 Restore behavior 改成這個選項（沙盒用同一政策即可）。
 - 已知代價：刪了舊帳號再重辦的人，買過的訂閱找不回來（RevenueCat 仍綁在已刪帳號）。建議補強：刪帳號時順便刪除 RevenueCat 上的顧客紀錄，訂閱就能在新帳號恢復；要改 delete-account 並部署，先問老闆。
+
+## 六、審查沙盒（E1 方案 C，PR #150）上線規矩
+- RevenueCat webhook 的環境選 **both**（正式＋沙盒都送），否則審查員買了不會生效。
+- `REVENUECAT_APP_IDS` 只放 App Store 的 app，**不放 Test Store**。程式也會擋 Test Store 購買，這裡是雙重保險。
+- **TestFlight 不可開公開連結**：測試者的沙盒購買不花錢，每天重買就能一直是 Pro。邀請制（自己人）可以。
+- 緊急開關：發現有人濫用時，在資料庫執行 `update huddle_ops.settings set accept_sandbox_purchases = false;`，所有沙盒 Pro 立刻失效。送審期間要記得打開。
