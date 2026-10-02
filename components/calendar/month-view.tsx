@@ -716,7 +716,7 @@ export function MonthView({
                             // ramp (never a plain blue) when the day actually
                             // has something pressing in it.
                             backgroundColor: pendingTasks.some(t => t.urgency >= 7)
-                              ? 'var(--urgency-critical)'
+                              ? 'var(--urgency-critical-strong)'
                               : 'var(--foreground)',
                           }}
                         >
