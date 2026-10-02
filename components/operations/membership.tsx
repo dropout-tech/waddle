@@ -17,8 +17,8 @@ import { useI18n } from '@/lib/i18n/react'
 import { usePlanUsage } from '@/hooks/use-plan-usage'
 import { usageMeters } from '@/lib/billing/plan-usage-core'
 import { UsageMeters } from '@/components/billing/usage-meters'
+import { WebOnly } from '@/components/legal/web-only'
 import { ProPurchaseCard } from '@/components/billing/pro-purchase-card'
-import { isIosPurchaseSurface } from '@/components/billing/billing-session'
 
 export function MembershipPage() {
   const { user } = useAuth()
@@ -107,9 +107,6 @@ function MembershipContent() {
   }
   const meters = usageMeters(usage)
   const active = data?.pro_until && Date.parse(data.pro_until) > Date.now()
-  // App Store guideline 3.1.1: the native iOS app may not unlock Pro time with
-  // typed-in codes. Web and desktop keep both forms.
-  const codeEntry = !isIosPurchaseSurface()
   const link =
     data?.member.referral_code && typeof window !== 'undefined'
       ? enrollmentLink('ref', data.member.referral_code)
@@ -169,6 +166,9 @@ function MembershipContent() {
             </section>
           )}
           <div className={styles.grid}>
+            {/* Not in the iOS/Android app: referral rewards grant Pro days
+                outside in-app purchase (Apple 3.1.1). Web unchanged. */}
+            <WebOnly>
             <section className={styles.panel}>
               <h2>{t('你的推薦碼')}</h2>
               <p className={styles.muted}>
@@ -221,6 +221,7 @@ function MembershipContent() {
                 })}
               </p>
             </section>
+            </WebOnly>
             <section className={styles.panel}>
               <h2>{t('化名與排行榜')}</h2>
               <p className={styles.muted}>
@@ -258,7 +259,9 @@ function MembershipContent() {
                 </button>
               </form>
             </section>
-            {codeEntry && (
+            {/* Not in the iOS/Android app: unlocking Pro with our own codes is
+                outside in-app purchase (Apple 3.1.1). Web unchanged. */}
+            <WebOnly>
             <section className={styles.panel}>
               <h2>{t('兌換優惠碼')}</h2>
               <p className={styles.muted}>
@@ -291,8 +294,6 @@ function MembershipContent() {
                 </button>
               </form>
             </section>
-            )}
-            {codeEntry && (
             <section className={styles.panel}>
               <h2>{t('朋友的推薦碼')}</h2>
               {data.referred ? (
@@ -326,7 +327,7 @@ function MembershipContent() {
                 </>
               )}
             </section>
-            )}
+            </WebOnly>
           </div>
           <section className={styles.panel}>
             <h2>{t('推薦排行榜')}</h2>

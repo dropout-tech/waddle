@@ -524,12 +524,12 @@ export function FullScreenTaskView({
               >
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-2 rounded-lg bg-urgency-critical/10">
-                    <AlertTriangle className="w-4 h-4 text-urgency-critical" />
+                    <AlertTriangle className="w-4 h-4 text-urgency-critical-ink" />
                   </div>
                   <span className="text-sm text-muted-foreground">{t('已過期')}</span>
                 </div>
-                <div className="text-2xl font-bold text-urgency-critical">{stats.overdue.length}</div>
-                <div className="text-xs text-urgency-critical mt-1">{t('可以先看看')}</div>
+                <div className="text-2xl font-bold text-urgency-critical-ink">{stats.overdue.length}</div>
+                <div className="text-xs text-urgency-critical-ink mt-1">{t('可以先看看')}</div>
               </div>
 
               <div className="p-4 rounded-xl bg-urgency-high/10 border border-urgency-high/30">
@@ -573,7 +573,7 @@ export function FullScreenTaskView({
                         </div>
                         <div className="flex items-center gap-4 text-sm">
                           {ws.stats.overdue > 0 && (
-                            <span className="px-2 py-0.5 rounded-full bg-urgency-critical/10 text-urgency-critical text-xs font-medium">
+                            <span className="px-2 py-0.5 rounded-full bg-urgency-critical/10 text-urgency-critical-ink text-xs font-medium">
                               {t('{count} 過期', { count: ws.stats.overdue })}
                             </span>
                           )}
@@ -608,7 +608,7 @@ export function FullScreenTaskView({
                 {/* Overdue Alert */}
                 {stats.overdue.length > 0 && (
                   <div className="space-y-3">
-                    <h2 className="text-lg font-semibold flex items-center gap-2 text-urgency-critical">
+                    <h2 className="text-lg font-semibold flex items-center gap-2 text-urgency-critical-ink">
                       <AlertTriangle className="w-5 h-5" />
                       {t('可以先處理')}
                     </h2>
@@ -625,7 +625,7 @@ export function FullScreenTaskView({
                           />
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium truncate">{task.title}</div>
-                            <div className="text-xs text-urgency-critical">
+                            <div className="text-xs text-urgency-critical-ink">
                               {t('過期 {days} 天', { days: getDaysOverdue(task.dueDate!) })}
                             </div>
                           </div>
@@ -637,7 +637,7 @@ export function FullScreenTaskView({
                       ))}
                       {stats.overdue.length > 5 && (
                         <button 
-                          className="w-full text-center text-sm text-urgency-critical py-2 hover:underline"
+                          className="w-full text-center text-sm text-urgency-critical-ink py-2 hover:underline"
                           onClick={() => { setActiveTab('tasks'); setTaskFilter('overdue') }}
                         >
                           {t('查看全部 {count} 個過期任務', { count: stats.overdue.length })}
@@ -992,7 +992,7 @@ export function FullScreenTaskView({
                                           {task.urgency > 0 && (
                                             <span className={cn(
                                               "px-1.5 py-0.5 rounded text-[10px] font-medium",
-                                              task.urgency >= 8 && "bg-urgency-critical/10 text-urgency-critical",
+                                              task.urgency >= 8 && "bg-urgency-critical/10 text-urgency-critical-ink",
                                               task.urgency >= 5 && task.urgency < 8 && "bg-urgency-high/10 text-urgency-high",
                                               task.urgency < 5 && "bg-success/10 text-success"
                                             )}>
@@ -1002,7 +1002,7 @@ export function FullScreenTaskView({
                                           {task.dueDate && (
                                             <span className={cn(
                                               "text-xs",
-                                              new Date(task.dueDate) < now ? "text-urgency-critical font-medium" : "text-muted-foreground"
+                                              new Date(task.dueDate) < now ? "text-urgency-critical-ink font-medium" : "text-muted-foreground"
                                             )}>
                                               {formatDate(task.dueDate)}
                                             </span>
@@ -1170,7 +1170,7 @@ export function FullScreenTaskView({
                           <span
                             className={cn(
                               'text-xs whitespace-nowrap',
-                              isOverdue ? 'text-urgency-critical font-medium' : 'text-muted-foreground'
+                              isOverdue ? 'text-urgency-critical-ink font-medium' : 'text-muted-foreground'
                             )}
                           >
                             {isOverdue
@@ -1188,7 +1188,7 @@ export function FullScreenTaskView({
                         )}
                         {density === 'compact' && isOverdue && (
                           <span
-                            className="text-[10px] font-medium text-urgency-critical whitespace-nowrap"
+                            className="text-[10px] font-medium text-urgency-critical-ink whitespace-nowrap"
                             aria-label={t('已過期')}
                           >
                             {t('過期')}
@@ -1335,7 +1335,7 @@ function WorkspacesView({
             </p>
           </div>
           {summary.overdue > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-urgency-critical/10 text-urgency-critical text-xs font-medium">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-urgency-critical/10 text-urgency-critical-ink text-xs font-medium">
               <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
               {t('{count} 個已過預定日', { count: summary.overdue })}
             </span>
@@ -1381,7 +1381,7 @@ function SummaryStat({
 }) {
   const toneClasses =
     tone === 'red'
-      ? 'text-urgency-critical'
+      ? 'text-urgency-critical-ink'
       : tone === 'amber'
       ? 'text-urgency-medium'
       : tone === 'primary'
@@ -1533,7 +1533,7 @@ function WorkspaceCard({
                   <span
                     className={cn(
                       'inline-flex items-center gap-1 font-medium',
-                      urgentMeta.tone === 'red' && 'text-urgency-critical',
+                      urgentMeta.tone === 'red' && 'text-urgency-critical-ink',
                       urgentMeta.tone === 'amber' && 'text-urgency-medium',
                       urgentMeta.tone === 'primary' && 'text-primary',
                       urgentMeta.tone === 'neutral' && 'text-muted-foreground'
@@ -1610,7 +1610,7 @@ function HealthBadge({ health }: { health: 'healthy' | 'caution' | 'warning' }) 
   const config = {
     healthy: { Icon: ShieldCheck, label: t('健康'), cls: 'bg-success/10 text-success' },
     caution: { Icon: Shield, label: t('注意'), cls: 'bg-urgency-medium/10 text-urgency-medium' },
-    warning: { Icon: ShieldAlert, label: t('警示'), cls: 'bg-urgency-critical/10 text-urgency-critical' },
+    warning: { Icon: ShieldAlert, label: t('警示'), cls: 'bg-urgency-critical/10 text-urgency-critical-ink' },
   } as const
   const { Icon, label, cls } = config[health]
   return (
@@ -1640,7 +1640,7 @@ function KpiTile({
 }) {
   const toneClasses =
     tone === 'red'
-      ? 'text-urgency-critical'
+      ? 'text-urgency-critical-ink'
       : tone === 'primary'
       ? 'text-primary'
       : 'text-foreground'

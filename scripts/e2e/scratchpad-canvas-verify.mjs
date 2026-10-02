@@ -81,7 +81,7 @@ try {
  await editor.focus()
  await editor.dispatchEvent('compositionend',{data:'字'})
  await editor.press('Enter');await editor.press('End');await editor.type('第二行')
- check('Enter inserts a newline without prematurely saving',(await editor.inputValue()).includes('\n')&&writes.length===before)
+ check('Enter inserts a newline without prematurely saving',await editor.locator('p').count()>=2&&writes.length===before)
  await blurEditor(page)
  const newText=rows.find(row=>row.content.includes('在畫布直接寫字'))
  check('Leaving a new text object creates exactly one record',!!newText&&rows.length===countBeforeText+1&&writes.length===before+1&&writes.at(-1).method==='POST')
