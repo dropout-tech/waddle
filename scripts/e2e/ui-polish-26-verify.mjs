@@ -169,12 +169,14 @@ async function checkNotebookIcons(page, label) {
   const left = await page.evaluate(() => {
     const root = document.querySelector('.ProseMirror')?.closest('main') || document.body
     return [...document.querySelectorAll('svg.lucide')]
-      .filter((s) => !s.closest('.ProseMirror') && !s.closest('.nb-slash-menu') && !s.classList.contains('animate-spin'))
+      // Scope = top bar + sidebar. The phone formatting bar is a separate row
+      // (main added colour/highlight swatches there with lucide; out of scope).
+      .filter((s) => !s.closest('.ProseMirror') && !s.closest('.nb-slash-menu') && !s.closest('[data-nb-keyboard-bar]') && !s.classList.contains('animate-spin'))
       .filter((s) => { const b = s.getBoundingClientRect(); return b.width > 0 && b.height > 0 })
       .map((s) => [...s.classList].find((c) => c.startsWith('lucide-')) || 'lucide')
       .concat(root ? [] : [])
   })
-  check(`③ ${label} notebook chrome has no visible lucide icon`, left.length === 0, left.join(' ') || 'none')
+  check(`③ ${label} notebook top bar + sidebar have no lucide icon`, left.length === 0, left.join(' ') || 'none')
 }
 
 const pm = (page) => page.locator('.ProseMirror').first()
