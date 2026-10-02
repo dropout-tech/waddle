@@ -447,11 +447,11 @@ export function SettingsModal({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-border">
+        <div className={cn('flex border-b border-border', showSubscription && 'overflow-x-auto')}>
           <button
             onClick={() => setActiveTab('general')}
             className={cn(
-              `flex-1 ${showSubscription ? 'px-1.5' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
+              `flex-1 ${showSubscription ? 'whitespace-nowrap px-1' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
               activeTab === 'general'
                 ? 'text-primary border-b-2 border-primary bg-primary/5'
                 : 'text-muted-foreground hover:text-foreground'
@@ -462,7 +462,7 @@ export function SettingsModal({
           <button
             onClick={() => setActiveTab('notifications')}
             className={cn(
-              `flex-1 ${showSubscription ? 'px-1.5' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
+              `flex-1 ${showSubscription ? 'whitespace-nowrap px-1' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
               activeTab === 'notifications'
                 ? 'text-primary border-b-2 border-primary bg-primary/5'
                 : 'text-muted-foreground hover:text-foreground'
@@ -473,7 +473,7 @@ export function SettingsModal({
           <button
             onClick={() => setActiveTab('slotTypes')}
             className={cn(
-              `flex-1 ${showSubscription ? 'px-1.5' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
+              `flex-1 ${showSubscription ? 'whitespace-nowrap px-1' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
               activeTab === 'slotTypes'
                 ? 'text-primary border-b-2 border-primary bg-primary/5'
                 : 'text-muted-foreground hover:text-foreground'
@@ -484,7 +484,7 @@ export function SettingsModal({
           <button
             onClick={() => setActiveTab('sharing')}
             className={cn(
-              `flex-1 ${showSubscription ? 'px-1.5' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
+              `flex-1 ${showSubscription ? 'whitespace-nowrap px-1' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
               activeTab === 'sharing'
                 ? 'text-primary border-b-2 border-primary bg-primary/5'
                 : 'text-muted-foreground hover:text-foreground'
@@ -497,7 +497,7 @@ export function SettingsModal({
               onClick={() => setActiveTab('subscription')}
               data-testid="settings-tab-subscription"
               className={cn(
-                `flex-1 ${showSubscription ? 'px-1.5' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
+                `flex-1 ${showSubscription ? 'whitespace-nowrap px-1' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
                 activeTab === 'subscription'
                   ? 'text-primary border-b-2 border-primary bg-primary/5'
                   : 'text-muted-foreground hover:text-foreground'

@@ -34,7 +34,6 @@ export const dict: Record<string, string> = {
   '付款表單載入中…': 'Loading payment form…',
   '這個頁面目前不可用。': "This page isn't available right now.",
   // Settings → Subscription
-  '訂閱': 'Subscription',
   '讀取訂閱資料中…': 'Loading your subscription…',
   '已收到你的退款申請。我們會盡快處理，並在 15 天內退回原本付款的信用卡。':
     "We've received your refund request. We'll process it soon and return the money to the card you paid with within 15 days.",
@@ -64,7 +63,6 @@ export const dict: Record<string, string> = {
   '{date}・{amount}': '{date} · {amount}',
   '（{unit}自動續訂）': ' (renews {unit})',
   'Pro 可使用到': 'Pro available until',
-  '請在這天前補付': 'Please pay by',
   '付款卡片': 'Card',
   '你的銀行需要你本人確認這筆付款。請按「立即付款」完成，這段期間 Pro 照常可以使用。':
     'Your bank needs you to confirm this payment yourself. Tap "Pay now" to finish; Pro keeps working in the meantime.',
@@ -74,6 +72,13 @@ export const dict: Record<string, string> = {
     "Renewal is canceled and you won't be charged again. You can resume it if you want to keep going.",
   '退款申請處理中，預計 {date} 前退回原本付款的信用卡。':
     'Refund in progress. It should return to the card you paid with by {date}.',
+  '請在 {date} 前補付，逾期 Pro 會停用。': 'Please pay by {date}; after that Pro will stop working.',
+  '免費試用中，{date} 前取消不會扣款。': "Free trial — cancel before {date} and you won't be charged.",
+  '退款完成後，Pro 會立刻停止，回到免費版。': 'Once the refund completes, Pro stops immediately and you move to the free plan.',
+  '申請後訂閱會停止續訂（你的資料不會被刪除）。款項會退回原本付款的信用卡，我們在收到申請隔天起 15 天內完成。':
+    'Renewal stops once you request it (your data is not deleted). The money returns to the card you paid with, within 15 days of the day after we receive your request.',
+  '免費試用 {days} 天，{date} 結束後自動扣款 {amount}。': '{days}-day free trial. When it ends on {date}, we automatically charge {amount}.',
+  '付款後立即開通，今天扣款 {amount}。': 'Pro starts right away and {amount} is charged today.',
   '要取消續訂嗎？': 'Cancel renewal?',
   '取消後，試用結束時不會扣款。Pro 可以用到 {date}，之後回到免費版，你的資料不會被刪除。':
     "If you cancel, you won't be charged when the trial ends. Pro works until {date}, then you move to the free plan. Your data is not deleted.",
@@ -83,8 +88,6 @@ export const dict: Record<string, string> = {
     "If you cancel, you won't be charged again. Pro works until {date}, the end of what you've paid for, then you move to the free plan. Your data is not deleted.",
   '確認取消續訂': 'Yes, cancel renewal',
   '要申請全額退款 {amount} 嗎？': 'Request a full refund of {amount}?',
-  '申請後訂閱會停止續訂，退款完成時 Pro 會立刻停止、回到免費版（資料不會被刪除）。款項會退回原本付款的信用卡，我們在收到申請隔天起 15 天內完成。':
-    "Renewal stops once you request it, and Pro ends as soon as the refund completes (you move to the free plan; your data is not deleted). The money returns to the card you paid with, within 15 days of the day after we receive your request.",
   '確認申請退款': 'Yes, request refund',
   '立即付款': 'Pay now',
   '更換信用卡': 'Change card',

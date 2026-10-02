@@ -28,6 +28,7 @@ const SUPABASE = 'https://e2e-mock.supabase.co'
 const USER_ID = '11111111-2222-4333-8444-555555555555'
 const CJK = /[㐀-鿿＀-￯]/ // CJK + fullwidth punctuation
 
+let cancelBgGlobal = ''
 let failed = 0
 let passed = 0
 const check = (name, ok, detail = '') => {
@@ -117,6 +118,11 @@ const SCENARIOS = {
     trial_eligible: false, card: CARD,
     subscription: sub({ status: 'past_due', needs_customer_action: true, grace_until: inDays(5), current_period_end: inDays(-2) }),
     payments: [{ id: 'pay-3', date: inDays(-2), amount_minor: 15000, status: 'failed', refunded_minor: 0, refundable_until: null }],
+  }),
+  past_due_plain: base({
+    trial_eligible: false, card: CARD,
+    subscription: sub({ status: 'past_due', needs_customer_action: false, grace_until: inDays(6), current_period_end: inDays(-1) }),
+    payments: [{ id: 'pay-5', date: inDays(-1), amount_minor: 15000, status: 'failed', refunded_minor: 0, refundable_until: null }],
   }),
   canceled: base({
     trial_eligible: false, card: CARD,
@@ -252,8 +258,14 @@ async function openPage(browser, state, port, { scenario = 'none', viewport, lan
   const pageErrors = []
   page.on('pageerror', (e) => pageErrors.push(String(e)))
   const cspErrors = []
-  page.on('console', (m) => { if (/Content Security Policy|Refused to/i.test(m.text())) cspErrors.push(m.text()) })
-  return { ctx, page, st, pageErrors, cspErrors }
+  const consoleErrors = []
+  const badResponses = []
+  page.on('response', (r) => { if (r.status() >= 400) badResponses.push(`${r.status()} ${new URL(r.url()).pathname}`) })
+  page.on('console', (m) => {
+    if (/Content Security Policy|Refused to/i.test(m.text())) cspErrors.push(m.text())
+    if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 300))
+  })
+  return { ctx, page, st, pageErrors, cspErrors, consoleErrors, badResponses }
 }
 
 const shot = (page, name) => page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: false })
@@ -328,10 +340,11 @@ const TAB_EXPECT = {
   none_used: { root: 'sub-none', has: ['訂閱 Pro'], hasNot: ['開始免費試用'] },
   unavailable: { root: 'sub-none', has: ['尚未對你的帳號開放'], hasNot: ['開始免費試用'] },
   apple: { root: 'sub-none', has: ['Apple', 'iPhone'], hasNot: ['開始免費試用', '訂閱 Pro', '/billing'] },
-  trialing: { root: 'sub-live', has: ['試用中', '下次扣款', 'NT$150', 'VISA •••• 4242', '取消續訂', '更換信用卡'], hasNot: ['申請退款', '立即付款', '恢復續訂'] },
+  trialing: { root: 'sub-live', has: ['試用中', '下次扣款', 'NT$150', 'VISA •••• 4242', '取消續訂', '更換信用卡', '免費試用中，', '前取消不會扣款'], hasNot: ['申請退款', '立即付款', '恢復續訂'] },
   active_refundable: { root: 'sub-live', has: ['使用中', 'Pro 年繳', 'NT$990', '申請退款', '23:59', '扣款紀錄', '取消續訂'], hasNot: ['立即付款'] },
   active_plain: { root: 'sub-live', has: ['使用中', '已付款', '取消續訂'], hasNot: ['申請退款'] },
-  past_due: { root: 'sub-live', has: ['付款失敗', '立即付款', '請在這天前補付', '本人確認', '未成功'], hasNot: ['申請退款'] },
+  past_due: { root: 'sub-live', has: ['付款失敗', '立即付款', '請在 ', ' 前補付，逾期 Pro 會停用', '本人確認', '未成功'], hasNot: ['申請退款'] },
+  past_due_plain: { root: 'sub-live', has: ['付款失敗', '立即付款', ' 前補付，逾期 Pro 會停用', '這一期的扣款沒有成功', '更換信用卡'], hasNot: ['本人確認', '申請退款'] },
   canceled: { root: 'sub-live', has: ['已取消', '恢復續訂', 'Pro 可使用到'], hasNot: ['下次扣款', '申請退款'] },
   expired: { root: 'sub-none', has: ['已經結束', '訂閱 Pro'], hasNot: ['取消續訂'] },
 }
@@ -356,6 +369,16 @@ async function partBTabs(browser, port, state) {
       const small = await smallTargets(o.page, `[data-testid="${exp_.root}"]`)
       check(`${tag}: buttons/links >= 44px`, small.length === 0, small.join(', '))
       check(`${tag}: no page errors`, o.pageErrors.length === 0, o.pageErrors.join(' | '))
+      if (scenario === 'trialing') {
+        const tabs = await o.page.evaluate(() => {
+          const btns = [...document.querySelectorAll('[role="dialog"] button, [data-testid="settings-tab-subscription"]')].filter((b) => /一般設定|提醒設定|時間區塊|共享|訂閱/.test(b.textContent || '') && b.className.includes('flex-1'))
+          const nav = btns[0]?.parentElement
+          return { heights: btns.map((b) => Math.round(b.getBoundingClientRect().height)), overflow: nav ? nav.scrollWidth - nav.clientWidth : -1, n: btns.length }
+        })
+        check(`${tag}: 5 settings tabs, each on ONE line (same height), tab strip does not scroll`, tabs.n === 5 && new Set(tabs.heights).size === 1 && tabs.overflow <= 0, JSON.stringify(tabs))
+        check(`${tag}: console errors are only the mock's 404s on unrelated RPCs (nothing from billing code, no React errors)`, o.consoleErrors.every((m) => /Failed to load resource|\[calendar-sharing\] load peers failed/.test(m)) && !o.badResponses.some((r) => /billing/.test(r)), o.consoleErrors.filter((m) => !/Failed to load resource|\[calendar-sharing\] load peers failed/.test(m)).join(' | ') || o.badResponses.join(', '))
+        console.log(`INFO  ${tag}: console.error count=${o.consoleErrors.length}; failing requests: ${[...new Set(o.badResponses)].join(', ') || 'none'}`)
+      }
       await shot(o.page, `B1-${scenario}-${sizeName}`)
       await o.ctx.close()
     }
@@ -371,11 +394,18 @@ async function partBTabs(browser, port, state) {
     await o.page.getByTestId('sub-cancel').click()
     check('B2: cancel asks first', await o.page.getByTestId('confirm-cancel').isVisible())
     check('B2: cancel NOT sent before confirming', !o.st.calls.some((c) => c.action === 'cancel'))
+    cancelBgGlobal = await o.page.evaluate(() => getComputedStyle(document.querySelector('[data-testid="confirm-cancel-confirm"]')).backgroundColor)
     await shot(o.page, 'B2-cancel-confirm-390')
     await o.page.getByTestId('confirm-cancel-back').click()
     check('B2: "先不要" closes the confirmation, nothing sent', (await o.page.getByTestId('confirm-cancel').count()) === 0 && !o.st.calls.some((c) => c.action === 'cancel'))
     await o.page.getByTestId('sub-refund').click()
     check('B2: refund asks first (shows amount)', (await o.page.getByTestId('confirm-refund').innerText()).includes('NT$990'))
+    const strength = await o.page.evaluate(() => {
+      const bg = (id) => getComputedStyle(document.querySelector(`[data-testid="${id}"]`)).backgroundColor
+      const emp = document.querySelector('[data-testid="confirm-refund-emphasis"]')
+      return { refundBtn: bg('confirm-refund-confirm'), emphWeight: emp ? Number(getComputedStyle(emp).fontWeight) : 0, emphText: emp?.textContent ?? '' }
+    })
+    check('B2: refund confirm is a solid filled button (different from cancel\'s light one), with a bold 「Pro 會立刻停止」 line', !/rgba\(0, 0, 0, 0\)/.test(strength.refundBtn) && strength.refundBtn !== cancelBgGlobal && strength.emphWeight >= 700 && /Pro 會立刻停止/.test(strength.emphText), JSON.stringify({ ...strength, cancelBg: cancelBgGlobal }))
     check('B2: refund NOT sent before confirming', !o.st.calls.some((c) => c.action === 'refund'))
     await shot(o.page, 'B2-refund-confirm-390')
     await o.page.getByTestId('confirm-refund-confirm').click()
@@ -415,7 +445,7 @@ async function partBTabs(browser, port, state) {
 
   if (want('B3')) {
   console.log('\n== Part B3: English has no leftover Chinese ==')
-  for (const scenario of ['none', 'trialing', 'active_refundable', 'past_due', 'canceled', 'apple', 'expired', 'unavailable']) {
+  for (const scenario of ['none', 'trialing', 'active_refundable', 'past_due', 'past_due_plain', 'canceled', 'apple', 'expired', 'unavailable']) {
     const o = await openPage(browser, state, port, { scenario, viewport: { width: 390, height: 844 }, lang: 'en' })
     await openSubscriptionTab(o.page, port)
     const root = (await o.page.locator('[data-testid="sub-live"]').count()) ? 'sub-live' : 'sub-none'
@@ -431,7 +461,16 @@ async function partBTabs(browser, port, state) {
     }
     const text = await o.page.locator(`[data-testid="${root}"]`).innerText()
     check(`B3 en ${scenario}: no Chinese in the tab`, !CJK.test(text), text.match(CJK) ? text.slice(Math.max(0, text.search(CJK) - 30), text.search(CJK) + 40).replace(/\n/g, ' / ') : '')
-    if (scenario === 'trialing') await shot(o.page, 'B3-en-trialing-390')
+    if (scenario === 'trialing') {
+      const strip = await o.page.evaluate(() => {
+        const btns = [...document.querySelectorAll('button')].filter((b) => b.className.includes('flex-1') && b.className.includes('py-2.5'))
+        const nav = btns[0]?.parentElement
+        return { labels: btns.map((b) => (b.textContent || '').trim()), heights: btns.map((b) => Math.round(b.getBoundingClientRect().height)), overflow: nav ? nav.scrollWidth - nav.clientWidth : -1 }
+      })
+      check('B3 en: settings tab strip has no Chinese ("Subscription" tab), 5 tabs on one line, no scrolling', strip.labels.length === 5 && !strip.labels.some((l) => CJK.test(l)) && strip.labels.includes('Subscription') && new Set(strip.heights).size === 1 && strip.overflow <= 0, JSON.stringify(strip))
+      await shot(o.page, 'B3-en-trialing-390')
+    }
+    if (scenario === 'past_due_plain') await shot(o.page, 'B3-en-past_due_plain-390')
     await o.ctx.close()
   }
 }
@@ -451,6 +490,8 @@ async function partBPages(browser, port, state) {
     for (const s of ['付款前請確認', 'NT$150', 'NT$990', '免費試用 14 天', '自動續訂', '取消續訂', 'SHOPLINE Payments', '法定代理人', '服務條款', '取消與退款']) {
       check(`${tag}: discloses 「${s}」`, text.includes(s))
     }
+    const summary = await o.page.evaluate(() => { const el = document.querySelector('[data-testid="disclosure-summary"]'); const ul = el?.parentElement?.querySelector('ul'); return { text: el?.textContent ?? '', weight: el ? Number(getComputedStyle(el).fontWeight) : 0, aboveList: !!(el && ul && (el.compareDocumentPosition(ul) & Node.DOCUMENT_POSITION_FOLLOWING)) } })
+    check(`${tag}: bold summary line above the bullets (trial end date + amount)`, summary.weight >= 700 && summary.aboveList && /\d{4}\/\d{2}\/\d{2}/.test(summary.text) && summary.text.includes('NT$150'), JSON.stringify(summary))
     check(`${tag}: trial charge date shown (will be charged NT$150 on <date>)`, /試用到 \d{4}\/\d{2}\/\d{2} 結束，我們會在 \d{4}\/\d{2}\/\d{2} 自動扣款 NT\$150/.test(text), text.match(/免費試用 14 天[^\n]*/)?.[0])
     const cfg = await o.page.evaluate(() => window.__slpConfig)
     check(`${tag}: SDK init config (key, merchant, TWD, minor-unit amount, bindCard, mustAccept)`,
@@ -505,6 +546,11 @@ async function partBPages(browser, port, state) {
     await o.page.getByTestId('billing-submit-error').waitFor({ timeout: 20000 })
     await o.page.getByTestId('disclosure-charge').waitFor({ timeout: 20000 })
     const msg = await o.page.getByTestId('billing-submit-error').innerText()
+    const errBox = await o.page.getByTestId('billing-submit-error').boundingBox()
+    const vh = await o.page.evaluate(() => window.innerHeight)
+    await sleep(800) // smooth scroll
+    const errBox2 = await o.page.getByTestId('billing-submit-error').boundingBox()
+    check('B4 trial_used: the error is scrolled into view next to the submit button', !!errBox2 && errBox2.y >= 0 && errBox2.y + errBox2.height <= vh, JSON.stringify({ errBox, errBox2, vh }))
     check('B4 trial_used: friendly message says nothing was charged', /用過免費試用/.test(msg) && /還沒有被扣款/.test(msg), msg)
     check('B4 trial_used: page re-read the state and now shows the paid offer (charged today, 「付款並開通 Pro」)', (await o.page.getByTestId('disclosure-charge').innerText()).includes('今天就會扣款') && (await o.page.getByTestId('billing-submit').innerText()).includes('付款並開通 Pro'))
     check('B4 trial_used: agreement unticked, submit disabled until the member agrees again', !(await o.page.getByTestId('agree').isChecked()) && await o.page.getByTestId('billing-submit').isDisabled())
@@ -616,7 +662,8 @@ async function partBPages(browser, port, state) {
     await o.page.getByTestId('return-wait').waitFor({ timeout: 120000 })
     check('B9 /billing/return polls `status` (waiting state shown, status called)', o.st.calls.some((c) => c.action === 'status'))
     await o.page.getByTestId('return-slow').waitFor({ timeout: 75000 })
-    check('B9 /billing/return gives up after ~60s with a "still processing" note', true)
+    const widths = await o.page.evaluate(() => { const root = document.querySelector('[data-testid="return-slow"]'); const w = root.getBoundingClientRect().width; return { w, links: [...root.querySelectorAll('a')].map((a) => ({ t: a.textContent.trim(), w: Math.round(a.getBoundingClientRect().width) })) } })
+    check('B9 /billing/return gives up after ~60s with a "still processing" note; full-width 「回到 Huddle」 and 「查看訂閱」 buttons', widths.links.length === 2 && widths.links.some((l) => l.t === '回到 Huddle') && widths.links.every((l) => l.w >= widths.w - 2), JSON.stringify(widths))
     await shot(o.page, 'B9-return-slow-390')
     await o.ctx.close()
   }

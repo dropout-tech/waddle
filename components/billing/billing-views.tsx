@@ -22,7 +22,7 @@ import {
   type WebBillingSnapshot,
   type WebPlan,
 } from '@/lib/billing/web-billing-client'
-import { BillingButton, BillingFrame, Notice, Spinner, btnOutline, btnPrimary } from './billing-ui'
+import { BillingButton, BillingFrame, ButtonStack, Notice, Spinner, SubmitError, btnOutline, btnPrimary } from './billing-ui'
 import { SlpPaymentForm } from './slp-payment-form'
 import { useWebBilling } from './use-web-billing'
 
@@ -89,7 +89,7 @@ function PurchaseView() {
     return (
       <BillingFrame title={title}>
         <Notice testId="billing-already">{webBillingErrorMessage('already_subscribed', t)}</Notice>
-        <Link href={SETTINGS_SUB} className={btnOutline}>{t('前往訂閱設定')}</Link>
+        <Link href={SETTINGS_SUB} className={`${btnOutline} w-full`}>{t('前往訂閱設定')}</Link>
       </BillingFrame>
     )
   }
@@ -147,6 +147,11 @@ function PurchaseView() {
 
       <section className="space-y-2 rounded-xl border border-border bg-card p-4 text-sm leading-6" data-testid="disclosure">
         <h2 className="text-base font-semibold">{t('付款前請確認')}</h2>
+        <p className="rounded-lg bg-muted px-3 py-2 text-base font-bold leading-6" data-testid="disclosure-summary">
+          {trial
+            ? t('免費試用 {days} 天，{date} 結束後自動扣款 {amount}。', { days: snapshot.trial_days, date: firstCharge ?? '', amount: formatMoney(price) })
+            : t('付款後立即開通，今天扣款 {amount}。', { amount: formatMoney(price) })}
+        </p>
         <ul className="list-disc space-y-1.5 pl-5">
           <li>{t('內容：Huddle Pro，進行中任務與記事本筆記沒有數量上限、圖片空間 20GB、AI 會議整理每月 20 次，並可串接 Google 日曆與建立組織。')}</li>
           <li>{t('價格：{amount}{unit}，已含稅，沒有其他手續費。只收信用卡，不分期。', { amount: formatMoney(price), unit: plan === 'annual' ? t('／年') : t('／月') })}</li>
@@ -180,7 +185,7 @@ function PurchaseView() {
         </span>
       </label>
 
-      {err && <Notice tone="error" testId="billing-submit-error">{err}</Notice>}
+      {err && <SubmitError testId="billing-submit-error">{err}</SubmitError>}
 
       <BillingButton variant="primary" className="w-full" data-testid="billing-submit" disabled={!agreed || !ready} busy={busy} onClick={() => void submit()}>
         {trial ? t('開始免費試用') : t('付款並開通 Pro')}
@@ -268,19 +273,22 @@ function ReturnView() {
             {kind === 'pay' && t('付款完成，訂閱已經恢復正常。')}
           </Notice>
           {kind === 'card' && snap?.subscription?.status === 'past_due' && (
-            <Link href="/billing/pay" className={btnPrimary}>{t('立即付款')}</Link>
+            <Link href="/billing/pay" className={`${btnPrimary} w-full`}>{t('立即付款')}</Link>
           )}
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <ButtonStack>
             <Link href="/" className={btnPrimary}>{t('回到 Huddle')}</Link>
             {toSettings}
-          </div>
+          </ButtonStack>
         </div>
       )}
       {phase === 'failed' && (
         <div className="space-y-4" data-testid="return-failed">
           <Notice tone="error">{t('這次付款沒有成功，你可以再試一次，或換一張信用卡。')}</Notice>
-          <Link href="/billing/pay" className={btnPrimary}>{t('重新付款')}</Link>
-          {toSettings}
+          <ButtonStack>
+            <Link href="/billing/pay" className={btnPrimary}>{t('重新付款')}</Link>
+            <Link href="/" className={btnOutline}>{t('回到 Huddle')}</Link>
+            {toSettings}
+          </ButtonStack>
         </div>
       )}
       {phase === 'slow' && (
@@ -290,7 +298,10 @@ function ReturnView() {
               ? t('銀行還在處理，需要多一點時間。請稍後再到「設定」→「訂閱」查看結果；如果超過一小時仍沒有開通，請聯絡客服，我們會協助處理。')
               : t('還在處理中，需要多一點時間。請稍後再到「設定」→「訂閱」查看結果。')}
           </Notice>
-          {toSettings}
+          <ButtonStack>
+            <Link href="/" className={btnPrimary}>{t('回到 Huddle')}</Link>
+            {toSettings}
+          </ButtonStack>
         </div>
       )}
     </BillingFrame>
@@ -324,7 +335,7 @@ function CardView() {
     return (
       <BillingFrame title={title}>
         <Notice testId="card-none">{t('目前沒有進行中的訂閱，不需要更換卡片。')}</Notice>
-        <Link href={SETTINGS_SUB} className={btnOutline}>{t('前往訂閱設定')}</Link>
+        <Link href={SETTINGS_SUB} className={`${btnOutline} w-full`}>{t('前往訂閱設定')}</Link>
       </BillingFrame>
     )
   }
@@ -351,7 +362,7 @@ function CardView() {
     <BillingFrame title={title} intro={t('輸入新的信用卡。綁定成功後，之後的扣款會改用這張卡，舊卡會解除綁定。')}>
       {current && <Notice testId="card-current">{t('目前使用的卡片：{card}', { card: current })}</Notice>}
       <SlpPaymentForm amountMinor={sub.price_minor} bindCard paymentRef={paymentRef} onReadyChange={setReady} />
-      {err && <Notice tone="error" testId="billing-submit-error">{err}</Notice>}
+      {err && <SubmitError testId="billing-submit-error">{err}</SubmitError>}
       <BillingButton variant="primary" className="w-full" data-testid="card-submit" disabled={!ready} busy={busy} onClick={() => void submit()}>
         {t('儲存新卡片')}
       </BillingButton>
@@ -394,7 +405,7 @@ function PayView() {
     return (
       <BillingFrame title={title}>
         <Notice testId="pay-none">{t('目前沒有需要補付的款項。')}</Notice>
-        <Link href={SETTINGS_SUB} className={btnOutline}>{t('前往訂閱設定')}</Link>
+        <Link href={SETTINGS_SUB} className={`${btnOutline} w-full`}>{t('前往訂閱設定')}</Link>
       </BillingFrame>
     )
   }
@@ -425,7 +436,7 @@ function PayView() {
       {tokenError && <Notice tone="error" testId="billing-error">{tokenError}</Notice>}
       {token && <SlpPaymentForm amountMinor={sub.price_minor} bindCard customerToken={token} paymentRef={paymentRef} onReadyChange={setReady} />}
       {!token && !tokenError && <Spinner label={t('付款表單載入中…')} />}
-      {err && <Notice tone="error" testId="billing-submit-error">{err}</Notice>}
+      {err && <SubmitError testId="billing-submit-error">{err}</SubmitError>}
       <BillingButton variant="primary" className="w-full" data-testid="pay-submit" disabled={!ready} busy={busy} onClick={() => void submit()}>
         {t('付款 {amount}', { amount: formatMoney(sub.price_minor) })}
       </BillingButton>
