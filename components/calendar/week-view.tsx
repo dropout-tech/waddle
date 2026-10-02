@@ -9,14 +9,14 @@ import {
   WEEKDAY_NAMES,
   timeToMinutes,
   minutesToTime,
-  snap,
-  clamp,
   calculateUnifiedColumns,
   toDateString,
   autoScrollContainerNearEdge,
   calendarHitTest,
   fitTaskTimeRange,
   taskOccursOnDate,
+  computeDragRange,
+  daysSinceWeekStart,
 } from '@/lib/calendar-utils'
 import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -31,6 +31,8 @@ import { X, ChevronLeft } from 'lucide-react'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from '../modals/recurrence-choice-modal'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
+import { readStoredSize, writeStoredSize, ALL_DAY_HEIGHT_WEEK_KEY } from '@/lib/persisted-size'
+import { useDefaultTaskDuration, useWeekViewAlignDay } from '@/components/user-settings-context'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { WORKSPACE_COLORS } from '@/lib/palette'
 import { useI18n } from '@/lib/i18n/react'
@@ -128,6 +130,16 @@ export function WeekView({
     ? Math.floor((viewportWidth - TIME_COL_WIDTH) / columnsPerScreen)
     : Math.round(BASE_DAY_WIDTH * (7 / safeWeekDays))
   const EXTEND_THRESHOLD = DAY_WIDTH * 3
+  // 每週開始日: on desktop (5-7 columns) the first visible column is the
+  // start of the selected date's week. Clamped so the selected date itself
+  // never scrolls out of view (e.g. a Saturday in a Mon-Fri work week).
+  // Phones keep their 3-column strip starting at the selected date.
+  // 自動 (null): no alignment — the selected date is the first column, as
+  // before the setting existed.
+  const weekAlignDay = useWeekViewAlignDay()
+  const weekStartOffset = isMobile || weekAlignDay === null
+    ? 0
+    : Math.min(daysSinceWeekStart(selectedDate, weekAlignDay), columnsPerScreen - 1)
 
   // New-slot drag state
   const [isDragging, setIsDragging] = useState(false)
@@ -271,7 +283,7 @@ export function WeekView({
     const container = scrollContainerRef.current
     if (!container || viewportWidth === 0) return
 
-    const targetScrollLeft = INITIAL_DAYS_BEFORE * DAY_WIDTH
+    const targetScrollLeft = (INITIAL_DAYS_BEFORE - weekStartOffset) * DAY_WIDTH
 
     isScrolling.current = true
     container.scrollLeft = targetScrollLeft
@@ -280,7 +292,7 @@ export function WeekView({
 
     const t = window.setTimeout(() => { isScrolling.current = false }, 150)
     return () => window.clearTimeout(t)
-  }, [selectedDate, DAY_WIDTH, viewportWidth])
+  }, [selectedDate, DAY_WIDTH, viewportWidth, weekStartOffset])
 
   // After prepending days, shift scrollLeft so visual position is preserved
   useLayoutEffect(() => {
@@ -411,8 +423,8 @@ export function WeekView({
   const slotPickerOpenedAt = useRef<number>(0)
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null)
 
-  // Default duration for click-to-create (in minutes)
-  const DEFAULT_DURATION = 30
+  // Default duration for click-to-create (in minutes) — 設定「預設任務時長」.
+  const DEFAULT_DURATION = useDefaultTaskDuration()
   // Double-click / double-tap on empty grid → create a task for that slot.
   const DOUBLE_TAP_MS = 400
   const DOUBLE_TAP_SLOP = 24 // px between the two presses
@@ -431,6 +443,7 @@ export function WeekView({
     const startX = info.startX
     const startY = info.startY
     let movedBeyondThreshold = false
+    let cancelled = false
     // Closure-local mirror of activeTaskDrag. Side effects at mouseup read
     // from this rather than from a functional setState callback — calling
     // parent setters inside setActiveTaskDrag(curr => ...) would run during
@@ -461,17 +474,23 @@ export function WeekView({
       const mouseYInContent = ev.clientY - containerRect.top + scrollContainer.scrollTop
       const relX = mouseXInContent - TIME_COL_WIDTH
       const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
-      const minutes = snap(MIN + mouseYInContent)
-
-      const duration = dragState.originalEnd - dragState.originalStart
-      if (dragState.dragType === 'move') {
-        const newStart = clamp(snap(minutes - dragState.offsetY), MIN, MAX - 15)
-        const newEnd = clamp(newStart + duration, MIN + 15, MAX)
-        dragState = { ...dragState, dayIndex: newDayIndex, currentStart: newStart, currentEnd: newEnd }
-      } else if (dragState.dragType === 'resize-top') {
-        dragState = { ...dragState, currentStart: clamp(snap(minutes), MIN, dragState.currentEnd - 15) }
-      } else if (dragState.dragType === 'resize-bottom') {
-        dragState = { ...dragState, currentEnd: clamp(snap(minutes), dragState.currentStart + 15, MAX) }
+      const range = computeDragRange({
+        dragType: dragState.dragType,
+        pointerY: mouseYInContent,
+        grabOffsetY: dragState.offsetY,
+        hourHeight,
+        min: MIN,
+        max: MAX,
+        originalStart: dragState.originalStart,
+        originalEnd: dragState.originalEnd,
+        currentStart: dragState.currentStart,
+        currentEnd: dragState.currentEnd,
+      })
+      dragState = {
+        ...dragState,
+        ...(dragState.dragType === 'move' ? { dayIndex: newDayIndex } : {}),
+        currentStart: range.start,
+        currentEnd: range.end,
       }
       setActiveTaskDrag(dragState)
 
@@ -485,10 +504,31 @@ export function WeekView({
       autoScrollContainerNearEdge(scrollContainer, ev.clientY)
     }
 
+    // Esc mid-drag cancels: the preview snaps back and nothing is written.
+    // pointerup stays armed so the release still runs the post-drag
+    // cooldown (no stray click / slot picker where the mouse lets go).
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape' || !movedBeyondThreshold || cancelled) return
+      ev.preventDefault()
+      ev.stopImmediatePropagation()
+      cancelled = true
+      window.removeEventListener('pointermove', onMove)
+      dragState = null
+      setActiveTaskDrag(null)
+      setHoveredPendingZoneDate(null)
+    }
+
     const onUp = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
+      window.removeEventListener('keydown', onKey, true)
+      if (cancelled) {
+        isDraggingTaskRef.current = false
+        dragEndCooldown.current = true
+        setTimeout(() => { dragEndCooldown.current = false }, 300)
+        return
+      }
 
       if (!movedBeyondThreshold || !dragState) {
         // Click. activeTaskDrag was never set — TaskBlock's own onMouseUp
@@ -588,7 +628,8 @@ export function WeekView({
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
-  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask, tasks, DAY_WIDTH, translate])
+    window.addEventListener('keydown', onKey, true)
+  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask, tasks, DAY_WIDTH, translate, hourHeight])
 
   // Pending task drag — same window-level pattern. Drag preview only activates
   // after the cursor moves past the threshold, so a plain click on a pending
@@ -601,6 +642,7 @@ export function WeekView({
     const startY = e.clientY
     const duration = fitTaskTimeRange(MIN, task.estimatedMinutes || 30, MIN, MAX).duration
     let movedBeyondThreshold = false
+    let cancelled = false
 
     const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX
@@ -638,7 +680,21 @@ export function WeekView({
       autoScrollContainerNearEdge(scrollContainer, ev.clientY)
     }
 
+    // Esc mid-drag cancels: the preview snaps back and nothing is written.
+    // pointerup stays armed so the release still runs the post-drag
+    // cooldown (no stray click / slot picker where the mouse lets go).
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape' || !movedBeyondThreshold || cancelled) return
+      ev.preventDefault()
+      ev.stopImmediatePropagation()
+      cancelled = true
+      window.removeEventListener('pointermove', onMove)
+      setPendingTaskDrag(null)
+      setHoveredPendingZoneDate(null)
+    }
+
     const removeListeners = () => {
+      window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onCancel)
@@ -654,6 +710,7 @@ export function WeekView({
 
     const onUp = (ev: PointerEvent) => {
       removeListeners()
+      if (cancelled) { finishDragUi(); return }
 
       if (!movedBeyondThreshold) {
         // Click — let onClick fire normally to open the detail modal.
@@ -691,6 +748,7 @@ export function WeekView({
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onCancel)
+    window.addEventListener('keydown', onKey, true)
   }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask])
 
   // Handle mouse down on grid to start new-slot drag or click
@@ -764,7 +822,7 @@ export function WeekView({
     setDragStart(null)
     setDragEnd(null)
     mouseDownPos.current = null
-  }, [isDragging, dragStart, dragEnd, allDates, yToTime, activeTaskDrag, pendingTaskDrag, onRescheduleTask, endHour])
+  }, [isDragging, dragStart, dragEnd, allDates, yToTime, activeTaskDrag, pendingTaskDrag, onRescheduleTask, endHour, DEFAULT_DURATION])
 
   // Handle slot type selection
   const handleSelectType = useCallback((slotType: SlotType) => {
@@ -828,7 +886,11 @@ export function WeekView({
   // keeps the 160px default (~4 task rows) and phones fit it to the busiest
   // loaded day's all-day chips — a fixed 160 left ~1/5 of an iPhone screen
   // empty (report 2026-09-28).
-  const [resizedHeaderHeight, setHeaderHeight] = useState<number | null>(null)
+  // The dragged height is remembered per device (desktop only — phones
+  // have no handle and keep the auto-fit height).
+  const [resizedHeaderHeight, setHeaderHeight] = useState<number | null>(
+    () => (isMobile ? null : readStoredSize(ALL_DAY_HEIGHT_WEEK_KEY, 100, 320)),
+  )
   const HEADER_DATE_HEIGHT = 52 // fixed date row height
   const HEADER_HANDLE_HEIGHT = 8 // resize handle (h-2) below the header row
   const HEADER_MIN = 100 // min: at least some space for pending tasks
@@ -852,13 +914,16 @@ export function WeekView({
     resizeStartY.current = e.clientY
     resizeStartH.current = headerHeight
 
+    let lastHeight: number | null = null
     const onMove = (ev: PointerEvent) => {
       if (!isResizingHeader.current) return
       const delta = ev.clientY - resizeStartY.current
-      setHeaderHeight(Math.max(HEADER_MIN, Math.min(HEADER_MAX, resizeStartH.current + delta)))
+      lastHeight = Math.max(HEADER_MIN, Math.min(HEADER_MAX, resizeStartH.current + delta))
+      setHeaderHeight(lastHeight)
     }
     const onUp = () => {
       isResizingHeader.current = false
+      if (lastHeight !== null) writeStoredSize(ALL_DAY_HEIGHT_WEEK_KEY, lastHeight)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)

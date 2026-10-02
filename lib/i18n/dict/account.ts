@@ -114,4 +114,7 @@ export const dict: Record<string, string> = {
   '繼續即表示你同意 Huddle 的{terms}，並已閱讀{privacy}。': 'By continuing, you agree to Huddle’s {terms} and confirm that you have read the {privacy}.',
   '服務條款': 'Terms of use',
   '隱私權政策': 'Privacy notice',
+
+  // reset-password (2026-10 i18n sweep)
+  '兩次輸入的密碼不一致': 'The two passwords don\'t match',
 }

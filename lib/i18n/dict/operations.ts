@@ -328,4 +328,9 @@ export const dict: Record<string, string> = {
   '顯示名稱不能包含 Huddle、官方、客服、管理員等保留字，以免被誤認為官方帳號':
     'Display names cannot contain reserved words such as Huddle, official, support or admin, so they are not mistaken for an official account.',
   '此推薦碼不能用於推薦人本人或同一人的其他帳號': "This referral code can't be used by the referrer or by other accounts of the same person.",
+
+  // admin.tsx (2026-10 i18n sweep)
+  '無法讀取會員': 'Couldn\'t load members',
+  '無法讀取兌換紀錄': 'Couldn\'t load redemption history',
+  '使用時間已贈送': 'Time granted',
 }

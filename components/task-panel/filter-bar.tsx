@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Filter, X, ChevronDown, AlignJustify, Minus, GripVertical } from 'lucide-react'
+import { Search, Filter, X, ChevronDown, ChevronUp, AlignJustify, Minus, GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Density, MetaField } from './task-panel'
 import { useI18n } from '@/lib/i18n/react'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 export interface FilterState {
   search: string
@@ -36,6 +37,16 @@ interface FilterBarProps {
 
 export function FilterBar({ filters, onFiltersChange, workspaces, density, onDensityChange, metaOrder, onMetaOrderChange }: FilterBarProps) {
   const { t } = useI18n()
+  // HTML5 drag-and-drop never fires on touch screens, so phones reorder the
+  // meta fields with up/down buttons instead of dragging the chips.
+  const isMobile = useIsMobile()
+  const moveMetaField = (index: number, dir: -1 | 1) => {
+    const to = index + dir
+    if (to < 0 || to >= metaOrder.length) return
+    const next = [...metaOrder]
+    ;[next[index], next[to]] = [next[to], next[index]]
+    onMetaOrderChange(next)
+  }
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [draggingField, setDraggingField] = useState<MetaField | null>(null)
   const [dragOverField, setDragOverField] = useState<MetaField | null>(null)
@@ -231,6 +242,38 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
               {t('資訊顯示順序')}
             </span>
+            {isMobile ? (
+              <div className="mt-1.5 flex flex-col gap-1" data-testid="meta-order-list">
+                {metaOrder.map((field, index) => (
+                  <div
+                    key={field}
+                    data-meta-field={field}
+                    className="flex items-center gap-2 rounded-md border border-border bg-muted/50 pl-2.5 text-xs font-medium text-foreground"
+                  >
+                    <span className="font-mono text-[10px] text-muted-foreground/70">{index + 1}</span>
+                    <span className="flex-1">{t(META_FIELD_LABELS[field])}</span>
+                    <button
+                      type="button"
+                      onClick={() => moveMetaField(index, -1)}
+                      disabled={index === 0}
+                      aria-label={t('上移「{label}」', { label: t(META_FIELD_LABELS[field]) })}
+                      className="flex size-11 items-center justify-center rounded-md text-muted-foreground active:bg-primary/10 disabled:opacity-30"
+                    >
+                      <ChevronUp className="size-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveMetaField(index, 1)}
+                      disabled={index === metaOrder.length - 1}
+                      aria-label={t('下移「{label}」', { label: t(META_FIELD_LABELS[field]) })}
+                      className="flex size-11 items-center justify-center rounded-md text-muted-foreground active:bg-primary/10 disabled:opacity-30"
+                    >
+                      <ChevronDown className="size-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
             <div className="flex items-center gap-1.5 mt-1.5">
               {metaOrder.map((field, index) => (
                 <div
@@ -266,7 +309,10 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
                 </div>
               ))}
             </div>
-            <p className="text-[9px] text-muted-foreground/50 mt-1">{t('拖曳調整顯示順序')}</p>
+            )}
+            <p className="text-[9px] text-muted-foreground/50 mt-1">
+              {isMobile ? t('點上下箭頭調整顯示順序') : t('拖曳調整顯示順序')}
+            </p>
           </div>
         </div>
       )}

@@ -215,12 +215,13 @@ async function main() {
   await step('focus scratchpad dropdown', async (check) => {
     await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' })
     await page.getByRole('button', { name: '月檢視' }).waitFor({ state: 'visible', timeout: 20000 })
-    // The pull-down handle is a button labelled 白板 (focus-scratchpad.tsx);
-    // its collapse control is a button labelled 收起 inside the open panel.
-    await page.getByRole('button', { name: '白板', exact: true }).click()
+    // The pull-down is the top-center "白板 ⌄" tab (data-tour="scratchpad");
+    // once open its header offers "收起" to fold it back up.
+    await page.locator('[data-tour="scratchpad"]').click()
     await page.getByRole('button', { name: '收起', exact: true }).waitFor({ state: 'visible', timeout: 10000 })
     await check('scratchpad-open') // assert while the dropdown is actually open
     await page.getByRole('button', { name: '收起', exact: true }).click()
+    await page.locator('[data-tour="scratchpad"]').waitFor({ state: 'visible', timeout: 10000 })
     await check('scratchpad-closed')
   })
 
@@ -235,7 +236,7 @@ async function main() {
   })
 
   await step('report view', async (check) => {
-    // 報告 lives in the calendar header's 更多工具 (tools) dropdown menu.
+    // 報告 lives in the header's "更多工具" disclosure menu.
     await page.getByRole('button', { name: '更多工具' }).click()
     await page.getByRole('menuitem', { name: '報告' }).click()
     await page.getByRole('button', { name: '返回日曆' }).waitFor({ state: 'visible', timeout: 10000 })

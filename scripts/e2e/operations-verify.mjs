@@ -75,7 +75,6 @@ const coupons = []
 const calls = []
 let role = 'admin'
 let errorMode = false
-let signupPayload
 const browser = await chromium.launch()
 await fs.mkdir('/tmp/huddle-operations-screens', { recursive: true })
 const context = await browser.newContext({
@@ -92,10 +91,6 @@ await context.addCookies([
 ])
 await context.route('**/*.supabase.co/**', async (route) => {
   const u = new URL(route.request().url())
-  if (u.pathname.endsWith('/signup')) {
-    signupPayload = route.request().postDataJSON()
-    return route.fulfill({ json: { user, session: null } })
-  }
   if (u.pathname.endsWith('/user')) return route.fulfill({ json: user })
   if (u.pathname.endsWith('/huddle_operations')) {
     const { p_action: a, p_data: p = {} } = route.request().postDataJSON()
@@ -366,12 +361,23 @@ try {
     (await page.getByLabel('活動優惠碼', { exact: true }).inputValue()) ===
       'EXPIRED'
   )
+  // Since ecd82b0 a code that was processed and refused (expired, used, not
+  // found) is dropped instead of kept: re-sending it can never succeed and a
+  // refresh used to replay it forever. Only a network failure keeps a code.
   check(
-    'only failed enrollment remains pending',
-    await page.evaluate(
-      () =>
-        JSON.parse(localStorage.getItem('huddle-enrollment-v1')).referral === ''
-    )
+    'a refused coupon is not kept for automatic retry',
+    await page.evaluate(() => localStorage.getItem('huddle-enrollment-v1')) ===
+      null
+  )
+  const afterEnrollment = calls.length
+  await page.reload()
+  await page.getByRole('heading', { name: '你的推薦碼', exact: true }).waitFor()
+  await page.waitForTimeout(1500)
+  check(
+    'reloading does not re-send the refused or the redeemed code',
+    !calls
+      .slice(afterEnrollment)
+      .some((c) => c.a === 'refer' || c.a === 'redeem')
   )
   await context.clearCookies()
   await page.evaluate(() => localStorage.clear())
@@ -387,14 +393,23 @@ try {
     (await page.getByLabel('活動優惠碼', { exact: true }).inputValue()) ===
       'WELCOME60'
   )
-  await page.getByLabel('Email', { exact: true }).fill('new@example.invalid')
-  await page.getByLabel('密碼', { exact: true }).fill('synthetic-password-123')
-  await page.getByRole('button', { name: '建立帳號', exact: true }).click()
-  await page.getByRole('heading', { name: '檢查你的信箱' }).waitFor()
+  // Email sign-up (and its "email verification carries enrollment across
+  // devices" check, which read the code from the sign-up request's
+  // user_metadata) was removed in 6d1eb32: sign-up is Google/Apple only. The
+  // codes now ride in localStorage across the OAuth redirect and are picked up
+  // by EnrollmentBridge after login, so that is what must hold here.
   check(
-    'email verification carries enrollment across devices',
-    signupPayload.data.huddle_enrollment.referral === 'FRIENDCODE' &&
-      signupPayload.data.huddle_enrollment.coupon === 'WELCOME60'
+    'signup page offers social sign-up only',
+    (await page.getByRole('button', { name: /Google/ }).isVisible()) &&
+      (await page.getByRole('button', { name: /Apple/ }).isVisible()) &&
+      (await page.getByLabel('Email', { exact: true }).count()) === 0
+  )
+  const carried = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('huddle-enrollment-v1') || 'null')
+  )
+  check(
+    'signup link keeps referral and coupon for the post-OAuth redeem',
+    carried?.referral === 'FRIENDCODE' && carried?.coupon === 'WELCOME60'
   )
   check('no browser exceptions', errors.length === 0)
   console.log(`${checks} UI checks passed; all remote traffic intercepted.`)

@@ -53,8 +53,14 @@ export function taskOccursOnDate(task: Task, date: Date): boolean {
   // If this date is explicitly excluded, it never occurs.
   if (task.exdates?.includes(dateStr)) return false
 
-  // Original occurrence — always counts.
-  if (task.scheduledDate === dateStr) return true
+  // Original occurrence — always counts, unless the series was cut off
+  // before it even started (endDate < start). That was left behind by a
+  // "this and following" split on a series' first day, which also showed
+  // the new series on that day: two entries for one occurrence.
+  if (task.scheduledDate === dateStr) {
+    const end = task.isRecurring ? task.recurrence?.endDate : undefined
+    return !end || end >= dateStr
+  }
 
   if (!task.isRecurring || !task.recurrence) return false
 
@@ -101,6 +107,78 @@ export function taskOccursOnDate(task: Task, date: Date): boolean {
   }
 
   return false
+}
+
+/**
+ * True when `targetDate` is the first occurrence of the series (or earlier).
+ * "This and following" from there means the whole series: splitting would
+ * end the old master the day before it starts and duplicate that first day.
+ */
+export function isSeriesStart(task: Pick<Task, 'scheduledDate'>, targetDate?: string): boolean {
+  return !!targetDate && !!task.scheduledDate && targetDate <= task.scheduledDate
+}
+
+/**
+ * "All occurrences" after dragging one occurrence from `targetDate` to `date`:
+ * move the whole series by the drag's day offset. Writing the dropped day as
+ * the series start would erase every occurrence before it, and a weekly
+ * series with chosen weekdays (每週一、三) must move its weekdays too — the
+ * rule fires on `daysOfWeek`, so shifting only the start left the series on
+ * the old weekdays plus a stray occurrence on the new start day.
+ */
+export function shiftSeries(
+  task: Pick<Task, 'scheduledDate' | 'recurrence'>,
+  targetDate: string,
+  date: string,
+): { scheduledDate: string; daysOfWeek?: number[] } {
+  const offset = Math.round(
+    (parseDateString(date).getTime() - parseDateString(targetDate).getTime()) / 86_400_000,
+  )
+  const start = parseDateString(task.scheduledDate ?? targetDate)
+  start.setDate(start.getDate() + offset)
+  const dow = task.recurrence?.type === 'weekly' ? task.recurrence.daysOfWeek : undefined
+  if (!dow || dow.length === 0) return { scheduledDate: toDateString(start) }
+  const shifted = [...new Set(dow.map((d) => (((d + offset) % 7) + 7) % 7))].sort((a, b) => a - b)
+  return { scheduledDate: toDateString(start), daysOfWeek: shifted }
+}
+
+/**
+ * Whether shiftSeries can express "every occurrence moved by the drag's
+ * offset". Weekly rules count weeks from the start's Sunday-based week, so
+ * an every-2+-weeks series with several weekdays whose shifted weekdays land
+ * across a Saturday/Sunday boundary would put some of them in the wrong week
+ * (每兩週五、六 dragged one day later is not "every other Sat + Sun"). The
+ * caller refuses those moves instead of saving a wrong schedule. Checked by
+ * comparing the old and new rule over several cycles.
+ */
+export function seriesShiftIsExact(
+  task: Pick<Task, 'scheduledDate' | 'recurrence' | 'isRecurring'>,
+  targetDate: string,
+  date: string,
+): boolean {
+  const r = task.recurrence
+  if (!task.isRecurring || !r || r.type !== 'weekly' || (r.interval || 1) <= 1 || !r.daysOfWeek?.length) return true
+  if (!task.scheduledDate) return true
+  const offset = Math.round(
+    (parseDateString(date).getTime() - parseDateString(targetDate).getTime()) / 86_400_000,
+  )
+  const shifted = shiftSeries(task, targetDate, date)
+  // End date and skipped days aren't moved by shiftSeries; leave them out.
+  const before = { ...task, exdates: undefined, recurrence: { ...r, endDate: undefined } } as Task
+  const after = {
+    ...before,
+    scheduledDate: shifted.scheduledDate,
+    recurrence: { ...before.recurrence!, daysOfWeek: shifted.daysOfWeek ?? r.daysOfWeek },
+  } as Task
+  const days = (r.interval || 1) * 7 * 4 + 14
+  const d = parseDateString(task.scheduledDate)
+  for (let i = 0; i < days; i++) {
+    const moved = new Date(d)
+    moved.setDate(moved.getDate() + offset)
+    if (taskOccursOnDate(before, d) !== taskOccursOnDate(after, moved)) return false
+    d.setDate(d.getDate() + 1)
+  }
+  return true
 }
 
 /**
@@ -217,6 +295,59 @@ export function calendarHitTest(clientX: number, clientY: number): CalendarHit {
 
 export function clamp(val: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, val))
+}
+
+/**
+ * Live start/end (minutes from midnight) for a block being dragged on the
+ * time grid. `pointerY` / `grabOffsetY` are PIXELS — converted through
+ * `hourHeight`, so the result is right at every zoom level (the old inline
+ * math treated pixels as minutes and was only correct at 60 px/hour).
+ * A move keeps the block's length and stops flush with the grid's bottom
+ * instead of being squeezed to 15 minutes.
+ */
+export function computeDragRange(p: {
+  dragType: 'move' | 'resize-top' | 'resize-bottom'
+  /** Pointer Y in px, measured from the grid's top (minute `min`). */
+  pointerY: number
+  /** Where inside the block it was grabbed, in px (move only). */
+  grabOffsetY: number
+  hourHeight: number
+  min: number
+  max: number
+  originalStart: number
+  originalEnd: number
+  currentStart: number
+  currentEnd: number
+}): { start: number; end: number } {
+  const pxToMin = (px: number) => (px * 60) / (p.hourHeight > 0 ? p.hourHeight : 60)
+  const pointer = snap(p.min + pxToMin(p.pointerY))
+  if (p.dragType === 'move') {
+    const duration = clamp(p.originalEnd - p.originalStart, SNAP_MINUTES, Math.max(SNAP_MINUTES, p.max - p.min))
+    const start = clamp(snap(p.min + pxToMin(p.pointerY - p.grabOffsetY)), p.min, p.max - duration)
+    return { start, end: start + duration }
+  }
+  if (p.dragType === 'resize-top') {
+    return { start: clamp(pointer, p.min, p.currentEnd - SNAP_MINUTES), end: p.currentEnd }
+  }
+  return { start: p.currentStart, end: clamp(pointer, p.currentStart + SNAP_MINUTES, p.max) }
+}
+
+/** How many days `date` is past the start of its week (0-6). */
+export function daysSinceWeekStart(date: Date, weekStartDay: number): number {
+  const start = ((Math.trunc(weekStartDay) % 7) + 7) % 7
+  return (date.getDay() - start + 7) % 7
+}
+
+/** Weekday indexes (0=Sun) in display order for a week starting on `weekStartDay`. */
+export function orderedWeekdays(weekStartDay: number): number[] {
+  const start = ((Math.trunc(weekStartDay) % 7) + 7) % 7
+  return Array.from({ length: 7 }, (_, i) => (start + i) % 7)
+}
+
+/** A usable calendar hour range: 0 ≤ start < end ≤ 24. */
+export function isValidHourRange(startHour: number, endHour: number): boolean {
+  return Number.isInteger(startHour) && Number.isInteger(endHour) &&
+    startHour >= 0 && endHour <= 24 && startHour < endHour
 }
 
 export function overlaps(a: Task, b: Task): boolean {
