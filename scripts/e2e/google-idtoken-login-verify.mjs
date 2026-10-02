@@ -69,7 +69,7 @@ try {
       ex[0].body.provider === 'google' && ex[0].body.id_token === 'mock.google.idtoken'
       && createHash('sha256').update(ex[0].body.nonce).digest('hex') === a.searchParams.get('nonce'))
     check('Signed-in landing page has no token in URL', !page.url().includes('id_token') && !page.url().includes('#'))
-    check('Pending nonce/state removed after use', await page.evaluate(() => sessionStorage.getItem('huddle-google-idtoken-pending') === null))
+    check('Pending nonce/state removed after use', await page.evaluate(() => localStorage.getItem('huddle-google-idtoken-pending') === null))
     await page.getByText('ID token workspace', { exact: true }).first().waitFor({ timeout: 30000 })
     check('Main app renders with the new session', true)
     await ctx.close()

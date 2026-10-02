@@ -42,7 +42,7 @@ export async function sha256Hex(value: string): Promise<string> {
 export async function startGoogleWebLogin(): Promise<void> {
   const nonce = randomHex(32)
   const state = randomHex(32)
-  window.sessionStorage.setItem(PENDING_KEY, JSON.stringify({ nonce, state, expires: Date.now() + PENDING_TTL_MS }))
+  window.localStorage.setItem(PENDING_KEY, JSON.stringify({ nonce, state, expires: Date.now() + PENDING_TTL_MS }))
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
   url.searchParams.set('client_id', GOOGLE_WEB_CLIENT_ID)
   url.searchParams.set('redirect_uri', `${window.location.origin}${GOOGLE_WEB_CALLBACK_PATH}`)
@@ -69,8 +69,8 @@ export function completeGoogleWebLogin(fragment: string): Promise<GoogleWebResul
   inflight = (async (): Promise<GoogleWebResult> => {
     const params = new URLSearchParams(fragment.replace(/^#/, ''))
     let pending: { nonce?: string; state?: string; expires?: number } | null = null
-    try { pending = JSON.parse(window.sessionStorage.getItem(PENDING_KEY) || 'null') } catch {}
-    window.sessionStorage.removeItem(PENDING_KEY)
+    try { pending = JSON.parse(window.localStorage.getItem(PENDING_KEY) || 'null') } catch {}
+    window.localStorage.removeItem(PENDING_KEY)
     // state must match the value this tab generated; anything else is a
     // replayed or forged response and is ignored.
     if (!pending?.nonce || !pending.state || (pending.expires ?? 0) < Date.now()) return 'failed'
