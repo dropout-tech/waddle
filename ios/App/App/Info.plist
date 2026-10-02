@@ -37,8 +37,16 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Huddle uses the camera only when you choose to take a photo to add to a task, note, whiteboard or workspace.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Huddle saves images to your photo library only when you choose to save an exported calendar image.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Huddle accesses your photos only when you choose an image to add to a task, note, whiteboard or workspace.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>UIBackgroundModes</key>
