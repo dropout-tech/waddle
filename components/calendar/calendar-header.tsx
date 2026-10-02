@@ -31,6 +31,7 @@ import { format } from 'date-fns'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
 import { HubLauncherButton } from '@/components/floating/hub-launcher-button'
 import { ScratchpadPullTab } from '@/components/scratchpad/focus-scratchpad'
+import { BrainDumpHeaderButton } from '@/components/brain-dump/brain-dump-entry'
 
 interface CalendarHeaderProps {
   selectedDate: Date
@@ -324,6 +325,7 @@ export function CalendarHeader({
 
         {/* Right: Today + Bell + (mobile) overflow menu */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {!isMobile && <BrainDumpHeaderButton />}
           <Button
             variant={isToday() ? 'secondary' : 'outline'}
             size="sm"
