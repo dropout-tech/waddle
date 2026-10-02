@@ -193,7 +193,8 @@
   overflow-wrap: anywhere;
 }
 .bubble[data-side='right'] {
-  left: calc(100% - 6px);
+  /* starts past the calendar's hour gutter so the time labels stay readable */
+  left: calc(100% + 10px);
   bottom: 62%;
   border-bottom-left-radius: 4px;
 }
