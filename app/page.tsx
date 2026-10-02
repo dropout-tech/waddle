@@ -37,6 +37,9 @@ import { t as translate } from '@/lib/i18n'
 import { assignTask, assignmentErrorMessage, notifyAssignmentsChanged, type AssignablePerson } from '@/lib/assignments'
 import type { Task, SlotType, TimeBlock } from '@/lib/types'
 
+/** Remembers an emailed "/?settings=subscription" link across the login redirect. */
+const OPEN_SUBSCRIPTION_KEY = 'huddle-open-settings-subscription'
+
 /** How long the water popup keeps quiet after the onboarding tour closes. */
 const WATER_GRACE_AFTER_TOUR_MS = 60 * 1000
 
@@ -191,6 +194,28 @@ function HuddlePage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('general')
   const [isOverdueReviewOpen, setIsOverdueReviewOpen] = useState(false)
+
+  // Email links ("/?settings=subscription") open Settings → 訂閱 directly. The
+  // flag is blanked for the Capacitor export, so this is dead code in the app.
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_WEB_BILLING_ENABLED !== 'true' || isNative()) return
+    let wanted = false
+    try { wanted = sessionStorage.getItem(OPEN_SUBSCRIPTION_KEY) === '1' } catch { /* private mode */ }
+    if (wanted) {
+      try { sessionStorage.removeItem(OPEN_SUBSCRIPTION_KEY) } catch { /* ignore */ }
+    }
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('settings') === 'subscription') {
+      wanted = true
+      params.delete('settings')
+      const qs = params.toString()
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`)
+    }
+    if (wanted) {
+      setSettingsInitialTab('subscription')
+      setIsSettingsOpen(true)
+    }
+  }, [])
   const [selectedTimeBlock, setSelectedTimeBlock] = useState<TimeBlock | null>(null)
 
   // Calendar quick-create saves 「新任務」 before its editor opens. If that
@@ -699,6 +724,14 @@ const APP_SHELL_BUILD = process.env.HUDDLE_APP_SHELL_BUILD === '1'
 
 export default function Page() {
   const { session, loading } = useAuth()
+
+  // Signed-out visitor following an emailed Settings → 訂閱 link: remember it so
+  // the settings open after they log in (dead code unless the flag is on).
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_WEB_BILLING_ENABLED !== 'true' || loading || session) return
+    if (new URLSearchParams(window.location.search).get('settings') !== 'subscription') return
+    try { sessionStorage.setItem(OPEN_SUBSCRIPTION_KEY, '1') } catch { /* private mode */ }
+  }, [loading, session])
 
   if (loading) {
     // Native app: never show the marketing site (prices, Mac download) while
