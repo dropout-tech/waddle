@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getWaterNextDueAt, getWaterReminderEnabled, recordWaterFromWidget } from '@/lib/water-reminder'
 import { applyWidgetActions, withWatchFocus, WATCH_FOCUS_TTL_MS } from '@/lib/widgets/actions'
 import { widgetPet } from '@/lib/widgets/pet'
+import { getIglooSnapshot } from '@/lib/igloo/store'
 import { isTaskOverdue } from '@/lib/task-utils'
 import { getLang, t } from '@/lib/i18n'
 import { checkInDate } from '@/lib/daily-check-in'
@@ -87,7 +88,7 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null,weekStar
         snapshot.water={enabled:getWaterReminderEnabled(),nextAt:getWaterNextDueAt(),count:0}
         // 「我的 Huddle」: look + ready-rendered lines; the widget picks the bubble itself.
         const overdue=x.workspaces.filter(w=>!w.isArchived).flatMap(w=>w.categories.filter(c=>!c.isArchived).flatMap(c=>c.tasks)).filter(t=>isTaskOverdue(t,snapshot.today)).length
-        snapshot.pet=widgetPet(x.pet,{overdue,lang:getLang(),day:snapshot.today})
+        snapshot.pet=widgetPet(x.pet,{overdue,lang:getLang(),day:snapshot.today,igloo:getIglooSnapshot()})
         // Check-in status for the watch; refreshed at most every 5 minutes or when the Taipei day changes.
         if(!checkIn||Date.now()-checkIn.at>300_000||checkIn.value?.date!==checkInDate()) {
           const {data,error}=await db.rpc('get_daily_check_in_status').single()

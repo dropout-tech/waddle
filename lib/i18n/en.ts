@@ -12,6 +12,7 @@ import { dict as operations } from './dict/operations'
 import { dict as account } from './dict/account'
 import { dict as meetings } from './dict/meetings'
 import { dict as pet } from './dict/pet'
+import { dict as igloo } from './dict/igloo'
 import { dict as stickyNotes } from './dict/sticky-notes'
 import { dict as assignments } from './dict/assignments'
 import { dict as pwa } from './dict/pwa'
@@ -19,6 +20,8 @@ import { dict as widgets } from './dict/widgets'
 import { dict as googleCalendar } from './dict/google-calendar'
 import { dict as billing } from './dict/billing'
 import { dict as aiReview } from './dict/ai-review'
+import { dict as brainDump } from './dict/brain-dump'
+import { dict as lifeGrid } from './dict/life-grid'
 
 // Merged English dictionary. Keys are the Traditional Chinese source strings
 // (see lib/i18n/index.ts). Split by feature area purely to keep files
@@ -39,6 +42,7 @@ export const en: Record<string, string> = {
   ...operations,
   ...meetings,
   ...pet,
+  ...igloo,
   ...stickyNotes,
   ...widgets,
   ...assignments,
@@ -46,6 +50,8 @@ export const en: Record<string, string> = {
   ...googleCalendar,
   ...billing,
   ...aiReview,
+  ...brainDump,
+  ...lifeGrid,
   // Whiteboard canvas controls.
   "手寫筆記": "Handwritten note",
   "請選擇圖片檔案。": "Please choose an image file.",

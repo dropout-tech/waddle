@@ -1,4 +1,6 @@
 import { PET_LINES, linesOf, renderLine, type PetLineCategory } from '@/lib/pet/lines'
+import { iglooLine } from '@/lib/igloo/lines'
+import type { IglooMood, IglooState } from '@/lib/igloo/compute'
 import { PET_COLORS, PET_ACCESSORIES, type PetAccessory, type PetColor, type PetSettings } from '@/lib/pet/types'
 
 /**
@@ -19,6 +21,39 @@ export interface WidgetPet {
   overdueLine: string
   /** Short absurd lines / jokes / tips for idle moments and 「呱」 taps. */
   lines: string[]
+  /**
+   * 企鵝的冰屋 (lib/igloo). Optional: older app builds don't send it and the
+   * native widget must treat it as absent. Not read by Swift yet.
+   */
+  igloo?: WidgetIgloo
+}
+
+export interface WidgetIgloo {
+  /** 1-based number of the igloo under construction (or the one finished today). */
+  stage: number
+  /** Igloos already finished. */
+  built: number
+  /** Bricks on the current igloo (equals perIgloo on the day one is finished). */
+  bricks: number
+  perIgloo: number
+  /** Bricks added today. */
+  today: number
+  mood: IglooMood
+  /** One ready-rendered line about today, in `lang`. */
+  line: string
+}
+
+export function widgetIgloo(state: IglooState, lang: 'zh-TW' | 'en', seed: string): WidgetIgloo {
+  const full = state.bricksInCurrent === 0 && state.completedIgloos > 0 && state.mood === 'proud'
+  return {
+    stage: full ? state.completedIgloos : state.completedIgloos + 1,
+    built: state.completedIgloos,
+    bricks: full ? state.bricksPerIgloo : state.bricksInCurrent,
+    perIgloo: state.bricksPerIgloo,
+    today: state.bricksToday,
+    mood: state.mood,
+    line: iglooLine(state, lang, seed),
+  }
 }
 
 const FUN: PetLineCategory[] = ['absurd', 'joke', 'work', 'tip']
@@ -36,7 +71,7 @@ function seeded(seed: string) {
   }
 }
 
-export function widgetPet(pet: PetSettings | null | undefined, opts: { overdue: number; lang: 'zh-TW' | 'en'; day: string }): WidgetPet {
+export function widgetPet(pet: PetSettings | null | undefined, opts: { overdue: number; lang: 'zh-TW' | 'en'; day: string; igloo?: IglooState | null }): WidgetPet {
   const { lang, day } = opts
   const adopted = !!pet?.adopted && pet.enabled !== false
   const name = pet?.name || 'Huddle'
@@ -55,5 +90,6 @@ export function widgetPet(pet: PetSettings | null | undefined, opts: { overdue: 
     overdue: opts.overdue,
     overdueLine: opts.overdue > 0 && overdueTemplates.length ? overdueTemplates[Math.floor(rand() * overdueTemplates.length)] : '',
     lines: adopted ? pool.slice(0, WIDGET_PET_LINES) : [],
+    ...(opts.igloo ? { igloo: widgetIgloo(opts.igloo, lang, `${day}:${name}`) } : {}),
   }
 }

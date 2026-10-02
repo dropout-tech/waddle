@@ -67,7 +67,8 @@ export function PetSprite({
   )
 }
 
-function Accessory({ kind, accent }: { kind: PetAccessory; accent: string }) {
+/** The accessory art in the stand pose's 240×240 space (reused, re-positioned, by the igloo scene). */
+export function Accessory({ kind, accent }: { kind: PetAccessory; accent: string }) {
   switch (kind) {
     case 'scarf':
       return (

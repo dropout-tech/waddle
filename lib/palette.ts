@@ -172,6 +172,23 @@ export const URGENCY_COLORS = {
 } as const satisfies Record<string, PaletteColor>
 
 // ─────────────────────────────────────────────────────────────────────────
+// Mood set (人生年曆 / life grid) — one color per journal_entries.mood value.
+// Same hue families as the picker swatches (honey, sage, terracotta-sand,
+// Workspace 2's permitted blue, the lavender of Workspace 4) but pulled down
+// to low chroma so a year of them reads like watercolor on the paper, not a
+// heat map. No red for a bad day: heavy days get quiet, cool-dusk colors.
+// Terracotta stays reserved for the single accent (today's ring).
+// ─────────────────────────────────────────────────────────────────────────
+
+export const MOOD_COLORS = {
+  great: { id: 'mood-great', name: '很棒（暖蜂蜜）', hex: '#E0B76C', oklch: 'oklch(0.8 0.105 82)' },
+  good: { id: 'mood-good', name: '不錯（淡鼠尾草）', hex: '#97B98F', oklch: 'oklch(0.75 0.07 140)' },
+  neutral: { id: 'mood-neutral', name: '平常（沙色）', hex: '#E1BBA3', oklch: 'oklch(0.82 0.055 55)' },
+  bad: { id: 'mood-bad', name: '有點低（霧藍灰）', hex: '#8AAABD', oklch: 'oklch(0.72 0.045 235)' },
+  terrible: { id: 'mood-terrible', name: '很難熬（暮色薰衣草）', hex: '#9D92B3', oklch: 'oklch(0.68 0.05 300)' },
+} as const satisfies Record<'great' | 'good' | 'neutral' | 'bad' | 'terrible', PaletteColor>
+
+// ─────────────────────────────────────────────────────────────────────────
 // Migration map — every hardcoded non-brand hex found in the codebase
 // (demo-data.ts, mock-data.ts, the two duplicated PRESET_COLORS arrays in
 // settings-modal.tsx / task-detail-modal.tsx, the onboarding template

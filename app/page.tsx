@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { WidgetSync } from '@/components/widgets/widget-sync'
 import { petVoiceName, setPetVoice } from '@/lib/pet/voice'
 import { MainLayout } from '@/components/layout/main-layout'
+import { BrainDumpHost } from '@/components/brain-dump/brain-dump-host'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
 import { TimeBlockModal } from '@/components/modals/time-block-modal'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -15,6 +16,7 @@ import { OnboardingTour } from '@/components/onboarding-tour'
 import { SettingsModal, type SettingsTab } from '@/components/modals/settings-modal'
 import { MascotLoader } from '@/components/branding/mascot-loader'
 import { DailyClearCelebration } from '@/components/celebration/daily-clear-celebration'
+import { IglooHost } from '@/components/igloo/igloo-host'
 import { OverdueTaskReview } from '@/components/task-panel/overdue-task-review'
 import { useRecurringCompleteConfirm } from '@/components/task-panel/use-recurring-complete-confirm'
 import { useWaddleData } from '@/hooks/use-waddle-data'
@@ -32,6 +34,7 @@ import { AuthGuard } from '@/components/auth/auth-guard'
 import { CategoryPrefixProvider } from '@/components/category-prefix-context'
 import { UserSettingsProvider } from '@/components/user-settings-context'
 import { NotebookOverlayProvider } from '@/components/notebook/notebook-overlay-provider'
+import { LifeGridOverlayProvider } from '@/components/life-grid/life-grid-overlay-provider'
 import { useI18n } from '@/lib/i18n/react'
 import { t as translate } from '@/lib/i18n'
 import { assignTask, assignmentErrorMessage, notifyAssignmentsChanged, type AssignablePerson } from '@/lib/assignments'
@@ -578,6 +581,7 @@ function HuddlePage() {
       <CategoryPrefixProvider value={settings.showCategoryPrefix ?? true}>
       <UserSettingsProvider value={settings}>
       <NotebookOverlayProvider>
+      <LifeGridOverlayProvider>
       {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} pet={settings.pet} weekStartDay={settings.weekStartDay} />}
       <MainLayout
         workspaces={workspaces}
@@ -630,9 +634,18 @@ function HuddlePage() {
         onClearScratchpadDate={clearScratchpadDate}
         onPromoteToTask={handlePromoteToTask}
       />
+      </LifeGridOverlayProvider>
       </NotebookOverlayProvider>
       </UserSettingsProvider>
       </CategoryPrefixProvider>
+
+      <BrainDumpHost
+        workspaces={workspaces}
+        assignedTasks={assignedTasks}
+        timeBlocks={timeBlocks}
+        settings={settings}
+        createTask={createTask}
+      />
 
       <OverdueTaskReview
         isOpen={isOverdueReviewOpen}
@@ -709,6 +722,7 @@ function HuddlePage() {
       />
       <KeyboardShortcutsHint />
       <DailyClearCelebration />
+      <IglooHost workspaces={workspaces} pet={settings.pet} onSetPet={setPet} />
       <WaterReminderModal
         isOpen={water.isOpen}
         onDrink={water.dismiss}
