@@ -32,7 +32,9 @@ export function sandboxSnapshot(body, userId, entitlementId) {
   const subscription = body.subscriber.subscriptions?.[entitlement?.product_identifier]
   const expiry = Date.parse(entitlement?.expires_date ?? '')
   const grace = Date.parse(subscription?.grace_period_expires_date ?? '')
-  const eligible = subscription?.is_sandbox === true && !subscription.refunded_at && Number.isFinite(expiry)
+  // Only Apple's own sandbox (App Review, TestFlight, Xcode): RevenueCat Test Store purchases never
+  // reach Apple, so anyone holding a Test Store key could "buy" for any account (security review 2026-10-02).
+  const eligible = subscription?.is_sandbox === true && subscription.store === 'app_store' && !subscription.refunded_at && Number.isFinite(expiry)
   const end = eligible ? Math.min(Math.max(expiry, Number.isFinite(grace) ? grace : 0), body.request_date_ms + SANDBOX_MAX_MS) : 0
   return {
     user_id: userId,

@@ -27,7 +27,7 @@ test('untrusted app and unknown environment never write', async () => {
   assert.equal((await handler(request({ ...event, environment: 'STAGING' }))).status, 200); assert.equal(writes.length, 0)
 })
 const sandboxBody = (expiresInMs) => {
-  const data = body(); data.subscriber.subscriptions.monthly.is_sandbox = true
+  const data = body(); Object.assign(data.subscriber.subscriptions.monthly, { is_sandbox: true, store: 'app_store' })
   data.subscriber.entitlements.pro.expires_date = new Date(now + expiresInMs).toISOString(); return data
 }
 test('E1: a sandbox purchase (App Review / Test Store) writes only a short-lived sandbox row', async () => {
@@ -85,4 +85,10 @@ test('upstream errors and DB errors remain retryable, never acknowledged', async
 test('removing entitlement writes revocation with authoritative ordering timestamp', () => {
   const data = body(); data.subscriber.entitlements = {}
   assert.deepEqual(snapshot(data, id, 'pro'), { user_id: id, entitlement: 'pro', expires_at: null, observed_at_ms: now })
+})
+test('E1: RevenueCat Test Store (or any non-Apple store) sandbox purchases never unlock Pro', () => {
+  for (const store of ['test_store', 'play_store', 'stripe', undefined]) {
+    const data = sandboxBody(60000); data.subscriber.subscriptions.monthly.store = store
+    assert.equal(sandboxSnapshot(data, id, 'pro').expires_at, null, String(store))
+  }
 })
