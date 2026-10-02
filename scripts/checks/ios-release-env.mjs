@@ -32,5 +32,5 @@ for (const [label, ok] of checks) {
   if (!ok) fail++
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}`)
 }
-console.log(fail ? `${fail} FAILED — fix .env.local before \`pnpm cap:sync\`` : 'ALL PASS')
+console.log(fail ? `${fail} FAILED — set them in .env.production.local before \`pnpm cap:sync\`` : 'ALL PASS')
 process.exit(fail ? 1 : 0)
