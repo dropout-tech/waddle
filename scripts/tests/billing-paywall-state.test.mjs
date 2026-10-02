@@ -541,3 +541,20 @@ test('session store with the real adapter: App User ID is the signed-in user, si
   assert.deepEqual(calls.at(-1), ['logOut'])
   assert.equal((await acquired.purchase('$rc_monthly')).status, 'sign_in_required')
 })
+
+test('subscription bound to another Huddle account: purchase and restore say so, nothing unlocks', async () => {
+  const owned = fakeStore({
+    async purchase() { throw { ownedByOtherAccount: true } },
+    async restore() { throw { ownedByOtherAccount: true } },
+  }).session
+  const ready = await loaded(owned)
+  const bought = run(ready, { type: 'purchase_started' }, { type: 'purchase_result', result: await owned.purchase('$rc_monthly'), at: T0 })
+  assert.equal(bought.phase, 'ready')
+  assert.equal(bought.notice, 'owned_elsewhere')
+  assert.equal(bought.waiting, null)
+  const restored = run(ready, { type: 'restore_started' }, { type: 'restore_result', result: await owned.restore(), at: T0 })
+  assert.equal(restored.phase, 'ready')
+  assert.equal(restored.notice, 'owned_elsewhere')
+  assert.equal(restored.waiting, null)
+  assert.ok(billingEnglish['這個 Apple ID 的 Huddle Pro 訂閱已綁定另一個 Huddle 帳號，無法轉移。請登出後改用當初購買時的帳號登入；需要協助請聯絡客服。'])
+})

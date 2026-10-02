@@ -25,7 +25,7 @@ export type PaywallPhase =
   | 'syncing' // store reported success, server has not confirmed yet
   | 'sync_delayed' // still unconfirmed after the fast window; checks continue at a slower pace
   | 'pending' // store is waiting on someone else (Ask to Buy, bank verification)
-export type PaywallNotice = 'purchase_failed' | 'restore_failed' | 'restore_nothing' | 'activated'
+export type PaywallNotice = 'purchase_failed' | 'restore_failed' | 'restore_nothing' | 'owned_elsewhere' | 'activated'
 export interface PaywallState {
   phase: PaywallPhase
   plans: PaywallPlan[]
@@ -129,7 +129,7 @@ export function paywallReducer(state: PaywallState, event: PaywallEvent): Paywal
       if (status === 'ready') return { ...state, phase: 'syncing', notice: null, waiting: 'purchase', waitingSince: event.at }
       if (status === 'pending') return { ...state, phase: 'pending', notice: null, waiting: 'approval', waitingSince: event.at }
       // Backing out of the store sheet is a choice, not an error: no message.
-      return rest(state, status === 'cancelled' ? null : 'purchase_failed')
+      return rest(state, status === 'cancelled' ? null : status === 'owned_elsewhere' ? 'owned_elsewhere' : 'purchase_failed')
     }
     case 'restore_started':
       // Restore stays reachable when products failed to load and during a slow sync or a pending approval.
@@ -143,7 +143,10 @@ export function paywallReducer(state: PaywallState, event: PaywallEvent): Paywal
       if (result.status === 'ready' && result.value.hasActiveSubscription) {
         return { ...state, phase: 'syncing', notice: null, waiting: 'restore', waitingSince: event.at, resume: null }
       }
-      const notice = result.status === 'cancelled' ? null : result.status === 'ready' ? 'restore_nothing' : 'restore_failed'
+      const notice = result.status === 'cancelled' ? null
+        : result.status === 'ready' ? 'restore_nothing'
+        : result.status === 'owned_elsewhere' ? 'owned_elsewhere'
+        : 'restore_failed'
       // Finding nothing does not end an outstanding wait: the purchase lock stays on.
       return { ...state, phase: state.waiting ? (state.resume ?? restPhase(state)) : restPhase(state), notice, resume: null }
     }

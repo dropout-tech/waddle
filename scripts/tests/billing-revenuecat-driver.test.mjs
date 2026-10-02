@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
-import { createRevenueCatDriver, PURCHASE_CANCELLED_CODE, PAYMENT_PENDING_CODE, INTRO_ELIGIBLE_STATUS } from '../../lib/billing/revenuecat-driver.ts'
+import { createRevenueCatDriver, PURCHASE_CANCELLED_CODE, PAYMENT_PENDING_CODE, OWNED_BY_OTHER_ACCOUNT_CODES, INTRO_ELIGIBLE_STATUS } from '../../lib/billing/revenuecat-driver.ts'
 import { toPlans } from '../../lib/billing/paywall-state.ts'
 import { planCopy } from '../../lib/billing/paywall-copy.ts'
 import { createNativeBillingSession } from '../../lib/billing/native-adapter.ts'
@@ -52,6 +52,8 @@ test('Capacitor bridge error codes: cancelled and pending are told apart from fa
   assert.equal(await outcome({ code: PURCHASE_CANCELLED_CODE, message: 'Purchase was cancelled.' }), 'cancelled')
   assert.equal(await outcome({ code: PAYMENT_PENDING_CODE, message: 'The payment is pending.' }), 'pending')
   assert.equal(await outcome({ code: '2', message: 'There was a problem with the App Store.' }), 'failed')
+  assert.equal(await outcome({ code: '7', message: 'The receipt is already in use by another subscriber.' }), 'owned_elsewhere')
+  assert.equal(await outcome({ code: '13', message: 'The receipt is in use by another subscriber.' }), 'owned_elsewhere')
   assert.equal(await outcome(new Error('unknown')), 'failed')
 })
 test('error code constants match the installed RevenueCat SDK', () => {
@@ -62,6 +64,7 @@ test('error code constants match the installed RevenueCat SDK', () => {
   const code = (name) => source.match(new RegExp(`\\["${name}"\\] = "(\\d+)"`))?.[1]
   assert.equal(code('PURCHASE_CANCELLED_ERROR'), PURCHASE_CANCELLED_CODE)
   assert.equal(code('PAYMENT_PENDING_ERROR'), PAYMENT_PENDING_CODE)
+  assert.deepEqual(OWNED_BY_OTHER_ACCOUNT_CODES, [code('RECEIPT_ALREADY_IN_USE_ERROR'), code('RECEIPT_IN_USE_BY_OTHER_SUBSCRIBER_ERROR')])
   const offerings = fs.readFileSync(path.join(internal, 'dist/offerings.js'), 'utf8')
   assert.equal(Number(offerings.match(/\["INTRO_ELIGIBILITY_STATUS_ELIGIBLE"\] = (\d+)/)?.[1]), INTRO_ELIGIBLE_STATUS)
 })
