@@ -1,28 +1,30 @@
-# 網站訂閱開賣：需要老闆做／決定的事（2026-10-02）
+# 網站訂閱開賣：需要老闆做／決定的事（2026-10-02；2026-10-03 更新）
 
 工程端能自己做的部分已做到「本機全部測過、等真實環境」。下面每一項都卡在你本人。
 順序＝建議處理順序。標 🔑 的是金鑰／個資，**請不要貼在對話裡**，到時我給你逐步指引、你本人貼進後台。
 
 ## A. 這週可以先做（不花錢或幾乎不花錢）
 1. **把 SHOPLINE 問題轉給窗口**：整段複製 `docs/billing/2026-10-02-slp-questions-to-send.md` 的「您好…」貼給窗口。★ 前 7 題最急（開通綁卡／定期扣款、個人戶可否、IP 白名單、沙盒帳號）。
-2. ✅ **Resend 寄信網域（2026-10-02 21:52 完成）**：Resend 帳號「lazy72」、網域 lazy72.com Verified（東京機房）；Cloudflare 新增 `send`／`rsend` CNAME、`resend._domainkey` DKIM、`_dmarc`（p=none），根網域 MX／SPF 未動；Apple 寄件來源 lazy72.com、send.lazy72.com、billing@lazy72.com 三項 SPF 通過。**剩：Resend API Key 由老闆本人產生並貼進 Supabase（測試專案開好後）。**
+2. ✅ **Resend 寄信網域（2026-10-02 21:52 完成）**：Resend 帳號「lazy72」、網域 lazy72.com Verified（東京機房）；Cloudflare 新增 `send`／`rsend` CNAME、`resend._domainkey` DKIM、`_dmarc`（p=none），根網域 MX／SPF 未動；Apple 寄件來源 lazy72.com、send.lazy72.com、billing@lazy72.com 三項 SPF 通過。**剩：Resend API Key 由老闆本人產生並貼進 Supabase（正式庫 penguinflow 的 Edge Function Secrets；不另開測試專案）。**
 3. ✅ **測試用資料庫**：老闆決定直接用正式庫（penguinflow），不另開專案。2026-10-02 已套 20261003020100／020200／020300；套用前後 9 個帳號 Pro 狀態快照逐筆相同；網站開關全關（checkout_mode=off、renewals_enabled=false）；新函式 anon／authenticated 皆不可執行。沙盒測試資料以訂單號前綴 hs 區分，只開放白名單帳號。
 
 ## B. 送件 SHOPLINE 前一定要有（條款與 SHOPLINE 都要求）
 4. ✅ 本名：廖思明／Liao Sih-Ming（已寫進程式 lib/legal/operator.ts）
-5. 🔑 **聯絡地址**（建議用商務中心地址，不必用住家）
-6. ✅ 客服 Email：hi@lazy72.com（信件頁尾與回覆地址已用）
-   以上三項提供前，網站一律不放、不留空白欄位。
+5. 🔑 **聯絡地址**（老闆 2026-10-02 決定用工作室可收信地址；2026-10-03 說「之後再說」。**不填不能開賣**——消保法要求網站揭露營業所）
+6. ✅ 客服 Email：hi@lazy72.com（信件頁尾與回覆地址已用；不寫回覆時效）
+   ✅ 客服電話 0988-493-026、管轄法院臺灣新北地方法院（已在 lib/legal/operator.ts，條款頁已顯示）
+   注意：截至 2026-10-03，條款／支援頁**只顯示電話**，本名與 Email 尚未放上網頁（operator.ts 註解）；開賣前要一起放上，地址同。
 
 ## C. 金鑰（到 P2 沙盒實測時才需要，你本人貼）
-7. 🔑 SHOPLINE 沙盒：merchantId、apiKey、clientKey、webhook signKey → 貼進 Supabase 測試專案的 Edge Function Secrets。
+7. 🔑 SHOPLINE 沙盒：merchantId、apiKey、clientKey、webhook signKey → 貼進 Supabase **正式庫 penguinflow** 的 Edge Function Secrets（老闆已決定不開測試專案）。
+   ⚠️ 我們的兩個價格 NT$150、NT$990 在 SLP 沙盒都會被當成「要 3D 驗證」，自動續扣在沙盒一定失敗；要測扣款成功，工程師需暫時把沙盒價格改成 151／991 之類，測完要改回並清掉測試訂閱——到時會先問你。
 8. 🔑 Resend API Key（`RESEND_API_KEY`）→ 同上。
 9. 正式環境的同一組金鑰：等最後上線（P6）時再說，每一步都會先問你。
 
-## D. 問會計師（2026-10-02 老闆：會計師、電子發票先不處理；W-8BEN 已填完）
-10. **稅籍登記**：個人網路銷售單月營收達新台幣 5 萬元要辦稅籍登記。年繳 NT$990 集中在同一個月時可能衝過門檻——該怎麼估、何時去辦、辦了之後要公開什麼（統編、名稱）？
+## D. 問會計師（2026-10-02 老闆：會計師、電子發票先不處理；W-8BEN 已填完；稅籍／行號先不辦，老闆已問過會計師）
+10. （已決定先不辦，留作月營收接近 5 萬時再看）**稅籍登記**：個人網路銷售單月營收達新台幣 5 萬元要辦稅籍登記。年繳 NT$990 集中在同一個月時可能衝過門檻——該怎麼估、何時去辦、辦了之後要公開什麼（統編、名稱）？
 11. **統一發票**：月營收達 20 萬要開統一發票。SHOPLINE Payments 不內建電子發票，要用哪家加值中心？在那之前「電子收據」是否足夠？收據上要寫什麼？
-12. **美國預扣稅**：Apple App Store（以及 RevenueCat 等美國服務）對台灣開發者的美國銷售收入會預扣稅款，要不要填 W-8BEN、台灣有無適用的租稅協定可降低預扣率、國內申報時這筆怎麼處理？
+12. ✅（W-8BEN 已填完）**美國預扣稅**：Apple App Store（以及 RevenueCat 等美國服務）對台灣開發者的美國銷售收入會預扣稅款，要不要填 W-8BEN、台灣有無適用的租稅協定可降低預扣率、國內申報時這筆怎麼處理？
 13. **帳務紀錄保存年限**：扣款／退款紀錄要保存幾年（工程建議 5 年，需你確認）？
 14. （順帶）收據寫「已含稅（如適用）」是否恰當？
 
