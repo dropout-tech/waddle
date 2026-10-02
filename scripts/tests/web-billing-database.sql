@@ -17,6 +17,20 @@ end $$;
 -- ── 1. Rollback round trip: up → down → identical defs → up again ──────────
 \ir ../../supabase/rollback/20261002230100_web_billing_foundation_down.sql
 select public.t_defs_capture('down');
+-- World B (App Review sandbox, 20261002150000, applied before P1): down must
+-- give back #150's has_pro / dispatch, not the pre-#150 ones (md5 check above
+-- compares with the captured 'pre'; this names what that means).
+do $$ begin
+  if to_regprocedure('huddle_ops.review_sandbox_until(uuid)') is null then
+    raise notice 'SKIP: world B (review sandbox) down checks — 20261002150000 not present';
+  else
+    perform public.t_ok(position('review_sandbox_until(p_user) is not null' in pg_get_functiondef('huddle_ops.has_pro(uuid)'::regprocedure)) > 0
+      and position('paid_until(' in replace(pg_get_functiondef('huddle_ops.has_pro(uuid)'::regprocedure), 'sandbox_until(', '')) = 0
+      and position($f$'pro_until',greatest((select max(expires_at) from huddle_ops.grants where user_id=u and revoked_at is null),(select expires_at from public.billing_entitlements where user_id=u and entitlement='pro'),huddle_ops.review_sandbox_until(u)),$f$ in pg_get_functiondef('huddle_ops.dispatch(text,jsonb)'::regprocedure)) > 0
+      and position('web_paid_until' in pg_get_functiondef('huddle_ops.dispatch(text,jsonb)'::regprocedure)) = 0,
+      'world B: down restores #150''s has_pro (sandbox clause) and its self pro_until key, no web terms left');
+  end if;
+end $$;
 select public.t_ok(not exists (
   select 1 from public.t_defs p join public.t_defs d on d.sig = p.sig and d.phase = 'down'
   where p.phase = 'pre' and p.md5 is distinct from d.md5)
@@ -184,6 +198,38 @@ select public.t_ok((public.t_self('00000000-0000-4000-8000-0000000000b3') ->> 'p
   and (public.t_self('00000000-0000-4000-8000-0000000000b3') ->> 'web_paid_until')::timestamptz = public.t_web('00000000-0000-4000-8000-0000000000b3')
   and (public.t_self('00000000-0000-4000-8000-0000000000b3') ->> 'pro_until')::timestamptz = public.t_web('00000000-0000-4000-8000-0000000000b3'),
   'self (Apple + web, web later): paid_until = Apple exactly, pro_until = web');
+
+-- ── 5b. World B: App Review sandbox (20261002150000) applied before P1 ─────
+do $$
+declare v_self jsonb; v_sbx uuid := '00000000-0000-4000-8000-0000000000bf';
+begin
+  if to_regprocedure('huddle_ops.review_sandbox_until(uuid)') is null then
+    raise notice 'SKIP: world B (review sandbox) checks — 20261002150000 not present';
+    return;
+  end if;
+  insert into auth.users(id, email) values (v_sbx, 'sandbox-reviewer@example.invalid');
+  insert into huddle_ops.members(user_id, alias, trial_checked) values (v_sbx, 'w bf', true);
+  execute 'insert into public.billing_sandbox_entitlements(user_id, expires_at, observed_at_ms) values ($1, now() + interval ''2 hours'', 1)' using v_sbx;
+  v_self := public.t_self(v_sbx::text);
+  perform public.t_ok(huddle_ops.has_pro(v_sbx)
+    and (v_self ->> 'paid_until')::timestamptz = huddle_ops.review_sandbox_until(v_sbx)
+    and (v_self ->> 'pro_until')::timestamptz = huddle_ops.review_sandbox_until(v_sbx)
+    and v_self -> 'web_paid_until' = 'null'::jsonb,
+    'world B: sandbox reviewer is Pro; self.paid_until / pro_until show the sandbox period; web_paid_until key present (null)');
+  perform public.t_ok(huddle_ops.paid_until(v_sbx) is null and huddle_ops.pro_until(v_sbx) <= now() + interval '1 second',
+    'world B: sandbox stays out of paid_until() / pro_until() (gift base), as #150 designed');
+  perform public.t_ok(huddle_ops.has_pro('00000000-0000-4000-8000-0000000000b1')
+    and (public.t_self('00000000-0000-4000-8000-0000000000b1') ->> 'pro_until')::timestamptz = public.t_web('00000000-0000-4000-8000-0000000000b1')
+    and public.t_self('00000000-0000-4000-8000-0000000000b1') -> 'paid_until' = 'null'::jsonb,
+    'world B: web subscriber still Pro, self.pro_until = web coverage, paid_until (Apple + sandbox) null');
+  update huddle_ops.settings set accept_sandbox_purchases = false;
+  perform public.t_ok(not huddle_ops.has_pro(v_sbx) and huddle_ops.has_pro('00000000-0000-4000-8000-0000000000b1'),
+    'world B: sandbox switch off removes sandbox Pro only');
+  update huddle_ops.settings set accept_sandbox_purchases = true;
+  perform public.t_ok(position('review_sandbox_until(p_user) is not null' in pg_get_functiondef('huddle_ops.has_pro(uuid)'::regprocedure)) > 0
+    and position('huddle_ops.paid_until(p_user)' in pg_get_functiondef('huddle_ops.has_pro(uuid)'::regprocedure)) > 0,
+    'world B: has_pro has both the web paid_until and the sandbox clause');
+end $$;
 
 -- ── 6. Gifts always sit behind paid coverage, web included ─────────────────
 select huddle_ops.give_days('00000000-0000-4000-8000-0000000000bb', 7, 'manual', 'w:bb', 'test');

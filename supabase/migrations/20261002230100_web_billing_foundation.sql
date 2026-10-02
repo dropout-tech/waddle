@@ -25,6 +25,19 @@
 -- tables on purpose (billing records must survive). Once real customers
 -- exist, rolling back is a business decision (design §7 回滾), not a script.
 --
+-- TWO WORLDS (App Store review sandbox, PR #150, 20261002150000): when
+-- huddle_ops.review_sandbox_until(uuid) exists before this migration, has_pro
+-- keeps its "or review_sandbox_until(p_user) is not null" clause and
+-- dispatch('self') keeps the sandbox term in BOTH paid_until (Apple + sandbox,
+-- exactly as #150 defines it) and pro_until (grants, paid_until(u), sandbox).
+-- The sandbox is deliberately NOT added to paid_until() / pro_until() /
+-- give_days / defer_gifts (iOS design). Without it, behaviour is unchanged.
+-- The down migration restores whichever world it finds, byte for byte.
+-- If #150 is merged AFTER this migration (it copies dispatch whole), it must
+-- keep: the 'self' key web_paid_until, huddle_ops.paid_until(u) inside
+-- pro_until, has_pro's coalesce(huddle_ops.paid_until(p_user) > now(), false),
+-- and the six other web-billing fragments of §5 below.
+--
 -- No BEGIN/COMMIT inside (same as 20261001200000) so the equivalence test can
 -- run this file inside its own transaction. Apply with `psql -1` or the usual
 -- `supabase db push`. Statement order keeps every partial state harmless:
@@ -375,6 +388,19 @@ language sql stable security definer set search_path = '' as $$
       or exists(select 1 from huddle_ops.grants g
                 where g.user_id = p_user and g.revoked_at is null and g.expires_at > now())
 $$;
+-- World B (#150 applied first): keep its App Review sandbox clause.
+do $do$
+begin
+  if to_regprocedure('huddle_ops.review_sandbox_until(uuid)') is not null then
+    execute $sql$create or replace function huddle_ops.has_pro(p_user uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select coalesce(huddle_ops.paid_until(p_user) > now(), false) -- web billing: Apple or web
+      or exists(select 1 from huddle_ops.grants g
+                where g.user_id = p_user and g.revoked_at is null and g.expires_at > now())
+      or huddle_ops.review_sandbox_until(p_user) is not null -- App Review sandbox (20261002150000)
+$$$sql$;
+  end if;
+end $do$;
 
 -- From 20261001200000_pro_limits.sql.
 create or replace function huddle_ops.pro_until(p_user uuid) returns timestamptz
@@ -429,7 +455,8 @@ create trigger operations_defer_gifts_web after insert or update of access_until
 -- hotfix. Like 20261001200000 §8/§10, read the live definition, replace each
 -- fragment that must appear EXACTLY once, else abort the migration.
 --   1 'self'            pro_until includes web; new key web_paid_until.
---                       (key paid_until untouched: Apple only, iOS card)
+--                       (key paid_until untouched: Apple only, iOS card —
+--                       Apple + App Review sandbox in world B, see header)
 --   2 admin_revoke      re-queue gifts behind web coverage too
 --   3 admin_analytics   "paid" counts web subscribers
 --   4-6 admin_overview  paid / gifted / converted_trials count web subscribers
@@ -457,7 +484,15 @@ declare
     $f$(select expires_at from public.billing_entitlements where user_id=au.id) as paid_until,
         huddle_ops.web_paid_until(au.id) as web_paid_until,$f$];
   v_hits integer;
+  v_sandbox boolean := to_regprocedure('huddle_ops.review_sandbox_until(uuid)') is not null;
+  v_self_paid text := $f$'paid_until',(select expires_at from public.billing_entitlements where user_id=u and entitlement='pro'),$f$;
 begin
+  if v_sandbox then  -- world B: #150's 'self' keys carry the sandbox term
+    v_old[1] := $f$'pro_until',greatest((select max(expires_at) from huddle_ops.grants where user_id=u and revoked_at is null),(select expires_at from public.billing_entitlements where user_id=u and entitlement='pro'),huddle_ops.review_sandbox_until(u)),$f$;
+    v_new[1] := $f$'pro_until',greatest((select max(expires_at) from huddle_ops.grants where user_id=u and revoked_at is null),huddle_ops.paid_until(u),huddle_ops.review_sandbox_until(u)),
+      'web_paid_until',huddle_ops.web_paid_until(u),$f$;
+    v_self_paid := $f$'paid_until',greatest((select expires_at from public.billing_entitlements where user_id=u and entitlement='pro'),huddle_ops.review_sandbox_until(u)),$f$;
+  end if;
   for i in 1 .. array_length(v_old, 1) loop
     v_hits := (length(v_def) - length(replace(v_def, v_old[i], ''))) / length(v_old[i]);
     if v_hits <> 1 then
@@ -468,7 +503,7 @@ begin
   -- Exactly 5 Apple reads may remain: 'self' paid_until, the Apple half of
   -- admin_overview paid, admin_members paid_until, admin_coupons, admin_billing.
   if (length(v_def) - length(replace(v_def, 'public.billing_entitlements', ''))) / length('public.billing_entitlements') <> 5
-     or position($f$'paid_until',(select expires_at from public.billing_entitlements where user_id=u and entitlement='pro'),$f$ in v_def) = 0 then
+     or position(v_self_paid in v_def) = 0 then
     raise exception 'dispatch Apple-only readers changed shape; review web billing migration';
   end if;
   execute v_def;

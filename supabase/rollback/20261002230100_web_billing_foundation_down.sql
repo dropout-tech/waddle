@@ -6,7 +6,8 @@
 -- that pg_get_functiondef md5 equals the pre-migration value) and removes the
 -- new functions and triggers. The web_* TABLES AND THEIR ROWS ARE KEPT on
 -- purpose: they are billing records. After this, website subscribers are NOT
--- Pro any more (has_pro is Apple + gifts again) — if any exist, decide with
+-- Pro any more (has_pro is Apple + gifts again, + App Review sandbox when
+-- 20261002150000 is present: that world is detected and restored exactly) — if any exist, decide with
 -- the owner first. Re-applying the up migration afterwards works (tables use
 -- "if not exists").
 
@@ -37,6 +38,12 @@ declare
     $f$(select expires_at from public.billing_entitlements where user_id=au.id) as paid_until,$f$];
   v_hits integer;
 begin
+  if to_regprocedure('huddle_ops.review_sandbox_until(uuid)') is not null then
+    -- World B (#150 applied before the up migration): back to #150's keys.
+    v_old[1] := $f$'pro_until',greatest((select max(expires_at) from huddle_ops.grants where user_id=u and revoked_at is null),huddle_ops.paid_until(u),huddle_ops.review_sandbox_until(u)),
+      'web_paid_until',huddle_ops.web_paid_until(u),$f$;
+    v_new[1] := $f$'pro_until',greatest((select max(expires_at) from huddle_ops.grants where user_id=u and revoked_at is null),(select expires_at from public.billing_entitlements where user_id=u and entitlement='pro'),huddle_ops.review_sandbox_until(u)),$f$;
+  end if;
   for i in 1 .. array_length(v_old, 1) loop
     v_hits := (length(v_def) - length(replace(v_def, v_old[i], ''))) / length(v_old[i]);
     if v_hits <> 1 then
@@ -59,6 +66,20 @@ language sql stable security definer set search_path = '' as $$
       or exists(select 1 from huddle_ops.grants g
                 where g.user_id = p_user and g.revoked_at is null and g.expires_at > now())
 $$;
+-- World B: #150's has_pro (20261002150000), verbatim.
+do $do$
+begin
+  if to_regprocedure('huddle_ops.review_sandbox_until(uuid)') is not null then
+    execute $sql$create or replace function huddle_ops.has_pro(p_user uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists(select 1 from public.billing_entitlements b
+                where b.user_id = p_user and b.entitlement = 'pro' and b.expires_at > now())
+      or exists(select 1 from huddle_ops.grants g
+                where g.user_id = p_user and g.revoked_at is null and g.expires_at > now())
+      or huddle_ops.review_sandbox_until(p_user) is not null
+$$;$sql$;
+  end if;
+end $do$;
 
 -- 20261001200000_pro_limits.sql
 create or replace function huddle_ops.pro_until(p_user uuid) returns timestamptz
