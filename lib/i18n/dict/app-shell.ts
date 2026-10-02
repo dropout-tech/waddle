@@ -8,6 +8,7 @@ export const dict: Record<string, string> = {
   '使用 Google 登入': 'Continue with Google',
   '使用 Apple 登入': 'Continue with Apple',
   '或使用 Email': 'Or continue with email',
+  '用 Email 登入': 'Sign in with email',
   '密碼': 'Password',
   '忘記密碼？': 'Forgot password?',
   '隱藏密碼': 'Hide password',
