@@ -86,6 +86,8 @@ export function DeleteAccountButton({ open, onOpenChange }: DeleteAccountButtonP
           <AlertDialogTitle>{t('確定要刪除帳號嗎？')}</AlertDialogTitle>
           <AlertDialogDescription>
             {t('這會永久刪除你的帳號與所有資料（任務、行程、日記、設定），無法復原。')}
+            {' '}
+            {t('若你在 iPhone 上訂閱了 Huddle Pro，刪除帳號不會停止 Apple 的扣款，請先到 Apple ID 的「訂閱」設定取消。')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

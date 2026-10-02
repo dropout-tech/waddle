@@ -56,6 +56,8 @@ export const dict: Record<string, string> = {
     'This permanently deletes your account and all your data (tasks, schedule, notes, settings) — this cannot be undone.',
   '取消': 'Cancel',
   '永久刪除': 'Delete permanently',
+  '若你在 iPhone 上訂閱了 Huddle Pro，刪除帳號不會停止 Apple 的扣款，請先到 Apple ID 的「訂閱」設定取消。':
+    "If you subscribed to Huddle Pro on iPhone, deleting your account does not stop Apple from charging you — cancel it first in your Apple ID's Subscriptions settings.",
 
   // components/user-menu.tsx
   '使用者選單': 'User menu',

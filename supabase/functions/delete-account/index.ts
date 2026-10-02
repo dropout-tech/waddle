@@ -13,11 +13,18 @@
 // deleted and the request fails, so a retry can finish the job instead of
 // leaving orphaned, still-public images with no owner to delete them.
 //
+// The member's RevenueCat customer is deleted next (see revenuecat.mjs), so a
+// subscription bound to this account can be restored on a new one. Same rule:
+// if RevenueCat cannot confirm, the account is NOT deleted and the member retries.
+// Skipped while REVENUECAT_SECRET_API_KEY is not set (billing not launched).
+//
 // Deploy:  supabase functions deploy delete-account
 // (SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY are injected
-//  by the platform — no manual secrets needed.)
+//  by the platform; REVENUECAT_SECRET_API_KEY is the same project secret the
+//  revenuecat-webhook function uses.)
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { deleteRevenueCatCustomer } from './revenuecat.mjs'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -111,6 +118,14 @@ Deno.serve(async (req) => {
     } catch (e) {
       console.error('[delete-account] image purge failed', e instanceof Error ? e.message : String(e))
       return json({ error: 'Could not delete uploaded images; account was not deleted' }, 500)
+    }
+
+    // Release any App Store subscription bound to this account (Keep with original App User ID).
+    try {
+      await deleteRevenueCatCustomer({ apiKey: Deno.env.get('REVENUECAT_SECRET_API_KEY') ?? '', userId: user.id })
+    } catch (e) {
+      console.error('[delete-account] RevenueCat customer delete failed', e instanceof Error ? e.message : String(e))
+      return json({ error: 'Could not remove purchase records; account was not deleted' }, 503)
     }
 
     // Delete with the service role; FKs cascade-delete all the user's rows.
