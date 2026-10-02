@@ -12,7 +12,7 @@ import { pickLine, renderLine, type PetLineCategory } from '@/lib/pet/lines'
 import { isPetMuted, localDate, readPetLocal, writePetLocal } from '@/lib/pet/local'
 import { getIglooSnapshot, openIgloo } from '@/lib/igloo/store'
 import { hasDailyLine } from '@/lib/life-grid/data'
-import { taipeiToday } from '@/lib/life-grid/compute'
+import { localToday } from '@/lib/life-grid/compute'
 import { openLifeGrid } from '@/lib/life-grid/events'
 import { CELEBRATE_CHANCE, IDLE_DAILY_CAP, IDLE_MINUTES, type PetSettings } from '@/lib/pet/types'
 import type { Workspace } from '@/lib/types'
@@ -436,7 +436,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
       }
 
       // 3b) 人生年曆 — after 20:00 (21:00 for a low-chattiness penguin), once a
-      //     day, only if today (Taipei day, same as the grid) has no line yet.
+      //     day, only if today (the device's local day, same as the grid) has no line yet.
       //     Tapping the bubble opens the grid with today's input focused.
       const askFrom = pet.chattiness === 'low' ? 21 : 20
       if (hour >= askFrom && local.dailyLineAsked !== today && !dailyLineBusy) {
@@ -446,7 +446,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
           const supabase = createClient()
           const { data: { session } } = await supabase.auth.getSession()
           const uid = session?.user.id
-          if (uid && !(await hasDailyLine(supabase, uid, taipeiToday())) && canAuto()) {
+          if (uid && !(await hasDailyLine(supabase, uid, localToday())) && canAuto()) {
             say(line(['dailyLine']), { auto: true, act: 'hop', action: () => openLifeGrid({ focusToday: true }) })
             return
           }
@@ -606,7 +606,9 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
       data-yield={yielding ? '' : undefined}
       data-paused={pageHidden ? '' : undefined}
     >
-      <div className={styles.mover} style={{ transform: `translateX(${offsetX}px)` }}>
+      {/* Desktop: while asking the evening question the penguin steps off the
+          hour gutter (its home) so the time labels behind it stay readable. */}
+      <div className={styles.mover} style={{ transform: `translateX(${offsetX + (bubble?.action && !isMobile ? 58 : 0)}px)` }}>
         <button
           ref={buttonRef}
           type="button"

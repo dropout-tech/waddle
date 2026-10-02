@@ -7,7 +7,7 @@
  *  1. seeds ~60 fake past days for the current year (screenshots look real)
  *  2. penguin evening question → tap bubble → grid opens with today's input
  *     focused (the browser time zone is picked so local time is ~21:00 now;
- *     "today" for the grid is still the Taipei day)
+ *     the grid's "today" is that zone's local day — a non-Taipei user)
  *  3. write today's line + mood → cell lights up → reload → still there
  *  4. backfill a past day from the grid
  *  5. ⌘K → 開人生年曆 opens the pop-up
@@ -25,7 +25,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { chromium } from 'playwright'
 import { createClient } from '@supabase/supabase-js'
-import { dateKey, parseDateKey, taipeiToday } from '../../lib/life-grid/compute.ts'
+import { dateKey, parseDateKey, localToday } from '../../lib/life-grid/compute.ts'
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3103'
 const SHOTS = process.env.LIFE_GRID_SHOTS || path.join(tmpdir(), 'life-grid-shots')
@@ -82,7 +82,13 @@ console.log(`supabase host: ${new URL(SB_URL).host}`)
 const startCount = await countRows()
 console.log(`journal_entries rows before: ${startCount}`)
 
-const today = taipeiToday()
+// Local evening right now: choose a fixed-offset zone where it is ~21:00.
+const utcH = new Date().getUTCHours()
+let off = ((21 - utcH) % 24 + 24) % 24
+if (off > 14) off -= 24
+const eveningTz = off === 0 ? 'Etc/GMT' : `Etc/GMT${off > 0 ? '-' : '+'}${Math.abs(off)}`
+
+const today = localToday(new Date(), eveningTz) // every browser context runs in eveningTz
 const t = parseDateKey(today)
 const year = t.year
 const shift = (date, days) => {
@@ -177,14 +183,8 @@ try {
 
   browser = await chromium.launch()
 
-  // Local evening right now: choose a fixed-offset zone where it is ~21:00.
-  const utcH = new Date().getUTCHours()
-  let off = ((21 - utcH) % 24 + 24) % 24
-  if (off > 14) off -= 24
-  const eveningTz = off === 0 ? 'Etc/GMT' : `Etc/GMT${off > 0 ? '-' : '+'}${Math.abs(off)}`
-
-  const desktop = { viewport: { width: 1440, height: 900 }, locale: 'zh-TW' }
-  const ctxA = await browser.newContext({ ...desktop, timezoneId: eveningTz })
+  const desktop = { viewport: { width: 1440, height: 900 }, locale: 'zh-TW', timezoneId: eveningTz }
+  const ctxA = await browser.newContext(desktop)
   const page = await ctxA.newPage()
   current = page
   const pageErrors = []
@@ -202,11 +202,45 @@ try {
     await action.waitFor({ state: 'attached', timeout: 200000 })
     const bubbleText = await page.locator('[data-pet-bubble]').innerText()
     assert(bubbleText.includes('今天最想記住的是什麼'), `bubble says: ${bubbleText}`)
+    await page.waitForTimeout(1600) // the penguin steps off the hour gutter while asking
+    // the hour labels must not sit under the penguin or its bubble
+    const covered = await page.evaluate(() => {
+      const pet = document.querySelector('[data-pet-button]')?.getBoundingClientRect()
+      const bubble = document.querySelector('[data-pet-bubble]')?.getBoundingClientRect()
+      const hits = []
+      for (const el of document.querySelectorAll('[data-tour="calendar-panel"] *')) {
+        if (el.children.length || !/^\d{2}:00$/.test(el.textContent.trim())) continue
+        const r = el.getBoundingClientRect()
+        if (!r.width) continue
+        for (const b of [pet, bubble]) if (b && r.left < b.right && r.right > b.left && r.top < b.bottom && r.bottom > b.top) hits.push(el.textContent.trim())
+      }
+      return hits
+    })
+    assert(covered.length === 0, `hour labels covered: ${covered.join(', ')}`)
     await page.screenshot({ path: path.join(SHOTS, 'pet-evening-question.png') })
     await action.click({ timeout: 5000 }).catch(() => action.evaluate((el) => el.click()))
     await page.locator('[role="dialog"] [data-life-grid]').waitFor({ timeout: 10000 })
-    await page.waitForFunction(() => document.activeElement?.hasAttribute('data-life-grid-input'), null, { timeout: 5000 })
-    return `bubble: "${bubbleText.replace(/\s+/g, ' ').slice(0, 60)}"`
+    const opened = Date.now()
+    // The year lights up first; only then does the view glide to today's input.
+    await page.waitForTimeout(700)
+    const early = await page.evaluate(() => document.activeElement?.hasAttribute('data-life-grid-input') ?? false)
+    assert(!early, 'input grabbed focus before the reveal finished')
+    await page.waitForFunction(() => document.activeElement?.hasAttribute('data-life-grid-input'), null, { timeout: 6000 })
+    const focusedAfter = Date.now() - opened
+    await page.waitForTimeout(800) // smooth scroll settles
+    const inView = await page.locator('[role="dialog"] [data-life-grid-input]').evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      return r.top >= 0 && r.bottom <= window.innerHeight
+    })
+    assert(inView, 'today input not scrolled into view')
+    const headerOk = await page.evaluate(() => {
+      const d = document.querySelector('[role="dialog"] [data-life-grid]').getBoundingClientRect()
+      const h = document.querySelector('[role="dialog"] [data-life-grid] header').getBoundingClientRect()
+      return h.top >= d.top - 1
+    })
+    assert(headerOk, 'pop-up header was scrolled out of view')
+    await page.screenshot({ path: path.join(SHOTS, 'overlay-question-landed.png') })
+    return `bubble: "${bubbleText.replace(/\s+/g, ' ').slice(0, 40)}"; input focused ${focusedAfter}ms after open, in view`
   })
 
   const TODAY_LINE = '今天把人生年曆做出來了'
@@ -260,9 +294,8 @@ try {
     // layout size (offsetWidth) — boundingBox would include the reveal's scale()
     const size = await pb.locator(`[data-date="${today}"]`).evaluate((el) => ({ width: el.offsetWidth }))
     assert(size.width >= 20, `desktop cell only ${size.width}px`)
-    const latestSeed = [...seeds].sort().at(-1)
     const letter = await pb.locator('[data-life-grid-letter]').innerText()
-    assert(letter.includes(seedLine.get(latestSeed)), `letter line: ${letter}`)
+    assert(letter.includes('今天你記下了') && letter.includes(TODAY_LINE), `letter line: ${letter}`)
     await pb.waitForTimeout(1600) // let the reveal finish before the screenshot
     await pb.locator(`[data-date="${today}"][data-written]`).waitFor({ timeout: 10000 })
     const line = await pb.locator('[data-life-grid-line]').innerText()
@@ -279,6 +312,10 @@ try {
     await card.getByText('這天還空著，想補一句嗎？').waitFor({ timeout: 5000 })
     await card.locator('[data-life-grid-input]').fill('補記：那天去爬山')
     await card.locator('[data-mood="good"]').click()
+    await card.getByText('那天的心情', { exact: true }).waitFor({ timeout: 3000 })
+    await card.evaluate((el) => el.scrollIntoView({ block: 'center' }))
+    await pb.waitForTimeout(300)
+    await pb.screenshot({ path: path.join(SHOTS, 'desktop-1440-backfill-mood.png') })
     await card.locator('[data-life-grid-save]').click()
     await pb.locator(`[data-date="${BACKFILL}"][data-written]`).waitFor({ timeout: 10000 })
     await card.locator('[data-life-grid-line]').waitFor({ timeout: 10000 }) // shown only after the write resolved
@@ -319,6 +356,7 @@ try {
       const labels = [...document.querySelectorAll('[data-life-grid] [aria-label]')].map((n) => n.getAttribute('aria-label'))
       return [...(text.match(/[㐀-鿿]+/g) || []), ...labels.filter((l) => /[㐀-鿿]/.test(l))]
     })
+    await pb.waitForTimeout(1700) // after the reveal
     await pb.screenshot({ path: path.join(SHOTS, 'desktop-1440-en.png') })
     assert(leftovers.length === 0, `CJK left: ${JSON.stringify(leftovers.slice(0, 5))}`)
   })
@@ -328,13 +366,20 @@ try {
     await gotoYear(pb)
     const dark = await pb.evaluate(() => document.documentElement.classList.contains('dark'))
     assert(dark, 'html.dark not set')
+    await pb.waitForTimeout(1700) // after the reveal
     await pb.screenshot({ path: path.join(SHOTS, 'desktop-1440-dark.png') })
+    await pb.evaluate(() => {
+      const sc = document.querySelector('[data-life-grid-scroll]')
+      sc.scrollTop = sc.scrollHeight
+    })
+    await pb.waitForTimeout(400)
+    await pb.screenshot({ path: path.join(SHOTS, 'desktop-1440-dark-bottom.png') })
     await pb.evaluate(() => localStorage.setItem('theme', 'light'))
   })
   storage = await ctxB.storageState()
   await ctxB.close()
 
-  const ctxC = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'zh-TW', storageState: storage })
+  const ctxC = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'zh-TW', timezoneId: eveningTz, storageState: storage })
   const pm = await ctxC.newPage()
   current = pm
   pm.on('pageerror', (e) => pageErrors.push(e.message))

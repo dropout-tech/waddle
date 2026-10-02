@@ -27,7 +27,7 @@ import { isMood, normalizeLine, type Mood } from './compute'
 type Client = SupabaseClient<Database>
 
 export interface DailyLine {
-  /** YYYY-MM-DD (Asia/Taipei day the line belongs to). */
+  /** YYYY-MM-DD — the user's local calendar day the line belongs to. */
   date: string
   content: string
   mood: Mood | null
