@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import type { Editor } from '@tiptap/react'
+import { X } from 'lucide-react'
 import {
   InkBold,
   InkItalic,
@@ -27,6 +29,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { useKeyboardInset } from '@/hooks/use-keyboard-inset'
 import { useI18n } from '@/lib/i18n/react'
 import { pickAndInsertImage, type UploadImageFn } from './upload-image'
+import { InkSwatches, InkTriggerIcon, type InkPalette } from './ink-swatches'
 
 interface EditorToolbarProps {
   editor: Editor | null
@@ -64,6 +67,7 @@ export function EditorToolbar({ editor, onPromote, uploadImage }: EditorToolbarP
   const isMobile = useIsMobile()
   const keyboardInset = useKeyboardInset()
   const { t } = useI18n()
+  const [palette, setPalette] = useState<InkPalette | null>(null)
 
   if (!editor) return null
   if (!isMobile) return null
@@ -104,6 +108,17 @@ export function EditorToolbar({ editor, onPromote, uploadImage }: EditorToolbarP
           : undefined
       }
     >
+      {palette ? (
+        // The colour row replaces the bar while open: a popover would be
+        // clipped by this horizontally scrolling, keyboard-docked strip.
+        <>
+          <Btn label={t('關閉')} active={false} onClick={() => setPalette(null)}>
+            <X className="h-5 w-5" />
+          </Btn>
+          <Divider />
+          <InkSwatches editor={editor} palette={palette} onDone={() => setPalette(null)} />
+        </>
+      ) : (<>
       <Btn label={t('標題 1')} active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
         <InkHeading1 className="h-5 w-5" />
       </Btn>
@@ -133,6 +148,12 @@ export function EditorToolbar({ editor, onPromote, uploadImage }: EditorToolbarP
       </Btn>
       <Btn label={t('連結')} active={editor.isActive('link')} onClick={setLink}>
         <InkLink className="h-5 w-5" />
+      </Btn>
+      <Btn label={t('文字顏色')} active={false} onClick={() => setPalette('color')}>
+        <InkTriggerIcon editor={editor} palette="color" />
+      </Btn>
+      <Btn label={t('螢光筆')} active={false} onClick={() => setPalette('highlight')}>
+        <InkTriggerIcon editor={editor} palette="highlight" />
       </Btn>
 
       <Divider />
@@ -176,6 +197,7 @@ export function EditorToolbar({ editor, onPromote, uploadImage }: EditorToolbarP
           </Btn>
         </>
       )}
+      </>)}
     </div>
   )
 }
