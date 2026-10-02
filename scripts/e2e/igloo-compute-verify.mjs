@@ -12,7 +12,7 @@ import assert from 'node:assert/strict'
 
 const { computeIgloo, brickSlot, BRICKS_PER_IGLOO, IGLOO_LAYERS, localDay } = await import('../../lib/igloo/compute.ts')
 const { iglooLine, catchUpLine } = await import('../../lib/igloo/lines.ts')
-const { mergeIglooLedger, ledgerTasks } = await import('../../lib/igloo/local.ts')
+const { mergeIglooLedger, ledgerTasks, startFocusCounting } = await import('../../lib/igloo/local.ts')
 
 let passed = 0
 const results = []
@@ -147,8 +147,51 @@ check('ledger keeps bricks of deleted tasks; undated ledger rows still count', (
   const s = computeIgloo(ledgerTasks(next), next.focus, NOW)
   assert.equal(s.totalBricks, 6)
   assert.equal(s.bricksToday, 5)
-  const again = mergeIglooLedger(next, many(3, '2026-10-03'), { date: '2026-10-03', count: 2 })
+  const again = mergeIglooLedger(next, many(3, '2026-10-03'), next.focusSeen)
   assert.equal(again.changed, false, 'merging the same data twice changes nothing')
+  // re-running the merge from the same loaded ledger is idempotent
+  const loaded = { tasks: {}, focus: {}, focusSeen: { date: '2026-10-03', count: 1 } }
+  const a = mergeIglooLedger(loaded, many(2, '2026-10-03'), { date: '2026-10-03', count: 4 })
+  const b = mergeIglooLedger(loaded, many(2, '2026-10-03'), { date: '2026-10-03', count: 4 })
+  assert.deepEqual(a, b)
+  assert.equal(a.next.focus['2026-10-03'], 3)
+})
+
+check('pomodoros on a shared device go to the account that was signed in', () => {
+  const D = '2026-10-03'
+  const store = {} // userId → ledger, as in localStorage
+  let device = 0 // lib/pomodoro-count.ts: one counter per device
+  let active = null // the device-wide "last active account" key
+  let session = null // { user, loaded } — what IglooHost holds in memory
+  const signIn = (user) => {
+    const local = store[user] ?? { tasks: {}, focus: {} }
+    session = { user, loaded: startFocusCounting(local, active, user, { date: D, count: device }) }
+    active = user
+    sync()
+  }
+  const sync = () => { store[session.user] = mergeIglooLedger(session.loaded, [], { date: D, count: device }).next }
+  const pomodoro = (n = 1) => { device += n; sync() }
+  const reload = () => signIn(session.user)
+  const focusOf = (user) => store[user]?.focus[D] ?? 0
+
+  signIn('A'); pomodoro(3)
+  assert.equal(focusOf('A'), 3)
+  signIn('B'); pomodoro(2) // device counter 3 → 5
+  assert.equal(focusOf('B'), 2, 'B gets only its own 2')
+  assert.equal(focusOf('A'), 3, "A doesn't get B's")
+  signIn('A'); pomodoro(1) // back to A: 5 → 6
+  assert.equal(focusOf('A'), 4, 'A: 3 + 1')
+  assert.equal(focusOf('B'), 2)
+  reload(); reload() // same account reloading never double-counts
+  assert.equal(focusOf('A'), 4)
+  pomodoro(1)
+  assert.equal(focusOf('A'), 5)
+  // next day: the device counter restarts at 0
+  const E = '2026-10-04'
+  session.loaded = store['A']
+  store['A'] = mergeIglooLedger(session.loaded, [], { date: E, count: 1 }).next
+  assert.equal(store['A'].focus[E], 1)
+  assert.equal(store['A'].focus[D], 5, 'yesterday untouched')
 })
 
 check('brick slots fill bottom course first and stay in range', () => {
