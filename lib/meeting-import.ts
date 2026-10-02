@@ -11,13 +11,19 @@ export interface MeetingTaskDraft {
   assignmentConfidence?: "explicit" | "uncertain";
   assignmentReason?: string;
   assigneeId?: string;
+  // Older meetings predate these two fields; read them as "unknown" / false.
+  ownerSide?: "ours" | "theirs" | "unknown";
+  followUp?: boolean;
 }
+export type MeetingSide = "ours" | "theirs";
 export interface MeetingParticipant {
   id: string;
   name: string;
   organization: string;
   aliases: string[];
   userId: string;
+  // Older meetings predate this field; read a missing side as "ours".
+  side?: MeetingSide;
 }
 export interface MeetingPeer {
   peer_id: string;
@@ -51,6 +57,7 @@ export interface MeetingImport {
   imported_tasks: Record<string, string>;
   context?: {
     meetingTime: string;
+    purpose?: string;
     participants: MeetingParticipant[];
     categoryId: string;
     autoSelf: boolean;

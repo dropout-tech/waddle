@@ -29,6 +29,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
   const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
   const [peers, setPeers] = useState<MeetingPeer[]>([]);
   const [meetingTime, setMeetingTime] = useState("");
+  const [purpose, setPurpose] = useState("");
   const [autoSelf, setAutoSelf] = useState(true);
   const [list, setList] = useState<MeetingList | null>(null);
   const [title, setTitle] = useState("");
@@ -54,11 +55,13 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
       meeting.result?.tasks.map((t, index) => ({
         ...t,
         assigneeId:
-          meeting.imported_tasks[String(index)] ? userId : t.assignmentConfidence === "explicit"
-            ? meeting.context?.participants.find(
-                (p) => p.id === t.ownerParticipantId,
-              )?.userId || ""
-            : "",
+          meeting.imported_tasks[String(index)] || t.followUp === true
+            ? userId
+            : t.assignmentConfidence === "explicit"
+              ? meeting.context?.participants.find(
+                  (p) => p.id === t.ownerParticipantId,
+                )?.userId || ""
+              : "",
         ...meeting.checklist?.[String(index)],
       })) ?? [],
     );
@@ -174,8 +177,10 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
       transcript: transcript.trim(),
       context: {
         meetingTime,
+        purpose: purpose.trim(),
         participants: participants.map((p) => ({
           ...p,
+          side: p.side ?? "ours",
           name: p.name.trim(),
           organization: p.organization.trim(),
           aliases: p.aliases.map((a) => a.trim()).filter(Boolean),
@@ -385,6 +390,18 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                     onChange={(e) => setMeetingTime(e.target.value)}
                   />
                 </label>
+                <label className="block space-y-2 text-sm">
+                  {t("會議目的")}
+                  <input
+                    type="text"
+                    className={field}
+                    value={purpose}
+                    maxLength={300}
+                    disabled={busy}
+                    placeholder={t("例：確認康庭專案範圍與時程")}
+                    onChange={(e) => setPurpose(e.target.value)}
+                  />
+                </label>
                 <ParticipantsEditor
                   participants={participants}
                   peers={peers}
@@ -511,6 +528,11 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                   {selected.context.meetingTime ? t('時間：{time}（台北） · ', { time: selected.context.meetingTime }) : ''}
                   {t('與會者：{list}', { list: selected.context.participants.map(p=>`${p.name}${p.organization ? `（${p.organization}）` : ''}`).join('、') || t('未提供') })}
                 </p>}
+                {selected.context?.purpose && (
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    {t("目的：{purpose}", { purpose: selected.context.purpose })}
+                  </p>
+                )}
                 {pending && !expired && (
                   <p role="status" className="mt-5">
                     {t("正在整理重點與任務，請稍候。離開此頁仍可從最近紀錄查看結果。")}
@@ -618,8 +640,13 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                                   </label>
                                   <div className="min-w-0 flex-1 space-y-3">
                                     <label className="block space-y-1 text-sm">
-                                      <span>
+                                      <span className="flex flex-wrap items-center gap-2">
                                         {imported ? statusLabel : t("任務名稱")}
+                                        {task.followUp === true && (
+                                          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                            {t("追蹤對方")}
+                                          </span>
+                                        )}
                                       </span>
                                       <input
                                         className={field}
