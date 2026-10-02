@@ -19,7 +19,7 @@
 -- dispatch, has_pro, pro_until, give_days, defer_gifts, plan_allows and
 -- my_plan_usage are identical to a fresh database migrated from this repo.
 --
--- ROLLBACK: supabase/rollback/20261002120000_web_billing_foundation_down.sql
+-- ROLLBACK: supabase/rollback/20261002230100_web_billing_foundation_down.sql
 -- restores the five rewritten functions byte-for-byte (tested: up → down →
 -- pg_get_functiondef md5 equal to before → up again). It keeps the web_*
 -- tables on purpose (billing records must survive). Once real customers

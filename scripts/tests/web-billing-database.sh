@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Disposable local cluster only; never reads project connection strings.
-# Website billing P1 (20261002120000_web_billing_foundation):
+# Website billing P1 (20261002230100_web_billing_foundation):
 #   1. applies every migration BEFORE it to a fresh database, with
 #      Supabase-style default grants on (new public tables/functions are
 #      granted to anon/authenticated), so the migration's revokes are real;
@@ -13,7 +13,7 @@
 set -euo pipefail
 export LC_ALL=C
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-WEB_MIGRATION=20261002120000_web_billing_foundation.sql
+WEB_MIGRATION=20261002230100_web_billing_foundation.sql
 T=$(mktemp -d "${TMPDIR:-/tmp}/huddle-web-billing.XXXXXX")
 trap 'pg_ctl -D "$T/data" -m immediate stop >/dev/null 2>&1 || true; rm -rf "$T"' EXIT
 initdb -D "$T/data" -A trust --no-locale --encoding=UTF8 -U postgres >/dev/null

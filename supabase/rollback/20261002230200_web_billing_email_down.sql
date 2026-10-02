@@ -1,4 +1,4 @@
--- DOWN for 20261002130000_web_billing_email.sql. Run as ONE transaction
+-- DOWN for 20261002230200_web_billing_email.sql. Run as ONE transaction
 -- (psql -1 -f this_file). Removes the three huddle_ops email functions and the
 -- claimed_at column. Queued / sent mail rows stay (they are billing records);
 -- the foundation tables are untouched. Re-applying the up migration works.

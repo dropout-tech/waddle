@@ -477,7 +477,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 
 ### P1 實作紀錄（2026-10-02，分支 feat/web-billing；**尚未套用到任何遠端資料庫**）
 
-- 檔案：`supabase/migrations/20261002120000_web_billing_foundation.sql`（up）、`supabase/rollback/20261002120000_web_billing_foundation_down.sql`（down）、`scripts/tests/web-billing-database.sh`（＋`web-billing-equivalence.sql`、`web-billing-database.sql`）、`lib/operations/types.ts`（只加 `web_paid_until`）。
+- 檔案：`supabase/migrations/20261002230100_web_billing_foundation.sql`（up）、`supabase/rollback/20261002230100_web_billing_foundation_down.sql`（down）、`scripts/tests/web-billing-database.sh`（＋`web-billing-equivalence.sql`、`web-billing-database.sql`）、`lib/operations/types.ts`（只加 `web_paid_until`）。
 - 正式庫比對（唯讀 SELECT，`supabase db query --linked`，project ref jnikcndiexjojgvicohf，2026-10-02）：dispatch／has_pro／pro_until／give_days／defer_gifts／plan_allows／my_plan_usage 的 `md5(pg_get_functiondef)` 與 repo 從零套到底的結果**完全一致**；正式庫最新 migration＝20261001200000，尚無 `web_*` 表與 `paid_until` 函式。
 - 與本文件設計不同之處：
   1. dispatch 不整支複製，改「讀現行定義→7 段片段各須恰好出現一次才替換→否則整支 migration 中止」（同 `pro_limits.sql` §8/§10 的寫法）。理由：23KB 整支複製最容易默默蓋掉正式庫熱修；片段對不上會停而不是猜。另外多改了 §1.4 表沒列的 `admin_analytics.paid`（純統計，與 admin_overview 一致）。
@@ -486,7 +486,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
   4. `web_payment_attempts.subscription_id` 改 NOT NULL（所有流程都掛在某筆訂閱下，唯一索引才有意義）。
   5. `my_web_billing()` 比 §1.5 多回 `trial_days` 與 `prices.currency`（T1 購買頁要顯示試用結束日，天數只放 DB 一處）；卡片只在 `status='active'` 時回傳。
   6. R9 的「金額必須等於價格表」DB 檢查**未做**：綁卡 1 元、漲價過渡期都會讓固定清單誤擋，改在 P2 轉換函式內檢查。
-- 回滾（down）：`psql -1 -f supabase/rollback/20261002120000_web_billing_foundation_down.sql`。把 5 支函式還原成**逐位元組相同**的舊定義（測試以 md5 驗證）、刪除新函式與觸發器；`web_*` 表與資料**保留**（帳務紀錄）。已有網站訂閱客人時執行 down＝他們立刻失去 Pro，屬商業決定，必問老闆。down 後可再套 up（測試已驗 up→down→up）。
+- 回滾（down）：`psql -1 -f supabase/rollback/20261002230100_web_billing_foundation_down.sql`。把 5 支函式還原成**逐位元組相同**的舊定義（測試以 md5 驗證）、刪除新函式與觸發器；`web_*` 表與資料**保留**（帳務紀錄）。已有網站訂閱客人時執行 down＝他們立刻失去 Pro，屬商業決定，必問老闆。down 後可再套 up（測試已驗 up→down→up）。
 - P3 前必修（本階段刻意不碰 UI）：`components/operations/announcements.tsx:277-278` 的「贈送即將結束」提醒只排除 Apple，網站訂閱者會被誤提醒——開 `checkout_mode` 之前要加 `!web_paid_until` 條件。
 
 ---

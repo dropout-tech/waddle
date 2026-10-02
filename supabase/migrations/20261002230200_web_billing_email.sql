@@ -1,11 +1,11 @@
 -- Website subscriptions, module C: reminder enqueueing + outbox claim/finish.
 -- Design: docs/billing/2026-10-02-web-billing-design.md §2.2 (續訂提醒信), §4.2
 -- steps 5 and 7. Interface: docs/billing/2026-10-02-web-billing-contracts.md §3.
--- Depends only on 20261002120000_web_billing_foundation (web_subscriptions,
+-- Depends only on 20261002230100_web_billing_foundation (web_subscriptions,
 -- web_payment_methods, web_email_outbox). Nothing here sends mail or changes
 -- who is Pro; with no web subscriptions it does nothing at all.
 --
--- ROLLBACK: supabase/rollback/20261002130000_web_billing_email_down.sql
+-- ROLLBACK: supabase/rollback/20261002230200_web_billing_email_down.sql
 -- (drops the three functions and the claimed_at column; queued rows stay).
 --
 -- No BEGIN/COMMIT inside, same as the foundation migration.

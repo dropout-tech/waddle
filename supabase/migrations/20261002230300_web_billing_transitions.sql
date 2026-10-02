@@ -24,15 +24,15 @@
 -- executable by service_role only. It never accepts a caller-supplied clock
 -- (the p_now parameters exist for tests only). Module C's outbox / reminder
 -- functions are called through it dynamically (to_regprocedure) so this
--- migration does not depend on 20261002130000 being present.
+-- migration does not depend on 20261002230200 being present.
 --
 -- Time: all calendar logic is in Asia/Taipei (UTC+8, no DST) and independent
 -- of the session TimeZone; durations use hours ('24 hours'), never days.
 --
--- ROLLBACK: supabase/rollback/20261002140000_web_billing_transitions_down.sql
+-- ROLLBACK: supabase/rollback/20261002230300_web_billing_transitions_down.sql
 -- (drops these functions and the rate-limit table; billing rows untouched).
 --
--- No BEGIN/COMMIT inside (same convention as 20261002120000). Apply with
+-- No BEGIN/COMMIT inside (same convention as 20261002230100). Apply with
 -- `psql -1` or `supabase db push`.
 
 set lock_timeout = '5s';
@@ -1101,7 +1101,7 @@ begin
     when 'customer_of' then
       return (select jsonb_build_object('customer_id', bc.slp_customer_id) from public.web_billing_customers bc
                where bc.user_id = (a ->> 'user_id')::uuid);
-    -- Module C (20261002130000), looked up at run time so this migration does
+    -- Module C (20261002230200), looked up at run time so this migration does
     -- not depend on it. Missing → {"missing": true}; the cron skips the step.
     when 'enqueue_reminders' then
       if to_regprocedure('huddle_ops.web_enqueue_reminders(timestamptz)') is null then

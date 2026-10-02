@@ -593,7 +593,7 @@ end $$;
 select public.t_ok(true, 'module C functions: reported missing when absent, passed through (positional finish args) when present');
 
 -- ── 19. Privileges: nothing new is callable by anon / authenticated ───────
--- Module C (20261002130000) adds 3 more huddle_ops.web_* functions when present;
+-- Module C (20261002230200) adds 3 more huddle_ops.web_* functions when present;
 -- they are covered by the same "no anon / authenticated EXECUTE" check.
 select public.t_ok((select count(*) = 31 + (select count(*) from pg_proc p2 join pg_namespace n2 on n2.oid = p2.pronamespace
         where n2.nspname = 'huddle_ops' and p2.proname in ('web_enqueue_reminders','web_claim_outbox','web_finish_outbox'))
@@ -624,7 +624,7 @@ select public.t_ok(public.t_mwb(2) -> 'subscription' ->> 'status' = 'active' and
 -- ── 20. Rollback round trip: down → (billing rows kept) → up ──────────────
 create table public.t_rows as select (select count(*) from public.web_subscriptions) s, (select count(*) from public.web_payment_attempts) a,
   (select count(*) from public.web_email_outbox) o;
-\ir ../../supabase/rollback/20261002140000_web_billing_transitions_down.sql
+\ir ../../supabase/rollback/20261002230300_web_billing_transitions_down.sql
 select public.t_ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where (n.nspname = 'huddle_ops' and p.proname like 'web\_%'
            and p.proname not in ('web_paid_until','web_subscription_guard','web_payment_attempt_guard','web_refund_guard',
@@ -637,7 +637,7 @@ select public.t_ok(not exists (select 1 from pg_proc p join pg_namespace n on n.
          and o = (select count(*) from public.web_email_outbox) from public.t_rows)
   and to_regprocedure('huddle_ops.paid_until(uuid)') is not null and huddle_ops.has_pro(public.t_u(2)),
   'down: all new functions and the rate table gone; billing rows and P1 functions untouched');
-\ir ../../supabase/migrations/20261002140000_web_billing_transitions.sql
+\ir ../../supabase/migrations/20261002230300_web_billing_transitions.sql
 select public.t_ok((select count(*) = 31 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where (n.nspname = 'huddle_ops' and p.proname like 'web\_%'
            and p.proname not in ('web_paid_until','web_subscription_guard','web_payment_attempt_guard','web_refund_guard',

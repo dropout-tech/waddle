@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Disposable local cluster only; never reads project connection strings.
-# Website billing P2 (20261002140000_web_billing_transitions):
+# Website billing P2 (20261002230300_web_billing_transitions):
 #   1. applies EVERY migration to a fresh database with Supabase-style default
 #      grants on (so the migration's revokes are real);
 #   2. web-billing-transitions.sql: the whole state machine with explicit

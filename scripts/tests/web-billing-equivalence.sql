@@ -1,5 +1,5 @@
 -- Web billing P1: with the web_* tables EMPTY, every existing reader must give
--- byte-identical answers before and after 20261002120000_web_billing_foundation.
+-- byte-identical answers before and after 20261002230100_web_billing_foundation.
 -- Before and after run in ONE transaction, so now() is the same instant and
 -- even now()-based values (pro_until, give_days base) compare exactly.
 -- Run by scripts/tests/web-billing-database.sh on a database migrated up to,
@@ -128,7 +128,7 @@ end $$;
 begin;
 select public.t_defs_capture('pre');
 select public.t_capture('pre');
-\ir ../../supabase/migrations/20261002120000_web_billing_foundation.sql
+\ir ../../supabase/migrations/20261002230100_web_billing_foundation.sql
 select public.t_defs_capture('up1');
 select public.t_capture('post');
 

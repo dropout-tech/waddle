@@ -15,7 +15,7 @@ begin
 end $$;
 
 -- ── 1. Rollback round trip: up → down → identical defs → up again ──────────
-\ir ../../supabase/rollback/20261002120000_web_billing_foundation_down.sql
+\ir ../../supabase/rollback/20261002230100_web_billing_foundation_down.sql
 select public.t_defs_capture('down');
 select public.t_ok(not exists (
   select 1 from public.t_defs p join public.t_defs d on d.sig = p.sig and d.phase = 'down'
@@ -26,7 +26,7 @@ select public.t_ok(to_regprocedure('huddle_ops.paid_until(uuid)') is null and to
   and to_regclass('public.web_subscriptions') is not null
   and not exists (select 1 from pg_trigger where tgname in ('operations_defer_gifts_web','web_subscription_guard')),
   'down drops new functions and triggers but keeps the web_* tables (billing records)');
-\ir ../../supabase/migrations/20261002120000_web_billing_foundation.sql
+\ir ../../supabase/migrations/20261002230100_web_billing_foundation.sql
 select public.t_defs_capture('up2');
 select public.t_ok(not exists (
   select 1 from public.t_defs a join public.t_defs b on b.sig = a.sig and b.phase = 'up2'
