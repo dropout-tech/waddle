@@ -7,6 +7,15 @@
 > **與既有草稿的關係**：`docs/legal/2026-10-01-pro-launch-copy-draft.md`（以下簡稱「IAP 稿」）寫的是「只在 iOS 透過 Apple 賣」。本稿加上「網站用 SHOPLINE Payments 刷卡」這條路，**以下 IAP 稿段落由本稿取代**：B1、T2、T4 第二段、T5、R1、R4、R6、S1–S4、P1、P3、P5（P5 的 Apple／RevenueCat 段落保留，見本稿 3-3）。IAP 稿其餘段落（R2 Apple 退款流程、R5、P2、P4 等）仍有效，與本稿不衝突。
 > 價格與 Pro 內容依 `docs/billing/2026-10-01-pro-scope.md`（月繳 NT$150、年繳 NT$990），用量數字依老闆 2026-10-01 上線決策（免費 AI 5 次／Pro 20 次、積極版門檻 150／100／200 MB、Apple Watch 第一版不帶）。
 
+> **2026-10-03 狀態更新（以此為準，覆蓋下文同項）**——本稿寫於 10-01，之後老闆已拍板，條款頁（`app/terms`、`app/refunds`、`app/support`）多數段落已依新決定上線在開賣開關後面：
+> - **D2 已改為「有試用」**：網站首次購買享 **2 週**免費試用、需綁卡、到期自動扣第一期、每人限一次（跨 iOS／網站）。因此本稿所有「首次付款後 7 天」的退款寫法，要改成「**試用結束後第一次扣款（沒有試用資格者為首次付款）後 7 天**」；「今天扣款」要分試用／直購兩版（已在 7-1、7-2 修正）。條款頁現行寫法見 `app/refunds/page.tsx` 的 web-refund 段。
+> - **D1 採乙**（首扣＋年繳續扣 7 天全額退），程式一致（`20261003020300_web_billing_transitions.sql:585`）。**D4 採建議值**（寬限 7 天、重試 3 次）。
+> - **營運者資訊**：本名 廖思明／Liao Sih-Ming、客服 Email hi@lazy72.com（**不寫回覆時效**）、客服電話 0988-493-026、管轄 **臺灣新北地方法院**（`lib/legal/operator.ts`）。地址：老闆選「工作室可收信地址」，**尚未提供（不填不能開賣）**。截至 10-03 條款頁只顯示電話，本名與 Email 尚未上頁。
+> - **0-5 稅務**：老闆已問過會計師，稅籍／行號先不辦、統編句不放。**0-6 黃 2**：老闆已向 SLP 窗口確認個人戶可收 SaaS、每月收款無上限。
+> - **2-3 Pro 內容**：「不設數量上限」照寫（老闆決定）；**企鵝造型／音樂包不寫進 Pro 介紹**，推出當天再加——2-3、6-1 的相關句要刪。
+> - **第 9 節**：`app/terms` 已無 NT$1,290、`lib/billing/plans.ts` 已是 990；表中行號已過時，以現行檔案為準。
+> - 回覆時效佔位【待老闆填：回覆時效】一律刪句，不填。
+
 ---
 
 ## 0. 給老闆的一頁摘要
@@ -641,10 +650,10 @@ English：
 
 繁中：
 > **你要購買：Huddle Pro 月繳方案**（年繳則顯示「年繳方案」）
-> - 今天扣款：NT$150（年繳：NT$990），新台幣，已含稅（如適用），沒有其他費用
+> - 今天扣款：NT$150（年繳：NT$990），新台幣，已含稅（如適用），沒有其他費用【有試用資格時改為：今天不扣款，免費試用 2 週到【系統帶入：YYYY 年 M 月 D 日】，當天自動扣款 NT$150（NT$990）；試用期內取消就不扣款】
 > - 自動續訂：之後每月（每年）的【系統帶入：日】日自動扣款 NT$150（NT$990），直到你取消。下次扣款日：【系統帶入：YYYY 年 M 月 D 日】
 > - 取消：隨時登入 Huddle，到「設定」→「訂閱」線上取消，Pro 用到期末
-> - 退款：首次付款後 7 天內可申請全額退款（〈取消與退款〉連結）
+> - 退款：試用結束後第一次扣款（沒有試用者為今天的付款）後 7 天內，以及年繳續訂扣款後 7 天內，可申請全額退款（〈取消與退款〉連結）
 > - 付款方式：信用卡（【工程師填：可用卡別】），刷卡由 SHOPLINE Payments 處理；Huddle 不會取得完整卡號
 > - 收據：寄到你的帳號 Email【系統帶入：Email】
 > - 營運者：【待老闆填：本名】（個人）｜客服：【待老闆填：客服 Email】／【待老闆填：客服電話】
@@ -652,10 +661,10 @@ English：
 
 English：
 > **You are buying: Huddle Pro, monthly plan** (or “annual plan”)
-> - Charged today: TWD 150 (annual: TWD 990), including any applicable tax, with no additional fees
+> - Charged today: TWD 150 (annual: TWD 990), including any applicable tax, with no additional fees [if eligible for the trial: nothing is charged today; your 2-week free trial ends on 【系統帶入：Month D, YYYY】 and TWD 150 (TWD 990) is charged that day; cancel during the trial and you pay nothing]
 > - Auto-renewal: TWD 150 (TWD 990) is charged automatically on day 【系統帶入：D】 of each month (each year) until you cancel. Next charge: 【系統帶入：Month D, YYYY】
 > - Cancel: anytime online — sign in, go to Settings → Subscription. Pro stays active until the end of the period
-> - Refunds: full refund within 7 days of your first payment (link to Cancellation & refunds)
+> - Refunds: full refund within 7 days of your first charge after the trial (or of today’s payment if you have no trial), and within 7 days of an annual renewal charge (link to Cancellation & refunds)
 > - Payment: credit card (【工程師填：可用卡別】), processed by SHOPLINE Payments. Huddle never receives your full card number
 > - Receipt: sent to your account email 【系統帶入：Email】
 > - Operator: 【待老闆填：英文姓名】 (individual) · Support: 【待老闆填：客服 Email】 / 【待老闆填：客服電話】
@@ -668,8 +677,8 @@ English：
 > English：I have read and agree to the Terms of use and the Cancellation & refunds policy, and I have read the Privacy notice.
 
 勾選二（自動扣款授權）：
-> 繁中：我同意 Huddle 以這張信用卡每月（每年）自動扣款 NT$150（NT$990），直到我取消續訂為止。我了解可以隨時在帳號設定線上取消，且首次付款後 7 天內可申請全額退款。
-> English：I authorize Huddle to charge this credit card TWD 150 every month (TWD 990 every year) until I cancel renewal. I understand that I can cancel online at any time in my account settings, and that I can get a full refund within 7 days of my first payment.
+> 繁中：我同意 Huddle 以這張信用卡每月（每年）自動扣款 NT$150（NT$990），直到我取消續訂為止。我了解可以隨時在帳號設定線上取消，且試用結束後第一次扣款（沒有試用者為首次付款）與年繳續訂扣款後 7 天內可申請全額退款。
+> English：I authorize Huddle to charge this credit card TWD 150 every month (TWD 990 every year) until I cancel renewal. I understand that I can cancel online at any time in my account settings, and that I can get a full refund within 7 days of my first charge after the trial (or of my first payment if I have no trial) and of each annual renewal charge.
 
 付款按鈕文字：
 > 繁中：同意並付款 NT$150（年繳：同意並付款 NT$990）

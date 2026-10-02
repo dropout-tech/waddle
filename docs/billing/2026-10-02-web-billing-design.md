@@ -1,6 +1,6 @@
 # Huddle 網站訂閱（SHOPLINE Payments）設計文件與開工前風險審查
 
-- 日期：2026-10-02　作者：engineer（Claude）　狀態：**草案，待老闆拍板第 0 節決策後開工**
+- 日期：2026-10-02　作者：engineer（Claude）　狀態：**D1–D10 已拍板（見下方決策紀錄）；P1–P5 程式已合併 main、開關全關；P1–P5 的 3 支 migration 已於 2026-10-02 套用正式庫；Edge Function 未部署、待 SLP 沙盒金鑰**（2026-10-03 狀態更新）
 - 分支：feat/web-billing（基準 origin/main 79fd238）
 - 依據：`docs/billing/2026-10-02-shopline-api-notes.md`（以下簡稱「SLP 筆記」）、`app/terms/page.tsx`、`app/refunds/page.tsx`、`app/support/page.tsx`、`app/privacy/page.tsx`，以及本文引用的 migration／程式行號（皆以 79fd238 為準，開工時請重核）。
 - 本文件只做設計，**沒有寫程式、沒有碰任何資料庫、沒有打任何 SLP API**。文中標 [推測] 的地方，要等 sandbox 實測或 SLP 窗口回覆才能定案。
@@ -8,6 +8,7 @@
 ---
 
 > **決策紀錄（2026-10-02）**：老闆對 D1–D10 回覆「照建議」，全部採用下表建議欄。D7 已由 PR #128（main 62574cf）定案：月繳 NT$150、年繳 NT$990，網站與 App 一致。老闆已向 SLP 窗口確認個人戶可收 SaaS 訂閱、月收款無上限（§9 第 2 題已答）。
+> **D8 改決定（2026-10-02 晚）**：老闆決定**不開測試專案**，直接用正式庫 penguinflow 接 SLP sandbox，沙盒資料以訂單號前綴 `hs` 區分、只開白名單帳號（owner-checklist A3）。本文件凡寫「測試專案」處，實際都是正式庫；由此衍生的風險見 `2026-10-03-docs-review.md`（沙盒價格、hs 測試訂閱在切正式前要清掉）。
 
 ## 0. 給老闆的一頁摘要
 
@@ -30,13 +31,13 @@
 
 | # | 議題 | 選項 | 建議 | 理由 |
 |---|---|---|---|---|
-| D1 | 寄信服務 | A. Resend 免費方案（$0，3,000 封／月、100 封／天、寄件網域 lazy72.com）<br>B. Resend Pro（US$20／月，5 萬封、無每日上限）<br>C. 不寄信 | **A**，日寄信量接近 80 封再升 B | 條款已承諾收據、年繳續訂前 7 天提醒、扣款失敗通知、漲價通知（0.5 節對照表 T14/T15/T18/T19），**C 等於違約**。同一個 Resend 帳號也能順便解決「Supabase 註冊驗證信 SMTP 未設」的舊問題。你要做：在 lazy72.com 的 DNS 加 3 筆紀錄（SPF／DKIM／回信）；另外要在 Apple 開發者後台登記寄件網域，否則用「隱藏我的 Email」登入的 Apple 用戶**收不到信**（風險 R14）。費用以 resend.com/pricing 2026-10-02 頁面為準。 |
+| D1 | 寄信服務 | A. Resend 免費方案（$0，3,000 封／月、100 封／天、寄件網域 lazy72.com）<br>B. Resend Pro（US$20／月，5 萬封、無每日上限）<br>C. 不寄信 | **A**，日寄信量接近 80 封再升 B | 條款已承諾收據、年繳續訂前 7 天提醒、扣款失敗通知、漲價通知（0.5 節對照表 T14/T15/T18/T19），**C 等於違約**。同一個 Resend 帳號也能順便解決「Supabase 註冊驗證信 SMTP 未設」的舊問題。你要做：在 lazy72.com 的 DNS 加 3 筆紀錄（SPF／DKIM／回信）；另外要在 Apple 開發者後台登記寄件網域，否則用「隱藏我的 Email」登入的 Apple 用戶**收不到信**（風險 R14）。（**2026-10-02 已完成**：Resend 網域 lazy72.com Verified、Apple 寄件來源三項 SPF 通過，見 owner-checklist A2；剩 API Key。）費用以 resend.com/pricing 2026-10-02 頁面為準。 |
 | D2 | 同時有 Apple 與網站訂閱 | A. 擋下：已有有效 Apple 訂閱的人，網站不給買；已有網站訂閱的人，App 購買卡顯示「你已是 Pro」不給買<br>B. 警告後允許<br>C. 不管 | **A** | 條款寫「請不要重複購買，重複了來電退網站那筆」（terms 〈同時有 Apple 訂閱時〉）。擋下最省客訴與退款手續費。App 端只顯示「你已是 Pro」、不提網站、不放連結，不違反 Apple 3.1.1。 |
 | D3 | 7 天退款 | A. 自助按鈕，按下即自動退款（第二次以上申請改人工）<br>B. 按鈕只送出申請，你在後台按「核准」才退<br>C. 只接電話 | **A** | 條款承諾「設定→訂閱→申請退款」（refunds 〈七日內全額退款〉），**C 違約**。B 可行但你一個人營運，條款承諾「收到申請隔天起 15 天內完成」，漏看就違約。法律上 7 天內本來就不能拒絕，人工審核擋不了什麼。A 加「同一帳號第二次以上退款轉人工」防「訂→用 6 天→退」循環。 |
 | D4 | 試用到期第一次扣款失敗 | A. 比照續訂：7 天寬限、Pro 照用、最多再試 3 次<br>B. Pro 立刻停，7 天內補付可恢復<br>C. 直接結束 | **A** | 條款〈扣款失敗〉寫的是「續訂扣款失敗」，試用轉付費算不算「續訂」有疑義；條款自己寫「有疑義時作有利於消費者的解釋」（terms 〈準據法〉）。A 最安全。代價：卡片有問題的人最多多用 7 天，因為每人只能試用一次，損失有上限。 |
 | D5 | 管理後台 | A. 最小版，放在現有營運後台：查某人的訂閱與扣款紀錄、代取消、代退款（含 7 天外一定要退的情形）、暫停扣款（帳號被冒用）、排程最後執行時間與異常清單<br>B. 只用 SHOPLINE 後台＋請工程師查資料庫<br>C. 完整版（報表、匯出、漲價工具） | **A** | 條款承諾電話代取消、帳號被冒用暫停扣款、重複扣款一定退（terms〈帳號與使用安全〉、refunds 第 2 段末），沒有後台按鈕，你只能半夜找工程師。C 的漲價工具留到真的要漲價前再做（第 8 節 P7）。 |
 | D6 | 試用到期前提醒信（條款沒承諾） | A. 寄（試用結束前 2 天）<br>B. 不寄 | **A** | 不提醒就扣款是「訂閱糾紛」和信用卡拒付（chargeback）的主要來源；拒付每筆會有額外處理成本（金額要問 SLP）。多寄一封信成本趨近 0。 |
-| D7 | 網站價格 | A. 與 App 一致（PR #128 把月繳改 150，尚未合併）<br>B. 網站維持 149 | **A，先決定 App 價格再開工 P3** | 兩邊價格不同，客人會問；條款、官網、收據、SDK 金額都要跟著改。程式會把價格做成設定，不寫死。 |
+| D7 | 網站價格 | A. 與 App 一致（PR #128 把月繳改 150；**已合併**，main 62574cf）<br>B. 網站維持 149 | **A，先決定 App 價格再開工 P3** | 兩邊價格不同，客人會問；條款、官網、收據、SDK 金額都要跟著改。程式會把價格做成設定，不寫死。 |
 | D8 | 測試環境 | A. 開一個免費的 Supabase「測試專案」，接 SLP sandbox<br>B. 直接在正式資料庫用白名單測 | **A** | 把測試卡的假交易寫進正式庫，等於讓假資料混進帳務紀錄。Supabase 免費方案可以開 2 個專案，$0。需要你用你的帳號開（或授權我開）。 |
 | D9 | 沒試用直接購買的第一筆，7 天內可退嗎 | A. 可以<br>B. 不行（條款字面只寫「試用結束後第一次扣款」） | **A** | 消保法 7 天解除權本來就涵蓋第一次購買；B 有違法風險。 |
 | D10 | 月繳↔年繳互換 | A. 第一版不做，客人取消後到期再買，或來電人工處理<br>B. 第一版就做 | **A** | 換方案涉及按比例退費與扣款日重算，會讓範圍再大 M 級。條款沒有承諾這件事。 |
@@ -262,7 +263,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 ### 2.2 其他流程
 
 **試用到期首扣**（CR 每 10 分鐘）
-1. DB `web_claim_due(limit 20)`：`select … for update skip locked` 挑 `status in (trialing,active,past_due)`、`not cancel_at_period_end`、`not billing_hold`、`not needs_customer_action`、`renewals_enabled`、到期（`current_period_end <= now()` 或 `next_retry_at <= now()`）、且該期**沒有**成功或未決的扣款紀錄 → 為每筆插入 `pending` 扣款紀錄（`kind=recurring`、`cycle=本期`、`attempt_no=第幾次`）→ commit。
+1. DB `web_claim_due`（實作：一次 claim 1 筆、送出後再 claim 下一筆，每 tick 最多 10 筆，見 §4.2 與 `web-billing-cron/handler.mjs:140-151`）：`select … for update skip locked` 挑 `status in (trialing,active,past_due)`、`not cancel_at_period_end`、`not billing_hold`、`not needs_customer_action`、`renewals_enabled`、到期（`current_period_end <= now()` 或 `next_retry_at <= now()`）、且該期**沒有**成功或未決的扣款紀錄 → 為每筆插入 `pending` 扣款紀錄（`kind=recurring`、`cycle=本期`、`attempt_no=第幾次`）→ commit。
 2. CR 對每筆呼叫 SLP Recurring（`autoConfirm=true`、`paymentCustomerId`、`paymentInstrumentId`、金額＝`price_minor`、`referenceOrderId`＝決定性訂單號、`idempotentKey`＝同值）。
 3. 同步回應是終態 → DB `web_apply_payment_result`；不是終態或逾時 → 保持 `pending`，交給 webhook 與對帳（§4.3）。
 4. 成功：`active`、`cycle+1`、`current_period_start=原到期時間`、`current_period_end=錨點+(cycle) 單位`、`access_until=period_end+1 天`、清空重試、`cooling_off_eligible`（首扣／年繳續扣為真）、`refund_deadline`、寄收據（同一 transaction 入佇列）。
@@ -273,7 +274,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 **扣款失敗、重試與寬限**
 - 第一次失敗：`past_due`、`grace_until=原到期時間+7 天`、`access_until=grace_until`、`retry_count=0`、`next_retry_at=+1 天`；寄「扣款失敗」信（附更換卡片／立即付款入口）。
 - 重試排程：+1、+3、+6 天（共 3 次，全在 7 天內，T18）。
-- 失敗碼 4900（需 3D）、4901（需 CVC）、4902（已存卡付款其他錯誤）：SLP 明說無人在場無法完成，且建議停止對該卡發起定期扣款（SLP 筆記 §5）→ 設 `needs_customer_action=true`、**不自動重試**、寄「請回網站完成付款」信。
+- 失敗碼 4900（需 3D）、4901（需 CVC）、4902（已存卡付款其他錯誤）：SLP 明說無人在場無法完成（SLP 筆記 §5；官方「停止對該工具扣款」的明文是針對解綁／工具停用，見筆記 §13）→ 設 `needs_customer_action=true`、**不自動重試**、寄「請回網站完成付款」信。
 - 1201（卡片處理中）：5 分鐘後重試，不計入 3 次。
 - `grace_until` 到仍未成功 → `expired`、`cancel_reason=grace_exhausted`；寄「訂閱已結束」信；不留欠款。
 
@@ -364,7 +365,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 三層，任何一層單獨失效都不會重複扣款：
 1. **租約**：`update web_billing_config set runner_lease_until = now()+interval '5 minutes' where runner_lease_until is null or runner_lease_until < now() returning true`——拿不到就不跑。不用 advisory lock，因為經 PostgREST 的連線是 pooled、鎖撐不過多次 HTTP 呼叫。
 2. **資料庫唯一約束**：同一期最多一筆成功、最多一筆未決（§1.2 `web_payment_attempts` 約束）。claim 在同一 transaction 內 `for update skip locked` 鎖訂閱列並插入 `pending` 列，兩個 tick 同時跑也只有一個插得進去。
-3. **決定性訂單號**：`referenceOrderId = {prefix 2 碼}{order_ref 16 碼}c{期數 4 碼}a{次數 2 碼}`（共 25 碼 ≤ 32）。同一筆扣款紀錄重送時用同一個號碼，SLP 若照預期回 1001「Order exist」就不會重扣（[推測]，SLP 筆記 §5，第 9 節 Q5 要問）。`prefix`：正式 `hp`、sandbox `hs`，webhook 依前綴過濾別人的事件。
+3. **決定性訂單號**：`referenceOrderId = {prefix 2 碼}{order_ref 16 碼}c{期數 4 碼}a{次數 2 碼}`（共 26 碼 ≤ 32；退款單號把 `a` 換成 `r`，`core.mjs:23-32`）。同一筆扣款紀錄重送時用同一個號碼，SLP 若照預期回 1001「Order exist」就不會重扣（[推測]，SLP 筆記 §5，第 9 節 Q5 要問）。`prefix`：正式 `hp`、sandbox `hs`，webhook 依前綴過濾別人的事件。
 - 「冪等鍵＝訂閱 ID＋週期」由約束 2 實現；重試同一期需要新的 SLP 訂單號（`attempt_no` 遞增），因為 SLP 不保證失敗單號可重用。
 - 未決（`pending`／`unknown`）存在時，該期**絕不**再發新扣款。寧可漏扣（客人多用幾天，後台人工補），不可重扣。
 
@@ -438,7 +439,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 | R17 | 退款濫用 | 低 | 同一人反覆「訂→用 6 天→退」 | D3：第二次起人工；每次都沒有試用（試用只有一次） |
 | R18 | 排程超時 | 中 | 免費方案 150 秒上限，一批扣款太多被砍，紀錄停在 pending | 每 tick 上限＋總時限；pending 由對帳處理 |
 | R19 | 隱私說明不符 | 低 | 為了「卡片快到期提醒」存了有效期限，但隱私說明沒列 | 第一版不存；要做先改隱私說明 |
-| R20 | 價格不一致 | 中 | 網站 149、App 150；收據、條款、SDK 金額各說各話 | D7；價格只放 `web_billing_config` 一處 |
+| R20 | 價格不一致 | 中 | 網站 149、App 150；收據、條款、SDK 金額各說各話 | D7（已定 150／990）；價格只放 `web_billing_config` 一處（正式庫預設 15000／99000，`20261003020100_web_billing_foundation.sql:69-70`） |
 | R21 | 稅務門檻 | 中（非技術） | 年繳 990 讓某月營收衝過 5 萬，需立即辦稅籍、公開統編；收據格式可能要改 | 交給會計師（HANDOFF 2026-10-01 地雷 ③）；收據模板可改 |
 | R22 | 網站先於 App 開賣 | 高（審查） | Apple 3.1.3(b)：App 解鎖網站買的 Pro，前提是 App 內也能買；網站先開會讓 App 審查出問題 | `checkout_mode` 只在 iOS 內購上線後才開（P6 前置條件） |
 | R23 | Scope 膨脹 | 中 | 邊做邊加「換方案、優惠碼折抵、發票」，時程失控 | D10 第一版不做換方案；優惠碼與發票明列不在本範圍 |
@@ -447,7 +448,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 - 單元（`node --test scripts/tests/web-billing-*.test.mjs`）：驗簽（自造向量＋SLP 實際 webhook 樣本）、時間窗、訂單號（≤32、決定性、前綴）、日期（§2.3 清單）、退款截止、狀態轉換表、錯誤碼對照、金額換算。
 - DB（新增 `scripts/tests/web-billing-database.sh`，照 `billing-database.sh` 用拋棄式本機 PG，**不讀任何專案連線字串**）：所有 migration 依序套用；網站表空時 `has_pro`／`pro_until`／`give_days`／`defer_gifts`／dispatch 與改前等價；RLS（他人讀不到、client 不能寫）；兩個 session 同時 claim 不會產生兩筆 pending；同期兩筆成功被唯一約束擋下；webhook 重放冪等；刪人後帳務紀錄保留；開關關閉時 claim 回 0 筆；既有 4 份 DB 測試照跑。
 - Sandbox E2E（在 D8 的測試專案）：Playwright 跑購買頁（Visa／MC／JCB 測試卡、3D 成功／失敗、非 3D 失敗用偶數金額）；排程用「測試專用時間平移」（只在 `SHOPLINE_API_BASE` 為 sandbox 時允許的 DB 函式，把 `trial_end` 拉到現在）測首扣、失敗、重試、寬限結束、退款；寄信寄到測試信箱實收。
-- sandbox 限制：共用帳號、webhook 可能被覆蓋、「3 的倍數」規則以元或分計不確定、Recurring 是否已開通未知 → 這些測不到的部分，P6 用老闆本人真卡在正式環境實刷 NT$150＋立刻退款收尾。
+- sandbox 限制：共用帳號、webhook 可能被覆蓋、Recurring 是否已開通未知；**正式價格 150／990 都是 3 的倍數，在沙盒固定進 3D、無人在場的 Recurring 預期失敗**，要測扣款成功路徑得把沙盒價格設成 151／991 這類非 3 倍數的單數金額（SLP 筆記 §8）→ 這些測不到的部分，P6 用老闆本人真卡在正式環境實刷 NT$150＋立刻退款收尾。
 
 **回滾**
 - 前端：`NEXT_PUBLIC_WEB_BILLING_ENABLED` 移除即隱藏全部入口（需重新部署）。
@@ -475,7 +476,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 
 總規模：XL（約 3–4 週）。最大不確定：SLP 正式特店的綁卡／Recurring 開通時程與無人在場扣款失敗率。
 
-### P1 實作紀錄（2026-10-02，分支 feat/web-billing；**尚未套用到任何遠端資料庫**）
+### P1 實作紀錄（2026-10-02，分支 feat/web-billing；撰寫當下尚未套用遠端。**更新：2026-10-02 晚已套用正式庫**，套用前後 9 個帳號 Pro 狀態快照逐筆相同、開關全關，見 owner-checklist A3）
 
 - 檔案：`supabase/migrations/20261003020100_web_billing_foundation.sql`（up）、`supabase/rollback/20261003020100_web_billing_foundation_down.sql`（down）、`scripts/tests/web-billing-database.sh`（＋`web-billing-equivalence.sql`、`web-billing-database.sql`）、`lib/operations/types.ts`（只加 `web_paid_until`）。
 - 正式庫比對（唯讀 SELECT，`supabase db query --linked`，project ref jnikcndiexjojgvicohf，2026-10-02）：dispatch／has_pro／pro_until／give_days／defer_gifts／plan_allows／my_plan_usage 的 `md5(pg_get_functiondef)` 與 repo 從零套到底的結果**完全一致**；正式庫最新 migration＝20261001200000，尚無 `web_*` 表與 `paid_until` 函式。
@@ -489,7 +490,7 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 - 回滾（down）：`psql -1 -f supabase/rollback/20261003020100_web_billing_foundation_down.sql`。把 5 支函式還原成**逐位元組相同**的舊定義（測試以 md5 驗證）、刪除新函式與觸發器；`web_*` 表與資料**保留**（帳務紀錄）。已有網站訂閱客人時執行 down＝他們立刻失去 Pro，屬商業決定，必問老闆。down 後可再套 up（測試已驗 up→down→up）。
 - P3 前必修（本階段刻意不碰 UI）：`components/operations/announcements.tsx:277-278` 的「贈送即將結束」提醒只排除 Apple，網站訂閱者會被誤提醒——開 `checkout_mode` 之前要加 `!web_paid_until` 條件。
 
-### P2–P5 程式實作紀錄（2026-10-02 晚，分支 feat/web-billing 0ce9ce7；**全部只在本機一次性資料庫與假後端測過，未碰任何遠端**）
+### P2–P5 程式實作紀錄（2026-10-02 晚，分支 feat/web-billing 0ce9ce7；撰寫當下只在本機一次性資料庫與假後端測過。**更新：已合併 main（PR #166）；020200／020300 migration 已套正式庫；3 支 Edge Function 尚未部署**）
 
 - 介面合約：`docs/billing/2026-10-02-web-billing-contracts.md`（三模組平行施工依據）。
 - migration 已改號：P1 `20261003020100`、寄信 `20261003020200`、扣款狀態轉換 `20261003020300`（`140000` 被 PR #141 佔用；iOS 審查沙盒 PR #150 為 `150000`，**#150 必須先合併套用**）。P1 會偵測 `review_sandbox_until` 是否存在，兩種情況都保留 iOS 沙盒條款；回滾也還原對應版本。
