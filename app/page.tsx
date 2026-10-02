@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { WidgetSync } from '@/components/widgets/widget-sync'
 import { petVoiceName, setPetVoice } from '@/lib/pet/voice'
 import { MainLayout } from '@/components/layout/main-layout'
+import { BrainDumpHost } from '@/components/brain-dump/brain-dump-host'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
 import { TimeBlockModal } from '@/components/modals/time-block-modal'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -633,6 +634,14 @@ function HuddlePage() {
       </NotebookOverlayProvider>
       </UserSettingsProvider>
       </CategoryPrefixProvider>
+
+      <BrainDumpHost
+        workspaces={workspaces}
+        assignedTasks={assignedTasks}
+        timeBlocks={timeBlocks}
+        settings={settings}
+        createTask={createTask}
+      />
 
       <OverdueTaskReview
         isOpen={isOverdueReviewOpen}
