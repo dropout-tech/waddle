@@ -15,6 +15,7 @@ export const TICK_BUDGET_MS = 120000
 export const MAX_CHARGES_PER_TICK = 10
 const SLP_CALL_MS = 10000
 const BINDING_ABANDON_MS = 60 * 60 * 1000
+const STALE_PENDING_MS = 24 * 60 * 60 * 1000
 
 // config: { ready, slpProblem, cronSecret, prefix, siteUrl, resendApiKey, resendFrom, serverIp }
 // email: { processOutbox, renderEmail, sendEmail } from _shared/web-billing/email.mjs (module C)
@@ -58,6 +59,10 @@ export function createCronHandler({ config, db, slp, email, fetch: fetchFn, log 
         return r?.missing ? 'missing' : r?.count ?? 0
       })
       await step('refunds', () => trackRefunds(candidates.refunds ?? []))
+      await step('anomalies', async () => {
+        const list = await db.server('anomalies')
+        return Array.isArray(list) ? list.length : 0
+      })
       await step('emails', async () => {
         // module C sleeps ~600 ms between e-mails: keep it inside the budget.
         const max = Math.max(0, Math.min(30, Math.floor((left() - 10000) / 1500)))
@@ -81,31 +86,55 @@ export function createCronHandler({ config, db, slp, email, fetch: fetchFn, log 
     return reply(200, { ok: summary.errors.length === 0, ...summary })
 
     // Step 2: requests SLP has not answered. Ask SLP; never re-send.
+    // The DB hands out the least recently checked rows first (rotation).
     async function reconcile(attempts) {
-      let resolved = 0, unknown = 0, abandoned = 0
+      let resolved = 0, unknown = 0, abandoned = 0, stale = 0
       for (const ctx of attempts) {
         if (left() < 60000) break
         const ref = ctx.reference_order_id
+        let f = null
         if (ctx.trade_order_id) {
-          const f = await fetchAttemptResult(slp, ctx)
+          f = await fetchAttemptResult(slp, ctx)
           if (f.result && f.result.status !== 'pending') {
             await applyAttemptResult({ db, slp, referenceOrderId: ref, result: f.result, log }); resolved++; continue
           }
         }
+        if (ctx.status === 'succeeded') continue // paid, card still unknown: try again next time
         const age = now() - Date.parse(ctx.created_at)
-        if (ctx.kind === 'card_bind' && age > BINDING_ABANDON_MS) {
-          // A card binding moves no money: after an hour it is closed so the
-          // member can try again (a late success is then ignored).
-          await applyAttemptResult({ db, slp, referenceOrderId: ref, result: { status: 'failed', failure_code: 'abandoned', failure_kind: 'hard' }, log })
-          abandoned++
-        } else if (!ctx.trade_order_id && ctx.status === 'pending') {
-          // Sent but no trade id came back (timeout): we cannot ask SLP by our
-          // order id (TODO(SLP-Q5)), so it waits for the webhook or a human.
-          await applyAttemptResult({ db, slp, referenceOrderId: ref, result: { status: 'unknown', failure_code: 'no_trade_id' }, log })
-          unknown++
+        if (ctx.kind === 'card_bind') {
+          if (age > BINDING_ABANDON_MS) {
+            // A card binding moves no money: after an hour it is closed so the
+            // member can try again (a late success is then ignored).
+            await applyAttemptResult({ db, slp, referenceOrderId: ref, result: { status: 'failed', failure_code: 'abandoned', failure_kind: 'hard' }, log })
+            abandoned++
+          }
+        } else if (!ctx.trade_order_id) {
+          if (ctx.status === 'pending') {
+            // Sent but no trade id came back (timeout): we cannot ask SLP by our
+            // order id (TODO(SLP-Q5)), so it waits for the webhook or a human.
+            await applyAttemptResult({ db, slp, referenceOrderId: ref, result: { status: 'unknown', failure_code: 'no_trade_id' }, log })
+            unknown++
+          }
+        } else if (ctx.status === 'pending' && f?.result && age > STALE_PENDING_MS) {
+          // SLP still says "not final" after a day (review #2). A customer-
+          // present request (abandoned 3-D Secure) is voided at SLP; only if
+          // SLP then confirms a final state is it decided, which releases the
+          // member. Otherwise, and always for unattended charges: 'unknown'
+          // for a human (web_billing_anomalies); never charged again.
+          if (ctx.kind !== 'recurring') {
+            const c = await slp.cancelPayment(ref, ctx.trade_order_id)
+            if (c.ok) {
+              const g = await fetchAttemptResult(slp, ctx)
+              if (g.result && g.result.status !== 'pending') {
+                await applyAttemptResult({ db, slp, referenceOrderId: ref, result: g.result, log }); resolved++; continue
+              }
+            }
+          }
+          await applyAttemptResult({ db, slp, referenceOrderId: ref, result: { status: 'unknown', failure_code: 'stale_pending' }, log })
+          stale++
         }
       }
-      return { resolved, unknown, abandoned }
+      return { resolved, unknown, abandoned, stale }
     }
 
     // Step 3: claim ONE due subscription, send it, record the answer; repeat.

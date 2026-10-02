@@ -48,6 +48,11 @@ create table if not exists huddle_ops.web_rate_hits (
 create index if not exists web_rate_hits_user_idx on huddle_ops.web_rate_hits (user_id, bucket, hit_at);
 revoke all on huddle_ops.web_rate_hits from public, anon, authenticated;
 
+-- Reconciliation bookkeeping (review 2026-10-02 #2/#3): the cron work lists
+-- rotate on last_checked_at, so rows SLP never settles cannot starve the rest.
+alter table public.web_payment_attempts add column if not exists last_checked_at timestamptz;
+alter table public.web_refunds add column if not exists last_checked_at timestamptz;
+
 -- ── 1. Pure helpers ────────────────────────────────────────────────────────
 -- ISO 8601 in UTC for e-mail payloads (contract §2), whatever the TimeZone.
 create or replace function huddle_ops.web_iso(p_at timestamptz) returns text
@@ -201,8 +206,8 @@ begin
       s := null;
     end if;
     if s.id is null then
-      insert into public.web_subscriptions (order_ref, user_id, plan, price_minor, with_trial)
-      values (substr(replace(gen_random_uuid()::text, '-', ''), 1, 16), p_user, p_plan, v_price, v_trial)
+      insert into public.web_subscriptions (order_ref, user_id, plan, price_minor, with_trial, created_at)
+      values (substr(replace(gen_random_uuid()::text, '-', ''), 1, 16), p_user, p_plan, v_price, v_trial, p_now)
       returning * into s;
     end if;
     if s.with_trial then
@@ -226,6 +231,12 @@ begin
     end if;
     v_kind := 'customer_present'; v_cycle := s.cycle + 1; v_amount := s.price_minor; v_behavior := 'QuickPayment';
     if not huddle_ops.web_amount_ok(v_amount) then raise exception 'WEB_BILLING:unavailable'; end if;
+    -- At most 20 customer-present tries per cycle: the order number has two
+    -- attempt digits shared with the cron's retries (review #1).
+    if (select count(*) from public.web_payment_attempts a
+         where a.subscription_id = s.id and a.cycle = v_cycle and a.kind = 'customer_present') >= 20 then
+      raise exception 'WEB_BILLING:rate_limited';
+    end if;
   end if;
 
   -- One undecided SLP request per subscription, whatever its kind.
@@ -237,8 +248,8 @@ begin
     from public.web_payment_attempts a where a.subscription_id = s.id and a.cycle = v_cycle;
   if v_no > 99 then raise exception 'WEB_BILLING:unavailable'; end if;
   v_ref := huddle_ops.web_order_id(p_prefix, s.order_ref, v_cycle, v_no, 'a');
-  insert into public.web_payment_attempts (subscription_id, user_id, kind, cycle, attempt_no, reference_order_id, amount_minor)
-  values (s.id, p_user, v_kind, v_cycle, v_no, v_ref, v_amount)
+  insert into public.web_payment_attempts (subscription_id, user_id, kind, cycle, attempt_no, reference_order_id, amount_minor, created_at)
+  values (s.id, p_user, v_kind, v_cycle, v_no, v_ref, v_amount, p_now)
   returning id into v_attempt;
   return jsonb_build_object(
     'subscription_id', s.id, 'attempt_id', v_attempt, 'reference_order_id', v_ref, 'order_ref', s.order_ref,
@@ -270,6 +281,11 @@ declare
   v_amount text := p_result ->> 'amount_minor';
 begin
   select * into a from public.web_payment_attempts where id = p_attempt;
+  -- Parked for a human (money / owner inconsistency): no later SLP answer
+  -- (e.g. one without an amount) may silently upgrade it (review #6).
+  if a.status = 'unknown' and a.failure_code in ('amount_mismatch','duplicate_success','owner_conflict') then
+    return jsonb_build_object('applied', false, 'reason', 'needs_review', 'status', a.status);
+  end if;
   if v_status is null or v_status not in ('pending','unknown','succeeded','failed') then
     raise exception 'WEB_BILLING:invalid_input' using detail = 'result status';
   end if;
@@ -304,6 +320,33 @@ begin
   return null;
 end $$;
 
+-- Store the SLP customer + card for a member. NULL when either already
+-- belongs to ANOTHER member (never reused; caller parks the attempt).
+create or replace function huddle_ops.web_store_card(p_user uuid, p_customer text, p_result jsonb)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare
+  v_instrument text := nullif(p_result #>> '{instrument,id}', '');
+  v_last4 text := p_result #>> '{instrument,last4}';
+  v_pm uuid;
+begin
+  if exists (select 1 from public.web_billing_customers bc where bc.slp_customer_id = p_customer and bc.user_id <> p_user)
+     or exists (select 1 from public.web_payment_methods pm where pm.slp_instrument_id = v_instrument
+                 and pm.user_id is distinct from p_user) then
+    return null;
+  end if;
+  insert into public.web_billing_customers (user_id, slp_customer_id) values (p_user, p_customer)
+  on conflict (user_id) do nothing;
+  insert into public.web_payment_methods (user_id, slp_customer_id, slp_instrument_id, brand, issuer_country, last4)
+  values (p_user, p_customer, v_instrument, left(p_result #>> '{instrument,brand}', 20),
+          left(p_result #>> '{instrument,issuer_country}', 8), case when v_last4 ~ '^[0-9]{4}$' then v_last4 end)
+  on conflict (slp_instrument_id) do update set status = 'active', disabled_at = null,
+    brand = coalesce(excluded.brand, public.web_payment_methods.brand),
+    issuer_country = coalesce(excluded.issuer_country, public.web_payment_methods.issuer_country),
+    last4 = coalesce(excluded.last4, public.web_payment_methods.last4)
+  returning id into v_pm;
+  return v_pm;
+end $$;
+
 -- Card binding (trial start / card change) and first purchase (CardBindPayment).
 create or replace function huddle_ops.web_apply_bind_result(p_reference_order_id text, p_result jsonb,
   p_now timestamptz default now())
@@ -317,7 +360,6 @@ declare
   v_status text := p_result ->> 'status';
   v_customer text := nullif(p_result ->> 'customer_id', '');
   v_instrument text := nullif(p_result #>> '{instrument,id}', '');
-  v_last4 text := p_result #>> '{instrument,last4}';
   v_pm uuid;
   v_old public.web_payment_methods;
   v_trial_end timestamptz;
@@ -329,6 +371,18 @@ begin
   select * into a from public.web_payment_attempts where reference_order_id = p_reference_order_id for update;
   if a.kind not in ('card_bind','first_purchase') then
     raise exception 'WEB_BILLING:invalid_input' using detail = 'not a binding attempt';
+  end if;
+  -- A first purchase activated without knowing the card ('card_unmatched'):
+  -- a later authoritative answer naming the card attaches it (review #2).
+  if a.status = 'succeeded' and a.failure_code = 'card_unmatched' and v_status = 'succeeded'
+     and v_customer is not null and v_instrument is not null and s.payment_method_id is null
+     and s.user_id = a.user_id and s.status in ('trialing','active','past_due')
+     and (nullif(p_result ->> 'trade_order_id', '') is null or nullif(p_result ->> 'trade_order_id', '') = a.slp_trade_order_id) then
+    v_pm := huddle_ops.web_store_card(a.user_id, v_customer, p_result);
+    if v_pm is null then return jsonb_build_object('applied', false, 'reason', 'owner_conflict', 'status', a.status); end if;
+    update public.web_subscriptions set payment_method_id = v_pm where id = s.id;
+    update public.web_payment_attempts set failure_code = null where id = a.id;
+    return jsonb_build_object('applied', true, 'status', 'succeeded', 'card', 'attached');
   end if;
   v := huddle_ops.web_attempt_progress(a.id, p_result);
   if v is not null then return v; end if;
@@ -344,6 +398,21 @@ begin
 
   -- succeeded: we must know which SLP customer and card it was.
   if v_customer is null or v_instrument is null then
+    if a.kind = 'first_purchase' and s.status = 'incomplete' and a.user_id is not null then
+      -- Money was taken but SLP did not say with which card: money taken =
+      -- the member gets Pro now (review #2). No card = no automatic renewal
+      -- until one is attached; listed in web_billing_anomalies.
+      update public.web_payment_attempts set status = 'succeeded', finished_at = p_now, failure_code = 'card_unmatched',
+        cooling_off_eligible = true, refund_deadline = huddle_ops.web_taipei_day(p_now, 8),
+        slp_trade_order_id = coalesce(slp_trade_order_id, nullif(p_result ->> 'trade_order_id', ''))
+      where id = a.id;
+      v_end := huddle_ops.web_cycle_at(p_now, s.plan, 2);
+      update public.web_subscriptions set status = 'active', cycle = 1, anchor_at = p_now,
+        current_period_start = p_now, current_period_end = v_end, access_until = v_end + interval '24 hours'
+      where id = s.id;
+      perform huddle_ops.web_txn_receipt(a.id);
+      return jsonb_build_object('applied', true, 'status', 'succeeded', 'subscription_status', 'active', 'card', 'unmatched');
+    end if;
     return jsonb_build_object('applied', false, 'reason', 'instrument_missing', 'status', a.status);
   end if;
   if a.user_id is null then
@@ -352,23 +421,12 @@ begin
     return jsonb_build_object('applied', true, 'status', 'succeeded', 'needs_review', a.kind = 'first_purchase');
   end if;
   -- An SLP customer or card already linked to ANOTHER member is never reused.
-  if exists (select 1 from public.web_billing_customers bc where bc.slp_customer_id = v_customer and bc.user_id <> a.user_id)
-     or exists (select 1 from public.web_payment_methods pm where pm.slp_instrument_id = v_instrument
-                 and pm.user_id is distinct from a.user_id) then
+  v_pm := huddle_ops.web_store_card(a.user_id, v_customer, p_result);
+  if v_pm is null then
     update public.web_payment_attempts set status = 'unknown', failure_code = 'owner_conflict'
      where id = a.id and status = 'pending';
     return jsonb_build_object('applied', false, 'reason', 'owner_conflict', 'status', 'unknown');
   end if;
-  insert into public.web_billing_customers (user_id, slp_customer_id) values (a.user_id, v_customer)
-  on conflict (user_id) do nothing;
-  insert into public.web_payment_methods (user_id, slp_customer_id, slp_instrument_id, brand, issuer_country, last4)
-  values (a.user_id, v_customer, v_instrument, left(p_result #>> '{instrument,brand}', 20),
-          left(p_result #>> '{instrument,issuer_country}', 8), case when v_last4 ~ '^[0-9]{4}$' then v_last4 end)
-  on conflict (slp_instrument_id) do update set status = 'active', disabled_at = null,
-    brand = coalesce(excluded.brand, public.web_payment_methods.brand),
-    issuer_country = coalesce(excluded.issuer_country, public.web_payment_methods.issuer_country),
-    last4 = coalesce(excluded.last4, public.web_payment_methods.last4)
-  returning id into v_pm;
   update public.web_payment_attempts set status = 'succeeded', finished_at = p_now,
     cooling_off_eligible = (a.kind = 'first_purchase'),                       -- D9-A
     refund_deadline = case when a.kind = 'first_purchase' then huddle_ops.web_taipei_day(p_now, 8) end
@@ -453,6 +511,15 @@ begin
     if a.kind = 'customer_present' then
       -- The member is on the page and can try again; no automatic consequence.
       return jsonb_build_object('applied', true, 'status', 'failed', 'state_change', false);
+    end if;
+    if s.cancel_at_period_end and s.status in ('trialing','active') then
+      -- Canceled while this renewal was in flight (R2): the renewal simply did
+      -- not happen. Pro ends at the paid end: no grace, no retry, no "we will
+      -- retry" e-mail (the cancel confirmation was already sent). Review #5.
+      update public.web_subscriptions set status = 'expired', ended_at = p_now, access_until = least(access_until, p_now),
+        next_retry_at = null
+      where id = s.id;
+      return jsonb_build_object('applied', true, 'status', 'failed', 'subscription_status', 'expired');
     end if;
     if v_fk = 'soft' then
       -- 1201 "card is cloning": retry in ~5 minutes, not counted (SLP notes §5),
@@ -548,13 +615,17 @@ returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   v_limit integer := least(greatest(coalesce(p_limit, 0), 0), 10);
   r record;
-  v_no integer; v_ref text; v_attempt uuid;
+  v_no integer; v_ref text; v_attempt uuid; v_count integer := 0;
   v_out jsonb := '[]'::jsonb;
 begin
   perform huddle_ops.web_order_id(p_prefix, '0000000000000000', 0, 1, 'a');
   if v_limit = 0 or not coalesce((select c.renewals_enabled from public.web_billing_config c where c.id), false) then
     return v_out;
   end if;
+  -- No LIMIT in the scan (review #1): a row skipped below can never hide
+  -- later due rows. Rows that can never be charged automatically (absurd
+  -- price, 20 automatic tries in one cycle, order numbers used up) are not
+  -- due at all; web_billing_anomalies lists them for a human.
   for r in
     select s.id, s.order_ref, s.user_id, s.plan, s.cycle, s.price_minor, pm.slp_customer_id, pm.slp_instrument_id
       from public.web_subscriptions s
@@ -565,26 +636,31 @@ begin
        and ((s.status in ('trialing','active') and s.current_period_end <= p_now
               and s.current_period_end > p_now - interval '168 hours')
          or (s.status = 'past_due' and s.next_retry_at <= p_now and s.grace_until > p_now))
+       and huddle_ops.web_amount_ok(s.price_minor)
        and not exists (select 1 from public.web_payment_attempts a
                         where a.subscription_id = s.id and a.status in ('pending','unknown'))
+       and (select count(*) from public.web_payment_attempts a
+             where a.subscription_id = s.id and a.cycle = s.cycle + 1 and a.kind = 'recurring') < 20
+       and coalesce((select max(a.attempt_no) from public.web_payment_attempts a
+                      where a.subscription_id = s.id and a.cycle = s.cycle + 1), 0) < 99
      order by coalesce(s.next_retry_at, s.current_period_end), s.id
-     limit v_limit
      for update of s skip locked
   loop
+    exit when v_count >= v_limit;
     -- Re-check under the row lock (the snapshot above may be stale).
     if exists (select 1 from public.web_payment_attempts a
                 where a.subscription_id = r.id and (a.status in ('pending','unknown')
                    or (a.cycle = r.cycle + 1 and a.status = 'succeeded'))) then
       continue;
     end if;
-    if not huddle_ops.web_amount_ok(r.price_minor) then continue; end if;
     select coalesce(max(a.attempt_no), 0) + 1 into v_no
       from public.web_payment_attempts a where a.subscription_id = r.id and a.cycle = r.cycle + 1;
-    if v_no > 20 then continue; end if;  -- something is very wrong: leave it to a human
+    if v_no > 99 then continue; end if;
     v_ref := huddle_ops.web_order_id(p_prefix, r.order_ref, r.cycle + 1, v_no, 'a');
-    insert into public.web_payment_attempts (subscription_id, user_id, kind, cycle, attempt_no, reference_order_id, amount_minor)
-    values (r.id, r.user_id, 'recurring', r.cycle + 1, v_no, v_ref, r.price_minor)
+    insert into public.web_payment_attempts (subscription_id, user_id, kind, cycle, attempt_no, reference_order_id, amount_minor, created_at)
+    values (r.id, r.user_id, 'recurring', r.cycle + 1, v_no, v_ref, r.price_minor, p_now)
     returning id into v_attempt;
+    v_count := v_count + 1;
     v_out := v_out || jsonb_build_array(jsonb_build_object(
       'attempt_id', v_attempt, 'subscription_id', r.id, 'reference_order_id', v_ref, 'kind', 'recurring',
       'amount_minor', r.price_minor, 'charge_amount_minor', r.price_minor, 'currency', 'TWD',
@@ -755,7 +831,9 @@ declare
 begin
   for r in
     select s.* from public.web_subscriptions s
-     where ((s.status = 'incomplete' and s.created_at <= p_now - interval '1 hour')
+     where ((s.status = 'incomplete'
+             and greatest(s.created_at, (select max(a.created_at) from public.web_payment_attempts a
+                                          where a.subscription_id = s.id)) <= p_now - interval '1 hour')
          or (s.status in ('trialing','active') and s.cancel_at_period_end and s.access_until <= p_now)
          or (s.status = 'past_due' and s.grace_until <= p_now)
          or (s.status in ('trialing','active') and not s.cancel_at_period_end
@@ -796,10 +874,15 @@ begin
       n_lapsed := n_lapsed + 1;
     end if;
   end loop;
-  -- Automatic refunds whose SLP call never got an answer go to a human
-  -- (re-sending a refund is a money movement; let a person check SLP first).
+  -- Refunds go to a human (status needs_review; money is never re-sent):
+  --  * automatic request SLP never answered (10 min);
+  --  * SLP said "processing" without a refund id we could track (30 min);
+  --    refund/get needs SLP's id, TODO(SLP-Q9): lookup by our reference;
+  --  * anything not final 5 days before the 15-day promise (R6). Review #3.
   update public.web_refunds set status = 'needs_review'
-   where status = 'requested' and slp_refund_order_id is null and requested_at <= p_now - interval '10 minutes';
+   where (status = 'requested' and slp_refund_order_id is null and requested_at <= p_now - interval '10 minutes')
+      or (status = 'processing' and slp_refund_order_id is null and requested_at <= p_now - interval '30 minutes')
+      or (status in ('requested','processing') and due_by <= p_now + interval '120 hours');
   get diagnostics n_refunds = row_count;
   return jsonb_build_object('incomplete_expired', n_incomplete, 'canceled_expired', n_canceled,
     'grace_exhausted', n_grace, 'lapsed', n_lapsed, 'refunds_to_review', n_refunds);
@@ -849,7 +932,7 @@ $$;
 create or replace function huddle_ops.web_attempt_json(p_attempt uuid) returns jsonb
 language sql stable security definer set search_path = '' as $$
   select jsonb_build_object('attempt_id', a.id, 'reference_order_id', a.reference_order_id, 'kind', a.kind,
-    'status', a.status, 'cycle', a.cycle, 'amount_minor', a.amount_minor, 'trade_order_id', a.slp_trade_order_id,
+    'status', a.status, 'failure_code', a.failure_code, 'cycle', a.cycle, 'amount_minor', a.amount_minor, 'trade_order_id', a.slp_trade_order_id,
     'created_at', huddle_ops.web_iso(a.created_at), 'subscription_id', a.subscription_id,
     'subscription_status', s.status, 'user_id', a.user_id,
     'reference_customer_id', replace(a.user_id::text, '-', ''),
@@ -872,20 +955,72 @@ language sql stable security definer set search_path = '' as $$
     from public.web_payment_attempts a where a.user_id = p_user and a.status in ('pending','unknown')
 $$;
 
--- Cron step 2 / 6 work lists: attempts pending > 15 min, card bindings still
--- open after 1 hour, and refunds SLP is still processing.
+-- Cron step 2 / 6 work lists, rotating on last_checked_at (never-checked and
+-- longest-unchecked first) so rows SLP never settles cannot starve the rest
+-- (review #2). Attempts: pending > 15 min; card bindings open > 1 hour;
+-- charges escalated as stale_pending (SLP may still settle them); first
+-- purchases paid without a known card (< 7 days, to attach it). Refunds SLP
+-- holds: processing, or needs_review with an SLP id.
 create or replace function huddle_ops.web_reconcile_candidates(p_now timestamptz default now(), p_limit integer default 20)
-returns jsonb language sql stable security definer set search_path = '' as $$
-  select jsonb_build_object(
-    'attempts', coalesce((select jsonb_agg(huddle_ops.web_attempt_json(q.id)) from (
-        select a.id from public.web_payment_attempts a
-         where (a.status = 'pending' and a.created_at <= p_now - interval '15 minutes')
-            or (a.kind = 'card_bind' and a.status in ('pending','unknown') and a.created_at <= p_now - interval '1 hour')
-         order by a.created_at, a.id limit least(greatest(coalesce(p_limit, 20), 1), 50)) q), '[]'::jsonb),
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_limit integer := least(greatest(coalesce(p_limit, 20), 1), 50);
+  v_att uuid[]; v_ref uuid[];
+begin
+  select coalesce(array_agg(q.id order by q.ord), '{}') into v_att from (
+    select a.id, row_number() over (order by a.last_checked_at nulls first, a.created_at, a.id) ord
+      from public.web_payment_attempts a
+     where (a.status = 'pending' and a.created_at <= p_now - interval '15 minutes')
+        or (a.kind = 'card_bind' and a.status in ('pending','unknown') and a.created_at <= p_now - interval '1 hour')
+        or (a.status = 'unknown' and a.failure_code = 'stale_pending' and a.slp_trade_order_id is not null)
+        or (a.status = 'succeeded' and a.failure_code = 'card_unmatched' and a.finished_at > p_now - interval '7 days')
+     order by a.last_checked_at nulls first, a.created_at, a.id limit v_limit) q;
+  update public.web_payment_attempts set last_checked_at = p_now where id = any(v_att);
+  select coalesce(array_agg(q.id order by q.ord), '{}') into v_ref from (
+    select r.id, row_number() over (order by r.last_checked_at nulls first, r.requested_at, r.id) ord
+      from public.web_refunds r
+     where r.status in ('processing','needs_review') and r.slp_refund_order_id is not null
+     order by r.last_checked_at nulls first, r.requested_at, r.id limit v_limit) q;
+  update public.web_refunds set last_checked_at = p_now where id = any(v_ref);
+  return jsonb_build_object(
+    'attempts', coalesce((select jsonb_agg(huddle_ops.web_attempt_json(x.id) order by x.ord)
+                            from unnest(v_att) with ordinality x(id, ord)), '[]'::jsonb),
     'refunds', coalesce((select jsonb_agg(jsonb_build_object('refund_id', r.id, 'reference_order_id', r.reference_order_id,
-        'refund_order_id', r.slp_refund_order_id, 'amount_minor', r.amount_minor) order by r.requested_at) from (
-        select * from public.web_refunds r0 where r0.status = 'processing' and r0.slp_refund_order_id is not null
-         order by r0.requested_at, r0.id limit least(greatest(coalesce(p_limit, 20), 1), 50)) r), '[]'::jsonb))
+        'refund_order_id', r.slp_refund_order_id, 'amount_minor', r.amount_minor, 'status', r.status) order by x.ord)
+                           from unnest(v_ref) with ordinality x(id, ord) join public.web_refunds r on r.id = x.id), '[]'::jsonb));
+end $$;
+
+-- What a human must look at (back office P5; the cron reports the count).
+create or replace function huddle_ops.web_billing_anomalies(p_now timestamptz default now())
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(x order by x ->> 'kind', x ->> 'since'), '[]'::jsonb) from (
+    -- due subscriptions the cron will never claim (review #1)
+    select jsonb_build_object('kind', 'claim_blocked', 'subscription_id', s.id, 'since', huddle_ops.web_iso(s.current_period_end)) x
+      from public.web_subscriptions s
+     where s.status in ('trialing','active','past_due') and not s.cancel_at_period_end and not s.billing_hold
+       and (not huddle_ops.web_amount_ok(s.price_minor)
+         or (select count(*) from public.web_payment_attempts a
+              where a.subscription_id = s.id and a.cycle = s.cycle + 1 and a.kind = 'recurring') >= 20
+         or coalesce((select max(a.attempt_no) from public.web_payment_attempts a
+                       where a.subscription_id = s.id and a.cycle = s.cycle + 1), 0) >= 99)
+    union all
+    -- undecided requests: unknown, or still pending after a day
+    select jsonb_build_object('kind', case when a.status = 'unknown' then 'attempt_unknown' else 'attempt_pending_24h' end,
+             'attempt_id', a.id, 'subscription_id', a.subscription_id, 'reason', a.failure_code, 'since', huddle_ops.web_iso(a.created_at))
+      from public.web_payment_attempts a
+     where a.status = 'unknown' or (a.status = 'pending' and a.created_at <= p_now - interval '24 hours')
+    union all
+    -- paid, Pro granted, but no card on file: will not renew (review #2)
+    select jsonb_build_object('kind', 'paid_without_card', 'subscription_id', s.id, 'since', huddle_ops.web_iso(s.updated_at))
+      from public.web_subscriptions s
+     where s.status in ('active','past_due') and s.payment_method_id is null
+    union all
+    -- refunds a human must finish, or close to the 15-day promise (R6)
+    select jsonb_build_object('kind', case when r.status = 'needs_review' then 'refund_needs_review' else 'refund_due_soon' end,
+             'refund_id', r.id, 'since', huddle_ops.web_iso(r.requested_at), 'due_by', huddle_ops.web_iso(r.due_by))
+      from public.web_refunds r
+     where r.status = 'needs_review' or (r.status in ('requested','processing') and r.due_by <= p_now + interval '120 hours')
+  ) q
 $$;
 
 create or replace function huddle_ops.web_refund_context(p_reference_order_id text) returns jsonb
@@ -957,7 +1092,12 @@ begin
     when 'user_by_ref' then
       v_user := huddle_ops.web_user_by_ref(a ->> 'reference_customer_id');
       return case when v_user is null then null else jsonb_build_object('user_id', v_user,
-        'open_attempts', huddle_ops.web_open_attempts(v_user)) end;
+        'open_attempts', huddle_ops.web_open_attempts(v_user),
+        'unmatched_attempts', coalesce((select jsonb_agg(huddle_ops.web_attempt_json(a.id) order by a.created_at desc)
+            from public.web_payment_attempts a
+           where a.user_id = v_user and a.status = 'succeeded' and a.failure_code = 'card_unmatched'), '[]'::jsonb)) end;
+    when 'anomalies' then
+      return huddle_ops.web_billing_anomalies();
     when 'customer_of' then
       return (select jsonb_build_object('customer_id', bc.slp_customer_id) from public.web_billing_customers bc
                where bc.user_id = (a ->> 'user_id')::uuid);
@@ -1018,6 +1158,8 @@ revoke all on function
   huddle_ops.web_reconcile_candidates(timestamptz, integer),
   huddle_ops.web_refund_context(text),
   huddle_ops.web_user_by_ref(text),
+  huddle_ops.web_store_card(uuid, text, jsonb),
+  huddle_ops.web_billing_anomalies(timestamptz),
   public.web_billing_server(text, jsonb)
 from public, anon, authenticated;
 grant execute on function
@@ -1032,6 +1174,7 @@ grant execute on function
   huddle_ops.web_expire_due(timestamptz),
   huddle_ops.web_take_runner_lease(timestamptz, integer),
   huddle_ops.web_release_runner_lease(timestamptz, timestamptz),
+  huddle_ops.web_billing_anomalies(timestamptz),
   public.web_billing_server(text, jsonb)
 to service_role;
 

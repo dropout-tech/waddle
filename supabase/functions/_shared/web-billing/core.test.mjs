@@ -229,3 +229,28 @@ test('misc: requestId is 32 hex and unique; token expiry forms; DB error codes',
   assert.equal(dbErrorCode({ message: 'WEB_BILLING:payment_in_progress' }), 'payment_in_progress')
   assert.equal(dbErrorCode({ message: 'duplicate key value' }), 'unavailable')
 })
+
+test('review #2: first purchase paid but card unconfirmable → succeeded WITHOUT card (member gets Pro); binding waits', async () => {
+  const foreign = fakeSlp({ queryInstruments: async () => ({ ok: true, data: { referenceCustomerId: 'ffffffffffffffffffffffffffffffff',
+    paymentInstruments: [{ instrumentId: 'NEW1', instrumentStatus: 'SUCCESSED' }] } }) })
+  const paid = { referenceOrderId: ctxBase.reference_order_id, status: 'SUCCEEDED', paidAmount: { value: 15000 },
+    order: { payment: { paymentInstrument: { paymentInstrumentId: 'NEW1' } } }, paymentCustomerId: 'CUS1' }
+  const r = await resolveTrade(foreign, { ...ctxBase, kind: 'first_purchase', known_instruments: [] }, paid)
+  assert.equal(r.status, 'succeeded')
+  assert.equal('instrument' in r, false, 'a card not proven to be this member\'s is never stored')
+  assert.equal('customer_id' in r, false)
+  assert.equal(r.amount_minor, 15000)
+  const down = fakeSlp({ queryInstruments: async () => ({ ok: false, kind: 'timeout' }) })
+  assert.equal((await resolveTrade(down, { ...ctxBase, kind: 'first_purchase' }, paid)).status, 'succeeded')
+  assert.equal((await resolveTrade(down, { ...ctxBase, kind: 'card_bind' }, paid)).status, 'pending', 'no money moved: binding waits')
+})
+
+test('review #6: amount taken from paidAmount; order amount only as a marked fallback (TODO SLP-Q6)', () => {
+  const a = normalizeTrade({ status: 'SUCCEEDED', paidAmount: { value: 15000 }, amount: { value: 15000 } })
+  assert.deepEqual([a.amount_minor, a.amount_source], [15000, 'paid'])
+  const b = normalizeTrade({ status: 'SUCCEEDED', amount: { value: 15000 } })
+  assert.deepEqual([b.amount_minor, b.amount_source], [15000, 'order'])
+  const c = normalizeTrade({ status: 'SUCCEEDED', paidAmount: { value: 1500 }, amount: { value: 15000 } })
+  assert.equal(c.amount_minor, 1500, 'what was paid wins over what was ordered')
+  assert.equal('amount_source' in normalizeTrade({ status: 'SUCCEEDED' }), false)
+})

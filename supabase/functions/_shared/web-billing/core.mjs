@@ -165,8 +165,16 @@ export function normalizeTrade(trade) {
     result.failure_msg = str(trade?.paymentMsg?.msg, 200)
     result.failure_kind = failureAction(code).kind
   }
-  const amount = intOrNull(trade?.paidAmount?.value ?? trade?.amount?.value)
-  if (result.status === 'succeeded' && amount != null) result.amount_minor = amount
+  // Prefer what SLP says was PAID. TODO(SLP-Q6): whether payment/get always
+  // carries paidAmount is undocumented; without it we fall back to the order
+  // amount SLP stored (still SLP's record, so unit errors show) and mark it,
+  // instead of blocking every charge. applyAttemptResult logs the fallback.
+  const paid = intOrNull(trade?.paidAmount?.value)
+  const amount = paid ?? intOrNull(trade?.amount?.value)
+  if (result.status === 'succeeded' && amount != null) {
+    result.amount_minor = amount
+    result.amount_source = paid != null ? 'paid' : 'order'
+  }
   // TODO(SLP-sandbox): where payment/get puts the SLP customer and card is not
   // documented; these are the paths the create-trade field table suggests.
   result.customer_id = str(trade?.paymentCustomerId ?? trade?.customer?.customerId ?? trade?.order?.customer?.customerId
@@ -291,12 +299,21 @@ export async function resolveTrade(slp, ctx, trade, hint = {}) {
   if (result.status !== 'succeeded' && !voidedBinding) return result
   const pending = { ...result, status: 'pending' }
   delete pending.failure_code; delete pending.failure_kind; delete pending.failure_msg
+  // Money taken but the card cannot be confirmed: a first purchase is still
+  // recorded as paid WITHOUT a card (member gets Pro, card attached later;
+  // review #2). A binding (no money) waits instead.
+  const unmatched = () => {
+    if (ctx.kind !== 'first_purchase' || result.status !== 'succeeded') return pending
+    const paidNoCard = { ...result }
+    delete paidNoCard.customer_id; delete paidNoCard.instrument
+    return paidNoCard
+  }
   const customerId = result.customer_id || ctx.customer_id || hint.customerId || null
-  if (!customerId) return pending // wait for customer.instrument.binded
+  if (!customerId) return unmatched() // card arrives with customer.instrument.binded
   const q = await slp.queryInstruments(customerId)
-  if (!q.ok) return pending
+  if (!q.ok) return unmatched()
   const ref = q.data?.referenceCustomerId
-  if (!ref || ref !== ctx.reference_customer_id) return pending // card must belong to THIS member
+  if (!ref || ref !== ctx.reference_customer_id) return unmatched() // card must belong to THIS member
   const usable = (Array.isArray(q.data?.paymentInstruments) ? q.data.paymentInstruments : [])
     .map(normalizeInstrument).filter(instrumentUsable)
   const wanted = result.instrument?.id || hint.instrumentId || null
@@ -306,7 +323,7 @@ export async function resolveTrade(slp, ctx, trade, hint = {}) {
     const fresh = usable.filter((i) => !known.has(i.id))
     pick = fresh.length === 1 ? fresh[0] : null
   }
-  if (!pick) return pending
+  if (!pick) return unmatched()
   return { ...pending, status: 'succeeded', customer_id: customerId,
     instrument: { id: pick.id, brand: pick.brand, issuer_country: pick.issuer_country, last4: pick.last4 } }
 }
@@ -315,6 +332,9 @@ export async function resolveTrade(slp, ctx, trade, hint = {}) {
 // refund), unbind it at SLP. Unbinding is best effort: the card is already
 // disabled on our side and never charged again (admin can retry, P5).
 export async function applyAttemptResult({ db, slp, referenceOrderId, result, log = () => {} }) {
+  if (result?.status === 'succeeded' && result.amount_source !== 'paid') {
+    log({ amount: 'unconfirmed', ref: referenceOrderId, source: result.amount_source ?? 'none' }) // TODO(SLP-Q6)
+  }
   const out = await db.server('apply_payment_result', { reference_order_id: referenceOrderId, result })
   await unbindReleased({ slp, out, log })
   return out

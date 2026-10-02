@@ -108,7 +108,9 @@ export function createWebhookHandler({ config, db, slp, log = () => {}, now = ()
     if (!refCustomer || !customerId || !instrumentId) return 'incomplete_event'
     const who = await db.server('user_by_ref', { reference_customer_id: refCustomer })
     if (!who) return 'unknown_customer'
+    // An undecided binding, else a first purchase paid without a known card.
     const ctx = (Array.isArray(who.open_attempts) ? who.open_attempts : []).find((c) => BIND_KINDS.has(c.kind))
+      ?? (Array.isArray(who.unmatched_attempts) ? who.unmatched_attempts : [])[0]
     if (!ctx) return 'no_open_binding'
     if (!ctx.trade_order_id) return 'retry' // our create call has not stored its trade id yet
     const f = await fetchAttemptResult(slp, ctx, { customerId, instrumentId })
