@@ -502,10 +502,8 @@ export function MainLayout({
       task.scheduledEndTime
   )
 
-  // Handle opening journal in focus mode
-  const handleOpenJournalFocus = useCallback(() => {
-    setFocusMode('journal')
-  }, [])
+  // 日記 entry points removed 2026-10-02: JournalFocusView never saved what
+  // was typed (owner decision: hide until it persists). See JournalFocusView.
 
   // Handle opening report in focus mode
   const handleOpenReportFocus = useCallback(() => {
@@ -733,7 +731,6 @@ export function MainLayout({
                 onUpdateTimeBlock={onUpdateTimeBlock}
                 onDeleteTimeBlock={onDeleteTimeBlock}
                 onTimeBlockSelect={onTimeBlockSelect}
-                onOpenJournal={handleOpenJournalFocus}
                 onOpenReport={handleOpenReportFocus}
                 onOpenGrowth={handleOpenGrowthFocus}
                 onOpenSettings={onOpenSettings}
@@ -1121,7 +1118,6 @@ export function MainLayout({
                   onUpdateTimeBlock={onUpdateTimeBlock}
                   onDeleteTimeBlock={onDeleteTimeBlock}
                   onTimeBlockSelect={onTimeBlockSelect}
-                  onOpenJournal={handleOpenJournalFocus}
                   onOpenReport={handleOpenReportDesktop}
                   onOpenGrowth={handleOpenGrowthFocus}
                   onOpenSettings={onOpenSettings}
@@ -1251,6 +1247,9 @@ export function MainLayout({
 }
 
 // Journal Focus View Component
+// Hidden 2026-10-02 (no entry point passes onOpenJournal any more): the entry
+// textarea is local state only and is never saved. Kept for when journaling
+// gets real persistence (journal_entries table already exists).
 function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], onClose: () => void }) {
   const { t, lang } = useI18n()
   const [selectedDate, setSelectedDate] = useState(new Date())
