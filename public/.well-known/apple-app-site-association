@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["PQZ8V7ZAXU.com.lazylazy.huddle"],
+        "components": [
+          { "/": "/org/invite*", "comment": "Organization invite links open in the iOS app (token stays in #t=)" }
+        ]
+      }
+    ]
+  }
+}

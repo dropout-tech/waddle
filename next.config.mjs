@@ -125,6 +125,12 @@ const nextConfig = {
               ],
             },
             {
+              // iOS Universal Links: Apple fetches this extensionless file and
+              // expects JSON (org invite links open the app, see the file).
+              source: '/.well-known/apple-app-site-association',
+              headers: [{ key: 'Content-Type', value: 'application/json' }],
+            },
+            {
               // The PWA service worker must never be served stale by an HTTP
               // or CDN cache, or a fixed worker could fail to roll out.
               source: '/sw.js',

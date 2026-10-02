@@ -37,6 +37,29 @@ export function clearPendingOrgInvite(kv: KV | null = store()) {
   try { kv?.removeItem(PENDING_ORG_INVITE_KEY) } catch { /* ignore */ }
 }
 
+// create_org_invite returns 32 random bytes as unpadded base64url (43 chars).
+const INVITE_TOKEN = /^[A-Za-z0-9_-]{20,128}$/
+
+/**
+ * Pull the invite token out of anything that should mean "this org invite":
+ * the web link `https://<host>/org/invite#t=…` (Universal Link or pasted),
+ * the app link `huddle://org/invite#t=…`, or a bare token pasted on its own.
+ * Returns null for any other URL, so callers can fall through to other handlers.
+ */
+export function orgInviteTokenFromUrl(input: string): string | null {
+  const text = input.trim()
+  if (INVITE_TOKEN.test(text)) return text
+  let url: URL
+  try { url = new URL(text) } catch { return null }
+  // huddle://org/invite → host "org", path "/invite"; https://x/org/invite/ → path "/org/invite/".
+  const route = (url.protocol === 'huddle:' ? `/${url.host}${url.pathname}` : url.pathname).replace(/\/+$/, '')
+  if (route !== '/org/invite' || !/^(https?|huddle):$/.test(url.protocol)) return null
+  const raw = url.hash.startsWith('#t=') ? url.hash.slice(3) : url.searchParams.get('t') ?? ''
+  let token = raw
+  try { token = decodeURIComponent(raw) } catch { /* keep raw */ }
+  return INVITE_TOKEN.test(token) ? token : null
+}
+
 /** Where to resume after any login / sign-up / deep-link return (else null). */
 export function pendingOrgInvitePath(now = Date.now(), kv: KV | null = store()): string | null {
   return readPendingOrgInvite(now, kv) ? '/org/invite' : null
