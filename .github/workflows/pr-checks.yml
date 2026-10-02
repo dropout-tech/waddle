@@ -1,0 +1,147 @@
+name: PR checks
+
+# 自動檢查：每個開向 main 的 PR、以及每次 push 到 main 都會跑。
+# Automatic checks on every PR targeting main and every push to main.
+# 紅燈 = 有檢查沒過，不要合併 / Red = a check failed, do not merge.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# 同一個 PR 又推了新 commit -> 取消還在跑的舊檢查（只對 PR；main 上的 push 一律跑完）。
+# A new push to the same PR cancels the older run (PRs only; runs on main always finish).
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # ───────────────────────────────────────────────────────────
+  # 檢查 Checks：型別 / lint / 單元測試 / 兩種建置
+  # ───────────────────────────────────────────────────────────
+  checks:
+    name: 檢查 Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # 建置只需要「編譯得過」，不會真的連線。這兩個值本來就會公開在前端程式碼裡，
+      # 所以可以放在 GitHub Variables（非 secret）；沒設定就用假值，
+      # 這樣 fork 來的 PR（拿不到任何設定）也能跑建置。
+      # The build only needs to compile; it never talks to Supabase. These two values are
+      # public in the frontend bundle anyway, so they live in repo Variables (not secrets).
+      # If unset we fall back to placeholders so fork PRs can still build.
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || 'https://ci-placeholder.supabase.co' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: 取得程式碼 Checkout
+        uses: actions/checkout@v4
+
+      - name: 安裝 pnpm Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: 安裝 Node Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安裝套件 Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 型別檢查 Type check
+        run: pnpm type-check
+
+      - name: 程式碼風格檢查 Lint
+        run: pnpm lint
+
+      - name: 單元測試 Unit tests
+        # desktop/*.test.cjs = 桌面版；scripts/tests/*.test.mjs = 帳單、小工具、匯入額度等邏輯
+        run: node --test desktop/*.test.cjs scripts/tests/*.test.mjs
+
+      - name: 網頁版建置 Build (web)
+        run: pnpm build:web
+
+      - name: iOS 殼靜態建置 Build (Capacitor static export)
+        run: pnpm build:cap
+
+  # ───────────────────────────────────────────────────────────
+  # 冒煙測試 Smoke test：用測試帳號登入，走過核心畫面
+  # 只有在必要的設定都存在時才跑；缺任何一個就「跳過」（綠燈），不會紅燈。
+  # Runs only when every required secret/variable exists. Otherwise it is skipped
+  # (green) with a notice. Fork PRs and Dependabot PRs cannot read secrets, so they skip too.
+  # ───────────────────────────────────────────────────────────
+  smoke:
+    name: 冒煙測試 Smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # 全部 PR 共用同一個測試帳號：一次只跑一個，避免互相踩到。
+    # One shared test account: run one smoke at a time, queue the rest.
+    concurrency:
+      group: e2e-smoke-shared-account
+      cancel-in-progress: false
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: 確認設定齊全 Check required secrets
+        id: gate
+        run: |
+          missing=""
+          [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]      && missing="$missing vars.NEXT_PUBLIC_SUPABASE_URL"
+          [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ] && missing="$missing vars.NEXT_PUBLIC_SUPABASE_ANON_KEY"
+          [ -z "$E2E_EMAIL" ]                     && missing="$missing secrets.E2E_EMAIL"
+          [ -z "$E2E_PASSWORD" ]                  && missing="$missing secrets.E2E_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=冒煙測試已跳過 Smoke test skipped::缺少 Missing:${missing} （fork / Dependabot PR 讀不到 secrets 屬正常 / expected for fork PRs）"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 取得程式碼 Checkout
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+
+      - name: 安裝 pnpm Setup pnpm
+        if: steps.gate.outputs.enabled == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: 安裝 Node Setup Node
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安裝套件 Install dependencies
+        if: steps.gate.outputs.enabled == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: 快取瀏覽器 Cache Playwright browsers
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: 安裝測試瀏覽器 Install Playwright Chromium
+        if: steps.gate.outputs.enabled == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: 冒煙測試 Run smoke test (pnpm e2e)
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          E2E_SCREENSHOT_DIR: ${{ runner.temp }}/e2e-shots
+        run: pnpm e2e
