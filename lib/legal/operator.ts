@@ -5,7 +5,9 @@
  * Deliberately NOT here (not provided yet, so never rendered anywhere):
  * postal address, service hours.
  * OPERATOR_NAME / SUPPORT_EMAIL were provided by the owner on 2026-10-02 and
- * are used by the website billing e-mails; legal pages do not render them yet.
+ * are used by the website billing e-mails. The legal pages render them only in
+ * the Pro-on-sale build (lib/billing/launch.ts PRO_ON_SALE); the website build
+ * keeps its current wording until launch day.
  */
 export const SUPPORT_PHONE = '0988-493-026'
 export const SUPPORT_EMAIL = 'hi@lazy72.com'
