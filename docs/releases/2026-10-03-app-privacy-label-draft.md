@@ -41,6 +41,6 @@ Apple 對「收集」的定義：資料離開裝置，且你或第三方夥伴�
 ## 需要老闆知道的判斷點（信心不足 8 成的地方）
 
 1. **Google 日曆事件：本表判定「不勾」**，信心約 7 成。理由：事件內容由伺服器即時向 Google 讀取後回傳，不存進我們的資料庫（`app/privacy/page.tsx` Google 日曆段落；伺服器只存加密的 refresh token：`supabase/functions/google-calendar/index.ts:150`），符合 Apple「只即時處理不算收集」的例外。若老闆想保守，可在「其他使用者內容」裡涵蓋，不影響其他勾選。要不要找第二意見？
-2. **Sentry 的 IP 位址**：SDK 的 dataCollection 已全關（`lib/monitoring/sentry.ts:60`），但 Sentry 伺服器預設可能記錄連線 IP。建議老闆在 Sentry 專案設定開「Prevent Storing of IP Addresses」，就不用另外勾「大略位置」。這項沒有在後台驗證過。
+2. **Sentry 的 IP 位址**：SDK 的 dataCollection 已全關（`lib/monitoring/sentry.ts:60`），但 Sentry 伺服器預設可能記錄連線 IP。Sentry 專案設定的「Prevent Storing of IP Addresses」已於 2026-10-03 開啟並重新整理確認已存（依交接紀錄 Sentry 段），所以不用另外勾「大略位置」。
 3. **OpenAI**：逐字稿由 OpenAI 保留最長 30 天防濫用（隱私頁已揭露）。Apple 的問卷是問「資料類型」不是問「給誰」，所以已涵蓋在「其他使用者內容」，不需另勾。
 4. 第一版 iOS 不含 Apple Watch；若之後加回 Watch，資料類型不變（Watch 只讀手機同步過去的資料）。

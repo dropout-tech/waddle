@@ -30,7 +30,7 @@ App Store Connect：Apple ID 6818073462、SKU huddle-ios-001、套件識別碼 c
 | 付費 App 協議 | ✅ | 2026-10-01 老闆本人簽署，後台狀態「有效」（老闆截圖確認）；效期至 2027-09-28，與開發者會員年費同步，到期前須續費 |
 | 銀行帳戶、稅務表格 | ✅ | 2026-10-01 老闆本人填完送出：台灣稅務表（公民 ID）、美國 W-8BEN（Part II 租稅協定刻意留空）、Apple 美國外國身分聲明（Title=Owner）、銀行帳戶。**待問會計師**：美國用戶收入的預扣比例、台美租稅協定是否生效（生效可補交新 W-8BEN） |
 | 小型企業方案（抽成 15%） | 🟡 | 2026-10-01 老闆已送出申請，等 Apple Email 通知核准 |
-| RevenueCat 帳號與設定 | 🟡 | 老闆已註冊並建 App；webhook 已部署並打通（依交接紀錄）。**仍待確認**：Offering `default` 的 $rc_monthly／$rc_annual 套件是否已掛上 App Store 商品（10-01 紀錄為未掛；沒掛的話購買畫面會顯示「無法取得方案」） |
+| RevenueCat 帳號與設定 | ✅ | 老闆已註冊並建 App；webhook 已部署並打通（TEST 事件 200）。Offering `default`：2026-10-03 已把 $rc_monthly 掛 huddle_pro_monthly、$rc_annual 掛 huddle_pro_annual，儲存後讀回確認（依交接紀錄 HANDOFF.md「iOS 內購線」段）；Restore＝Transfer |
 | 訂閱群組＋月繳 NT$150、年繳 NT$990 | ✅ | 群組「Huddle Pro」ID 22431318；月繳 huddle_pro_monthly（6818206890）、年繳 huddle_pro_annual（6818208288）；價格依交接紀錄已設（月 150／年 990）。家人共享未開（開了不能關，待老闆決定） |
 | 14 天免費試用（Introductory Offer 2 週） | ✅ | 依交接紀錄已設 |
 | 訂閱的審查用截圖與審查備註 | 🧑 | 每個訂閱商品要上傳一張購買畫面截圖（審查專用）；**第一個訂閱必須跟 App 版本一起送審**（版本頁「App 內購買項目與訂閱」區塊勾選兩個商品） |
