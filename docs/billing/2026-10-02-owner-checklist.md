@@ -6,11 +6,7 @@
 ## A. 這週可以先做（不花錢或幾乎不花錢）
 1. **把 SHOPLINE 問題轉給窗口**：整段複製 `docs/billing/2026-10-02-slp-questions-to-send.md` 的「您好…」貼給窗口。★ 前 7 題最急（開通綁卡／定期扣款、個人戶可否、IP 白名單、沙盒帳號）。
 2. ✅ **Resend 寄信網域（2026-10-02 21:52 完成）**：Resend 帳號「lazy72」、網域 lazy72.com Verified（東京機房）；Cloudflare 新增 `send`／`rsend` CNAME、`resend._domainkey` DKIM、`_dmarc`（p=none），根網域 MX／SPF 未動；Apple 寄件來源 lazy72.com、send.lazy72.com、billing@lazy72.com 三項 SPF 通過。**剩：Resend API Key 由老闆本人產生並貼進 Supabase（測試專案開好後）。**
-3. **測試用資料庫（Supabase 測試專案）——請選一個**：
-   - A. 在 LazyPenguin 組織再開一個專案：約 **US$10／月**（若該組織是付費方案），最單純。【建議】
-   - B. 免費專案 $0：但 Supabase 免費專案每個帳號最多 2 個 active，你目前帳號下已有多個專案，可能要先暫停一個（例如 lazy72-personal-site）才開得出來；閒置一週會自動暫停。
-   - C. 不開，等 SHOPLINE 沙盒回覆後再說（會延後實測）。
-   開好後告訴我專案名稱即可，我來套資料表（只套測試庫，正式庫另外問你）。
+3. ✅ **測試用資料庫**：老闆決定直接用正式庫（penguinflow），不另開專案。2026-10-02 已套 20261003020100／020200／020300；套用前後 9 個帳號 Pro 狀態快照逐筆相同；網站開關全關（checkout_mode=off、renewals_enabled=false）；新函式 anon／authenticated 皆不可執行。沙盒測試資料以訂單號前綴 hs 區分，只開放白名單帳號。
 
 ## B. 送件 SHOPLINE 前一定要有（條款與 SHOPLINE 都要求）
 4. ✅ 本名：廖思明／Liao Sih-Ming（已寫進程式 lib/legal/operator.ts）
