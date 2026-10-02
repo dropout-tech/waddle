@@ -1,4 +1,4 @@
--- DOWN for 20261002230300_web_billing_transitions.sql. Run as ONE transaction
+-- DOWN for 20261003020300_web_billing_transitions.sql. Run as ONE transaction
 -- (psql -1 -f this_file), only after the owner agreed (design §7 回滾), and
 -- only after the web-billing / web-billing-webhook / web-billing-cron Edge
 -- Functions are undeployed or their switches are off — without these
@@ -7,7 +7,7 @@
 -- Drops every function of the up migration, the rate-limit table and the
 -- last_checked_at bookkeeping columns. Billing
 -- rows (web_subscriptions, web_payment_attempts, web_refunds, outbox, events)
--- are NOT touched. Nothing from 20261002230100 (P1) is changed. Re-applying the
+-- are NOT touched. Nothing from 20261003020100 (P1) is changed. Re-applying the
 -- up migration afterwards works (scripts/tests/web-billing-transitions.sh).
 
 set lock_timeout = '5s';

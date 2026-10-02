@@ -1,4 +1,4 @@
--- DOWN for 20261002230100_web_billing_foundation.sql. Run as ONE transaction
+-- DOWN for 20261003020100_web_billing_foundation.sql. Run as ONE transaction
 -- (psql -1 -f this_file) and only after the owner agreed (design §7 回滾).
 --
 -- Restores has_pro / pro_until / give_days / defer_gifts / dispatch to their

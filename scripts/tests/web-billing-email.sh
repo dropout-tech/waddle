@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Disposable local cluster only; never reads project connection strings.
-# Website billing module C (20261002230200_web_billing_email):
+# Website billing module C (20261003020200_web_billing_email):
 #   1. applies every migration to a fresh database (Supabase-style default
 #      grants on, so the revokes in the migrations are real);
 #   2. web-billing-email.sql: reminder enqueueing, claim / finish, privileges,

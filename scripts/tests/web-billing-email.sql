@@ -252,7 +252,7 @@ reset role;
 -- ── 4. Rollback round trip ─────────────────────────────────────────────────
 select md5(string_agg(pg_get_functiondef(p.oid), '' order by p.proname)) as defs_before
   from pg_proc p where pronamespace = 'huddle_ops'::regnamespace and proname in ('web_enqueue_reminders', 'web_claim_outbox', 'web_finish_outbox') \gset
-\ir ../../supabase/rollback/20261002230200_web_billing_email_down.sql
+\ir ../../supabase/rollback/20261003020200_web_billing_email_down.sql
 select public.t_ok(to_regprocedure('huddle_ops.web_enqueue_reminders(timestamptz)') is null
   and to_regprocedure('huddle_ops.web_claim_outbox(integer)') is null
   and to_regprocedure('huddle_ops.web_finish_outbox(uuid,boolean,text,boolean)') is null
@@ -260,7 +260,7 @@ select public.t_ok(to_regprocedure('huddle_ops.web_enqueue_reminders(timestamptz
   'down drops the three functions and claimed_at');
 select public.t_ok((select count(*) from public.web_email_outbox) = 4 and to_regclass('public.web_subscriptions') is not null
   and (select count(*) from public.web_subscriptions) > 0, 'down keeps the outbox rows and the foundation tables');
-\ir ../../supabase/migrations/20261002230200_web_billing_email.sql
+\ir ../../supabase/migrations/20261003020200_web_billing_email.sql
 select md5(string_agg(pg_get_functiondef(p.oid), '' order by p.proname)) as defs_after
   from pg_proc p where pronamespace = 'huddle_ops'::regnamespace and proname in ('web_enqueue_reminders', 'web_claim_outbox', 'web_finish_outbox') \gset
 select public.t_ok(:'defs_before' = :'defs_after', 're-applying up gives byte-identical function definitions');

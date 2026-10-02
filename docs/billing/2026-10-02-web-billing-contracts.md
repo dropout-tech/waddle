@@ -7,11 +7,11 @@
 
 | 模組 | 擁有的檔案 | 不可碰 |
 |---|---|---|
-| 伺服器／扣款（A） | `supabase/migrations/20261002230300_web_billing_transitions.sql`（＋rollback）、`supabase/functions/_shared/web-billing/core.mjs`、`slp.mjs`、`web-billing/`、`web-billing-webhook/`、`web-billing-cron/`、`scripts/tests/web-billing-transitions.*`、`supabase/functions/_shared/web-billing/*.test.mjs`（core／slp 的） | 前端、`email.mjs`、寄信 migration |
-| 寄信／提醒（C） | `supabase/migrations/20261002230200_web_billing_email.sql`（＋rollback）、`supabase/functions/_shared/web-billing/email.mjs`、`email.test.mjs`、`scripts/tests/web-billing-email.*` | 扣款邏輯、前端、`core.mjs` |
+| 伺服器／扣款（A） | `supabase/migrations/20261003020300_web_billing_transitions.sql`（＋rollback）、`supabase/functions/_shared/web-billing/core.mjs`、`slp.mjs`、`web-billing/`、`web-billing-webhook/`、`web-billing-cron/`、`scripts/tests/web-billing-transitions.*`、`supabase/functions/_shared/web-billing/*.test.mjs`（core／slp 的） | 前端、`email.mjs`、寄信 migration |
+| 寄信／提醒（C） | `supabase/migrations/20261003020200_web_billing_email.sql`（＋rollback）、`supabase/functions/_shared/web-billing/email.mjs`、`email.test.mjs`、`scripts/tests/web-billing-email.*` | 扣款邏輯、前端、`core.mjs` |
 | 前端（B） | `app/billing/**`、`components/billing/**`、`lib/billing/web-billing-client.ts`、`lib/i18n/dict/billing.ts`（只加鍵）、`components/modals/settings-modal.tsx`（只加分頁接線）、`next.config.mjs`（只加 `/billing/:path*` CSP） | `supabase/**` |
 
-migration 順序：P1 `20261002230100` → C `20261002230200` → A `20261002230300`。
+migration 順序：P1 `20261003020100` → C `20261003020200` → A `20261003020300`。
 A 的 migration 可呼叫 C 的函式；C 的 migration 只依賴 P1。
 
 ## 1. Edge Function `web-billing`（A 提供，B 使用）
