@@ -122,12 +122,26 @@ async function login(page) {
 async function openApp(page) {
   if (!page.url().startsWith(BASE) || page.url().includes('/login')) await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
   const ready = page.locator('[data-tour="calendar-panel"], [data-tour="mobile-more"]').first()
+  // The e2e account is shared with other agents' runs: a sign-out elsewhere
+  // can bounce us to /login — just sign in again.
+  const readyOrLogin = async (timeout) => {
+    await Promise.race([
+      ready.waitFor({ timeout }),
+      page.waitForURL((u) => u.pathname.startsWith('/login'), { timeout }),
+    ])
+    if (new URL(page.url()).pathname.startsWith('/login')) {
+      console.log('      (signed out by another session — signing in again)')
+      await login(page)
+      if (!page.url().startsWith(BASE + '/') || page.url().includes('/login')) await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
+      await ready.waitFor({ timeout })
+    }
+  }
   try {
-    await ready.waitFor({ timeout: 60000 })
+    await readyOrLogin(60000)
   } catch {
     // Dev server cold compile / slow startup read: one reload, then give up.
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await ready.waitFor({ timeout: 90000 })
+    await readyOrLogin(90000)
   }
   const skip = page.getByRole('button', { name: /略過導覽|Skip tour/ })
   if (await skip.count()) await skip.first().click().catch(() => {})
@@ -176,8 +190,8 @@ async function injectLedger(page, { fake = 0, agoDays = 0, seenDelta = 0, prefix
     for (let i = 0; i < fake; i++) v.tasks[`${prefix}-${i}`] = at
     v.seen = Object.keys(v.tasks).length - seenDelta
     localStorage.setItem(key, JSON.stringify(v))
-    // nudge IglooHost to re-read the ledger
-    window.dispatchEvent(new CustomEvent('huddle:pomodoro-count', { detail: { date: '2000-01-01', count: 0 } }))
+    // what another tab writing the ledger looks like → IglooHost re-reads it
+    window.dispatchEvent(new StorageEvent('storage', { key }))
   }, { key: `huddle-igloo-v1:${uid}`, fake, agoDays, seenDelta, prefix })
   await page.waitForTimeout(400)
 }

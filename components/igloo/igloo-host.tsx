@@ -1,13 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { X } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useI18n } from '@/lib/i18n/react'
 import { computeIgloo, isSleepyHour, localDay, type IglooState } from '@/lib/igloo/compute'
 import { catchUpLine, iglooDoneLine, iglooLine } from '@/lib/igloo/lines'
-import { ledgerTasks, mergeIglooLedger, readIglooLocal, writeIglooLocal } from '@/lib/igloo/local'
+import { createIglooLedger, iglooStorageKey, ledgerTasks, readIglooLocal, writeActiveUser, writeIglooLocal, type IglooLocal } from '@/lib/igloo/local'
 import { OPEN_IGLOO_EVENT, setIglooSnapshot } from '@/lib/igloo/store'
 import { HUDDLE_POMODORO_COUNT_EVENT, loadPomodoroCount, type PomodoroDayCount } from '@/lib/pomodoro-count'
 import { defaultPet, type PetSettings } from '@/lib/pet/types'
@@ -36,9 +36,10 @@ export function IglooHost({
   const userId = user?.id ?? null
   const state = useIglooState(workspaces, userId)
 
+  // Signed out / another account: the old numbers go away at once.
   useEffect(() => {
-    if (state) setIglooSnapshot(state)
-  }, [state])
+    setIglooSnapshot(state, userId)
+  }, [state, userId])
 
   const [open, setOpen] = useState(false)
   const [replay, setReplay] = useState<{ from: number; to: number; first: boolean } | null>(null)
@@ -78,10 +79,18 @@ export function IglooHost({
   )
 }
 
-/** Live igloo numbers for this account (null until signed in). */
+/**
+ * Live igloo numbers for this account (null until signed in).
+ *
+ * The ledger is read from localStorage once per account (and again only when
+ * another tab changes it, or the day rolls over); everything after that is
+ * in memory. The bricks are recomputed only when the set of completed tasks,
+ * the pomodoro counter or the minute changes — not on every task edit.
+ */
 function useIglooState(workspaces: Workspace[], userId: string | null): IglooState | null {
   const [now, setNow] = useState(() => new Date())
   const [focusToday, setFocusToday] = useState<PomodoroDayCount>(() => loadPomodoroCount())
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     const tick = () => {
@@ -93,35 +102,63 @@ function useIglooState(workspaces: Workspace[], userId: string | null): IglooSta
       setFocusToday(detail ?? loadPomodoroCount())
       setNow(new Date())
     }
+    // Another tab (or window) wrote this account's ledger → read it again.
+    const onStorage = (e: StorageEvent) => {
+      if (userId && e.key === iglooStorageKey(userId)) setReloadKey((k) => k + 1)
+    }
     const id = window.setInterval(tick, 60_000)
     window.addEventListener(HUDDLE_POMODORO_COUNT_EVENT, onPomodoro)
+    window.addEventListener('storage', onStorage)
     document.addEventListener('visibilitychange', tick)
     return () => {
       window.clearInterval(id)
       window.removeEventListener(HUDDLE_POMODORO_COUNT_EVENT, onPomodoro)
+      window.removeEventListener('storage', onStorage)
       document.removeEventListener('visibilitychange', tick)
     }
-  }, [])
+  }, [userId])
 
-  // Every completed task the app has loaded (archived ones too — the work still happened).
-  const liveDone = useMemo(() => {
+  // Completed tasks the app has loaded (archived ones too — the work still
+  // happened), plus a cheap signature so the merge below only re-runs when
+  // that set actually changes.
+  const { liveDone, doneKey } = useMemo(() => {
     const out: { id: string; completedAt: string | null }[] = []
-    for (const ws of workspaces) for (const c of ws.categories) for (const t of c.tasks) if (t.isCompleted) out.push({ id: t.id, completedAt: t.completedAt ?? null })
-    return out
+    let key = ''
+    for (const ws of workspaces) for (const c of ws.categories) for (const t of c.tasks) {
+      if (!t.isCompleted) continue
+      out.push({ id: t.id, completedAt: t.completedAt ?? null })
+      key += `${t.id}${t.completedAt ?? ''}|`
+    }
+    return { liveDone: out, doneKey: key }
   }, [workspaces])
 
-  const merged = useMemo(() => {
-    if (!userId) return null
-    return mergeIglooLedger(readIglooLocal(userId), liveDone, focusToday)
-  }, [userId, liveDone, focusToday])
-
-  // Persist the ledger so a brick survives its task being deleted later.
+  // This account's ledger: one localStorage read when the account becomes
+  // active (again only for a new day or another tab's write), then in memory.
+  // When another account used the device since, pomodoro counting restarts
+  // from the device counter as it is now.
+  const day = focusToday.date
+  const ledger = useMemo(
+    () => (userId ? createIglooLedger(userId, loadPomodoroCount()) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `day` / `reloadKey` are re-read triggers
+    [userId, day, reloadKey],
+  )
   useEffect(() => {
-    if (userId && merged?.changed) writeIglooLocal(userId, { ...readIglooLocal(userId), tasks: merged.next.tasks, focus: merged.next.focus })
-  }, [userId, merged])
+    if (userId) writeActiveUser(userId)
+  }, [userId])
 
-  return useMemo(() => (merged ? computeIgloo(ledgerTasks(merged.next), merged.next.focus, now) : null), [merged, now])
+  // Merge only when the completed-task set or the pomodoro counter changes
+  // (not on every task edit); writes back only if something changed.
+  useEffect(() => {
+    ledger?.sync(liveDone, focusToday)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `liveDone` is keyed by `doneKey`; its identity changes on every task edit
+  }, [ledger, doneKey, focusToday])
+
+  const data = useSyncExternalStore(ledger?.subscribe ?? noSubscribe, ledger?.get ?? noLedger, noLedger)
+  return useMemo(() => (data ? computeIgloo(ledgerTasks(data), data.focus, now) : null), [data, now])
 }
+
+const noSubscribe = () => () => {}
+const noLedger = (): IglooLocal | null => null
 
 function IglooDialog({
   state,
