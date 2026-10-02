@@ -1,7 +1,7 @@
 # AI 回顧報告：後端技術設計（對應規格 v3）
 
 - 規格：`spec-ai-review.md` v3（2026-10-01）。本文件是後端與前端工程師對接的唯一依據；資料表、函式、API 以這裡為準。
-- Migration 草稿：`supabase/migrations/20261001120000_ai_reviews.sql`（以下簡稱「本 migration」，行號以該檔為準）。**尚未套用到任何 Supabase 專案**，只在拋棄式本機 PostgreSQL 驗過（第 13 節）。
+- Migration 草稿：`supabase/migrations-draft/20261001120000_ai_reviews.sql`（2026-10-03 從 `supabase/migrations/` 搬出，避免被例行 `db push` 套進正式庫；以下簡稱「本 migration」，行號以該檔為準）。**尚未套用到任何 Supabase 專案**，只在拋棄式本機 PostgreSQL 驗過（第 13 節）。
 - 本文件出現的 `檔案:行號`，路徑相對於 repo 根目錄；migration 檔省略 `supabase/migrations/` 前綴。
 
 ## 0. 先讀這三件事

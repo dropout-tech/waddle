@@ -12,11 +12,12 @@
 |---|---|---|
 | 規格書 v4（12 項功能、30 條驗收標準） | 老闆已簽認 | `spec-ai-review.md` |
 | 技術設計（資料表、函式、API 合約、素材白名單、測試計畫） | 完成 | `docs/features/ai-review-design.md` |
-| 資料庫變更草稿（三張新表、9 支函式） | 已在本機拋棄式資料庫驗過，**未套用到任何 Supabase 專案** | `supabase/migrations/20261001120000_ai_reviews.sql` |
+| 資料庫變更草稿（三張新表、9 支函式） | 已在本機拋棄式資料庫驗過，**未套用到任何 Supabase 專案** | `supabase/migrations-draft/20261001120000_ai_reviews.sql`（2026-10-03 搬出 `migrations/`） |
 | 資料庫測試 | 可重跑，全過（見第 5 節） | `supabase/tests/ai_review_checks.sql`、`scripts/tests/ai-review-*.sh` |
 | 同意畫面與政策文案 | 初稿，**老闆尚未審** | `docs/legal/2026-10-01-ai-consent-copy-draft.md` |
 | 假設帳本（13 條） | 持續更新 | `docs/assumptions.md` |
-| Edge Function `ai-review` | 未開始 | — |
+| Edge Function `ai-review` | 2026-10-03 程式完成、node 單元測試通過，**未部署**；新增 `handler.ts`（邏輯）與 `index.ts`（只有它碰金鑰） | `supabase/functions/ai-review/` |
+| 任務來源欄 `tasks.source`（v5 #7） | 2026-10-03 草稿完成，本機驗過回填、使用者改不動、回滾；**未套用** | `supabase/migrations-draft/20261003030000_task_source.sql`、`rollback/` |
 | 前端 | 未開始 | — |
 
 ## 2. 建議的閱讀順序
@@ -90,7 +91,7 @@ bash scripts/tests/ai-review-concurrency.sh
 
 ## 6. 地雷
 
-- **不要在這個分支上跑 `supabase db push`**，除非老闆已同意套用。草稿 migration 就放在 `supabase/migrations/`，push 會把它套到正式庫。
+- **不要在這個分支上跑 `supabase db push`**，除非老闆已同意套用。（2026-10-03 起草稿已搬到 `supabase/migrations-draft/`，`db push` 不會讀它；上線搬回的步驟見該資料夾 README。）
 - 宣稱「對正式庫做了某事」之前，先印出連線的專案代號核對。正式專案是 `jnikcndiexjojgvicohf`。
 - 回顧頁的「本週」是最近 7 天的滾動視窗，不是日曆週（`components/reports/report-dashboard.tsx:47-55`）。AI 回顧照同樣算法，數字才對得上。回顧頁用瀏覽器時區，伺服器固定台北時區，邊界日可能差一天。
 - AI 會議整理是已上線功能。同意畫面的前端沒上線前，不能打開伺服器的同意檢查，否則使用者會被擋卻看不到同意畫面。

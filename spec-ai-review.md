@@ -2,7 +2,7 @@
 
 - 狀態：**規格 v5（2026-10-02）：老闆 12 項待決事項已全部拍板，見第 12 節（接手工程師先讀第 12 節，它蓋過前文衝突處）。** v4 已定案、老闆已簽認（2026-10-01，原話「用建議值，加第二意見，同意開工」）。設計與資料庫草稿完成，功能程式尚未實作，交接給接手工程師。
 - 交接說明（接手請從這裡開始）：[docs/features/ai-review-handoff.md](docs/features/ai-review-handoff.md)
-- 技術設計：[docs/features/ai-review-design.md](docs/features/ai-review-design.md)；資料庫變更草稿：supabase/migrations/20261001120000_ai_reviews.sql（未套用）
+- 技術設計：[docs/features/ai-review-design.md](docs/features/ai-review-design.md)；資料庫變更草稿：supabase/migrations-draft/20261001120000_ai_reviews.sql、20261003030000_task_source.sql（未套用）
 - 假設帳本：[docs/assumptions.md](docs/assumptions.md)
 - v2 修訂摘要見第 9 節。資安與法規兩位顧問的結論都是「方向不變，但要先補規格才能開工」，本版已補。
 
