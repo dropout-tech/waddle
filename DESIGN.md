@@ -104,7 +104,9 @@ Primary：暖黃用於主海報；墨色用於標題與實心 CTA。Secondary：
 | Urgency Low | `oklch(0.78 0.1 155)` | 綠 — 不急 |
 | Urgency Medium | `oklch(0.8 0.12 95)` | 黃綠 — 一般 |
 | Urgency High | `oklch(0.75 0.14 55)` | 橘 — 重要 |
-| Urgency Critical | `oklch(0.68 0.16 25)` | 偏赤陶 — 緊急（不要紅色驚嘆） |
+| Urgency Critical | `oklch(0.68 0.16 25)` | 偏赤陶 — 緊急（不要紅色驚嘆）；**只給圓點／淡底／色條／邊框**，上面不放字 |
+| Urgency Critical Ink | 淺 `oklch(0.535 0.15 30)`／深 `oklch(0.72 0.15 28)` | 緊急的**字色**（`text-urgency-critical-ink`），淺色卡片 5.48:1、深色 6.57:1 |
+| Urgency Critical Strong | 淺 `oklch(0.535 0.15 30)`／深 `oklch(0.5 0.15 27)` | 白字徽章的**實心底**（`bg-urgency-critical-strong`），白字 5.56／6.47:1 |
 | Overdue | `oklch(0.6 0.18 25)` | 比 critical 略深，但仍在赤陶色域 |
 
 **重要禁區**：不要在這套色系裡混進純藍（#3b82f6）、純紫（#a855f7）、純綠（#22c55e）、純紅（#ef4444）等 Tailwind 預設色。所有顏色必須留在 warm hue 範圍（25-155，避開 200-300 的冷藍紫）。

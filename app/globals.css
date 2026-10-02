@@ -50,6 +50,12 @@
   --urgency-medium: oklch(0.8 0.12 95);
   --urgency-high: oklch(0.75 0.14 55);
   --urgency-critical: oklch(0.68 0.16 25);
+  /* Critical splits into two roles (same pattern as primary #cf5731 vs
+     #b8482a): the token above stays for dots / tints / bars; anything that
+     carries text uses these so it clears WCAG AA 4.5:1.
+     ink = critical-colored text; strong = solid fill under white text. */
+  --urgency-critical-ink: oklch(0.535 0.15 30);
+  --urgency-critical-strong: oklch(0.535 0.15 30);
   --overdue: oklch(0.6 0.18 25);
   
   /* Status Colors - Soft natural */
@@ -127,6 +133,9 @@
   --urgency-medium: oklch(0.72 0.14 95);
   --urgency-high: oklch(0.7 0.16 55);
   --urgency-critical: oklch(0.65 0.18 25);
+  /* Text on charcoal needs a lighter ink; white-text badges need a deeper fill. */
+  --urgency-critical-ink: oklch(0.72 0.15 28);
+  --urgency-critical-strong: oklch(0.5 0.15 27);
   --overdue: oklch(0.6 0.2 25);
 
   /* Status colors — slightly more saturated for dark. */
@@ -193,6 +202,8 @@
   --color-urgency-medium: var(--urgency-medium);
   --color-urgency-high: var(--urgency-high);
   --color-urgency-critical: var(--urgency-critical);
+  --color-urgency-critical-ink: var(--urgency-critical-ink);
+  --color-urgency-critical-strong: var(--urgency-critical-strong);
   --color-overdue: var(--overdue);
   --color-success: var(--success);
   --color-warning: var(--warning);

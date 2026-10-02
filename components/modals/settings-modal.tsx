@@ -1428,7 +1428,7 @@ function NotificationsSettingsTab({
           {/* Overdue Tasks */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-urgency-critical" />
+              <AlertTriangle className="w-4 h-4 text-urgency-critical-ink" />
               <h3 className="text-sm font-semibold text-foreground">{t('過期任務提醒')}</h3>
             </div>
 

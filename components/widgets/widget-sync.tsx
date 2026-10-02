@@ -28,13 +28,13 @@ function focusOf(timer:Timer,notes:NotebookNote[],today:string):WidgetSnapshot['
   return {mode:s?.mode,state:timer.state,title:s?.label ?? t('慢慢來，先專心一件事'),seconds:timer.displayTime,endAt:s && timer.state==='running' && s.mode==='pomodoro' ? s.startedAt.getTime()+s.pausedMs+s.targetSeconds*1000:null,note:focusNoteExcerpt(notes,today,s?.label),...(s?.mode==='pomodoro' ? {total:s.targetSeconds} : {})}
 }
 
-export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[];pet?:PetSettings|null}) {
+export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null,weekStartDay=null}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[];pet?:PetSettings|null;weekStartDay?:number|null}) {
   const {user}=useAuth(), timer=useFocusTimer(), notebook=useNotebook()
-  const latest=useRef({workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet})
+  const latest=useRef({workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet,weekStartDay})
   // Last snapshot that reached the native store — lets a focus start/pause/stop
   // republish instantly instead of waiting on the debounced, network-bound sync.
   const lastSnap=useRef<WidgetSnapshot|null>(null)
-  useEffect(()=>{latest.current={workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet}},[workspaces,timeBlocks,boards,timer,notebook.notes,notes,user,pet])
+  useEffect(()=>{latest.current={workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet,weekStartDay}},[workspaces,timeBlocks,boards,timer,notebook.notes,notes,user,pet,weekStartDay])
   useEffect(()=>{
     let alive=true, busy=false, again=false
     let checkIn:{at:number;value?:WidgetSnapshot['checkIn']}|undefined
@@ -72,7 +72,7 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{worksp
           if(!alive || widgetAccount().accountId!==source || widgetAccount().epoch!==auth.epoch) return
           if(!error) stickies={at:Date.now(),rows:(data??[]).map(r=>({id:r.id,content:r.content as StickyNote['content'],color:r.color as StickyNoteColor,updatedAt:r.updated_at}))}
         }
-        const snapshot=makeSnapshot({accountId:source,epoch:auth.epoch,tasks:x.workspaces.filter(w=>!w.isArchived).flatMap(w=>w.categories.filter(c=>!c.isArchived).flatMap(c=>c.tasks)),blocks:x.timeBlocks,boards:x.boards,notes:x.notes,stickies:stickies?.rows,locale:getLang()})
+        const snapshot=makeSnapshot({accountId:source,epoch:auth.epoch,tasks:x.workspaces.filter(w=>!w.isArchived).flatMap(w=>w.categories.filter(c=>!c.isArchived).flatMap(c=>c.tasks)),blocks:x.timeBlocks,boards:x.boards,notes:x.notes,stickies:stickies?.rows,locale:getLang(),weekStartDay:x.weekStartDay})
         // Completion revisions and displayed task content must come from the same server row.
         if(snapshot.tasks.length) {
           const {data:rows,error}=await db.from('tasks').select('*').eq('user_id',source).in('id',snapshot.tasks.map(t=>t.id))
@@ -112,7 +112,7 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{worksp
     window.addEventListener('focus',onVisible);document.addEventListener('visibilitychange',onVisible)
     return ()=>{alive=false;lastSnap.current=null;clearTimeout(changeTimer);window.removeEventListener('huddle-widget-refresh',onChange);window.removeEventListener(STICKY_CHANGED_EVENT,onSticky);clearInterval(id);clearTimeout(first);window.removeEventListener('focus',onVisible);document.removeEventListener('visibilitychange',onVisible)}
   },[user?.id])
-  useEffect(()=>{window.dispatchEvent(new Event('huddle-widget-refresh'))},[workspaces,timeBlocks,boards,notebook.notes,notes,timer.state,timer.session,pet])
+  useEffect(()=>{window.dispatchEvent(new Event('huddle-widget-refresh'))},[workspaces,timeBlocks,boards,notebook.notes,notes,timer.state,timer.session,pet,weekStartDay])
   // Focus start / pause / resume / stop → push the Live Activity right away from the
   // last published snapshot (only `focus` changes; the full sync above follows).
   useEffect(()=>{

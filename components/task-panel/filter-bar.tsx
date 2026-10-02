@@ -178,7 +178,7 @@ export function FilterBar({ filters, onFiltersChange, workspaces, density, onDen
                         ? 'bg-urgency-medium text-foreground'
                         : level <= 8
                         ? 'bg-urgency-high text-white'
-                        : 'bg-urgency-critical text-white'
+                        : 'bg-urgency-critical-strong text-white'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                   )}
                 >
