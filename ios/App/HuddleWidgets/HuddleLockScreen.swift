@@ -345,11 +345,6 @@ extension WidgetView {
             Spacer(minLength:0)
         }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading)
     }
-    /// A small one-line caption that takes whatever width is left but asks for none, so
-    /// ViewThatFits judges a candidate by its big line only.
-    func looseLine(_ t:String)->some View {
-        Text(t).font(.system(size:13,weight:.medium)).lineLimit(1).opacity(0.8).frame(minWidth:0,idealWidth:0,maxWidth:.infinity,alignment:.leading)
-    }
     /// The longest of `texts` that fits on one line (ViewThatFits), else the last one.
     @ViewBuilder func fitLine(_ texts:[String])->some View {
         ViewThatFits(in:.horizontal){
@@ -440,16 +435,15 @@ extension WidgetView {
                 .widgetURL(url(.agenda,n.item))
         } else {
             if let item=n.item {
-                // The time is never shortened. First choice 「16:57 今天」 on the big line with the
-                // whole title under it; if that line doesn't fit (e.g. "17:28 Today") the big line
-                // is just the time and the day leads the title line instead.
-                HStack(spacing:8){
-                    inkIcon(InkPaths.clock,rectIcon)
-                    ViewThatFits(in:.horizontal){
-                        VStack(alignment:.leading,spacing:-1){hero(n.time,unit:n.day,size:32).fixedSize();looseLine(item.title)}
-                        VStack(alignment:.leading,spacing:-1){hero(n.time,size:34).fixedSize();looseLine("\(n.day) · \(item.title)")}
-                    }
-                }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading).widgetURL(url(.agenda,item))
+                // The time is never shortened. Chinese keeps 「16:57 今天」 on the big line (fits,
+                // verified on the simulator); English day words ("Today", "Tomorrow") are too wide,
+                // so the big line is just the time and the day leads the title line. Chosen by
+                // language, not ViewThatFits: on the Lock Screen it rejected the Chinese line too.
+                if isEN {
+                    hRect("\(n.day) · \(item.title)"){inkIcon(InkPaths.clock,rectIcon)} hero:{hero(n.time,size:34).fixedSize()}.widgetURL(url(.agenda,item))
+                } else {
+                    hRect(item.title){inkIcon(InkPaths.clock,rectIcon)} hero:{hero(n.time,unit:n.day,size:34)}.widgetURL(url(.agenda,item))
+                }
             } else {
                 hRect(L("接下來七天","Next 7 days")){inkIcon(InkPaths.clock,rectIcon)} hero:{hero(L("沒有行程","No plans"),size:24)}.widgetURL(url(.agenda))
             }
