@@ -42,20 +42,47 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
             { items: SlashItem[]; command: (item: SlashItem) => void }
           > | null = null
           let popup: HTMLDivElement | null = null
+          let caretRect: (() => DOMRect | null) | null | undefined = null
+
+          // Room the menu may use: the visible viewport minus the phone's
+          // keyboard-docked formatting bar (EditorToolbar). Without the bar
+          // the menu opened below a mid-screen caret and slid under it.
+          const bounds = () => {
+            const vv = window.visualViewport
+            const top = vv ? vv.offsetTop : 0
+            let bottom = vv ? vv.offsetTop + vv.height : window.innerHeight
+            const bar = document.querySelector('[data-nb-keyboard-bar]')?.getBoundingClientRect()
+            if (bar && bar.height > 0 && bar.top > top) bottom = Math.min(bottom, bar.top)
+            return { top, bottom }
+          }
 
           const position = (rect: DOMRect | null | undefined) => {
             if (!popup || !rect) return
-            const spaceBelow = window.innerHeight - rect.bottom
-            const flipUp = spaceBelow < MENU_HEIGHT + GAP && rect.top > MENU_HEIGHT
+            const list = popup.querySelector<HTMLElement>('[role="listbox"]')
+            if (list) list.style.maxHeight = ''
+            const natural = Math.min(list?.offsetHeight || MENU_HEIGHT, MENU_HEIGHT)
+            const { top, bottom } = bounds()
+            // A caret hidden behind the bar still anchors the menu above the bar.
+            const anchorTop = Math.min(rect.top, bottom)
+            const spaceBelow = bottom - rect.bottom - GAP * 2
+            const spaceAbove = anchorTop - top - GAP * 2
+            // Below if it fits, else above if it fits, else the roomier side
+            // with the list capped to that room (it scrolls).
+            const flipUp = spaceBelow < natural && (spaceAbove >= natural || spaceAbove > spaceBelow)
+            const room = flipUp ? spaceAbove : spaceBelow
+            if (list && room < natural) list.style.maxHeight = `${Math.max(room, 96)}px`
             popup.style.left = `${Math.max(GAP, Math.min(rect.left, window.innerWidth - MENU_WIDTH - GAP))}px`
             if (flipUp) {
               popup.style.top = 'auto'
-              popup.style.bottom = `${window.innerHeight - rect.top + GAP}px`
+              popup.style.bottom = `${window.innerHeight - anchorTop + GAP}px`
             } else {
               popup.style.bottom = 'auto'
               popup.style.top = `${rect.bottom + GAP}px`
             }
           }
+          // The keyboard (and the bar riding on it) can move while the menu
+          // is open — e.g. it finishes sliding up after "/" was typed.
+          const reposition = () => position(caretRect?.())
 
           return {
             onStart: (props) => {
@@ -71,7 +98,12 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
               // the dialog so modal pointer/focus guards permit interaction.
               const overlay = props.editor.view.dom.closest('[data-whiteboard-detail]')
               ;(overlay ?? document.body).appendChild(popup)
+              caretRect = props.clientRect
               position(props.clientRect?.())
+              // The list renders a frame later; measure and cap it then.
+              requestAnimationFrame(reposition)
+              window.visualViewport?.addEventListener('resize', reposition)
+              window.visualViewport?.addEventListener('scroll', reposition)
             },
             onUpdate: (props) => {
               component?.updateProps({
@@ -79,6 +111,7 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
                 command: (item: SlashItem) => props.command(item),
               })
               if (popup) popup.style.display = props.items.length === 0 ? 'none' : ''
+              caretRect = props.clientRect
               position(props.clientRect?.())
             },
             onKeyDown: (props) => {
@@ -89,6 +122,9 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
               return component?.ref?.onKeyDown({ event: props.event }) ?? false
             },
             onExit: () => {
+              window.visualViewport?.removeEventListener('resize', reposition)
+              window.visualViewport?.removeEventListener('scroll', reposition)
+              caretRect = null
               popup?.remove()
               popup = null
               component?.destroy()

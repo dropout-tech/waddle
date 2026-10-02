@@ -199,9 +199,15 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
                 <span className="text-sm font-medium text-foreground truncate">
                   {publicAlias || session.displayName}
                 </span>
-                <span className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                  <InkMail className="w-3.5 h-3.5 -m-px" />
-                  {session.email}
+                {/* Long addresses wrap rather than being clipped — `truncate`
+                    never worked here: the text is a flex item, so it was cut
+                    without an ellipsis. Prefer the break before "@"; only a
+                    part still too long breaks mid-word. */}
+                <span className="text-xs text-muted-foreground flex items-start gap-1" title={session.email}>
+                  <InkMail className="w-3.5 h-3.5 -m-px mt-px shrink-0" />
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    {session.email.includes('@') ? <>{session.email.slice(0, session.email.indexOf('@'))}<wbr />{session.email.slice(session.email.indexOf('@'))}</> : session.email}
+                  </span>
                 </span>
               </div>
             </div>

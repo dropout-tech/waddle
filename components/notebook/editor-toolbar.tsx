@@ -85,6 +85,7 @@ export function EditorToolbar({ editor, onPromote, uploadImage }: EditorToolbarP
 
   return (
     <div
+      data-nb-keyboard-bar=""
       className={cn(
         'z-sticky flex items-center gap-0.5 border-border bg-card/85 px-2 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-card/65',
         isMobile

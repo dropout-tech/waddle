@@ -57,6 +57,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     immediatelyRender: false,
     editorProps: {
       attributes: { class: 'nb-prose focus:outline-none' },
+      // Phones: the formatting bar is docked over the bottom of the scroller,
+      // so typing near the end must scroll the caret above it, not behind it
+      // (ProseMirror's default keeps only 5px to the scroller's edge).
+      ...(isMobile && {
+        scrollThreshold: { top: 0, right: 0, bottom: 80, left: 0 },
+        scrollMargin: { top: 5, right: 5, bottom: 80, left: 5 },
+      }),
       // Pasted/dropped images go straight to Supabase Storage (never base64
       // into the content JSON). Non-image paste/drop falls through untouched
       // by returning false, so text/HTML/internal-node drag stays default.
