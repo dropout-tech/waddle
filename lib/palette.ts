@@ -164,6 +164,10 @@ export const URGENCY_COLORS = {
   medium: { id: 'urgency-medium', name: '一般（黃綠）', hex: '#D6BD5C', oklch: 'oklch(0.8 0.12 95)' },
   high: { id: 'urgency-high', name: '重要（橘）', hex: '#F1944F', oklch: 'oklch(0.75 0.14 55)' },
   critical: { id: 'urgency-critical', name: '緊急（赤陶）', hex: '#EA6A64', oklch: 'oklch(0.68 0.16 25)' },
+  // Text-bearing roles of critical (WCAG AA). Light-mode values; dark mode
+  // uses ink oklch(0.72 0.15 28) / strong oklch(0.5 0.15 27) in globals.css.
+  criticalInk: { id: 'urgency-critical-ink', name: '緊急字色（深赤陶）', hex: '#B44334', oklch: 'oklch(0.535 0.15 30)' },
+  criticalStrong: { id: 'urgency-critical-strong', name: '緊急徽章底（白字用）', hex: '#B44334', oklch: 'oklch(0.535 0.15 30)' },
   overdue: { id: 'overdue', name: '逾期（深赤陶）', hex: '#D74745', oklch: 'oklch(0.6 0.18 25)' },
 } as const satisfies Record<string, PaletteColor>
 

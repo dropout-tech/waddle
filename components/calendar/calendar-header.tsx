@@ -363,7 +363,7 @@ export function CalendarHeader({
                     aria-hidden="true"
                     className={cn(
                       'absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center rounded-full text-[9px] font-bold text-white',
-                      notifHigh ? 'bg-urgency-critical' : 'bg-urgency-high',
+                      notifHigh ? 'bg-urgency-critical-strong' : 'bg-urgency-high',
                     )}
                   >
                     {notifCount > 9 ? '9+' : notifCount}
@@ -398,7 +398,7 @@ export function CalendarHeader({
                     <InkBell className="w-4 h-4" />
                     <span className="flex-1 text-left">{t('通知')}</span>
                     {notifCount > 0 && (
-                      <span className={cn('rounded-full px-1.5 text-[11px] font-semibold text-white', notifHigh ? 'bg-urgency-critical' : 'bg-urgency-high')}>
+                      <span className={cn('rounded-full px-1.5 text-[11px] font-semibold text-white', notifHigh ? 'bg-urgency-critical-strong' : 'bg-urgency-high')}>
                         {notifCount > 9 ? '9+' : notifCount}
                       </span>
                     )}
