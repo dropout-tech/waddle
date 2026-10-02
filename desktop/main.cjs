@@ -91,7 +91,9 @@ const template = [
 app.whenReady().then(() => {
   if (!locked) return
   if (process.platform === 'win32') app.setAppUserModelId('com.lazylazy.huddle.desktop')
-  app.setAsDefaultProtocolClient('huddle-desktop')
+  // Only the installed app may claim huddle-desktop://. A dev run (`pnpm desktop:dev`) would
+  // otherwise register node_modules' Electron.app as the OS handler and swallow OAuth returns.
+  if (app.isPackaged) app.setAsDefaultProtocolClient('huddle-desktop')
   oauth = createOAuth({ file: path.join(app.getPath('userData'), 'pending-oauth.json'), origin: allowedOrigin, openExternal: url => shell.openExternal(url) })
   for (const [channel, handler] of Object.entries({
     'desktop-oauth-begin': () => oauth.begin(),

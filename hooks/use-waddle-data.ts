@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { classifyDbError } from '@/lib/supabase/db-error-reason'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
+import { isNative } from '@/lib/platform'
 import { seedUserData } from '@/lib/supabase/seed'
 import type { Database, Json } from '@/lib/supabase/database.types'
 import {
@@ -375,12 +376,16 @@ export function useWaddleData(): UseWaddleData {
     workspacesRef.current = workspaces
   }, [workspaces])
 
+  // 'ok' = fresh data is on screen; 'failed' = a read failed or no user came
+  // back (what is on screen is kept); 'interrupted' = a local write landed
+  // mid-read, so the snapshot was dropped and is still owed; 'stale' =
+  // superseded by a newer load, nothing committed on purpose.
   const loadData = useCallback(
-    async ({ initial = false }: { initial?: boolean } = {}) => {
+    async ({ initial = false }: { initial?: boolean } = {}): Promise<'ok' | 'failed' | 'interrupted' | 'stale'> => {
       // Synchronous claim — must run before any `await` in this function.
       // See initialLoadClaimedRef above.
       if (initial) {
-        if (initialLoadClaimedRef.current) return
+        if (initialLoadClaimedRef.current) return 'stale'
         initialLoadClaimedRef.current = true
       }
       const myVersion = ++loadVersionRef.current
@@ -428,7 +433,7 @@ export function useWaddleData(): UseWaddleData {
       ])
       if (!user) {
         if (initial && !isStale()) setIsLoading(false)
-        return
+        return 'failed'
       }
       userIdRef.current = user.id
 
@@ -450,7 +455,7 @@ export function useWaddleData(): UseWaddleData {
           console.error('[seed] failed:', err)
           toast.error(translate('初始化資料失敗，請重新整理'))
           if (!isStale()) setIsLoading(false)
-          return
+          return 'failed'
         }
         reads = await readAll(user.id)
         wsRows = reads[0].data
@@ -464,7 +469,7 @@ export function useWaddleData(): UseWaddleData {
       if (readErrors.length > 0) {
         console.error('[loadData] read failed', readErrors)
         if (initial && !isStale()) setLoadError(true)
-        return
+        return 'failed'
       }
 
       const [
@@ -781,7 +786,7 @@ export function useWaddleData(): UseWaddleData {
         }
       }
 
-      if (isStale()) return
+      if (isStale()) return myVersion === loadVersionRef.current ? 'interrupted' : 'stale'
       setWorkspaces(builtWorkspaces)
       assignedTasksRef.current = builtAssigned
       setAssignedTasks(builtAssigned)
@@ -795,6 +800,7 @@ export function useWaddleData(): UseWaddleData {
         setOnboardingCompleted(settingsRow?.onboarding_completed ?? true)
         setIsLoading(false)
       }
+      return 'ok'
     },
     [supabase],
   )
@@ -816,41 +822,92 @@ export function useWaddleData(): UseWaddleData {
   // so a quick alt-tab / cmd-tab burst doesn't hammer Supabase. We
   // intentionally do NOT toggle isLoading on refetch so the UI doesn't
   // flash the loading spinner.
+  //
+  // The iOS app also refetches on Capacitor's appStateChange: coming back
+  // from the background is not a dependable visibilitychange/focus in
+  // WKWebView. And the first request after a long suspension often fails
+  // while the connection comes back, so a failed refresh is retried twice
+  // instead of leaving the old data on screen until the next switch.
   useEffect(() => {
     // A background refresh must not invalidate the initial load: only that
     // initial request clears isLoading. Attach listeners once it has finished.
     if (isLoading) return
     const REFETCH_THROTTLE_MS = 3000
-    const tryRefetch = () => {
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
-      // Skip refetch while local writes are in flight — otherwise a refetch
-      // landing between optimistic-update and DB-confirm clobbers the new
-      // state with the pre-write DB snapshot.
-      if (pendingWritesRef.current > 0) return
-      const now = Date.now()
-      if (now - lastRefetchRef.current < REFETCH_THROTTLE_MS) return
-      lastRefetchRef.current = now
-      void loadData({ initial: false })
+    const RETRY_DELAYS_MS = [1500, 4000]
+    const WRITE_POLL_MS = 300
+    // A write that never settles (e.g. its request died while suspended)
+    // must not keep a refresh queued forever; the next return will try again.
+    const WRITE_WAIT_LIMIT_MS = 10000
+    const native = isNative()
+    let appActive = true
+    let disposed = false
+    let queuedTimer: ReturnType<typeof setTimeout> | undefined
+    const inForeground = () =>
+      appActive && (typeof document === 'undefined' || document.visibilityState === 'visible')
+    const queue = (fn: () => void, ms: number) => {
+      queuedTimer = setTimeout(() => { queuedTimer = undefined; fn() }, ms)
     }
+    const refetch = ({ force = false, attempt = 0, waitedMs = 0 } = {}) => {
+      if (disposed || !inForeground()) return
+      if (attempt === 0 && waitedMs === 0) {
+        if (force) {
+          clearTimeout(queuedTimer)
+          queuedTimer = undefined
+        } else {
+          // A deferred or retry refresh is already queued — it will run.
+          if (queuedTimer !== undefined) return
+          if (Date.now() - lastRefetchRef.current < REFETCH_THROTTLE_MS) return
+        }
+      }
+      // Never read while local writes are in flight — a refetch landing
+      // between optimistic-update and DB-confirm clobbers the new state with
+      // the pre-write DB snapshot. Wait for them to settle instead.
+      if (pendingWritesRef.current > 0) {
+        if (waitedMs < WRITE_WAIT_LIMIT_MS) {
+          queue(() => refetch({ attempt, waitedMs: waitedMs + WRITE_POLL_MS }), WRITE_POLL_MS)
+        }
+        return
+      }
+      lastRefetchRef.current = Date.now()
+      void loadData({ initial: false }).catch(() => 'failed' as const).then((result) => {
+        // 'interrupted' (a local write landed mid-read) is retried too, so a
+        // tap right after returning doesn't cancel the sync it was owed.
+        if (result === 'ok' || result === 'stale') return
+        if (disposed || attempt >= RETRY_DELAYS_MS.length) return
+        if (queuedTimer !== undefined) return
+        queue(() => refetch({ attempt: attempt + 1 }), RETRY_DELAYS_MS[attempt])
+      })
+    }
+    const tryRefetch = () => refetch()
+    const afterExternalWrite = () => refetch({ force: true })
     document.addEventListener('visibilitychange', tryRefetch)
     window.addEventListener('focus', tryRefetch)
-    let externalRefreshTimer: ReturnType<typeof setTimeout> | undefined
-    const afterExternalWrite = () => {
-      clearTimeout(externalRefreshTimer)
-      if (pendingWritesRef.current > 0) { externalRefreshTimer = setTimeout(afterExternalWrite, 300); return }
-      lastRefetchRef.current = 0
-      tryRefetch()
-    }
     window.addEventListener('huddle:tasks-imported', afterExternalWrite)
     window.addEventListener('huddle-widget-synced', afterExternalWrite)
     window.addEventListener(ASSIGNMENTS_CHANGED_EVENT, afterExternalWrite)
+    let removeAppListener: (() => void) | undefined
+    if (native) {
+      void import('@capacitor/app').then(({ App }) =>
+        App.addListener('appStateChange', ({ isActive }) => {
+          // Also fires around Control Center / system sheets, so it keeps
+          // the normal throttle rather than forcing a read every time.
+          appActive = isActive
+          if (isActive) refetch()
+        }),
+      ).then((handle) => {
+        if (disposed) void handle.remove()
+        else removeAppListener = () => void handle.remove()
+      }).catch(() => {})
+    }
     return () => {
+      disposed = true
+      removeAppListener?.()
       window.removeEventListener(ASSIGNMENTS_CHANGED_EVENT, afterExternalWrite)
       document.removeEventListener('visibilitychange', tryRefetch)
       window.removeEventListener('focus', tryRefetch)
       window.removeEventListener('huddle:tasks-imported', afterExternalWrite)
       window.removeEventListener('huddle-widget-synced', afterExternalWrite)
-      clearTimeout(externalRefreshTimer)
+      clearTimeout(queuedTimer)
     }
   }, [loadData, isLoading])
 

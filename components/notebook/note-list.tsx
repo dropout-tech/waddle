@@ -26,14 +26,14 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
-  Plus,
-  Trash2,
-  GripVertical,
-  FolderPlus,
-  ChevronDown,
-  Pencil,
-  FolderInput,
-} from 'lucide-react'
+  InkChevronDown,
+  InkFolder,
+  InkFolderPlus,
+  InkGrip,
+  InkPencil,
+  InkPlus,
+  InkTrash,
+} from '@/components/icons/huddle-icons'
 import { formatDistanceToNow } from 'date-fns'
 import { zhTW, enUS } from 'date-fns/locale'
 import type { NotebookNote, NotebookCategory } from '@/lib/types'
@@ -242,7 +242,7 @@ export function NoteList({
             aria-label={t('新增分類')}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
-            <FolderPlus className="h-4 w-4" />
+            <InkFolderPlus className="h-4 w-4" />
           </button>
           <button
             type="button"
@@ -251,7 +251,7 @@ export function NoteList({
             aria-label={t('新增記事')}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
-            <Plus className="h-4 w-4" />
+            <InkPlus className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -284,7 +284,7 @@ export function NoteList({
         <div className="flex-1 overflow-y-auto px-2 pb-3">
           {addingCategory && (
             <div className="mb-2 flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-2 py-1.5">
-              <FolderPlus className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <InkFolderPlus className="h-3.5 w-3.5 shrink-0 text-primary" />
               <input
                 type="text"
                 value={newCategoryName}
@@ -420,7 +420,7 @@ function CategoryGroup({
           className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground"
           aria-label={collapsed ? t('展開分類') : t('收合分類')}
         >
-          <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-150', collapsed && '-rotate-90')} />
+          <InkChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-150', collapsed && '-rotate-90')} />
         </button>
         <span
           className="h-1.5 w-1.5 shrink-0 rounded-full"
@@ -473,7 +473,7 @@ function CategoryGroup({
             aria-label={t('在此新增記事')}
             className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 hover:bg-secondary hover:text-foreground"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <InkPlus className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
@@ -482,7 +482,7 @@ function CategoryGroup({
             aria-label={t('改名')}
             className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 hover:bg-secondary hover:text-foreground"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <InkPencil className="h-3.5 w-3.5" />
           </button>
           {confirmingDelete ? (
             <span className="flex items-center gap-1 pl-0.5">
@@ -509,7 +509,7 @@ function CategoryGroup({
               aria-label={t('刪除分類')}
               className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <InkTrash className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
@@ -575,7 +575,7 @@ function UncategorizedGroup({
         )}
         aria-expanded={!collapsed}
       >
-        <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform duration-150', collapsed && '-rotate-90')} />
+        <InkChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform duration-150', collapsed && '-rotate-90')} />
         <span className="text-xs font-semibold text-muted-foreground">{t('未分類')}</span>
         <span className="ml-auto text-[10px] font-medium text-muted-foreground">{notes.length}</span>
       </button>
@@ -682,7 +682,7 @@ function NoteRow({
         {...attributes}
         {...listeners}
       >
-        <GripVertical className="h-4 w-4" />
+        <InkGrip className="h-4 w-4" />
       </button>
 
       <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left">
@@ -732,7 +732,7 @@ function NoteRow({
                 aria-label={t('移到分類')}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-muted-foreground/50 hover:text-foreground"
               >
-                <FolderInput className="h-3.5 w-3.5" />
+                <InkFolder className="h-3.5 w-3.5" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
@@ -766,7 +766,7 @@ function NoteRow({
             aria-label={t('刪除記事')}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-muted-foreground/50 transition-opacity hover:text-destructive"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <InkTrash className="h-3.5 w-3.5" />
           </button>
         </span>
       )}
@@ -780,7 +780,7 @@ function NoteDragOverlay({ note }: { note: NotebookNote | undefined }) {
 
   return (
     <div className="flex w-64 max-w-[calc(100vw-2rem)] items-center gap-2 rounded-lg border border-primary/30 bg-card px-2 py-2 shadow-lg">
-      <GripVertical className="h-4 w-4 shrink-0 text-primary/70" />
+      <InkGrip className="h-4 w-4 shrink-0 text-primary/70" />
       <span className="shrink-0 text-base leading-none">{note.icon ?? '📄'}</span>
       <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
         {note.title.trim() || t('無標題')}

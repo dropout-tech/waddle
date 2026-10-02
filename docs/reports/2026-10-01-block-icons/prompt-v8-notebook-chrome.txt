@@ -1,0 +1,64 @@
+Use your image generation tool to create ONE new image, then save it as a PNG file at exactly this absolute path:
+__OUT__
+Do not modify, create or delete any other file. Do not write code. When done, reply with only the saved path and the pixel size.
+
+WHAT TO DRAW
+A single sheet of 24 tiny DOODLES for a notebook and task app, arranged in a strict grid of 6 columns x 4 rows on a landscape 3:2 canvas (1536 x 1024 px).
+
+The attached image is a STYLE REFERENCE FOR LINE QUALITY ONLY: copy the feel of its thick, soft, rounded, slightly wobbly hand-inked outline. Do NOT draw the character, any animal, any face, or any mascot. Only abstract UI symbols.
+
+HAND-DRAWN CHARACTER (the most important rule: these will be shown at only 16 px, and must STILL look obviously drawn by hand, never like a clean icon font)
+- Draw each symbol the way a person doodles it quickly in a notebook margin with ONE fat round-tip marker.
+- The marker tip is 24 px wide, and every doodle is SMALL: only about 120 px tall or wide. So the line is one fifth of the doodle: chunky like a poster marker or a fat crayon, as thick as the dots in the "More" doodle. A doodle is never more than five line-widths across.
+- Because the line is so fat, every shape is reduced to its simplest form (two to four strokes), and every hole or inner gap is at least one full line-width wide. If a detail would not fit, leave it out.
+- EXAGGERATE the imperfection, because at 16 px small wobbles disappear. Concretely:
+  * every box is drawn as four separate strokes that visibly CROSS at the corners and stick out past them by a full line-width, like a hastily sketched "#";
+  * every box or page leans 8 to 12 degrees, some to the left and some to the right, and its sides are not parallel;
+  * every circle or loop is one fast spiral stroke whose end overshoots the start by a quarter turn and pokes out, like a hand-written "6" or "e"; it is egg-shaped, never round;
+  * every "straight" line is visibly bowed or wavy; pairs of lines are never parallel and never the same length;
+  * nothing is symmetrical and nothing is centred precisely.
+- The stroke swells and thins a little like a brush pen pressed harder in places, with blunt rounded ends.
+- Outline doodles only. Do not fill shapes solid black, except small dots where listed.
+- Even so, each symbol must be instantly recognisable.
+
+FLAT INK RULES
+- Pure solid black ink (#000000) on an opaque pure flat white background (#FFFFFF). No transparency, no gray, no color, no paper texture, no shading, no gradients, no drop shadows, no hatching.
+- Every doodle is centered in its own 256 x 256 px cell and is SMALL inside it (about 120 px, less than half the cell), surrounded by wide empty white margins.
+- NO grid lines, NO cell borders, NO frames around doodles, NO captions, NO labels, NO numbering of cells, no letters, no digits.
+- All 24 the same visual size and the same marker weight, one family drawn by one hand in one sitting.
+
+THE 24 DOODLES, in reading order (left to right, top row first)
+
+Row 1
+1. New folder: a leaning folder (a box with a small tab on its top-left edge) with a fat "+" drawn inside it.
+2. Move to folder: a leaning folder with a fat arrow coming from the upper right and pointing down into the folder.
+3. Drag handle: six round dots arranged in two columns of three, slightly uneven.
+4. Offline: a fluffy cloud drawn in one bumpy stroke, with one long diagonal slash crossing through it.
+5. Back: a fat arrow pointing left, a wavy shaft with a two-stroke arrowhead.
+6. Whiteboard: a leaning board on a little three-legged easel, with one loose squiggle written on the board.
+
+Row 2
+7. Whiteboard 2: a wide leaning board with a short ledge under it, a marker lying on the ledge, and a squiggle on the board.
+8. Whiteboard 3: a leaning square board with a round pushpin at the top centre and two wavy lines of scribble on it.
+9. Trash can: a tapered bin with a lid stroke and a little handle on the lid.
+10. Pencil: a fat pencil leaning diagonally, tip at the lower left.
+11. Check: one big check mark.
+12. Close: two crossing strokes like an "x".
+
+Row 3
+13. Folder: a plain leaning folder with a small tab on its top-left edge.
+14. Refresh: two curved arrows chasing each other around an egg-shaped loop.
+15. Pin: a round pushpin head with a short needle pointing down-left.
+16. Copy: two leaning pages, one overlapping the other.
+17. Share: a leaning open box with a fat arrow pointing up out of it.
+18. Inbox: a leaning tray with a dip in the middle of its front edge.
+
+Row 4
+19. Lightbulb: a bulb loop with two short strokes for the base.
+20. Eraser: a fat leaning block with one stroke across it near one end.
+21. Palette: an egg-shaped palette with a thumb hole and three round dots.
+22. Filter: a funnel, a wide "V" with a short stem.
+23. Image: a leaning frame with a small mountain zigzag and one round dot for the sun.
+24. Hand: an open hand with four fingers and a thumb, drawn very simply.
+
+Double-check before saving: exactly 24 doodles, exactly 6 per row, each one small (about 120 px) with a 24 px fat marker line, opaque white background, corners that cross and stick out, leaning boxes, spiral loops with poking ends, nothing else on the canvas.
