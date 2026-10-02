@@ -449,7 +449,7 @@ export function MonthView({
                     }}
                     className="flex items-center gap-1 pr-2 min-h-[52px] [@media(max-height:700px)]:min-h-[46px] rounded-xl active:bg-secondary/50 transition-colors cursor-pointer"
                   >
-                    {!task.id.startsWith('meeting:') && <button
+                    {!task.id.startsWith('meeting:') && !task.isRecurring && <button
                       type="button"
                       onClick={(e) => handleToggleComplete(e, task.id)}
                       aria-label={t('完成任務')}
@@ -460,6 +460,7 @@ export function MonthView({
                         style={{ borderColor: displayColor(task.calendarColor || task.workspaceColor) }}
                       />
                     </button>}
+                    {task.isRecurring && <span aria-hidden="true" className="w-11 h-11 flex-shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <div className="text-[15px] leading-snug text-foreground truncate">
                         {taskDisplayTitle(task, showCategoryPrefix)}
@@ -488,7 +489,7 @@ export function MonthView({
                     }}
                     className="flex items-center gap-1 pr-2 min-h-[52px] rounded-xl active:bg-secondary/50 transition-colors cursor-pointer opacity-60"
                   >
-                    {!task.id.startsWith('meeting:') && <button
+                    {!task.id.startsWith('meeting:') && !task.isRecurring && <button
                       type="button"
                       onClick={(e) => handleToggleComplete(e, task.id)}
                       aria-label={t('取消完成')}
@@ -501,6 +502,7 @@ export function MonthView({
                         <Check className="w-3 h-3 text-white" strokeWidth={3} />
                       </span>
                     </button>}
+                    {task.isRecurring && <span aria-hidden="true" className="w-11 h-11 flex-shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <div className="text-[15px] leading-snug text-muted-foreground line-through truncate">
                         {taskDisplayTitle(task, showCategoryPrefix)}
@@ -648,7 +650,7 @@ export function MonthView({
                               borderLeft: `2px solid ${color}`,
                             }}
                           >
-                            {!task.id.startsWith('meeting:') && <button
+                            {!task.id.startsWith('meeting:') && !task.isRecurring && <button
                               onClick={(e) => handleToggleComplete(e, task.id)}
                               className="flex-shrink-0 w-2.5 h-2.5 rounded-full border flex items-center justify-center"
                               style={{ borderColor: color }}

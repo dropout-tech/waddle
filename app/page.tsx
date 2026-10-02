@@ -17,6 +17,7 @@ import { SettingsModal, type SettingsTab } from '@/components/modals/settings-mo
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { DailyClearCelebration } from '@/components/celebration/daily-clear-celebration'
 import { OverdueTaskReview } from '@/components/task-panel/overdue-task-review'
+import { useRecurringCompleteConfirm } from '@/components/task-panel/use-recurring-complete-confirm'
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { useMeetingReminders } from '@/hooks/use-meeting-reminders'
 import { useWaterReminder } from '@/hooks/use-water-reminder'
@@ -86,6 +87,24 @@ function HuddlePage() {
     reorderScratchpadItems,
     clearScratchpadDate,
   } = useWaddleData()
+
+  // Every in-app "complete" entry point (list rows, full-screen list, detail
+  // modal, focus board, overdue review) funnels through these two. Completing
+  // a recurring master completes the whole series, so ask first; the calendar
+  // hides its checkbox for recurring tasks instead. Un-completing never asks.
+  const { confirm: confirmSeriesComplete, dialog: seriesCompleteDialog } = useRecurringCompleteConfirm()
+  const completesSeries = useCallback((taskId: string) => {
+    const task = findTaskById(workspaces, taskId)
+    return !!task?.isRecurring && !task.isCompleted
+  }, [workspaces])
+  const toggleTaskCompleteConfirmed = useCallback(async (taskId: string) => {
+    if (completesSeries(taskId) && !(await confirmSeriesComplete())) return
+    await toggleTaskComplete(taskId)
+  }, [completesSeries, confirmSeriesComplete, toggleTaskComplete])
+  const completeTasksConfirmed = useCallback(async (taskIds: string[]) => {
+    if (taskIds.some(completesSeries) && !(await confirmSeriesComplete())) return
+    await completeTasks(taskIds)
+  }, [completesSeries, confirmSeriesComplete, completeTasks])
 
   // Watch all meetings and fire browser notifications N minutes before
   // each one starts. Pref + permission live in localStorage / Notification
@@ -552,7 +571,7 @@ function HuddlePage() {
         settings={settings}
         onToggleCategoryCollapse={toggleCategoryCollapse}
         onReorderCategories={reorderCategories}
-        onToggleComplete={toggleTaskComplete}
+        onToggleComplete={toggleTaskCompleteConfirmed}
         onSelectTask={handleSelectTask}
         onAddTask={addTask}
         onAddCategory={addCategory}
@@ -603,13 +622,15 @@ function HuddlePage() {
         isOpen={isOverdueReviewOpen}
         workspaces={workspaces}
         onClose={() => setIsOverdueReviewOpen(false)}
-        onComplete={toggleTaskComplete}
-        onCompleteAll={completeTasks}
+        onComplete={toggleTaskCompleteConfirmed}
+        onCompleteAll={completeTasksConfirmed}
         onReturnToBacklog={handleReturnToBacklog}
         onScheduleToday={handleScheduleToday}
         onArchive={handleArchiveTask}
         onSelectTask={handleSelectTask}
       />
+
+      {seriesCompleteDialog}
 
       {liveSelectedTask && (
         <TaskDetailModal
@@ -630,7 +651,7 @@ function HuddlePage() {
             setSelectedOccurrenceDate(undefined)
           }}
           onSave={handleSaveTask}
-          onToggleComplete={taskMode === 'edit' ? toggleTaskComplete : undefined}
+          onToggleComplete={taskMode === 'edit' ? toggleTaskCompleteConfirmed : undefined}
           onDelete={taskMode === 'edit' ? (...args: Parameters<typeof deleteTask>) => {
             quickCreatedRef.current = null
             return deleteTask(...args)
