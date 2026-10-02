@@ -54,6 +54,7 @@ import { PICKER_COLOR_HEXES, WORKSPACE_COLORS } from '@/lib/palette'
 import { resolveDefaultWorkspace, sortWorkspacesForDisplay } from '@/lib/default-category'
 import { CategoryCascadePicker } from '@/components/category/category-cascade-picker'
 import { PetSettingsSection } from '@/components/pet/pet-settings-section'
+import { AiReviewSettingsSection } from '@/components/ai-review/ai-review-settings-section'
 import type { PetSettings } from '@/lib/pet/types'
 import {
   WATER_REMINDER_INTERVALS,
@@ -569,6 +570,9 @@ export function SettingsModal({
           {/* 企鵝 — reads the live `settings.pet` (not localSettings): it saves
               on every change through onSetPet, outside this modal's draft. */}
           {onSetPet && <PetSettingsSection pet={settings.pet ?? null} onSetPet={onSetPet} />}
+
+          {/* AI 回顧：同意狀態與撤回。伺服器未開放前整段不渲染。 */}
+          <AiReviewSettingsSection />
 
           {/* Calendar Time Range */}
           <div className="space-y-3">
