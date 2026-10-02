@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { ErrorScreen } from '@/components/errors/error-screen'
+import { captureClientError } from '@/lib/monitoring/sentry'
 
 // Segment-level error page. Catches render errors in any route below the root
 // layout, so a crash shows a calm bilingual page with a retry button instead
@@ -16,6 +17,7 @@ export default function AppError({
 }) {
   useEffect(() => {
     console.error('[app/error]', error)
+    captureClientError(error)
   }, [error])
 
   return (

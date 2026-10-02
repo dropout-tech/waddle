@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { ErrorScreen } from '@/components/errors/error-screen'
 import { useI18n } from '@/lib/i18n/react'
+import { captureClientError } from '@/lib/monitoring/sentry'
 
 // Root-level error page: replaces the root layout when the layout itself (or
 // a provider in it) throws, so it must render its own <html>/<body>. No
@@ -20,6 +21,7 @@ export default function GlobalError({
 
   useEffect(() => {
     console.error('[app/global-error]', error)
+    captureClientError(error)
     // The theme provider is gone here; honor the user's saved dark choice (next-themes key).
     try {
       if (window.localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark')
