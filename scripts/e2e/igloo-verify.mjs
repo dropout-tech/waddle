@@ -169,16 +169,16 @@ async function shot(page, name, target) {
 }
 
 /** Add fake bricks to this device's igloo ledger (localStorage only — nothing is written to the account). */
-async function injectLedger(page, { fake = 0, agoDays = 0, seenDelta = 0 }) {
-  await page.evaluate(({ key, fake, agoDays, seenDelta }) => {
+async function injectLedger(page, { fake = 0, agoDays = 0, seenDelta = 0, prefix = 'fake' }) {
+  await page.evaluate(({ key, fake, agoDays, seenDelta, prefix }) => {
     const v = JSON.parse(localStorage.getItem(key) ?? '{"tasks":{},"focus":{}}')
     const at = new Date(Date.now() - agoDays * 86400000).toISOString()
-    for (let i = 0; i < fake; i++) v.tasks[`fake-${i}`] = at
+    for (let i = 0; i < fake; i++) v.tasks[`${prefix}-${i}`] = at
     v.seen = Object.keys(v.tasks).length - seenDelta
     localStorage.setItem(key, JSON.stringify(v))
     // nudge IglooHost to re-read the ledger
     window.dispatchEvent(new CustomEvent('huddle:pomodoro-count', { detail: { date: '2000-01-01', count: 0 } }))
-  }, { key: `huddle-igloo-v1:${uid}`, fake, agoDays, seenDelta })
+  }, { key: `huddle-igloo-v1:${uid}`, fake, agoDays, seenDelta, prefix })
   await page.waitForTimeout(400)
 }
 
@@ -229,7 +229,13 @@ const countCompleted = async () => {
     assert.equal(d.bricks, d.total % 35, 'bricks drawn on the current igloo')
     return `total=${d.total} (DB completed=${db}), drawn=${d.bricks}, mood=${d.mood}, progress="${d.progress}"`
   })
-  await step('desktop 1440 screenshot', async () => shot(page, 'igloo-desktop-1440.png'))
+  await step('desktop 1440 screenshot (line under the scene matches the pose)', async () => {
+    const pose = await page.locator('[data-igloo-penguin]').getAttribute('data-igloo-penguin')
+    const line = (await page.locator('[data-igloo-line]').textContent().catch(() => '')) ?? ''
+    if (pose !== 'sleep') assert.ok(!/睡|晚安/.test(line), `awake penguin but line "${line}"`)
+    await shot(page, 'igloo-desktop-1440.png')
+    return `pose=${pose}, line="${line}"`
+  })
   await closeDialog(page)
 
   await step('growth page shows the igloo card and it opens the igloo', async () => {
@@ -444,8 +450,9 @@ const countCompleted = async () => {
   await openApp(page)
   await step('finishing an igloo: painting fades in, pennant rises, penguin cheers', async () => {
     const live = await page.evaluate((key) => Object.keys(JSON.parse(localStorage.getItem(key) ?? '{"tasks":{}}').tasks).length, `huddle-igloo-v1:${uid}`)
-    // top the ledger up to exactly 70 (two igloos), replaying the last 2 bricks
-    await injectLedger(page, { fake: 70 - live, agoDays: 0, seenDelta: 2 })
+    // a natural day: everything up to yesterday, then 4 done today that finish igloo no. 2 (70 bricks)
+    await injectLedger(page, { fake: 70 - live - 4, agoDays: 2, seenDelta: 0, prefix: 'past' })
+    await injectLedger(page, { fake: 4, agoDays: 0, seenDelta: 2, prefix: 'today' })
     await openViaEvent(page)
     await page.waitForFunction(() => document.querySelector('[data-igloo-dialog]')?.getAttribute('data-igloo-celebrating') === 'true', null, { timeout: 20000 })
     await page.waitForTimeout(2000) // pennant fully up
@@ -456,8 +463,9 @@ const countCompleted = async () => {
     await waitReplayDone(page)
     const d = await readDialog(page)
     assert.equal(d.mood, 'proud')
+    assert.equal(d.today, 4)
     await closeDialog(page)
-    return `total=${d.total}, mood=${d.mood}, bubble="${d.bubble}"`
+    return `total=${d.total}, today=+${d.today}, mood=${d.mood}, bubble="${d.bubble}"`
   })
   await context.close()
 }

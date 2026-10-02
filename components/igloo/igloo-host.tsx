@@ -153,7 +153,8 @@ function IglooDialog({
   const [bubble, setBubble] = useState<{ text: string; key: number } | null>(null)
   const timer = useRef<number | undefined>(undefined)
 
-  const moodLine = iglooLine(state, lang, `${localDay(new Date())}:${name}`)
+  const seed = `${localDay(new Date())}:${name}`
+  const moodLine = iglooLine(state, lang, seed)
   // The sky follows the real clock — a night-time replay happens under the moon.
   const night = isSleepyHour(new Date().getHours())
 
@@ -222,6 +223,11 @@ function IglooDialog({
   }
   const inProgress = view.bricks === 0 && view.completed > 0 && (celebrating || view.mood === 'proud') ? per : view.bricks
   const iglooNo = inProgress === per ? view.completed : view.completed + 1
+
+  // The line under the scene matches what the penguin is doing: while it is
+  // still up carrying (replay, or telling the night-time news) it talks about
+  // the building, not about going to sleep.
+  const shownLine = running || awake ? iglooLine({ ...state, mood: 'building' }, lang, seed) : moodLine
 
   const sceneLabel = t('冰屋場景：第 {n} 座冰屋蓋了 {x}/{per} 塊冰磚，村落裡有 {built} 座蓋好的冰屋。', { n: iglooNo, x: inProgress, per, built: view.completed })
 
@@ -295,7 +301,7 @@ function IglooDialog({
           />
         </div>
         {/* The bubble carries the mood line unless it's busy with the catch-up news. */}
-        {!!bubble && bubble.text !== moodLine && !running && <p className="mt-3 text-sm leading-6 text-foreground" data-igloo-line>{moodLine}</p>}
+        {!!bubble && bubble.text !== shownLine && !running && <p className="mt-3 text-sm leading-6 text-foreground" data-igloo-line>{shownLine}</p>}
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
           {t('今天 +{n} 塊', { n: state.bricksToday })}
           <span aria-hidden="true" className="mx-2">·</span>

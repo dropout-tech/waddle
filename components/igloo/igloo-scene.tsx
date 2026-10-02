@@ -4,7 +4,7 @@ import { useId, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { IGLOO_LAYERS, brickSlot, type IglooMood } from '@/lib/igloo/compute'
 import { PET_COLOR_STYLES, type PetAccessory, type PetColor } from '@/lib/pet/types'
-import { PetSprite } from '@/components/pet/pet-sprite'
+import { Accessory, PetSprite } from '@/components/pet/pet-sprite'
 import styles from './igloo.module.css'
 
 /** What the scene draws — may lag the real state while bricks are replayed. */
@@ -42,6 +42,16 @@ const SPOTS = {
   sit: { left: 19, bottom: 4, width: 25 },
 } as const
 type Pose = keyof typeof SPOTS
+/**
+ * Where the user's accessory goes on the other art: translate + scale that maps
+ * the stand pose's eyes (the space PetSprite's accessories are drawn in) onto
+ * each pose's eyes. Measured on the art, 2026-10-03.
+ */
+const ACCESSORY_FIT: Partial<Record<Pose, { x: number; y: number; s: number }>> = {
+  carry: { x: 40.6, y: 54, s: 0.66 },
+  happy: { x: -4.9, y: -5.5, s: 1.03 },
+  sit: { x: 52, y: 37.4, s: 0.64 },
+}
 /** Where the carried brick sits (scene units): top-centre of the carry spot. */
 const HANDS = {
   x: ((SPOTS.carry.left + SPOTS.carry.width / 2) / 100) * W,
@@ -139,12 +149,21 @@ function FinishedIgloo({ cx, base, r, clipId, className }: { cx: number; base: n
 /** The penguin: the user's own colour; accessories only on the poses the overlay art fits. */
 function Penguin({ pose, look, rough }: { pose: Pose; look: { color: PetColor; accessory: PetAccessory }; rough: string }) {
   if (pose === 'sleep') return <PetSprite color={look.color} accessory={look.accessory} pose="sleep" />
-  const filter = (PET_COLOR_STYLES[look.color] ?? PET_COLOR_STYLES.ink).body
+  const palette = PET_COLOR_STYLES[look.color] ?? PET_COLOR_STYLES.ink
+  const filter = palette.body
+  const fit = ACCESSORY_FIT[pose]
   const src = pose === 'sit' ? SIT_SRC : `/art/penguin/${pose}.webp`
   return (
     <span className={styles.figure}>
       {/* eslint-disable-next-line @next/next/no-img-element -- small static art, same as PetSprite */}
       <img src={src} alt="" draggable={false} decoding="async" style={{ filter: filter === 'none' ? undefined : filter }} />
+      {fit && look.accessory !== 'none' && (
+        <svg viewBox="0 0 240 240" className={styles.figureOverlay} aria-hidden="true" data-igloo-accessory={look.accessory}>
+          <g transform={`translate(${fit.x} ${fit.y}) scale(${fit.s})`}>
+            <Accessory kind={look.accessory} accent={palette.accent} />
+          </g>
+        </svg>
+      )}
       {pose === 'carry' && (
         // An ice brick lifted overhead, painted over the card in the carry art.
         <svg viewBox="0 0 100 100" className={styles.figureOverlay} aria-hidden="true">
