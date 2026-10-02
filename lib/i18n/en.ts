@@ -21,6 +21,7 @@ import { dict as googleCalendar } from './dict/google-calendar'
 import { dict as billing } from './dict/billing'
 import { dict as aiReview } from './dict/ai-review'
 import { dict as brainDump } from './dict/brain-dump'
+import { dict as lifeGrid } from './dict/life-grid'
 
 // Merged English dictionary. Keys are the Traditional Chinese source strings
 // (see lib/i18n/index.ts). Split by feature area purely to keep files
@@ -50,6 +51,7 @@ export const en: Record<string, string> = {
   ...billing,
   ...aiReview,
   ...brainDump,
+  ...lifeGrid,
   // Whiteboard canvas controls.
   "手寫筆記": "Handwritten note",
   "請選擇圖片檔案。": "Please choose an image file.",

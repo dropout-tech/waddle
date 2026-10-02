@@ -1,0 +1,97 @@
+/* 人生年曆 cell states. Colors for written days come inline (mood palette via
+   useDisplayColor); everything else is a theme token so dark mode follows. */
+
+.cell {
+  display: block;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), background-color 240ms ease;
+}
+
+/* Hand-cut squares: four slightly uneven corner sets, picked per day, so a
+   year reads like squares painted on paper, not a hard pixel grid. */
+.w0 { border-radius: 32% 26% 30% 24% / 26% 32% 24% 30%; }
+.w1 { border-radius: 24% 34% 26% 30% / 30% 24% 34% 26%; }
+.w2 { border-radius: 30% 24% 34% 28% / 24% 30% 28% 34%; }
+.w3 { border-radius: 26% 30% 24% 34% / 34% 26% 30% 24%; }
+
+/* A written day: grainy flat fill (paper texture multiplied into the mood
+   color) with a faint dry-brush brown edge. */
+.ink {
+  background-image: url('/art/paper-texture.jpg');
+  background-size: 240px;
+  background-blend-mode: multiply;
+  box-shadow: inset 0 0 0 1px rgb(74 59 44 / 0.22);
+}
+:global(.dark) .ink {
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.3);
+}
+
+/* A past day without a line: quiet paper, not a "missed" mark. */
+.past {
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+
+.future {
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground) 14%, transparent);
+  background: transparent;
+}
+
+/* Today: a soft breathing ring in the primary color. */
+.today {
+  position: relative;
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  animation-name: breathe;
+  animation-duration: 2.8s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.today.empty {
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+}
+
+.selected {
+  outline: 2px solid var(--foreground);
+  outline-offset: 1px;
+}
+
+/* Fresh save: the cell pops once as it lights up. */
+.lit {
+  animation-name: lit;
+  animation-duration: 520ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (hover: hover) {
+  button.cell:hover {
+    transform: scale(1.25);
+  }
+}
+
+@keyframes breathe {
+  0%, 100% { outline-color: color-mix(in oklch, var(--primary) 95%, transparent); }
+  50% { outline-color: color-mix(in oklch, var(--primary) 35%, transparent); }
+}
+
+@keyframes lit {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+/* Hand-drawn feel for the mood dots: slightly uneven circles. */
+.moodDot {
+  border-radius: 47% 53% 50% 50% / 53% 47% 52% 48%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .today,
+  .lit {
+    animation: none;
+  }
+  .cell {
+    transition: none;
+  }
+}

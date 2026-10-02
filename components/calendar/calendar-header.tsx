@@ -29,6 +29,8 @@ import type { Workspace, Task } from '@/lib/types'
 import { useI18n } from '@/lib/i18n/react'
 import { format } from 'date-fns'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
+import { LifeGridIcon } from '@/components/life-grid/life-grid-icon'
+import { openLifeGrid } from '@/lib/life-grid/events'
 import { HubLauncherButton } from '@/components/floating/hub-launcher-button'
 import { ScratchpadPullTab } from '@/components/scratchpad/focus-scratchpad'
 import { BrainDumpHeaderButton } from '@/components/brain-dump/brain-dump-entry'
@@ -531,6 +533,15 @@ export function CalendarHeader({
                       <span>{t('每日簽到')}</span>
                     </button>
                   )}
+                  <button
+                    type="button"
+                    data-life-grid-entry
+                    onClick={() => { setOverflowOpen(false); openLifeGrid() }}
+                    className="w-full min-h-11 flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors text-foreground"
+                  >
+                    <LifeGridIcon className="h-4 w-4" />
+                    <span>{t('人生年曆')}</span>
+                  </button>
                   {onOpenExport && (
                     <button
                       onClick={() => { setOverflowOpen(false); onOpenExport() }}
@@ -770,6 +781,10 @@ export function CalendarHeader({
                   {t('每日簽到')}
                 </DropdownMenuItem>
               )}
+              <DropdownMenuItem onSelect={() => openLifeGrid()} className="gap-2.5 rounded-lg py-2 text-xs" data-life-grid-entry>
+                <LifeGridIcon className="w-3.5 h-3.5" />
+                {t('人生年曆')}
+              </DropdownMenuItem>
               {onOpenExport && (
                 <DropdownMenuItem
                   onSelect={onOpenExport}
