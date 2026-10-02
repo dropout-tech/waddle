@@ -302,6 +302,10 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
         console.error('[sticky-notes] patch failed', error)
         const prevSnapshot = snapshot
         setNotes((prev) => prev.map((n) => (n.id === id ? prevSnapshot : n)))
+      } else if (!error) {
+        // Drag end / bring-to-front / resize / color are committed once per gesture, so this
+        // fires on release (never mid-drag) and lets the 便條紙 widget re-sort right away.
+        window.dispatchEvent(new Event(STICKY_CHANGED_EVENT))
       }
     },
     [supabase],

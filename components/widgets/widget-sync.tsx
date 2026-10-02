@@ -6,7 +6,7 @@ import { useFocusTimer } from '@/components/timer/focus-timer-provider'
 import { useNotebook } from '@/hooks/use-notebook'
 import { boardThumbnail } from '@/lib/widgets/thumbnail'
 import { syncWidgetReminders } from '@/lib/widgets/reminders'
-import { focusNoteExcerpt, makeSnapshot } from '@/lib/widgets/model'
+import { focusNoteExcerpt, loadStickyRows, makeSnapshot } from '@/lib/widgets/model'
 import { HuddleWidgets, publishWidgets, widgetAccount } from '@/lib/widgets/native'
 import { rowToTask } from '@/lib/supabase/mappers'
 import { createClient } from '@/lib/supabase/client'
@@ -41,6 +41,8 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{worksp
     // 便條紙 widget: sticky notes only load in-app when the overlay is open, so read the
     // newest few straight from the table (RLS: own rows). Cached a minute; edits invalidate it.
     let stickies:{at:number;rows:Pick<StickyNote,'id'|'content'|'color'|'updatedAt'>[]}|undefined
+    // A failed read keeps the last good rows and backs off for a minute (an edit resets it).
+    let stickyFailAt=0
     const sync=async():Promise<void>=>{
       // A change that lands mid-sync must not be dropped (it used to wait for the 30s tick).
       if(busy) {again=true;return}
@@ -67,10 +69,10 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{worksp
         if(handled.length) {await HuddleWidgets.acknowledge({accountId:source,epoch:auth.epoch,ids:handled});window.dispatchEvent(new Event('huddle-widget-synced'));return}
         if(!alive || widgetAccount().accountId!==source || widgetAccount().epoch!==auth.epoch) return
         const x=latest.current
-        if(!stickies||Date.now()-stickies.at>60_000) {
-          const {data,error}=await db.from('sticky_notes').select('id,content,color,updated_at').eq('user_id',source).order('updated_at',{ascending:false}).limit(12)
+        if((!stickies||Date.now()-stickies.at>60_000) && Date.now()-stickyFailAt>60_000) {
+          const rows=await loadStickyRows((from,to)=>db.from('sticky_notes').select('id,content,color,updated_at').eq('user_id',source).order('updated_at',{ascending:false}).order('id').range(from,to).then(({data,error})=>({error,rows:(data??[]).map(r=>({id:r.id,content:r.content as StickyNote['content'],color:r.color as StickyNoteColor,updatedAt:r.updated_at}))})))
           if(!alive || widgetAccount().accountId!==source || widgetAccount().epoch!==auth.epoch) return
-          if(!error) stickies={at:Date.now(),rows:(data??[]).map(r=>({id:r.id,content:r.content as StickyNote['content'],color:r.color as StickyNoteColor,updatedAt:r.updated_at}))}
+          if(rows) {stickies={at:Date.now(),rows};stickyFailAt=0} else stickyFailAt=Date.now()
         }
         const snapshot=makeSnapshot({accountId:source,epoch:auth.epoch,tasks:x.workspaces.filter(w=>!w.isArchived).flatMap(w=>w.categories.filter(c=>!c.isArchived).flatMap(c=>c.tasks)),blocks:x.timeBlocks,boards:x.boards,notes:x.notes,stickies:stickies?.rows,locale:getLang()})
         // Completion revisions and displayed task content must come from the same server row.
@@ -104,7 +106,7 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null}:{worksp
     let changeTimer: ReturnType<typeof setTimeout> | undefined
     const onChange=()=>{clearTimeout(changeTimer);changeTimer=setTimeout(()=>void sync(),750)}
     window.addEventListener('huddle-widget-refresh',onChange)
-    const onSticky=()=>{stickies=undefined;onChange()}
+    const onSticky=()=>{if(stickies) stickies={...stickies,at:0};stickyFailAt=0;onChange()}
     window.addEventListener(STICKY_CHANGED_EVENT,onSticky)
     const onVisible=()=>{if(document.visibilityState==='visible') void sync()}
     const id=window.setInterval(()=>void sync(),30_000)
