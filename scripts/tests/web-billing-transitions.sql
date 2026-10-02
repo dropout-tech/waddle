@@ -595,7 +595,7 @@ select public.t_ok(true, 'module C functions: reported missing when absent, pass
 -- ── 19. Privileges: nothing new is callable by anon / authenticated ───────
 -- Module C (20261002130000) adds 3 more huddle_ops.web_* functions when present;
 -- they are covered by the same "no anon / authenticated EXECUTE" check.
-select public.t_ok((select count(*) = 29 + (select count(*) from pg_proc p2 join pg_namespace n2 on n2.oid = p2.pronamespace
+select public.t_ok((select count(*) = 31 + (select count(*) from pg_proc p2 join pg_namespace n2 on n2.oid = p2.pronamespace
         where n2.nspname = 'huddle_ops' and p2.proname in ('web_enqueue_reminders','web_claim_outbox','web_finish_outbox'))
       and bool_and(not has_function_privilege('anon', p.oid, 'EXECUTE')
       and not has_function_privilege('authenticated', p.oid, 'EXECUTE'))
@@ -606,7 +606,7 @@ select public.t_ok((select count(*) = 29 + (select count(*) from pg_proc p2 join
   and has_function_privilege('service_role', 'public.web_billing_server(text,jsonb)', 'EXECUTE')
   and not has_table_privilege('authenticated', 'huddle_ops.web_rate_hits', 'SELECT')
   and not has_table_privilege('anon', 'huddle_ops.web_rate_hits', 'SELECT'),
-  'all 29 new functions (28 huddle_ops + dispatcher): no EXECUTE for anon / authenticated (despite default grants); service_role has the dispatcher');
+  'all 31 new functions (30 huddle_ops + dispatcher): no EXECUTE for anon / authenticated (despite default grants); service_role has the dispatcher');
 set role authenticated;
 set request.jwt.claim.sub = '00000000-0000-4000-8000-0000000c0001';
 select public.t_err($$select public.web_billing_server('config')$$, 'permission denied', 'a member cannot call the dispatcher');
@@ -631,19 +631,174 @@ select public.t_ok(not exists (select 1 from pg_proc p join pg_namespace n on n.
                                  'web_enqueue_reminders','web_claim_outbox','web_finish_outbox'))  -- P1 / module C, not ours
        or (n.nspname = 'public' and p.proname = 'web_billing_server'))
   and to_regclass('huddle_ops.web_rate_hits') is null
+  and not exists (select 1 from information_schema.columns where column_name = 'last_checked_at'
+                  and table_name in ('web_payment_attempts','web_refunds'))
   and (select s = (select count(*) from public.web_subscriptions) and a = (select count(*) from public.web_payment_attempts)
          and o = (select count(*) from public.web_email_outbox) from public.t_rows)
   and to_regprocedure('huddle_ops.paid_until(uuid)') is not null and huddle_ops.has_pro(public.t_u(2)),
   'down: all new functions and the rate table gone; billing rows and P1 functions untouched');
 \ir ../../supabase/migrations/20261002140000_web_billing_transitions.sql
-select public.t_ok((select count(*) = 29 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+select public.t_ok((select count(*) = 31 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where (n.nspname = 'huddle_ops' and p.proname like 'web\_%'
            and p.proname not in ('web_paid_until','web_subscription_guard','web_payment_attempt_guard','web_refund_guard',
                                  'web_enqueue_reminders','web_claim_outbox','web_finish_outbox'))
        or (n.nspname = 'public' and p.proname = 'web_billing_server'))
   and not has_function_privilege('authenticated', 'public.web_billing_server(text,jsonb)', 'EXECUTE')
+  and (select count(*) = 2 from information_schema.columns where column_name = 'last_checked_at'
+        and table_name in ('web_payment_attempts','web_refunds'))
   and (public.t_claim1(3, (public.t_sub(3)).current_period_end + interval '1 minute') -> 0 ->> 'reference_order_id') like '%c0003a01',
-  'up again after down: 29 functions back, privileges re-applied, claiming works');
+  'up again after down: 31 functions back, privileges re-applied, claiming works');
+
+-- ── 20b. Review 2026-10-02 regressions (each failed on 41a7a08) ──────────
+insert into public.web_trial_usage(user_id, source)
+  select public.t_u(n), 'apple' from unnest(array[26,27,28,29,30,31,32,34,36]) n on conflict do nothing;
+-- Claim with only the given members' subscriptions eligible (others held).
+create or replace function public.t_claimset(ns integer[], p_now timestamptz, p_limit integer) returns jsonb language plpgsql as $$
+declare v jsonb; held uuid[];
+begin
+  select array_agg(id) into held from public.web_subscriptions
+   where status in ('trialing','active','past_due') and not billing_hold
+     and (user_id is null or user_id <> all (select public.t_u(n) from unnest(ns) n));
+  update public.web_subscriptions set billing_hold = true where id = any(held);
+  v := huddle_ops.web_claim_due('hs', p_limit, p_now);
+  update public.web_subscriptions set billing_hold = false where id = any(held);
+  return v;
+end $$;
+
+-- #6 sticky mismatch: a later answer without an amount cannot upgrade it.
+select public.t_okr(public.t_start(35, 'start', 'monthly', public.t0()) ->> 'reference_order_id', public.t0());
+select public.t_keep('c35', public.t_claim1(35, (public.t_sub(35)).trial_end + interval '1 minute') -> 0 ->> 'reference_order_id');
+select public.t_res(public.t_get('c35'), 'succeeded', (public.t_sub(35)).trial_end + interval '2 minutes', null, null, 1500);
+select public.t_keep('x', public.t_res(public.t_get('c35'), 'succeeded', (public.t_sub(35)).trial_end + interval '3 minutes')::text);
+select public.t_ok(public.t_get('x')::jsonb ->> 'reason' = 'needs_review'
+  and (select status = 'unknown' and failure_code = 'amount_mismatch' from public.web_payment_attempts where reference_order_id = public.t_get('c35'))
+  and (public.t_sub(35)).status = 'trialing',
+  'review #6: amount-mismatch stays parked; a later success without an amount does not activate it');
+
+-- #2 paid but card unknown: Pro now, card attached later, anomaly meanwhile.
+select public.t_keep('r30', public.t_start(30, 'start', 'monthly', public.t0()) ->> 'reference_order_id');
+select public.t_keep('x', public.t_res(public.t_get('r30'), 'succeeded', public.t0(), null, null, 15000)::text);
+select public.t_ok(public.t_get('x')::jsonb ->> 'card' = 'unmatched'
+  and (public.t_sub(30)).status = 'active' and (public.t_sub(30)).payment_method_id is null
+  and huddle_ops.has_pro(public.t_u(30)) and public.t_outbox(30, 'receipt') = 1
+  and (select failure_code = 'card_unmatched' and cooling_off_eligible from public.web_payment_attempts where reference_order_id = public.t_get('r30'))
+  and exists (select 1 from jsonb_array_elements(huddle_ops.web_billing_anomalies()) e
+              where e ->> 'kind' = 'paid_without_card' and e ->> 'subscription_id' = (public.t_sub(30)).id::text)
+  and jsonb_array_length(public.t_claim1(30, (public.t_sub(30)).current_period_end + interval '1 minute')) = 0,
+  'review #2: first purchase paid but card unmatched → active + Pro + receipt, flagged paid_without_card, never auto-renewed without a card');
+select public.t_keep('x', public.t_okr(public.t_get('r30'), public.t0() + interval '5 minutes', 'CARD30', 15000)::text);
+select public.t_ok(public.t_get('x')::jsonb ->> 'card' = 'attached'
+  and (select slp_instrument_id = 'CARD30' from public.web_payment_methods where id = (public.t_sub(30)).payment_method_id)
+  and (select failure_code is null from public.web_payment_attempts where reference_order_id = public.t_get('r30'))
+  and not exists (select 1 from jsonb_array_elements(huddle_ops.web_billing_anomalies()) e
+                  where e ->> 'kind' = 'paid_without_card' and e ->> 'subscription_id' = (public.t_sub(30)).id::text),
+  'review #2: the card named later by SLP is attached; anomaly cleared');
+
+-- #2 rotation: the reconcile list cannot be starved by rows SLP never settles.
+select public.t_keep('rc1', (select string_agg(e ->> 'attempt_id', ',' order by e ->> 'attempt_id')
+  from jsonb_array_elements(huddle_ops.web_reconcile_candidates(public.t0() + interval '400 days', 2) -> 'attempts') e));
+select public.t_keep('rc2', (select string_agg(e ->> 'attempt_id', ',' order by e ->> 'attempt_id')
+  from jsonb_array_elements(huddle_ops.web_reconcile_candidates(public.t0() + interval '400 days', 2) -> 'attempts') e));
+select public.t_ok(public.t_get('rc1') is not null and public.t_get('rc2') is not null and public.t_get('rc1') <> public.t_get('rc2')
+  and (select count(*) from public.web_payment_attempts where last_checked_at = public.t0() + interval '400 days') = 4,
+  'review #2: reconcile hands out least-recently-checked rows first (two calls of 2 = 4 different rows)');
+
+-- #3 refund "processing" without an SLP id, and refunds near the 15-day promise.
+select public.t_keep('r31', public.t_start(31, 'start', 'monthly', public.t0() - interval '2 days') ->> 'reference_order_id');
+select public.t_okr(public.t_get('r31'), public.t0() - interval '2 days', null, 15000);
+select public.t_keep('f31', huddle_ops.web_request_refund(public.t_u(31), (select id from public.web_payment_attempts where reference_order_id = public.t_get('r31')),
+  'hs', public.t0() - interval '2 days') ->> 'reference_order_id');
+select huddle_ops.web_apply_refund_result(public.t_get('f31'), '{"status":"processing"}', public.t0() - interval '2 days');
+select huddle_ops.web_expire_due(public.t0() - interval '2 days' + interval '20 minutes');
+select public.t_ok((select status = 'processing' from public.web_refunds where reference_order_id = public.t_get('f31')),
+  'review #3: processing without an id is given 30 minutes');
+select huddle_ops.web_expire_due(public.t0() - interval '2 days' + interval '31 minutes');
+select public.t_ok((select status = 'needs_review' and slp_refund_order_id is null from public.web_refunds where reference_order_id = public.t_get('f31'))
+  and exists (select 1 from jsonb_array_elements(huddle_ops.web_billing_anomalies()) e
+              where e ->> 'kind' = 'refund_needs_review' and e ->> 'refund_id' = (select id::text from public.web_refunds where reference_order_id = public.t_get('f31'))),
+  'review #3: processing without an SLP refund id → needs_review after 30 minutes (anomaly), never silently past the deadline');
+select public.t_keep('r32', public.t_start(32, 'start', 'monthly', public.t0() - interval '13 days') ->> 'reference_order_id');
+select public.t_okr(public.t_get('r32'), public.t0() - interval '13 days', null, 15000);
+select public.t_keep('f32', huddle_ops.web_request_refund(public.t_u(32), (select id from public.web_payment_attempts where reference_order_id = public.t_get('r32')),
+  'hs', public.t0() - interval '12 days') ->> 'reference_order_id');
+select huddle_ops.web_apply_refund_result(public.t_get('f32'), '{"status":"processing","refund_order_id":"RF32"}', public.t0() - interval '12 days');
+select huddle_ops.web_expire_due(public.t0() - interval '12 days' + interval '1 hour');
+select public.t_ok((select status = 'processing' from public.web_refunds where reference_order_id = public.t_get('f32')),
+  'review #3: a tracked refund far from its due date stays with SLP');
+select huddle_ops.web_expire_due(public.t0());
+select public.t_ok((select status = 'needs_review' and due_by <= public.t0() + interval '120 hours' from public.web_refunds where reference_order_id = public.t_get('f32'))
+  and exists (select 1 from jsonb_array_elements(huddle_ops.web_reconcile_candidates(public.t0(), 50) -> 'refunds') e
+              where e ->> 'reference_order_id' = public.t_get('f32')),
+  'review #3: refund not final 5 days before due_by → needs_review, and SLP is still polled for it');
+
+-- #5 member cancels while the renewal is in flight; the renewal then fails.
+select public.t_okr(public.t_start(34, 'start', 'monthly', public.t0() + interval '50 days') ->> 'reference_order_id', public.t0() + interval '50 days', null, 15000);
+select public.t_keep('d34', (public.t_sub(34)).current_period_end::text);
+select public.t_keep('c34', public.t_claim1(34, public.t_get('d34')::timestamptz + interval '1 minute') -> 0 ->> 'reference_order_id');
+select huddle_ops.web_cancel(public.t_u(34), public.t_get('d34')::timestamptz + interval '2 minutes');
+select public.t_keep('x', public.t_res(public.t_get('c34'), 'failed', public.t_get('d34')::timestamptz + interval '3 minutes', '1203', 'hard')::text);
+select public.t_ok(public.t_get('x')::jsonb ->> 'subscription_status' = 'expired'
+  and (select status = 'expired' and cancel_reason = 'user' and grace_until is null and next_retry_at is null
+          and access_until <= public.t_get('d34')::timestamptz + interval '3 minutes'
+       from public.web_subscriptions where user_id = public.t_u(34))
+  and public.t_outbox(34, 'payment_failed') = 0 and public.t_outbox(34, 'canceled') = 1,
+  'review #5: canceled member whose in-flight renewal fails ends at period end: no grace, no retry, no "we will retry" e-mail');
+
+-- #1 head-of-line: a member with many failed "pay now" tries must not stall others.
+select public.t_okr(public.t_start(26, 'start', 'monthly', public.t0() + interval '100 days') ->> 'reference_order_id', public.t0() + interval '100 days', null, 15000);
+select public.t_okr(public.t_start(27, 'start', 'monthly', public.t0() + interval '100 days 30 hours') ->> 'reference_order_id', public.t0() + interval '100 days 30 hours', null, 15000);
+select public.t_keep('d26', (public.t_sub(26)).current_period_end::text);
+select public.t_res(public.t_claimset(array[26], public.t_get('d26')::timestamptz + interval '1 minute', 1) -> 0 ->> 'reference_order_id',
+  'failed', public.t_get('d26')::timestamptz + interval '2 minutes', '9999', 'hard');
+do $$ begin
+  for i in 1 .. 20 loop
+    perform public.t_res(public.t_start(26, 'pay', null, public.t_get('d26')::timestamptz + interval '3 minutes') ->> 'reference_order_id',
+      'failed', public.t_get('d26')::timestamptz + interval '3 minutes', '9999', 'hard');
+  end loop;
+end $$;
+select public.t_err($$select public.t_start(26, 'pay', null, public.t_get('d26')::timestamptz + interval '4 minutes')$$, 'WEB_BILLING:rate_limited',
+  'review #1: the 21st "pay now" of one cycle is refused (order numbers stay available for retries)');
+select public.t_keep('h1', public.t_claimset(array[26,27], public.t_get('d26')::timestamptz + interval '48 hours', 1)::text);
+select public.t_keep('h2', public.t_claimset(array[26,27], public.t_get('d26')::timestamptz + interval '48 hours', 1)::text);
+select public.t_ok(public.t_get('h1')::jsonb -> 0 ->> 'subscription_id' = (public.t_sub(26)).id::text
+  and public.t_get('h1')::jsonb -> 0 ->> 'reference_order_id' like '%c0002a22'
+  and public.t_get('h2')::jsonb -> 0 ->> 'subscription_id' = (public.t_sub(27)).id::text,
+  'review #1: after 20 failed pay-now tries the member''s retry (a22) is still claimed, and the next claim gets the other member');
+select public.t_okr(public.t_start(28, 'start', 'monthly', public.t0() + interval '100 days') ->> 'reference_order_id', public.t0() + interval '100 days', null, 15000);
+select public.t_okr(public.t_start(29, 'start', 'monthly', public.t0() + interval '100 days 1 hour') ->> 'reference_order_id', public.t0() + interval '100 days 1 hour', null, 15000);
+update public.web_subscriptions set price_minor = 9900000 where id = (public.t_sub(28)).id;  -- can never be charged
+select public.t_keep('h3', public.t_claimset(array[28,29], (public.t_sub(29)).current_period_end + interval '1 minute', 1)::text);
+select public.t_ok(public.t_get('h3')::jsonb -> 0 ->> 'subscription_id' = (public.t_sub(29)).id::text
+  and not exists (select 1 from public.web_payment_attempts where subscription_id = (public.t_sub(28)).id and kind = 'recurring')
+  and exists (select 1 from jsonb_array_elements(huddle_ops.web_billing_anomalies()) e
+              where e ->> 'kind' = 'claim_blocked' and e ->> 'subscription_id' = (public.t_sub(28)).id::text),
+  'review #1: an unchargeable row (earlier in the queue) is not due: limit-1 claim returns the next member; row listed as claim_blocked');
+select public.t_okr(public.t_start(36, 'start', 'monthly', public.t0() + interval '100 days') ->> 'reference_order_id', public.t0() + interval '100 days', null, 15000);
+do $$
+declare s public.web_subscriptions := public.t_sub(36); i integer;
+begin
+  -- 20 automatic attempts already used on the next cycle → excluded, not re-selected forever.
+  for i in 1 .. 20 loop
+    insert into public.web_payment_attempts (subscription_id, user_id, kind, cycle, attempt_no, reference_order_id, amount_minor, status, finished_at, failure_code)
+    values (s.id, s.user_id, 'recurring', s.cycle + 1, 50 + i, 'hsCAP36' || i, 15000, 'failed', now(), '9999');
+  end loop;
+end $$;
+select public.t_ok(jsonb_array_length(public.t_claimset(array[36], (public.t_sub(36)).current_period_end + interval '1 minute', 10)) = 0
+  and exists (select 1 from jsonb_array_elements(huddle_ops.web_billing_anomalies()) e
+              where e ->> 'kind' = 'claim_blocked' and e ->> 'subscription_id' = (public.t_sub(36)).id::text),
+  'review #1: a cycle with 20 automatic attempts is excluded from claims and surfaced as claim_blocked');
+
+-- #4 re-used checkout: closing time follows the LATEST start, not the first.
+select public.t_keep('r33', public.t_start(33, 'start', 'monthly', public.t0() + interval '200 days') ->> 'reference_order_id');
+select public.t_res(public.t_get('r33'), 'failed', public.t0() + interval '200 days 1 minute', 'abandoned', 'hard');
+select public.t_keep('r33b', public.t_start(33, 'start', 'monthly', public.t0() + interval '200 days 2 hours') ->> 'reference_order_id');
+select huddle_ops.web_expire_due(public.t0() + interval '200 days 2 hours 1 minute');
+select public.t_keep('x', public.t_okr(public.t_get('r33b'), public.t0() + interval '200 days 2 hours 3 minutes')::text);
+select public.t_ok(substr(public.t_get('r33'), 3, 16) = substr(public.t_get('r33b'), 3, 16)
+  and public.t_get('x')::jsonb ->> 'subscription_status' = 'trialing' and (public.t_sub(33)).status = 'trialing',
+  'review #4: a checkout re-used 2 h later is not closed 1 minute after the new start; the late binding starts the trial');
+select huddle_ops.web_expire_due(public.t0() + interval '200 days 4 hours');
+select public.t_ok((public.t_sub(33)).status = 'trialing', 'review #4: the trial itself is untouched by later expiry runs');
 
 -- ── 21. Leave exactly one due subscription for the two-session claim race ─
 select public.t_okr(public.t_start(24, 'start', 'monthly', public.t0()) ->> 'reference_order_id', public.t0());

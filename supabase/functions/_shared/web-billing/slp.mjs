@@ -9,6 +9,7 @@ import { requestId as newRequestId } from './core.mjs'
 export const SLP_PATHS = Object.freeze({
   createPayment: '/api/v1/trade/payment/create',
   getPayment: '/api/v1/trade/payment/get',
+  cancelPayment: '/api/v1/trade/payment/cancel',
   createRefund: '/api/v1/trade/refund/create',
   getRefund: '/api/v1/trade/refund/get',
   customerToken: '/api/v1/customer/token',
@@ -56,6 +57,9 @@ export function createSlpClient({ fetch: fetchFn, apiBase, merchantId, apiKey, t
     call,
     createPayment: (body, opts = {}) => call('createPayment', body, { ref: body?.referenceOrderId, ...opts }),
     getPayment: (tradeOrderId) => call('getPayment', { tradeOrderId }),
+    // Void an authorisation that was never completed (before capture). Only
+    // used on customer-present requests SLP left undecided for a day.
+    cancelPayment: (referenceOrderId, tradeOrderId) => call('cancelPayment', { referenceOrderId, tradeOrderId }, { ref: referenceOrderId }),
     createRefund: (body, opts = {}) => call('createRefund', body, { ref: body?.referenceOrderId, ...opts }),
     getRefund: (refundOrderId) => call('getRefund', { refundOrderId }),
     // TODO(SLP-sandbox §12-5): docs disagree whether this takes SLP's customerId

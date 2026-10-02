@@ -47,6 +47,7 @@ function fakeSlp(over = {}) {
     customerToken: async () => ({ ok: true, data: { customerToken: 'ctok', expireTime: 600 } }),
     queryInstruments: async () => ({ ok: true, data: { referenceCustomerId: REFC, paymentInstruments: [{ instrumentId: 'INS9', instrumentStatus: 'SUCCESSED', instrumentCard: { brand: 'Visa', last: '8405' } }] } }),
     unbind: async () => ({ ok: true, data: {} }),
+    cancelPayment: async () => ({ ok: true, data: { status: 'PROCESSING' } }),
     ...over,
   }
   const slp = { calls }
@@ -404,7 +405,7 @@ test('cron reconcile: ask SLP, never re-send; stuck binding closed after 1 h; no
   const db = fakeDb(baseCron({ reconcile_candidates: { attempts, refunds: [{ reference_order_id: 'hsAbCdEf0123456789c0001r01', refund_order_id: 'RF1' }] } }))
   const slp = fakeSlp({ getPayment: async () => ({ ok: true, data: { referenceOrderId: 'hsAbCdEf0123456789c0001a01', tradeOrderId: 'T9', status: 'SUCCEEDED', paidAmount: { value: 15000 } } }) })
   const r = await (await cron(db, slp)(crRequest())).json()
-  assert.deepEqual(r.reconciled, { resolved: 1, unknown: 1, abandoned: 1 })
+  assert.deepEqual(r.reconciled, { resolved: 1, unknown: 1, abandoned: 1, stale: 0 })
   const applied = db.ops('apply_payment_result').map((c) => [c.args.reference_order_id, c.args.result.status, c.args.result.failure_code ?? null])
   assert.deepEqual(applied, [['hsAbCdEf0123456789c0001a01', 'succeeded', null], ['hsAbCdEf0123456789c0002a01', 'unknown', 'no_trade_id'],
     ['hsAbCdEf0123456789c0000a02', 'failed', 'abandoned']])
@@ -438,4 +439,61 @@ test('cron: a failing step does not stop the others and the lease is always rele
   assert.equal(r.ok, false)
   assert.equal(db.ops('claim_due').length, 1)
   assert.equal(db.ops('release_lease').length, 1)
+})
+
+// ── Review 2026-10-02 regressions (each failed on 41a7a08) ─────────────────
+test('review #2 cron: customer-present request undecided for > 24 h is voided at SLP, then decided (member unblocked)', async () => {
+  const ctx = { ...attemptCtx, kind: 'customer_present', created_at: new Date(NOW - 25 * 3600 * 1000).toISOString() }
+  const db = fakeDb(baseCron({ reconcile_candidates: { attempts: [ctx], refunds: [] } }))
+  let canceled = false
+  const slp = fakeSlp({
+    getPayment: async () => ({ ok: true, data: { referenceOrderId: REF, tradeOrderId: 'T9', status: canceled ? 'CANCELLED' : 'PROCESSING' } }),
+    cancelPayment: async () => { canceled = true; return { ok: true, data: { status: 'PROCESSING' } } },
+  })
+  const r = await (await cron(db, slp)(crRequest())).json()
+  assert.deepEqual(slp.calls.find((c) => c.name === 'cancelPayment').args, [REF, 'T9'])
+  assert.deepEqual(r.reconciled, { resolved: 1, unknown: 0, abandoned: 0, stale: 0 })
+  assert.equal(db.ops('apply_payment_result')[0].args.result.status, 'failed')
+  assert.equal(slp.calls.filter((c) => c.name === 'createPayment').length, 0)
+})
+
+test('review #2 cron: unattended charge (or void refused) undecided > 24 h → unknown stale_pending for a human, never re-sent', async () => {
+  const old = new Date(NOW - 25 * 3600 * 1000).toISOString()
+  const attempts = [{ ...attemptCtx, kind: 'recurring', created_at: old },
+    { ...attemptCtx, reference_order_id: 'hsAbCdEf0123456789c0002a01', trade_order_id: 'T10', kind: 'first_purchase', created_at: old }]
+  const db = fakeDb(baseCron({ reconcile_candidates: { attempts, refunds: [] }, anomalies: [{ kind: 'attempt_unknown' }, { kind: 'claim_blocked' }] }))
+  const slp = fakeSlp({
+    getPayment: async (id) => ({ ok: true, data: { referenceOrderId: id === 'T9' ? REF : 'hsAbCdEf0123456789c0002a01', tradeOrderId: id, status: 'PROCESSING' } }),
+    cancelPayment: async () => ({ ok: false, kind: 'http', status: 400, code: '1099' }),
+  })
+  const r = await (await cron(db, slp)(crRequest())).json()
+  assert.deepEqual(r.reconciled, { resolved: 0, unknown: 0, abandoned: 0, stale: 2 })
+  assert.deepEqual(db.ops('apply_payment_result').map((c) => c.args.result), [{ status: 'unknown', failure_code: 'stale_pending' }, { status: 'unknown', failure_code: 'stale_pending' }])
+  assert.equal(slp.calls.filter((c) => c.name === 'cancelPayment').length, 1, 'only the customer-present request is voided')
+  assert.equal(slp.calls.filter((c) => c.name === 'createPayment').length, 0)
+  assert.equal(r.anomalies, 2)
+  // younger than a day: left alone
+  const young = fakeDb(baseCron({ reconcile_candidates: { attempts: [{ ...attemptCtx, created_at: new Date(NOW - 3600 * 1000).toISOString() }], refunds: [] } }))
+  await cron(young, fakeSlp({ getPayment: async () => ({ ok: true, data: { referenceOrderId: REF, status: 'PROCESSING' } }) }))(crRequest())
+  assert.equal(young.ops('apply_payment_result').length, 0)
+})
+
+test('review #2 webhook: card binding event attaches the card to a first purchase that was paid without one', async () => {
+  const paid = { ...ctxStart, kind: 'first_purchase', status: 'succeeded', failure_code: 'card_unmatched', trade_order_id: 'T9', customer_id: null, known_instruments: [] }
+  const db = fakeDb({ webhook_begin: 'new', user_by_ref: { user_id: USER, open_attempts: [], unmatched_attempts: [paid] } })
+  const slp = fakeSlp({ getPayment: async () => ({ ok: true, data: { referenceOrderId: REF, tradeOrderId: 'T9', status: 'SUCCEEDED', paidAmount: { value: 15000 } } }) })
+  const ev = { id: 'evt_c', type: 'customer.instrument.binded', data: { customerId: 'CUS9', referenceCustomerId: REFC, paymentInstrument: { instrumentId: 'INS9' } } }
+  assert.equal((await wh(db, slp)(whRequest(ev))).status, 200)
+  const res = db.ops('apply_payment_result')[0].args
+  assert.deepEqual([res.reference_order_id, res.result.status, res.result.customer_id, res.result.instrument.id], [REF, 'succeeded', 'CUS9', 'INS9'])
+})
+
+test('review #6: a success whose amount SLP did not confirm as paid is logged (TODO SLP-Q6)', async () => {
+  const logs = []
+  const db = fakeDb(baseCron({ claim_due: (() => { let done = false; return () => (done ? [] : (done = true, [{ reference_order_id: REF, behavior: 'Recurring', plan: 'monthly',
+    charge_amount_minor: 15000, customer_id: 'C', instrument_id: 'I', reference_customer_id: REFC }])) })() }))
+  const slp = fakeSlp({ createPayment: async () => ({ ok: true, data: { tradeOrderId: 'T1', status: 'SUCCEEDED', amount: { value: 15000 } } }) })
+  await createCronHandler({ config: crConfig, db, slp, email: fakeEmail(), fetch: async () => {}, now: () => NOW, log: (e) => logs.push(e) })(crRequest())
+  assert.deepEqual(logs.find((l) => l.amount), { amount: 'unconfirmed', ref: REF, source: 'order' })
+  assert.equal(db.ops('apply_payment_result')[0].args.result.amount_source, 'order')
 })
