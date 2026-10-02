@@ -68,6 +68,7 @@ import {
 } from '@/lib/taiwan-holidays'
 import { getShowCompletedTasks, setShowCompletedTasks } from '@/lib/show-completed'
 import { isValidHourRange } from '@/lib/calendar-utils'
+import { AUTO_TASK_MINUTES, MIN_TASK_MINUTES, MAX_TASK_MINUTES } from '@/lib/settings-auto'
 
 // Map icon names to components
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -286,7 +287,12 @@ export function SettingsModal({
       return tb
     })
 
-    onSave(localSettings, updatedBlocks)
+    // 預設任務時長: keep a typed value inside what the DB accepts (15-240).
+    const minutes = localSettings.defaultTaskMinutes
+    const settingsToSave = minutes == null
+      ? localSettings
+      : { ...localSettings, defaultTaskMinutes: Math.min(MAX_TASK_MINUTES, Math.max(MIN_TASK_MINUTES, Math.round(minutes))) }
+    onSave(settingsToSave, updatedBlocks)
     onClose()
   }
 
@@ -591,17 +597,19 @@ export function SettingsModal({
               {t('預設視圖模式')}
             </h3>
             <p className="text-xs text-muted-foreground">{t('開啟日曆時的預設顯示模式')}</p>
-            <div className="flex gap-2">
-              {[
+            <div className="flex flex-wrap gap-2" data-testid="settings-default-view">
+              {([
+                { key: null, label: '自動' },
                 { key: 'day', label: '日' },
                 { key: 'week', label: '週' },
                 { key: 'month', label: '月' },
-              ].map(({ key, label }) => (
+              ] as const).map(({ key, label }) => (
                 <button
-                  key={key}
+                  key={key ?? 'auto'}
+                  data-value={key ?? 'auto'}
                   onClick={() => setLocalSettings(prev => ({
                     ...prev,
-                    defaultView: key as 'day' | 'week' | 'month'
+                    defaultView: key
                   }))}
                   className={cn(
                     'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
@@ -614,6 +622,7 @@ export function SettingsModal({
                 </button>
               ))}
             </div>
+            <p className="text-[11px] text-muted-foreground">{t('自動：電腦開「日」、手機開「週」')}</p>
           </div>
 
           {/* Visible day count per view — keeps day-mode (1-3) and
@@ -693,13 +702,15 @@ export function SettingsModal({
               {t('每週開始日')}
             </h3>
             <p className="text-xs text-muted-foreground">{t('設定週視圖的第一天')}</p>
-            <div className="flex gap-2">
-              {[
+            <div className="flex flex-wrap gap-2" data-testid="settings-week-start">
+              {([
+                { day: null, label: '自動' },
                 { day: 0, label: '週日' },
                 { day: 1, label: '週一' },
-              ].map(({ day, label }) => (
+              ] as const).map(({ day, label }) => (
                 <button
-                  key={day}
+                  key={day ?? 'auto'}
+                  data-value={day ?? 'auto'}
                   onClick={() => setLocalSettings(prev => ({
                     ...prev,
                     weekStartDay: day
@@ -715,6 +726,7 @@ export function SettingsModal({
                 </button>
               ))}
             </div>
+            <p className="text-[11px] text-muted-foreground">{t('自動：月曆從週日開始，週視圖從今天往後排')}</p>
           </div>
 
           {/* Google Calendar (read-only) — managed on its own page because
@@ -743,22 +755,9 @@ export function SettingsModal({
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-foreground">{t('延伸功能')}</h3>
 
-            {/* Auto sync workspace tasks */}
-            <label className="flex items-center justify-between cursor-pointer">
-              <div>
-                <div className="text-sm text-foreground">{t('自動同步工作區任務')}</div>
-                <div className="text-xs text-muted-foreground">{t('從日曆建立任務時自動同步到左側工作區')}</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={localSettings.lunchBreak?.enabled ?? true}
-                onChange={(e) => setLocalSettings(prev => ({
-                  ...prev,
-                  lunchBreak: { ...prev.lunchBreak, enabled: e.target.checked }
-                }))}
-                className="w-4 h-4 rounded border-border accent-primary"
-              />
-            </label>
+            {/* (The old 「自動同步工作區任務」 switch is gone: it actually toggled
+                lunch_break.enabled, which meeting availability reads. That
+                value is kept as stored and written back unchanged.) */}
 
             {/* Show completed tasks */}
             <label className="flex items-center justify-between cursor-pointer">
@@ -1021,18 +1020,36 @@ export function SettingsModal({
               <div>
                 <div className="text-sm text-foreground">{t('預設任務時長')}</div>
                 <div className="text-xs text-muted-foreground">{t('點一下空白時段建立任務時的預設長度')}</div>
+                <div className="text-[11px] text-muted-foreground">{t('自動：30 分鐘')}</div>
               </div>
               <div className="flex items-center gap-2">
+                {/* Its own setting (default_task_minutes). It used to write
+                    bufferTime.defaultDuration — the buffer-block length. */}
+                <button
+                  type="button"
+                  data-testid="settings-task-minutes-auto"
+                  onClick={() => setLocalSettings(prev => ({ ...prev, defaultTaskMinutes: null }))}
+                  className={cn(
+                    'h-8 px-3 rounded-md text-xs font-medium transition-colors',
+                    localSettings.defaultTaskMinutes == null
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                  )}
+                >
+                  {t('自動')}
+                </button>
                 <Input
                   type="number"
-                  min={15}
-                  max={240}
+                  data-testid="settings-task-minutes"
+                  min={MIN_TASK_MINUTES}
+                  max={MAX_TASK_MINUTES}
                   step={15}
-                  value={localSettings.bufferTime?.defaultDuration ?? 30}
-                  onChange={(e) => setLocalSettings(prev => ({
-                    ...prev,
-                    bufferTime: { ...prev.bufferTime, defaultDuration: parseInt(e.target.value) || 30 }
-                  }))}
+                  placeholder={String(AUTO_TASK_MINUTES)}
+                  value={localSettings.defaultTaskMinutes ?? ''}
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value)
+                    setLocalSettings(prev => ({ ...prev, defaultTaskMinutes: Number.isFinite(n) ? n : null }))
+                  }}
                   className="h-8 w-20 text-center"
                 />
                 <span className="text-xs text-muted-foreground">{t('分鐘')}</span>

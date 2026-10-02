@@ -32,7 +32,7 @@ import { RecurrenceChoiceModal, type RecurrenceChoice } from '../modals/recurren
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
 import { readStoredSize, writeStoredSize, ALL_DAY_HEIGHT_WEEK_KEY } from '@/lib/persisted-size'
-import { useDefaultTaskDuration, useWeekStartDay } from '@/components/user-settings-context'
+import { useDefaultTaskDuration, useWeekViewAlignDay } from '@/components/user-settings-context'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { WORKSPACE_COLORS } from '@/lib/palette'
 import { useI18n } from '@/lib/i18n/react'
@@ -134,10 +134,12 @@ export function WeekView({
   // start of the selected date's week. Clamped so the selected date itself
   // never scrolls out of view (e.g. a Saturday in a Mon-Fri work week).
   // Phones keep their 3-column strip starting at the selected date.
-  const weekStartDay = useWeekStartDay()
-  const weekStartOffset = isMobile
+  // 自動 (null): no alignment — the selected date is the first column, as
+  // before the setting existed.
+  const weekAlignDay = useWeekViewAlignDay()
+  const weekStartOffset = isMobile || weekAlignDay === null
     ? 0
-    : Math.min(daysSinceWeekStart(selectedDate, weekStartDay), columnsPerScreen - 1)
+    : Math.min(daysSinceWeekStart(selectedDate, weekAlignDay), columnsPerScreen - 1)
 
   // New-slot drag state
   const [isDragging, setIsDragging] = useState(false)

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { Check, Plus, ChevronRight } from 'lucide-react'
 import { toDateString, taskOccursOnDate, timeToMinutes, daysSinceWeekStart, orderedWeekdays } from '@/lib/calendar-utils'
-import { useWeekStartDay } from '@/components/user-settings-context'
+import { useMonthStartDay } from '@/components/user-settings-context'
 import type { PeerEvent } from '@/hooks/use-calendar-sharing'
 import { GoogleAgendaRow, GoogleMonthChip } from './google-event-block'
 import { taskDisplayTitle } from '@/lib/task-display'
@@ -61,7 +61,7 @@ export function MonthView({
   const { t, lang } = useI18n()
   const holidaysEnabled = useTaiwanHolidaysEnabled()
   // 每週開始日 — drives both the weekday header and each month's leading days.
-  const weekStartDay = useWeekStartDay()
+  const weekStartDay = useMonthStartDay()
   const weekdayOrder = useMemo(() => orderedWeekdays(weekStartDay), [weekStartDay])
 
   // Mobile agenda: the day whose tasks are listed under the compact grid.
