@@ -40,6 +40,7 @@ export const dict: Record<string, string> = {
   "那天發生了什麼？": "What happened that day?",
   "今天的心情": "Today's mood",
   "那天的心情": "That day's mood",
+  "今天你記下了：": "Today you wrote: ",
   "最近一次是 {date}，你記下了：": "Most recently, on {date}, you wrote: ",
   "儲存中…": "Saving…",
   "存下來": "Save",

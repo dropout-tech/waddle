@@ -13,7 +13,7 @@ import { MOOD_COLORS } from '@/lib/palette'
 import { isImeComposing } from '@/lib/ime'
 import {
   DAILY_LINE_MAX, MOODS, buildYearGrid, countWrittenInYear, daysInMonth, dateKey,
-  isWritableDate, parseDateKey, taipeiToday, type Mood,
+  isWritableDate, parseDateKey, localToday, type Mood,
 } from '@/lib/life-grid/compute'
 import type { DailyLine } from '@/lib/life-grid/data'
 import { drawLifeGridImage, shareLifeGridImage } from '@/lib/life-grid/share-image'
@@ -30,6 +30,24 @@ export const MOOD_LABELS: Record<Mood, string> = {
 
 const YEARS_BACK = 10
 
+/**
+ * Smooth-scroll only the life grid's own scroll area. Element.scrollIntoView
+ * would also scroll every ancestor — inside the pop-up that shoved the whole
+ * panel (header included) up and out of view.
+ */
+function scrollWithin(el: HTMLElement, block: 'center' | 'nearest') {
+  const sc = el.closest<HTMLElement>('[data-life-grid-scroll]')
+  if (!sc) return
+  const r = el.getBoundingClientRect()
+  const box = sc.getBoundingClientRect()
+  const top = r.top - box.top + sc.scrollTop
+  let target = sc.scrollTop
+  if (block === 'center') target = top - (sc.clientHeight - r.height) / 2
+  else if (r.top < box.top) target = top - 16
+  else if (r.bottom > box.bottom) target = top + r.height - sc.clientHeight + 16
+  sc.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
+}
+
 const locale = (lang: Lang) => (lang === 'en' ? 'en-US' : 'zh-TW')
 const utcDate = (date: string) => {
   const p = parseDateKey(date)
@@ -37,9 +55,9 @@ const utcDate = (date: string) => {
 }
 
 function useToday() {
-  const [today, setToday] = useState(() => taipeiToday())
+  const [today, setToday] = useState(() => localToday())
   useEffect(() => {
-    const id = window.setInterval(() => setToday(taipeiToday()), 60_000)
+    const id = window.setInterval(() => setToday(localToday()), 60_000)
     return () => window.clearInterval(id)
   }, [])
   return today
@@ -139,7 +157,7 @@ export function LifeGridView({ onExit, exitVariant = 'close', focusToday = false
   const select = (date: string, opts: { scroll?: boolean } = {}) => {
     setSelected(date)
     setZoomMonth(Number(date.slice(5, 7)))
-    if (opts.scroll) dayCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    if (opts.scroll && dayCardRef.current) scrollWithin(dayCardRef.current, 'nearest')
   }
 
   const onSave = async (date: string, content: string, mood: Mood | null) => {
@@ -232,7 +250,7 @@ export function LifeGridView({ onExit, exitVariant = 'close', focusToday = false
       </header>
 
       {/* Soft fade at the bottom edge so content never looks cut off by the pop-up. */}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [mask-image:linear-gradient(to_bottom,#000_calc(100%-40px),transparent)]">
+      <div data-life-grid-scroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain [mask-image:linear-gradient(to_bottom,#000_calc(100%-40px),transparent)]">
         <div className="mx-auto w-full max-w-[1080px] px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7">
           <p className="text-[15px] leading-relaxed md:text-base" data-life-grid-summary>
             {summary}
@@ -462,17 +480,19 @@ function PhoneYearGrid({
 
 function LetterLine({ lines, today }: { lines: Map<string, DailyLine>; today: string }) {
   const { t, lang } = useI18n()
+  // Today's own line if it exists, otherwise the most recent earlier one.
   const latest = useMemo(() => {
     let best: DailyLine | null = null
-    for (const l of lines.values()) if (l.content && l.date < today && (!best || l.date > best.date)) best = l
+    for (const l of lines.values()) if (l.content && l.date <= today && (!best || l.date > best.date)) best = l
     return best
   }, [lines, today])
   if (!latest) return null
+  const isToday = latest.date === today
   const date = new Intl.DateTimeFormat(locale(lang), { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(utcDate(latest.date))
   const [open, close] = lang === 'en' ? ['“', '”'] : ['「', '」']
   return (
     <p className="mt-6 max-w-[62ch] text-[15px] leading-[1.85] text-muted-foreground [text-wrap:pretty]" data-life-grid-letter>
-      {t('最近一次是 {date}，你記下了：', { date })}
+      {isToday ? t('今天你記下了：') : t('最近一次是 {date}，你記下了：', { date })}
       <span className="text-foreground" data-user-text>{open}{latest.content}{close}</span>
     </p>
   )
@@ -641,17 +661,21 @@ function DayCard({
     }
   }, [line])
 
-  // Penguin question → focus today's input once it exists (it only renders
-  // after the year has loaded), after the pop-up's enter animation.
+  // Penguin question → let the year light up first (the reveal is ~1.5s),
+  // then glide to today's card and focus its input. Waiting matters: an
+  // instant focus would jump-scroll past the opening moment.
   const autoFocused = useRef(false)
+  const cardRef = useRef<HTMLDivElement>(null)
   const showsInput = writable && editing && !(loading && !line)
   useEffect(() => {
     if (!autoFocus || !showsInput || autoFocused.current) return
     const id = window.setTimeout(() => {
-      if (!inputRef.current) return
-      inputRef.current.focus()
+      const input = inputRef.current
+      if (!input) return
       autoFocused.current = true
-    }, 360)
+      if (cardRef.current) scrollWithin(cardRef.current, 'center')
+      input.focus({ preventScroll: true })
+    }, 1650)
     return () => window.clearTimeout(id)
   }, [autoFocus, showsInput])
 
@@ -691,7 +715,7 @@ function DayCard({
           : null
 
   return (
-    <div className="rounded-2xl border border-border/80 bg-card px-4 py-4 md:px-5" data-life-grid-day={date} aria-live="polite">
+    <div ref={cardRef} className="scroll-my-6 rounded-2xl border border-border/80 bg-card px-4 py-4 md:px-5" data-life-grid-day={date} aria-live="polite">
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           {label}

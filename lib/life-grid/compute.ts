@@ -30,13 +30,17 @@ export interface GridMonth {
 }
 
 /**
- * "Today" for the life grid, in Asia/Taipei — the same shared day the daily
- * check-in uses (lib/daily-check-in.ts `checkInDate`, duplicated here so this
- * file stays importable from plain node).
+ * "Today" for the life grid = the user's own calendar day: the device's local
+ * date, same convention as the rest of the app (lib/calendar-utils.ts
+ * `toDateString`). A line written at 20:00 in New York belongs to that New
+ * York day, not to Taipei's tomorrow. `timeZone` is only for tests/tools.
  */
-export function taipeiToday(now: Date = new Date()): string {
+export function localToday(now: Date = new Date(), timeZone?: string): string {
+  if (!timeZone) {
+    return dateKey(now.getFullYear(), now.getMonth() + 1, now.getDate())
+  }
   return new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(now)
 }
 

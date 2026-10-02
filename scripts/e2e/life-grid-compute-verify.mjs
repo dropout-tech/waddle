@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Pure-function checks for the life grid (lib/life-grid/compute.ts):
- * leap years, month lengths, the Taipei "today", cell states, grid shape,
+ * leap years, month lengths, the local "today", cell states, grid shape,
  * day-of-year, line normalisation. No network, no browser.
  *
  * Run: node scripts/e2e/life-grid-compute-verify.mjs
@@ -11,7 +11,7 @@ import assert from 'node:assert/strict'
 import {
   buildYearGrid, cellState, countWrittenInYear, dateKey, dayOfYear, daysArrived,
   daysInMonth, daysInYear, isLeapYear, isMood, isWritableDate, normalizeLine,
-  parseDateKey, taipeiToday, DAILY_LINE_MAX,
+  parseDateKey, localToday, DAILY_LINE_MAX,
 } from '../../lib/life-grid/compute.ts'
 
 let passed = 0
@@ -73,17 +73,30 @@ test('a past year is all past, a future year all future', () => {
   assert.equal(cellState('2025-12-31', '2026-01-01'), 'past')
 })
 
-test('Taipei today: 2026-10-03 16:30Z is already 10-04 in Taipei', () => {
-  assert.equal(taipeiToday(new Date('2026-10-03T16:30:00Z')), '2026-10-04')
-  assert.equal(taipeiToday(new Date('2026-10-03T15:59:59Z')), '2026-10-03')
+test('local today: New York 20:00 on 10-03 stays 10-03 (not Taipei\'s 10-04)', () => {
+  // 2026-10-03 20:00 EDT = 2026-10-04 00:00Z = 08:00 on 10-04 in Taipei
+  const t = new Date('2026-10-04T00:00:00Z')
+  assert.equal(localToday(t, 'America/New_York'), '2026-10-03')
+  assert.equal(localToday(t, 'Asia/Taipei'), '2026-10-04')
 })
 
-test('Taipei today: New Year rollover (2026-12-31 16:00Z → 2027-01-01)', () => {
-  assert.equal(taipeiToday(new Date('2026-12-31T16:00:00Z')), '2027-01-01')
+test('local today: Taipei 01:00 on 10-04 is already 10-04', () => {
+  // 2026-10-04 01:00 +08 = 2026-10-03 17:00Z
+  assert.equal(localToday(new Date('2026-10-03T17:00:00Z'), 'Asia/Taipei'), '2026-10-04')
+  assert.equal(localToday(new Date('2026-10-03T15:59:59Z'), 'Asia/Taipei'), '2026-10-03')
 })
 
-test('Taipei today: leap day 2028-02-29 exists', () => {
-  assert.equal(taipeiToday(new Date('2028-02-28T16:00:00Z')), '2028-02-29')
+test('local today: default = the device clock (same as calendar-utils toDateString)', () => {
+  const now = new Date()
+  const expect = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  assert.equal(localToday(now), expect)
+  assert.equal(localToday(now), localToday(now, Intl.DateTimeFormat().resolvedOptions().timeZone))
+})
+
+test('local today: New Year rollover and leap day', () => {
+  assert.equal(localToday(new Date('2026-12-31T16:00:00Z'), 'Asia/Taipei'), '2027-01-01')
+  assert.equal(localToday(new Date('2026-12-31T16:00:00Z'), 'America/New_York'), '2026-12-31')
+  assert.equal(localToday(new Date('2028-02-28T16:00:00Z'), 'Asia/Taipei'), '2028-02-29')
 })
 
 test('day of year incl. leap years', () => {
