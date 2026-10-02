@@ -251,6 +251,7 @@ Deno.serve(async (req) => {
               meetingWeekday: meetingWeekday(input.meetingDate),
               transcript: input.transcript,
               meetingTime: input.context.meetingTime,
+              purpose: input.context.purpose,
               participants: input.context.participants.map(
                 ({ userId: _account, ...person }) => person,
               ),

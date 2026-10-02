@@ -13,6 +13,10 @@ export const participant = z.object({
   organization: z.string().trim().max(100),
   aliases: z.array(z.string().trim().min(1).max(80)).max(12),
   userId: z.union([z.string().uuid(), z.literal("")]),
+  // "ours" = the uploader's own team, "theirs" = the other party (client,
+  // vendor...). Their commitments become the uploader's follow-up tasks.
+  // Defaults to "ours" so meetings saved before this field existed still parse.
+  side: z.enum(["ours", "theirs"]).default("ours"),
 });
 export type Participant = z.infer<typeof participant>;
 export const contextSchema = z
@@ -20,6 +24,7 @@ export const contextSchema = z
     meetingTime: z
       .union([z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/), z.literal("")])
       .default(""),
+    purpose: z.string().trim().max(300).default(""),
     participants: z.array(participant).max(30).default([]),
     categoryId: z.union([z.string().uuid(), z.literal("")]).default(""),
     autoSelf: z.boolean().default(false),
@@ -86,6 +91,10 @@ export const resultSchema = z.object({
         title: z.string().min(1).max(200),
         owner: z.string().max(100),
         due: dueSchema,
+        // The exact deadline wording inside `source` ("明天前", "9/30"...).
+        // A non-"none" due without matching evidence is discarded in code.
+        dueEvidence: z.string().max(200).default(""),
+        ownerSide: z.enum(["ours", "theirs", "unknown"]).default("unknown"),
         source: z.string().min(1).max(2000),
         ownerParticipantId: z.string().default(""),
         ownerEvidence: z.string().max(2000).default(""),
@@ -150,6 +159,8 @@ export const outputSchema = {
               },
             ],
           },
+          dueEvidence: { type: "string" },
+          ownerSide: { type: "string", enum: ["ours", "theirs", "unknown"] },
           source: { type: "string" },
           ownerParticipantId: { type: "string" },
           ownerEvidence: { type: "string" },
@@ -163,6 +174,8 @@ export const outputSchema = {
           "title",
           "owner",
           "due",
+          "dueEvidence",
+          "ownerSide",
           "source",
           "ownerParticipantId",
           "ownerEvidence",
@@ -188,10 +201,30 @@ export function validateResult(
   // unchanged so the frontend/DB contract stays compatible.
   const result = {
     ...parsed,
-    tasks: parsed.tasks.map(({ due, ...task }) => ({
-      ...task,
-      dueDate: resolveDue(due, meetingDate),
-    })),
+    tasks: parsed.tasks.map(({ due, dueEvidence, ownerSide, ...task }) => {
+      // A participant the model named outranks its own side guess, because
+      // the side was set by the user. Evaluated before the explicit-assignment
+      // downgrade below: a weakly evidenced owner still tells us whose
+      // promise it was, even if we will not auto-assign it.
+      const side =
+        participants.find((p) => p.id === task.ownerParticipantId)?.side ??
+        ownerSide;
+      const followUp = side === "theirs";
+      const title =
+        followUp && !task.title.startsWith("追")
+          ? `追 ${task.owner || "對方"}：${task.title}`.slice(0, 200)
+          : task.title;
+      return {
+        ...task,
+        title,
+        ownerSide: side,
+        followUp,
+        dueDate: resolveDue(
+          dueSupported(due, dueEvidence, task.source) ? due : { kind: "none" },
+          meetingDate,
+        ),
+      };
+    }),
   };
   // Never attach invented evidence to an executable task.
   if (result.tasks.some((task) => !transcript.includes(task.source)))
@@ -261,6 +294,26 @@ export function meetingWeekDates(
   }
   return { thisWeek, nextWeek };
 }
+// Baseline eval (康庭 2026-08-12 minutes) showed the model dodging the
+// "vague deadline → none" rule by disguising "8 月中下旬、助理離職前" as
+// relative_days 15/18 and "9–10 月" as weekday 7. So each due kind now needs
+// matching wording quoted from the task's own source before it is trusted.
+export function dueSupported(due: Due, evidence: string, source: string): boolean {
+  if (due.kind === "none") return true;
+  if (!evidence || !source.includes(evidence)) return false;
+  if (due.kind === "date")
+    return /\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\s*[\/月]\s*\d{1,2}/.test(evidence);
+  if (due.kind === "weekday")
+    return /(?:[週周]|禮拜|星期)\s*[一二三四五六日天1-7]/.test(evidence);
+  if (VAGUE_DAY_WORDS.test(evidence)) return false;
+  return RELATIVE_DAY_WORDS.some((word) => evidence.includes(word));
+}
+// Wording that genuinely means "N days from the meeting". Matched by
+// substring, so "天內" covers "三天內"/"5 天內"; bare "天" is deliberately
+// absent because it would also admit "改天"/"天天".
+const RELATIVE_DAY_WORDS = ["今天", "今日", "今晚", "明天", "明日", "後天", "大後天", "天內", "天後", "日內"];
+// "幾天內"/"過幾天"/"改天" contain the words above but name no real day count.
+const VAGUE_DAY_WORDS = /幾|改天/;
 // Deterministically turns the model's structured `due` classification into
 // a YYYY-MM-DD string (or "" when there is none). The model never computes
 // a date itself: "weekday"+week:"this" is auto-corrected forward to next

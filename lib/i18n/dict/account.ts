@@ -109,6 +109,8 @@ export const dict: Record<string, string> = {
   '共享夥伴': 'Shared peer',
   '移除此人': 'Remove this person',
   '新增與會者': 'Add participant',
+  '我方': 'Our side',
+  '與會者 {n} 立場': 'Participant {n} side',
   // components/auth/legal-consent.tsx — sign-in / sign-up consent line
   '建立帳號即表示你同意 Huddle 的{terms}，並已閱讀{privacy}。': 'By creating an account, you agree to Huddle’s {terms} and confirm that you have read the {privacy}.',
   '繼續即表示你同意 Huddle 的{terms}，並已閱讀{privacy}。': 'By continuing, you agree to Huddle’s {terms} and confirm that you have read the {privacy}.',

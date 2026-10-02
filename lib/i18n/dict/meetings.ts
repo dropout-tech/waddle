@@ -38,6 +38,10 @@ export const dict: Record<string, string> = {
   '例如：網站改版討論': 'e.g. Website redesign discussion',
   '會議日期': 'Meeting date',
   '會議時間（台北時間，可留空）': 'Meeting time (Taipei time, optional)',
+  '會議目的': 'Meeting purpose',
+  '例：確認康庭專案範圍與時程': 'e.g. Confirm the project scope and timeline',
+  '目的：{purpose}': 'Purpose: {purpose}',
+  '追蹤對方': 'Follow up',
   '自己的任務加入哪個分類': 'Which category to add your tasks to',
   '有明確依據、指派給「我」的任務，整理完成後直接建立':
     'Automatically create tasks with clear evidence that are assigned to "me" once the summary finishes',
