@@ -173,6 +173,12 @@ select public.t_err(format($$select public.finish_ai_review(%L,'11111111-0000-40
 select public.reserve_ai_review(:'A','11111111-0000-4000-8000-000000000003',1);
 select public.t_err(format($$select public.finish_ai_review(%L,'11111111-0000-4000-8000-000000000003',public.t_report(%L,public.t_cid(%L,'ai_review'),'節奏 https://evil.example/x'),null,10,20)$$,:'A',:'A',:'A'),
   'ai_review_reports_no_urls','a report that still contains a URL is not stored');
+select public.t_ok(
+  'Your data: 3 items, metadata:title, wow www. ok' !~* c.pat
+  and 'see data:text/html,hi' ~* c.pat and 'go www.evil.example' ~* c.pat and 'x https://e.example' ~* c.pat,
+  'no_urls backstop rejects URLs but not prose like "data: 3 items"')
+  from (select substring(pg_get_constraintdef(oid) from $re$!~\* '([^']*)'$re$) as pat
+          from pg_constraint where conname = 'ai_review_reports_no_urls') c;
 select public.t_err(format($$select public.finish_ai_review(%L,'11111111-0000-4000-8000-000000000003',public.t_report(%L,public.t_cid(%L,'ai_review'),'節奏','{"note":"寫季報"}'),null,10,20)$$,:'A',:'A',:'A'),
   'INVALID_REPORT','stats must be numbers only');
 select public.t_err(format($$select public.finish_ai_review(%L,'11111111-0000-4000-8000-000000000003',public.t_report(%L,public.t_cid(%L,'ai_review'),repeat('長',901)),null,10,20)$$,:'A',:'A',:'A'),

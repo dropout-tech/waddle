@@ -130,11 +130,21 @@ test("stripUrls removes markdown links/images, HTML, schemes, www, mailto, data:
   assert.ok(!/ {2}/.test(s), "whitespace collapsed");
 });
 
+// Same pattern as the ai_review_reports_no_urls constraint (\m in Postgres = \b at a word start).
+const backstop = /(:\/\/|\bwww\.\S|\bdata:\S)/i;
+
 test("stripUrls output passes the database backstop check", () => {
-  const backstop = /(:\/\/|www\.|data:)/i;
   for (const s of ["HTTPS://X.Y", "ftp://f", "WWW.ABC.COM", "Data:text/html,hi", "javascript://x"]) {
     assert.ok(!backstop.test(stripUrls(`a ${s} b`)), s);
   }
+});
+
+test("plain prose with data: / metadata: / www. survives and is not rejected by the backstop", () => {
+  for (const s of ["Your data: 3 items were saved.", "Checked the metadata:title field.", "wow www. ok"]) {
+    const out = stripUrls(s);
+    assert.ok(!backstop.test(out), `backstop would reject: ${out}`);
+  }
+  assert.equal(stripUrls("Your data: 3 items were saved."), "Your data: 3 items were saved.");
 });
 
 test("clampText cuts at the last sentence end inside the limit, else hard-cuts with …", () => {

@@ -178,8 +178,11 @@ create table public.ai_review_reports (
   check (period_end > period_start),
   -- Backstop for "remove URLs before saving": the Edge Function strips them;
   -- a report that still carries a scheme, www. or a data: URI is not stored.
+  -- Mirrors stripUrls: "www." / "data:" only count at a word start and directly
+  -- followed by a non-space, so plain prose such as "your data: 3 items" or
+  -- "metadata:" is not rejected (it would fail the report and burn an attempt).
   constraint ai_review_reports_no_urls check (
-    concat_ws(' ', rhythm, done, time_spent, pending, observation) !~* '(://|www\.|data:)'
+    concat_ws(' ', rhythm, done, time_spent, pending, observation) !~* '(://|\mwww\.\S|\mdata:\S)'
   )
 );
 create index ai_review_reports_user_created_idx on public.ai_review_reports(user_id, created_at desc);
