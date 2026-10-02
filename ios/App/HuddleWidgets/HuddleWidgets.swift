@@ -27,9 +27,6 @@ struct Snapshot:Decodable {
     var span:[SpanDay]?
     /// 便條紙: newest sticky notes as plain text. Optional.
     var stickies:[StickyInfo]?
-    /// Design-proposal switch for the Lock Screen faces ("a" | "b" | "c", HuddleLockDesigns.swift).
-    /// Only the demo fixture writes it; real snapshots never do, so they get the current faces.
-    var designVariant:String?
 }
 struct PetInfo:Decodable {var adopted:Bool;var name:String;var color:String;var accessory:String;var lang:String;var overdue:Int;var overdueLine:String;var lines:[String]}
 enum Kind:String,AppEnum,CaseIterable {
@@ -237,10 +234,9 @@ struct WidgetView:View {
     }
     var body:some View {
         Group {
-            if kind == .pet && family == .accessoryRectangular && entry.lock == nil && lockDesign == nil {petLockScreen}
-            // Every other Lock Screen face (HuddleLockScreen.swift). Owner chose
+            // Every Lock Screen face (HuddleLockScreen.swift). Owner chose
             // "always show" for these, so no privacySensitive here.
-            else if entry.lock != nil || isAccessory {accessoryView}
+            if entry.lock != nil || isAccessory {accessoryView}
             else if kind == .pet,let s=entry.snapshot {petPanel(s).foregroundStyle(ink).widgetURL(petLink(s)).privacySensitive()}
             else if let s=entry.snapshot {
                 // Calendar-heavy widgets fill the whole frame: drop the title row
@@ -622,16 +618,6 @@ extension WidgetView {
                 PenguinFigure(color:"ink",accessory:"none").frame(width:family == .systemSmall ? 64:90,height:family == .systemSmall ? 64:90).opacity(0.55)
                 Text(en ? "Open Huddle to adopt your penguin":"打開 Huddle 領養你的企鵝").font(.caption.weight(.semibold)).multilineTextAlignment(.center)
             }.frame(maxWidth:.infinity,maxHeight:.infinity)
-        }
-    }
-    /// Lock screen: name + a title-free bubble (the lock screen can be seen by anyone).
-    @ViewBuilder var petLockScreen:some View {
-        if let s=entry.snapshot,let p=s.pet,p.adopted {
-            let b=petBubble(s,p,safe:true)
-            VStack(alignment:.leading,spacing:1){Text(p.name).font(.headline).lineLimit(1);Text(b.text).font(.caption).lineLimit(2)}
-                .frame(maxWidth:.infinity,alignment:.leading).widgetURL(b.link)
-        } else {
-            Text(entry.snapshot?.pet?.lang == "en" ? "Open Huddle to adopt your penguin":"打開 Huddle 領養你的企鵝").font(.caption).widgetURL(url(.pet))
         }
     }
 }
