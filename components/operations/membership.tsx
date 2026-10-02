@@ -17,6 +17,7 @@ import { useI18n } from '@/lib/i18n/react'
 import { usePlanUsage } from '@/hooks/use-plan-usage'
 import { usageMeters } from '@/lib/billing/plan-usage-core'
 import { UsageMeters } from '@/components/billing/usage-meters'
+import { WebOnly } from '@/components/legal/web-only'
 
 export function MembershipPage() {
   const { user } = useAuth()
@@ -243,6 +244,9 @@ function MembershipContent() {
                 </button>
               </form>
             </section>
+            {/* Not in the iOS/Android app: unlocking Pro with our own codes is
+                outside in-app purchase (Apple 3.1.1). Web unchanged. */}
+            <WebOnly>
             <section className={styles.panel}>
               <h2>{t('兌換優惠碼')}</h2>
               <p className={styles.muted}>
@@ -275,6 +279,7 @@ function MembershipContent() {
                 </button>
               </form>
             </section>
+            </WebOnly>
             <section className={styles.panel}>
               <h2>{t('朋友的推薦碼')}</h2>
               {data.referred ? (

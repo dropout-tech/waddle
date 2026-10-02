@@ -703,10 +703,17 @@ function HuddlePage() {
   )
 }
 
+/** Set by next.config.mjs for the Capacitor static export (native-only bundle). */
+const APP_SHELL_BUILD = process.env.HUDDLE_APP_SHELL_BUILD === '1'
+
 export default function Page() {
   const { session, loading } = useAuth()
 
   if (loading) {
+    // Native app: never show the marketing site (prices, Mac download) while
+    // the session resolves — Apple 3.1.1. The Capacitor export prerenders "/"
+    // as this loader too, so nothing flashes before hydration.
+    if (APP_SHELL_BUILD || isNative()) return <AuthGuard><HuddlePage /></AuthGuard>
     // Keep the static response useful to visitors and search engines instead
     // of shipping a loader-only first page while the local session resolves.
     return <MarketingPage />

@@ -154,7 +154,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       <header className={styles.header}>
         <Link href={`${base}/about`} className={styles.brand} aria-label="Huddle">Huddle<span className={styles.brandDot}>.</span></Link>
         <nav aria-label={en ? 'Main navigation' : '主要導覽'} className={styles.nav}>
-          {['features', 'pricing', 'download'].map((id, i) => <a key={id} href={`#${id}`}>{t.nav[i]}</a>)}
+          {(native ? ['features'] : ['features', 'pricing', 'download']).map((id, i) => <a key={id} href={`#${id}`}>{t.nav[i]}</a>)}
           <Link href={`${base}/support`}>{t.nav[3]}</Link>
         </nav>
         <div className={styles.headerActions}><Link href={en ? '/about' : '/en/about'} hrefLang={en ? 'zh-Hant' : 'en'} className={styles.language} aria-label={en ? '切換為繁體中文' : 'Switch to English'}>{en ? '繁中' : 'EN'}</Link><Link href="/login" onClick={toLang} className={styles.login}>{t.login}<ArrowRight size={16} aria-hidden="true" /></Link></div>
@@ -218,7 +218,9 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
 
       <section className={styles.focus} aria-labelledby="focus-title"><div className={styles.focusCopy}><h2 id="focus-title">{t.focusTitle}</h2><p>{t.focusBody}</p><Link href="/login" onClick={toLang} className={styles.textLink}>{t.focusAction}<ArrowRight size={22} aria-hidden="true" /></Link><ToyButton toy="focus" locale={locale} /></div><div className={styles.focusVisual}><div className={focusStageClass} data-penguin-stop="focus" data-penguin-at="0.5 0.5" data-penguin-pose="slide" data-penguin-motion="orbit"><Image src="/art/feature-focus.webp" width={800} height={800} alt={en ? 'Huddle penguin holding a focus timer' : 'Huddle 企鵝抱著專注計時環'} sizes="(max-width: 760px) 80vw, 40vw" /><FocusRing /><ToyStage toy="focus" locale={locale} /></div><span className={styles.handNote}>{en ? 'A little at a time.' : '一步一步，也很好。'}</span></div></section>
 
-      <section id="pricing" className={styles.pricing} aria-labelledby="pricing-title">
+      {/* Inside the iOS/Android app (/about is reachable from the legal pages)
+          no prices or download links — Apple 3.1.1. */}
+      {native ? null : <section id="pricing" className={styles.pricing} aria-labelledby="pricing-title">
         <div className={styles.priceHead}>
           <div><h2 id="pricing-title">{t.priceTitle}</h2><p>{t.priceIntro}</p></div>
           <picture className={styles.sceneArt}>
@@ -229,11 +231,11 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
         </div>
         <div className={styles.plans}><article data-penguin-stop="price" data-penguin-at="0.86 0 0 -3"><h3>{t.free}</h3><p className={styles.price}>NT$0</p><p>{t.freeBody}</p><Link href="/signup" onClick={toLang} className={styles.primary}>{t.start}<ArrowRight size={19} aria-hidden="true" /></Link></article><article className={styles.pro}><h3>Pro <span>{t.soon}</span></h3><p className={styles.price}>NT$150<small>{t.month}</small></p><p className={styles.annual}>{t.year}</p><p>{t.proBody}</p></article></div>
         {native ? null : <p className={styles.priceNote} data-price-note>{t.priceNote}</p>}
-      </section>
+      </section>}
 
       <div id="promo-loop" className={styles.promo}><PromoLoop locale={locale} /></div>
 
-      <section id="download" className={styles.download} aria-labelledby="download-title">
+      {native ? null : <section id="download" className={styles.download} aria-labelledby="download-title">
         <div className={styles.downloadCopy}><h2 id="download-title" data-penguin-stop="download" data-penguin-at="0 0 70 -10" data-penguin-pose="wave">{t.downloadTitle}</h2><p>{t.downloadBody}</p>
           <div className={styles.downloadOptions}><a href={download('arm64')}><span>Mac · Apple Silicon</span><Download size={24} aria-hidden="true" /></a><a href={download('x64')}><span>Mac · Intel</span><Download size={24} aria-hidden="true" /></a><a href="https://github.com/dropout-tech/waddle/releases/download/v0.1.2-beta.1/Huddle-0.1.2-win-x64.exe"><span>Windows · x64</span><Download size={24} aria-hidden="true" /></a><p>{t.downloadNote}</p><a href={release} className={styles.releaseLink}>{t.release}<ArrowRight size={17} aria-hidden="true" /></a></div>
         </div>
@@ -242,7 +244,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/art/film/C-05.webp" width={1280} height={720} alt="" loading="lazy" decoding="async" />
         </picture>
-      </section>
+      </section>}
 
       <section className={styles.faq} aria-labelledby="faq-title"><div><h2 id="faq-title">{t.faqTitle}</h2><CheckInToy locale={locale} /></div><div>{t.questions.map(([q, a]) => <details key={q}><summary>{q}<ChevronDown size={22} aria-hidden="true" /></summary><p>{a}</p></details>)}</div></section>
       <footer className={styles.footer}><Hammock /><div><Link href={`${base}/about`} className={styles.brand}>Huddle.</Link><p>{t.footerLine}</p><p className={styles.operatorLine} data-operator-footer>{t.operatorLine}<a href={SUPPORT_PHONE_TEL}>{SUPPORT_PHONE}</a>{en ? ' · ' : '｜'}<Link href={`${base}/terms#operator`}>{t.operatorLink}</Link></p></div><nav aria-label={en ? 'Service information' : '服務資訊'}>{['terms', 'privacy', 'refunds', 'support'].map((path, i) => <Link href={`${base}/${path}`} key={path}>{t.legal[i]}</Link>)}<a href="#top">{t.all}<ArrowDown className={styles.up} size={15} aria-hidden="true" /></a></nav></footer>

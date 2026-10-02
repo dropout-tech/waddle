@@ -55,6 +55,12 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Inlined into the bundle: the Capacitor export only ever ships inside the
+  // native app, so app/page.tsx prerenders "/" as the app loader there
+  // instead of the marketing site (Apple 3.1.1: no prices / downloads in-app).
+  env: {
+    HUDDLE_APP_SHELL_BUILD: isCapacitor ? '1' : '',
+  },
   ...(isCapacitor
     ? {
         // Static export for Capacitor. trailingSlash makes the WKWebView resolve
