@@ -39,6 +39,9 @@ const BOX = 24            // viewBox units
 const TARGET_STROKE = 2.5 // units; default pen (lucide is 2). Sheets override with { target }
 const MAX_EXTENT = 22.5   // longest side an icon may take inside the box
 const UP = 3              // supersampling before tracing
+// Global pen multiplier for weight comparisons (INK_WEIGHT=1.2 → 20% fatter
+// ink on every icon). 1 reproduces the shipped file byte for byte.
+const WEIGHT = Number(process.env.INK_WEIGHT || 1)
 
 /**
  * Per-sheet grid + cell → icon name (`null` = cell not used), plus the pen:
@@ -61,6 +64,8 @@ const SHEETS = [
       'Bold', 'Italic', 'Underline', 'Strikethrough', 'InlineCode', 'Link',
       'Undo', 'Redo', null /* "≡+" */, 'AddTask', null /* table */, null /* marker pen */,
     ],
+    // the notebook top bar shows "升級為任務" at 14px → small grade
+    extra: [{ from: 'AddTask', name: 'AddTaskSm' }],
   },
   // Toolbar set = the SMALL optical grade: shown at 14–16px, so the pen is
   // fatter in units — the same ~2px of ink on screen as the notebook set.
@@ -84,6 +89,21 @@ const SHEETS = [
       'Focus', 'Tasks', 'Calendar', 'Mail', 'Gift', 'Document',
       'Clipboard', 'Building', 'Sun', 'Moon', 'LogOut', 'Phone',
       null, null, null, null, null, null,
+      null, null, null, null, null, null,
+    ],
+  },
+  // Notebook page chrome (top bar, folder sidebar, save status) + the
+  // whiteboard tab candidate. Same style text as v7, word for word; small
+  // grade (12–16px). Cell 2 "move to folder" read as a scribble at 16px — the
+  // plain folder is used for that labelled menu item instead; cell 15 came
+  // out as a magnifier, not a pin. Whiteboard 2/3 and the bottom two rows are
+  // spares.
+  {
+    file: 'sheet-v8-notebook-chrome.png', cols: 6, rows: 4, pen: 17.8, target: 3.1, scale: 0.125, maxExtent: 22, blur: 0.8, tol: 1.2,
+    cells: [
+      'FolderPlus', null /* move to folder */, 'Grip', 'CloudOff', 'ArrowLeft', 'Whiteboard',
+      null /* whiteboard on a ledge */, null /* pinned board */, 'Trash', 'Pencil', 'Check', 'Close',
+      'Folder', null, null, null, null, null,
       null, null, null, null, null, null,
     ],
   },
@@ -144,6 +164,11 @@ const OPTIONS = {
   // the "more tools" menu; its pen measured the same as theirs (≈3.0u) but it
   // read thinner, so it gets a touch more ink.
   Download: { grow: 1.2 },
+  AddTaskSm: { target: 3.1 },
+  // Whiteboard is a bottom-tab candidate (20px) → the 20px weight.
+  Whiteboard: { target: 2.5 },
+  // wide drawings: keep the grown ink inside the 24-unit box
+  FolderPlus: { fit: 21 }, CloudOff: { fit: 21 }, Trash: { fit: 21 }, Folder: { fit: 21 },
 }
 
 // ── raster helpers ────────────────────────────────────────────────────────
@@ -397,7 +422,7 @@ for (const sheet of SHEETS) {
     // ones (single-stroke chevrons, plus…) get thinned. Icons that are mostly
     // solid ink measure "fat" without being so — mark them { solid: true }.
     const own = opt.stroke ?? (opt.solid ? median : r.stroke)
-    const grow = ((opt.target ?? sheetTarget) / s - own) / 2 + (opt.grow ?? 0)
+    const grow = ((opt.target ?? sheetTarget) * WEIGHT / s - own) / 2 + (opt.grow ?? 0)
     const fat = grow >= 0 ? dilate(r.mask, r.W, r.H, grow * UP) : erode(r.mask, r.W, r.H, -grow * UP)
     // bbox after growing
     let minX = r.W, minY = r.H, maxX = 0, maxY = 0

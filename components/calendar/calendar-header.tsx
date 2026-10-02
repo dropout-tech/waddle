@@ -30,6 +30,7 @@ import { useI18n } from '@/lib/i18n/react'
 import { format } from 'date-fns'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
 import { HubLauncherButton } from '@/components/floating/hub-launcher-button'
+import { ScratchpadPullTab } from '@/components/scratchpad/focus-scratchpad'
 
 interface CalendarHeaderProps {
   selectedDate: Date
@@ -235,12 +236,17 @@ export function CalendarHeader({
             {getDisplayText()}
           </span>
 
+          {/* Whiteboard pull-tab hangs from the top edge, centred in the gap
+              between the title and the view switcher (desktop only; phones
+              open the whiteboard from the bottom tab bar). */}
+          {!isMobile && <ScratchpadPullTab className="-mt-3 mx-auto self-start" />}
+
           {/* View Mode picker — desktop renders inline segmented control,
               mobile renders a single button + popover so it's tappable. */}
           {!isMobile ? (
             <div
               data-tour="view-modes"
-              className="hidden md:flex items-center border border-border rounded-lg overflow-hidden ml-auto"
+              className="hidden md:flex items-center border border-border rounded-lg overflow-hidden"
               role="group"
               aria-label={t('檢視模式')}
             >
