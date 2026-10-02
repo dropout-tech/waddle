@@ -214,7 +214,7 @@ if (mode === 'baseline') {
 // ── Native iOS (simulated) with a fake store ───────────────────────────────
 const PHONE = { width: 390, height: 844 }
 const PACKAGES = [
-  { identifier: '$rc_monthly', localizedPrice: 'NT$149.00', subscriptionPeriod: 'P1M' },
+  { identifier: '$rc_monthly', localizedPrice: 'NT$150.00', subscriptionPeriod: 'P1M' },
   { identifier: '$rc_annual', localizedPrice: 'NT$990.00', subscriptionPeriod: 'P1Y' },
 ]
 const TRIAL_PACKAGES = PACKAGES.map((item) => ({ ...item, freeTrial: { unit: 'WEEK', count: 2 } }))
@@ -258,7 +258,7 @@ for (const lang of ['zh-TW', 'en']) {
   await phase(page, 'ready')
   const text = await card(page).innerText()
   check(`paywall ${tag}: plan name and both plans with the store's price and period`,
-    text.includes('Huddle Pro') && text.includes('NT$149.00') && text.includes('NT$990.00')
+    text.includes('Huddle Pro') && text.includes('NT$150.00') && text.includes('NT$990.00')
       && text.includes(english ? 'Monthly' : '月繳') && text.includes(english ? 'Yearly' : '年繳')
       && text.includes(english ? 'Renews monthly' : '每月自動續訂') && text.includes(english ? 'Renews yearly' : '每年自動續訂'))
   check(`paywall ${tag}: auto-renewal disclosure (24 hours, cancel in Apple ID settings)`,
@@ -289,7 +289,7 @@ for (const lang of ['zh-TW', 'en']) {
   await card(page).locator('label[data-plan="month"]').click()
 
   // Buy the monthly plan. The fake store succeeds; the fake server says nothing yet.
-  await card(page).getByRole('button', { name: /NT\$149\.00/ }).click()
+  await card(page).getByRole('button', { name: /NT\$150\.00/ }).click()
   await phase(page, 'syncing')
   const syncing = await card(page).innerText()
   check(`syncing ${tag}: says the purchase is complete and syncing`, syncing.includes(english ? 'Purchase complete — syncing' : '購買已完成，正在同步'))
@@ -355,7 +355,7 @@ for (const lang of ['zh-TW', 'en']) {
 
 // Remaining purchase outcomes (assertions only).
 {
-  // Prices are whatever the store returns — never the 149 / 990 reference amounts.
+  // Prices are whatever the store returns — never the 150 / 990 reference amounts.
   const foreign = [
     { identifier: '$rc_monthly', localizedPrice: 'US$4.99', subscriptionPeriod: 'P1M' },
     { identifier: '$rc_annual', localizedPrice: 'Rp 1.249.000,00', subscriptionPeriod: 'P1Y' },
@@ -363,7 +363,7 @@ for (const lang of ['zh-TW', 'en']) {
   const { context, page } = await open({ ...PHONE, billing: { packages: foreign, purchase: 'cancel' } })
   await phase(page, 'ready')
   const text = await card(page).innerText()
-  check('price: shows the store price and not the reference amounts', text.includes('US$4.99') && text.includes('Rp 1.249.000,00') && !/149|990/.test(text))
+  check('price: shows the store price and not the reference amounts', text.includes('US$4.99') && text.includes('Rp 1.249.000,00') && !/150|990/.test(text))
   await layout(page, 'long price format')
   await card(page).locator('label[data-plan="year"]').click()
   check('plan: choosing yearly updates the subscribe button', (await card(page).getByRole('button', { name: /Rp 1\.249\.000,00/ }).count()) === 1)
@@ -378,7 +378,7 @@ for (const lang of ['zh-TW', 'en']) {
 {
   const { context, page } = await open({ ...PHONE, billing: { packages: PACKAGES, purchase: 'fail' } })
   await phase(page, 'ready')
-  await card(page).getByRole('button', { name: /NT\$149\.00/ }).click()
+  await card(page).getByRole('button', { name: /NT\$150\.00/ }).click()
   await card(page).locator('[data-billing-notice="purchase_failed"]').waitFor({ timeout: 15000 })
   const text = await card(page).innerText()
   check('fail: message shown, plans still offered, not syncing', text.includes('購買沒有完成') && (await card(page).getAttribute('data-phase')) === 'ready' && (await card(page).locator('input[type="radio"]').count()) === 2)
@@ -399,7 +399,7 @@ async function leaveAndReturn(page) {
   // Ask to Buy / bank verification: purchasing stays locked, also after leaving the page.
   const { context, page, state } = await open({ ...PHONE, billing: { packages: PACKAGES, purchase: 'pending' } })
   await phase(page, 'ready')
-  await card(page).getByRole('button', { name: /NT\$149\.00/ }).click()
+  await card(page).getByRole('button', { name: /NT\$150\.00/ }).click()
   await phase(page, 'pending')
   const text = await card(page).innerText()
   check('pending: says it is waiting for approval; no plans and no subscribe button',
@@ -426,7 +426,7 @@ async function leaveAndReturn(page) {
   // The double-purchase case: bought monthly, not synced yet, user wanders off and comes back.
   const { context, page, state } = await open({ ...PHONE, billing: { packages: PACKAGES } })
   await phase(page, 'ready')
-  await card(page).getByRole('button', { name: /NT\$149\.00/ }).click()
+  await card(page).getByRole('button', { name: /NT\$150\.00/ }).click()
   await phase(page, 'syncing')
   const sameInstance = await leaveAndReturn(page)
   const text = await card(page).innerText()
@@ -444,7 +444,7 @@ async function leaveAndReturn(page) {
 {
   const { context, page } = await open({ ...PHONE, billing: { packages: PACKAGES, purchase: 'hang' } })
   await phase(page, 'ready')
-  await card(page).getByRole('button', { name: /NT\$149\.00/ }).click()
+  await card(page).getByRole('button', { name: /NT\$150\.00/ }).click()
   await phase(page, 'purchasing')
   const cta = card(page).getByRole('button', { name: '等待 App Store 確認…' })
   check('purchasing: button shows it is waiting and cannot be pressed twice', await cta.isDisabled())
@@ -504,7 +504,7 @@ for (const lang of ['zh-TW', 'en']) {
   const restoreName = english ? 'Restore purchases' : '恢復購買'
   const { context, page, state } = await open({ ...PHONE, lang, billing: { packages: PACKAGES, sync: QUICK_SYNC } })
   await phase(page, 'ready')
-  await card(page).getByRole('button', { name: /NT\$149\.00/ }).click()
+  await card(page).getByRole('button', { name: /NT\$150\.00/ }).click()
   await phase(page, 'sync_delayed')
   const text = await card(page).innerText()
   check(`slow sync ${tag}: says it will take effect later and offers restore; not shown as subscribed, nothing to buy`,
@@ -543,14 +543,14 @@ for (const lang of ['zh-TW', 'en']) {
   const text = await card(page).innerText()
   check(`trial ${tag}: each plan states the trial length and the price after it`,
     english
-      ? text.includes('Free for 2 weeks, then NT$149.00 / month') && text.includes('Free for 2 weeks, then NT$990.00 / year')
-      : text.includes('前 2 週免費，之後 NT$149.00／月') && text.includes('前 2 週免費，之後 NT$990.00／年'))
+      ? text.includes('Free for 2 weeks, then NT$150.00 / month') && text.includes('Free for 2 weeks, then NT$990.00 / year')
+      : text.includes('前 2 週免費，之後 NT$150.00／月') && text.includes('前 2 週免費，之後 NT$990.00／年'))
   const cta = await card(page).locator('[data-billing-cta]').innerText()
   check(`trial ${tag}: main button starts the free trial`, cta === (english ? 'Try free for 2 weeks' : '開始 2 週免費試用'), cta)
   check(`trial ${tag}: disclosure says the trial converts to a paid subscription unless cancelled 24 hours before it ends`,
     english
-      ? text.includes('When the trial ends, your Apple account is charged NT$149.00 / month automatically') && text.includes('at least 24 hours before the trial ends')
-      : text.includes('試用結束後會自動以 NT$149.00／月 向你的 Apple 帳號扣款') && text.includes('試用結束前至少 24 小時取消'))
+      ? text.includes('When the trial ends, your Apple account is charged NT$150.00 / month automatically') && text.includes('at least 24 hours before the trial ends')
+      : text.includes('試用結束後會自動以 NT$150.00／月 向你的 Apple 帳號扣款') && text.includes('試用結束前至少 24 小時取消'))
   if (english) check('trial en: no Chinese left in the card', !CJK.test(text), text.match(CJK)?.[0])
   await layout(page, `trial ${tag}`)
   await cardShot(page, `paywall-trial-390-${tag}.jpg`)
