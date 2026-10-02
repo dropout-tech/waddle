@@ -215,10 +215,13 @@ async function main() {
   await step('focus scratchpad dropdown', async (check) => {
     await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' })
     await page.getByRole('button', { name: '月檢視' }).waitFor({ state: 'visible', timeout: 20000 })
-    await page.getByText('專注白板').first().click()
-    await page.getByText('收起白板').waitFor({ state: 'visible', timeout: 10000 })
+    // The pull-down is the top-center "白板 ⌄" tab (data-tour="scratchpad");
+    // once open its header offers "收起" to fold it back up.
+    await page.locator('[data-tour="scratchpad"]').click()
+    await page.getByRole('button', { name: '收起', exact: true }).waitFor({ state: 'visible', timeout: 10000 })
     await check('scratchpad-open') // assert while the dropdown is actually open
-    await page.getByText('收起白板').click()
+    await page.getByRole('button', { name: '收起', exact: true }).click()
+    await page.locator('[data-tour="scratchpad"]').waitFor({ state: 'visible', timeout: 10000 })
     await check('scratchpad-closed')
   })
 
@@ -233,7 +236,9 @@ async function main() {
   })
 
   await step('report view', async (check) => {
-    await page.getByRole('button', { name: '報告' }).click()
+    // 報告 lives in the header's "更多工具" disclosure menu.
+    await page.getByRole('button', { name: '更多工具' }).click()
+    await page.getByRole('menuitem', { name: '報告' }).click()
     await page.getByRole('button', { name: '返回日曆' }).waitFor({ state: 'visible', timeout: 10000 })
     await check('report-view') // assert while the report dashboard is actually showing
     await page.getByRole('button', { name: '返回日曆' }).click()

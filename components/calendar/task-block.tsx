@@ -92,6 +92,8 @@ function TaskBlockImpl({
 
   const top = dragOverride ? dragOverride.top : baseTop
   const height = dragOverride ? dragOverride.height : baseHeight
+  // Mobile resize-strip height: proportional so short blocks keep a tappable middle.
+  const mobileHandlePx = Math.max(8, Math.min(16, Math.round(height * 0.22)))
 
   // Column positioning for compact mode (no time label offset needed)
   const GAP_PX = 2
@@ -228,13 +230,17 @@ function TaskBlockImpl({
 
     // Touch: same long-press gate as the body. Otherwise a brushing finger
     // on the resize handle while scrolling resizes the task by accident.
+    // A short tap (released before the long-press fires) opens the task via
+    // handleBodyPointerUp, so the strip never makes part of the block dead.
     const startX = e.clientX
     const startY = e.clientY
+    pressOrigin.current = { x: startX, y: startY, t: Date.now() }
     const onWindowMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX
       const dy = ev.clientY - startY
       if (Math.sqrt(dx * dx + dy * dy) > TOUCH_HOLD_TOLERANCE_PX) {
         cancelLongPress()
+        pressOrigin.current = null
         window.removeEventListener('pointermove', onWindowMove)
         window.removeEventListener('pointerup', onWindowUp)
         window.removeEventListener('pointercancel', onWindowUp)
@@ -254,6 +260,7 @@ function TaskBlockImpl({
       longPressTimer.current = null
       haptic(15)
       fireDragStart({ clientX: startX, clientY: startY }, dragType)
+      pressOrigin.current = null
     }, TOUCH_LONG_PRESS_MS)
   }
 
@@ -361,19 +368,18 @@ function TaskBlockImpl({
           }}
         />
       )}
-      {/* Resize handle — TOP. Larger touch target on mobile (the indicator
-          stays small; the hit area expands invisibly). Edge element sitting
-          at the very top of a block that can be as short as ~20-30px, so a
-          full 44px target isn't feasible without eating into the body's
-          drag/tap area below it — the visible strip grows to 24px (h-6) and
-          an invisible ::before extends 8px further *upward*, outside the
-          block into the empty gap above it, for a 32px effective reach.
-          Disabled on desktop (md:before:content-none) where hover reveals
-          the thin 8px (h-2) handle instead. */}
+      {/* Resize handle — TOP. On mobile the strip scales with the block
+          (--rh: ~22% of the height, 8–16px) so even a 30-min block keeps
+          its middle free for tap-to-open; the checkbox sits above the
+          strip (z-panel, later in DOM). A short tap on the strip opens the
+          task like the body does; long-press + drag resizes. The block is
+          overflow-hidden, so the hit area cannot extend outside it.
+          Desktop keeps the thin 8px (h-2) hover-revealed strip. */}
       {!readOnlyMeeting && <div
-        className="absolute top-0 left-0 right-0 h-6 md:h-2 z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity before:content-[''] before:absolute before:inset-x-0 before:-top-2 before:h-8 md:before:content-none"
+        className="absolute top-0 left-0 right-0 h-[var(--rh)] md:h-2 z-panel cursor-ns-resize flex items-start md:items-center justify-center pt-0.5 md:pt-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
         onPointerDown={handleResizeTopPointerDown}
-        style={{ touchAction: 'none' }}
+        onPointerUp={handleBodyPointerUp}
+        style={{ touchAction: 'none', ['--rh' as string]: `${mobileHandlePx}px` }}
       >
         <div className="w-6 h-0.5 bg-white/60 rounded-full" />
       </div>}
@@ -401,7 +407,7 @@ function TaskBlockImpl({
       >
         {/* Top Row: Checkbox + Title */}
         <div className={cn('flex min-w-0', totalColumns > 1 ? 'items-start gap-1' : 'items-start gap-1.5')}>
-          <div className="relative flex-shrink-0" style={readOnlyMeeting ? { display: 'none' } : undefined}>
+          <div className="relative z-panel flex-shrink-0" style={readOnlyMeeting ? { display: 'none' } : undefined}>
             <div
               role="checkbox"
               aria-checked={task.isCompleted}
@@ -525,13 +531,12 @@ function TaskBlockImpl({
         <GripVertical className="w-3 h-3 text-white" />
       </div>}
 
-      {/* Resize handle — BOTTOM. Same mobile sizing as TOP, mirrored: the
-          invisible ::before extends 8px downward into the gap below the
-          block instead of upward. */}
+      {/* Resize handle — BOTTOM. Same sizing/tap behaviour as TOP, mirrored. */}
       {!readOnlyMeeting && <div
-        className="absolute bottom-0 left-0 right-0 h-6 md:h-2 z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity before:content-[''] before:absolute before:inset-x-0 before:-bottom-2 before:h-8 md:before:content-none"
+        className="absolute bottom-0 left-0 right-0 h-[var(--rh)] md:h-2 z-panel cursor-ns-resize flex items-end md:items-center justify-center pb-0.5 md:pb-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
         onPointerDown={handleResizeBottomPointerDown}
-        style={{ touchAction: 'none' }}
+        onPointerUp={handleBodyPointerUp}
+        style={{ touchAction: 'none', ['--rh' as string]: `${mobileHandlePx}px` }}
       >
         <div className="w-6 h-0.5 bg-white/60 rounded-full" />
       </div>}

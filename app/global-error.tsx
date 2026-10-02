@@ -1,32 +1,44 @@
 'use client'
 
 import { useEffect } from 'react'
+import { ErrorScreen } from '@/components/errors/error-screen'
+import { useI18n } from '@/lib/i18n/react'
 import { captureClientError } from '@/lib/monitoring/sentry'
 
-// Last-resort boundary: only renders when the root layout itself crashes, so
-// it must supply its own <html>/<body> and cannot rely on providers or i18n
-// (hence the hard-coded zh/en text). Reports to Sentry (no-op without DSN).
-export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+// Root-level error page: replaces the root layout when the layout itself (or
+// a provider in it) throws, so it must render its own <html>/<body>. No
+// globals.css here — ErrorScreen styles itself. Client component only (the
+// Capacitor build exports this statically).
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  // SSR/first render is zh-TW; flips to the stored/detected language after mount.
+  const { lang } = useI18n()
+
   useEffect(() => {
+    console.error('[app/global-error]', error)
     captureClientError(error)
+    // The theme provider is gone here; honor the user's saved dark choice (next-themes key).
+    try {
+      if (window.localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark')
+    } catch {
+      /* storage blocked — stay light */
+    }
   }, [error])
 
   return (
-    <html lang="zh-TW">
-      <body style={{ margin: 0, fontFamily: 'system-ui, sans-serif', background: '#fdf8ec', color: '#2a2a2a' }}>
-        <div
-          role="alert"
-          style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, textAlign: 'center' }}
-        >
-          <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>發生錯誤 · Something went wrong</h2>
-          <button
-            type="button"
-            onClick={reset}
-            style={{ padding: '8px 16px', borderRadius: 8, border: 0, background: '#2a2a2a', color: '#fdf8ec', fontSize: 14, cursor: 'pointer' }}
-          >
-            重試 · Retry
-          </button>
-        </div>
+    <html lang={lang} suppressHydrationWarning>
+      <body style={{ margin: 0 }}>
+        <ErrorScreen
+          title="出了點小狀況"
+          message="這一頁暫時打不開。請再試一次；如果還是不行，先回首頁看看。"
+          digest={error.digest}
+          onRetry={reset}
+        />
       </body>
     </html>
   )

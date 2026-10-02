@@ -12,6 +12,7 @@ import type {
   UserSettings,
 } from '@/lib/types'
 import { normalizeFocusSettings } from '@/lib/focus'
+import { prefsFromRow } from '@/lib/settings-auto'
 import { normalizePet } from '@/lib/pet/types'
 
 type TaskRow = Database['public']['Tables']['tasks']['Row']
@@ -250,8 +251,9 @@ export function rowToSettings(
   return {
     calendarStartHour: row.calendar_start_hour,
     calendarEndHour: row.calendar_end_hour,
-    defaultView: row.default_view,
-    weekStartDay: row.week_start_day,
+    // 自動 (null) handling, including rows read before the nullable-columns
+    // migration — see lib/settings-auto.ts.
+    ...prefsFromRow(row as unknown as Record<string, unknown>),
     // Migration 0006 added these — fall back to defaults if the row pre-dates
     // the migration so the app keeps working before the user re-runs schema.
     dayViewDays: row.day_view_days ?? fallbackSettings.dayViewDays,

@@ -14,6 +14,9 @@ export const dict: Record<string, string> = {
   '顯示已完成': 'Show completed',
   '資訊顯示順序': 'Info display order',
   '拖曳調整顯示順序': 'Drag to reorder',
+  '點上下箭頭調整顯示順序': 'Use the arrows to reorder',
+  '上移「{label}」': 'Move "{label}" up',
+  '下移「{label}」': 'Move "{label}" down',
 
   // category-section.tsx
   '刪除分類「{name}」？這會連同 {count} 個任務一起刪除，無法復原。':
@@ -67,7 +70,7 @@ export const dict: Record<string, string> = {
 
   // task-panel.tsx
   '已完成': 'Completed',
-  '已完成 {count} 項任務': '{count} tasks completed',
+  '已完成 {count} 項任務': '{count} {count|task|tasks} completed',
   '依分類': 'By category',
   '依時間': 'By time',
   '依急迫程度': 'By urgency',
@@ -309,4 +312,13 @@ export const dict: Record<string, string> = {
   "離開編輯區自動儲存，Esc 取消": "Changes save when you leave the editor. Esc to cancel.",
   "重試": "Retry",
   "已還原上次未儲存的草稿，請確認後再送出": "Restored your unsaved draft from last time. Please review before it saves.",
+
+  // full-screen-task-view / focus-board / overdue-task-review (2026-10 i18n sweep)
+  '保持這個節奏': 'Keep it going',
+  '今日': 'Today',
+  '依優先度': 'By priority',
+  '過期': 'Overdue',
+  '清單': 'List',
+  '儲存中…': 'Saving…',
+  '回到日曆': 'Back to calendar',
 }
