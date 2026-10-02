@@ -13,7 +13,7 @@
 // Anything for a later day, or that doesn't fit, becomes 待排 (pending):
 // it gets a date but no time, and lands in the calendar's pending zone.
 
-import { addDays, dateKey, dayTokenToDate } from './parse'
+import { addDays, dateKey, dayToken, dayTokenToDate } from './parse'
 import type { BrainDumpDraft, BusyInterval, DayPart, DayPlan, PlannedItem } from './types'
 
 export interface PlanOptions {
@@ -164,6 +164,18 @@ export function planDay(drafts: BrainDumpDraft[], occupied: BusyInterval[], opts
   const todayCount = todays.length
   const full = !late && todayCount > 0 && items.every((x) => x.date !== today || x.status === 'pending')
   return { today, windowStart, windowEnd: workEnd, items, late, full }
+}
+
+/**
+ * The date changed while the preview was open (past midnight): turn the
+ * planned items back into drafts anchored on the new `now`. Anything dated
+ * before the new today moves to today; later dates stay. Hand-picked times
+ * are dropped (fixed times written in the text are kept) so planDay can
+ * place everything again.
+ */
+export function rebaseDrafts(items: PlannedItem[], now: Date): BrainDumpDraft[] {
+  const today = dateKey(now)
+  return items.map(({ draft, date }) => ({ ...draft, day: dayToken(date < today ? today : date, now) }))
 }
 
 /** Re-check conflicts after the user edits one item by hand. */

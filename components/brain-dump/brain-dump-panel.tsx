@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
 import { parseWithBestAvailable } from '@/lib/brain-dump/ai'
 import { addDays, dateKey, splitFragments } from '@/lib/brain-dump/parse'
-import { markConflicts, planDay, toHHmm, toMinutes } from '@/lib/brain-dump/plan'
+import { markConflicts, planDay, rebaseDrafts, toHHmm, toMinutes } from '@/lib/brain-dump/plan'
 import type { DayPlan, PlannedItem } from '@/lib/brain-dump/types'
 import type { Task, TimeBlock, Workspace } from '@/lib/types'
 import { BrainDumpPreview } from './brain-dump-preview'
@@ -30,8 +30,14 @@ interface PanelProps {
   onClose: () => void
   /** Category the tasks land in unless the user picks another one. */
   defaultCategoryId?: string
-  /** Writes the chosen items; resolves to how many were created. */
-  onCommit: (items: PlannedItem[], today: string, categoryId: string) => Promise<number>
+  /** Writes the chosen items one by one; reports which notes didn't make it. */
+  onCommit: (items: PlannedItem[], today: string, categoryId: string) => Promise<CommitResult>
+}
+
+export interface CommitResult {
+  created: number
+  /** draft ids that could not be written (refused or threw). */
+  failedIds: string[]
 }
 
 // The category pick is remembered per device (only for this feature).
@@ -68,6 +74,10 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set())
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  /** Notes whose write failed — the preview keeps only these, ready to retry. */
+  const [failed, setFailed] = useState<Set<string>>(() => new Set())
+  const [writtenCount, setWrittenCount] = useState(0)
+  const [rebased, setRebased] = useState(false)
   const [scraps, setScraps] = useState<string[]>([])
   const categories = useMemo(
     () => workspaces.filter((w) => !w.isArchived).flatMap((w) =>
@@ -145,6 +155,9 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
 
   const restart = () => {
     runRef.current++
+    setFailed(new Set())
+    setWrittenCount(0)
+    setRebased(false)
     setPhase('input')
     setPlan(null)
     setSelectedId(null)
@@ -190,10 +203,38 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
 
   const commit = async () => {
     if (!plan || !chosen.length || saving) return
+    // Midnight passed while the preview was open: "today" is a new day.
+    // Re-plan for it and let the user look once more before writing.
+    const at = new Date()
+    if (dateKey(at) !== plan.today) {
+      const occupied = collectBusy(workspaces, assignedTasks, timeBlocks, at)
+      const next = planDay(rebaseDrafts(items, at), occupied, { now: at, workStart: workStart * 60, workEnd: workEnd * 60 })
+      setNow(at)
+      setPlan(next)
+      setItems(next.items)
+      setSelectedId(null)
+      setRebased(true)
+      return
+    }
+    setRebased(false)
     setSaving(true)
-    const created = await onCommit(chosen, plan.today, categoryId)
-    setSaving(false)
-    if (created > 0) onTextChange('')
+    let result: CommitResult
+    try {
+      result = await onCommit(chosen, plan.today, categoryId)
+    } catch (err) {
+      console.error('[brain-dump] commit failed', err)
+      result = { created: 0, failedIds: chosen.map((x) => x.draft.id) }
+    } finally {
+      setSaving(false)
+    }
+    if (result.failedIds.length) {
+      const keep = new Set(result.failedIds)
+      setItems((prev) => prev.filter((x) => keep.has(x.draft.id)))
+      setExcluded(new Set())
+      setFailed(keep)
+      setWrittenCount((n) => n + result.created)
+      setSelectedId(null)
+    }
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -208,7 +249,15 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
   const pendingCount = items.length - scheduledToday
   let headline = ''
   let headlinePose: PenguinPose = 'happy'
-  if (plan?.late) {
+  if (failed.size) {
+    headline = writtenCount
+      ? t('已放進 {m} 件；還有 {n} 件沒放成功，網路順了再試一次就好。', { m: writtenCount, n: items.length })
+      : t('這 {n} 件還沒放進去，網路順了再試一次就好。', { n: items.length })
+    headlinePose = 'stand'
+  } else if (rebased) {
+    headline = t('已經過午夜了，幫你改排到今天，再看一次就好。')
+    headlinePose = 'stand'
+  } else if (plan?.late) {
     headline = t('夜深了，今天就到這裡吧。企鵝先把它們放進明天的待排區。')
     headlinePose = 'sleep'
   } else if (plan?.full) {
@@ -403,6 +452,7 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
           <div>
             <BrainDumpPreview
               headline={headline}
+              failedIds={failed}
               finalPose={headlinePose}
               plan={plan}
               items={items}
@@ -462,7 +512,11 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
               disabled={!chosen.length || saving}
               className="min-h-11 flex-shrink-0 whitespace-nowrap rounded-lg bg-primary px-4 md:px-5 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:min-h-9"
             >
-              {saving ? t('放進去中…') : t('放進行事曆（{n}）', { n: chosen.length })}
+              {saving
+                ? t('放進去中…')
+                : failed.size
+                  ? t('再試一次（{n}）', { n: chosen.length })
+                  : t('放進行事曆（{n}）', { n: chosen.length })}
             </button>
           </>
         ) : (

@@ -65,5 +65,10 @@ export const dict: Record<string, string> = {
   '還有 {n} 件沒放成功，可以再試一次。': '{n} couldn\'t be added — you can try again.',
   '已經在行事曆上了。': 'They\'re on your calendar now.',
   '放進分類': 'Category',
+  '已放進 {m} 件；還有 {n} 件沒放成功，網路順了再試一次就好。': 'Added {m}; {n} didn\'t make it — try again once the connection settles.',
+  '這 {n} 件還沒放進去，網路順了再試一次就好。': 'These {n} aren\'t in yet — try again once the connection settles.',
+  '已經過午夜了，幫你改排到今天，再看一次就好。': 'It\'s past midnight, so the penguin re-planned for today. Have one more look.',
+  '再試一次（{n}）': 'Try again ({n})',
+  '這張還沒放進去': 'Not added yet',
   '找不到可以放任務的分類，先建立一個分類再試試。': 'There\'s no category to put tasks in yet. Create one and try again.',
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { ModalShell } from '@/components/modals/modal-shell'
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from '@/components/ui/drawer'
@@ -10,7 +10,7 @@ import { resolveGlobalDefaultCategory } from '@/lib/default-category'
 import type { PlannedItem } from '@/lib/brain-dump/types'
 import type { Task, TimeBlock, UserSettings, Workspace } from '@/lib/types'
 import { BRAIN_DUMP_OPEN_EVENT, BRAIN_DUMP_SHOW_TODAY_EVENT } from './brain-dump-events'
-import { BrainDumpPanel } from './brain-dump-panel'
+import { BrainDumpPanel, type CommitResult } from './brain-dump-panel'
 import { BrainDumpToast } from './brain-dump-toast'
 import { busiestRecentCategory } from './brain-dump-utils'
 
@@ -43,6 +43,7 @@ export function BrainDumpHost({ workspaces, assignedTasks, timeBlocks, settings,
       busiestRecentCategory(workspaces, Date.now())
         ?? resolveGlobalDefaultCategory(workspaces, settings.defaultCategoryEnabled)?.category.id,
     )
+    writtenRef.current.splice(0)
     setSession((s) => s + 1)
     setOpen(true)
   }, [workspaces, settings.defaultCategoryEnabled])
@@ -70,7 +71,11 @@ export function BrainDumpHost({ workspaces, assignedTasks, timeBlocks, settings,
   const close = useCallback(() => setOpen(false), [])
 
 
-  const commit = useCallback(async (items: PlannedItem[], today: string, categoryId: string): Promise<number> => {
+  // Today-scheduled tasks written in this panel session (across retries),
+  // so the calendar can show and glow all of them once everything is in.
+  const writtenRef = useRef<{ id: string; start: string }[]>([])
+
+  const commit = useCallback(async (items: PlannedItem[], today: string, categoryId: string): Promise<CommitResult> => {
     let target = resolveGlobalDefaultCategory(workspaces, settings.defaultCategoryEnabled)
     for (const w of workspaces) {
       const c = w.categories.find((x) => x.id === categoryId && !x.isArchived)
@@ -78,13 +83,14 @@ export function BrainDumpHost({ workspaces, assignedTasks, timeBlocks, settings,
     }
     if (!target) {
       toast.error(t('找不到可以放任務的分類，先建立一個分類再試試。'))
-      return 0
+      return { created: 0, failedIds: items.map((x) => x.draft.id) }
     }
     const { workspace, category } = target
     let created = 0
     let scheduled = 0
-    const newIds: string[] = []
-    let firstToday: { id: string; start: string } | null = null
+    const failedIds: string[] = []
+    // One by one; a refusal or a thrown error (offline, signed out…) only
+    // marks that note — the rest still get their turn.
     for (const item of items) {
       const stamp = new Date().toISOString()
       const task: Task = {
@@ -109,45 +115,55 @@ export function BrainDumpHost({ workspaces, assignedTasks, timeBlocks, settings,
         createdAt: stamp,
         updatedAt: stamp,
       }
-      // Refused (offline, plan limit…): createTask already told the user why.
-      if (!(await createTask(task))) break
+      let ok = false
+      try {
+        ok = await createTask(task)
+      } catch (err) {
+        console.error('[brain-dump] createTask threw', err)
+      }
+      if (!ok) {
+        failedIds.push(item.draft.id)
+        continue
+      }
       created++
       if (item.status === 'scheduled') scheduled++
-      if (item.status === 'scheduled' && item.date === today) newIds.push(task.id)
-      if (item.status === 'scheduled' && item.date === today && item.start && (!firstToday || item.start < firstToday.start)) {
-        firstToday = { id: task.id, start: item.start }
-      }
+      if (item.status === 'scheduled' && item.date === today && item.start) writtenRef.current.push({ id: task.id, start: item.start })
     }
-    if (!created) return 0
 
-    // This feature's own toast (penguin + terracotta) — the global sonner
-    // style is untouched. Lifted above the phone tab bar.
-    toast.custom(
-      () => <BrainDumpToast scheduled={scheduled} pending={created - scheduled} failed={items.length - created} />,
-      {
-        duration: 4500,
-        style: window.matchMedia('(max-width: 767px)').matches
-          // Clear the tab bar and the stacked 丟給企鵝 / ＋ buttons (top at 252px).
-          ? { marginBottom: 'calc(244px + env(safe-area-inset-bottom))' }
-          : undefined,
-      },
-    )
+    if (created) {
+      // This feature's own toast (penguin + terracotta) — the global sonner
+      // style is untouched. Lifted above the phone tab bar and FABs.
+      toast.custom(
+        () => <BrainDumpToast scheduled={scheduled} pending={created - scheduled} failed={failedIds.length} />,
+        {
+          duration: 4500,
+          style: window.matchMedia('(max-width: 767px)').matches
+            // Clear the tab bar and the stacked 丟給企鵝 / ＋ buttons (top at 252px).
+            ? { marginBottom: 'calc(244px + env(safe-area-inset-bottom))' }
+            : undefined,
+        },
+      )
+    }
+    // Anything failed → keep the panel and the text; the panel offers a retry.
+    if (failedIds.length) return { created, failedIds }
+
     setText('')
     setOpen(false)
 
     // Show today on the calendar, bring the first new task into view, and
     // let every new block glow softly once (~600ms) so the eye finds them.
-    if (firstToday) {
-      const id = firstToday.id
+    const written = writtenRef.current.splice(0)
+    if (written.length) {
+      const first = written.reduce((a, b) => (b.start < a.start ? b : a))
       window.dispatchEvent(new CustomEvent(BRAIN_DUMP_SHOW_TODAY_EVENT))
       window.setTimeout(() => {
-        const el = document.querySelector<HTMLElement>(`[data-task-block-id="${id}"]`)
+        const el = document.querySelector<HTMLElement>(`[data-task-block-id="${first.id}"]`)
         const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
         el?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: reduced ? 'auto' : 'smooth' })
         if (reduced) return
         window.setTimeout(() => {
-          for (const newId of newIds) {
-            document.querySelectorAll<HTMLElement>(`[data-task-block-id="${newId}"]`).forEach((block) => {
+          for (const { id } of written) {
+            document.querySelectorAll<HTMLElement>(`[data-task-block-id="${id}"]`).forEach((block) => {
               block.setAttribute('data-bd-glow', '')
               block.animate(
                 [
@@ -162,7 +178,7 @@ export function BrainDumpHost({ workspaces, assignedTasks, timeBlocks, settings,
         }, 350)
       }, 450)
     }
-    return created
+    return { created, failedIds }
   }, [workspaces, settings.defaultCategoryEnabled, createTask, t])
 
   const panel = (

@@ -29,6 +29,8 @@ interface PreviewProps {
   isMobile: boolean
   headline: string
   finalPose: PenguinPose
+  /** Notes whose write failed (shown with a gentle marker). */
+  failedIds?: Set<string>
   onToggle: (id: string) => void
   onSelect: (id: string | null) => void
 }
@@ -40,7 +42,7 @@ interface PreviewProps {
  * slot one after another; the penguin nods once per landing.
  */
 export function BrainDumpPreview({
-  plan, items, busy, now, excluded, selectedId, isMobile, headline, finalPose, onToggle, onSelect,
+  plan, items, busy, now, excluded, selectedId, isMobile, headline, finalPose, failedIds, onToggle, onSelect,
 }: PreviewProps) {
   const { t, lang } = useI18n()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -78,14 +80,16 @@ export function BrainDumpPreview({
     for (const item of timed) {
       const s = toMinutes(item.start!)
       const e = toMinutes(item.end!)
-      const h = Math.max(MIN_NOTE_PX, (e - s) * pxPerMin - 2)
+      // A third line ("not added yet" / overlap) needs a taller note.
+      const extra = item.conflict || failedIds?.has(item.draft.id)
+      const h = Math.max(extra ? MIN_NOTE_PX + 14 : MIN_NOTE_PX, (e - s) * pxPerMin - 2)
       const prev = out[out.length - 1]
       const top = Math.max(y(s), prev ? prev.top + prev.h + 3 : -Infinity)
       out.push({ item, top, h })
     }
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps -- y derives from range/pxPerMin
-  }, [timed, range, pxPerMin])
+  }, [timed, range, pxPerMin, failedIds])
   const contentHeight = Math.max(y(range.hi), ...placedNotes.map((n) => n.top + n.h)) + LABEL_GAP
 
   // Measure once, before the first paint: scroll to the first note (with
@@ -197,6 +201,7 @@ export function BrainDumpPreview({
                   key={`${item.draft.id}-t`}
                   item={item}
                   off={excluded.has(item.draft.id)}
+                  failed={!!failedIds?.has(item.draft.id)}
                   selected={selectedId === item.draft.id}
                   className={cn('absolute left-12 right-2 z-10', !settled && styles.drop)}
                   style={{ top, height: h, ...noteStyle(item) }}
@@ -223,6 +228,7 @@ export function BrainDumpPreview({
                 key={`${item.draft.id}-p`}
                 item={item}
                 off={excluded.has(item.draft.id)}
+                failed={!!failedIds?.has(item.draft.id)}
                 selected={selectedId === item.draft.id}
                 className={cn('relative min-h-11', !settled && styles.drop)}
                 style={noteStyle(item)}
@@ -280,10 +286,11 @@ function InkCheck({ checked }: { checked: boolean }) {
 }
 
 function NoteCard({
-  item, off, selected, className, style, tint, meta, onToggle, onSelect,
+  item, off, failed, selected, className, style, tint, meta, onToggle, onSelect,
 }: {
   item: PlannedItem
   off: boolean
+  failed?: boolean
   selected: boolean
   className?: string
   style?: CSSProperties
@@ -303,6 +310,7 @@ function NoteCard({
       data-bd-start={item.start ?? ''}
       data-bd-end={item.end ?? ''}
       data-off={off ? '' : undefined}
+      data-bd-failed={failed ? '' : undefined}
       data-selected={selected ? '' : undefined}
       className={cn(styles.note, tint, 'flex items-stretch rounded-[7px]', className)}
       style={style}
@@ -332,6 +340,7 @@ function NoteCard({
           {meta}
           {item.draft.dueDate ? ` · ${t('{date} 前', { date: formatMonthDay(item.draft.dueDate, lang) })}` : ''}
         </span>
+        {failed && <span className="truncate text-[11px] leading-tight text-primary">{t('這張還沒放進去')}</span>}
         {item.conflict && <span className="truncate text-[11px] leading-tight text-primary">{t('跟已有的行程重疊')}</span>}
       </button>
     </div>
