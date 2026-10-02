@@ -125,7 +125,13 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       return clean + (clean.includes('?') ? '&' : '?') + `r=${n}${Date.now() % 100000}`
     }
     const timers = new Set<number>()
+    // One retry in flight per image. An early failure can be reported twice
+    // (seen in production: one dropped request → two retries, image still
+    // broken); a second retry cancels the first mid-load and burns the whole
+    // budget, leaving the hole it was meant to fix.
+    const queued = new WeakSet<HTMLImageElement>()
     const retry = (img: HTMLImageElement) => {
+      if (queued.has(img)) return
       // The count belongs to one image URL: next/image reuses the same <img>
       // node when the source changes (e.g. switching board tabs), so a new
       // URL starts with a fresh budget of two retries.
@@ -134,18 +140,67 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       const n = Number(img.dataset.retry || 0)
       if (n >= 2) return
       img.dataset.retry = String(n + 1)
+      queued.add(img)
       const id = window.setTimeout(() => {
-        timers.delete(id)
+        timers.delete(id); queued.delete(img)
         img.parentElement?.querySelectorAll('source').forEach(s => { if (s.srcset) s.srcset = bust(s.srcset, n + 1) })
         img.src = bust(img.getAttribute('src') || img.src, n + 1)
       }, 700 * (n + 1))
       timers.add(id)
     }
-    const onError = (e: Event) => { if (e.target instanceof HTMLImageElement) retry(e.target) }
+    // A request can also hang without ever erroring, which the error listener
+    // never sees. Once an image is on screen it gets STALL_MS to finish, then
+    // is retried like a failure (sharing the two-retry budget). Only once per
+    // image URL: a slow-but-alive download that gets cut off restarts from
+    // zero, so a second cut would only make it later. Lazy images further
+    // down and display:none ones never start the clock.
+    const STALL_MS = 15000
+    const visible = new WeakSet<HTMLImageElement>()
+    const stalls = new WeakMap<HTMLImageElement, number>()
+    const disarm = (img: HTMLImageElement) => {
+      const id = stalls.get(img)
+      if (id === undefined) return
+      window.clearTimeout(id); timers.delete(id); stalls.delete(img)
+    }
+    const arm = (img: HTMLImageElement) => {
+      disarm(img)
+      if (!visible.has(img) || !img.getAttribute('src')) return
+      if (img.complete && img.naturalWidth > 0) return // already showing
+      const base = strip(img.getAttribute('src') || img.src)
+      if (img.dataset.stallSrc === base) return // already cut once
+      const id = window.setTimeout(() => {
+        timers.delete(id); stalls.delete(img)
+        if (!img.isConnected || (img.complete && img.naturalWidth > 0)) return
+        img.dataset.stallSrc = base
+        retry(img)
+      }, STALL_MS)
+      stalls.set(img, id); timers.add(id)
+    }
+    const io = new IntersectionObserver(entries => entries.forEach(({ target, isIntersecting }) => {
+      const img = target as HTMLImageElement
+      if (isIntersecting) { visible.add(img); arm(img) } else { visible.delete(img); disarm(img) }
+    }))
+    const watch = (node: Node) => {
+      if (node instanceof HTMLImageElement) io.observe(node)
+      else if (node instanceof Element) node.querySelectorAll('img').forEach(img => io.observe(img))
+    }
+    // New images (tab switches, late sections) get watched; a new src —
+    // including our own retry — restarts that image's clock.
+    const mo = new MutationObserver(records => records.forEach(r => {
+      if (r.type === 'childList') r.addedNodes.forEach(watch)
+      else if (r.target instanceof HTMLImageElement) arm(r.target)
+    }))
+    mo.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] })
+    watch(root)
+    const onError = (e: Event) => { if (e.target instanceof HTMLImageElement) { disarm(e.target); retry(e.target) } }
+    const onLoad = (e: Event) => { if (e.target instanceof HTMLImageElement) disarm(e.target) }
     root.addEventListener('error', onError, true)
+    root.addEventListener('load', onLoad, true)
     root.querySelectorAll('img').forEach(img => { if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) retry(img) })
     return () => {
       root.removeEventListener('error', onError, true)
+      root.removeEventListener('load', onLoad, true)
+      io.disconnect(); mo.disconnect()
       timers.forEach((id) => window.clearTimeout(id))
     }
   }, [])
