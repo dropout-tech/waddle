@@ -48,16 +48,22 @@
 .legend { padding: 8px 18px; border-width: 5px; font-size: 34px; letter-spacing: .06em; }
 .pa { color: #292b24; font: 900 20px/1 var(--poster-en, sans-serif); white-space: nowrap; }
 
-/* whiteboard doodle: you draw, the penguin copies */
-.doodle { margin-top: 30px; }
-.papers { display: flex; gap: 18px; flex-wrap: wrap; }
-.paper { position: relative; margin: 0; }
-.paper figcaption { margin-top: 6px; font: 700 13px/1.2 var(--poster-zh, sans-serif); color: #54564a; text-align: center; }
-.canvas { display: block; width: 150px; height: 150px; background: #fbf9f2; border: 2px solid #292b24; border-radius: 6px; box-shadow: 3px 3px 0 #292b24; touch-action: none; cursor: crosshair; }
-.itsPaper .canvas { transform: rotate(2.5deg); cursor: default; }
-.artist { position: absolute; left: 0; top: 0; width: 46px; height: 46px; object-fit: contain; object-position: 50% 100%; opacity: 0; pointer-events: none; transition: opacity .2s; filter: drop-shadow(0 0 1.5px #f6f3e9); }
-.artist[data-on] { opacity: 1; }
-.verdict { position: absolute; right: -14px; top: -16px; padding: 5px 10px; background: #292b24; color: #edc747; border-radius: 4px; font: 800 15px/1.1 var(--poster-zh, sans-serif); white-space: nowrap; opacity: 0; pointer-events: none; }
-.verdict[data-on] { opacity: 1; }
-.ghostBtn { min-height: 48px; padding: 10px 16px; background: transparent; color: #292b24; border: 2px solid #292b24; border-radius: 4px; font: 800 15px/1.2 var(--poster-zh, sans-serif); cursor: pointer; }
-.ghostBtn:hover { background: #292b240d; }
+/* whiteboard: toss ideas in, the penguin sorts them. Notes sit at --x/--y
+   (percent of the board, via container units) so the layout scales with the
+   board; only transform/opacity move. */
+.ideas { margin-top: 30px; }
+.board { position: relative; container-type: size; width: 100%; max-width: 380px; height: 280px; background: #fbf9f2; border: 2px solid #292b24; border-radius: 8px; box-shadow: 5px 5px 0 #edc747; overflow: hidden; }
+.boardHead, .idea { position: absolute; left: 0; top: 0; transform: translate(calc(var(--x) * 1cqw), calc(var(--y, 5) * 1cqh)) rotate(var(--r, 0deg)); }
+.boardHead { font: 900 14px/1 var(--poster-zh, sans-serif); color: #cf5731; letter-spacing: .06em; opacity: 0; transition: opacity .3s .15s; }
+.board[data-sorted] .boardHead { opacity: 1; }
+.idea { display: inline-flex; align-items: center; gap: 6px; max-width: 44cqw; padding: 7px 11px; background: var(--tint); color: #292b24; border: 2px solid #292b24; border-radius: 4px; box-shadow: 2px 2px 0 #292b24; font: 800 14px/1.2 var(--poster-zh, sans-serif); white-space: nowrap; transition: transform .55s cubic-bezier(.3,.7,.3,1) var(--d, 0ms); animation: ideaDrop .5s cubic-bezier(.2,1.3,.4,1) backwards; }
+@keyframes ideaDrop { from { opacity: 0; translate: 0 -40px; } }
+.tick { display: inline-block; width: 0; height: 12px; border: 0 solid #292b24; border-radius: 2px; transition: width .25s var(--d, 0ms), border-width .25s var(--d, 0ms); }
+.idea[data-placed] .tick { width: 12px; border-width: 2px; }
+.sorter { position: absolute; right: 10px; bottom: 8px; width: 56px; height: 56px; object-fit: contain; object-position: 50% 100%; opacity: 0; transform: translateY(10px); transition: opacity .25s .35s, transform .35s cubic-bezier(.2,1.5,.4,1) .35s; pointer-events: none; }
+.sortedSign { position: absolute; right: 74px; bottom: 20px; padding: 5px 10px; background: #292b24; color: #edc747; border-radius: 4px; font: 800 15px/1.1 var(--poster-zh, sans-serif); white-space: nowrap; opacity: 0; transform: scale(.5) rotate(-12deg); transition: opacity .2s .5s, transform .3s cubic-bezier(.2,1.5,.4,1) .5s; pointer-events: none; }
+.board[data-sorted] .sorter, .board[data-occupied] .sorter { opacity: 1; transform: none; }
+.board[data-sorted] .sortedSign { opacity: 1; transform: rotate(-5deg); }
+@media (prefers-reduced-motion: reduce) {
+  .boardHead, .idea, .tick, .sorter, .sortedSign { transition: none; animation: none; }
+}
