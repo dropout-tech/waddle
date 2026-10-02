@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { Calendar, ChevronLeft, ChevronRight, ChevronUp, Trash2 } from 'lucide-react'
 import { InkChevronDown } from '@/components/icons/huddle-icons'
 import { cn } from '@/lib/utils'
@@ -10,6 +10,28 @@ import { useI18n } from '@/lib/i18n/react'
 import { FloatOutButton } from '@/components/floating/float-out-button'
 import { ScratchpadCanvas } from './scratchpad-canvas'
 import type { ScratchpadItem } from '@/lib/types'
+
+// The desktop pull-tab hangs inside the calendar header (ScratchpadPullTab),
+// in the gap between the date title and the view switcher, so it can never
+// cover the title — a tab centred on the whole window did, in English at
+// 1280px. FocusScratchpad keeps its own floating tab only while no header
+// slot is mounted (report / growth views replace the calendar).
+const pullTab = { slots: 0, open: null as null | (() => void), listeners: new Set<() => void>() }
+const notifyPullTab = () => pullTab.listeners.forEach(l => l())
+const subscribePullTab = (cb: () => void) => { pullTab.listeners.add(cb); return () => { pullTab.listeners.delete(cb) } }
+const pullTabTone = 'flex min-h-11 items-center gap-2 rounded-b-xl border border-t-0 border-border bg-card px-4 text-sm'
+
+export function ScratchpadPullTab({ className }: { className?: string }) {
+  const { t } = useI18n()
+  useEffect(() => {
+    pullTab.slots += 1
+    notifyPullTab()
+    return () => { pullTab.slots -= 1; notifyPullTab() }
+  }, [])
+  // Below 1280px the header row is full (iPad widths), so the tab shrinks to
+  // its chevron; the name stays as tooltip + accessible label.
+  return <button type="button" data-tour="scratchpad" title={t('白板')} className={cn(pullTabTone, 'shrink-0 max-xl:px-1.5', className)} onClick={() => pullTab.open?.()}><span className="max-xl:sr-only">{t('白板')}</span><InkChevronDown className="h-4 w-4" /></button>
+}
 
 interface FocusScratchpadProps {
   className?: string
@@ -84,6 +106,13 @@ export function FocusScratchpad({ initialDate, className, isOpen, onOpenChange, 
   const isToday = selectedDate === todayKey
   const dates = useMemo(() => Array.from(new Set([todayKey, ...Object.keys(scratchpadByDate).filter(date => scratchpadByDate[date]?.length)])).sort().reverse(), [todayKey, scratchpadByDate])
   const dateIndex = dates.indexOf(selectedDate)
+  const headerTabMounted = useSyncExternalStore(subscribePullTab, () => pullTab.slots > 0, () => false)
+  useEffect(() => {
+    if (hideTrigger) return
+    const open = () => { setSelectedDate(todayKey); setIsExpanded(true) }
+    pullTab.open = open
+    return () => { if (pullTab.open === open) pullTab.open = null }
+  })
 
   useEffect(() => {
     if (!isExpanded) return
@@ -103,7 +132,7 @@ export function FocusScratchpad({ initialDate, className, isOpen, onOpenChange, 
     {/* Backdrop only for the desktop pull-down; the phone sheet (hideTrigger) fills the screen above the tab bar, and a backdrop there blurred and blocked the tab bar. */}
     {isExpanded && !fill && !hideTrigger && <div className="fixed inset-0 bg-black/20 backdrop-blur-[2px] z-popover" onClick={() => setIsExpanded(false)} />}
     <div className={cn('relative z-toast', className)}>
-      {!hideTrigger && !isExpanded && <button data-tour="scratchpad" className="absolute left-1/2 top-0 flex min-h-11 -translate-x-1/2 items-center gap-2 rounded-b-xl border border-t-0 border-border bg-card px-4 text-sm" onClick={() => { setSelectedDate(todayKey); setIsExpanded(true) }}>{t('白板')}<InkChevronDown className="h-4 w-4" /></button>}
+      {!hideTrigger && !isExpanded && !headerTabMounted && <button data-tour="scratchpad" className={cn(pullTabTone, 'absolute left-1/2 top-0 -translate-x-1/2')} onClick={() => { setSelectedDate(todayKey); setIsExpanded(true) }}>{t('白板')}<InkChevronDown className="h-4 w-4" /></button>}
       <div className={cn(fill ? 'fixed inset-0 bg-card' : hideTrigger ? 'fixed inset-x-0 top-0 bg-card' : 'absolute inset-x-0 top-0 overflow-hidden border-b border-border bg-card', !isExpanded && !fill && 'hidden')} data-pet-hide={isExpanded || fill ? '' : undefined} data-sheet-above-tabbar={hideTrigger && !fill ? '' : undefined} style={hideTrigger && !fill ? { paddingTop: 'env(safe-area-inset-top)', bottom: 'var(--sheet-bottom, calc(58px + env(safe-area-inset-bottom)))' } : undefined}>
         <div className={cn('overflow-y-auto', fill || hideTrigger ? 'flex h-full flex-col' : 'max-h-[85dvh]')}>
           <div className={cn('mx-auto w-full max-w-6xl px-3 py-2 sm:px-4 md:px-6', (fill || hideTrigger) && 'flex min-h-0 flex-1 flex-col max-md:pb-0')}>

@@ -672,7 +672,7 @@ const URGENCY_BUCKETS = [
   { label: '低', range: [1, 3], color: 'bg-urgency-low', text: 'text-urgency-low', chipText: 'text-foreground', ring: 'ring-urgency-low/50' },
   { label: '中', range: [4, 5], color: 'bg-urgency-medium', text: 'text-urgency-medium', chipText: 'text-foreground', ring: 'ring-urgency-medium/50' },
   { label: '高', range: [6, 8], color: 'bg-urgency-high', text: 'text-urgency-high', chipText: 'text-white', ring: 'ring-urgency-high/50' },
-  { label: '緊急', range: [9, 10], color: 'bg-urgency-critical', text: 'text-urgency-critical', chipText: 'text-white', ring: 'ring-urgency-critical/50' },
+  { label: '緊急', range: [9, 10], color: 'bg-urgency-critical-strong', text: 'text-urgency-critical-ink', chipText: 'text-white', ring: 'ring-urgency-critical/50' },
 ] as const
 
 function urgencyBucket(level: number) {

@@ -2,7 +2,8 @@
 // into a booted iOS Simulator's App Group container, so the native widgets can
 // be screenshotted without signing in. Used for docs/reports/2026-10-01-lockscreen-widgets.
 //
-//   node scripts/e2e/widget-fixture.mjs <app-group-container-dir> [--en] [--focus=running|paused|idle]
+//   node scripts/e2e/widget-fixture.mjs <app-group-container-dir> [--en] [--focus=running|paused|idle] [--week-start=0-6]
+//   (--week-start = the 每週開始日 setting, 0 = Sunday; omitted = 自動)
 //
 // Find the container with:
 //   xcrun simctl get_app_container booted com.lazylazy.huddle group.com.lazylazy.huddle
@@ -18,6 +19,8 @@ const { makeSnapshot } = await import('../../lib/widgets/model.ts')
 const dir = process.argv[2]
 if (!dir) { console.error('usage: widget-fixture.mjs <container-dir> [--en] [--focus=running|paused|idle]'); process.exit(1) }
 const en = process.argv.includes('--en')
+const weekArg = process.argv.find(a => a.startsWith('--week-start='))
+const weekStartDay = weekArg ? Number(weekArg.slice(13)) : null
 const focusState = (process.argv.find(a => a.startsWith('--focus=')) ?? '--focus=running').slice(8)
 const now = new Date()
 const key = (offset) => { const d = new Date(now); d.setDate(d.getDate() + offset); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
@@ -54,7 +57,7 @@ const stickies = [
   { id: 'aaaa-3', color: 'rose', updatedAt: minsAgo(60 * 50), content: doc(T('給媽媽的生日禮物', "Mom's birthday gift"), T('圍巾或是保溫杯', 'A scarf or a tumbler')) },
   { id: 'aaaa-4', color: 'cream', updatedAt: minsAgo(60 * 80), content: doc(T('書單', 'Reading list')) },
 ]
-const snapshot = makeSnapshot({ accountId: 'demo-account', epoch: 'demo-epoch', tasks, blocks, boards: {}, notes: [], stickies, now, locale: en ? 'en' : 'zh-TW' })
+const snapshot = makeSnapshot({ accountId: 'demo-account', epoch: 'demo-epoch', tasks, blocks, boards: {}, notes: [], stickies, now, locale: en ? 'en' : 'zh-TW', weekStartDay })
 const focusTotal = 50 * 60
 snapshot.focus = focusState === 'running'
   ? { mode: 'pomodoro', state: 'running', title: T('寫提案', 'Proposal'), endAt: now.getTime() + 44 * 60000, seconds: 44 * 60, note: '', total: focusTotal }

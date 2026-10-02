@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import type { NotebookNote, TiptapDoc } from '@/lib/types'
+import { packStyledDoc, unpackStyledDoc } from '@/lib/styled-doc'
 import { notebookExtensions } from './tiptap-extensions'
 import { EditorToolbar, selectionOrLineText } from './editor-toolbar'
 import { SelectionToolbar } from './selection-toolbar'
@@ -51,11 +52,18 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const editor = useEditor({
     extensions: notebookExtensions(uploadImage),
     editable: !readOnly,
-    content: note.content ?? EMPTY_DOC,
+    content: unpackStyledDoc(note.content) ?? EMPTY_DOC,
     // Tiptap SSR guard: render only on the client to avoid hydration mismatch.
     immediatelyRender: false,
     editorProps: {
       attributes: { class: 'nb-prose focus:outline-none' },
+      // Phones: the formatting bar is docked over the bottom of the scroller,
+      // so typing near the end must scroll the caret above it, not behind it
+      // (ProseMirror's default keeps only 5px to the scroller's edge).
+      ...(isMobile && {
+        scrollThreshold: { top: 0, right: 0, bottom: 80, left: 0 },
+        scrollMargin: { top: 5, right: 5, bottom: 80, left: 5 },
+      }),
       // Pasted/dropped images go straight to Supabase Storage (never base64
       // into the content JSON). Non-image paste/drop falls through untouched
       // by returning false, so text/HTML/internal-node drag stays default.
@@ -83,7 +91,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     },
     onUpdate: ({ editor }) => {
       if (applyingRef.current || readOnly) return
-      onContentChange(editor.getJSON() as TiptapDoc)
+      onContentChange(packStyledDoc(editor.getJSON() as TiptapDoc))
     },
   })
 
@@ -109,7 +117,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     if (loadedIdRef.current === loadKey) return
     loadedIdRef.current = loadKey
     applyingRef.current = true
-    editor.commands.setContent(note.content ?? EMPTY_DOC, { emitUpdate: false })
+    editor.commands.setContent(unpackStyledDoc(note.content) ?? EMPTY_DOC, { emitUpdate: false })
     applyingRef.current = false
   }, [editor, note.id, note.syncRev, note.content])
 

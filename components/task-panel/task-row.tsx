@@ -127,7 +127,8 @@ function TaskRowImpl({
   const handleCheck = (e: React.MouseEvent) => {
     e.stopPropagation()
     onDeleteRevealChange?.(null)
-    if (!task.isCompleted) {
+    // Recurring: the toggle asks first (may be cancelled), so no early burst.
+    if (!task.isCompleted && !task.isRecurring) {
       setBurst(true)
       window.setTimeout(() => setBurst(false), 700)
       haptic(20)

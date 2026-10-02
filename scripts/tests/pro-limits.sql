@@ -366,6 +366,44 @@ reset role;
 insert into public.google_calendar_connections(user_id,refresh_cipher,scope) values (:'P','sealed','calendar.readonly');
 select public.t_ok(not exists(select 1 from huddle_ops.feature_grandfathers where user_id=:'P'),'on: links made while on are not grandfathered');
 
+-- ════ Visible-only task count (20261002140000_pro_limits_visible_count) ═════
+\set V    '00000000-0000-4000-8000-0000000000d1'
+\set WSV  '10000000-0000-4000-8000-0000000000d1'
+\set WSVA '10000000-0000-4000-8000-0000000000d2'
+\set CATV '20000000-0000-4000-8000-0000000000d1'
+\set CATVA '20000000-0000-4000-8000-0000000000d2'
+\set CATWA '20000000-0000-4000-8000-0000000000d3'
+insert into auth.users(id,email) values (:'V','visible@example.invalid');
+insert into public.workspaces(id,user_id,name,color,icon,is_archived) values (:'WSV',:'V','W','#aaa','x',false),(:'WSVA',:'V','Old','#aaa','x',true);
+insert into public.categories(id,user_id,workspace_id,name,is_archived) values
+  (:'CATV',:'V',:'WSV','C',false),(:'CATVA',:'V',:'WSV','Old C',true),(:'CATWA',:'V',:'WSVA','C in old W',false);
+-- Hidden rows inserted by the owner while the switch was off would behave the same; insert as superuser here.
+insert into public.tasks(user_id,workspace_id,category_id,title,is_meeting) select :'V',:'WSV',:'CATV','meeting'||g,true from generate_series(1,40) g;
+insert into public.tasks(user_id,workspace_id,category_id,title,show_in_task_list) select :'V',:'WSV',:'CATV','cal-only'||g,false from generate_series(1,40) g;
+insert into public.tasks(user_id,workspace_id,category_id,title) select :'V',:'WSVA',:'CATWA','old-ws'||g from generate_series(1,40) g;
+insert into public.tasks(user_id,workspace_id,category_id,title) select :'V',:'WSV',:'CATVA','old-cat'||g from generate_series(1,40) g;
+insert into public.tasks(user_id,workspace_id,category_id,title,is_recurring,recurrence_end_date) select :'V',:'WSV',:'CATV','ended'||g,true,current_date-30 from generate_series(1,40) g;
+insert into public.tasks(user_id,workspace_id,category_id,title,is_recurring,recurrence_end_date) values (:'V',:'WSV',:'CATV','ongoing series',true,current_date+30),(:'V',:'WSV',:'CATV','open-ended series',true,null);
+insert into public.tasks(user_id,workspace_id,category_id,title) select :'V',:'WSV',:'CATV','visible'||g from generate_series(1,8) g;
+select public.t_ok(huddle_ops.active_task_count(:'V')=10,'visible count: 200 hidden rows (meetings, calendar-only, archived workspace/category, ended series) are not counted; 8 tasks + 2 live series = 10');
+set role authenticated;
+set request.jwt.claim.sub = :'V';
+select public.my_plan_usage() as uv \gset
+select public.t_ok((:'uv'::jsonb->'used'->>'active_tasks')::int=10,'visible count: membership page shows the same 10');
+insert into public.tasks(user_id,workspace_id,category_id,title) select :'V',:'WSV',:'CATV','more'||g from generate_series(1,140) g;
+select public.t_ok(true,'visible count: member with 200 hidden rows can still reach 150 visible tasks');
+select public.t_err(format($$insert into public.tasks(user_id,workspace_id,category_id,title) values (%L,%L,%L,'151st visible')$$,:'V',:'WSV',:'CATV'),
+  'TASK_LIMIT','visible count: the 151st visible task is still refused');
+insert into public.tasks(user_id,workspace_id,category_id,title,is_meeting) values (:'V',:'WSV',:'CATV','meeting at cap',true);
+insert into public.tasks(user_id,workspace_id,category_id,title,show_in_task_list) values (:'V',:'WSV',:'CATV','calendar-only at cap',false);
+select public.t_ok((public.my_plan_usage()->'used'->>'active_tasks')::int=150,'visible count: meetings / calendar-only rows can be added at the cap and do not count');
+update public.workspaces set is_archived=true where id=:'WSV';
+insert into public.workspaces(id,user_id,name,color,icon) values ('10000000-0000-4000-8000-0000000000d4',:'V','New','#aaa','x');
+insert into public.categories(id,user_id,workspace_id,name) values ('20000000-0000-4000-8000-0000000000d4',:'V','10000000-0000-4000-8000-0000000000d4','C');
+insert into public.tasks(user_id,workspace_id,category_id,title) values (:'V','10000000-0000-4000-8000-0000000000d4','20000000-0000-4000-8000-0000000000d4','fresh start');
+select public.t_ok((public.my_plan_usage()->'used'->>'active_tasks')::int=1,'visible count: archiving a full workspace frees its slots');
+reset role;
+
 -- ════ Turning the switch OFF (rollback) ════════════════════════════════════
 set role service_role;
 select huddle_ops.disable_pro_limits();

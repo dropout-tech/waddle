@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import type { Editor } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
 import { InkBold, InkItalic, InkUnderline, InkStrikethrough, InkInlineCode, InkLink } from '@/components/icons/huddle-icons'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
+import { InkSwatches, InkTriggerIcon, type InkPalette } from './ink-swatches'
 
 interface SelectionToolbarProps {
   editor: Editor | null
@@ -15,6 +17,7 @@ interface SelectionToolbarProps {
 // that surface there, and stacking ours on top of it fights the system UI.
 export function SelectionToolbar({ editor }: SelectionToolbarProps) {
   const { t } = useI18n()
+  const [palette, setPalette] = useState<InkPalette | null>(null)
   if (!editor) return null
 
   const setLink = () => {
@@ -42,7 +45,8 @@ export function SelectionToolbar({ editor }: SelectionToolbarProps) {
       }}
       shouldShow={({ editor: e, from, to }) => from !== to && !e.isActive('codeBlock')}
     >
-      <div className="flex items-center gap-0.5 rounded-lg border border-border bg-popover p-1 shadow-md">
+      <div className="flex flex-col gap-0.5 rounded-lg border border-border bg-popover p-1 shadow-md">
+      <div className="flex items-center gap-0.5">
         <Btn label={t('粗體')} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
           <InkBold className="h-5 w-5" />
         </Btn>
@@ -70,6 +74,15 @@ export function SelectionToolbar({ editor }: SelectionToolbarProps) {
         <Btn label={t('連結')} active={editor.isActive('link')} onClick={setLink}>
           <InkLink className="h-5 w-5" />
         </Btn>
+        <span className="mx-0.5 h-5 w-px bg-muted-foreground/45" aria-hidden />
+        <Btn label={t('文字顏色')} active={palette === 'color'} onClick={() => setPalette(palette === 'color' ? null : 'color')}>
+          <InkTriggerIcon editor={editor} palette="color" />
+        </Btn>
+        <Btn label={t('螢光筆')} active={palette === 'highlight'} onClick={() => setPalette(palette === 'highlight' ? null : 'highlight')}>
+          <InkTriggerIcon editor={editor} palette="highlight" />
+        </Btn>
+      </div>
+      {palette && <InkSwatches editor={editor} palette={palette} onDone={() => setPalette(null)} className="border-t border-border/60 pt-0.5" />}
       </div>
     </BubbleMenu>
   )

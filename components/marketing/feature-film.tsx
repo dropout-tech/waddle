@@ -26,7 +26,7 @@ export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
     paragraphs: [
       'The penguin is trapped inside a giant clock, running as the clock hands chase it from behind.',
       'It tumbles into an office, looks around, and realises how much is still undone, so it splits into five penguins, each scrambling to keep up.',
-      'The five merge back into one and let Huddle sort things out. The penguin settles into a hammock as the bilingual line appears: "You need five penguins. Or one Huddle." There is no dialogue, and the music and sound effects carry no instructions.',
+      'The five merge back into one and let Huddle sort things out. The penguin settles into a hammock as the bilingual line appears: "You need five penguins. Or one Huddle." There is no dialogue, just music and sound effects.',
     ],
   } : {
     title: ['時間追著你跑的時候，', '你會怎麼辦？'], intro: ['有一隻企鵝，每天都被時鐘追著跑。', '44 秒，看牠怎麼找回自己的步調。'],
@@ -35,7 +35,7 @@ export function FeatureFilm({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
     paragraphs: [
       '企鵝被困在一個巨大的時鐘裡，指針從後面追著牠跑，越追越近。',
       '牠跌進辦公室，左右張望，發現還有好多事沒做，於是分身成五隻企鵝，各自手忙腳亂。',
-      '最後五隻合而為一，事情交給 Huddle 排好；企鵝躺上吊床休息，畫面浮出雙語標語：「你需要五隻企鵝，或是一個 Huddle。」全片沒有對白，配樂與音效不帶操作指令。',
+      '最後五隻合而為一，事情交給 Huddle 排好；企鵝躺上吊床休息，畫面浮出雙語標語：「你需要五隻企鵝，或是一個 Huddle。」全片沒有對白，只有配樂與音效。',
     ],
   }
   const id = useId()

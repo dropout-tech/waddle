@@ -242,6 +242,34 @@ function restoreDraft(supabase: SupabaseClient, userId: string, noteId: string, 
   return p
 }
 
+// Drafts no mounted instance holds — the notebook was closed while offline,
+// or only a non-editing instance (widget sync) is mounted — used to wait
+// until the notebook was opened again. They are re-sent when the connection
+// comes back and before sign-out (which then counts whatever is left).
+// A note an open editor holds is skipped by restoreDraft and sent by it.
+const UNHELD = Symbol('unheld-drafts')
+// Notes an open editor shows a recovered draft for without taking it over
+// (drafts that change the title: see `editor`). Re-sending one behind the
+// editor's back would leave it on an outdated version token, so only
+// sign-out (the editor is about to go) sends those.
+const shownInEditor = new Map<string, number>()
+export async function restoreUnheldNotebookDrafts({ includeShown = false } = {}): Promise<void> {
+  if (typeof window === 'undefined') return
+  const supabase = createClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  const userId = session?.user.id
+  if (!userId) return
+  await Promise.all(
+    readNotebookDrafts(userId)
+      .filter((d) => !draftOwners.has(d.noteId) && (includeShown || !shownInEditor.has(d.noteId)))
+      .map((d) => withTimeout(restoreDraft(supabase, userId, d.noteId, UNHELD), false)),
+  )
+}
+registerPendingWrites(() => restoreUnheldNotebookDrafts({ includeShown: true }))
+if (typeof window !== 'undefined') window.addEventListener('online', () => void restoreUnheldNotebookDrafts())
+
 // Data layer for the notebook (記事本). Mirrors the optimistic-update +
 // rollback pattern used by use-waddle-data for the scratchpad, but lives in its
 // own hook because the notebook is a self-contained surface rather than part of
@@ -277,7 +305,19 @@ function rowToCategory(r: NotebookCategoriesRow): NotebookCategory {
   }
 }
 
-export function useNotebook() {
+/**
+ * `editor`: this instance shows notes for editing (notebook workspace,
+ * floating note). A content draft its first load couldn't send is then taken
+ * over — queued like unsent typing and sent through this instance's own
+ * version-checked save — so nothing re-sends it behind the editor's back
+ * (the editor would keep an outdated version token and its next save would
+ * look like a conflict). A draft that also changes the title isn't taken
+ * over (titles only get version-checked as part of a draft restore): it is
+ * marked shownInEditor and sent on sign-out or the next load.
+ * Non-editing instances (widget sync) leave drafts to
+ * restoreUnheldNotebookDrafts.
+ */
+export function useNotebook({ editor = false }: { editor?: boolean } = {}) {
   const supabase = createClient()
   const [notes, setNotes] = useState<NotebookNote[]>([])
   const [categories, setCategories] = useState<NotebookCategory[]>([])
@@ -318,6 +358,8 @@ export function useNotebook() {
   }, [])
   // Identifies this instance in draftOwners.
   const ownerRef = useRef<symbol>(Symbol('useNotebook'))
+  // Latest flushContent, for code declared above it (initial load, applyConflict).
+  const flushContentRef = useRef<(id: string) => Promise<void>>(async () => {})
   const notesRef = useRef<NotebookNote[]>([])
   // Original note id → its conflict copy, between applyConflict and the
   // render that swaps the editor to the server text: a keystroke in that
@@ -334,6 +376,7 @@ export function useNotebook() {
   useEffect(() => {
     let mounted = true
     const owner = ownerRef.current
+    const shownHere = new Set<string>()
     ;(async () => {
       const {
         data: { user },
@@ -434,13 +477,40 @@ export function useNotebook() {
         const localOnly = prev.filter((n) => !serverIds.has(n.id))
         return [...localOnly, ...server.map((n) => local.get(n.id) ?? n)]
       })
+      // An editor takes over the drafts it shows (see `editor`): the text is
+      // queued as if typed here and the backup re-stamped as this page's.
+      if (editor) {
+        for (const noteId of recoveredById.keys()) {
+          if (draftOwners.has(noteId) || noteId in pendingContent.current) continue
+          const fresh = readNotebookDraft(user.id, noteId)
+          if (!fresh) continue // settled meanwhile
+          if (fresh.draft.title !== undefined || fresh.draft.content === undefined) {
+            shownInEditor.set(noteId, (shownInEditor.get(noteId) ?? 0) + 1)
+            shownHere.add(noteId)
+            continue
+          }
+          pendingContent.current[noteId] = fresh.draft.content
+          saveNotebookDraft(user.id, noteId, 'content', fresh.draft.content, fresh.draft.base, fresh.draft.baseHash)
+          draftOwners.set(noteId, owner)
+          // Try again shortly (this load's attempt just failed); offline it
+          // stays queued for the reconnect / leave / sign-out flushes.
+          clearTimeout(saveTimers.current[noteId])
+          saveTimers.current[noteId] = setTimeout(() => void flushContentRef.current(noteId), SAVE_DEBOUNCE_MS)
+        }
+      }
       setLoading(false)
     })()
 
     return () => {
       mounted = false
+      for (const id of shownHere) {
+        const n = (shownInEditor.get(id) ?? 1) - 1
+        if (n > 0) shownInEditor.set(id, n)
+        else shownInEditor.delete(id)
+      }
+      shownHere.clear()
     }
-  }, [supabase, setBase])
+  }, [supabase, setBase, editor])
 
   // ── Create ───────────────────────────────────────────────
   // `categoryId` seeds the note into a folder (the sidebar passes the folder
@@ -576,9 +646,9 @@ export function useNotebook() {
   // ── Content autosave (debounced) ─────────────────────────
   // Updates local state immediately (so switching notes never loses keystrokes)
   // and flushes to Supabase after a short idle window.
-  // The ref breaks the flushContent ↔ applyConflict cycle (text typed while a
-  // conflict was being resolved is re-queued on the copy).
-  const flushContentRef = useRef<(id: string) => Promise<void>>(async () => {})
+  // flushContentRef (declared with the other refs above) breaks the
+  // flushContent ↔ applyConflict cycle (text typed while a conflict was
+  // being resolved is re-queued on the copy).
 
   // A save hit a version this device hadn't seen and the content really
   // differs: the original note now shows the server's version, this
@@ -720,6 +790,8 @@ export function useNotebook() {
       if (document.visibilityState === 'hidden') flushAllContent()
     }
     window.addEventListener('pagehide', flushAllContent)
+    // Text whose save failed offline goes out as soon as the connection is back.
+    window.addEventListener('online', flushAllContent)
     document.addEventListener('visibilitychange', onVisibility)
     // Signing out sends everything first and waits for it (lib/auth/sign-out).
     const unregister = registerPendingWrites(async () => {
@@ -728,6 +800,7 @@ export function useNotebook() {
     })
     return () => {
       window.removeEventListener('pagehide', flushAllContent)
+      window.removeEventListener('online', flushAllContent)
       document.removeEventListener('visibilitychange', onVisibility)
       unregister()
       flushAllContent()

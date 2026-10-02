@@ -9,7 +9,7 @@
  *
  * 在沒有視窗概念的環境（手機、Capacitor 殼）不渲染任何東西。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { PanelTopOpen } from 'lucide-react'
 import { canFloat, openPopupWindow } from '@/lib/floating-window'
 import { hubAvailable, openFloatingHub, type HubTab } from '@/lib/floating-hub'
@@ -25,6 +25,7 @@ export function FloatOutButton({
   height = 560,
   label,
   className,
+  icon,
 }: {
   /** 懸浮工作站要開的分頁。 */
   tab: Extract<HubTab, 'note' | 'scratchpad'>
@@ -39,6 +40,8 @@ export function FloatOutButton({
   /** 覆寫 aria-label / tooltip 文案。 */
   label?: string
   className?: string
+  /** Icon override — the notebook top bar uses the Huddle ink icon. */
+  icon?: ReactNode
 }) {
   // canFloat() 讀 window，SSR 時不能跑；掛載後才決定顯不顯示。
   const [available, setAvailable] = useState(false)
@@ -65,7 +68,7 @@ export function FloatOutButton({
         className,
       )}
     >
-      <PanelTopOpen className="h-4 w-4" />
+      {icon ?? <PanelTopOpen className="h-4 w-4" />}
     </button>
   )
 }

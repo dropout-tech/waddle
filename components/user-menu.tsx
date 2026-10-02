@@ -21,6 +21,7 @@ import { useI18n } from '@/lib/i18n/react'
 import { useStickyNotesToggle } from '@/components/sticky-notes/sticky-notes-provider'
 import { listAssignments } from '@/lib/assignments'
 import { InstallAppMenuItem } from '@/components/pwa/install-app-menu-item'
+import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 
 interface SessionInfo {
   email: string
@@ -48,6 +49,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [publicAlias, setPublicAlias] = useState<string | null>(null)
   const [innerOpen, setInnerOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const open = controlledOpen ?? innerOpen
   const setOpen = useCallback((next: boolean | ((v: boolean) => boolean)) => {
     const value = typeof next === 'function' ? next(open) : next
@@ -197,9 +199,15 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
                 <span className="text-sm font-medium text-foreground truncate">
                   {publicAlias || session.displayName}
                 </span>
-                <span className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                  <InkMail className="w-3.5 h-3.5 -m-px" />
-                  {session.email}
+                {/* Long addresses wrap rather than being clipped — `truncate`
+                    never worked here: the text is a flex item, so it was cut
+                    without an ellipsis. Prefer the break before "@"; only a
+                    part still too long breaks mid-word. */}
+                <span className="text-xs text-muted-foreground flex items-start gap-1" title={session.email}>
+                  <InkMail className="w-3.5 h-3.5 -m-px mt-px shrink-0" />
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    {session.email.includes('@') ? <>{session.email.slice(0, session.email.indexOf('@'))}<wbr />{session.email.slice(session.email.indexOf('@'))}</> : session.email}
+                  </span>
                 </span>
               </div>
             </div>
@@ -311,9 +319,22 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
             )}
             <span>{t('登出')}</span>
           </button>
+
+          {/* App Store 5.1.1(v): account deletion must be easy to find, not
+              only inside Settings. Kept quiet (small, muted, no icon) since
+              almost nobody needs it; the dialog lives outside the dropdown. */}
+          <button
+            data-testid="user-menu-delete-account"
+            onClick={() => { setOpen(false); setDeleteOpen(true) }}
+            className="w-full min-h-11 flex items-center px-4 py-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors"
+            role="menuitem"
+          >
+            {t('刪除帳號')}
+          </button>
         </div>
       )}
       {signOutDialog}
+      <DeleteAccountButton open={deleteOpen} onOpenChange={setDeleteOpen} />
     </div>
   )
 }

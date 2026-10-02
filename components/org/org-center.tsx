@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Building2, Copy, Crown, Link2, Loader2, LogOut, Plus, Trash2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Building2, ClipboardPaste, Copy, Crown, Link2, Loader2, LogOut, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/components/auth/auth-provider'
@@ -29,6 +30,7 @@ import {
   type OrgBlock,
 } from '@/lib/assignments'
 import { getLang } from '@/lib/i18n'
+import { orgInviteTokenFromUrl, savePendingOrgInvite } from '@/lib/pending-org-invite'
 
 const ROLE_LABEL: Record<OrgMember['role'], string> = { owner: '擁有者', admin: '管理員', member: '成員' }
 
@@ -78,7 +80,75 @@ export function OrgCenter() {
           onCreated={async (id) => { setCreating(false); setSelected(id); await load() }} />
       )}
       {org && !creating && <OrgDetail key={org.id} org={org} onChanged={load} />}
+      <JoinByLink defaultOpen={data.orgs.length === 0} />
     </div>
+  )
+}
+
+/**
+ * Paste an invite link to join — the fallback when tapping the link didn't
+ * open the app (LINE's in-app browser, a link received on another device).
+ * Hands off to /org/invite, which shows who invited you before joining.
+ */
+function JoinByLink({ defaultOpen }: { defaultOpen: boolean }) {
+  const { t } = useI18n()
+  const router = useRouter()
+  const [open, setOpen] = useState(defaultOpen)
+  const [value, setValue] = useState('')
+  const [error, setError] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function join(text: string) {
+    const token = orgInviteTokenFromUrl(text)
+    if (!token) { setError(t('這不是邀請連結，請確認有複製完整的連結')); return }
+    savePendingOrgInvite(token)
+    router.push('/org/invite')
+  }
+
+  async function pasteAndJoin() {
+    try {
+      const text = await navigator.clipboard.readText()
+      setValue(text)
+      join(text)
+    } catch {
+      // No clipboard access (permission denied / unsupported): paste by hand.
+      setError(t('沒辦法讀取剪貼簿，請長按輸入框貼上'))
+      inputRef.current?.focus()
+    }
+  }
+
+  if (!open) {
+    return (
+      <button type="button" data-testid="org-join-toggle" onClick={() => setOpen(true)}
+        className="flex min-h-11 items-center gap-2 px-1 text-sm text-muted-foreground hover:text-foreground">
+        <Link2 className="h-4 w-4" />{t('有邀請連結？貼上加入')}
+      </button>
+    )
+  }
+  return (
+    <section data-testid="org-join" className="rounded-2xl border border-border bg-card p-5">
+      <div className="mb-1 flex items-center gap-2">
+        <Link2 className="h-5 w-5 text-primary" />
+        <h2 className="font-semibold">{t('用邀請連結加入')}</h2>
+      </div>
+      <p className="mb-4 text-sm text-muted-foreground">{t('把別人傳給你的邀請連結貼到這裡，免費加入他的組織。')}</p>
+      <form onSubmit={(e) => { e.preventDefault(); join(value) }} className="flex flex-col gap-2 sm:flex-row">
+        <input ref={inputRef} value={value} onChange={(e) => { setValue(e.target.value); setError('') }}
+          placeholder={t('貼上邀請連結')} aria-label={t('邀請連結')} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
+          className="min-h-11 flex-1 rounded-lg border border-border bg-background px-3 text-base md:text-sm" />
+        <div className="flex gap-2">
+          <button type="button" onClick={() => void pasteAndJoin()}
+            className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border px-4 text-sm sm:flex-none">
+            <ClipboardPaste className="h-4 w-4" />{t('貼上')}
+          </button>
+          <button type="submit" disabled={!value.trim()}
+            className="min-h-11 flex-1 rounded-lg bg-primary px-4 text-sm text-primary-foreground disabled:opacity-50 sm:flex-none">
+            {t('加入')}
+          </button>
+        </div>
+      </form>
+      {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
+    </section>
   )
 }
 
@@ -125,7 +195,7 @@ function CreateOrg({ canCreate, onCreated, onCancel }: { canCreate: boolean; onC
         <UpgradePrompt
           testId="org-upgrade"
           message={t('建立組織是 Pro 會員功能。升級後就能建立組織、產生邀請連結。')}
-          hint={t('收到別人的邀請連結？直接打開連結即可免費加入。')}
+          hint={t('收到別人的邀請連結？打開連結，或貼到下面，就能免費加入。')}
         />
       )}
     </section>

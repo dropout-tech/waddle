@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { EnrollmentFields } from '@/components/operations/enrollment-fields'
+import { useIosPurchaseSurface } from '@/components/billing/billing-session'
 import Link from 'next/link'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { LegalConsent } from '@/components/auth/legal-consent'
@@ -39,6 +40,8 @@ export default function SignupPage() {
   // Hook-bound t shadows the module-level import inside the component so
   // render output follows the hydration-safe language (SSR = zh first paint).
   const { t } = useI18n()
+  // App Store guideline 3.1.1: no typed-in referral/coupon codes in the native iOS app (same rule as the membership page).
+  const codeEntry = !useIosPurchaseSurface()
 
   // Google / Apple only (owner decision 2026-10-01). Enrollment codes in
   // EnrollmentFields are picked up after OAuth by EnrollmentBridge.
@@ -81,7 +84,7 @@ export default function SignupPage() {
       </div>
       <LegalConsent mode="signup" />
 
-      <EnrollmentFields />
+      {codeEntry && <EnrollmentFields />}
       <div className="space-y-2.5">
         <Button
           type="button"

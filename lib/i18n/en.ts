@@ -109,4 +109,5 @@ export const en: Record<string, string> = {
   "藍色": "Blue",
   "紫色": "Purple",
   "粉紅色": "Pink",
+  "只改選取的字": "Selected text only",
 }
