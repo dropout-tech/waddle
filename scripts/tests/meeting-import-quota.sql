@@ -39,6 +39,7 @@ grant execute on function public.t_ok(boolean,text), public.t_err(text,text,text
 \set N  '00000000-0000-4000-8000-00000000a006'
 \set P  '00000000-0000-4000-8000-00000000a007'
 \set Z  '00000000-0000-4000-8000-00000000a008'
+\set G  '00000000-0000-4000-8000-00000000a009'
 \set R1 '30000000-0000-4000-8000-000000000001'
 \set R2 '30000000-0000-4000-8000-000000000002'
 \set R3 '30000000-0000-4000-8000-000000000003'
@@ -46,8 +47,11 @@ grant execute on function public.t_ok(boolean,text), public.t_err(text,text,text
 
 insert into auth.users(id,email,created_at)
 select u::uuid, u||'@example.invalid', now()-interval '30 days'
-  from unnest(array[:'A',:'B',:'C',:'D',:'E',:'N',:'P',:'Z']) u;
+  from unnest(array[:'A',:'B',:'C',:'D',:'E',:'N',:'P',:'Z',:'G']) u;
+-- P pays (store entitlement); G has gifted Pro (grant), like every member today.
 insert into public.billing_entitlements(user_id,entitlement,expires_at,observed_at_ms) values (:'P','pro',now()+interval '30 days',1);
+insert into huddle_ops.grants(user_id,days,source,source_key,starts_at,expires_at,reason)
+values (:'G',60,'manual','test-early-pro-g',now()-interval '1 day',now()+interval '59 days','test gift');
 
 -- ════ Shape and privileges ═════════════════════════════════════════════════
 select public.t_ok((select meeting_import_daily_cap=300 from huddle_ops.settings),'fuse defaults to 300 calls per 24 h');
@@ -154,13 +158,32 @@ select public.t_ok((public.t_reserve(:'P')->>'claimed')::boolean,'on: Pro member
 reset role;
 update huddle_ops.settings set limits_enforced=false, limits_enforced_at=null where id;
 
--- ════ Site-wide daily fuse ══════════════════════════════════════════════════
-update huddle_ops.settings set meeting_import_daily_cap=(
-  select count(*) from public.meeting_imports where created_at>now()-interval '24 hours' and (status<>'failed' or provider_billable)) + 1 where id;
+-- ════ Site-wide daily fuse (free members only; limits switch OFF) ═════════
+-- Free = no paid entitlement and no live grant (has_pro), regardless of the switch.
+create or replace function public.t_free_calls() returns bigint language sql as $$
+  select count(*) from public.meeting_imports m
+   where m.created_at > now()-interval '24 hours' and (m.status<>'failed' or m.provider_billable)
+     and not huddle_ops.has_pro(m.user_id) $$;
+select public.t_ok(not huddle_ops.limits_enforced() and huddle_ops.has_pro(:'P') and huddle_ops.has_pro(:'G') and not huddle_ops.has_pro(:'A'),
+  'fuse setup: switch off, P (paid) and G (gift) are Pro, A is free');
+update huddle_ops.settings set meeting_import_daily_cap=public.t_free_calls()+1 where id;
 set role service_role;
-select public.t_ok((public.t_reserve(:'A')->>'claimed')::boolean,'fuse: the last call under the cap is allowed');
+select public.t_ok((public.t_reserve(:'P')->>'claimed')::boolean and (public.t_reserve(:'G')->>'claimed')::boolean,
+  'fuse: Pro calls (paid and gifted) go through one slot before the cap');
+reset role;
+select public.t_ok(public.t_free_calls()+1=(select meeting_import_daily_cap from huddle_ops.settings),
+  'fuse: Pro calls do not use the free members'' shared slots');
+set role service_role;
+select public.t_ok((public.t_reserve(:'A')->>'claimed')::boolean,'fuse: the last free slot is still there after the Pro calls');
 select public.t_err(format('select public.t_reserve(%L)',:'Z'),'MONTHLY_LIMIT','fuse: per-member refusals still come first');
-select public.t_err(format('select public.t_reserve(%L)',:'A'),'AI_PAUSED','fuse: next call from any member is refused with AI_PAUSED');
+select public.t_err(format('select public.t_reserve(%L)',:'A'),'AI_PAUSED','fuse: free member over the shared cap is refused with AI_PAUSED');
+select public.t_ok((public.t_reserve(:'P')->>'claimed')::boolean,'fuse: paid Pro member still gets AI summaries while the free fuse is used up');
+select public.t_ok((public.t_reserve(:'G')->>'claimed')::boolean,'fuse: gifted Pro member (grant) also unaffected while it is used up');
+reset role;
+-- A member whose Pro ended counts as free again.
+update huddle_ops.grants set revoked_at=now(), revoked_reason='test' where user_id=:'G';
+set role service_role;
+select public.t_err(format('select public.t_reserve(%L)',:'G'),'AI_PAUSED','fuse: once the gift is revoked G is free and refused');
 reset role;
 -- Not-charged failures do not trip it; calls older than 24 h fall out of the window.
 select public.t_seed(:'C',50,'failed',false);
@@ -171,5 +194,7 @@ reset role;
 update huddle_ops.settings set meeting_import_daily_cap=0 where id;
 set role service_role;
 select public.t_err(format('select public.t_reserve(%L)',:'C'),'AI_PAUSED','fuse: cap 0 stops all new AI summaries (kill switch)');
+select public.t_err(format('select public.t_reserve(%L)',:'P'),'AI_PAUSED','fuse: cap 0 stops Pro members too');
+select public.t_ok(public.t_rows(:'P')=13,'fuse: the refused Pro call leaves no row behind');
 select public.t_ok(not (public.t_reserve(:'E',:'R3')->>'claimed')::boolean,'fuse: polling an existing request still works while paused');
 reset role;

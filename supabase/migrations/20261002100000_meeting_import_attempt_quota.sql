@@ -12,10 +12,16 @@
 --                    with provider_billable). Only a failure where OpenAI
 --                    itself refused the request (non-2xx, not charged) is
 --                    marked provider_billable = false by the Edge Function.
---   * AI_PAUSED      site-wide fuse: at most huddle_ops.settings
---                    .meeting_import_daily_cap such calls in any rolling 24 h,
---                    all members together. Setting it to 0 stops new AI
---                    summaries immediately (service_role / SQL editor only).
+--   * AI_PAUSED      site-wide fuse for FREE members: at most
+--                    huddle_ops.settings.meeting_import_daily_cap such calls
+--                    in any rolling 24 h, all free members together. Pro
+--                    members (huddle_ops.has_pro: a paid entitlement or an
+--                    unrevoked grant — independent of the limits_enforced
+--                    switch) skip the fuse and their calls are not counted;
+--                    their own monthly quota and attempt limit still apply.
+--                    Setting the cap to 0 is the kill switch: it stops new AI
+--                    summaries for EVERYONE, Pro included (service_role / SQL
+--                    editor only).
 -- Both checks run inside reserve_meeting_import_v2 AFTER the reservation is
 -- inserted; raising rolls the reservation back, so a refused request leaves
 -- no row behind. Re-sending an existing request id is never refused here.
@@ -50,13 +56,26 @@ begin
          and (m.status <> 'failed' or m.provider_billable)) > v_limit then
     raise exception 'ATTEMPT_LIMIT';
   end if;
-  -- One site-wide lock so concurrent members cannot all take the last slot
-  -- (always taken after the per-member lock: no deadlock).
-  perform pg_advisory_xact_lock(hashtextextended('meeting_import_daily_cap', 726));
   select s.meeting_import_daily_cap into v_cap from huddle_ops.settings s where s.id;
+  -- Kill switch: cap 0 (or no settings row) stops everyone, Pro included.
+  if coalesce(v_cap, 0) <= 0 then
+    raise exception 'AI_PAUSED';
+  end if;
+  -- Pro members are not limited by the shared fuse (owner's decision
+  -- 2026-10-02). has_pro looks at entitlements/grants only, not at the
+  -- limits_enforced switch, so it is right whether limits are on or off.
+  if huddle_ops.has_pro(p_user) then
+    return;
+  end if;
+  -- One site-wide lock so concurrent free members cannot all take the last
+  -- slot (always taken after the per-member lock: no deadlock).
+  perform pg_advisory_xact_lock(hashtextextended('meeting_import_daily_cap', 726));
+  -- Only free members' calls use the fuse; Pro status is read now, so a
+  -- member who upgrades stops counting and one whose Pro ends starts to.
   if (select count(*) from public.meeting_imports m
        where m.created_at > now() - interval '24 hours'
-         and (m.status <> 'failed' or m.provider_billable)) > coalesce(v_cap, 0) then
+         and (m.status <> 'failed' or m.provider_billable)
+         and not huddle_ops.has_pro(m.user_id)) > v_cap then
     raise exception 'AI_PAUSED';
   end if;
 end;
