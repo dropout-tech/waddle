@@ -58,7 +58,7 @@ try {
     const a = authorize[0]
     check('Login button goes straight to Google (no supabase.co hop)', authorize.length === 1 && a.hostname === 'accounts.google.com' && a.pathname === '/o/oauth2/v2/auth')
     check('Google request: our client, own-domain redirect, id_token, openid scopes',
-      a.searchParams.get('client_id') === '507405611281-d0pmotl6m8psngfm8v6c0p6upi5mtubl.apps.googleusercontent.com'
+      a.searchParams.get('client_id') === '959162587714-dt5s9ullq0c40sk5172v3jtove1bcrcv.apps.googleusercontent.com'
       && a.searchParams.get('redirect_uri') === `${base}/auth/google`
       && a.searchParams.get('response_type') === 'id_token'
       && a.searchParams.get('scope') === 'openid email profile')

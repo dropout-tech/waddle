@@ -12,16 +12,21 @@ import { t } from '@/lib/i18n'
 // receives the raw value and re-hashes it to compare with the token claim.
 // Desktop keeps the PKCE relay in desktop-oauth.ts (no token may cross apps).
 
-/** Web OAuth client (also the one configured on the Supabase Google provider). */
-export const GOOGLE_WEB_CLIENT_ID = '507405611281-d0pmotl6m8psngfm8v6c0p6upi5mtubl.apps.googleusercontent.com'
+// Both clients live in the owner's Google Cloud project "Huddle Calendar"
+// (959162587714, lazydragon0247). The Supabase Google provider's Client IDs
+// field is a comma list whose FIRST entry (507405611281-…, a different
+// project) drives the redirect flow still used by desktop and older iOS
+// builds — keep it first; these two are appended after it.
+
+/** Web OAuth client "Huddle Web Login" (redirect URIs: <origin>/auth/google). */
+export const GOOGLE_WEB_CLIENT_ID = '959162587714-dt5s9ullq0c40sk5172v3jtove1bcrcv.apps.googleusercontent.com'
 
 /**
- * iOS OAuth client (Google Cloud → Clients → iOS, bundle com.lazylazy.huddle).
- * Empty = native app keeps the old system-browser flow. When filling it in,
- * also add its reversed form as a URL scheme in ios/App/App/Info.plist and
- * list it under the Supabase Google provider's additional client IDs.
+ * iOS OAuth client "Huddle iOS Login" (bundle com.lazylazy.huddle). Its
+ * reversed form is registered as a URL scheme in ios/App/App/Info.plist.
+ * Empty = native app falls back to the system-browser flow.
  */
-export const GOOGLE_IOS_CLIENT_ID = ''
+export const GOOGLE_IOS_CLIENT_ID = '959162587714-54uj7jis0t0b4hk0hgbs71usj4bvm5d1.apps.googleusercontent.com'
 
 export const GOOGLE_WEB_CALLBACK_PATH = '/auth/google'
 const PENDING_KEY = 'huddle-google-idtoken-pending'
