@@ -55,7 +55,7 @@ export function NotebookWorkspace({ onExit, exitVariant, launchNote }: NotebookW
     renameCategory,
     deleteCategory,
     uploadImage,
-  } = useNotebook()
+  } = useNotebook({ editor: true })
 
   // Reuse the board's task layer so "升級為任務" creates a real task with the
   // same modal + createTask path used everywhere else. Unlike the scratchpad,

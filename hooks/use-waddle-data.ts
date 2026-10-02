@@ -14,7 +14,7 @@ import {
   timeBlockToRow,
   rowToSettings,
 } from '@/lib/supabase/mappers'
-import { toDateString, parseDateString, isSeriesStart, shiftSeries, seriesShiftIsExact } from '@/lib/calendar-utils'
+import { toDateString, parseDateString, isSeriesStart, shiftSeries, seriesShiftIsExact, overridesFollowingShift, shiftDateString } from '@/lib/calendar-utils'
 import { prefsToRow } from '@/lib/settings-auto'
 import { playTaskCompleteSound } from '@/lib/task-sound'
 import { hapticTaskComplete } from '@/lib/haptics'
@@ -2396,6 +2396,10 @@ export function useWaddleData(): UseWaddleData {
     // start and, for 每週幾 series, its weekdays) by the drag's day offset.
     let seriesShifted = false
     let shiftedDays: number[] | undefined
+    let shiftedExdates: string[] | undefined
+    // "Only this" overrides still on their original day move along (see
+    // overridesFollowingShift); id → [as it was, new date].
+    const movedOverrides = new Map<string, [Task, string]>()
     if (task.isRecurring && recurrenceChoice === 'all' && date && targetDate && task.scheduledDate) {
       if (!seriesShiftIsExact(task, targetDate, date)) {
         // Not expressible as the same rule (every 2+ weeks, several weekdays,
@@ -2407,6 +2411,11 @@ export function useWaddleData(): UseWaddleData {
       const shifted = shiftSeries(task, targetDate, date)
       date = shifted.scheduledDate
       shiftedDays = shifted.daysOfWeek
+      shiftedExdates = shifted.exdates
+      const allTasks = workspacesRef.current.flatMap((w) => w.categories.flatMap((c) => c.tasks))
+      for (const o of overridesFollowingShift(task, allTasks)) {
+        movedOverrides.set(o.id, [o, shiftDateString(o.scheduledDate!, shifted.offset)])
+      }
       seriesShifted = true
     }
 
@@ -2425,9 +2434,12 @@ export function useWaddleData(): UseWaddleData {
                     scheduledEndTime: endTime,
                     ...(date ? { scheduledDate: date } : {}),
                     ...(shiftedDays && t.recurrence ? { recurrence: { ...t.recurrence, daysOfWeek: shiftedDays } } : {}),
+                    ...(shiftedExdates ? { exdates: shiftedExdates } : {}),
                     updatedAt: new Date().toISOString(),
                   }
-                : t
+                : movedOverrides.has(t.id)
+                  ? { ...t, scheduledDate: movedOverrides.get(t.id)![1], updatedAt: new Date().toISOString() }
+                  : t
             ),
           })),
         }))
@@ -2438,12 +2450,14 @@ export function useWaddleData(): UseWaddleData {
         scheduled_end_time: string
         scheduled_date?: string
         recurrence_days_of_week?: number[]
+        exdates?: string[]
       } = {
         scheduled_start_time: startTime,
         scheduled_end_time: endTime,
       }
       if (date) update.scheduled_date = date
       if (shiftedDays) update.recurrence_days_of_week = shiftedDays
+      if (shiftedExdates) update.exdates = shiftedExdates
 
       pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
@@ -2469,6 +2483,20 @@ export function useWaddleData(): UseWaddleData {
           })
           toast.error(translate('任務排程沒寫入：可能登入逾時，請重新整理或登出再登入'))
           return
+        }
+        // After the series itself: if one of these fails, the overrides not
+        // written yet just stay on their old day (their occurrences are still
+        // skipped, so nothing shows twice); the screen goes back to match and
+        // the user is told.
+        const overrides = [...movedOverrides.values()]
+        for (let i = 0; i < overrides.length; i++) {
+          const [before, newDate] = overrides[i]
+          const { error: overrideError } = await supabase.from('tasks').update({ scheduled_date: newDate }).eq('id', before.id)
+          if (overrideError) {
+            overrides.slice(i).forEach(([o]) => restoreTaskSnapshot(o))
+            handleDbError('重新排程')(overrideError)
+            break
+          }
         }
       } finally {
         pendingWritesRef.current -= 1

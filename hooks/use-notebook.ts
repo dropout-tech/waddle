@@ -242,6 +242,29 @@ function restoreDraft(supabase: SupabaseClient, userId: string, noteId: string, 
   return p
 }
 
+// Drafts no mounted instance holds — the notebook was closed while offline,
+// or only a non-editing instance (widget sync) is mounted — used to wait
+// until the notebook was opened again. They are re-sent when the connection
+// comes back and before sign-out (which then counts whatever is left).
+// A note an open editor holds is skipped by restoreDraft and sent by it.
+const UNHELD = Symbol('unheld-drafts')
+export async function restoreUnheldNotebookDrafts(): Promise<void> {
+  if (typeof window === 'undefined') return
+  const supabase = createClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  const userId = session?.user.id
+  if (!userId) return
+  await Promise.all(
+    readNotebookDrafts(userId)
+      .filter((d) => !draftOwners.has(d.noteId))
+      .map((d) => withTimeout(restoreDraft(supabase, userId, d.noteId, UNHELD), false)),
+  )
+}
+registerPendingWrites(restoreUnheldNotebookDrafts)
+if (typeof window !== 'undefined') window.addEventListener('online', () => void restoreUnheldNotebookDrafts())
+
 // Data layer for the notebook (記事本). Mirrors the optimistic-update +
 // rollback pattern used by use-waddle-data for the scratchpad, but lives in its
 // own hook because the notebook is a self-contained surface rather than part of
@@ -277,7 +300,16 @@ function rowToCategory(r: NotebookCategoriesRow): NotebookCategory {
   }
 }
 
-export function useNotebook() {
+/**
+ * `editor`: this instance shows notes for editing (notebook workspace,
+ * floating note). A draft its first load couldn't send is then taken over
+ * — queued like unsent typing, sent on reconnect / leaving / sign-out — so
+ * nothing else re-sends it behind the editor's back (the editor would keep
+ * an outdated version token and its next save would look like a conflict).
+ * Non-editing instances (widget sync) leave such drafts to
+ * restoreUnheldNotebookDrafts.
+ */
+export function useNotebook({ editor = false }: { editor?: boolean } = {}) {
   const supabase = createClient()
   const [notes, setNotes] = useState<NotebookNote[]>([])
   const [categories, setCategories] = useState<NotebookCategory[]>([])
@@ -318,6 +350,9 @@ export function useNotebook() {
   }, [])
   // Identifies this instance in draftOwners.
   const ownerRef = useRef<symbol>(Symbol('useNotebook'))
+  // patchNote is declared below the initial load, which needs it to send a
+  // recovered draft's title.
+  const sendTitleRef = useRef<(id: string, title: string) => Promise<void>>(async () => {})
   const notesRef = useRef<NotebookNote[]>([])
   // Original note id → its conflict copy, between applyConflict and the
   // render that swaps the editor to the server text: a keystroke in that
@@ -434,13 +469,28 @@ export function useNotebook() {
         const localOnly = prev.filter((n) => !serverIds.has(n.id))
         return [...localOnly, ...server.map((n) => local.get(n.id) ?? n)]
       })
+      // An editor takes over the drafts it shows (see `editor`): the text is
+      // queued as if typed here and the backup re-stamped as this page's.
+      if (editor) {
+        for (const [noteId, d] of recoveredById) {
+          if (draftOwners.has(noteId)) continue
+          if (d.content !== undefined && !(noteId in pendingContent.current)) {
+            const fresh = readNotebookDraft(user.id, noteId)
+            if (fresh?.draft.content === undefined) continue // settled meanwhile
+            pendingContent.current[noteId] = fresh.draft.content
+            saveNotebookDraft(user.id, noteId, 'content', fresh.draft.content, fresh.draft.base, fresh.draft.baseHash)
+            draftOwners.set(noteId, owner)
+          }
+          if (d.title !== undefined) void sendTitleRef.current(noteId, d.title)
+        }
+      }
       setLoading(false)
     })()
 
     return () => {
       mounted = false
     }
-  }, [supabase, setBase])
+  }, [supabase, setBase, editor])
 
   // ── Create ───────────────────────────────────────────────
   // `categoryId` seeds the note into a folder (the sidebar passes the folder
@@ -566,6 +616,9 @@ export function useNotebook() {
   )
 
   const renameNote = useCallback((id: string, title: string) => patchNote(id, { title }), [patchNote])
+  useEffect(() => {
+    sendTitleRef.current = (id, title) => patchNote(id, { title })
+  }, [patchNote])
   const setNoteIcon = useCallback((id: string, icon: string | undefined) => patchNote(id, { icon }), [patchNote])
   // Move a note into a folder (or to 未分類 with null).
   const setNoteCategory = useCallback(
@@ -720,6 +773,8 @@ export function useNotebook() {
       if (document.visibilityState === 'hidden') flushAllContent()
     }
     window.addEventListener('pagehide', flushAllContent)
+    // Text whose save failed offline goes out as soon as the connection is back.
+    window.addEventListener('online', flushAllContent)
     document.addEventListener('visibilitychange', onVisibility)
     // Signing out sends everything first and waits for it (lib/auth/sign-out).
     const unregister = registerPendingWrites(async () => {
@@ -728,6 +783,7 @@ export function useNotebook() {
     })
     return () => {
       window.removeEventListener('pagehide', flushAllContent)
+      window.removeEventListener('online', flushAllContent)
       document.removeEventListener('visibilitychange', onVisibility)
       unregister()
       flushAllContent()

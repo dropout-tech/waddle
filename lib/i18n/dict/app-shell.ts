@@ -62,10 +62,10 @@ export const dict: Record<string, string> = {
   '切換淺色': 'Switch to light mode',
   '切換深色': 'Switch to dark mode',
   '登出': 'Log out',
-  // use-safe-sign-out.tsx — notes that only exist on this device
-  '還有筆記沒有同步': 'Some notes haven\'t synced',
-  '有 {count} 則筆記還沒同步。先打開記事本、確認內容已同步再登出；現在登出，這些內容會遺失。':
-    '{count} {count|note hasn\'t|notes haven\'t} synced yet. Open the notebook and make sure it has synced before logging out — if you log out now, that text will be lost.',
+  // use-safe-sign-out.tsx — notes / sticky notes that only exist on this device
+  '還有內容沒有同步': 'Some changes haven\'t synced',
+  '有 {count} 則筆記或便條紙還沒存到雲端。請連上網路、稍等幾秒再按一次登出；現在登出，這些內容會遺失。':
+    '{count} {count|note or sticky note hasn\'t|notes or sticky notes haven\'t} been saved to the cloud yet. Get online, wait a few seconds and log out again — if you log out now, that text will be lost.',
   '登出失敗，請檢查網路後再試一次': 'Couldn\'t log out. Check your connection and try again.',
   '先不要登出': 'Don\'t log out yet',
   '仍要登出': 'Log out anyway',
