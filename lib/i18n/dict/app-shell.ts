@@ -64,8 +64,8 @@ export const dict: Record<string, string> = {
   '登出': 'Log out',
   // use-safe-sign-out.tsx — notes / sticky notes that only exist on this device
   '還有內容沒有同步': 'Some changes haven\'t synced',
-  '有 {count} 則筆記或便條紙還沒存到雲端。請連上網路、稍等幾秒再按一次登出；現在登出，這些內容會遺失。':
-    '{count} {count|note or sticky note hasn\'t|notes or sticky notes haven\'t} been saved to the cloud yet. Get online, wait a few seconds and log out again — if you log out now, that text will be lost.',
+  '有 {count} 則筆記或便條紙還沒存到雲端。請連上網路、稍等幾秒再按一次登出（若筆記數量已達方案上限，請先刪掉一些筆記）；現在登出，這些內容會遺失。':
+    '{count} {count|note or sticky note hasn\'t|notes or sticky notes haven\'t} been saved to the cloud yet. Get online, wait a few seconds and log out again (if you\'ve reached your plan\'s note limit, delete a few notes first) — if you log out now, that text will be lost.',
   '登出失敗，請檢查網路後再試一次': 'Couldn\'t log out. Check your connection and try again.',
   '先不要登出': 'Don\'t log out yet',
   '仍要登出': 'Log out anyway',

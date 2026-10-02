@@ -248,7 +248,12 @@ function restoreDraft(supabase: SupabaseClient, userId: string, noteId: string, 
 // comes back and before sign-out (which then counts whatever is left).
 // A note an open editor holds is skipped by restoreDraft and sent by it.
 const UNHELD = Symbol('unheld-drafts')
-export async function restoreUnheldNotebookDrafts(): Promise<void> {
+// Notes an open editor shows a recovered draft for without taking it over
+// (drafts that change the title: see `editor`). Re-sending one behind the
+// editor's back would leave it on an outdated version token, so only
+// sign-out (the editor is about to go) sends those.
+const shownInEditor = new Map<string, number>()
+export async function restoreUnheldNotebookDrafts({ includeShown = false } = {}): Promise<void> {
   if (typeof window === 'undefined') return
   const supabase = createClient()
   const {
@@ -258,11 +263,11 @@ export async function restoreUnheldNotebookDrafts(): Promise<void> {
   if (!userId) return
   await Promise.all(
     readNotebookDrafts(userId)
-      .filter((d) => !draftOwners.has(d.noteId))
+      .filter((d) => !draftOwners.has(d.noteId) && (includeShown || !shownInEditor.has(d.noteId)))
       .map((d) => withTimeout(restoreDraft(supabase, userId, d.noteId, UNHELD), false)),
   )
 }
-registerPendingWrites(restoreUnheldNotebookDrafts)
+registerPendingWrites(() => restoreUnheldNotebookDrafts({ includeShown: true }))
 if (typeof window !== 'undefined') window.addEventListener('online', () => void restoreUnheldNotebookDrafts())
 
 // Data layer for the notebook (記事本). Mirrors the optimistic-update +
@@ -302,11 +307,14 @@ function rowToCategory(r: NotebookCategoriesRow): NotebookCategory {
 
 /**
  * `editor`: this instance shows notes for editing (notebook workspace,
- * floating note). A draft its first load couldn't send is then taken over
- * — queued like unsent typing, sent on reconnect / leaving / sign-out — so
- * nothing else re-sends it behind the editor's back (the editor would keep
- * an outdated version token and its next save would look like a conflict).
- * Non-editing instances (widget sync) leave such drafts to
+ * floating note). A content draft its first load couldn't send is then taken
+ * over — queued like unsent typing and sent through this instance's own
+ * version-checked save — so nothing re-sends it behind the editor's back
+ * (the editor would keep an outdated version token and its next save would
+ * look like a conflict). A draft that also changes the title isn't taken
+ * over (titles only get version-checked as part of a draft restore): it is
+ * marked shownInEditor and sent on sign-out or the next load.
+ * Non-editing instances (widget sync) leave drafts to
  * restoreUnheldNotebookDrafts.
  */
 export function useNotebook({ editor = false }: { editor?: boolean } = {}) {
@@ -350,9 +358,8 @@ export function useNotebook({ editor = false }: { editor?: boolean } = {}) {
   }, [])
   // Identifies this instance in draftOwners.
   const ownerRef = useRef<symbol>(Symbol('useNotebook'))
-  // patchNote is declared below the initial load, which needs it to send a
-  // recovered draft's title.
-  const sendTitleRef = useRef<(id: string, title: string) => Promise<void>>(async () => {})
+  // Latest flushContent, for code declared above it (initial load, applyConflict).
+  const flushContentRef = useRef<(id: string) => Promise<void>>(async () => {})
   const notesRef = useRef<NotebookNote[]>([])
   // Original note id → its conflict copy, between applyConflict and the
   // render that swaps the editor to the server text: a keystroke in that
@@ -369,6 +376,7 @@ export function useNotebook({ editor = false }: { editor?: boolean } = {}) {
   useEffect(() => {
     let mounted = true
     const owner = ownerRef.current
+    const shownHere = new Set<string>()
     ;(async () => {
       const {
         data: { user },
@@ -472,16 +480,22 @@ export function useNotebook({ editor = false }: { editor?: boolean } = {}) {
       // An editor takes over the drafts it shows (see `editor`): the text is
       // queued as if typed here and the backup re-stamped as this page's.
       if (editor) {
-        for (const [noteId, d] of recoveredById) {
-          if (draftOwners.has(noteId)) continue
-          if (d.content !== undefined && !(noteId in pendingContent.current)) {
-            const fresh = readNotebookDraft(user.id, noteId)
-            if (fresh?.draft.content === undefined) continue // settled meanwhile
-            pendingContent.current[noteId] = fresh.draft.content
-            saveNotebookDraft(user.id, noteId, 'content', fresh.draft.content, fresh.draft.base, fresh.draft.baseHash)
-            draftOwners.set(noteId, owner)
+        for (const noteId of recoveredById.keys()) {
+          if (draftOwners.has(noteId) || noteId in pendingContent.current) continue
+          const fresh = readNotebookDraft(user.id, noteId)
+          if (!fresh) continue // settled meanwhile
+          if (fresh.draft.title !== undefined || fresh.draft.content === undefined) {
+            shownInEditor.set(noteId, (shownInEditor.get(noteId) ?? 0) + 1)
+            shownHere.add(noteId)
+            continue
           }
-          if (d.title !== undefined) void sendTitleRef.current(noteId, d.title)
+          pendingContent.current[noteId] = fresh.draft.content
+          saveNotebookDraft(user.id, noteId, 'content', fresh.draft.content, fresh.draft.base, fresh.draft.baseHash)
+          draftOwners.set(noteId, owner)
+          // Try again shortly (this load's attempt just failed); offline it
+          // stays queued for the reconnect / leave / sign-out flushes.
+          clearTimeout(saveTimers.current[noteId])
+          saveTimers.current[noteId] = setTimeout(() => void flushContentRef.current(noteId), SAVE_DEBOUNCE_MS)
         }
       }
       setLoading(false)
@@ -489,6 +503,12 @@ export function useNotebook({ editor = false }: { editor?: boolean } = {}) {
 
     return () => {
       mounted = false
+      for (const id of shownHere) {
+        const n = (shownInEditor.get(id) ?? 1) - 1
+        if (n > 0) shownInEditor.set(id, n)
+        else shownInEditor.delete(id)
+      }
+      shownHere.clear()
     }
   }, [supabase, setBase, editor])
 
@@ -616,9 +636,6 @@ export function useNotebook({ editor = false }: { editor?: boolean } = {}) {
   )
 
   const renameNote = useCallback((id: string, title: string) => patchNote(id, { title }), [patchNote])
-  useEffect(() => {
-    sendTitleRef.current = (id, title) => patchNote(id, { title })
-  }, [patchNote])
   const setNoteIcon = useCallback((id: string, icon: string | undefined) => patchNote(id, { icon }), [patchNote])
   // Move a note into a folder (or to 未分類 with null).
   const setNoteCategory = useCallback(
@@ -629,9 +646,9 @@ export function useNotebook({ editor = false }: { editor?: boolean } = {}) {
   // ── Content autosave (debounced) ─────────────────────────
   // Updates local state immediately (so switching notes never loses keystrokes)
   // and flushes to Supabase after a short idle window.
-  // The ref breaks the flushContent ↔ applyConflict cycle (text typed while a
-  // conflict was being resolved is re-queued on the copy).
-  const flushContentRef = useRef<(id: string) => Promise<void>>(async () => {})
+  // flushContentRef (declared with the other refs above) breaks the
+  // flushContent ↔ applyConflict cycle (text typed while a conflict was
+  // being resolved is re-queued on the copy).
 
   // A save hit a version this device hadn't seen and the content really
   // differs: the original note now shows the server's version, this
