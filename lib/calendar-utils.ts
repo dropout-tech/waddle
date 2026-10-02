@@ -302,8 +302,8 @@ export function clamp(val: number, min: number, max: number): number {
  * time grid. `pointerY` / `grabOffsetY` are PIXELS — converted through
  * `hourHeight`, so the result is right at every zoom level (the old inline
  * math treated pixels as minutes and was only correct at 60 px/hour).
- * A move keeps the block's length and stops flush with the grid's bottom
- * instead of being squeezed to 15 minutes.
+ * A move keeps the block's exact length (even under 15 minutes) and stops
+ * flush with the grid's bottom instead of being squeezed.
  */
 export function computeDragRange(p: {
   dragType: 'move' | 'resize-top' | 'resize-bottom'
@@ -322,7 +322,9 @@ export function computeDragRange(p: {
   const pxToMin = (px: number) => (px * 60) / (p.hourHeight > 0 ? p.hourHeight : 60)
   const pointer = snap(p.min + pxToMin(p.pointerY))
   if (p.dragType === 'move') {
-    const duration = clamp(p.originalEnd - p.originalStart, SNAP_MINUTES, Math.max(SNAP_MINUTES, p.max - p.min))
+    // Keep the real length — a 1-min timer record stays 1 min. Only the
+    // start snaps to the grid; resizes still floor at SNAP_MINUTES.
+    const duration = clamp(p.originalEnd - p.originalStart, 1, Math.max(1, p.max - p.min))
     const start = clamp(snap(p.min + pxToMin(p.pointerY - p.grabOffsetY)), p.min, p.max - duration)
     return { start, end: start + duration }
   }

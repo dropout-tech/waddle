@@ -1,0 +1,33 @@
+PASS: stale inline format (text edited by an older build) falls back to the plain text
+PASS: packed rich card shows word colour on the board (rgb(212, 72, 59))
+PASS: editing with a caret only: toolbar shown in whole-card mode
+PASS: selecting words switches the toolbar to “只改選取的字”
+PASS: toolbar clicks keep focus in the card text
+PASS: selection survives the toolbar clicks
+PASS: content stays the plain text ("本週重點")
+PASS: only “重點” formatted: ["bold","textColor:red","textHighlight:yellow","textSize:xl"]
+PASS: “本週” left unformatted
+PASS: card-level style untouched; geometry kept
+PASS: card face shows the word format {"weight":"700","color":"rgb(212, 72, 59)","size":"26px","bg":"rgba(250, 204, 21, 0.4)"}
+PASS: rest of the card stays normal weight (400)
+PASS: reopened editor keeps the word formatting <p>本週<strong><span data-text-color="red" style="color: rgb(212, 72, 59);"><span data-text-highlight="yellow" style="background-color: rgba(250, 204, 21, 0.4); border-radius: 3px; padding: 0px 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone;"><span data-text-size="xl" style="font-size: 26px; line-height: 1.3;">重點</span></span></span></strong></p>
+PASS: Escape discards word formatting, no write
+PASS: whole-card colour clears word colours only: style={"color":"blue"} marks=["bold","textHighlight:yellow","textSize:xl"]
+PASS: new card saved with word + card format: {"c":"新卡片 重要","style":{"size":"lg"},"m":["bold"]}
+PASS: plain typing keeps the old format (content only): {"content":"本週重點！","title":"","_id":"00000000-0000-4000-8000-000000000401","_method":"PATCH"}
+PASS: detail editor unpacks the stored colour
+PASS: desktop whiteboard: no page errors 
+PASS: English selection hint: "Selected text only"
+PASS: notebook stores the styled copy: ["textColor:red","textHighlight:yellow"]
+PASS: notebook visible content has no unknown marks (old builds stay safe)
+PASS: notebook colour survives a reload
+PASS: desktop notebook: no page errors 
+PASS: touch: selection survives toolbar taps
+PASS: touch: toolbar with hint fits 390px (12–380)
+PASS: touch: every toolbar button ≥ 44pt (0 too small)
+PASS: touch: words formatted and saved ["bold","textColor:green"]
+PASS: phone whiteboard: no page errors 
+PASS: phone notebook: marker swatches replace the toolbar row
+PASS: phone notebook: marker saved ["textHighlight:pink"]
+PASS: phone notebook: no page errors 
+ALL PASS

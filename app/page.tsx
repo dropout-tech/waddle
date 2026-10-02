@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
-import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { WidgetSync } from '@/components/widgets/widget-sync'
 import { petVoiceName, setPetVoice } from '@/lib/pet/voice'
@@ -14,9 +13,10 @@ import { UserMenu } from '@/components/user-menu'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { OnboardingTour } from '@/components/onboarding-tour'
 import { SettingsModal, type SettingsTab } from '@/components/modals/settings-modal'
-import { HuddleMascot } from '@/components/branding/waddle-mascot'
+import { MascotLoader } from '@/components/branding/mascot-loader'
 import { DailyClearCelebration } from '@/components/celebration/daily-clear-celebration'
 import { OverdueTaskReview } from '@/components/task-panel/overdue-task-review'
+import { useRecurringCompleteConfirm } from '@/components/task-panel/use-recurring-complete-confirm'
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { useMeetingReminders } from '@/hooks/use-meeting-reminders'
 import { useWaterReminder } from '@/hooks/use-water-reminder'
@@ -86,6 +86,24 @@ function HuddlePage() {
     reorderScratchpadItems,
     clearScratchpadDate,
   } = useWaddleData()
+
+  // Every in-app "complete" entry point (list rows, full-screen list, detail
+  // modal, focus board, overdue review) funnels through these two. Completing
+  // a recurring master completes the whole series, so ask first; the calendar
+  // hides its checkbox for recurring tasks instead. Un-completing never asks.
+  const { confirm: confirmSeriesComplete, dialog: seriesCompleteDialog } = useRecurringCompleteConfirm()
+  const completesSeries = useCallback((taskId: string) => {
+    const task = findTaskById(workspaces, taskId)
+    return !!task?.isRecurring && !task.isCompleted
+  }, [workspaces])
+  const toggleTaskCompleteConfirmed = useCallback(async (taskId: string) => {
+    if (completesSeries(taskId) && !(await confirmSeriesComplete())) return
+    await toggleTaskComplete(taskId)
+  }, [completesSeries, confirmSeriesComplete, toggleTaskComplete])
+  const completeTasksConfirmed = useCallback(async (taskIds: string[]) => {
+    if (taskIds.some(completesSeries) && !(await confirmSeriesComplete())) return
+    await completeTasks(taskIds)
+  }, [completesSeries, confirmSeriesComplete, completeTasks])
 
   // Watch all meetings and fire browser notifications N minutes before
   // each one starts. Pref + permission live in localStorage / Notification
@@ -513,28 +531,20 @@ function HuddlePage() {
 
   if (isLoading) {
     return (
-      <main className="h-screen w-full flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4 text-muted-foreground">
-          <HuddleMascot className={loadError ? 'w-20 h-20' : 'w-20 h-20 animate-waddle-bob'} />
-          {loadError ? (
-            <div role="alert" className="flex flex-col items-center gap-3 px-6 text-center">
-              <span className="text-sm">{t('資料沒有載入完整，請檢查網路後重試。你的資料沒有遺失。')}</span>
-              <button
-                type="button"
-                onClick={retryLoad}
-                className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-              >
-                {t('重試')}
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">{t('載入中...')}</span>
-            </div>
-          )}
-        </div>
-      </main>
+      <MascotLoader still={!!loadError}>
+        {loadError ? (
+          <div role="alert" className="flex flex-col items-center gap-3 px-6 text-center">
+            <span className="text-sm">{t('資料沒有載入完整，請檢查網路後重試。你的資料沒有遺失。')}</span>
+            <button
+              type="button"
+              onClick={retryLoad}
+              className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+            >
+              {t('重試')}
+            </button>
+          </div>
+        ) : undefined}
+      </MascotLoader>
     )
   }
 
@@ -552,7 +562,7 @@ function HuddlePage() {
         settings={settings}
         onToggleCategoryCollapse={toggleCategoryCollapse}
         onReorderCategories={reorderCategories}
-        onToggleComplete={toggleTaskComplete}
+        onToggleComplete={toggleTaskCompleteConfirmed}
         onSelectTask={handleSelectTask}
         onAddTask={addTask}
         onAddCategory={addCategory}
@@ -603,13 +613,15 @@ function HuddlePage() {
         isOpen={isOverdueReviewOpen}
         workspaces={workspaces}
         onClose={() => setIsOverdueReviewOpen(false)}
-        onComplete={toggleTaskComplete}
-        onCompleteAll={completeTasks}
+        onComplete={toggleTaskCompleteConfirmed}
+        onCompleteAll={completeTasksConfirmed}
         onReturnToBacklog={handleReturnToBacklog}
         onScheduleToday={handleScheduleToday}
         onArchive={handleArchiveTask}
         onSelectTask={handleSelectTask}
       />
+
+      {seriesCompleteDialog}
 
       {liveSelectedTask && (
         <TaskDetailModal
@@ -630,7 +642,7 @@ function HuddlePage() {
             setSelectedOccurrenceDate(undefined)
           }}
           onSave={handleSaveTask}
-          onToggleComplete={taskMode === 'edit' ? toggleTaskComplete : undefined}
+          onToggleComplete={taskMode === 'edit' ? toggleTaskCompleteConfirmed : undefined}
           onDelete={taskMode === 'edit' ? (...args: Parameters<typeof deleteTask>) => {
             quickCreatedRef.current = null
             return deleteTask(...args)
@@ -682,10 +694,17 @@ function HuddlePage() {
   )
 }
 
+/** Set by next.config.mjs for the Capacitor static export (native-only bundle). */
+const APP_SHELL_BUILD = process.env.HUDDLE_APP_SHELL_BUILD === '1'
+
 export default function Page() {
   const { session, loading } = useAuth()
 
   if (loading) {
+    // Native app: never show the marketing site (prices, Mac download) while
+    // the session resolves — Apple 3.1.1. The Capacitor export prerenders "/"
+    // as this loader too, so nothing flashes before hydration.
+    if (APP_SHELL_BUILD || isNative()) return <AuthGuard><HuddlePage /></AuthGuard>
     // Keep the static response useful to visitors and search engines instead
     // of shipping a loader-only first page while the local session resolves.
     return <MarketingPage />

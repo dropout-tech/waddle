@@ -3002,6 +3002,10 @@ export function useWaddleData(): UseWaddleData {
         ;({ data, error } = await supabase.from('time_blocks').insert(buildPayload(true)).select('id'))
       }
       if (error) {
+        // Take the optimistic block back off the screen: it never reached
+        // the DB, and leaving it there made a "ghost" that every later drag
+        // bounced back from (0-row update) and that vanished on reload.
+        setTimeBlocks((prev) => prev.filter((b) => b.id !== id))
         handleDbError('建立時間區塊')(error)
         return
       }
@@ -3054,6 +3058,7 @@ export function useWaddleData(): UseWaddleData {
           .select('id'))
       }
       if (error) {
+        if (previous) setTimeBlocks((prev) => prev.map((b) => (b.id === id ? previous! : b)))
         handleDbError('更新時間區塊')(error)
         return
       }
@@ -3101,6 +3106,7 @@ export function useWaddleData(): UseWaddleData {
         .eq('id', id)
         .select('id')
       if (error) {
+        if (removed) setTimeBlocks((prev) => [...prev, removed!])
         handleDbError('刪除時間區塊')(error)
         return
       }

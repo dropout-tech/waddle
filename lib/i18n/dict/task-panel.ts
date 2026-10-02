@@ -321,4 +321,8 @@ export const dict: Record<string, string> = {
   '清單': 'List',
   '儲存中…': 'Saving…',
   '回到日曆': 'Back to calendar',
+  // use-recurring-complete-confirm.tsx
+  '整個系列標成完成？': 'Complete the whole series?',
+  '這是重複任務，勾選會把整個系列標成完成，所有日期都會從清單移除。要繼續嗎？': 'This is a recurring task. Checking it marks the whole series as complete, and every date will be removed from your list. Continue?',
+  '整個系列標成完成': 'Complete whole series',
 }

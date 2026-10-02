@@ -25,8 +25,18 @@ import { useI18n } from '@/lib/i18n/react'
  * delete-account Edge Function with the user's session, then signs out and
  * returns to /login. The function permanently removes the auth user and, via
  * cascade FKs, all of their data.
+ *
+ * Settings renders it with its own trigger button. The user menu passes
+ * `open`/`onOpenChange` without a trigger: the menu closes on outside clicks,
+ * so the dialog has to live outside the dropdown and be opened from state.
  */
-export function DeleteAccountButton() {
+interface DeleteAccountButtonProps {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}
+
+export function DeleteAccountButton({ open, onOpenChange }: DeleteAccountButtonProps = {}) {
+  const controlled = open !== undefined
   const router = useRouter()
   const [deleting, setDeleting] = useState(false)
   const { t } = useI18n()
@@ -51,8 +61,15 @@ export function DeleteAccountButton() {
   }
 
   return (
-    <AlertDialog>
-      <AlertDialogTrigger asChild>
+    <AlertDialog
+      open={open}
+      onOpenChange={(next) => {
+        // Don't let Esc / Cancel close the dialog mid-request.
+        if (!next && deleting) return
+        onOpenChange?.(next)
+      }}
+    >
+      {!controlled && <AlertDialogTrigger asChild>
         <button
           type="button"
           className={cn(
@@ -63,7 +80,7 @@ export function DeleteAccountButton() {
           <Trash2 className="w-3.5 h-3.5" />
           {t('刪除帳號')}
         </button>
-      </AlertDialogTrigger>
+      </AlertDialogTrigger>}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{t('確定要刪除帳號嗎？')}</AlertDialogTitle>

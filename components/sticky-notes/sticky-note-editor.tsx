@@ -3,9 +3,12 @@
 import { useEffect, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import type { StickyNote, TiptapDoc } from '@/lib/types'
+import { packStyledDoc, unpackStyledDoc } from '@/lib/styled-doc'
 import { notebookExtensions } from '@/components/notebook/tiptap-extensions'
 import type { UploadImageFn } from '@/components/notebook/upload-image'
 import { useI18n } from '@/lib/i18n/react'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { SelectionToolbar } from '@/components/notebook/selection-toolbar'
 
 const EMPTY_DOC: TiptapDoc = { type: 'doc', content: [{ type: 'paragraph' }] }
 
@@ -25,19 +28,20 @@ interface StickyNoteEditorProps {
 
 export function StickyNoteEditor({ note, onContentChange }: StickyNoteEditorProps) {
   const { t } = useI18n()
+  const isMobile = useIsMobile()
   const applyingRef = useRef(false)
   const loadedIdRef = useRef<string | null>(null)
 
   const editor = useEditor({
     extensions: notebookExtensions(notSupported),
-    content: note.content ?? EMPTY_DOC,
+    content: unpackStyledDoc(note.content) ?? EMPTY_DOC,
     immediatelyRender: false,
     editorProps: {
       attributes: { class: 'nb-prose focus:outline-none', 'aria-label': t('便條紙') },
     },
     onUpdate: ({ editor }) => {
       if (applyingRef.current) return
-      onContentChange(editor.getJSON() as TiptapDoc)
+      onContentChange(packStyledDoc(editor.getJSON() as TiptapDoc))
     },
   })
 
@@ -51,7 +55,7 @@ export function StickyNoteEditor({ note, onContentChange }: StickyNoteEditorProp
     if (loadedIdRef.current === loadKey) return
     loadedIdRef.current = loadKey
     applyingRef.current = true
-    editor.commands.setContent(note.content ?? EMPTY_DOC, { emitUpdate: false })
+    editor.commands.setContent(unpackStyledDoc(note.content) ?? EMPTY_DOC, { emitUpdate: false })
     applyingRef.current = false
   }, [editor, note.id, note.syncRev, note.content])
 
@@ -61,6 +65,8 @@ export function StickyNoteEditor({ note, onContentChange }: StickyNoteEditorProp
       onPointerDown={(e) => e.stopPropagation()}
     >
       <EditorContent editor={editor} />
+      {/* Desktop select-to-format bar (bold … colour, marker); phones keep the OS menu. */}
+      {!isMobile && <SelectionToolbar editor={editor} />}
     </div>
   )
 }

@@ -47,17 +47,19 @@ try {
   ok(JSON.stringify(notebookRow.content).includes('200+10%=220'), 'notebook: result saved to note content')
   await page.screenshot({ path: `${SHOTS}/1-notebook.png` })
 
-  // --- Whiteboard inline textarea (desktop + 390px) ---
+  // --- Whiteboard inline card editor (Tiptap, one paragraph per line; desktop + 390px) ---
+  const text = el => el.evaluate(n => [...n.querySelectorAll('p')].map(p => p.textContent).join('\n'))
+  const caretAtEnd = el => el.evaluate(n => { const s = getSelection(); const r = document.createRange(); r.selectNodeContents(n); r.setEnd(s.focusNode, s.focusOffset); return s.isCollapsed && r.toString().length === n.textContent.length })
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
     await page.goto(base+'/float/scratchpad'); await page.getByTestId('scratchpad-canvas').waitFor()
     await page.getByRole('button', { name:'文字', exact:true }).first().click()
     const ta = page.getByTestId('scratchpad-canvas').getByLabel('畫布內容', { exact:true }); await ta.waitFor()
     await ta.pressSequentially('500*15%=')
-    ok(await ta.inputValue() === '500*15%=75', `whiteboard ${width}px: "500*15%=" → ${JSON.stringify(await ta.inputValue())}`)
+    ok(await text(ta) === '500*15%=75', `whiteboard ${width}px: "500*15%=" → ${JSON.stringify(await text(ta))}`)
     await ta.pressSequentially('\n12*3=')
-    const v = await ta.inputValue(), caret = await ta.evaluate(el => el.selectionStart)
-    ok(v === '500*15%=75\n12*3=36' && caret === v.length, `whiteboard ${width}px: second line + caret at end (${JSON.stringify(v)}, caret ${caret})`)
+    const v = await text(ta), caret = await caretAtEnd(ta)
+    ok(v === '500*15%=75\n12*3=36' && caret, `whiteboard ${width}px: second line + caret at end (${JSON.stringify(v)}, caret at end ${caret})`)
     await page.screenshot({ path: `${SHOTS}/2-whiteboard-${width}.png` })
     await ta.press('Meta+Enter'); await sleep(800)
     ok(writes.some(w => w?.content === '500*15%=75\n12*3=36'), `whiteboard ${width}px: saved content includes results`)
