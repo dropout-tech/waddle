@@ -53,7 +53,7 @@ interface TourStep {
 // "like product X" comparisons. Lists use 「、」 rather than slashes.
 //
 // Copy shared by the desktop and phone tours (one dictionary entry each).
-const WELCOME_BODY = '任務、行事曆、專注計時和日記，都放在同一個地方。花一兩分鐘帶你走一圈，隨時可以略過。'
+const WELCOME_BODY = '任務、行事曆、專注計時和記事本，都放在同一個地方。花一兩分鐘帶你走一圈，隨時可以略過。'
 const TASK_LIST_BODY = '所有任務都收在這裡，分成三層：工作區 → 分類 → 任務。最上面的「未分類」是收件匣，還沒決定放哪的任務會先到這裡。'
 const SHORTCUTS_TITLE = '會議、整理、完成'
 const SHORTCUTS_BODY = '「會議」列出今天的會議，可以直接加入視訊。有任務過了原訂時間，這裡會出現「整理」，讓你逐一重新安排。「完成」可以回顧做完的任務和統計。'
@@ -152,7 +152,7 @@ const DESKTOP_STEPS: TourStep[] = [
   {
     target: '[data-tour="calendar-export"]',
     title: '更多工具',
-    body: '這個小箭頭裡收著日記、報告、每日簽到、匯出等功能。「匯出」可以把行程存成圖片分享；開啟隱私模式，就只顯示時段、不顯示任務名稱。',
+    body: '這個小箭頭裡收著報告、每日簽到、匯出等功能。「匯出」可以把行程存成圖片分享；開啟隱私模式，就只顯示時段、不顯示任務名稱。',
     placement: 'bottom',
     padding: 6,
   },

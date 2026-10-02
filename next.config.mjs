@@ -89,7 +89,12 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // HUDDLE_APP_SHELL_BUILD is inlined into the bundle: the Capacitor export
+  // only ever ships inside the native app, so app/page.tsx prerenders "/" as
+  // the app loader there instead of the marketing site (Apple 3.1.1: no
+  // prices / downloads in-app).
   env: {
+    HUDDLE_APP_SHELL_BUILD: isCapacitor ? '1' : '',
     // Always defined (even as '') so the bundler inlines it and can drop the
     // whole Sentry chunk when no DSN is configured.
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN || '',
