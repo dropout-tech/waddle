@@ -17,8 +17,8 @@ export const SHARE_HEIGHT = 1920
 const PAPER = '#f6f3e9'
 const INK = '#292b24'
 const MUTED = '#66645a'
-const EMPTY = '#e7e0cc' // a past day without a line — quiet, not a "miss"
-const FUTURE = '#e0d8c0'
+const EMPTY = '#efeadd' // a past day without a line — barely there, never a "miss"
+const FUTURE = '#e6dfcd'
 const BRAND = '#cf5731'
 
 function loadImage(src: string): Promise<HTMLImageElement | null> {
@@ -83,20 +83,22 @@ export async function drawLifeGridImage(year: number, moods: ReadonlyMap<string,
   ctx.fillRect(0, 0, SHARE_WIDTH, SHARE_HEIGHT)
 
   // Year + the single terracotta accent stroke under it
+  // IG story safe area: nothing important in the top ~200px (profile bar) or
+  // the bottom ~250px (reply bar). The signature sits top-right, beside the year.
   const left = 96
   ctx.fillStyle = INK
   ctx.textBaseline = 'alphabetic'
   ctx.font = `700 168px ${family}`
-  ctx.fillText(String(year), left - 6, 318)
+  ctx.fillText(String(year), left - 6, 392)
   ctx.fillStyle = BRAND
-  wobblyRect(ctx, left, 352, 132, 12, 6, rand)
+  wobblyRect(ctx, left, 426, 132, 12, 6, rand)
   ctx.fill()
 
   // Grid: months across (12 columns), days down (31 rows) — portrait fits a story.
   const gridLeft = 168
   const gridRight = SHARE_WIDTH - left
-  const gridTop = 486
-  const gridBottom = 1560
+  const gridTop = 540
+  const gridBottom = 1640
   const colPitch = (gridRight - gridLeft) / 12
   const rowPitch = (gridBottom - gridTop) / 31
   const cellW = colPitch - 12
@@ -130,7 +132,7 @@ export async function drawLifeGridImage(year: number, moods: ReadonlyMap<string,
         ctx.fill()
       } else {
         ctx.strokeStyle = FUTURE
-        ctx.lineWidth = 2
+        ctx.lineWidth = 1.5
         ctx.stroke()
       }
     }
@@ -154,18 +156,22 @@ export async function drawLifeGridImage(year: number, moods: ReadonlyMap<string,
   for (let i = 0; i < 9000; i++) ctx.fillRect(rand() * SHARE_WIDTH, rand() * SHARE_HEIGHT, 1.6, 1.6)
   ctx.restore()
 
-  // Signature: the hand-drawn Huddle penguin + wordmark
-  const markH = 200
-  const markY = SHARE_HEIGHT - 96 - markH
-  let textX = left
+  // Signature (top-right, inside the safe area): the hand-drawn penguin with
+  // the wordmark under it.
+  const right = SHARE_WIDTH - left
+  const markH = 176
+  const markTop = 236
+  let markCenter = right - 70
   if (penguin) {
     const w = (penguin.naturalWidth / penguin.naturalHeight) * markH
-    ctx.drawImage(penguin, left - 10, markY, w, markH)
-    textX = left - 10 + w + 14
+    ctx.drawImage(penguin, right - w, markTop, w, markH)
+    markCenter = right - w / 2
   }
   ctx.fillStyle = INK
-  ctx.font = `600 52px ${family}`
-  ctx.fillText('Huddle', textX, markY + markH * 0.62)
+  ctx.font = `600 40px ${family}`
+  ctx.textAlign = 'center'
+  ctx.fillText('Huddle', markCenter, markTop + markH + 42)
+  ctx.textAlign = 'left'
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))), 'image/png')

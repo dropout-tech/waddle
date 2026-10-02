@@ -97,12 +97,30 @@ const touched = new Set([today, BACKFILL]) // every date this run may write
 let seed = 7
 const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 const MOODS = ['great', 'good', 'good', 'good', 'neutral', 'neutral', 'bad', 'terrible']
-const LINES = ['和朋友吃了很好吃的牛肉麵', '終於把報告交出去', '下午的陽光很舒服', '跑了五公里', '跟家人視訊聊很久', '讀完一本書', '下雨天在家煮湯', '工作卡關但撐過去了', '散步看到很美的晚霞', '第一次自己修好水管']
+// 60 different, everyday lines — every seeded day gets its own (no repeats).
+const LINES = [
+  '傍晚沿著河堤散步，風很舒服', '讀到一句話：慢慢來，比較快', '和爸媽吃火鍋，聊到很晚', '終於把季報交出去了',
+  '早上的咖啡特別香', '在公車上看完一集喜歡的節目', '幫鄰居奶奶搬了一箱水', '下雨天在家煮了一鍋湯',
+  '跑完五公里，腿很痠但很開心', '和老朋友視訊，笑到肚子痛', '整理了衣櫃，丟掉三袋舊衣服', '第一次自己修好水龍頭',
+  '午休時在公園曬太陽', '學會一道新菜：番茄炒蛋', '工作卡關，但最後找到解法', '在書店待了一個下午',
+  '妹妹傳了小時候的照片', '騎腳踏車去海邊看夕陽', '把拖了很久的信回完了', '睡了一個很飽的午覺',
+  '同事請大家喝手搖飲', '在路上看到一隻很胖的貓', '下班後去游泳，整個人放鬆', '和另一半一起逛市場',
+  '寫完企劃書的第一版', '早起看日出，天空是粉紅色的', '把房間的植物都換了盆', '聽了一場很好聽的街頭演奏',
+  '跟主管談完，心裡踏實多了', '一個人去看了一部電影', '媽媽寄來自己做的醬菜', '第一次試著冥想十分鐘',
+  '雨後的空氣有青草味', '幫朋友搬家，累但很溫暖', '把相簿裡的照片整理好', '和團隊一起慶祝專案上線',
+  '在咖啡廳寫了一整頁日記', '走錯路，卻發現一家好吃的麵店', '颱風天停班，在家拼拼圖', '跟爸爸一起去爬象山',
+  '收到一張手寫的感謝卡', '重新開始練吉他', '早餐吃到剛出爐的蛋餅', '晚上在陽台看到很亮的月亮',
+  '完成了一件拖延很久的工作', '和小姪子玩了一下午積木', '試穿了一件很喜歡的外套', '去市場買了當季的水果',
+  '讀完一本小說，結局很好', '下班路上聽到喜歡的歌', '跟自己說今天辛苦了', '和朋友約好明年一起旅行',
+  '在家做了一次大掃除', '第一次報名了線上課程', '吃到好吃的牛肉麵', '陪家裡的狗散步兩圈',
+  '午餐和同事聊得很開心', '把書桌整理得乾乾淨淨', '泡了一壺新買的茶', '睡前讀了幾頁詩',
+]
 const seeds = []
 const past = []
 for (let d = shift(today, -1); d >= dateKey(year, 1, 1); d = shift(d, -1)) if (d !== BACKFILL) past.push(d)
-for (const d of past) if (seeds.length < 60 && rand() < 0.3) seeds.push(d)
+for (const d of past) if (seeds.length < LINES.length && rand() < 0.3) seeds.push(d)
 for (const d of seeds) touched.add(d)
+const seedLine = new Map(seeds.map((d, i) => [d, LINES[i]]))
 
 async function cleanup() {
   const dates = [...touched]
@@ -151,11 +169,11 @@ async function gotoAuthed(p, url) {
 let browser
 try {
   const { error: seedErr } = await sb.from('journal_entries').upsert(
-    seeds.map((date) => ({ user_id: uid, date, content: LINES[Math.floor(rand() * LINES.length)], mood: MOODS[Math.floor(rand() * MOODS.length)] })),
+    seeds.map((date) => ({ user_id: uid, date, content: seedLine.get(date), mood: MOODS[Math.floor(rand() * MOODS.length)] })),
     { onConflict: 'user_id,date' },
   )
   if (seedErr) throw seedErr
-  console.log(`seeded ${seeds.length} fake days; today=${today}; backfill=${BACKFILL}`)
+  console.log(`seeded ${seeds.length} fake days (${new Set(seedLine.values()).size} distinct lines); today=${today}; backfill=${BACKFILL}`)
 
   browser = await chromium.launch()
 
@@ -228,17 +246,31 @@ try {
     await p.waitForTimeout(400)
   }
 
-  await step('reload /year → today\'s line is still there', async () => {
+  await step('reload /year → today\'s line is still there; squares reveal one by one; letter line quotes the latest day', async () => {
     await gotoYear(pb)
     await pb.reload({ waitUntil: 'domcontentloaded' })
     await gotoYear(pb)
+    const anim = await pb.evaluate(() => {
+      const cells = [...document.querySelectorAll('[data-life-grid-grid] [data-written]')]
+      const delays = cells.map((c) => parseFloat(getComputedStyle(c).animationDelay) * 1000)
+      return { n: cells.length, name: getComputedStyle(cells.at(-1)).animationName, max: Math.max(...delays) }
+    })
+    assert(/reveal/.test(anim.name), `no reveal animation (${anim.name})`)
+    assert(anim.max <= 1100, `stagger too long: last delay ${anim.max}ms`)
+    // layout size (offsetWidth) — boundingBox would include the reveal's scale()
+    const size = await pb.locator(`[data-date="${today}"]`).evaluate((el) => ({ width: el.offsetWidth }))
+    assert(size.width >= 20, `desktop cell only ${size.width}px`)
+    const latestSeed = [...seeds].sort().at(-1)
+    const letter = await pb.locator('[data-life-grid-letter]').innerText()
+    assert(letter.includes(seedLine.get(latestSeed)), `letter line: ${letter}`)
+    await pb.waitForTimeout(1600) // let the reveal finish before the screenshot
     await pb.locator(`[data-date="${today}"][data-written]`).waitFor({ timeout: 10000 })
     const line = await pb.locator('[data-life-grid-line]').innerText()
     assert(line === TODAY_LINE, `card shows "${line}"`)
     const lit = await pb.locator('[data-life-grid-grid] [data-written]').count()
     const summary = await pb.locator('[data-life-grid-summary]').innerText()
     await pb.screenshot({ path: path.join(SHOTS, 'desktop-1440-zh.png') })
-    return `${lit} lit cells; summary: "${summary.replace(/\s+/g, ' ')}"`
+    return `${lit} lit cells, cell ${size.width.toFixed(0)}px, reveal last delay ${anim.max}ms; summary: "${summary.replace(/\s+/g, ' ')}"; letter: "${letter}"`
   })
 
   await step(`backfill a past day (${BACKFILL}) from the grid`, async () => {
@@ -271,7 +303,9 @@ try {
     await pb.getByRole('option', { name: '開人生年曆' }).click({ timeout: 10000 })
     await pb.locator('[role="dialog"] [data-life-grid]').waitFor({ timeout: 10000 })
     await pb.waitForFunction(() => document.querySelectorAll('[role="dialog"] [data-life-grid] [data-written]').length > 0, null, { timeout: 15000 })
-    await pb.waitForTimeout(500)
+    await pb.waitForTimeout(450)
+    await pb.screenshot({ path: path.join(SHOTS, 'desktop-1440-overlay-reveal.png') }) // mid-animation
+    await pb.waitForTimeout(1700)
     await pb.screenshot({ path: path.join(SHOTS, 'desktop-1440-overlay.png') })
   })
 
@@ -295,6 +329,7 @@ try {
     const dark = await pb.evaluate(() => document.documentElement.classList.contains('dark'))
     assert(dark, 'html.dark not set')
     await pb.screenshot({ path: path.join(SHOTS, 'desktop-1440-dark.png') })
+    await pb.evaluate(() => localStorage.setItem('theme', 'light'))
   })
   storage = await ctxB.storageState()
   await ctxB.close()
@@ -307,15 +342,22 @@ try {
     await gotoYear(pm)
     const ov = await pm.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }))
     assert(ov.sw <= ov.cw + 1, `overflow ${ov.sw} > ${ov.cw}`)
-    const cell = await pm.locator(`[data-date="${today}"]`).boundingBox()
+    const dark = await pm.evaluate(() => document.documentElement.classList.contains('dark'))
+    assert(!dark, 'phone page is in dark mode — expected light')
+    await pm.waitForTimeout(1600)
+    const col = await pm.locator('[data-life-grid-month="1"]').boundingBox()
+    assert(col.width >= 28 && col.height >= 28, `month column ${col.width}×${col.height}`)
     await pm.screenshot({ path: path.join(SHOTS, 'mobile-390-zh.png') })
+    await pm.locator('[data-life-grid-phone]').evaluate((el) => el.scrollIntoView({ block: 'start' }))
+    await pm.waitForTimeout(300)
+    await pm.screenshot({ path: path.join(SHOTS, 'mobile-390-zh-grid.png') })
     const month = Number(BACKFILL.slice(5, 7))
     await pm.locator(`[data-life-grid-month="${month}"]`).tap()
     await pm.locator(`[data-zoom-date="${BACKFILL}"]`).tap()
     await pm.locator(`[data-life-grid-day="${BACKFILL}"]`).waitFor({ timeout: 5000 })
     await pm.locator('[data-life-grid-zoom]').scrollIntoViewIfNeeded()
     await pm.screenshot({ path: path.join(SHOTS, 'mobile-390-zoom.png') })
-    return `grid cell ${cell.width.toFixed(1)}px; zoom pick ok`
+    return `light mode; month column tap target ${col.width.toFixed(0)}×${col.height.toFixed(0)}px; zoom pick ok`
   })
   await step('phone 390 dark', async () => {
     await pm.evaluate(() => localStorage.setItem('theme', 'dark'))

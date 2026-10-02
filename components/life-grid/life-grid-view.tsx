@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
@@ -12,7 +12,7 @@ import { InkArrowLeft, InkChevronLeft, InkChevronRight, InkClose } from '@/compo
 import { MOOD_COLORS } from '@/lib/palette'
 import { isImeComposing } from '@/lib/ime'
 import {
-  DAILY_LINE_MAX, MOODS, buildYearGrid, countWrittenInYear, daysArrived, daysInMonth, dateKey,
+  DAILY_LINE_MAX, MOODS, buildYearGrid, countWrittenInYear, daysInMonth, dateKey,
   isWritableDate, parseDateKey, taipeiToday, type Mood,
 } from '@/lib/life-grid/compute'
 import type { DailyLine } from '@/lib/life-grid/data'
@@ -45,9 +45,9 @@ function useToday() {
   return today
 }
 
-/** Inline narrative number (same voice as the AI review): mono, accent color. */
+/** Inline narrative number: body font, terracotta accent (numbers live inside the sentence). */
 function Num({ children, tight = false }: { children: ReactNode; tight?: boolean }) {
-  return <span className={cn('font-mono text-[1.05em] font-medium tabular-nums text-primary', !tight && 'mx-1')}>{children}</span>
+  return <span className={cn('text-[1.08em] font-semibold tabular-nums text-primary', !tight && 'mx-1')}>{children}</span>
 }
 
 /** Translate a template, resolve its {count|one|other} plural, and render {count} as <Num>. */
@@ -59,11 +59,17 @@ function Sentence({ lang, template, count, vars = {} }: { lang: Lang; template: 
   // Chinese: the number sits between characters (Num's margin is the gap).
   // English: keep the real spaces and drop the margin.
   const en = lang === 'en'
+  // The number and the word right after it never break apart ("62 天", "62 days").
+  const rest = en ? after : after.trimStart()
+  const glue = /^\s*\S+/.exec(rest)?.[0] ?? ''
   return (
     <>
       {en ? before : before.trimEnd()}
-      <Num tight={en}>{count}</Num>
-      {en ? after : after.trimStart()}
+      <span className="whitespace-nowrap">
+        <Num tight={en}>{count}</Num>
+        {glue}
+      </span>
+      {rest.slice(glue.length)}
     </>
   )
 }
@@ -91,7 +97,26 @@ export function LifeGridView({ onExit, exitVariant = 'close', focusToday = false
 
   const grid = useMemo(() => buildYearGrid(year, today), [year, today])
   const written = useMemo(() => countWrittenInYear(lines.keys(), year), [lines, year])
-  const arrived = daysArrived(year, today)
+
+  // The opening moment: written days light up one by one, in date order
+  // (≤1.5s in total). Layout effect so the first painted frame is already
+  // "dark" — no flash of the finished grid before the animation.
+  const [revealing, setRevealing] = useState(false)
+  useLayoutEffect(() => {
+    if (status !== 'ready') return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- must flip before paint (no flash of the finished grid)
+    setRevealing(true)
+    const id = window.setTimeout(() => setRevealing(false), 1700)
+    return () => window.clearTimeout(id)
+  }, [status, year])
+  const reveal = useMemo(() => {
+    const dates = [...lines.keys()].sort()
+    const step = dates.length ? Math.min(28, 1050 / dates.length) : 0
+    return new Map(dates.map((d, i) => [d, Math.round(i * step)]))
+    // Only the order at load time matters; later saves use the single "lit" pop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealing])
+  const revealFor = (date: string) => (revealing && reveal.has(date) ? reveal.get(date)! : null)
 
   const monthShort = useMemo(() => {
     const f = new Intl.DateTimeFormat(locale(lang), { month: 'short', timeZone: 'UTC' })
@@ -206,13 +231,11 @@ export function LifeGridView({ onExit, exitVariant = 'close', focusToday = false
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      {/* Soft fade at the bottom edge so content never looks cut off by the pop-up. */}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [mask-image:linear-gradient(to_bottom,#000_calc(100%-40px),transparent)]">
         <div className="mx-auto w-full max-w-[1080px] px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-5 md:px-8 md:pt-7">
           <p className="text-[15px] leading-relaxed md:text-base" data-life-grid-summary>
             {summary}
-            {year === currentYear && arrived > 0 && (
-              <span className="text-muted-foreground"> <Sentence lang={lang} template="這一年已經走過 {count} 天。" count={arrived} /></span>
-            )}
           </p>
 
           {status === 'error' && (
@@ -224,9 +247,10 @@ export function LifeGridView({ onExit, exitVariant = 'close', focusToday = false
             </div>
           )}
 
-          <div className="mt-5 flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-10">
-            {/* Day card — first on phones (the question lives at the top), right column on desktop. */}
-            <div ref={dayCardRef} className="scroll-mt-4 lg:order-2 lg:sticky lg:top-0 lg:w-[340px] lg:shrink-0">
+          {/* Phone: question card → year → the rest. Desktop: the year spans the
+              full width on top (big squares), card and recent lines below. */}
+          <div className={cn('mt-5', styles.layout)}>
+            <div ref={dayCardRef} className={cn('scroll-mt-4', styles.areaCard)}>
               <DayCard
                 key={selected}
                 date={selected}
@@ -237,10 +261,9 @@ export function LifeGridView({ onExit, exitVariant = 'close', focusToday = false
                 autoFocus={focusToday && selected === today}
                 onSave={onSave}
               />
-              <RecentLines lines={lines} dayLabel={dayLabel} display={display} onSelect={(d) => select(d, { scroll: true })} className="hidden lg:block" />
             </div>
 
-            <div className="min-w-0 flex-1 lg:order-1">
+            <div className={cn('min-w-0', styles.areaYear)}>
               <YearGrid
                 grid={grid}
                 lines={lines}
@@ -249,17 +272,21 @@ export function LifeGridView({ onExit, exitVariant = 'close', focusToday = false
                 monthShort={monthShort}
                 dayLabel={dayLabel}
                 display={display}
+                revealFor={revealFor}
                 onSelectDay={(d) => select(d)}
-                onSelectMonth={(m) => setZoomMonth(m)}
+              />
+              <PhoneYearGrid
+                grid={grid}
+                lines={lines}
+                justLit={justLit}
+                monthShort={monthShort}
+                display={display}
+                revealFor={revealFor}
                 zoomMonth={zoomMonth}
+                onSelectMonth={(m) => setZoomMonth(m)}
               />
               <Legend display={display} />
-              {/* Desktop: a quiet sign-off under the year, in the illustrations' voice. */}
-              <div className="mt-10 hidden items-end gap-3 lg:flex" aria-hidden="true">
-                {/* eslint-disable-next-line @next/next/no-img-element -- static export has no image optimizer */}
-                <img src="/art/penguin/sleep.webp" alt="" width={88} height={88} className="h-[72px] w-auto" />
-                <p className="pb-3 text-sm text-muted-foreground">{t('一天一格，慢慢來就好。')}</p>
-              </div>
+              <LetterLine lines={lines} today={today} />
               <MonthZoom
                 year={year}
                 month={zoomMonth}
@@ -269,7 +296,22 @@ export function LifeGridView({ onExit, exitVariant = 'close', focusToday = false
                 display={display}
                 onSelect={(d) => select(d, { scroll: true })}
               />
-              <RecentLines lines={lines} dayLabel={dayLabel} display={display} onSelect={(d) => select(d, { scroll: true })} className="lg:hidden" />
+            </div>
+
+            <div className={cn('min-w-0', styles.areaMore)}>
+              <RecentLines lines={lines} dayLabel={dayLabel} display={display} onSelect={(d) => select(d, { scroll: true })} />
+              {/* A quiet sign-off, in the illustrations' voice. */}
+              <div className="mt-8 flex items-end gap-3" aria-hidden="true">
+                {/* eslint-disable-next-line @next/next/no-img-element -- static export has no image optimizer */}
+                <img
+                  src="/art/penguin/sleep.webp"
+                  alt=""
+                  width={88}
+                  height={88}
+                  className="h-[72px] w-auto dark:rounded-2xl dark:bg-[#efe8d6] dark:p-1.5 dark:brightness-95"
+                />
+                <p className="pb-3 text-sm text-muted-foreground">{t('一天一格，慢慢來就好。')}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -284,13 +326,14 @@ const WOBBLE = [styles.w0, styles.w1, styles.w2, styles.w3]
 /** Deterministic uneven corners per day (same day → same shape every render). */
 const wobble = (month: number, day: number) => WOBBLE[(month * 7 + day * 3) % 4]
 /** Mood fill + a per-day offset into the paper grain so no two squares look stamped. */
-const inkStyle = (color: string | undefined, month: number, day: number) => ({
+const inkStyle = (color: string | undefined, month: number, day: number, delay: number | null = null): CSSProperties => ({
   backgroundColor: color,
   backgroundPosition: `${(day * 37) % 240}px ${(month * 53) % 240}px`,
+  ...(delay !== null ? { animationDelay: `${delay}ms` } : null),
 })
 
 function YearGrid({
-  grid, lines, selected, justLit, monthShort, dayLabel, display, onSelectDay, onSelectMonth, zoomMonth,
+  grid, lines, selected, justLit, monthShort, dayLabel, display, revealFor, onSelectDay,
 }: {
   grid: ReturnType<typeof buildYearGrid>
   lines: Map<string, DailyLine>
@@ -299,38 +342,29 @@ function YearGrid({
   monthShort: string[]
   dayLabel: (date: string) => string
   display: (hex: string) => string | undefined
+  revealFor: (date: string) => number | null
   onSelectDay: (date: string) => void
-  onSelectMonth: (month: number) => void
-  zoomMonth: number
 }) {
   const { t } = useI18n()
-  const cols = 'grid-cols-[2rem_repeat(31,minmax(0,1fr))] md:grid-cols-[2.75rem_repeat(31,minmax(0,1fr))]'
+  const cols = 'grid-cols-[2.75rem_repeat(31,minmax(0,1fr))]'
   return (
-    <div className="select-none" data-life-grid-grid>
-      {/* Day ruler (desktop) */}
-      <div className={cn('mb-1 hidden gap-[3px] md:grid', cols)} aria-hidden="true">
+    <div className="select-none max-md:hidden" data-life-grid-grid>
+      <div className={cn('mb-1.5 grid gap-[5px]', cols)} aria-hidden="true">
         <span />
         {Array.from({ length: 31 }, (_, i) => (
-          <span key={i} className="text-center font-mono text-[10px] tabular-nums text-muted-foreground/80">
+          <span key={i} className="text-center text-[11px] tabular-nums text-muted-foreground/80">
             {[1, 5, 10, 15, 20, 25, 31].includes(i + 1) ? i + 1 : ''}
           </span>
         ))}
       </div>
-      <div className="flex flex-col gap-[3px] md:gap-[5px]">
+      <div className="flex flex-col gap-[5px]">
         {grid.map(({ month, days }) => (
-          <div
-            key={month}
-            className={cn(
-              'relative grid items-center gap-[2px] rounded-md md:gap-[3px]',
-              cols,
-              // Phone: the whole row is the touch target; the active row gets a faint band.
-              zoomMonth === month && 'max-md:bg-muted/50',
-            )}
-          >
-            <span className="pr-1 text-[11px] leading-none text-muted-foreground md:text-xs">{monthShort[month - 1]}</span>
+          <div key={month} className={cn('grid items-center gap-[5px]', cols)}>
+            <span className="pr-1 text-xs leading-none text-muted-foreground">{monthShort[month - 1]}</span>
             {days.map(({ date, day, state }) => {
               const line = lines.get(date)
-              const color = line ? (line.mood ? display(MOOD_COLORS[line.mood].hex) : undefined) : undefined
+              const color = line?.mood ? display(MOOD_COLORS[line.mood].hex) : undefined
+              const delay = line ? revealFor(date) : null
               const cls = cn(
                 styles.cell,
                 wobble(month, day),
@@ -338,6 +372,7 @@ function YearGrid({
                 state === 'today' && styles.today,
                 state === 'today' && !line && styles.empty,
                 selected === date && state !== 'today' && styles.selected,
+                delay !== null && styles.reveal,
                 justLit === date && styles.lit,
               )
               const status = line ? t(MOOD_LABELS[line.mood ?? 'neutral']) : state === 'future' ? t('還沒到') : t('還沒寫')
@@ -349,26 +384,97 @@ function YearGrid({
                   data-written={line ? '' : undefined}
                   disabled={state === 'future'}
                   onClick={() => onSelectDay(date)}
-                  className={cn(cls, 'max-md:pointer-events-none disabled:cursor-default')}
-                  style={line ? inkStyle(color, month, day) : undefined}
+                  className={cn(cls, 'disabled:cursor-default')}
+                  style={line ? inkStyle(color, month, day, delay) : undefined}
                   aria-label={`${dayLabel(date)} · ${line ? (line.mood ? status : t('已寫')) : status}`}
                   aria-pressed={selected === date}
                   title={line?.content ? `${dayLabel(date)}：${line.content}` : dayLabel(date)}
                 />
               )
             })}
-            {/* Phone: cells are ~9px, too small to aim at — a tap picks the month instead. */}
-            <button
-              type="button"
-              className="absolute inset-0 md:hidden"
-              onClick={() => onSelectMonth(month)}
-              aria-label={t('看{month}', { month: monthShort[month - 1] })}
-              data-life-grid-month={month}
-            />
           </div>
         ))}
       </div>
     </div>
+  )
+}
+
+// ─── Phone: months as columns (like the share image) ────────────────────
+// 31 cells across would be ~9px — too small to aim at. Turned on its side,
+// each month is a ~28px-wide, full-height column: one tap opens its zoom.
+
+function PhoneYearGrid({
+  grid, lines, justLit, monthShort, display, revealFor, zoomMonth, onSelectMonth,
+}: {
+  grid: ReturnType<typeof buildYearGrid>
+  lines: Map<string, DailyLine>
+  justLit: string | null
+  monthShort: string[]
+  display: (hex: string) => string | undefined
+  revealFor: (date: string) => number | null
+  zoomMonth: number
+  onSelectMonth: (month: number) => void
+}) {
+  const { t } = useI18n()
+  return (
+    <div className="flex select-none gap-[2px] md:hidden" data-life-grid-phone>
+      {grid.map(({ month, days }) => (
+        <button
+          key={month}
+          type="button"
+          onClick={() => onSelectMonth(month)}
+          aria-label={t('看{month}', { month: monthShort[month - 1] })}
+          aria-pressed={zoomMonth === month}
+          data-life-grid-month={month}
+          className={cn(
+            'flex min-w-0 flex-1 flex-col items-stretch gap-[3px] rounded-lg px-[3px] pb-1.5 pt-1 transition-colors',
+            zoomMonth === month ? 'bg-muted/70' : 'active:bg-muted/40',
+          )}
+        >
+          <span className="mb-0.5 truncate text-center text-[10px] leading-4 text-muted-foreground">{monthShort[month - 1]}</span>
+          {days.map(({ date, day, state }) => {
+            const line = lines.get(date)
+            const color = line?.mood ? display(MOOD_COLORS[line.mood].hex) : undefined
+            const delay = line ? revealFor(date) : null
+            return (
+              <span
+                key={day}
+                data-m-date={date}
+                className={cn(
+                  'block h-[9px] w-full rounded-[3px]',
+                  line ? cn(styles.ink, !color && 'bg-muted-foreground/60') : state === 'future' ? styles.future : styles.past,
+                  state === 'today' && styles.today,
+                  state === 'today' && !line && styles.empty,
+                  delay !== null && styles.reveal,
+                  justLit === date && styles.lit,
+                )}
+                style={line ? inkStyle(color, month, day, delay) : undefined}
+              />
+            )
+          })}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ─── Letter line: the latest thing you chose to remember ────────────────
+
+function LetterLine({ lines, today }: { lines: Map<string, DailyLine>; today: string }) {
+  const { t, lang } = useI18n()
+  const latest = useMemo(() => {
+    let best: DailyLine | null = null
+    for (const l of lines.values()) if (l.content && l.date < today && (!best || l.date > best.date)) best = l
+    return best
+  }, [lines, today])
+  if (!latest) return null
+  const date = new Intl.DateTimeFormat(locale(lang), { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(utcDate(latest.date))
+  const [open, close] = lang === 'en' ? ['“', '”'] : ['「', '」']
+  return (
+    <p className="mt-6 max-w-[62ch] text-[15px] leading-[1.85] text-muted-foreground [text-wrap:pretty]" data-life-grid-letter>
+      {t('最近一次是 {date}，你記下了：', { date })}
+      <span className="text-foreground" data-user-text>{open}{latest.content}{close}</span>
+    </p>
   )
 }
 
@@ -661,8 +767,8 @@ function DayCard({
           </div>
 
           <fieldset className="mt-1">
-            <legend className="mb-2 text-sm text-muted-foreground">{t('今天的心情')}</legend>
-            <div className="flex flex-wrap gap-1" role="radiogroup" aria-label={t('今天的心情')}>
+            <legend className="mb-2 text-sm text-muted-foreground">{isToday ? t('今天的心情') : t('那天的心情')}</legend>
+            <div className="flex flex-wrap gap-1" role="radiogroup" aria-label={isToday ? t('今天的心情') : t('那天的心情')}>
               {MOODS.map((m) => (
                 <button
                   key={m}
