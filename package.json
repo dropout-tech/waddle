@@ -13,6 +13,7 @@
     "build:web": "next build",
     "build:cap": "BUILD_TARGET=capacitor next build",
     "cap:sync": "pnpm build:cap && cap sync ios",
+    "cap:release": "node scripts/checks/ios-release-env.mjs && pnpm cap:sync",
     "cap:open": "cap open ios",
     "cap:run": "pnpm cap:sync && cap run ios",
     "start": "next start -p ${PORT:-3000}",
