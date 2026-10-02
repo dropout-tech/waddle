@@ -2,8 +2,9 @@
 
 - 日期：2026-10-01
 - 對應規格：spec-ai-review.md 第 6.2 節（九要素）、第 6.4 節（政策修訂）、F2、F9、F12
-- 狀態：**初稿，尚未放進程式。老闆審過才會上。**
-- 兩個空格等老闆提供：【營運者名稱】、【聯絡管道】（一個可收信的私人管道，不是公開討論區）
+- 狀態：**中文已定稿（老闆 2026-10-02「照這版定稿」），尚未放進程式。** 英文照中文結構翻。v5 改動：A、B 兩節加 18 歲聲明；A 節接受會議指派的任務改成會送日期；B 節保存期限改成可刪除逐字稿原文。
+- 老闆 2026-10-02 決定不諮詢律師；下文標「待律師」的句子照現稿使用。
+- 兩個空格等老闆提供：【營運者名稱】、【聯絡管道】（老闆 2026-10-02 決定寫**本名＋Email**，實際值待提供）
 - 本稿是法遵風險盤點後的文案，不是法律意見。標「待律師」的句子建議先問過執業律師。
 
 ---
@@ -33,7 +34,7 @@ Huddle 由【營運者名稱】營運。聯絡方式：【聯絡管道】。
 
 **不會送出的內容**
 圖片與手寫、記事本、Google 日曆事件、別人指派給你的任務、會議連結、地點、與會者名單、會議逐字稿。
-你接受別人的會議指派而產生的任務，只會送出標題與完成狀態。
+你接受別人的會議指派而產生的任務，只會送出標題、完成狀態、完成時間、截止日與排程時間。
 
 **〔開關，預設關〕也納入 AI 會議整理的重點**
 會議重點可能包含與會者的姓名與發言。打開前，請確認你可以這樣使用這些內容。
@@ -54,6 +55,8 @@ OpenAI 預設不會用這些內容訓練模型。為了偵測濫用，OpenAI 可
 
 **提醒**
 AI 產生的內容可能有誤。你的內容如果含有他人資訊或敏感資訊（例如健康、財務），請自行斟酌是否使用。
+
+（按鈕上方一句）我已滿 18 歲，或已取得法定代理人同意。
 
 **按鈕**：〔不同意〕　〔同意並繼續〕
 **連結**：資料與隱私說明
@@ -79,7 +82,7 @@ From the period you choose, items you created yourself:
 
 **What is not sent**
 Images and handwriting, Notebook, Google Calendar events, tasks other people assigned to you, meeting links, locations, attendee lists, and meeting transcripts.
-For tasks created when you accepted someone's meeting assignment, only the title and completion status are sent.
+For tasks created when you accepted someone's meeting assignment, only the title, completion status, completion time, due date, and scheduled time are sent.
 
 **〔Toggle, off by default〕Also include AI meeting summary highlights**
 Meeting highlights may include attendees' names and what they said. Please make sure you may use that content this way before turning it on.
@@ -100,6 +103,8 @@ You simply can't use AI Review. Everything else in Huddle works as usual.
 
 **Note**
 AI-generated content may contain mistakes. If your content includes other people's information or sensitive information (such as health or finances), please consider whether to use this feature.
+
+(One line above the buttons) I am 18 or older, or I have my parent's or legal guardian's consent.
 
 **Buttons**: 〔Decline〕　〔Agree and continue〕
 **Link**: Data & Privacy
@@ -130,7 +135,7 @@ OpenAI（第三方 AI 服務），在美國處理。只有在你按下「整理�
 
 **保留多久**
 OpenAI 預設不會用這些內容訓練模型。為了偵測濫用，OpenAI 可能保留最長 30 天的紀錄；法律要求時可能更久。
-你貼上的內容與整理結果會存在 Huddle，直到你刪除帳號。
+你貼上的內容與整理結果會存在 Huddle。你可以隨時在每筆會議紀錄刪除逐字稿原文；整理結果會保留到你刪除帳號。
 
 **你可以做的事**
 你可以隨時在「設定」撤回同意。撤回之後不會再傳送新的內容；已經送出的內容無法收回。
@@ -142,12 +147,14 @@ OpenAI 預設不會用這些內容訓練模型。為了偵測濫用，OpenAI 可
 **提醒**
 AI 產生的內容可能有誤。逐字稿通常包含其他與會者的姓名與發言，請確認你可以這樣使用，並避免貼上他人未同意分享的機密或敏感內容。
 
+（按鈕上方一句）我已滿 18 歲，或已取得法定代理人同意。
+
 **按鈕**：〔不同意〕　〔同意並繼續〕
 **連結**：資料與隱私說明
 
 （英文版在中文定稿後照同樣結構翻譯。）
 
-> 待確認：「存在 Huddle，直到你刪除帳號」是照現況寫的。目前使用者不能單獨刪除某一筆會議整理紀錄，這句如果老闆覺得不妥，要另外加刪除功能。
+> 已決（2026-10-02）：老闆決定新增「刪除逐字稿原文」，上面「保留多久」已改寫。功能要求見規格第 12 節。
 
 ---
 
@@ -187,6 +194,6 @@ AI 產生的內容可能有誤。逐字稿通常包含其他與會者的姓名�
 
 ## E. 還需要老闆決定或提供的
 
-1. 【營運者名稱】與【聯絡管道】。
-2. 未成年使用者（待律師）：是否在同意畫面加一句「我已滿 18 歲，或已取得法定代理人同意」。法規顧問對未成年單獨按同意的效力信心為中。
-3. B 節的待確認：會議整理紀錄目前不能單獨刪除。
+1. 【營運者名稱】與【聯絡管道】：老闆決定寫本名＋Email，實際值待提供。
+2. ~~未成年使用者~~ 已決（2026-10-02）：加，A、B 兩節按鈕上方都已寫入。
+3. ~~B 節的待確認~~ 已決（2026-10-02）：新增刪除逐字稿原文。
