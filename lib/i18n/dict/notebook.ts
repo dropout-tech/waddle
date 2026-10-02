@@ -107,4 +107,14 @@ export const dict: Record<string, string> = {
 
   // use-notebook.ts
   '尚未登入': 'Not signed in',
+
+  // upload-image.ts
+  '只能插入圖片檔': 'Only image files can be inserted',
+
+  // use-notebook.ts — save conflict between devices (nothing is dropped)
+  '{title}（衝突副本）': '{title} (conflict copy)',
+  '這篇筆記在其他裝置上也改過了。那邊的版本留在原筆記，這台的內容另存為「{title}」。':
+    'This note was also changed on another device. That version stays in the note; what you wrote here was saved as "{title}".',
+  '這篇筆記在其他裝置上也改過了，但筆記數量已達方案上限，沒辦法另存一份。這台的內容還保留在這台裝置上：刪掉一些筆記或升級後，下次存檔會再試一次；在那之前請不要登出。':
+    "This note was also changed on another device, but you've reached your plan's note limit, so your version couldn't be saved as a copy. It's still kept on this device: after you delete some notes or upgrade, the next save tries again. Please don't log out until then.",
 }

@@ -12,13 +12,15 @@ struct FocusInfo:Decodable {var mode:String?;var state:String;var title:String;v
     /// Session length in seconds (for the lock-screen progress ring). Optional: older app builds don't send it.
     var total:Int?}
 struct WaterInfo:Decodable {var enabled:Bool;var nextAt:Double?;var count:Int}
-/// One scheduled slot for the 本週時間表 widget (today + 6 days, "HH:mm", "#rrggbb").
+/// One scheduled slot for the 本週時間表 widget (7 days from `weekStart`, "HH:mm", "#rrggbb").
 struct Slot:Decodable {var date:String;var start:String;var end:String;var title:String;var color:String}
 struct Snapshot:Decodable {
     var accountId:String;var epoch:String;var generatedAt:String;var today:String
     var days:[Day];var tasks:[Item];var agenda:[Item];var notes:[Item];var boards:[Item];var focus:FocusInfo;var water:WaterInfo
     /// Optional: snapshots written by older app builds don't have it.
     var week:[Slot]?
+    /// First day of the 本週時間表 grid (每週開始日 setting; 自動 = today). Optional: older builds start at today.
+    var weekStart:String?
     /// 「我的 Huddle」 (lib/widgets/pet.ts). Optional for the same reason.
     var pet:PetInfo?
     /// "zh-TW" | "en" — the app's language (pet.lang wins when present). Optional.
@@ -234,10 +236,9 @@ struct WidgetView:View {
     }
     var body:some View {
         Group {
-            if kind == .pet && family == .accessoryRectangular && entry.lock == nil {petLockScreen}
-            // Every other Lock Screen face (HuddleLockScreen.swift). Owner chose
+            // Every Lock Screen face (HuddleLockScreen.swift). Owner chose
             // "always show" for these, so no privacySensitive here.
-            else if entry.lock != nil || isAccessory {accessoryView}
+            if entry.lock != nil || isAccessory {accessoryView}
             else if kind == .pet,let s=entry.snapshot {petPanel(s).foregroundStyle(ink).widgetURL(petLink(s)).privacySensitive()}
             else if let s=entry.snapshot {
                 // Calendar-heavy widgets fill the whole frame: drop the title row
@@ -343,7 +344,7 @@ struct WidgetView:View {
     }
     func week(_ s:Snapshot)->some View {
         let cal=Calendar(identifier:.gregorian)
-        let start=Self.dayFormat.date(from:s.today) ?? entry.date
+        let start=Self.dayFormat.date(from:s.weekStart ?? s.today) ?? entry.date
         let dates=(0..<7).map{cal.date(byAdding:.day,value:$0,to:start) ?? start}
         let keys=dates.map{Self.dayFormat.string(from:$0)}
         let large=family == .systemLarge
@@ -619,16 +620,6 @@ extension WidgetView {
                 PenguinFigure(color:"ink",accessory:"none").frame(width:family == .systemSmall ? 64:90,height:family == .systemSmall ? 64:90).opacity(0.55)
                 Text(en ? "Open Huddle to adopt your penguin":"打開 Huddle 領養你的企鵝").font(.caption.weight(.semibold)).multilineTextAlignment(.center)
             }.frame(maxWidth:.infinity,maxHeight:.infinity)
-        }
-    }
-    /// Lock screen: name + a title-free bubble (the lock screen can be seen by anyone).
-    @ViewBuilder var petLockScreen:some View {
-        if let s=entry.snapshot,let p=s.pet,p.adopted {
-            let b=petBubble(s,p,safe:true)
-            VStack(alignment:.leading,spacing:1){Text(p.name).font(.headline).lineLimit(1);Text(b.text).font(.caption).lineLimit(2)}
-                .frame(maxWidth:.infinity,alignment:.leading).widgetURL(b.link)
-        } else {
-            Text(entry.snapshot?.pet?.lang == "en" ? "Open Huddle to adopt your penguin":"打開 Huddle 領養你的企鵝").font(.caption).widgetURL(url(.pet))
         }
     }
 }

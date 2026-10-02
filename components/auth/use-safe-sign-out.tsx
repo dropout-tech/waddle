@@ -1,0 +1,94 @@
+'use client'
+
+import { useState } from 'react'
+import { toast } from 'sonner'
+import { prepareSignOut, completeSignOut } from '@/lib/auth/sign-out'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog'
+import { useI18n } from '@/lib/i18n/react'
+
+/**
+ * Sign-out that never silently drops unsynced notes: pending writes are sent
+ * first; if some notebook text still only exists on this device, the user is
+ * asked before it is discarded. Render `dialog` somewhere in the component.
+ */
+export function useSafeSignOut(afterSignOut?: () => void) {
+  const { t } = useI18n()
+  const [busy, setBusy] = useState(false)
+  const [asking, setAsking] = useState<{ userId: string | null; unsynced: number } | null>(null)
+
+  const finish = async (userId: string | null) => {
+    setAsking(null)
+    const { error } = await completeSignOut(userId).catch((e: unknown) => ({ error: e }))
+    setBusy(false) // the button works again if sign-out failed (offline…)
+    if (error) {
+      console.error('[sign-out] failed', error)
+      toast.error(t('登出失敗，請檢查網路後再試一次'))
+      return
+    }
+    afterSignOut?.()
+  }
+
+  const requestSignOut = async () => {
+    if (busy) return
+    setBusy(true)
+    let state: { userId: string | null; unsynced: number }
+    try {
+      state = await prepareSignOut()
+    } catch (e) {
+      console.error('[sign-out] prepare failed', e)
+      setBusy(false)
+      return
+    }
+    if (state.unsynced > 0) {
+      setAsking(state)
+      return
+    }
+    await finish(state.userId)
+  }
+
+  const dialog = (
+    <AlertDialog
+      open={!!asking}
+      onOpenChange={(open) => {
+        if (!open) {
+          setAsking(null)
+          setBusy(false)
+        }
+      }}
+    >
+      <AlertDialogContent data-unsynced-signout>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t('還有內容沒有同步')}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t('有 {count} 則筆記或便條紙還沒存到雲端。請連上網路、稍等幾秒再按一次登出（若筆記數量已達方案上限，請先刪掉一些筆記）；現在登出，這些內容會遺失。', {
+              count: asking?.unsynced ?? 0,
+            })}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t('先不要登出')}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              e.preventDefault()
+              void finish(asking?.userId ?? null)
+            }}
+            className="bg-destructive text-white hover:bg-destructive/90"
+          >
+            {t('仍要登出')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+
+  return { requestSignOut, busy, dialog }
+}

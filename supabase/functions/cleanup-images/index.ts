@@ -10,7 +10,7 @@
 // the reference lookup).
 //
 // Deploy:  supabase functions deploy cleanup-images   (verify_jwt stays on)
-// Requires migration 20260928140000 to be applied first.
+// Requires migrations 20260928140000 and 20261003010000 to be applied first.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { BUCKET, MAX_LIST, createHandler } from './core.mjs'
@@ -35,6 +35,12 @@ Deno.serve(createHandler({
     })
     const { data, error } = await userClient.auth.getUser()
     return error || !data.user ? null : data.user.id
+  },
+
+  async claimRun(ownerId: string, seconds: number) {
+    const { data, error } = await admin.rpc('claim_image_cleanup_run', { p_user: ownerId, p_min_interval_seconds: seconds })
+    if (error) throw error
+    return data === true
   },
 
   async listObjects(ownerId: string) {

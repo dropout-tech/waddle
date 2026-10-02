@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { classifyDbError } from '@/lib/supabase/db-error-reason'
 import { fetchAllRows } from '@/lib/supabase/fetch-all-rows'
+import { isNative } from '@/lib/platform'
 import { seedUserData } from '@/lib/supabase/seed'
 import type { Database, Json } from '@/lib/supabase/database.types'
 import {
@@ -14,7 +15,8 @@ import {
   timeBlockToRow,
   rowToSettings,
 } from '@/lib/supabase/mappers'
-import { toDateString, parseDateString } from '@/lib/calendar-utils'
+import { toDateString, parseDateString, isSeriesStart, shiftSeries, seriesShiftIsExact, overridesFollowingShift, shiftDateString } from '@/lib/calendar-utils'
+import { prefsToRow } from '@/lib/settings-auto'
 import { playTaskCompleteSound } from '@/lib/task-sound'
 import { hapticTaskComplete } from '@/lib/haptics'
 import { pushUndoableAction } from '@/lib/undo-stack'
@@ -128,6 +130,9 @@ function buildTaskInsert(task: Task, userId: string) {
 const SETTINGS_EXT_COL_RE = /day_view_days|week_view_days|keep_completed_today_in_list|quick_links|show_category_prefix|default_category_enabled|focus_board/
 let settingsExtColsKnownMissing = false
 const isMissingSettingsExtColumnError = (err: unknown) => isMissingColumnError(err, SETTINGS_EXT_COL_RE)
+// Pre-20261002110000 DB: default_task_minutes missing, or null into a NOT NULL column.
+const isMissingAutoSettingsError = (err: unknown) =>
+  isMissingColumnError(err, /default_task_minutes/) || (err as { code?: string } | null)?.code === '23502'
 
 // time_blocks.notes — migration 20260824120000_time_blocks_notes.sql (not
 // yet applied to prod as of this writing). Same latch-and-retry shape as the
@@ -145,8 +150,9 @@ const isMissingTimeBlockNotesColumnError = (err: unknown) => isMissingColumnErro
 export const DEFAULT_SETTINGS: UserSettings = {
   calendarStartHour: 0,
   calendarEndHour: 24,
-  defaultView: 'day',
-  weekStartDay: 0,
+  defaultView: null,
+  weekStartDay: null,
+  defaultTaskMinutes: null,
   dayViewDays: 1,
   weekViewDays: 7,
   keepCompletedTodayInList: true,
@@ -189,6 +195,12 @@ interface UseWaddleData {
   timeBlocks: TimeBlock[]
   settings: UserSettings
   isLoading: boolean
+  /**
+   * The first load could not read everything. isLoading stays true (nothing
+   * half-loaded is shown or saved over); call retryLoad to try again.
+   */
+  loadError: boolean
+  retryLoad: () => void
   /** True until the spotlight onboarding tour is completed (or skipped). */
   onboardingCompleted: boolean
   /** Mark the onboarding tour as complete and persist it. */
@@ -237,7 +249,16 @@ interface UseWaddleData {
   updateTimeBlock: (id: string, updates: Partial<TimeBlock>) => Promise<void>
   deleteTimeBlock: (id: string) => Promise<void>
   // Settings
-  saveSettings: (newSettings: UserSettings, newTimeBlocks: TimeBlock[]) => Promise<void>
+  /**
+   * `removed` lists the ids the caller (the settings modal) actually took
+   * out. Only those are deleted — rows the caller never saw (not loaded,
+   * added on another device meanwhile) are left alone.
+   */
+  saveSettings: (
+    newSettings: UserSettings,
+    newTimeBlocks: TimeBlock[],
+    removed?: { timeBlockIds?: string[]; slotTypeIds?: string[] },
+  ) => Promise<void>
   /**
    * Narrow mutation for the bottom quick-links bar. Updates only the
    * `quick_links` column so we don't pay the time-block-replace cost on
@@ -298,6 +319,7 @@ export function useWaddleData(): UseWaddleData {
     commitScratchpadByDate(next)
   }, [])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [onboardingCompleted, setOnboardingCompleted] = useState(true)
   const userIdRef = useRef<string | null>(null)
   // Monotonic counter so a fresh load() can invalidate any in-flight older
@@ -340,6 +362,11 @@ export function useWaddleData(): UseWaddleData {
   // same hook instance sees it already claimed and bails immediately.
   const initialLoadClaimedRef = useRef(false)
 
+  // Whether the time_blocks / slot_types lists on screen came from a
+  // successful read. When they didn't, their real contents are unknown and
+  // saveSettings must not delete anything from those tables.
+  const listsLoadedRef = useRef({ timeBlocks: false, slotTypes: false })
+
   // Mirrors `workspaces` so mutation callbacks can read the current task
   // tree without listing `workspaces` in their dependency arrays — which
   // would re-create the callbacks on every state change and bust the
@@ -349,12 +376,16 @@ export function useWaddleData(): UseWaddleData {
     workspacesRef.current = workspaces
   }, [workspaces])
 
+  // 'ok' = fresh data is on screen; 'failed' = a read failed or no user came
+  // back (what is on screen is kept); 'interrupted' = a local write landed
+  // mid-read, so the snapshot was dropped and is still owed; 'stale' =
+  // superseded by a newer load, nothing committed on purpose.
   const loadData = useCallback(
-    async ({ initial = false }: { initial?: boolean } = {}) => {
+    async ({ initial = false }: { initial?: boolean } = {}): Promise<'ok' | 'failed' | 'interrupted' | 'stale'> => {
       // Synchronous claim — must run before any `await` in this function.
       // See initialLoadClaimedRef above.
       if (initial) {
-        if (initialLoadClaimedRef.current) return
+        if (initialLoadClaimedRef.current) return 'stale'
         initialLoadClaimedRef.current = true
       }
       const myVersion = ++loadVersionRef.current
@@ -383,10 +414,13 @@ export function useWaddleData(): UseWaddleData {
         fetchAllRows((from, to) => supabase.from('tasks').select('*', { count: 'exact' })
           .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
           .order('id', { ascending: true }).range(from, to)),
-        supabase.from('time_blocks').select('*').order('date', { ascending: true }),
+        // Paged like tasks (1000-row cap); id makes the order total.
+        fetchAllRows((from, to) => supabase.from('time_blocks').select('*', { count: 'exact' })
+          .order('date', { ascending: true }).order('id', { ascending: true }).range(from, to)),
         supabase.from('user_settings').select('*').eq('user_id', userId).maybeSingle(),
         supabase.from('slot_types').select('*').order('sort_order', { ascending: true }),
-        supabase.from('scratchpad_items').select('*').order('created_at', { ascending: false }),
+        fetchAllRows((from, to) => supabase.from('scratchpad_items').select('*', { count: 'exact' })
+          .order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)),
       ])
       const { data: { session: localSession } } = await supabase.auth.getSession()
       const localUserId = localSession?.user.id ?? null
@@ -399,7 +433,7 @@ export function useWaddleData(): UseWaddleData {
       ])
       if (!user) {
         if (initial && !isStale()) setIsLoading(false)
-        return
+        return 'failed'
       }
       userIdRef.current = user.id
 
@@ -412,22 +446,31 @@ export function useWaddleData(): UseWaddleData {
       // assume workspaces already exist (user has been using the app).
       // First-run seeding must finish before the data is used: discard the
       // (empty) speculative reads and read everything again afterwards.
-      if (initial && (!wsRows || wsRows.length === 0)) {
+      // A FAILED workspaces read is not an empty account: never seed demo
+      // data into a real account because one request errored.
+      if (initial && !reads[0].error && (!wsRows || wsRows.length === 0)) {
         try {
           await seedUserData(user.id, user.email ?? '', supabase)
         } catch (err) {
           console.error('[seed] failed:', err)
           toast.error(translate('初始化資料失敗，請重新整理'))
           if (!isStale()) setIsLoading(false)
-          return
+          return 'failed'
         }
         reads = await readAll(user.id)
         wsRows = reads[0].data
       }
-      // The tasks read spans several requests for a large account, and one
-      // failed page leaves no list at all. On a background refresh, keep what
-      // is on screen rather than blanking every task until the next refresh.
-      if (!initial && reads[2].error) return
+      // Any failed read means that list's real contents are unknown — never
+      // treat it as empty (a failed categories read hides every task, a failed
+      // settings read would show defaults that the next save writes over the
+      // real ones). On a background refresh keep what is on screen; on the
+      // first load stay on the loading screen and offer a retry.
+      const readErrors = reads.map((r) => r.error).filter(Boolean)
+      if (readErrors.length > 0) {
+        console.error('[loadData] read failed', readErrors)
+        if (initial && !isStale()) setLoadError(true)
+        return 'failed'
+      }
 
       const [
         ,
@@ -743,11 +786,12 @@ export function useWaddleData(): UseWaddleData {
         }
       }
 
-      if (isStale()) return
+      if (isStale()) return myVersion === loadVersionRef.current ? 'interrupted' : 'stale'
       setWorkspaces(builtWorkspaces)
       assignedTasksRef.current = builtAssigned
       setAssignedTasks(builtAssigned)
       setTimeBlocks(builtTimeBlocks)
+      listsLoadedRef.current = { timeBlocks: !reads[3].error, slotTypes: !reads[5].error }
       petRef.current = builtSettings.pet
       notificationsRef.current = builtSettings.notifications
       setSettings(builtSettings)
@@ -756,6 +800,7 @@ export function useWaddleData(): UseWaddleData {
         setOnboardingCompleted(settingsRow?.onboarding_completed ?? true)
         setIsLoading(false)
       }
+      return 'ok'
     },
     [supabase],
   )
@@ -765,47 +810,104 @@ export function useWaddleData(): UseWaddleData {
     void loadData({ initial: true })
   }, [loadData])
 
+  const retryLoad = useCallback(() => {
+    setLoadError(false)
+    initialLoadClaimedRef.current = false
+    void loadData({ initial: true })
+  }, [loadData])
+
   // ─── Cross-device sync: refetch when tab becomes visible / regains focus.
   // This catches the common "I changed something on phone, switch to laptop,
   // it's still showing the old version" pattern. Throttled to once per 3s
   // so a quick alt-tab / cmd-tab burst doesn't hammer Supabase. We
   // intentionally do NOT toggle isLoading on refetch so the UI doesn't
   // flash the loading spinner.
+  //
+  // The iOS app also refetches on Capacitor's appStateChange: coming back
+  // from the background is not a dependable visibilitychange/focus in
+  // WKWebView. And the first request after a long suspension often fails
+  // while the connection comes back, so a failed refresh is retried twice
+  // instead of leaving the old data on screen until the next switch.
   useEffect(() => {
     // A background refresh must not invalidate the initial load: only that
     // initial request clears isLoading. Attach listeners once it has finished.
     if (isLoading) return
     const REFETCH_THROTTLE_MS = 3000
-    const tryRefetch = () => {
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
-      // Skip refetch while local writes are in flight — otherwise a refetch
-      // landing between optimistic-update and DB-confirm clobbers the new
-      // state with the pre-write DB snapshot.
-      if (pendingWritesRef.current > 0) return
-      const now = Date.now()
-      if (now - lastRefetchRef.current < REFETCH_THROTTLE_MS) return
-      lastRefetchRef.current = now
-      void loadData({ initial: false })
+    const RETRY_DELAYS_MS = [1500, 4000]
+    const WRITE_POLL_MS = 300
+    // A write that never settles (e.g. its request died while suspended)
+    // must not keep a refresh queued forever; the next return will try again.
+    const WRITE_WAIT_LIMIT_MS = 10000
+    const native = isNative()
+    let appActive = true
+    let disposed = false
+    let queuedTimer: ReturnType<typeof setTimeout> | undefined
+    const inForeground = () =>
+      appActive && (typeof document === 'undefined' || document.visibilityState === 'visible')
+    const queue = (fn: () => void, ms: number) => {
+      queuedTimer = setTimeout(() => { queuedTimer = undefined; fn() }, ms)
     }
+    const refetch = ({ force = false, attempt = 0, waitedMs = 0 } = {}) => {
+      if (disposed || !inForeground()) return
+      if (attempt === 0 && waitedMs === 0) {
+        if (force) {
+          clearTimeout(queuedTimer)
+          queuedTimer = undefined
+        } else {
+          // A deferred or retry refresh is already queued — it will run.
+          if (queuedTimer !== undefined) return
+          if (Date.now() - lastRefetchRef.current < REFETCH_THROTTLE_MS) return
+        }
+      }
+      // Never read while local writes are in flight — a refetch landing
+      // between optimistic-update and DB-confirm clobbers the new state with
+      // the pre-write DB snapshot. Wait for them to settle instead.
+      if (pendingWritesRef.current > 0) {
+        if (waitedMs < WRITE_WAIT_LIMIT_MS) {
+          queue(() => refetch({ attempt, waitedMs: waitedMs + WRITE_POLL_MS }), WRITE_POLL_MS)
+        }
+        return
+      }
+      lastRefetchRef.current = Date.now()
+      void loadData({ initial: false }).catch(() => 'failed' as const).then((result) => {
+        // 'interrupted' (a local write landed mid-read) is retried too, so a
+        // tap right after returning doesn't cancel the sync it was owed.
+        if (result === 'ok' || result === 'stale') return
+        if (disposed || attempt >= RETRY_DELAYS_MS.length) return
+        if (queuedTimer !== undefined) return
+        queue(() => refetch({ attempt: attempt + 1 }), RETRY_DELAYS_MS[attempt])
+      })
+    }
+    const tryRefetch = () => refetch()
+    const afterExternalWrite = () => refetch({ force: true })
     document.addEventListener('visibilitychange', tryRefetch)
     window.addEventListener('focus', tryRefetch)
-    let externalRefreshTimer: ReturnType<typeof setTimeout> | undefined
-    const afterExternalWrite = () => {
-      clearTimeout(externalRefreshTimer)
-      if (pendingWritesRef.current > 0) { externalRefreshTimer = setTimeout(afterExternalWrite, 300); return }
-      lastRefetchRef.current = 0
-      tryRefetch()
-    }
     window.addEventListener('huddle:tasks-imported', afterExternalWrite)
     window.addEventListener('huddle-widget-synced', afterExternalWrite)
     window.addEventListener(ASSIGNMENTS_CHANGED_EVENT, afterExternalWrite)
+    let removeAppListener: (() => void) | undefined
+    if (native) {
+      void import('@capacitor/app').then(({ App }) =>
+        App.addListener('appStateChange', ({ isActive }) => {
+          // Also fires around Control Center / system sheets, so it keeps
+          // the normal throttle rather than forcing a read every time.
+          appActive = isActive
+          if (isActive) refetch()
+        }),
+      ).then((handle) => {
+        if (disposed) void handle.remove()
+        else removeAppListener = () => void handle.remove()
+      }).catch(() => {})
+    }
     return () => {
+      disposed = true
+      removeAppListener?.()
       window.removeEventListener(ASSIGNMENTS_CHANGED_EVENT, afterExternalWrite)
       document.removeEventListener('visibilitychange', tryRefetch)
       window.removeEventListener('focus', tryRefetch)
       window.removeEventListener('huddle:tasks-imported', afterExternalWrite)
       window.removeEventListener('huddle-widget-synced', afterExternalWrite)
-      clearTimeout(externalRefreshTimer)
+      clearTimeout(queuedTimer)
     }
   }, [loadData, isLoading])
 
@@ -835,6 +937,84 @@ export function useWaddleData(): UseWaddleData {
         ? translate('儲存失敗：{op}（{reason}）', { op: translate(op), reason: why })
         : translate('儲存失敗：{op}', { op: translate(op) })
     )
+  }
+
+  // Put one task back exactly as it was (rollback after a failed write).
+  const restoreTaskSnapshot = (snapshot: Task) => {
+    setWorkspaces((prev) => prev.map((w) => ({
+      ...w,
+      categories: w.categories.map((c) => ({
+        ...c,
+        tasks: c.tasks.map((t) => (t.id === snapshot.id ? snapshot : t)),
+      })),
+    })))
+  }
+
+  // "Only this" on a virtual occurrence of a recurring master: write the
+  // one-off override FIRST and only then exclude the date from the master.
+  // The reverse order made that occurrence vanish whenever the second
+  // request failed. Any failure undoes what was written, rolls the screen
+  // back (override gone, master's exdates restored) and tells the user.
+  const detachOccurrence = async (master: Task, override: Task, nextExdates: string[], op: string) => {
+    const userId = requireUserId()
+    const { error: insertError } = await supabase.from('tasks').insert(buildTaskInsert(override, userId))
+    let error: unknown = insertError
+    if (!insertError) {
+      const { error: exdateError } = await supabase.from('tasks').update({ exdates: nextExdates }).eq('id', master.id)
+      if (!exdateError) return true
+      error = exdateError
+      await supabase.from('tasks').delete().eq('id', override.id)
+    }
+    setWorkspaces((prev) => prev.map((w) => ({
+      ...w,
+      categories: w.categories.map((c) => ({
+        ...c,
+        tasks: c.tasks
+          .filter((t) => t.id !== override.id)
+          .map((t) => (t.id === master.id ? { ...t, exdates: master.exdates } : t)),
+      })),
+    })))
+    handleDbError(op)(error)
+    return false
+  }
+
+  // Put tasks that were optimistically removed back on screen (their DELETE
+  // failed, so the server still has them).
+  const putTasksBack = (tasks: Task[]) => {
+    setWorkspaces((prev) => prev.map((w) => ({
+      ...w,
+      categories: w.categories.map((c) => {
+        const add = tasks.filter((t) => t.categoryId === c.id && !c.tasks.some((x) => x.id === t.id))
+        return add.length ? { ...c, tasks: [...c.tasks, ...add] } : c
+      }),
+    })))
+  }
+
+  // Deleting a recurring series must take its "only this" overrides along:
+  // tasks.parent_id is ON DELETE SET NULL, so they used to stay on the
+  // calendar as orphans. `fromDate` limits it to occurrences on/after that
+  // day ("delete this and following"). Returns the removed overrides so an
+  // undo can restore them. Callers delete/cap the master FIRST: if this
+  // second request fails, the overrides are still on the server — they go
+  // back on screen and the undo restores the master only.
+  const deleteSeriesOverrides = async (masterId: string, fromDate?: string): Promise<Task[]> => {
+    const overrides: Task[] = []
+    for (const w of workspacesRef.current) for (const c of w.categories) for (const t of c.tasks) {
+      if (t.parentId === masterId && (!fromDate || (!!t.scheduledDate && t.scheduledDate >= fromDate))) overrides.push(t)
+    }
+    if (overrides.length === 0) return []
+    const ids = new Set(overrides.map((t) => t.id))
+    setWorkspaces((prev) => prev.map((w) => ({
+      ...w,
+      categories: w.categories.map((c) => ({ ...c, tasks: c.tasks.filter((t) => !ids.has(t.id)) })),
+    })))
+    const { error } = await supabase.from('tasks').delete().in('id', [...ids])
+    if (error) {
+      handleDbError('刪除任務')(error)
+      putTasksBack(overrides)
+      return []
+    }
+    return overrides
   }
 
   // ─── Assigned-to-me tasks ────────────────────────────
@@ -1371,8 +1551,15 @@ export function useWaddleData(): UseWaddleData {
         // Idempotent: the row (client UUID) is already in the DB and our
         // optimistic state — swallow the duplicate instead of alarming the user.
         if (error && isDuplicateKeyError(error)) { inserted = true; return }
-        if (error) handleDbError('建立任務')(error)
-        else inserted = true
+        if (error) {
+          handleDbError('建立任務')(error)
+          // The row does not exist: take the optimistic copy off the screen,
+          // or later edits to it silently update 0 rows.
+          setWorkspaces((prev) => prev.map((w) => ({
+            ...w,
+            categories: w.categories.map((c) => ({ ...c, tasks: c.tasks.filter((t) => t.id !== task.id) })),
+          })))
+        } else inserted = true
       } finally {
         pendingWritesRef.current -= 1
         delete pendingTaskCreatesRef.current[task.id]
@@ -1419,6 +1606,8 @@ export function useWaddleData(): UseWaddleData {
       if (t) { existing = t; break }
     }
     if (!existing) return
+    // "This and following" from the series' first day IS the whole series.
+    if (recurrenceChoice === 'this_and_following' && isSeriesStart(existing, targetDate)) recurrenceChoice = 'all'
 
     // Non-recurring or "all" or missing choice
     if (!existing.isRecurring || recurrenceChoice === 'all' || !recurrenceChoice) {
@@ -1552,7 +1741,10 @@ export function useWaddleData(): UseWaddleData {
         try {
           const dbUpdates = taskToRow(updates)
           const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', taskId)
-          if (error) handleDbError('更新任務')(error)
+          if (error) {
+            restoreTaskSnapshot(existing)
+            handleDbError('更新任務')(error)
+          }
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -1594,9 +1786,7 @@ export function useWaddleData(): UseWaddleData {
 
         pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
-          await supabase.from('tasks').update({ exdates: nextExdates }).eq('id', taskId)
-          const userId = requireUserId()
-          await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
+          await detachOccurrence(existing, newTask, nextExdates, '更新任務')
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -1939,9 +2129,33 @@ export function useWaddleData(): UseWaddleData {
         }))
       )
       pendingWritesRef.current += 1; mutationSeqRef.current += 1
+      let removedOverrides: Task[] = []
       try {
+        // Master first, overrides second: the reverse order left the series'
+        // excluded days blank whenever the second request failed.
         const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-        if (error) handleDbError('刪除任務')(error)
+        if (error) {
+          handleDbError('刪除任務')(error)
+          // Nothing was deleted — show it again; no undo entry needed.
+          putTasksBack([task])
+          if (parentExdateCleanup) {
+            const cleanup = parentExdateCleanup
+            const parentBefore = task.parentId
+            setWorkspaces((prev) => prev.map((w) => ({
+              ...w,
+              categories: w.categories.map((c) => ({
+                ...c,
+                tasks: c.tasks.map((t) =>
+                  t.id === cleanup.parentId && parentBefore && task.scheduledDate
+                    ? { ...t, exdates: [...(t.exdates ?? []), task.scheduledDate] }
+                    : t,
+                ),
+              })),
+            })))
+          }
+          return
+        }
+        if (task.isRecurring && !task.parentId) removedOverrides = await deleteSeriesOverrides(taskId)
         if (parentExdateCleanup) {
           await supabase
             .from('tasks')
@@ -1963,6 +2177,7 @@ export function useWaddleData(): UseWaddleData {
           label: translate('刪除「{title}」', { title: snapshot.title }),
           undo: async () => {
             await restoreDeletedTask(snapshot)
+            for (const o of removedOverrides) await restoreDeletedTask(o)
             if (exdateRestore) {
               // Re-add the date back to parent's exdates so the master skips
               // it again (matching the pre-delete state).
@@ -2095,16 +2310,26 @@ export function useWaddleData(): UseWaddleData {
           }))
         )
         pendingWritesRef.current += 1; mutationSeqRef.current += 1
+        let removedOverrides: Task[] = []
         try {
+          // Master first (see the "all" branch above).
           const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-          if (error) handleDbError('刪除任務')(error)
+          if (error) {
+            handleDbError('刪除任務')(error)
+            putTasksBack([snapshot])
+            return
+          }
+          removedOverrides = await deleteSeriesOverrides(taskId)
         } finally {
           pendingWritesRef.current -= 1
         }
         if (recordUndo) {
           pushUndoableAction({
             label: translate('刪除「{title}」', { title: snapshot.title }),
-            undo: () => restoreDeletedTask(snapshot),
+            undo: async () => {
+              await restoreDeletedTask(snapshot)
+              for (const o of removedOverrides) await restoreDeletedTask(o)
+            },
             redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
           })
         }
@@ -2132,16 +2357,15 @@ export function useWaddleData(): UseWaddleData {
       )
 
       pendingWritesRef.current += 1; mutationSeqRef.current += 1
+      let removedOverrides: Task[] = []
       try {
         const { error } = await supabase
           .from('tasks')
           .update({ recurrence_end_date: endDate })
           .eq('id', taskId)
         if (error) handleDbError('更新重複任務結束日')(error)
-        
-        // 2. We don't need to create a new task since it's a delete.
-        // But we should re-parent or delete detached tasks past targetDate.
-        // For simplicity, we just delete the master's "future" via endDate.
+        // 2. Overrides on/after targetDate belong to the deleted part.
+        else removedOverrides = await deleteSeriesOverrides(taskId, targetDate)
       } finally {
         pendingWritesRef.current -= 1
       }
@@ -2173,6 +2397,7 @@ export function useWaddleData(): UseWaddleData {
               .from('tasks')
               .update({ recurrence_end_date: previousEndDate || null })
               .eq('id', taskId)
+            for (const o of removedOverrides) await restoreDeletedTask(o)
           },
           redo: () => deleteTask(taskId, targetDate, recurrenceChoice, false),
         })
@@ -2187,7 +2412,10 @@ export function useWaddleData(): UseWaddleData {
     endTime: string,
     recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice,
     targetDate?: string,
-    recordUndo: boolean = true
+    recordUndo: boolean = true,
+    /** Undo/redo of a series shift: exactly the overrides that moved with
+     *  it, instead of re-deriving them from exdates (see below). */
+    followOverrides?: string[]
   ) => {
     // A caller that drops an argument shifts the date into the start-time
     // slot (a wrapper did exactly that from 2026-09-25 to 10-01). Refuse
@@ -2221,6 +2449,38 @@ export function useWaddleData(): UseWaddleData {
     }
 
     if (!task) return
+    // "This and following" from the series' first day IS the whole series.
+    if (recurrenceChoice === 'this_and_following' && isSeriesStart(task, targetDate)) recurrenceChoice = 'all'
+
+    // "All occurrences" after dragging one occurrence: move the series (its
+    // start and, for 每週幾 series, its weekdays) by the drag's day offset.
+    let seriesShifted = false
+    let shiftedDays: number[] | undefined
+    let shiftedExdates: string[] | undefined
+    // "Only this" overrides still on their original day move along (see
+    // overridesFollowingShift); id → [as it was, new date].
+    const movedOverrides = new Map<string, [Task, string]>()
+    if (task.isRecurring && recurrenceChoice === 'all' && date && targetDate && task.scheduledDate) {
+      if (!seriesShiftIsExact(task, targetDate, date)) {
+        // Not expressible as the same rule (every 2+ weeks, several weekdays,
+        // moved across a week boundary): change nothing rather than save a
+        // schedule that puts some days in the wrong week.
+        toast.error(translate('這個重複任務是「每隔幾週、選了多個星期幾」，整串拖到這裡會讓部分日期跑到錯的那一週。請打開任務，在編輯視窗調整日期和星期。'))
+        return
+      }
+      const shifted = shiftSeries(task, targetDate, date)
+      date = shifted.scheduledDate
+      shiftedDays = shifted.daysOfWeek
+      shiftedExdates = shifted.exdates
+      const allTasks = workspacesRef.current.flatMap((w) => w.categories.flatMap((c) => c.tasks))
+      const following = followOverrides
+        ? allTasks.filter((t) => followOverrides.includes(t.id) && t.parentId === task!.id && !!t.scheduledDate)
+        : overridesFollowingShift(task, allTasks)
+      for (const o of following) {
+        movedOverrides.set(o.id, [o, shiftDateString(o.scheduledDate!, shifted.offset)])
+      }
+      seriesShifted = true
+    }
 
     // Non-recurring or "all" or missing choice
     if (!task.isRecurring || recurrenceChoice === 'all' || !recurrenceChoice) {
@@ -2236,22 +2496,56 @@ export function useWaddleData(): UseWaddleData {
                     scheduledStartTime: startTime,
                     scheduledEndTime: endTime,
                     ...(date ? { scheduledDate: date } : {}),
+                    ...(shiftedDays && t.recurrence ? { recurrence: { ...t.recurrence, daysOfWeek: shiftedDays } } : {}),
+                    ...(shiftedExdates ? { exdates: shiftedExdates } : {}),
                     updatedAt: new Date().toISOString(),
                   }
-                : t
+                : movedOverrides.has(t.id)
+                  ? { ...t, scheduledDate: movedOverrides.get(t.id)![1], updatedAt: new Date().toISOString() }
+                  : t
             ),
           })),
         }))
       )
 
-      const update: { scheduled_start_time: string; scheduled_end_time: string; scheduled_date?: string } = {
+      const update: {
+        scheduled_start_time: string
+        scheduled_end_time: string
+        scheduled_date?: string
+        recurrence_days_of_week?: number[]
+        exdates?: string[]
+      } = {
         scheduled_start_time: startTime,
         scheduled_end_time: endTime,
       }
       if (date) update.scheduled_date = date
+      if (shiftedDays) update.recurrence_days_of_week = shiftedDays
+      if (shiftedExdates) update.exdates = shiftedExdates
+
+      // Overrides that follow a series shift are written BEFORE the series:
+      // an override left on its old day after the series' exdates moved would
+      // show next to the series' own occurrence there. Any failure puts the
+      // overrides already moved back (best effort) and the screen back.
+      const overrides = [...movedOverrides.values()]
+      const putOverridesBack = async (written: number) => {
+        for (const [before] of overrides.slice(0, written)) {
+          await supabase.from('tasks').update({ scheduled_date: before.scheduledDate }).eq('id', before.id)
+        }
+        restoreTaskSnapshot(task!)
+        overrides.forEach(([o]) => restoreTaskSnapshot(o))
+      }
 
       pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
+        for (let i = 0; i < overrides.length; i++) {
+          const [before, newDate] = overrides[i]
+          const { error: overrideError } = await supabase.from('tasks').update({ scheduled_date: newDate }).eq('id', before.id)
+          if (overrideError) {
+            await putOverridesBack(i)
+            handleDbError('重新排程')(overrideError)
+            return
+          }
+        }
         // .select() so PostgREST returns the rows the UPDATE touched. If RLS
         // or a stale session silently filters the row out, error stays null
         // but data is empty — exactly the "task disappears" failure mode.
@@ -2262,10 +2556,12 @@ export function useWaddleData(): UseWaddleData {
           .select('id, scheduled_date, scheduled_start_time, scheduled_end_time')
         if (error) {
           console.error('[rescheduleTask] supabase error', { taskId, update, error })
+          if (overrides.length) await putOverridesBack(overrides.length)
           handleDbError('重新排程')(error)
           return
         }
         if (!data || data.length === 0) {
+          if (overrides.length) await putOverridesBack(overrides.length)
           const { data: { user } } = await supabase.auth.getUser()
           console.error('[rescheduleTask] 0 rows updated — RLS / stale session?', {
             taskId,
@@ -2290,16 +2586,21 @@ export function useWaddleData(): UseWaddleData {
         const beforeEnd = task.scheduledEndTime
         const title = task.title
         const newDate = date ?? beforeDate
+        // A shifted series is undone/redone as the opposite shift, so its
+        // weekdays move back too (passing the old start alone wouldn't).
+        const shiftFrom = seriesShifted ? newDate : undefined
+        const shiftBackFrom = seriesShifted ? beforeDate : undefined
+        const movedIds = seriesShifted ? [...movedOverrides.keys()] : undefined
         pushUndoableAction({
           label: translate('重排「{title}」', { title }),
           undo: () => {
             if (beforeStart && beforeEnd) {
-              return rescheduleTask(taskId, beforeDate, beforeStart, beforeEnd, 'all', undefined, false)
+              return rescheduleTask(taskId, beforeDate, beforeStart, beforeEnd, 'all', shiftFrom, false, movedIds)
             }
             // Task was pending before — undo by unscheduling.
             return unscheduleTask(taskId, beforeDate, 'all', undefined, false)
           },
-          redo: () => rescheduleTask(taskId, newDate, startTime, endTime, 'all', undefined, false),
+          redo: () => rescheduleTask(taskId, newDate, startTime, endTime, 'all', shiftBackFrom, false, movedIds),
         })
       }
       return
@@ -2338,7 +2639,10 @@ export function useWaddleData(): UseWaddleData {
               scheduled_end_time: endTime,
             })
             .eq('id', taskId)
-          if (error) handleDbError('重新排程')(error)
+          if (error) {
+            restoreTaskSnapshot(task)
+            handleDbError('重新排程')(error)
+          }
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -2384,17 +2688,7 @@ export function useWaddleData(): UseWaddleData {
 
         pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
-          const { error: updateError } = await supabase
-            .from('tasks')
-            .update({ exdates: nextExdates })
-            .eq('id', taskId)
-          if (updateError) handleDbError('更新重複任務例外')(updateError)
-
-          const userId = requireUserId()
-          const { error: insertError } = await supabase
-            .from('tasks')
-            .insert(buildTaskInsert(newTask, userId))
-          if (insertError) handleDbError('建立任務例外')(insertError)
+          await detachOccurrence(task, newTask, nextExdates, '建立任務例外')
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -2497,6 +2791,8 @@ export function useWaddleData(): UseWaddleData {
       if (task) break
     }
     if (!task) return
+    // "This and following" from the series' first day IS the whole series.
+    if (recurrenceChoice === 'this_and_following' && isSeriesStart(task, targetDate)) recurrenceChoice = 'all'
 
     // Non-recurring or "all" → clear the master's time fields (and date if
     // fully unscheduled). Earlier delegation to rescheduleTask with `''`
@@ -2583,7 +2879,7 @@ export function useWaddleData(): UseWaddleData {
         )
         pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
-          await supabase
+          const { error } = await supabase
             .from('tasks')
             .update({
               scheduled_start_time: null,
@@ -2591,6 +2887,10 @@ export function useWaddleData(): UseWaddleData {
               scheduled_date: date ?? null,
             })
             .eq('id', taskId)
+          if (error) {
+            restoreTaskSnapshot(task)
+            handleDbError('取消排程')(error)
+          }
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -2631,9 +2931,7 @@ export function useWaddleData(): UseWaddleData {
         )
         pendingWritesRef.current += 1; mutationSeqRef.current += 1
         try {
-          await supabase.from('tasks').update({ exdates: nextExdates }).eq('id', taskId)
-          const userId = requireUserId()
-          await supabase.from('tasks').insert(buildTaskInsert(newTask, userId))
+          await detachOccurrence(task, newTask, nextExdates, '取消排程')
         } finally {
           pendingWritesRef.current -= 1
         }
@@ -2749,6 +3047,10 @@ export function useWaddleData(): UseWaddleData {
         ;({ data, error } = await supabase.from('time_blocks').insert(buildPayload(true)).select('id'))
       }
       if (error) {
+        // Take the optimistic block back off the screen: it never reached
+        // the DB, and leaving it there made a "ghost" that every later drag
+        // bounced back from (0-row update) and that vanished on reload.
+        setTimeBlocks((prev) => prev.filter((b) => b.id !== id))
         handleDbError('建立時間區塊')(error)
         return
       }
@@ -2801,6 +3103,7 @@ export function useWaddleData(): UseWaddleData {
           .select('id'))
       }
       if (error) {
+        if (previous) setTimeBlocks((prev) => prev.map((b) => (b.id === id ? previous! : b)))
         handleDbError('更新時間區塊')(error)
         return
       }
@@ -2848,6 +3151,7 @@ export function useWaddleData(): UseWaddleData {
         .eq('id', id)
         .select('id')
       if (error) {
+        if (removed) setTimeBlocks((prev) => [...prev, removed!])
         handleDbError('刪除時間區塊')(error)
         return
       }
@@ -2880,6 +3184,7 @@ export function useWaddleData(): UseWaddleData {
   const saveSettings = useCallback(async (
     newSettings: UserSettings,
     newTimeBlocks: TimeBlock[],
+    removed?: { timeBlockIds?: string[]; slotTypeIds?: string[] },
   ) => {
     const userId = requireUserId()
     // The pet is owned by setPet — always keep the latest one.
@@ -2898,8 +3203,14 @@ export function useWaddleData(): UseWaddleData {
       user_id: userId,
       calendar_start_hour: newSettings.calendarStartHour,
       calendar_end_hour: newSettings.calendarEndHour,
-      default_view: newSettings.defaultView,
-      week_start_day: newSettings.weekStartDay,
+      // 自動 = null, or the old defaults on a DB without the migration.
+      ...prefsToRow({
+        defaultView: newSettings.defaultView,
+        weekStartDay: newSettings.weekStartDay,
+        defaultTaskMinutes: newSettings.defaultTaskMinutes,
+        // Unknown (no row was read): try the new schema, fall back below.
+        autoColumns: newSettings.autoColumns ?? true,
+      }),
       weather_city: newSettings.weatherCity,
       weather_unit: newSettings.weatherUnit,
       // JSONB columns — UserSettings shapes are richer than the generic Json
@@ -2968,6 +3279,14 @@ export function useWaddleData(): UseWaddleData {
           focus_board: newSettings.focusBoard as unknown as Json,
         }
     let { error } = await supabase.from('user_settings').upsert(fullSettingsRow)
+    // DB without the 自動 migration (NOT NULL columns, no default_task_minutes):
+    // write 自動 as the old defaults instead.
+    if (error && newSettings.autoColumns !== false && isMissingAutoSettingsError(error)) {
+      const legacy = prefsToRow({ ...newSettings, autoColumns: false })
+      const { default_task_minutes: _drop, ...autoFree } = fullSettingsRow as typeof fullSettingsRow & { default_task_minutes?: unknown }
+      void _drop
+      ;({ error } = await supabase.from('user_settings').upsert({ ...autoFree, ...legacy }))
+    }
     if (error && isMissingSettingsExtColumnError(error)) {
       settingsExtColsKnownMissing = true
       console.warn('[settings] migration columns missing — falling back to localStorage. Run latest migration.', error)
@@ -2979,17 +3298,17 @@ export function useWaddleData(): UseWaddleData {
       return
     }
 
-    // Non-destructive write for time blocks: upsert all the rows we want
-    // present, then delete only the rows whose id is NOT in that list. The
-    // previous DELETE-then-INSERT pattern wiped everything if the INSERT
-    // failed for any reason (constraint, RLS, malformed row), and left a
-    // window where the user's DB had zero rows — if a refetch landed there,
-    // the UI flashed empty too.
-    if (newTimeBlocks.length === 0) {
-      const { error: tbError } = await supabase
-        .from('time_blocks').delete().eq('user_id', userId)
-      if (tbError) handleDbError('儲存時間區塊')(tbError)
-    } else {
+    // Time blocks: upsert what the caller holds, then delete only the ids
+    // it reports as removed. Never "delete everything not in this list" — the
+    // list can be short because a read failed, was capped, or another device
+    // added rows while the settings modal was open, and every such row would
+    // be destroyed. Nothing is deleted while the on-screen list is unknown.
+    const keptTimeBlockIds = new Set(newTimeBlocks.map((tb) => tb.id))
+    const removedTimeBlockIds = listsLoadedRef.current.timeBlocks
+      ? (removed?.timeBlockIds ?? []).filter((id) => id && !keptTimeBlockIds.has(id))
+      : []
+    let timeBlocksUpserted = true
+    if (newTimeBlocks.length > 0) {
       const rows = newTimeBlocks.map((tb) => ({
         id: tb.id || crypto.randomUUID(),
         user_id: userId,
@@ -3005,28 +3324,29 @@ export function useWaddleData(): UseWaddleData {
       const { error: upsertError } = await supabase
         .from('time_blocks').upsert(rows, { onConflict: 'id' })
       if (upsertError) {
+        timeBlocksUpserted = false
         handleDbError('儲存時間區塊')(upsertError)
-      } else {
-        const keepIds = rows.map((r) => r.id).join(',')
-        const { error: pruneError } = await supabase
-          .from('time_blocks').delete()
-          .eq('user_id', userId)
-          .not('id', 'in', `(${keepIds})`)
-        if (pruneError) handleDbError('儲存時間區塊')(pruneError)
       }
     }
+    if (timeBlocksUpserted && removedTimeBlockIds.length > 0) {
+      const { error: pruneError } = await supabase
+        .from('time_blocks').delete()
+        .eq('user_id', userId)
+        .in('id', removedTimeBlockIds)
+      if (pruneError) handleDbError('儲存時間區塊')(pruneError)
+    }
 
-    // Slot types: same non-destructive pattern. Only persist user-customs —
-    // built-in types (workspace tabs, 時間區塊/午休/緩衝/專注) are
-    // synthesized at runtime in app/page.tsx, so we don't write them.
+    // Slot types: same rule. Only persist user-customs — built-in types
+    // (workspace tabs, 時間區塊/午休/緩衝/專注) are synthesized at runtime in
+    // app/page.tsx, so we don't write them; built-in rows that exist as
+    // calendar-sharing grant anchors are never deleted here.
     const customSlotTypes = newSettings.slotTypes.filter((s) => !s.isBuiltIn)
-    if (customSlotTypes.length === 0) {
-      // Built-in rows may exist as calendar-sharing grant anchors (seeded on
-      // grant); wiping them would orphan those grants, so only clear customs.
-      const { error: stError } = await supabase
-        .from('slot_types').delete().eq('user_id', userId).eq('is_built_in', false)
-      if (stError) handleDbError('儲存時間區塊類型')(stError)
-    } else {
+    const keptSlotTypeIds = new Set(customSlotTypes.map((s) => s.id))
+    const removedSlotTypeIds = listsLoadedRef.current.slotTypes
+      ? (removed?.slotTypeIds ?? []).filter((id) => id && !keptSlotTypeIds.has(id))
+      : []
+    let slotTypesUpserted = true
+    if (customSlotTypes.length > 0) {
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
       const slotRows = customSlotTypes.map((s) => {
         // parent_id has a uuid FK to slot_types.id, so it can only hold
@@ -3052,18 +3372,17 @@ export function useWaddleData(): UseWaddleData {
       const { error: upsertError } = await supabase
         .from('slot_types').upsert(slotRows, { onConflict: 'id' })
       if (upsertError) {
+        slotTypesUpserted = false
         handleDbError('儲存時間區塊類型')(upsertError)
-      } else {
-        const keepIds = slotRows.map((r) => r.id).join(',')
-        // Built-ins (is_built_in = true) live in the same table; don't prune
-        // them. We only prune user-custom rows that are no longer present.
-        const { error: pruneError } = await supabase
-          .from('slot_types').delete()
-          .eq('user_id', userId)
-          .eq('is_built_in', false)
-          .not('id', 'in', `(${keepIds})`)
-        if (pruneError) handleDbError('儲存時間區塊類型')(pruneError)
       }
+    }
+    if (slotTypesUpserted && removedSlotTypeIds.length > 0) {
+      const { error: pruneError } = await supabase
+        .from('slot_types').delete()
+        .eq('user_id', userId)
+        .eq('is_built_in', false)
+        .in('id', removedSlotTypeIds)
+      if (pruneError) handleDbError('儲存時間區塊類型')(pruneError)
     }
     } finally {
       pendingWritesRef.current -= 1
@@ -3189,7 +3508,7 @@ export function useWaddleData(): UseWaddleData {
 
   const addScratchpadItem = useCallback(async (date: string, item: ScratchpadItem) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const existing = scratchpadRef.current[date] ?? []
     const nextOrder = existing.length ? Math.max(...existing.map((i) => i.sortOrder)) + 10 : 0
     const placed = { ...item, sortOrder: nextOrder }
@@ -3222,7 +3541,7 @@ export function useWaddleData(): UseWaddleData {
 
   const deleteScratchpadItem = useCallback(async (id: string) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const entry = Object.entries(scratchpadRef.current).find(([, items]) => items.some((i) => i.id === id))
     if (!entry) return
     const [date, items] = entry
@@ -3248,9 +3567,9 @@ export function useWaddleData(): UseWaddleData {
 
   const updateScratchpadItem = useCallback(async (id: string, patch: Partial<ScratchpadItem>) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const entry = Object.entries(scratchpadRef.current).find(([, items]) => items.some((i) => i.id === id))
-    if (!entry) { toast.error('儲存失敗：找不到白板項目，請重新整理'); return }
+    if (!entry) { toast.error(translate('儲存失敗：找不到白板項目，請重新整理')); return }
     const [date, items] = entry
     const previous = items.find((i) => i.id === id)!
     const optimistic = { ...previous, ...patch }
@@ -3295,7 +3614,7 @@ export function useWaddleData(): UseWaddleData {
 
   const reorderScratchpadItems = useCallback(async (date: string, items: ScratchpadItem[]) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const previousOrders = new Map((scratchpadRef.current[date] ?? []).map((i) => [i.id, i.sortOrder]))
     const orders = new Map(items.filter((i) => previousOrders.has(i.id)).map((i) => [i.id, i.sortOrder]))
     // The caller may hold stale content/geometry or omit newly created items.
@@ -3332,7 +3651,7 @@ export function useWaddleData(): UseWaddleData {
 
   const clearScratchpadDate = useCallback(async (date: string) => {
     const userId = userIdRef.current
-    if (!userId) { toast.error('請先登入再儲存白板'); return }
+    if (!userId) { toast.error(translate('請先登入再儲存白板')); return }
     const snapshot = scratchpadRef.current[date] ?? []
     setScratchpadByDate((prev) => {
       const next = { ...prev }
@@ -3516,6 +3835,8 @@ export function useWaddleData(): UseWaddleData {
     timeBlocks,
     settings,
     isLoading,
+    loadError,
+    retryLoad,
     onboardingCompleted,
     completeOnboarding,
     applyOnboardingChoice,

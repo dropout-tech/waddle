@@ -14,7 +14,7 @@ test('same stable UUID configures once and purchase only requests backend sync',
   let configured = 0; let loggedOut = false
   const session = createNativeBillingSession({ authenticatedUserId, publicApiKey: 'public-test', purchasesEnabled: true, driver: {
     async configure(options) { assert.equal(options.appUserID, authenticatedUserId); configured++ },
-    async listPackages() { return [{ identifier: 'monthly', localizedPrice: 'NT$149' }] },
+    async listPackages() { return [{ identifier: 'monthly', localizedPrice: 'NT$150' }] },
     async purchase(id) { assert.equal(id, 'monthly') }, async restore() {}, async logOut() { loggedOut = true },
   } })
   const [packages, purchase] = await Promise.all([session.packages(), session.purchase('monthly')])

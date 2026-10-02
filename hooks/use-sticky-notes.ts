@@ -6,9 +6,95 @@ import type { StickyNote, StickyNoteColor, StickyNoteFolder, TiptapDoc } from '@
 import type { Database } from '@/lib/supabase/database.types'
 import { clampNotePosition } from '@/components/sticky-notes/sticky-note-card'
 import { STICKY_CHANGED_EVENT } from '@/lib/widgets/launch'
+import { toast } from 'sonner'
+import { t } from '@/lib/i18n'
+import { conflictCopyId, decideAfterMiss } from '@/lib/note-sync'
+import { registerPendingWrites } from '@/lib/pending-writes'
 
 type StickyNotesRow = Database['public']['Tables']['sticky_notes']['Row']
 type StickyNoteFoldersRow = Database['public']['Tables']['sticky_note_folders']['Row']
+type SupabaseClient = ReturnType<typeof createClient>
+
+// Content saves are version-locked exactly like the notebook's (see
+// lib/note-sync.ts and syncNoteWithLock in use-notebook.ts): a retry of
+// text that failed to save can't overwrite a newer save from another
+// device. On a real conflict the other device's text stays in the note and
+// this device's text becomes a new sticky note next to it.
+type StickySyncResult =
+  | { kind: 'saved'; updatedAt: string }
+  | { kind: 'same'; row: StickyNotesRow }
+  | { kind: 'copied'; row: StickyNotesRow | null; copy: StickyNotesRow }
+  | { kind: 'error'; error: unknown }
+
+async function syncStickyWithLock(
+  supabase: SupabaseClient,
+  a: {
+    userId: string
+    noteId: string
+    content: TiptapDoc
+    token: string | undefined
+    base?: { content: TiptapDoc | null }
+    local?: StickyNote
+    zIndex: number
+  },
+): Promise<StickySyncResult> {
+  let token = a.token
+  let row: StickyNotesRow | null = null
+  for (let attempt = 0; ; attempt++) {
+    if (token) {
+      const { data, error } = await supabase
+        .from('sticky_notes')
+        .update({ content: a.content as unknown as never, updated_at: new Date().toISOString() })
+        .eq('id', a.noteId)
+        .eq('updated_at', token)
+        .select('updated_at')
+      if (error) return { kind: 'error', error }
+      if (data && data.length > 0) return { kind: 'saved', updatedAt: data[0].updated_at }
+    }
+    const res = await supabase.from('sticky_notes').select('*').eq('id', a.noteId).maybeSingle()
+    if (res.error) return { kind: 'error', error: res.error }
+    row = res.data
+    const decision = decideAfterMiss(row, { content: a.content }, a.base)
+    if (decision === 'same' && row) return { kind: 'same', row }
+    if (decision === 'rebase' && row) {
+      if (attempt >= 2) return { kind: 'error', error: new Error('sticky note keeps changing; will retry') }
+      token = row.updated_at
+      continue
+    }
+    break
+  }
+  const src = row
+    ? { x: row.x, y: row.y, width: row.width, height: row.height, color: row.color, folder_id: row.folder_id }
+    : a.local
+      ? { x: a.local.x, y: a.local.y, width: a.local.width, height: a.local.height, color: a.local.color, folder_id: a.local.folderId }
+      : { x: 40, y: 20, width: 260, height: 220, color: 'yellow', folder_id: null }
+  const copyId = conflictCopyId(a.noteId, { content: a.content })
+  const ins = await supabase
+    .from('sticky_notes')
+    .insert({
+      id: copyId,
+      user_id: a.userId,
+      content: a.content as unknown as never,
+      // Offset so the copy doesn't hide exactly behind the original.
+      x: Math.min(src.x + 3, 90),
+      y: Math.min(src.y + 3, 90),
+      width: src.width,
+      height: src.height,
+      color: src.color,
+      folder_id: src.folder_id,
+      on_screen: true,
+      z_index: a.zIndex,
+      updated_at: new Date().toISOString(),
+    })
+    .select('*')
+    .single()
+  if (!ins.error && ins.data) return { kind: 'copied', row, copy: ins.data }
+  if (ins.error?.code === '23505') {
+    const again = await supabase.from('sticky_notes').select('*').eq('id', copyId).maybeSingle()
+    if (!again.error && again.data) return { kind: 'copied', row, copy: again.data }
+  }
+  return { kind: 'error', error: ins.error }
+}
 
 // Data layer for the sticky-notes glass overlay (便條紙). Same optimistic
 // update + rollback shape as use-notebook.ts, but simpler: no title/icon,
@@ -54,10 +140,39 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
   const [loaded, setLoaded] = useState(false)
 
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  // Latest not-yet-sent content per note (see use-notebook.ts): leaving the
+  // page sends it instead of dropping it with the cancelled timer.
+  const pendingContent = useRef<Record<string, TiptapDoc>>({})
   // In-flight INSERTs keyed by note id — any UPDATE/DELETE for a just-created
   // note must await this first (same race guard as use-notebook.ts).
   const pendingCreates = useRef<Record<string, Promise<void>>>({})
+  // Server version token + the content at that version, per note (see
+  // syncStickyWithLock), and a per-note queue so content saves go out one at
+  // a time with the right token.
+  const versionRef = useRef<Record<string, string>>({})
+  const baseRef = useRef<Record<string, TiptapDoc | null>>({})
+  const noteChains = useRef<Record<string, Promise<unknown>>>({})
+  const notesRef = useRef<StickyNote[]>([])
+  // Original → conflict copy until the editor shows the server text (same
+  // as use-notebook.ts): a keystroke in that gap belongs to the copy.
+  const redirectRef = useRef<Record<string, string>>({})
+  useEffect(() => {
+    notesRef.current = notes
+    redirectRef.current = {}
+  }, [notes])
 
+  // The provider lives in the root layout and never unmounts, and signing
+  // out / into another account doesn't reload the page. When the user
+  // changes, drop the previous account's notes and load the new one's —
+  // otherwise B kept seeing (and failing to edit) A's notes.
+  const [stateUserId, setStateUserId] = useState(userId)
+  if (stateUserId !== userId) {
+    setStateUserId(userId)
+    setNotes([])
+    setFolders([])
+    setLoading(true)
+    setLoaded(false)
+  }
   // Load once, the first time the overlay is switched on (and we have a
   // user id) — not on every mount, so flipping the toggle off/on mid-session
   // doesn't refetch.
@@ -79,17 +194,16 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
         setLoaded(true)
         return
       }
+      for (const r of data ?? []) {
+        versionRef.current[r.id] = r.updated_at
+        baseRef.current[r.id] = (r.content as TiptapDoc | null) ?? null
+      }
       setNotes((data ?? []).map(rowToNote))
       setLoading(false)
       setLoaded(true)
     })()
     return () => { mounted = false }
   }, [enabled, loaded, userId, supabase])
-
-  useEffect(() => {
-    const timers = saveTimers.current
-    return () => { Object.values(timers).forEach(clearTimeout) }
-  }, [])
 
   const nextZIndex = useCallback(
     () => notes.reduce((max, n) => Math.max(max, n.zIndex), 0) + 1,
@@ -120,18 +234,26 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
       setNotes((prev) => [...prev, optimistic])
 
       pendingCreates.current[id] = (async () => {
-        const { error } = await supabase.from('sticky_notes').insert({
-          id,
-          user_id: userId,
-          content: null,
-          x: optimistic.x,
-          y: optimistic.y,
-          width: optimistic.width,
-          height: optimistic.height,
-          color: optimistic.color,
-          z_index: z,
-          updated_at: now,
-        })
+        const { data: created, error } = await supabase
+          .from('sticky_notes')
+          .insert({
+            id,
+            user_id: userId,
+            content: null,
+            x: optimistic.x,
+            y: optimistic.y,
+            width: optimistic.width,
+            height: optimistic.height,
+            color: optimistic.color,
+            z_index: z,
+            updated_at: now,
+          })
+          .select('updated_at')
+          .single()
+        if (!error && created) {
+          versionRef.current[id] = created.updated_at
+          baseRef.current[id] = null
+        }
         if (error) {
           console.error('[sticky-notes] create failed', error)
           setNotes((prev) => prev.filter((n) => n.id !== id))
@@ -180,6 +302,10 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
         console.error('[sticky-notes] patch failed', error)
         const prevSnapshot = snapshot
         setNotes((prev) => prev.map((n) => (n.id === id ? prevSnapshot : n)))
+      } else if (!error) {
+        // Drag end / bring-to-front / resize / color are committed once per gesture, so this
+        // fires on release (never mid-drag) and lets the 便條紙 widget re-sort right away.
+        window.dispatchEvent(new Event(STICKY_CHANGED_EVENT))
       }
     },
     [supabase],
@@ -286,24 +412,151 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
   )
 
   // ── Content autosave (debounced), mirrors use-notebook.ts ────────
+  const flushContentRef = useRef<(id: string) => Promise<void>>(async () => {})
+
+  // Conflict: the note shows the other device's text again, this device's
+  // text is the new sticky note `copy`, and the user is told.
+  const applyConflict = useCallback((id: string, row: StickyNotesRow | null, copy: StickyNotesRow) => {
+    versionRef.current[copy.id] = copy.updated_at
+    baseRef.current[copy.id] = (copy.content as TiptapDoc | null) ?? null
+    if (row) {
+      versionRef.current[id] = row.updated_at
+      baseRef.current[id] = (row.content as TiptapDoc | null) ?? null
+    }
+    redirectRef.current[id] = copy.id
+    // Text typed while this was resolving continues this device's version.
+    const newer = pendingContent.current[id]
+    if (newer !== undefined) {
+      delete pendingContent.current[id]
+      clearTimeout(saveTimers.current[id])
+      delete saveTimers.current[id]
+    }
+    setNotes((prev) => {
+      const out: StickyNote[] = []
+      for (const n of prev) {
+        if (n.id === copy.id) continue
+        if (n.id === id) {
+          if (row) out.push({ ...rowToNote(row), syncRev: (n.syncRev ?? 0) + 1 })
+          continue
+        }
+        out.push(n)
+      }
+      out.push({ ...rowToNote(copy), ...(newer !== undefined ? { content: newer } : {}) })
+      return out
+    })
+    if (newer !== undefined) {
+      pendingContent.current[copy.id] = newer
+      void flushContentRef.current(copy.id)
+    }
+    toast.warning(
+      t('這張便條紙在其他裝置上也改過了。那邊的版本留在原處，這台的內容另存成一張新便條紙。'),
+      { duration: 15000, id: `sticky-conflict-${copy.id}` },
+    )
+    window.dispatchEvent(new Event(STICKY_CHANGED_EVENT))
+  }, [])
+
+  const flushContent = useCallback(
+    (id: string): Promise<void> => {
+      clearTimeout(saveTimers.current[id])
+      delete saveTimers.current[id]
+      if (!(id in pendingContent.current)) return Promise.resolve()
+      const content = pendingContent.current[id]
+      delete pendingContent.current[id]
+      const run = async () => {
+        await pendingCreates.current[id]
+        const r = userId
+          ? await syncStickyWithLock(supabase, {
+              userId,
+              noteId: id,
+              content,
+              token: versionRef.current[id],
+              base: id in baseRef.current ? { content: baseRef.current[id] } : undefined,
+              local: notesRef.current.find((n) => n.id === id),
+              zIndex: notesRef.current.reduce((max, n) => Math.max(max, n.zIndex), 0) + 1,
+            })
+          : ({ kind: 'error', error: new Error('not signed in') } as const)
+        if (r.kind === 'error') {
+          console.error('[sticky-notes] content save failed', r.error)
+          // Keep it queued (unless newer text arrived) so the next flush
+          // retries — version-checked, so it can't clobber another device.
+          if (!(id in pendingContent.current)) pendingContent.current[id] = content
+          toast.error(t('便條紙內容沒有存到，請檢查網路後再試'), { id: 'sticky-save-failed' })
+          return
+        }
+        if (r.kind === 'copied') {
+          applyConflict(id, r.row, r.copy)
+          return
+        }
+        versionRef.current[id] = r.kind === 'saved' ? r.updatedAt : r.row.updated_at
+        baseRef.current[id] = content
+        window.dispatchEvent(new Event(STICKY_CHANGED_EVENT)) // refresh the 便條紙 widget
+      }
+      const p = (noteChains.current[id] ?? Promise.resolve()).then(run, run)
+      noteChains.current[id] = p.catch(() => undefined)
+      return p
+    },
+    [supabase, userId, applyConflict],
+  )
+  useEffect(() => {
+    flushContentRef.current = flushContent
+  }, [flushContent])
+
   const saveNoteContent = useCallback(
-    (id: string, content: TiptapDoc) => {
+    (editedId: string, content: TiptapDoc) => {
+      const id = redirectRef.current[editedId] ?? editedId
       const now = new Date().toISOString()
       setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, content, updatedAt: now } : n)))
 
+      pendingContent.current[id] = content
       clearTimeout(saveTimers.current[id])
-      saveTimers.current[id] = setTimeout(async () => {
-        await pendingCreates.current[id]
-        const { error } = await supabase
-          .from('sticky_notes')
-          .update({ content: content as unknown as never, updated_at: new Date().toISOString() })
-          .eq('id', id)
-        if (error) console.error('[sticky-notes] content save failed', error)
-        else window.dispatchEvent(new Event(STICKY_CHANGED_EVENT)) // refresh the 便條紙 widget
-      }, SAVE_DEBOUNCE_MS)
+      saveTimers.current[id] = setTimeout(() => void flushContent(id), SAVE_DEBOUNCE_MS)
     },
-    [supabase],
+    [flushContent],
   )
+
+  // Send pending text on unmount, pagehide and when the tab/app is hidden
+  // (iOS can suspend the WebView right after the user swipes home).
+  const flushAllContent = useCallback(() => {
+    for (const id of Object.keys(pendingContent.current)) void flushContent(id)
+  }, [flushContent])
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushAllContent()
+    }
+    window.addEventListener('pagehide', flushAllContent)
+    // Text whose save failed offline goes out as soon as the connection is back.
+    window.addEventListener('online', flushAllContent)
+    document.addEventListener('visibilitychange', onVisibility)
+    // Signing out sends pending text first and waits for it. Sticky text
+    // has no local backup, so whatever still didn't go through is reported
+    // and the user is asked before it's lost.
+    const unregister = registerPendingWrites(async () => {
+      flushAllContent()
+      await Promise.all(Object.values(noteChains.current))
+      return Object.keys(pendingContent.current).length
+    })
+    return () => {
+      window.removeEventListener('pagehide', flushAllContent)
+      window.removeEventListener('online', flushAllContent)
+      document.removeEventListener('visibilitychange', onVisibility)
+      unregister()
+      flushAllContent()
+    }
+  }, [flushAllContent])
+
+  // Declared after the flush effect on purpose: on unmount that one runs
+  // first and sends pending text; this only discards on an account switch.
+  useEffect(() => {
+    const timers = saveTimers.current
+    const pending = pendingContent.current
+    return () => {
+      // Unsent text of the previous account can't be saved under the new
+      // session (RLS would refuse it); drop it with its timers.
+      Object.values(timers).forEach(clearTimeout)
+      for (const id of Object.keys(pending)) delete pending[id]
+    }
+  }, [userId])
 
   // ── Delete ───────────────────────────────────────────────
   const deleteNote = useCallback(
@@ -314,6 +567,7 @@ export function useStickyNotes(enabled: boolean, userId: string | null) {
         return prev.filter((n) => n.id !== id)
       })
       clearTimeout(saveTimers.current[id])
+      delete pendingContent.current[id]
 
       await pendingCreates.current[id]
       const { error } = await supabase.from('sticky_notes').delete().eq('id', id)

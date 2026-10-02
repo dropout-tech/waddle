@@ -169,7 +169,14 @@ export function TaskDetailModal({
     )
   }
 
+  // End at or before start (e.g. 23:00 → 22:00): the schedule section shows
+  // 「結束需晚於開始」; saving is blocked until it's fixed.
+  const startMinutes = parseTime(scheduledStartTime || '')
+  const endMinutes = parseTime(scheduledEndTime || '')
+  const timeRangeInvalid = startMinutes !== null && endMinutes !== null && endMinutes <= startMinutes
+
   const handleSave = () => {
+    if (timeRangeInvalid) return
     if (!isCreate && task.isRecurring) {
       setRecurrenceModal({ isOpen: true, type: 'save' })
       return
@@ -261,6 +268,8 @@ export function TaskDetailModal({
           isOpen={recurrenceModal.isOpen}
           onClose={() => setRecurrenceModal(null)}
           onConfirm={handleRecurrenceConfirm}
+          mode={recurrenceModal.type === 'delete' ? 'delete' : 'edit'}
+          actionLabel={recurrenceModal.type === 'delete' ? t('刪除') : undefined}
           title={recurrenceModal.type === 'save' ? t('儲存重複任務') : t('刪除重複任務')}
         />
       )}
@@ -635,7 +644,12 @@ export function TaskDetailModal({
           <Button variant="secondary" onClick={onClose}>
             {t('取消')}
           </Button>
-          <Button onClick={handleSave} className="gap-2">
+          <Button
+            onClick={handleSave}
+            disabled={timeRangeInvalid}
+            title={timeRangeInvalid ? t('結束需晚於開始') : undefined}
+            className="gap-2"
+          >
             <Save className="w-4 h-4" />
             {isCreate ? t('建立任務') : t('儲存')}
           </Button>
@@ -658,7 +672,7 @@ const URGENCY_BUCKETS = [
   { label: '低', range: [1, 3], color: 'bg-urgency-low', text: 'text-urgency-low', chipText: 'text-foreground', ring: 'ring-urgency-low/50' },
   { label: '中', range: [4, 5], color: 'bg-urgency-medium', text: 'text-urgency-medium', chipText: 'text-foreground', ring: 'ring-urgency-medium/50' },
   { label: '高', range: [6, 8], color: 'bg-urgency-high', text: 'text-urgency-high', chipText: 'text-white', ring: 'ring-urgency-high/50' },
-  { label: '緊急', range: [9, 10], color: 'bg-urgency-critical', text: 'text-urgency-critical', chipText: 'text-white', ring: 'ring-urgency-critical/50' },
+  { label: '緊急', range: [9, 10], color: 'bg-urgency-critical-strong', text: 'text-urgency-critical-ink', chipText: 'text-white', ring: 'ring-urgency-critical/50' },
 ] as const
 
 function urgencyBucket(level: number) {

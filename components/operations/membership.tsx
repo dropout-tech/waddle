@@ -17,6 +17,8 @@ import { useI18n } from '@/lib/i18n/react'
 import { usePlanUsage } from '@/hooks/use-plan-usage'
 import { usageMeters } from '@/lib/billing/plan-usage-core'
 import { UsageMeters } from '@/components/billing/usage-meters'
+import { WebOnly } from '@/components/legal/web-only'
+import { ProPurchaseCard } from '@/components/billing/pro-purchase-card'
 
 export function MembershipPage() {
   const { user } = useAuth()
@@ -60,6 +62,15 @@ function MembershipContent() {
     setRanking(rows)
     setAlias(self.member.alias)
     setVisible(self.member.leaderboard_visible)
+  }, [user?.id])
+  // For the purchase card's wait-for-server check: re-reads the entitlement
+  // only, so a half-typed alias is not reset while it polls.
+  const refreshEntitlement = useCallback(async () => {
+    const uid = user?.id
+    const self = await operations<Membership>('self')
+    if (!alive.current || currentUser.current !== uid) return null
+    setData(self)
+    return self
   }, [user?.id])
   useEffect(() => {
     alive.current = true
@@ -143,6 +154,7 @@ function MembershipContent() {
               </p>
             )}
           </section>
+          <ProPurchaseCard userId={user?.id} paidUntil={data.paid_until} onRefresh={refreshEntitlement} />
           {/* Empty (nothing rendered) while limits are off or unavailable. */}
           {meters.length > 0 && (
             <section className={styles.panel} data-testid="plan-usage">
@@ -154,6 +166,9 @@ function MembershipContent() {
             </section>
           )}
           <div className={styles.grid}>
+            {/* Not in the iOS/Android app: referral rewards grant Pro days
+                outside in-app purchase (Apple 3.1.1). Web unchanged. */}
+            <WebOnly>
             <section className={styles.panel}>
               <h2>{t('你的推薦碼')}</h2>
               <p className={styles.muted}>
@@ -206,6 +221,7 @@ function MembershipContent() {
                 })}
               </p>
             </section>
+            </WebOnly>
             <section className={styles.panel}>
               <h2>{t('化名與排行榜')}</h2>
               <p className={styles.muted}>
@@ -243,6 +259,9 @@ function MembershipContent() {
                 </button>
               </form>
             </section>
+            {/* Not in the iOS/Android app: unlocking Pro with our own codes is
+                outside in-app purchase (Apple 3.1.1). Web unchanged. */}
+            <WebOnly>
             <section className={styles.panel}>
               <h2>{t('兌換優惠碼')}</h2>
               <p className={styles.muted}>
@@ -308,6 +327,7 @@ function MembershipContent() {
                 </>
               )}
             </section>
+            </WebOnly>
           </div>
           <section className={styles.panel}>
             <h2>{t('推薦排行榜')}</h2>

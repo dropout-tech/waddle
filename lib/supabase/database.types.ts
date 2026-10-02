@@ -286,8 +286,11 @@ type UserSettingsRow = {
   user_id: string
   calendar_start_hour: number
   calendar_end_hour: number
-  default_view: 'day' | 'week' | 'month'
-  week_start_day: number
+  /** Nullable since migration 20261002110000 (null = 自動). */
+  default_view: 'day' | 'week' | 'month' | null
+  week_start_day: number | null
+  /** Migration 20261002110000 — absent before it is applied; null = 自動 (30). */
+  default_task_minutes?: number | null
   /** Migration 0006 — optional in case the column hasn't shipped yet. */
   day_view_days?: number
   /** Migration 0006 — optional in case the column hasn't shipped yet. */
@@ -541,8 +544,9 @@ type UserSettingsInsert = {
   user_id: string
   calendar_start_hour?: number
   calendar_end_hour?: number
-  default_view?: 'day' | 'week' | 'month'
-  week_start_day?: number
+  default_view?: 'day' | 'week' | 'month' | null
+  week_start_day?: number | null
+  default_task_minutes?: number | null
   day_view_days?: number
   week_view_days?: number
   keep_completed_today_in_list?: boolean

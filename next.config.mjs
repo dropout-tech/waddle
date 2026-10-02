@@ -1,3 +1,6 @@
+import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+
 /** @type {import('next').NextConfig} */
 
 // When BUILD_TARGET=capacitor we produce a fully static export (`out/`) that
@@ -15,6 +18,37 @@ const isDev = process.env.NODE_ENV !== 'production'
 // entry if the env var is missing for some reason.
 const supabaseOrigin = (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://jnikcndiexjojgvicohf.supabase.co').replace(/\/$/, '')
 const supabaseWsOrigin = supabaseOrigin.replace(/^http/, 'ws')
+
+// Sentry error reporting (client-side only, see lib/monitoring/sentry.ts).
+// The browser POSTs events to the DSN's ingest origin, so that origin must be
+// in connect-src. With NEXT_PUBLIC_SENTRY_DSN unset this is '' and the CSP is
+// byte-for-byte what it was before Sentry was added.
+function sentryIngestOrigin(dsn) {
+  if (!dsn) return ''
+  try {
+    const u = new URL(dsn.trim())
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.origin : ''
+  } catch {
+    return ''
+  }
+}
+const sentryOrigin = sentryIngestOrigin(process.env.NEXT_PUBLIC_SENTRY_DSN)
+
+// Release tag for error reports: package version (+ short commit when known).
+const appVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version
+function commitSha() {
+  const fromEnv =
+    process.env.NEXT_PUBLIC_COMMIT_SHA ||
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    process.env.ZEABUR_GIT_COMMIT_SHA ||
+    process.env.GITHUB_SHA
+  if (fromEnv) return fromEnv.slice(0, 7)
+  try {
+    return execSync('git rev-parse --short=7 HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+  } catch {
+    return ''
+  }
+}
 
 // Content-Security-Policy for the server-hosted web build only (see note on
 // headers() below — it doesn't apply to the Capacitor static export).
@@ -41,7 +75,7 @@ const cspDirectives = [
   `font-src 'self' data:`,
   // Marketing videos (intro gate, promo film, promo loop) stream from the Supabase CDN bucket marketing-media.
   `media-src 'self' ${supabaseOrigin}`,
-  `connect-src 'self' ${supabaseOrigin} ${supabaseWsOrigin}`,
+  `connect-src 'self' ${supabaseOrigin} ${supabaseWsOrigin}${sentryOrigin ? ` ${sentryOrigin}` : ''}`,
   `frame-src 'self'`,
   `object-src 'none'`,
   `base-uri 'self'`,
@@ -54,6 +88,18 @@ const nextConfig = {
   poweredByHeader: false,
   images: {
     unoptimized: true,
+  },
+  // HUDDLE_APP_SHELL_BUILD is inlined into the bundle: the Capacitor export
+  // only ever ships inside the native app, so app/page.tsx prerenders "/" as
+  // the app loader there instead of the marketing site (Apple 3.1.1: no
+  // prices / downloads in-app).
+  env: {
+    HUDDLE_APP_SHELL_BUILD: isCapacitor ? '1' : '',
+    // Always defined (even as '') so the bundler inlines it and can drop the
+    // whole Sentry chunk when no DSN is configured.
+    NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN || '',
+    NEXT_PUBLIC_APP_VERSION: appVersion,
+    NEXT_PUBLIC_COMMIT_SHA: commitSha(),
   },
   ...(isCapacitor
     ? {
@@ -77,6 +123,12 @@ const nextConfig = {
                 { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
                 { key: 'Content-Security-Policy', value: cspDirectives },
               ],
+            },
+            {
+              // iOS Universal Links: Apple fetches this extensionless file and
+              // expects JSON (org invite links open the app, see the file).
+              source: '/.well-known/apple-app-site-association',
+              headers: [{ key: 'Content-Type', value: 'application/json' }],
             },
             {
               // The PWA service worker must never be served stale by an HTTP

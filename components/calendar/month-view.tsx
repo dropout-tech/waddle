@@ -4,7 +4,8 @@ import { useMemo, useRef, useCallback, useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { Task, TimeBlock } from '@/lib/types'
 import { Check, Plus, ChevronRight } from 'lucide-react'
-import { toDateString, taskOccursOnDate, timeToMinutes } from '@/lib/calendar-utils'
+import { toDateString, taskOccursOnDate, timeToMinutes, daysSinceWeekStart, orderedWeekdays } from '@/lib/calendar-utils'
+import { useMonthStartDay } from '@/components/user-settings-context'
 import type { PeerEvent } from '@/hooks/use-calendar-sharing'
 import { GoogleAgendaRow, GoogleMonthChip } from './google-event-block'
 import { taskDisplayTitle } from '@/lib/task-display'
@@ -59,6 +60,9 @@ export function MonthView({
   const displayColor = useDisplayColor()
   const { t, lang } = useI18n()
   const holidaysEnabled = useTaiwanHolidaysEnabled()
+  // 每週開始日 — drives both the weekday header and each month's leading days.
+  const weekStartDay = useMonthStartDay()
+  const weekdayOrder = useMemo(() => orderedWeekdays(weekStartDay), [weekStartDay])
 
   // Mobile agenda: the day whose tasks are listed under the compact grid.
   // Follows selectedDate (header navigation, "today" button) but can be
@@ -118,7 +122,7 @@ export function MonthView({
     const month = monthDate.getMonth()
 
     const firstDay = new Date(year, month, 1)
-    const firstDayOfWeek = firstDay.getDay()
+    const firstDayOfWeek = daysSinceWeekStart(firstDay, weekStartDay)
     const lastDay = new Date(year, month + 1, 0)
     const totalDays = lastDay.getDate()
     const prevMonthLastDay = new Date(year, month, 0).getDate()
@@ -165,7 +169,7 @@ export function MonthView({
     }
 
     return days
-  }, [])
+  }, [weekStartDay])
 
   // Lookup tasks for a given day, including recurring expansions.
   // Computing per-day at render time (≤42 days per month × N tasks) is
@@ -276,15 +280,15 @@ export function MonthView({
               >
                 {/* Weekday Headers */}
                 <div className="grid grid-cols-7 mb-1">
-                  {WEEKDAYS.map((day, index) => (
+                  {weekdayOrder.map((index) => (
                     <div
-                      key={day}
+                      key={index}
                       className={cn(
                         'text-center text-[11px] font-medium py-1.5',
                         index === 0 || index === 6 ? 'text-foreground/65' : 'text-muted-foreground'
                       )}
                     >
-                      {lang === 'en' ? WEEKDAYS_EN[index] : day}
+                      {lang === 'en' ? WEEKDAYS_EN[index] : WEEKDAYS[index]}
                     </div>
                   ))}
                 </div>
@@ -445,7 +449,7 @@ export function MonthView({
                     }}
                     className="flex items-center gap-1 pr-2 min-h-[52px] [@media(max-height:700px)]:min-h-[46px] rounded-xl active:bg-secondary/50 transition-colors cursor-pointer"
                   >
-                    {!task.id.startsWith('meeting:') && <button
+                    {!task.id.startsWith('meeting:') && !task.isRecurring && <button
                       type="button"
                       onClick={(e) => handleToggleComplete(e, task.id)}
                       aria-label={t('完成任務')}
@@ -456,6 +460,7 @@ export function MonthView({
                         style={{ borderColor: displayColor(task.calendarColor || task.workspaceColor) }}
                       />
                     </button>}
+                    {task.isRecurring && <span aria-hidden="true" className="w-11 h-11 flex-shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <div className="text-[15px] leading-snug text-foreground truncate">
                         {taskDisplayTitle(task, showCategoryPrefix)}
@@ -484,7 +489,7 @@ export function MonthView({
                     }}
                     className="flex items-center gap-1 pr-2 min-h-[52px] rounded-xl active:bg-secondary/50 transition-colors cursor-pointer opacity-60"
                   >
-                    {!task.id.startsWith('meeting:') && <button
+                    {!task.id.startsWith('meeting:') && !task.isRecurring && <button
                       type="button"
                       onClick={(e) => handleToggleComplete(e, task.id)}
                       aria-label={t('取消完成')}
@@ -497,6 +502,7 @@ export function MonthView({
                         <Check className="w-3 h-3 text-white" strokeWidth={3} />
                       </span>
                     </button>}
+                    {task.isRecurring && <span aria-hidden="true" className="w-11 h-11 flex-shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <div className="text-[15px] leading-snug text-muted-foreground line-through truncate">
                         {taskDisplayTitle(task, showCategoryPrefix)}
@@ -546,15 +552,15 @@ export function MonthView({
 
               {/* Weekday Headers */}
               <div className="grid grid-cols-7 mb-2">
-                {WEEKDAYS.map((day, index) => (
+                {weekdayOrder.map((index) => (
                   <div
-                    key={day}
+                    key={index}
                     className={cn(
                       'text-center text-xs font-medium py-2',
                       index === 0 || index === 6 ? 'text-foreground/65' : 'text-muted-foreground'
                     )}
                   >
-                    {lang === 'en' ? WEEKDAYS_EN[index] : `週${day}`}
+                    {lang === 'en' ? WEEKDAYS_EN[index] : `週${WEEKDAYS[index]}`}
                   </div>
                 ))}
               </div>
@@ -644,7 +650,7 @@ export function MonthView({
                               borderLeft: `2px solid ${color}`,
                             }}
                           >
-                            {!task.id.startsWith('meeting:') && <button
+                            {!task.id.startsWith('meeting:') && !task.isRecurring && <button
                               onClick={(e) => handleToggleComplete(e, task.id)}
                               className="flex-shrink-0 w-2.5 h-2.5 rounded-full border flex items-center justify-center"
                               style={{ borderColor: color }}
@@ -712,7 +718,7 @@ export function MonthView({
                             // ramp (never a plain blue) when the day actually
                             // has something pressing in it.
                             backgroundColor: pendingTasks.some(t => t.urgency >= 7)
-                              ? 'var(--urgency-critical)'
+                              ? 'var(--urgency-critical-strong)'
                               : 'var(--foreground)',
                           }}
                         >

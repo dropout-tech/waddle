@@ -36,6 +36,10 @@ export interface NotebookNote {
   isArchived: boolean
   createdAt: string
   updatedAt: string
+  /** Local only, never stored: bumped when this device replaces the note's
+   *  text with the server's version (after a save conflict), so an open
+   *  editor reloads its document. */
+  syncRev?: number
 }
 
 // Sticky note colors — kept in the warm/brand palette (see DESIGN.md), never
@@ -59,6 +63,8 @@ export interface StickyNote {
   onScreen: boolean // false = put away in the drawer (not deleted)
   createdAt: string
   updatedAt: string
+  /** Local only — see NotebookNote.syncRev. */
+  syncRev?: number
 }
 
 // A folder for put-away sticky notes — separate from the notebook's folders.
@@ -83,6 +89,8 @@ export interface NotebookCategory {
 // handle instead of `any` at the data boundary.
 export interface TiptapDoc {
   type: 'doc'
+  /** Only set on stored documents: lib/styled-doc.ts packStyledDoc. */
+  attrs?: Record<string, unknown>
   content?: TiptapNode[]
 }
 
@@ -267,8 +275,15 @@ export interface JournalPhoto {
 export interface UserSettings {
   calendarStartHour: number
   calendarEndHour: number
-  defaultView: 'day' | 'week' | 'month'
-  weekStartDay: number
+  /** null = 自動 (desktop 日, phones 週) — see lib/settings-auto.ts. */
+  defaultView: 'day' | 'week' | 'month' | null
+  /** 0 = Sunday … 6; null = 自動 (month grid from Sunday, week view from the selected date). */
+  weekStartDay: number | null
+  /** Length (minutes) of a task created by clicking an empty slot; null = 自動 (30). */
+  defaultTaskMinutes: number | null
+  /** Whether the DB has the nullable 自動 columns (migration 20261002110000).
+   *  Read-only bookkeeping for saving; false = legacy schema. */
+  autoColumns?: boolean
   /** Day-mode visible days (1-3). Focus / planning scope. */
   dayViewDays: number
   /** Week-mode visible days (5-7). Overview scope. */
@@ -306,6 +321,7 @@ export interface UserSettings {
   }
   bufferTime: {
     enabled: boolean
+    /** Buffer-block length — NOT the click-to-create task length (that is defaultTaskMinutes). */
     defaultDuration: number // minutes
     color: string
   }

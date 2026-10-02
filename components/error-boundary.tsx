@@ -3,6 +3,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { t } from '@/lib/i18n'
+import { captureClientError } from '@/lib/monitoring/sentry'
 
 interface Props {
   children: ReactNode
@@ -21,6 +22,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    captureClientError(error)
     if (process.env.NODE_ENV !== 'production') {
       console.error('[ErrorBoundary]', error, info.componentStack)
     }

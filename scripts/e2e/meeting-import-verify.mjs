@@ -81,7 +81,8 @@ try{
  assert.equal(imports,3)
  used=20;await page.getByRole('button',{name:'重新整理',exact:true}).click();await page.getByText('本月已用 20 / 20 次',{exact:false}).waitFor()
  await page.getByText('整理另一份會議',{exact:true}).click();assert(await page.getByRole('button',{name:'整理紀錄與任務',exact:true}).isDisabled())
- await page.goto('http://localhost:3172/assignments')
+ // The meeting-proposal inbox is the 會議提案 tab of the assignment center (09-27).
+ await page.goto('http://localhost:3172/assignments?tab=meetings')
  await page.getByText('準備測試報價',{exact:true}).waitFor()
  await page.screenshot({path:'/tmp/huddle-meeting-shots/inbox-pending.png'})
  await page.getByRole('button',{name:'接受並加入任務'}).first().click();await page.getByText('未能處理指派，請確認共享關係與目標分類後重試。',{exact:true}).waitFor()

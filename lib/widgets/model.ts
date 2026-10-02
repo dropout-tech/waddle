@@ -1,5 +1,6 @@
 import type { Task, TimeBlock, NotebookNote, ScratchpadItem, StickyNote } from '@/lib/types'
-import { taskOccursOnDate, toDateString } from '@/lib/calendar-utils'
+import { daysSinceWeekStart, taskOccursOnDate, toDateString } from '@/lib/calendar-utils'
+import { weekViewAlignDay } from '@/lib/settings-auto'
 import type { WidgetPet } from './pet'
 
 export const widgetKinds = ['overview', 'calendar', 'agenda', 'week', 'tasks', 'top-three', 'whiteboard', 'notebook', 'focus-note', 'focus', 'shortcuts', 'pet', 'month', 'sticky'] as const
@@ -28,6 +29,8 @@ export interface WidgetSnapshot {
   tasks: WidgetItem[]; agenda: WidgetItem[]; notes: WidgetItem[]; boards: WidgetItem[]
   /** Added after schemaVersion 1 shipped; the Swift side decodes it as optional. */
   week: WidgetSlot[]
+  /** First day of the 本週時間表 grid: today (每週開始日 自動) or the start of this week. Optional (older readers use today). */
+  weekStart?: string
   days: { date: string; day: number; inMonth: boolean; count: number }[]
   /** `total` = the pomodoro's full length in seconds (lock-screen ring); optional. */
   focus: { mode?: 'pomodoro' | 'stopwatch'; state: string; title: string; endAt: number | null; seconds: number; note: string; total?: number }
@@ -102,21 +105,47 @@ export function stickySummaries(notes: StickySource[]): WidgetSticky[] {
     .sort((a, b) => b.n.updatedAt.localeCompare(a.n.updatedAt)).slice(0, STICKY_LIMIT)
     .map(({ n, lines }) => ({ id: n.id, title: lines[0].slice(0, 40), body: lines.slice(1).join(' ').slice(0, 140), color: n.color, updatedAt: n.updatedAt }))
 }
-export function makeSnapshot(input: { accountId: string; epoch: string; tasks: Task[]; blocks: TimeBlock[]; notes?: NotebookNote[]; boards: Record<string, ScratchpadItem[]>; stickies?: StickySource[]; now?: Date; locale?: string }): WidgetSnapshot {
+/**
+ * Pull the newest sticky notes in small pages until STICKY_LIMIT *non-blank* ones are in hand
+ * (blank notes are skipped by stickySummaries, so a fixed `limit(12)` could leave the widget short).
+ * `page` returns rows newest-first with a stable tiebreak; returns null if any page fails.
+ */
+export async function loadStickyRows<R extends StickySource>(page: (from: number, to: number) => PromiseLike<{ rows: R[] | null; error: unknown }>, pageSize = 20, maxPages = 5): Promise<R[] | null> {
+  const all: R[] = []
+  for (let i = 0; i < maxPages; i++) {
+    const { rows, error } = await page(i * pageSize, (i + 1) * pageSize - 1)
+    if (error) return null
+    all.push(...(rows ?? []))
+    if ((rows?.length ?? 0) < pageSize || stickySummaries(all).length >= STICKY_LIMIT) break
+  }
+  return all
+}
+/** 本週時間表: same rule as the app's week view — 自動 starts today and rolls forward; a picked 每週開始日 snaps back to it. */
+export function weekGridStart(date: Date, weekStartDay?: number | null) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12)
+  const align = weekViewAlignDay(weekStartDay)
+  if (align !== null) d.setDate(d.getDate() - daysSinceWeekStart(d, align))
+  return d
+}
+export function makeSnapshot(input: { accountId: string; epoch: string; tasks: Task[]; blocks: TimeBlock[]; notes?: NotebookNote[]; boards: Record<string, ScratchpadItem[]>; stickies?: StickySource[]; now?: Date; locale?: string; weekStartDay?: number | null }): WidgetSnapshot {
   const now = input.now ?? new Date(), today = toDateString(now)
   const tasks = input.tasks.filter(t => !t.isArchived)
   const toItem = (t: Task, date?: string): WidgetItem => ({ id: t.id, title: t.title.slice(0, 80), subtitle: t.categoryName.slice(0, 40), date: date ?? t.scheduledDate ?? t.dueDate, time: t.scheduledStartTime, completed: t.isCompleted, actionable: !t.isRecurring && !t.isMeeting, revision: t.updatedAt })
   const days = monthDays(now).map(d => ({ ...d, count: tasks.filter(t => taskOccursOnDate(t, new Date(`${d.date}T12:00:00`))).length + input.blocks.filter(b => b.date === d.date).length }))
   const agenda: WidgetItem[] = [], week: WidgetSlot[] = []
+  const timedOn = (key: string) => tasks.filter(t => taskOccursOnDate(t, new Date(`${key}T12:00:00`)) && t.scheduledStartTime)
+  // 近期行程: always the next 7 days from today.
   for (let n = 0; n < 7; n++) {
     const date = new Date(now); date.setDate(date.getDate() + n); const key = toDateString(date)
-    const timed = tasks.filter(t => taskOccursOnDate(t, new Date(`${key}T12:00:00`)) && t.scheduledStartTime)
-    const blocks = input.blocks.filter(b => b.date === key)
-    timed.filter(t => !t.isCompleted).forEach(t => agenda.push(toItem(t, key)))
-    blocks.forEach(b => agenda.push({ id: b.id, title: b.label.slice(0, 80), subtitle: '時間區塊', date: key, time: b.startTime }))
-    // The week grid shows occupied hours, done or not.
-    timed.forEach(t => pushSlot(week, key, t.scheduledStartTime, t.scheduledEndTime, t.title, t.calendarColor || t.workspaceColor))
-    blocks.forEach(b => pushSlot(week, key, b.startTime, b.endTime, b.label, b.color))
+    timedOn(key).filter(t => !t.isCompleted).forEach(t => agenda.push(toItem(t, key)))
+    input.blocks.filter(b => b.date === key).forEach(b => agenda.push({ id: b.id, title: b.label.slice(0, 80), subtitle: '時間區塊', date: key, time: b.startTime }))
+  }
+  // 本週時間表: 7 days from weekGridStart (may include earlier days this week); occupied hours, done or not.
+  const weekStart = weekGridStart(now, input.weekStartDay)
+  for (let n = 0; n < 7; n++) {
+    const date = new Date(weekStart); date.setDate(date.getDate() + n); const key = toDateString(date)
+    timedOn(key).forEach(t => pushSlot(week, key, t.scheduledStartTime, t.scheduledEndTime, t.title, t.calendarColor || t.workspaceColor))
+    input.blocks.filter(b => b.date === key).forEach(b => pushSlot(week, key, b.startTime, b.endTime, b.label, b.color))
   }
   agenda.sort((a,b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
   week.sort((a,b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`))
@@ -124,7 +153,7 @@ export function makeSnapshot(input: { accountId: string; epoch: string; tasks: T
     schemaVersion: 1, accountId: input.accountId, epoch: input.epoch, generatedAt: now.toISOString(), today, locale: input.locale ?? 'zh-TW',
     days, tasks: tasks.filter(t => t.showInTaskList !== false && !t.isMeeting && (taskOccursOnDate(t, now) || (!t.scheduledDate && (!t.dueDate || t.dueDate <= today))))
       .sort((a,b) => Number(a.isCompleted) - Number(b.isCompleted) || a.sortOrder - b.sortOrder).slice(0, 20).map(t => toItem(t)),
-    agenda: agenda.slice(0, 20), week: week.slice(0, WEEK_SLOT_LIMIT), notes: (input.notes ?? []).filter(n => !n.isArchived).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8).map(n => ({ id:n.id, title:n.title.slice(0,80) || '未命名筆記', subtitle:plainText(n.content) })),
+    agenda: agenda.slice(0, 20), week: week.slice(0, WEEK_SLOT_LIMIT), weekStart: toDateString(weekStart), notes: (input.notes ?? []).filter(n => !n.isArchived).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8).map(n => ({ id:n.id, title:n.title.slice(0,80) || '未命名筆記', subtitle:plainText(n.content) })),
     boards: Object.entries(input.boards).filter(([,items])=>items.length).sort(([a],[b])=>b.localeCompare(a)).slice(0,7).map(([date,items])=>({ id:date,date,title:`${date} 白板`,subtitle:items.filter(i=>i.type === 'text' || i.type === 'todo').map(i=>i.title || i.content).join(' · ').slice(0,160) })),
     focus: { state:'idle',title:'慢慢來，先專心一件事',endAt:null,seconds:1500,note:'' }, water:{enabled:false,nextAt:null,count:0},
     span: makeSpan(now, tasks, input.blocks),

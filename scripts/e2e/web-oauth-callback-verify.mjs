@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import { chromium } from 'playwright'
 const base=process.env.E2E_BASE_URL||'http://localhost:3190'
+// Pin the UI language: the app follows the browser locale and this script asserts zh-TW copy.
 const browser=await chromium.launch()
 let checks=0
 const check=(name,result)=>{assert.ok(result,name);checks++;console.log('PASS',name)}
@@ -10,7 +11,7 @@ const user={id:'00000000-0000-4000-8000-000000000001',aud:'authenticated',role:'
 const token=`eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify({sub:user.id,exp:Math.floor(Date.now()/1000)+3600,aud:'authenticated',role:'authenticated'})).toString('base64url')}.fake`
 try {
  for(const mode of ['success','failure','stall']) {
-  const context=await browser.newContext()
+  const context=await browser.newContext({locale:'zh-TW'})
   let exchanges=0;let verifier=false;let release
   const gate=new Promise(resolve=>release=resolve)
   await context.route('**/*.supabase.co/**',async route=>{
@@ -47,7 +48,7 @@ try {
   }
   release(); await context.close()
  }
- const context=await browser.newContext()
+ const context=await browser.newContext({locale:'zh-TW'})
  let exchanges=0
  await context.route('**/*.supabase.co/**',route=>{if(route.request().url().includes('/token'))exchanges++;return route.abort()})
  const page=await context.newPage()

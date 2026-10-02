@@ -14,12 +14,14 @@ import {
   InkSun, InkMoon, InkLogOut,
 } from '@/components/icons/huddle-icons'
 import { createClient } from '@/lib/supabase/client'
+import { useSafeSignOut } from '@/components/auth/use-safe-sign-out'
 import { cn } from '@/lib/utils'
 import { AccountRegistrationDate } from '@/components/auth/account-registration-date'
 import { useI18n } from '@/lib/i18n/react'
 import { useStickyNotesToggle } from '@/components/sticky-notes/sticky-notes-provider'
 import { listAssignments } from '@/lib/assignments'
 import { InstallAppMenuItem } from '@/components/pwa/install-app-menu-item'
+import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 
 interface SessionInfo {
   email: string
@@ -47,13 +49,13 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [publicAlias, setPublicAlias] = useState<string | null>(null)
   const [innerOpen, setInnerOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const open = controlledOpen ?? innerOpen
   const setOpen = useCallback((next: boolean | ((v: boolean) => boolean)) => {
     const value = typeof next === 'function' ? next(open) : next
     if (onOpenChange) onOpenChange(value)
     else setInnerOpen(value)
   }, [open, onOpenChange])
-  const [signingOut, setSigningOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const { resolvedTheme, setTheme } = useTheme()
   const { t } = useI18n()
@@ -105,7 +107,7 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
     return () => { cancelled = true }
   }, [open])
 
-  // Close on outside click
+  // Close on outside click or Escape
   useEffect(() => {
     if (!open) return
     function handleClick(e: MouseEvent) {
@@ -113,19 +115,28 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
         setOpen(false)
       }
     }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      setOpen(false)
+      // Give focus back to the avatar button when it had moved into the menu.
+      if (ref.current?.contains(document.activeElement)) {
+        ref.current.querySelector<HTMLElement>('[data-tour="user-menu"]')?.focus()
+      }
+    }
     document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKey)
+    }
   }, [open, setOpen])
 
-  async function handleSignOut() {
-    setSigningOut(true)
-    // Client-side sign-out works on both web and the Capacitor WebView (there
-    // is no server route to POST to under static export). Clears the local
-    // session, then the AuthGuard / login redirect takes over.
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.replace('/login')
-  }
+  // Client-side sign-out works on both web and the Capacitor WebView (there
+  // is no server route to POST to under static export). Pending notes are
+  // sent first; unsynced ones make it ask (use-safe-sign-out.tsx). Then the
+  // AuthGuard / login redirect takes over.
+  const { requestSignOut, busy: signingOut, dialog: signOutDialog } = useSafeSignOut(() => router.replace('/login'))
+  const handleSignOut = () => void requestSignOut()
 
   if (!session) return null
 
@@ -188,9 +199,15 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
                 <span className="text-sm font-medium text-foreground truncate">
                   {publicAlias || session.displayName}
                 </span>
-                <span className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                  <InkMail className="w-3.5 h-3.5 -m-px" />
-                  {session.email}
+                {/* Long addresses wrap rather than being clipped — `truncate`
+                    never worked here: the text is a flex item, so it was cut
+                    without an ellipsis. Prefer the break before "@"; only a
+                    part still too long breaks mid-word. */}
+                <span className="text-xs text-muted-foreground flex items-start gap-1" title={session.email}>
+                  <InkMail className="w-3.5 h-3.5 -m-px mt-px shrink-0" />
+                  <span className="min-w-0 [overflow-wrap:anywhere]">
+                    {session.email.includes('@') ? <>{session.email.slice(0, session.email.indexOf('@'))}<wbr />{session.email.slice(session.email.indexOf('@'))}</> : session.email}
+                  </span>
                 </span>
               </div>
             </div>
@@ -302,8 +319,22 @@ export function UserMenu({ className, open: controlledOpen, onOpenChange, hideTr
             )}
             <span>{t('登出')}</span>
           </button>
+
+          {/* App Store 5.1.1(v): account deletion must be easy to find, not
+              only inside Settings. Kept quiet (small, muted, no icon) since
+              almost nobody needs it; the dialog lives outside the dropdown. */}
+          <button
+            data-testid="user-menu-delete-account"
+            onClick={() => { setOpen(false); setDeleteOpen(true) }}
+            className="w-full min-h-11 flex items-center px-4 py-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors"
+            role="menuitem"
+          >
+            {t('刪除帳號')}
+          </button>
         </div>
       )}
+      {signOutDialog}
+      <DeleteAccountButton open={deleteOpen} onOpenChange={setDeleteOpen} />
     </div>
   )
 }

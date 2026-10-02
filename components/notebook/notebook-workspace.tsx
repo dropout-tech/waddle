@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { ArrowLeft, X, ChevronLeft, Check, Loader2, CloudOff, ListPlus } from 'lucide-react'
+// Loader2 stays lucide: spinners are a loading state, not an icon slot (DESIGN.md).
+import { Loader2 } from 'lucide-react'
+import { InkAddTaskSm, InkArrowLeft, InkCheck, InkChevronLeft, InkClose, InkCloudOff, InkFloatingWindow } from '@/components/icons/huddle-icons'
 import { useNotebook } from '@/hooks/use-notebook'
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { TaskDetailModal } from '@/components/modals/task-detail-modal'
@@ -55,7 +57,7 @@ export function NotebookWorkspace({ onExit, exitVariant, launchNote }: NotebookW
     renameCategory,
     deleteCategory,
     uploadImage,
-  } = useNotebook()
+  } = useNotebook({ editor: true })
 
   // Reuse the board's task layer so "升級為任務" creates a real task with the
   // same modal + createTask path used everywhere else. Unlike the scratchpad,
@@ -104,7 +106,7 @@ export function NotebookWorkspace({ onExit, exitVariant, launchNote }: NotebookW
       const targetCategory = targetWorkspace?.categories.find((c) => c.id === targetCategoryId)
       if (!targetWorkspace || !targetCategory) return
       const now = new Date().toISOString()
-      await createTask({
+      const created = await createTask({
         ...draftTask,
         ...updates,
         categoryId: targetCategoryId,
@@ -116,7 +118,8 @@ export function NotebookWorkspace({ onExit, exitVariant, launchNote }: NotebookW
         createdAt: now,
         updatedAt: now,
       })
-      toast.success(t('已建立任務'))
+      // On failure createTask has already shown why; don't also claim success.
+      if (created) toast.success(t('已建立任務'))
     },
     [draftTask, workspaces, createTask, t],
   )
@@ -183,7 +186,7 @@ export function NotebookWorkspace({ onExit, exitVariant, launchNote }: NotebookW
           // safe-area fix, half under the iOS status bar); desktop keeps 32px.
           className="-ml-1.5 flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:ml-0 md:h-8 md:w-8"
         >
-          {exitVariant === 'back' ? <ArrowLeft className="h-4 w-4" /> : <X className="h-4 w-4" />}
+          {exitVariant === 'back' ? <InkArrowLeft className="h-4 w-4" /> : <InkClose className="h-4 w-4" />}
         </button>
         {/* Mobile: toggle back to the list from the editor */}
         {mobilePane === 'editor' && (
@@ -192,7 +195,7 @@ export function NotebookWorkspace({ onExit, exitVariant, launchNote }: NotebookW
             onClick={() => setMobilePane('list')}
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:hidden"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <InkChevronLeft className="h-4 w-4" />
             {t('記事')}
           </button>
         )}
@@ -206,7 +209,7 @@ export function NotebookWorkspace({ onExit, exitVariant, launchNote }: NotebookW
               aria-label={t('升級為任務')}
               className="hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:flex"
             >
-              <ListPlus className="h-3.5 w-3.5" />
+              <InkAddTaskSm className="h-4 w-4" />
               {t('升級為任務')}
             </button>
           )}
@@ -217,6 +220,7 @@ export function NotebookWorkspace({ onExit, exitVariant, launchNote }: NotebookW
               noteId={activeNote.id}
               fallbackUrl={`/float/note?id=${encodeURIComponent(activeNote.id)}`}
               windowName={`huddle-note-${activeNote.id}`}
+              icon={<InkFloatingWindow className="h-4 w-4" />}
             />
           )}
           <SaveIndicator status={saveStatus} hasNote={!!activeNote} />
@@ -320,14 +324,14 @@ function SaveIndicator({ status, hasNote }: { status: string; hasNote: boolean }
   if (status === 'error')
     return (
       <span className="flex items-center gap-1.5 text-xs text-destructive">
-        <CloudOff className="h-3 w-3" />
+        <InkCloudOff className="h-3.5 w-3.5" />
         {t('儲存失敗')}
       </span>
     )
   if (status === 'saved')
     return (
       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Check className="h-3 w-3" />
+        <InkCheck className="h-3.5 w-3.5" />
         {t('已儲存')}
       </span>
     )

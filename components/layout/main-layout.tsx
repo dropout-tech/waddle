@@ -16,7 +16,10 @@ import { FocusScratchpad } from '@/components/scratchpad/focus-scratchpad'
 import { FocusTimer } from '@/components/timer/focus-timer'
 import { CommandPalette } from '@/components/command-palette'
 import { ErrorBoundary } from '@/components/error-boundary'
-import { toDateString } from '@/lib/calendar-utils'
+import { toDateString, isValidHourRange } from '@/lib/calendar-utils'
+import { resolveDefaultView } from '@/lib/settings-auto'
+import { useShowCompletedTasks } from '@/lib/show-completed'
+import { readStoredSize, writeStoredSize, PANEL_WIDTH_KEY } from '@/lib/persisted-size'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useWideScreen } from '@/hooks/use-wide-screen'
 import { useSwipeNavigation } from '@/hooks/use-swipe-navigation'
@@ -28,7 +31,7 @@ import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, Scr
 import { DEFAULT_FOCUS_SETTINGS, type FocusSettings } from '@/lib/focus'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
 // Mobile bottom tabs + the "+" FAB use the Huddle hand-inked set (DESIGN.md → 圖示).
-import { InkFocus, InkTasks, InkSparklesLg, InkCalendar, InkLink, InkPlusLg } from '@/components/icons/huddle-icons'
+import { InkFocus, InkTasks, InkWhiteboard, InkCalendar, InkLink, InkPlusLg } from '@/components/icons/huddle-icons'
 import { useI18n } from '@/lib/i18n/react'
 import { GrowthJourneyDashboard } from '@/components/growth/growth-journey-dashboard'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
@@ -157,19 +160,26 @@ export function MainLayout({
     root.classList.add('app-shell-locked')
     return () => root.classList.remove('app-shell-locked')
   }, [])
-  const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
+  // Remembered per device; this layout only mounts client-side (after data
+  // loads), so reading localStorage in the initializer can't mismatch SSR.
+  const [panelWidth, setPanelWidth] = useState(
+    () => readStoredSize(PANEL_WIDTH_KEY, MIN_PANEL_WIDTH, MAX_PANEL_WIDTH) ?? DEFAULT_PANEL_WIDTH,
+  )
   const [selectedDate, setSelectedDate] = useState(new Date())
-  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day')
-  // Phones open the calendar on 週 (owner request 2026-09-26); desktop keeps
-  // 日. Applied once, the first time we know we're on a phone, and only if
-  // nothing has moved the view off the initial 'day' yet — so a user's own
-  // pick in this session is never overridden. (View mode isn't persisted.)
-  const mobileDefaultViewAppliedRef = useRef(false)
+  // Opens on the saved 預設視圖模式 (settings are loaded before this layout
+  // mounts) on every device. 自動 (null, the default) keeps the behaviour from
+  // before the setting existed: desktop 日, phones 週 (owner, 2026-09-26).
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>(() =>
+    resolveDefaultView(settings?.defaultView, isMobile),
+  )
+  // 自動 only: if we learn we're on a phone after mounting, switch the
+  // untouched initial 日 to 週 once — never overriding a pick made since.
+  const mobileAutoViewAppliedRef = useRef(false)
   useEffect(() => {
-    if (!isMobile || mobileDefaultViewAppliedRef.current) return
-    mobileDefaultViewAppliedRef.current = true
+    if (!isMobile || mobileAutoViewAppliedRef.current || settings?.defaultView) return
+    mobileAutoViewAppliedRef.current = true
     setViewMode((v) => (v === 'day' ? 'week' : v))
-  }, [isMobile])
+  }, [isMobile, settings?.defaultView])
   // Export-as-image modal — lives here because all the required data
   // (workspaces, timeBlocks, selectedDate, settings.calendarStartHour/EndHour)
   // is already in scope. Toggled by the export button in CalendarHeader.
@@ -331,8 +341,13 @@ export function MainLayout({
   const hourHeight = hourHeights[zoomLevel - 1] || 60
   
   // Time range from settings (with defensive fallbacks)
-  const startHour = settings?.calendarStartHour ?? 0
-  const endHour = settings?.calendarEndHour ?? 24
+  // An inverted / out-of-range pair (saved before the settings form
+  // validated it) would draw an empty grid — fall back to the full day.
+  const rawStartHour = settings?.calendarStartHour ?? 0
+  const rawEndHour = settings?.calendarEndHour ?? 24
+  const hourRangeOk = isValidHourRange(rawStartHour, rawEndHour)
+  const startHour = hourRangeOk ? rawStartHour : 0
+  const endHour = hourRangeOk ? rawEndHour : 24
   // Visible day count per view mode (1-3 for day, 5-7 for week)
   const dayViewDays = settings?.dayViewDays ?? 1
   const weekViewDays = settings?.weekViewDays ?? 7
@@ -387,6 +402,18 @@ export function MainLayout({
       return Math.min(Math.max(newWidth, MIN_PANEL_WIDTH), MAX_PANEL_WIDTH)
     })
   }, [])
+  // Mouse drags are absolute (width at press + total cursor travel), so the
+  // divider stays under the cursor even after hitting the min/max.
+  const dragStartWidthRef = useRef(panelWidth)
+  const handleResizeDragStart = useCallback(() => {
+    dragStartWidthRef.current = panelWidth
+  }, [panelWidth])
+  const handleResizeDrag = useCallback((totalDelta: number) => {
+    setPanelWidth(Math.min(Math.max(dragStartWidthRef.current + totalDelta, MIN_PANEL_WIDTH), MAX_PANEL_WIDTH))
+  }, [])
+  useEffect(() => {
+    writeStoredSize(PANEL_WIDTH_KEY, panelWidth)
+  }, [panelWidth])
 
   // ── Calendar sharing overlay ──────────────────────────────
   // Peers + per-peer visibility toggles live here (this component owns
@@ -443,11 +470,25 @@ export function MainLayout({
   const meetingController = useMeetingInvitations(selectedDate)
   const [meetingsOpen, setMeetingsOpen] = useState(false)
   const [meetingInviteId, setMeetingInviteId] = useState<string>()
+  // 設定「顯示已完成任務」off → completed tasks leave the calendar views.
+  const showCompletedOnCalendar = useShowCompletedTasks()
   const calendarTasks = [...allTasks, ...meetingController.calendarTasks]
+    .filter((task) => showCompletedOnCalendar || !task.isCompleted)
   const selectCalendarTask = (task: Task, occurrenceDate?: string) => {
     if (task.id.startsWith('meeting:')) { setMeetingInviteId(task.id.slice(8,44)); setMeetingsOpen(true); return }
     onSelectTask(task, occurrenceDate)
   }
+  const exportModal = (
+    <CalendarExportModal
+      isOpen={exportModalOpen}
+      onClose={() => setExportModalOpen(false)}
+      workspaces={workspaces}
+      timeBlocks={timeBlocks}
+      startHour={startHour}
+      endHour={endHour}
+      selectedDate={selectedDate}
+    />
+  )
   const meetingDialog = <MeetingDialog open={meetingsOpen} onOpenChange={setMeetingsOpen} controller={meetingController} peers={sharePeers} tasks={allTasks} timeBlocks={timeBlocks} initialDate={selectedDate} inviteId={meetingInviteId}/>
 
 
@@ -468,10 +509,8 @@ export function MainLayout({
       task.scheduledEndTime
   )
 
-  // Handle opening journal in focus mode
-  const handleOpenJournalFocus = useCallback(() => {
-    setFocusMode('journal')
-  }, [])
+  // 日記 entry points removed 2026-10-02: JournalFocusView never saved what
+  // was typed (owner decision: hide until it persists). See JournalFocusView.
 
   // Handle opening report in focus mode
   const handleOpenReportFocus = useCallback(() => {
@@ -699,7 +738,6 @@ export function MainLayout({
                 onUpdateTimeBlock={onUpdateTimeBlock}
                 onDeleteTimeBlock={onDeleteTimeBlock}
                 onTimeBlockSelect={onTimeBlockSelect}
-                onOpenJournal={handleOpenJournalFocus}
                 onOpenReport={handleOpenReportFocus}
                 onOpenGrowth={handleOpenGrowthFocus}
                 onOpenSettings={onOpenSettings}
@@ -759,7 +797,8 @@ export function MainLayout({
             {
               key: 'scratch' as const,
               label: t('白板'),
-              Icon: InkSparklesLg,
+              // 2026-10-02 boss picked the easel whiteboard over the star.
+              Icon: InkWhiteboard,
               active: mobileScratchpadOpen,
               onClick: () => {
                 hapticSelection()
@@ -892,6 +931,9 @@ export function MainLayout({
           workspaces={workspaces}
           onCreateTimeBlock={onCreateCalendarTimeBlock}
         />
+
+        {/* ⋯ → 匯出行程 opens this; it used to be mounted on desktop only. */}
+        {exportModal}
       </div>
     )
   }
@@ -991,7 +1033,13 @@ export function MainLayout({
           </div>
 
           {/* Resize Handle */}
-          {isLeftPanelOpen && <ResizeHandle onResize={handleResize} />}
+          {isLeftPanelOpen && (
+            <ResizeHandle
+              onResize={handleResize}
+              onDragStart={handleResizeDragStart}
+              onDrag={handleResizeDrag}
+            />
+          )}
 
           {/* Right Panel - Calendar or Focus View */}
           <div className="flex-1 h-full min-w-0 flex flex-col">
@@ -1078,7 +1126,6 @@ export function MainLayout({
                   onUpdateTimeBlock={onUpdateTimeBlock}
                   onDeleteTimeBlock={onDeleteTimeBlock}
                   onTimeBlockSelect={onTimeBlockSelect}
-                  onOpenJournal={handleOpenJournalFocus}
                   onOpenReport={handleOpenReportDesktop}
                   onOpenGrowth={handleOpenGrowthFocus}
                   onOpenSettings={onOpenSettings}
@@ -1202,20 +1249,15 @@ export function MainLayout({
       />
 
       {/* Calendar Export Modal — image-of-schedule generator. */}
-      <CalendarExportModal
-        isOpen={exportModalOpen}
-        onClose={() => setExportModalOpen(false)}
-        workspaces={workspaces}
-        timeBlocks={timeBlocks}
-        startHour={startHour}
-        endHour={endHour}
-        selectedDate={selectedDate}
-      />
+      {exportModal}
     </div>
   )
 }
 
 // Journal Focus View Component
+// Hidden 2026-10-02 (no entry point passes onOpenJournal any more): the entry
+// textarea is local state only and is never saved. Kept for when journaling
+// gets real persistence (journal_entries table already exists).
 function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], onClose: () => void }) {
   const { t, lang } = useI18n()
   const [selectedDate, setSelectedDate] = useState(new Date())

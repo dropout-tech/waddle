@@ -10,13 +10,13 @@ import {
   timeToMinutes,
   minutesToTime,
   snap,
-  clamp,
   calculateUnifiedColumns,
   toDateString,
   autoScrollContainerNearEdge,
   calendarHitTest,
   fitTaskTimeRange,
   taskOccursOnDate,
+  computeDragRange,
 } from '@/lib/calendar-utils'
 import { beginGestureSuppression, endGestureSuppression } from '@/hooks/use-swipe-navigation'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -31,6 +31,8 @@ import { X, ChevronLeft } from 'lucide-react'
 import { RecurrenceChoiceModal, type RecurrenceChoice } from '../modals/recurrence-choice-modal'
 import { taskDisplayTitle } from '@/lib/task-display'
 import { useShowCategoryPrefix } from '@/components/category-prefix-context'
+import { readStoredSize, writeStoredSize, ALL_DAY_HEIGHT_DAY_KEY } from '@/lib/persisted-size'
+import { useDefaultTaskDuration } from '@/components/user-settings-context'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { WORKSPACE_COLORS } from '@/lib/palette'
 import { useI18n } from '@/lib/i18n/react'
@@ -478,8 +480,8 @@ export function DayScrollView({
   const slotPickerOpenedAt = useRef<number>(0)
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null)
 
-  // Default duration for click-to-create (in minutes)
-  const DEFAULT_DURATION = 30
+  // Default duration for click-to-create (in minutes) — 設定「預設任務時長」.
+  const DEFAULT_DURATION = useDefaultTaskDuration()
   // Double-click / double-tap on empty grid → create a task for that slot.
   const DOUBLE_TAP_MS = 400
   const DOUBLE_TAP_SLOP = 24 // px between the two presses
@@ -498,6 +500,7 @@ export function DayScrollView({
     const startX = info.startX
     const startY = info.startY
     let movedBeyondThreshold = false
+    let cancelled = false
     // Closure-local mirror of activeTaskDrag. Side effects at mouseup read
     // from this rather than from a functional setState callback — calling
     // parent setters inside setActiveTaskDrag(curr => ...) would run during
@@ -528,17 +531,23 @@ export function DayScrollView({
       const mouseYInContent = ev.clientY - containerRect.top + scrollContainer.scrollTop
       const relX = mouseXInContent - TIME_COL_WIDTH
       const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
-      const minutes = snap(MIN + mouseYInContent)
-
-      const duration = dragState.originalEnd - dragState.originalStart
-      if (dragState.dragType === 'move') {
-        const newStart = clamp(snap(minutes - dragState.offsetY), MIN, MAX - 15)
-        const newEnd = clamp(newStart + duration, MIN + 15, MAX)
-        dragState = { ...dragState, dayIndex: newDayIndex, currentStart: newStart, currentEnd: newEnd }
-      } else if (dragState.dragType === 'resize-top') {
-        dragState = { ...dragState, currentStart: clamp(snap(minutes), MIN, dragState.currentEnd - 15) }
-      } else if (dragState.dragType === 'resize-bottom') {
-        dragState = { ...dragState, currentEnd: clamp(snap(minutes), dragState.currentStart + 15, MAX) }
+      const range = computeDragRange({
+        dragType: dragState.dragType,
+        pointerY: mouseYInContent,
+        grabOffsetY: dragState.offsetY,
+        hourHeight,
+        min: MIN,
+        max: MAX,
+        originalStart: dragState.originalStart,
+        originalEnd: dragState.originalEnd,
+        currentStart: dragState.currentStart,
+        currentEnd: dragState.currentEnd,
+      })
+      dragState = {
+        ...dragState,
+        ...(dragState.dragType === 'move' ? { dayIndex: newDayIndex } : {}),
+        currentStart: range.start,
+        currentEnd: range.end,
       }
       setActiveTaskDrag(dragState)
 
@@ -554,10 +563,31 @@ export function DayScrollView({
       autoScrollContainerNearEdge(scrollContainer, ev.clientY)
     }
 
+    // Esc mid-drag cancels: the preview snaps back and nothing is written.
+    // pointerup stays armed so the release still runs the post-drag
+    // cooldown (no stray click / slot picker where the mouse lets go).
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape' || !movedBeyondThreshold || cancelled) return
+      ev.preventDefault()
+      ev.stopImmediatePropagation()
+      cancelled = true
+      window.removeEventListener('pointermove', onMove)
+      dragState = null
+      setActiveTaskDrag(null)
+      setHoveredPendingZoneDate(null)
+    }
+
     const onUp = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
+      window.removeEventListener('keydown', onKey, true)
+      if (cancelled) {
+        isDraggingTaskRef.current = false
+        dragEndCooldown.current = true
+        setTimeout(() => { dragEndCooldown.current = false }, 300)
+        return
+      }
 
       if (!movedBeyondThreshold || !dragState) {
         // Click. activeTaskDrag was never set — TaskBlock's own onMouseUp
@@ -659,7 +689,8 @@ export function DayScrollView({
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
-  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask, tasks, DAY_WIDTH, translate])
+    window.addEventListener('keydown', onKey, true)
+  }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask, tasks, DAY_WIDTH, translate, hourHeight])
 
   // Time block drag (move / resize-top / resize-bottom). Same window-level
   // pattern as task drags — preview activates after cursor moves past
@@ -681,6 +712,7 @@ export function DayScrollView({
     const originalStart = timeToMinutes(block.startTime)
     const originalEnd = timeToMinutes(block.endTime)
     let movedBeyondThreshold = false
+    let cancelled = false
     let dragState: NonNullable<typeof activeBlockDrag> | null = null
 
     const onMove = (ev: PointerEvent) => {
@@ -711,27 +743,53 @@ export function DayScrollView({
       const mouseYInContent = ev.clientY - containerRect.top + scrollContainer.scrollTop
       const relX = mouseXInContent - TIME_COL_WIDTH
       const newDayIndex = Math.max(0, Math.min(Math.floor(relX / DAY_WIDTH), allDates.length - 1))
-      const minutes = snap(MIN + mouseYInContent)
-
-      const duration = dragState.originalEnd - dragState.originalStart
-      if (dragState.dragType === 'move') {
-        const newStart = clamp(snap(minutes - dragState.offsetY), MIN, MAX - 15)
-        const newEnd = clamp(newStart + duration, MIN + 15, MAX)
-        dragState = { ...dragState, dayIndex: newDayIndex, currentStart: newStart, currentEnd: newEnd }
-      } else if (dragState.dragType === 'resize-top') {
-        dragState = { ...dragState, currentStart: clamp(snap(minutes), MIN, dragState.currentEnd - 15) }
-      } else if (dragState.dragType === 'resize-bottom') {
-        dragState = { ...dragState, currentEnd: clamp(snap(minutes), dragState.currentStart + 15, MAX) }
+      const range = computeDragRange({
+        dragType: dragState.dragType,
+        pointerY: mouseYInContent,
+        grabOffsetY: dragState.offsetY,
+        hourHeight,
+        min: MIN,
+        max: MAX,
+        originalStart: dragState.originalStart,
+        originalEnd: dragState.originalEnd,
+        currentStart: dragState.currentStart,
+        currentEnd: dragState.currentEnd,
+      })
+      dragState = {
+        ...dragState,
+        ...(dragState.dragType === 'move' ? { dayIndex: newDayIndex } : {}),
+        currentStart: range.start,
+        currentEnd: range.end,
       }
       setActiveBlockDrag(dragState)
 
       autoScrollContainerNearEdge(scrollContainer, ev.clientY)
     }
 
+    // Esc mid-drag cancels: the preview snaps back and nothing is written.
+    // pointerup stays armed so the release still runs the post-drag
+    // cooldown (no stray click / slot picker where the mouse lets go).
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape' || !movedBeyondThreshold || cancelled) return
+      ev.preventDefault()
+      ev.stopImmediatePropagation()
+      cancelled = true
+      window.removeEventListener('pointermove', onMove)
+      dragState = null
+      setActiveBlockDrag(null)
+    }
+
     const onUp = () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
+      window.removeEventListener('keydown', onKey, true)
+      if (cancelled) {
+        isDraggingTaskRef.current = false
+        dragEndCooldown.current = true
+        setTimeout(() => { dragEndCooldown.current = false }, 300)
+        return
+      }
 
       if (!movedBeyondThreshold || !dragState) {
         // Tap — open detail modal via the click handler that follows.
@@ -759,7 +817,8 @@ export function DayScrollView({
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
-  }, [allDates, MIN, MAX, DAY_WIDTH, onUpdateTimeBlock])
+    window.addEventListener('keydown', onKey, true)
+  }, [allDates, MIN, MAX, DAY_WIDTH, onUpdateTimeBlock, hourHeight])
 
   // Pending task drag — same window-level pattern. Drag preview only activates
   // after the cursor moves past the threshold, so a plain click on a pending
@@ -772,6 +831,7 @@ export function DayScrollView({
     const startY = e.clientY
     const duration = fitTaskTimeRange(MIN, task.estimatedMinutes || 30, MIN, MAX).duration
     let movedBeyondThreshold = false
+    let cancelled = false
 
     const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX
@@ -812,7 +872,21 @@ export function DayScrollView({
       autoScrollContainerNearEdge(scrollContainer, ev.clientY)
     }
 
+    // Esc mid-drag cancels: the preview snaps back and nothing is written.
+    // pointerup stays armed so the release still runs the post-drag
+    // cooldown (no stray click / slot picker where the mouse lets go).
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape' || !movedBeyondThreshold || cancelled) return
+      ev.preventDefault()
+      ev.stopImmediatePropagation()
+      cancelled = true
+      window.removeEventListener('pointermove', onMove)
+      setPendingTaskDrag(null)
+      setHoveredPendingZoneDate(null)
+    }
+
     const removeListeners = () => {
+      window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onCancel)
@@ -828,6 +902,7 @@ export function DayScrollView({
 
     const onUp = (ev: PointerEvent) => {
       removeListeners()
+      if (cancelled) { finishDragUi(); return }
 
       if (!movedBeyondThreshold) {
         // Click — let onClick fire normally to open the detail modal.
@@ -868,6 +943,7 @@ export function DayScrollView({
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onCancel)
+    window.addEventListener('keydown', onKey, true)
   }, [allDates, MIN, MAX, onRescheduleTask, onUnscheduleTask])
 
   const handleMouseDown = useCallback((e: React.PointerEvent, dayIndex: number) => {
@@ -940,7 +1016,7 @@ export function DayScrollView({
     setDragStart(null)
     setDragEnd(null)
     mouseDownPos.current = null
-  }, [isDragging, dragStart, dragEnd, allDates, yToTime, activeTaskDrag, pendingTaskDrag, onRescheduleTask, endHour])
+  }, [isDragging, dragStart, dragEnd, allDates, yToTime, activeTaskDrag, pendingTaskDrag, onRescheduleTask, endHour, DEFAULT_DURATION])
 
   // Handle slot type selection
   const handleSelectType = useCallback((slotType: SlotType) => {
@@ -988,7 +1064,11 @@ export function DayScrollView({
   // Resizable header height (desktop drag handle). Phones have no handle, so
   // there it fits the busiest loaded day's all-day chips instead of a fixed
   // 160px that left ~1/5 of an iPhone screen empty (report 2026-09-28).
-  const [resizedHeaderHeight, setHeaderHeight] = useState<number | null>(null)
+  // The dragged height is remembered per device (desktop only — phones
+  // have no handle and keep the auto-fit height).
+  const [resizedHeaderHeight, setHeaderHeight] = useState<number | null>(
+    () => (isMobile ? null : readStoredSize(ALL_DAY_HEIGHT_DAY_KEY, 100, 360)),
+  )
   const HEADER_DATE_HEIGHT = 60
   const HEADER_HANDLE_HEIGHT = 8 // resize handle (h-2) below the header row
   const HEADER_MIN = 100 // min: at least some space for pending tasks
@@ -1012,13 +1092,16 @@ export function DayScrollView({
     resizeStartY.current = e.clientY
     resizeStartH.current = headerHeight
 
+    let lastHeight: number | null = null
     const onMove = (ev: PointerEvent) => {
       if (!isResizingHeader.current) return
       const delta = ev.clientY - resizeStartY.current
-      setHeaderHeight(Math.max(HEADER_MIN, Math.min(HEADER_MAX, resizeStartH.current + delta)))
+      lastHeight = Math.max(HEADER_MIN, Math.min(HEADER_MAX, resizeStartH.current + delta))
+      setHeaderHeight(lastHeight)
     }
     const onUp = () => {
       isResizingHeader.current = false
+      if (lastHeight !== null) writeStoredSize(ALL_DAY_HEIGHT_DAY_KEY, lastHeight)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onUp)
@@ -1350,6 +1433,14 @@ export function DayScrollView({
                   const height = isDraggingThis && activeBlockDrag
                     ? `${Math.max(activeBlockDrag.currentEnd - activeBlockDrag.currentStart, 30)}px`
                     : getDurationHeight(block.startTime, block.endTime)
+                  // Resize strips scale with the block (~a quarter of its
+                  // height each; phone 4–16px, md+ 3–8px) so a short block keeps a grabbable middle
+                  // for moving. Fixed 16px/8px strips covered a 15-min
+                  // (15px) block completely: every grab became a resize.
+                  const heightPx = parseFloat(height)
+                  const mobileStripPx = Math.max(4, Math.min(16, Math.round(heightPx * 0.25)))
+                  const desktopStripPx = Math.max(3, Math.min(8, Math.round(heightPx * 0.2)))
+                  const stripVars = { ['--rh' as string]: `${mobileStripPx}px`, ['--rhd' as string]: `${desktopStripPx}px` }
                   // Hide the source if the drag has moved to a different day
                   // (the live preview rendered in that day's column is the
                   // visible copy).
@@ -1400,11 +1491,11 @@ export function DayScrollView({
                         touchAction: 'none',
                       }}
                     >
-                      {/* Resize handle — TOP. Larger touch target on mobile. */}
+                      {/* Resize handle — TOP. Thicker on phones; both sizes scale with the block. */}
                       <div
-                        className="absolute top-0 left-0 right-0 h-4 md:h-2 z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        className="absolute top-0 left-0 right-0 h-[var(--rh)] md:h-[var(--rhd)] z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         onPointerDown={(e) => handleTimeBlockDragStart(block, 'resize-top', dayIndex, e)}
-                        style={{ touchAction: 'none' }}
+                        style={{ touchAction: 'none', ...stripVars }}
                       >
                         <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: color, opacity: 0.6 }} />
                       </div>
@@ -1425,9 +1516,9 @@ export function DayScrollView({
 
                       {/* Resize handle — BOTTOM. */}
                       <div
-                        className="absolute bottom-0 left-0 right-0 h-4 md:h-2 z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                        className="absolute bottom-0 left-0 right-0 h-[var(--rh)] md:h-[var(--rhd)] z-panel cursor-ns-resize flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                         onPointerDown={(e) => handleTimeBlockDragStart(block, 'resize-bottom', dayIndex, e)}
-                        style={{ touchAction: 'none' }}
+                        style={{ touchAction: 'none', ...stripVars }}
                       >
                         <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: color, opacity: 0.6 }} />
                       </div>

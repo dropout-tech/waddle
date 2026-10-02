@@ -65,19 +65,19 @@ export const dict: Record<string, string> = {
   '{n} 週前': '{n} weeks ago',
   '{n} 個月前': '{n} months ago',
   '{n} 年前': '{n} years ago',
-  '{n} 個任務已經放了一陣子': '{n} tasks have been sitting for a while',
+  '{n} 個任務已經放了一陣子': '{n} {n|task has|tasks have} been sitting for a while',
   '最久的一件是{time}的。有些也許已經不用做了——放心整理掉，留下真正想做的就好。':
     'The oldest one is from {time}. Some of these might not need doing anymore — feel free to clear them out and keep what you actually want to do.',
   '整理任務': 'Clean up tasks',
-  '{n} 個任務剛過了預定日': '{n} tasks just passed their due date',
+  '{n} 個任務剛過了預定日': '{n} {n|task|tasks} just passed {n|its|their} due date',
   '日子過了也沒關係，挑個合適的時段重新安排就好。': "It's fine that the date passed — just pick a new time that works.",
   '查看任務': 'View tasks',
-  '今天排了 {n} 件事': "{n} things on today's schedule",
+  '今天排了 {n} 件事': "{n} {n|thing|things} on today's schedule",
   '還有時間，可以慢慢做——一件一件來就好。': "There's still time — take it one thing at a time.",
-  '{n} 個任務這幾天到期': '{n} tasks are due in the next few days',
+  '{n} 個任務這幾天到期': '{n} {n|task is|tasks are} due in the next few days',
   '接下來三天會陸續到期，先挑個順手的時段放上日曆，到時候就從容多了。':
     "These are due over the next three days — put them on the calendar at a time that works, and you'll feel more at ease when they arrive.",
-  '{n} 個任務靜靜躺了兩週': '{n} tasks have been quietly sitting for two weeks',
+  '{n} 個任務靜靜躺了兩週': '{n} {n|task has|tasks have} been quietly sitting for two weeks',
   '還想做的話，挑個日子放上日曆；不想做了也沒關係，歸檔就好。':
     "If you still want to do them, pick a day and put them on the calendar. If not, that's fine too — just archive them.",
   '急件好像有點多': 'Quite a few urgent items',
@@ -135,6 +135,7 @@ export const dict: Record<string, string> = {
   '更多工具都在「⋯」': 'More tools live in "⋯"',
   '底部五個分頁': 'Five tabs at the bottom',
   '💧 喝水小提醒': '💧 Water reminder',
+  '🔔 App 關著也會提醒你': '🔔 Reminders even when the app is closed',
   '✨ 你準備好了！': "✨ You're all set!",
 
   // onboarding-tour.tsx — hints
@@ -144,14 +145,16 @@ export const dict: Record<string, string> = {
   '👉 點開計時器': '👉 Open the timer',
 
   // onboarding-tour.tsx — step bodies shared by the desktop and phone tours
-  '任務、行事曆、專注計時和日記，都放在同一個地方。花一兩分鐘帶你走一圈，隨時可以略過。':
-    'Tasks, calendar, focus timer and journal, all in one place. Take a minute or two to look around; you can skip at any time.',
+  '任務、行事曆、專注計時和記事本，都放在同一個地方。花一兩分鐘帶你走一圈，隨時可以略過。':
+    'Tasks, calendar, focus timer and notebook, all in one place. Take a minute or two to look around; you can skip at any time.',
   '所有任務都收在這裡，分成三層：工作區 → 分類 → 任務。最上面的「未分類」是收件匣，還沒決定放哪的任務會先到這裡。':
     'Every task lives here, in three layers: workspace → category → task. "Uncategorized" at the top is your inbox: tasks you have not filed yet land there first.',
   '「會議」列出今天的會議，可以直接加入視訊。有任務過了原訂時間，這裡會出現「整理」，讓你逐一重新安排。「完成」可以回顧做完的任務和統計。':
     '"Meeting" lists today\'s meetings so you can join the call directly. When tasks slip past their planned time, "Review" appears here so you can reschedule them one by one. "Done" lets you look back at finished tasks and your stats.',
   '設定一段時間，專心做一件事；預設是 25 分鐘的番茄鐘。可以搭配背景音樂或環境音，例如雨聲、海浪、咖啡廳。結束後會自動記到今天的日曆。':
     'Set a stretch of time and focus on one thing; the default is a 25-minute Pomodoro. Add music or ambient sound such as rain, waves or a cafe. When it ends, the session is logged on today\'s calendar automatically.',
+  '就算 Huddle 沒開著，手機也會跳通知提醒你：會議快開始、專注時間到、該喝水了。到「設定」→「一般設定」打開「會議提醒」和「背景提醒」；手機問要不要允許通知時，按「允許」就好。':
+    'Even when Huddle is closed, your phone can remind you that a meeting is about to start, your focus time is up, or it\'s time for water. Go to "Settings" → "General" and turn on "Meeting reminders" and "Background reminders". When your phone asks about notifications, tap "Allow".',
   '每 60 分鐘，Huddle 會提醒你喝口水。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。':
     'Every 60 minutes, Huddle reminds you to drink some water. Not now? Press "Snooze" and it comes back in five minutes. Change the interval in Settings, or turn it off entirely.',
   '角落這隻企鵝是你專屬的。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。牠偶爾會提醒你會議和過期的任務，但多半只是在說些荒謬的話。':
@@ -179,8 +182,8 @@ export const dict: Record<string, string> = {
     'For longer notes, click here. Type "/" while writing to insert blocks such as headings, to-do lists and images; select text to bring up formatting like bold and links.',
   '按一下，畫面上會多一層便條紙，換頁也不會消失。便條紙可以拖動、換顏色；暫時用不到的，收進旁邊的「收納」。':
     'Click to lay sticky notes over the screen; they stay put when you change pages. Drag them around or change their color, and tuck the ones you do not need right now into the drawer next to this button.',
-  '這個小箭頭裡收著日記、報告、每日簽到、匯出等功能。「匯出」可以把行程存成圖片分享；開啟隱私模式，就只顯示時段、不顯示任務名稱。':
-    'This little arrow holds Journal, Reports, Daily check-in, Export and more. Export saves your schedule as an image to share; turn on privacy mode to show time blocks without task names.',
+  '這個小箭頭裡收著報告、每日簽到、匯出等功能。「匯出」可以把行程存成圖片分享；開啟隱私模式，就只顯示時段、不顯示任務名稱。':
+    'This little arrow holds Reports, Daily check-in, Export and more. Export saves your schedule as an image to share; turn on privacy mode to show time blocks without task names.',
   '同一個選單裡的「每日簽到」：每天簽到一次，累積分數。頁面下方有匿名排行榜，只顯示小企鵝編號，不顯示帳號。':
     '"Daily check-in" is in the same menu: check in once a day to earn points. Further down that page is an anonymous leaderboard that shows penguin numbers, never account names.',
   '鈴鐺會提醒你快到期、已過期，或放了很久沒動的任務。有新提醒時，鈴鐺上會出現數字。':
