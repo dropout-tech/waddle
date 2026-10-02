@@ -93,3 +93,20 @@ test('water widgets are gone: no water kind; an old huddle://widget/water tap is
  assert.equal(parseWidgetURL('huddle://widget/water?accountId=a&epoch=e'),null)
  assert.deepEqual(makeSnapshot(args).water,{enabled:false,nextAt:null,count:0})
 })
+test('本週時間表 follows 每週開始日: 自動 = today forward, a picked day snaps back; 近期行程 stays today-forward',()=>{
+ // Fri 2026-10-02. One slot on Mon 09-28 (earlier this week) and one on Thu 10-08.
+ const blocks=[{id:'b1',date:'2026-09-28',startTime:'09:00',endTime:'10:00',label:'週一會',color:'#123456'},{id:'b2',date:'2026-10-08',startTime:'09:00',endTime:'10:00',label:'下週四',color:'#123456'}]
+ const at=weekStartDay=>makeSnapshot({...args,now:new Date(2026,9,2,9),blocks,weekStartDay})
+ const auto=at(null)
+ assert.equal(auto.weekStart,'2026-10-02')
+ assert.deepEqual(auto.week.map(s=>s.date),['2026-10-08'])
+ const mon=at(1)
+ assert.equal(mon.weekStart,'2026-09-28')
+ assert.deepEqual(mon.week.map(s=>s.date),['2026-09-28'])
+ assert.equal(at(0).weekStart,'2026-09-27')
+ assert.equal(at(5).weekStart,'2026-10-02') // picked day is today
+ assert.equal(at(9).weekStart,'2026-10-02') // junk value → 自動
+ assert.equal(makeSnapshot({...args,now:new Date(2026,9,2,9),blocks}).weekStart,'2026-10-02') // omitted → 自動
+ // The agenda never shows past days, whatever the setting.
+ assert.deepEqual(mon.agenda.map(a=>a.date),['2026-10-08'])
+})

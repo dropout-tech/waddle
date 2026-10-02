@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { pendingMeetingPath } from '@/lib/auth/meeting-return'
-import { pendingOrgInvitePath } from '@/lib/pending-org-invite'
+import { orgInviteTokenFromUrl, pendingOrgInvitePath, savePendingOrgInvite } from '@/lib/pending-org-invite'
 import { createClient } from '@/lib/supabase/client'
 import { isNative } from '@/lib/platform'
 
@@ -13,6 +13,11 @@ import { isNative } from '@/lib/platform'
  * PKCE code, exchange it for a session, close the browser, and route home.
  * No-op on web (there the /auth/callback page handles it). Mounted app-wide via
  * AuthProvider so it catches the deep link regardless of the current route.
+ *
+ * Also opens org invites: a tapped https://huddle.lazy72.com/org/invite#t=…
+ * (Universal Link, see public/.well-known/apple-app-site-association) or the
+ * web page's 「用 Huddle App 開啟」 huddle://org/invite#t=… link. The token is
+ * parked like any pending invite so the login round trip keeps it.
  */
 export function DeepLinkHandler() {
   const router = useRouter()
@@ -25,6 +30,15 @@ export function DeepLinkHandler() {
 
     import('@capacitor/app').then(({ App }) => {
       App.addListener('appUrlOpen', async ({ url }) => {
+        const inviteToken = orgInviteTokenFromUrl(url)
+        if (inviteToken) {
+          savePendingOrgInvite(inviteToken)
+          // Already on the invite page (another link tapped): it only reads
+          // the token on mount, so reload it instead of a no-op push.
+          if (window.location.pathname.replace(/\/+$/, '') === '/org/invite') window.location.reload()
+          else router.push('/org/invite')
+          return
+        }
         if (!url.includes('auth/callback')) return
         try {
           const code = new URL(url).searchParams.get('code')

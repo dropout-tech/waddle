@@ -83,6 +83,11 @@ function TaskBlockImpl({
   const displayColor = useDisplayColor()
   const displayTitle = taskDisplayTitle(task, showCategoryPrefix)
   const readOnlyMeeting = task.id.startsWith('meeting:')
+  // A recurring master's completion flag isn't per occurrence: ticking one
+  // day would complete the whole series (same rule as lib/widgets/model.ts).
+  // No checkbox on the calendar; completing a series goes through the list /
+  // detail view, which asks first.
+  const hideCheckbox = readOnlyMeeting || !!task.isRecurring
   const occurrenceDate = date ?? task.scheduledDate
   if (!task.scheduledStartTime || !task.scheduledEndTime) return null
 
@@ -106,7 +111,7 @@ function TaskBlockImpl({
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (readOnlyMeeting) return
+    if (hideCheckbox) return
     if (!task.isCompleted) {
       setBurst(true)
       window.setTimeout(() => setBurst(false), 700)
@@ -407,7 +412,7 @@ function TaskBlockImpl({
       >
         {/* Top Row: Checkbox + Title */}
         <div className={cn('flex min-w-0', totalColumns > 1 ? 'items-start gap-1' : 'items-start gap-1.5')}>
-          <div className="relative z-panel flex-shrink-0" style={readOnlyMeeting ? { display: 'none' } : undefined}>
+          <div className="relative z-panel flex-shrink-0" style={hideCheckbox ? { display: 'none' } : undefined}>
             <div
               role="checkbox"
               aria-checked={task.isCompleted}

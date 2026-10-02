@@ -3,7 +3,8 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { CheckSquare, CircleHelp, FileText, Grip, ImagePlus, Link2, Maximize2, Minimize2, Minus, Pencil, Plus, Scan, Trash2, Type } from 'lucide-react'
-import type { ScratchpadItem } from '@/lib/types'
+import type { Editor } from '@tiptap/react'
+import type { ScratchpadItem, TiptapDoc } from '@/lib/types'
 import { canvasGeometry, type CanvasGeometry } from '@/lib/scratchpad-canvas'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
@@ -11,9 +12,10 @@ import { createPortal } from 'react-dom'
 import { isNative } from '@/lib/platform'
 import { WhiteboardDetail } from './whiteboard-detail'
 import { createChecklistDocument, getWhiteboardDocument, hasWhiteboardDocument, replaceWhiteboardSourceLink, whiteboardChecklistSummary, whiteboardDocumentText } from '@/lib/whiteboard-document'
-import { completeMathAtCaret } from '@/lib/inline-math'
-import { cardHighlightCss, cardTextCss, getCardStyle, type CardStyle } from '@/lib/whiteboard-style'
-import { CardFormatToolbar } from './card-format-toolbar'
+import { cardHighlightCss, cardTextCss, getCardStyle, hasCardStyle, markCss, type CardStyle } from '@/lib/whiteboard-style'
+import { cardInlineDoc, documentRuns, hasInlineFormatting, packStyledDoc, paragraphsToText, removeMarks, sameJson, textToParagraphs, unpackStyledDoc } from '@/lib/styled-doc'
+import { CARD_STYLE_MARK, CardFormatToolbar } from './card-format-toolbar'
+import { InlineCardEditor } from './inline-card-editor'
 
 interface ScratchpadCanvasProps {
   items: ScratchpadItem[]
@@ -26,7 +28,10 @@ interface ScratchpadCanvasProps {
    * fills the remaining height edge-to-edge and "expand" becomes full screen. */
   fillHeight?: boolean
 }
-type CanvasEditor = { id: string; isNew: boolean; date: string; type: 'text' | 'todo' | 'link'; content: string; title: string; geometry: CanvasGeometry; visibleWidth: number; visibleHeight: number }
+// Text / todo cards edit a paragraph document (`doc`, character formatting
+// included); link cards edit the URL string in `content`. `style` holds the
+// card format chosen for a draft that doesn't exist as an item yet.
+type CanvasEditor = { id: string; isNew: boolean; date: string; type: 'text' | 'todo' | 'link'; content: string; doc?: TiptapDoc; style?: CardStyle; title: string; geometry: CanvasGeometry; visibleWidth: number; visibleHeight: number }
 type Point = { x: number; y: number }
 // `moved` stays false until the pointer travels past DRAG_SLOP, so a plain
 // click on a card selects it without writing a geometry update.
@@ -139,6 +144,7 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
   const editorRef = useRef<CanvasEditor | null>(null)
   const editorElement = useRef<HTMLFormElement>(null)
   const composing = useRef(false)
+  const [liveEditor, setLiveEditor] = useState<Editor | null>(null)
   const setEditor = (next: CanvasEditor | null) => {
     editorRef.current = next
     setEditorState(next)
@@ -160,10 +166,23 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
     const item: ScratchpadItem = { id: crypto.randomUUID(), type, content, title, sortOrder: 0, createdAt: new Date().toISOString(), metadata: { canvas: geometry } }
     onAddItem(date, item); setSelected(item.id)
   }
-  const saveStyle = (item: ScratchpadItem, patch: Partial<CardStyle>) => {
-    const style: CardStyle = { ...getCardStyle(item), ...patch }
+  const mergeStyle = (base: CardStyle, patch: Partial<CardStyle>) => {
+    const style: CardStyle = { ...base, ...patch }
     for (const key of Object.keys(style) as (keyof CardStyle)[]) if (style[key] === undefined) delete style[key]
-    onUpdateItem(item.id, { metadata: { ...item.metadata, style } })
+    return style
+  }
+  const saveStyle = (item: ScratchpadItem, patch: Partial<CardStyle>) => {
+    const metadata: Record<string, any> = { ...item.metadata, style: mergeStyle(getCardStyle(item), patch) }
+    // A whole-card format replaces word formatting of the same kind. (With the
+    // card's text box open the toolbar already cleared the live document,
+    // which is saved when the box closes.)
+    const marks = Object.keys(patch).map(key => CARD_STYLE_MARK[key as keyof CardStyle]).filter((mark): mark is string => !!mark)
+    if (marks.length && editorRef.current?.id !== item.id) {
+      const inline = cardInlineDoc(item)
+      if (inline) { const next = removeMarks(inline, marks); if (hasInlineFormatting(next)) metadata.inline = next; else delete metadata.inline }
+      if (hasWhiteboardDocument(item)) metadata.document = packStyledDoc(removeMarks(unpackStyledDoc(getWhiteboardDocument(item)), marks))
+    }
+    onUpdateItem(item.id, { metadata })
   }
   const saveGeometry = (item: ScratchpadItem, geometry: CanvasGeometry) => onUpdateItem(item.id, { metadata: { ...item.metadata, canvas: geometry } })
   const changeGeometryWithKeyboard = (item: ScratchpadItem, rendered: CanvasGeometry, kind: 'move' | 'resize', key: string) => {
@@ -232,8 +251,12 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
   // before React renders the latest keystroke. Clearing it claims the write once.
   // Do not flush on unmount: clearing a day must never recreate a removed item.
   const persistEditor = (draft: CanvasEditor) => {
-    if (draft.isNew && !draft.content.trim()) return true
-    let content = draft.content
+    const doc = draft.type !== 'link' ? draft.doc : undefined
+    // Formatting rides in metadata.inline; `content` stays the plain text that
+    // every other reader (and older builds) use.
+    const inline = doc && hasInlineFormatting(doc) ? doc : undefined
+    let content = doc ? paragraphsToText(doc) : draft.content
+    if (draft.isNew && !content.trim()) return true
     if (draft.type === 'link') {
       try {
         const url = new URL(/^https?:\/\//i.test(content.trim()) ? content.trim() : `https://${content.trim()}`)
@@ -242,13 +265,20 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
       } catch { return false }
     }
     if (draft.isNew) {
-      onAddItem(draft.date, { id: draft.id, type: draft.type, content, title: draft.title.trim() || undefined, sortOrder: 0, createdAt: new Date().toISOString(), metadata: { canvas: draft.geometry } })
+      const style = draft.style && hasCardStyle(draft.style) ? draft.style : undefined
+      onAddItem(draft.date, { id: draft.id, type: draft.type, content, title: draft.title.trim() || undefined, sortOrder: 0, createdAt: new Date().toISOString(), metadata: { canvas: draft.geometry, ...(style ? { style } : {}), ...(inline ? { inline } : {}) } })
     } else {
       const item = items.find(value => value.id === draft.id)
-      if (item && (item.content !== content || (item.title ?? '') !== draft.title.trim())) {
-        const metadata = draft.type === 'link' && item.content !== content && hasWhiteboardDocument(item)
+      // Also drops a stale metadata.inline (its text no longer matched).
+      const inlineChanged = !!doc && !!item && (!sameJson(cardInlineDoc(item), inline ?? null) || (!inline && item.metadata?.inline !== undefined))
+      if (item && (item.content !== content || (item.title ?? '') !== draft.title.trim() || inlineChanged)) {
+        let metadata: Record<string, any> | undefined = draft.type === 'link' && item.content !== content && hasWhiteboardDocument(item)
           ? { ...item.metadata, document: replaceWhiteboardSourceLink(getWhiteboardDocument(item), item.content, content) }
           : undefined
+        if (inlineChanged) {
+          const { inline: _previous, ...rest } = item.metadata ?? {}
+          metadata = inline ? { ...rest, inline } : rest
+        }
         onUpdateItem(draft.id, { content, title: draft.title.trim(), ...(metadata ? { metadata } : {}) })
       }
     }
@@ -293,7 +323,8 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
     setPen(false)
     setSelected(id)
     setError('')
-    setEditor({ id, isNew: !item, date, type, content: item?.content ?? '', title: item?.title ?? '', geometry, visibleWidth, visibleHeight })
+    const doc = type === 'link' ? undefined : (item && cardInlineDoc(item)) || textToParagraphs(item?.content ?? '')
+    setEditor({ id, isNew: !item, date, type, content: item?.content ?? '', doc, title: item?.title ?? '', geometry, visibleWidth, visibleHeight })
   }
   // Soft keyboard: when the visible area shrinks (visualViewport on mobile web,
   // a resized WebView in Capacitor), pan the board so the text being edited
@@ -353,28 +384,23 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
       if (e.key === 'Escape') { e.preventDefault(); setEditor(null); setError(''); viewport.current?.focus() }
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); if (saveEditor()) viewport.current?.focus() }
     }}>
-    <textarea key={editor.id} autoFocus aria-label={editor.type === 'link' ? t('連結網址') : t('畫布內容')} placeholder={editor.type === 'link' ? t('貼上網址…') : editor.type === 'todo' ? t('輸入待辦…') : t('直接寫下想法…')}
-      className="min-h-11 w-full flex-1 resize-none bg-transparent text-base leading-relaxed outline-none placeholder:text-muted-foreground"
-      style={editor.type === 'link' ? undefined : cardTextCss(getCardStyle(items.find(item => item.id === editor.id) ?? {}))}
-      value={editor.content} onChange={e => {
-        const current = editorRef.current
-        if (!current) return
-        const typed = (e.nativeEvent as InputEvent).inputType === 'insertText' && !composing.current
-        const math = typed && current.type !== 'link' ? completeMathAtCaret(e.target.value, e.target.selectionStart) : null
-        // Write the result into the DOM and place the caret synchronously: React
-        // then sees DOM === state and leaves the caret alone. (A deferred caret
-        // fix loses to fast typing and drags the caret back mid-word.)
-        if (math) { e.target.value = math.value; e.target.setSelectionRange(math.caret, math.caret) }
-        setEditor({ ...current, content: math?.value ?? e.target.value })
-      }}
-      onCompositionStart={() => { composing.current = true }} onCompositionEnd={e => {
-        composing.current = false
-        // IME-committed "＝" doesn't go through the insertText branch above.
-        const current = editorRef.current, el = e.currentTarget
-        const math = current && current.type !== 'link' ? completeMathAtCaret(el.value, el.selectionStart) : null
-        if (current && math) { el.value = math.value; el.setSelectionRange(math.caret, math.caret); setEditor({ ...current, content: math.value }) }
-        if (!editorElement.current?.contains(document.activeElement)) saveEditor()
-      }}/>
+    {editor.type === 'link'
+      ? <textarea key={editor.id} autoFocus aria-label={t('連結網址')} placeholder={t('貼上網址…')}
+        className="min-h-11 w-full flex-1 resize-none bg-transparent text-base leading-relaxed outline-none placeholder:text-muted-foreground"
+        value={editor.content} onChange={e => { const current = editorRef.current; if (current) setEditor({ ...current, content: e.target.value }) }}
+        onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => {
+          composing.current = false
+          if (!editorElement.current?.contains(document.activeElement)) saveEditor()
+        }}/>
+      : <InlineCardEditor key={editor.id} initial={editor.doc ?? textToParagraphs(editor.content)} ariaLabel={t('畫布內容')}
+        placeholder={editor.type === 'todo' ? t('輸入待辦…') : t('直接寫下想法…')}
+        style={cardTextCss(editor.isNew ? editor.style ?? {} : getCardStyle(items.find(item => item.id === editor.id) ?? {}))}
+        onChange={doc => { const current = editorRef.current; if (current) setEditor({ ...current, doc }) }}
+        onEditor={setLiveEditor}
+        onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => {
+          composing.current = false
+          if (!editorElement.current?.contains(document.activeElement)) saveEditor()
+        }}/>}
     {editor.type === 'link' && <input aria-label={t('連結標題')} placeholder={t('連結標題（選填）')} className="min-h-11 w-full rounded-lg border border-border bg-background px-2 text-base" value={editor.title} onChange={e => { const current = editorRef.current; if (current) setEditor({ ...current, title: e.target.value }) }}/>}
     <div className="flex shrink-0 items-center justify-between gap-1 text-xs text-muted-foreground/70"><span>{t('點空白處儲存')}</span><button type="button" className={button} onPointerDown={e => e.preventDefault()} onClick={() => { setEditor(null); setError(''); viewport.current?.focus() }}>{t('取消')}</button></div>
   </form>
@@ -416,6 +442,9 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
           const document = rich ? getWhiteboardDocument(item) : null
           const checklist = document ? whiteboardChecklistSummary(document) : null
           const previewText = document ? whiteboardDocumentText(document) : item.content
+          // Character formatting: the rich document's marks, or a plain card's metadata.inline.
+          const formatted = document ? unpackStyledDoc(document) : cardInlineDoc(item)
+          const faceText = formatted ? documentRuns(formatted).map((run, index) => run.marks.length ? <span key={index} style={markCss(run.marks)}>{run.text}</span> : run.text) : previewText
           return <article key={item.id} data-testid="canvas-item" data-canvas-item={item.id}
             className={cn('group pointer-events-auto absolute flex flex-col rounded-xl border text-card-foreground',
               // Plain text is written straight on the paper: no card, no frame.
@@ -446,7 +475,7 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
             </div>
             {editing ? renderEditor() : <div className={cn('min-h-0 flex-1 overflow-auto p-3 pb-11 text-base', selected === item.id && !readOnly && 'touch-none')}>
               {checklist && checklist.total > 0 && <p className="mb-2 text-xs text-muted-foreground">{t('已完成 {checked} / {total} 項', { checked: checklist.checked, total: checklist.total })}</p>}
-              {item.type === 'image' ? <img src={item.content} alt={item.title || t('畫布圖片')} draggable={false} className="h-full w-full object-contain"/> : item.type === 'link' ? <a href={/^https?:\/\//i.test(item.content) ? item.content : undefined} target="_blank" rel="noopener noreferrer" className="break-all text-primary underline">{item.title || item.content}</a> : <div className="flex items-start gap-2">{item.type === 'todo' && !rich && <label className="flex min-h-11 min-w-11 shrink-0 items-center justify-center" style={{ transform: `scale(${1 / view.zoom})`, transformOrigin: 'top left' }}><span className="sr-only">{t('完成畫布待辦')}</span><input type="checkbox" aria-label={t('完成畫布待辦')} checked={!!item.isChecked} disabled={readOnly} className="h-6 w-6" onChange={e => onUpdateItem(item.id, { isChecked: e.target.checked })}/></label>}<p tabIndex={readOnly ? undefined : 0} role={readOnly ? undefined : 'button'} aria-label={readOnly ? undefined : t('編輯{type}：{content}', { type: item.type === 'todo' ? t('待辦') : t('文字'), content: item.content })} onKeyDown={e => { if (!readOnly && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); beginEditor(item.type as CanvasEditor['type'], undefined, item) } }} className={cn('min-h-11 min-w-0 flex-1 whitespace-pre-wrap break-words leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-primary [overflow-wrap:anywhere]', !rich && item.isChecked && 'text-muted-foreground line-through')} style={cardTextCss(getCardStyle(item))}>{previewText ? <span style={cardHighlightCss(getCardStyle(item))}>{previewText}</span> : (checklist?.total ? t('開啟內容，開始編輯檢查清單') : t('開啟內容，開始寫筆記'))}</p></div>}
+              {item.type === 'image' ? <img src={item.content} alt={item.title || t('畫布圖片')} draggable={false} className="h-full w-full object-contain"/> : item.type === 'link' ? <a href={/^https?:\/\//i.test(item.content) ? item.content : undefined} target="_blank" rel="noopener noreferrer" className="break-all text-primary underline">{item.title || item.content}</a> : <div className="flex items-start gap-2">{item.type === 'todo' && !rich && <label className="flex min-h-11 min-w-11 shrink-0 items-center justify-center" style={{ transform: `scale(${1 / view.zoom})`, transformOrigin: 'top left' }}><span className="sr-only">{t('完成畫布待辦')}</span><input type="checkbox" aria-label={t('完成畫布待辦')} checked={!!item.isChecked} disabled={readOnly} className="h-6 w-6" onChange={e => onUpdateItem(item.id, { isChecked: e.target.checked })}/></label>}<p tabIndex={readOnly ? undefined : 0} role={readOnly ? undefined : 'button'} aria-label={readOnly ? undefined : t('編輯{type}：{content}', { type: item.type === 'todo' ? t('待辦') : t('文字'), content: item.content })} onKeyDown={e => { if (!readOnly && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); beginEditor(item.type as CanvasEditor['type'], undefined, item) } }} className={cn('min-h-11 min-w-0 flex-1 whitespace-pre-wrap break-words leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-primary [overflow-wrap:anywhere]', !rich && item.isChecked && 'text-muted-foreground line-through')} style={cardTextCss(getCardStyle(item))}>{previewText ? <span style={cardHighlightCss(getCardStyle(item))}>{faceText}</span> : (checklist?.total ? t('開啟內容，開始編輯檢查清單') : t('開啟內容，開始寫筆記'))}</p></div>}
             </div>}
             {!readOnly && !editing && <button data-testid="canvas-resize-handle" aria-label={t('調整卡片大小')} className={cn(button, 'absolute bottom-0 right-0 touch-none cursor-se-resize text-muted-foreground/60', !active && 'opacity-0 focus:opacity-100')} style={{ transform: `scale(${1 / view.zoom})`, transformOrigin: 'bottom right' }} onFocus={() => setSelected(item.id)} onPointerDown={e => start(e, 'resize', item)} onKeyDown={e => { if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return; e.preventDefault(); changeGeometryWithKeyboard(item, b, 'resize', e.key) }}><Maximize2 size={15}/></button>}
           </article>
@@ -461,8 +490,14 @@ export function ScratchpadCanvas({ items, date, readOnly, onAddItem, onUpdateIte
         <button type="button" className={cn(button, 'rounded-full')} aria-label={t('顯示全部')} title={t('顯示全部')} onClick={fit}><Scan size={16}/></button>
       </div>
       {selectedItem && !readOnly && !editor && <button type="button" className={cn(button, 'absolute bottom-2 left-2 z-panel rounded-full border border-border/60 bg-background/85 text-muted-foreground backdrop-blur-sm max-md:left-3')} aria-label={t('刪除選取的畫布卡片')} onClick={() => { if (window.confirm(t('確定刪除這張畫布卡片？'))) { onDeleteItem(selectedItem.id); setSelected(null) } }}><Trash2 size={16}/></button>}
-      {selectedItem && !readOnly && (selectedItem.type === 'text' || selectedItem.type === 'todo') && (!editor || editor.id === selectedItem.id) &&
-        <CardFormatToolbar style={getCardStyle(selectedItem)} onChange={patch => saveStyle(selectedItem, patch)}/>}
+      {!readOnly && (editor ? editor.type !== 'link' : selectedItem && (selectedItem.type === 'text' || selectedItem.type === 'todo')) && (() => {
+        // The open text box (a draft keeps its card format in the editor
+        // state until it is created), else the selected card.
+        const target = editor && !editor.isNew ? items.find(item => item.id === editor.id) : editor ? undefined : selectedItem
+        if (editor?.isNew) return <CardFormatToolbar style={editor.style ?? {}} editor={liveEditor}
+          onChange={patch => { const current = editorRef.current; if (current) setEditor({ ...current, style: mergeStyle(current.style ?? {}, patch) }) }}/>
+        return target && <CardFormatToolbar style={getCardStyle(target)} editor={editor ? liveEditor : null} onChange={patch => saveStyle(target, patch)}/>
+      })()}
       {!items.length && !stroke.length && !editor && <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">{readOnly ? t('這天還沒有白板內容') : pen ? t('在空白處開始畫圖') : t('按兩下這裡直接寫字，或點「文字」開始。')}</div>}
     </div>
     {detailItem && <WhiteboardDetail key={detailItem.id} item={detailItem} readOnly={readOnly} onUpdateItem={onUpdateItem} onClose={() => setDetailId(null)} container={full ? sectionEl : undefined}/>}

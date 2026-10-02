@@ -8,6 +8,7 @@ import type { Extensions } from '@tiptap/react'
 import { t } from '@/lib/i18n'
 import { SlashCommand } from './slash-command'
 import { InlineMath } from './inline-math'
+import { textStyleMarks } from './text-style-marks'
 import type { UploadImageFn } from './upload-image'
 
 // Shared editor vocabulary for the notebook. StarterKit (v3) already bundles
@@ -37,6 +38,8 @@ export function notebookExtensions(uploadImage: UploadImageFn): Extensions {
     Image.configure({ allowBase64: false, HTMLAttributes: { class: 'nb-image' } }),
     SlashCommand.configure({ uploadImage }),
     InlineMath,
+    // Colour / marker / size (stored packed: lib/styled-doc.ts).
+    ...textStyleMarks,
     Placeholder.configure({
       placeholder: ({ node }) => {
         if (node.type.name === 'heading') return t('標題')

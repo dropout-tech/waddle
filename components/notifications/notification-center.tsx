@@ -345,7 +345,7 @@ export function NotificationCenter({
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high':
-        return 'text-urgency-critical bg-urgency-critical/10'
+        return 'text-urgency-critical-ink bg-urgency-critical/10'
       case 'medium':
         return 'text-urgency-medium bg-urgency-medium/10'
       case 'low':
@@ -403,7 +403,7 @@ export function NotificationCenter({
             aria-live="polite"
             className={cn(
               'absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white',
-              highPriorityCount > 0 ? 'bg-urgency-critical' : 'bg-urgency-high',
+              highPriorityCount > 0 ? 'bg-urgency-critical-strong' : 'bg-urgency-high',
             )}
           >
             {totalCount > 9 ? '9+' : totalCount}

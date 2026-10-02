@@ -31,7 +31,7 @@ import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, Scr
 import { DEFAULT_FOCUS_SETTINGS, type FocusSettings } from '@/lib/focus'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
 // Mobile bottom tabs + the "+" FAB use the Huddle hand-inked set (DESIGN.md → 圖示).
-import { InkFocus, InkTasks, InkSparklesLg, InkCalendar, InkLink, InkPlusLg } from '@/components/icons/huddle-icons'
+import { InkFocus, InkTasks, InkWhiteboard, InkCalendar, InkLink, InkPlusLg } from '@/components/icons/huddle-icons'
 import { useI18n } from '@/lib/i18n/react'
 import { GrowthJourneyDashboard } from '@/components/growth/growth-journey-dashboard'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
@@ -509,10 +509,8 @@ export function MainLayout({
       task.scheduledEndTime
   )
 
-  // Handle opening journal in focus mode
-  const handleOpenJournalFocus = useCallback(() => {
-    setFocusMode('journal')
-  }, [])
+  // 日記 entry points removed 2026-10-02: JournalFocusView never saved what
+  // was typed (owner decision: hide until it persists). See JournalFocusView.
 
   // Handle opening report in focus mode
   const handleOpenReportFocus = useCallback(() => {
@@ -740,7 +738,6 @@ export function MainLayout({
                 onUpdateTimeBlock={onUpdateTimeBlock}
                 onDeleteTimeBlock={onDeleteTimeBlock}
                 onTimeBlockSelect={onTimeBlockSelect}
-                onOpenJournal={handleOpenJournalFocus}
                 onOpenReport={handleOpenReportFocus}
                 onOpenGrowth={handleOpenGrowthFocus}
                 onOpenSettings={onOpenSettings}
@@ -800,7 +797,8 @@ export function MainLayout({
             {
               key: 'scratch' as const,
               label: t('白板'),
-              Icon: InkSparklesLg,
+              // 2026-10-02 boss picked the easel whiteboard over the star.
+              Icon: InkWhiteboard,
               active: mobileScratchpadOpen,
               onClick: () => {
                 hapticSelection()
@@ -1128,7 +1126,6 @@ export function MainLayout({
                   onUpdateTimeBlock={onUpdateTimeBlock}
                   onDeleteTimeBlock={onDeleteTimeBlock}
                   onTimeBlockSelect={onTimeBlockSelect}
-                  onOpenJournal={handleOpenJournalFocus}
                   onOpenReport={handleOpenReportDesktop}
                   onOpenGrowth={handleOpenGrowthFocus}
                   onOpenSettings={onOpenSettings}
@@ -1258,6 +1255,9 @@ export function MainLayout({
 }
 
 // Journal Focus View Component
+// Hidden 2026-10-02 (no entry point passes onOpenJournal any more): the entry
+// textarea is local state only and is never saved. Kept for when journaling
+// gets real persistence (journal_entries table already exists).
 function JournalFocusView({ workspaces, onClose }: { workspaces: Workspace[], onClose: () => void }) {
   const { t, lang } = useI18n()
   const [selectedDate, setSelectedDate] = useState(new Date())
