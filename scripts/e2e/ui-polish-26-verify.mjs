@@ -21,7 +21,8 @@ import { chromium } from 'playwright'
 
 const MODE = process.argv[2] === 'after' ? 'after' : 'before'
 const PORT = Number(process.env.E2E_PORT || 3147)
-const BASE_URL = `http://localhost:${PORT}`
+// E2E_BASE_URL points it at the live site for post-deploy checks (test account only).
+const BASE_URL = process.env.E2E_BASE_URL || `http://localhost:${PORT}`
 const SHOT_DIR = path.join(process.cwd(), 'docs/reports/2026-10-02-ui-polish-26')
 const STATE = process.env.E2E_STATE || path.join(os.tmpdir(), 'huddle-ui-polish-26-state.json')
 mkdirSync(SHOT_DIR, { recursive: true })
@@ -320,7 +321,8 @@ async function main() {
     await setLang(pM, lang)
     await sleep(1500)
     const tabbar = pM.locator('nav').filter({ has: pM.locator('svg[data-ink-icon="Calendar"]') }).last()
-    if (await tabbar.count()) await tabbar.screenshot({ path: out(`${L}-tabbar`) })
+    await tabbar.waitFor({ state: 'visible' }) // the live site loads slower than localhost
+    await tabbar.screenshot({ path: out(`${L}-tabbar`) })
     // ④ boss picked the easel whiteboard over the star (2026-10-02).
     check(`④ ${L} whiteboard tab uses the whiteboard icon`, (await tabbar.locator('svg[data-ink-icon="Whiteboard"]').count()) === 1 && (await tabbar.locator('svg[data-ink-icon="SparklesLg"]').count()) === 0)
     // On phones the avatar lives in the Tasks tab header.
