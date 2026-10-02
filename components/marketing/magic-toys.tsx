@@ -14,7 +14,7 @@
  * shows, without motion.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Sparkles } from 'lucide-react'
 import styles from './magic-toys.module.css'
 
@@ -286,129 +286,76 @@ export function CheckInToy({ locale = 'zh' }: { locale?: Locale }) {
   )
 }
 
-/* ── Whiteboard doodle: you draw, the penguin copies (badly) ── */
 
-const doodleCopy = {
-  zh: { title: '塗鴉紙：在這裡畫畫', copy: '換企鵝畫', clear: '清除', empty: '先畫點什麼吧', verdicts: ['神似！', '抽象派', '大師級', '有我的風格', '這是…貓？'], mine: '你的', its: '企鵝的' },
-  en: { title: 'Doodle pad: draw here', copy: 'Penguin’s turn', clear: 'Clear', empty: 'Draw something first', verdicts: ['Uncanny!', 'Abstract art', 'Masterpiece', 'My style', 'Is this… a cat?'], mine: 'Yours', its: 'Penguin’s' },
+/* ── Whiteboard: toss ideas in any old way, the penguin sorts them ── */
+// Boss 2026-10-03: the doodle pad felt random next to "drop ideas first,
+// order them later" — this toy acts that line out. Buttons only, so a finger
+// on the board scrolls the page like anywhere else.
+
+type Idea = { text: string; group: 0 | 1 }
+const boardCopy = {
+  zh: {
+    drop: '丟個想法', tidy: '幫我整理', mess: '再弄亂', reset: '清空重來', done: '排好了！', groups: ['生活', '工作'],
+    ideas: [{ text: '買牛奶', group: 0 }, { text: '提案大綱', group: 1 }, { text: '想去京都', group: 0 }, { text: '回 Amy 的信', group: 1 }, { text: '週五聚餐', group: 0 }, { text: '季報數字', group: 1 }] as Idea[],
+    dropped: (s: string) => `丟進一張：${s}`, tidied: '分成生活和工作兩欄，排好了。', messed: '又弄亂了。', cleared: '白板清空，重來。',
+  },
+  en: {
+    drop: 'Toss an idea', tidy: 'Tidy it up', mess: 'Mess it up', reset: 'Start over', done: 'All sorted!', groups: ['Life', 'Work'],
+    ideas: [{ text: 'Buy milk', group: 0 }, { text: 'Pitch outline', group: 1 }, { text: 'Trip to Kyoto', group: 0 }, { text: 'Reply to Amy', group: 1 }, { text: 'Friday dinner', group: 0 }, { text: 'Q3 numbers', group: 1 }] as Idea[],
+    dropped: (s: string) => `Tossed in: ${s}`, tidied: 'Sorted into Life and Work.', messed: 'Messy again.', cleared: 'Board cleared.',
+  },
 } as const
-type Pt = { x: number; y: number }
-const PAPER = 150
+type Note = { key: number; x: number; y: number; r: number; placed: boolean }
+// Fixed spots for the first notes keep the server and browser render identical;
+// randomness only happens after a click.
+// spread over the whole board, clear of the penguin's bottom-right corner
+const SPOTS: [number, number, number][] = [[5, 8, -8], [52, 24, 6], [14, 56, -4], [55, 56, 9], [8, 32, 5], [30, 78, -7]]
+const START = 3
+const fresh = (n: number): Note[] => SPOTS.slice(0, n).map(([x, y, r], key) => ({ key, x, y, r, placed: false }))
+const scatter = (i: number): Pick<Note, 'x' | 'y' | 'r'> => { const [x, y] = SPOTS[i]; return { x: x + rnd(-4, 4), y: y + rnd(-4, 4), r: rnd(-10, 10) } }
 
-function prep(c: HTMLCanvasElement) {
-  const dpr = Math.min(2, window.devicePixelRatio || 1)
-  c.width = PAPER * dpr; c.height = PAPER * dpr
-  const g = c.getContext('2d')!
-  g.setTransform(dpr, 0, 0, dpr, 0, 0)
-  g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = 3.2; g.strokeStyle = '#292b24'; g.fillStyle = '#292b24'
-  return g
-}
-
-export function DoodleToy({ locale = 'zh' }: { locale?: Locale }) {
-  const t = doodleCopy[locale]
-  const mine = useRef<HTMLCanvasElement>(null)
-  const its = useRef<HTMLCanvasElement>(null)
-  const bird = useRef<HTMLImageElement>(null)
-  const sign = useRef<HTMLSpanElement>(null)
-  const strokes = useRef<Pt[][]>([])
-  const idle = useRef(0)
-  const playing = useRef(false)
-  const copyRef = useRef<() => void>(() => {})
+export function IdeaBoardToy({ locale = 'zh' }: { locale?: Locale }) {
+  const t = boardCopy[locale]
+  const [notes, setNotes] = useState<Note[]>(() => fresh(START))
   const [status, setStatus] = useState('')
+  const sorted = notes.every(n => n.placed)
+  const full = notes.length >= t.ideas.length
 
-  const copyIt = async () => {
-    clearTimeout(idle.current)
-    const o = its.current, b = bird.current, s = sign.current
-    if (!o || !b || !s || playing.current) return
-    const all = strokes.current.filter(st => st.length)
-    if (!all.length) { setStatus(t.empty); return }
-    playing.current = true; setStatus('')
-    const g = prep(o)
-    s.removeAttribute('data-on')
-    // the penguin's "interpretation": a tilt, a squash and a shaky flipper
-    const tilt = rnd(-0.22, 0.22), sx = rnd(0.8, 1.15), sy = rnd(0.8, 1.1), c = PAPER / 2
-    const pts: { x: number; y: number; start: boolean }[] = []
-    all.forEach(st => st.forEach((p, i) => {
-      const k = pts.length, x = (p.x - c) * sx, y = (p.y - c) * sy
-      pts.push({ x: c + x * Math.cos(tilt) - y * Math.sin(tilt) + Math.sin(k * 0.9) * 1.6 + rnd(-1.1, 1.1), y: c + x * Math.sin(tilt) + y * Math.cos(tilt) + Math.cos(k * 0.7) * 1.6 + rnd(-1.1, 1.1), start: i === 0 })
-    }))
-    const seg = (i: number) => { if (!pts[i].start && i) { g.beginPath(); g.moveTo(pts[i - 1].x, pts[i - 1].y); g.lineTo(pts[i].x, pts[i].y); g.stroke() } else { g.beginPath(); g.arc(pts[i].x, pts[i].y, 1.4, 0, Math.PI * 2); g.fill() } }
-    const place = (p: Pt) => { b.style.transform = `translate(${(p.x / PAPER) * o.clientWidth - 6}px,${(p.y / PAPER) * o.clientHeight - 44}px)` }
-    b.setAttribute('data-on', '')
-    await new Promise<void>(res => {
-      if (reduced()) { pts.forEach((_, i) => seg(i)); place(pts[pts.length - 1]); return res() }
-      const D = Math.min(2600, Math.max(900, pts.length * 14)), t0 = performance.now()
-      let i = 0
-      const tick = (now: number) => {
-        const target = Math.min(pts.length, Math.ceil(((now - t0) / D) * pts.length))
-        for (; i < target; i++) seg(i)
-        place(pts[Math.max(0, i - 1)])
-        if (i < pts.length) requestAnimationFrame(tick); else res()
-      }
-      requestAnimationFrame(tick)
-    })
-    const v = t.verdicts[Math.floor(Math.random() * t.verdicts.length)]
-    s.textContent = v; s.setAttribute('data-on', '')
-    mv(s, [{ transform: 'translateY(8px) scale(.5) rotate(-12deg)', opacity: 0 }, { transform: 'translateY(0) scale(1) rotate(-5deg)', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(.2,1.5,.4,1)' })
-    setStatus(v); cheer()
-    playing.current = false
+  const drop = () => {
+    if (full) { setNotes(fresh(START)); setStatus(t.cleared); return }
+    const key = notes.length
+    setNotes([...notes, { key, ...scatter(key), placed: false }])
+    setStatus(t.dropped(t.ideas[key].text))
   }
-  copyRef.current = copyIt
-
-  useEffect(() => {
-    const c = mine.current, o = its.current
-    if (!c || !o) return
-    const g = prep(c); prep(o)
-    let drawing: Pt[] | null = null
-    const pos = (e: PointerEvent): Pt => { const r = c.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * PAPER, y: ((e.clientY - r.top) / r.height) * PAPER } }
-    const down = (e: PointerEvent) => {
-      if (playing.current) return
-      e.preventDefault(); c.setPointerCapture(e.pointerId); clearTimeout(idle.current)
-      const p = pos(e); drawing = [p]; strokes.current.push(drawing)
-      g.beginPath(); g.arc(p.x, p.y, 1.4, 0, Math.PI * 2); g.fill()
-    }
-    const move = (e: PointerEvent) => {
-      if (!drawing) return
-      const p = pos(e), q = drawing[drawing.length - 1]
-      if (Math.hypot(p.x - q.x, p.y - q.y) < 1.5) return
-      drawing.push(p); g.beginPath(); g.moveTo(q.x, q.y); g.lineTo(p.x, p.y); g.stroke()
-    }
-    const up = () => {
-      if (!drawing) return
-      drawing = null
-      idle.current = window.setTimeout(() => copyRef.current(), 1100) // pen resting ~1s → penguin's turn
-    }
-    c.addEventListener('pointerdown', down); c.addEventListener('pointermove', move)
-    c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up)
-    return () => { clearTimeout(idle.current); c.removeEventListener('pointerdown', down); c.removeEventListener('pointermove', move); c.removeEventListener('pointerup', up); c.removeEventListener('pointercancel', up) }
-  }, [])
-
-  const clear = () => {
-    clearTimeout(idle.current)
-    if (playing.current) return
-    strokes.current = []
-    for (const c of [mine.current, its.current]) if (c) prep(c)
-    bird.current?.removeAttribute('data-on'); sign.current?.removeAttribute('data-on'); setStatus('')
+  const tidy = () => {
+    if (sorted) { setNotes(notes.map((n, i) => ({ ...n, ...scatter(i), placed: false }))); setStatus(t.messed); return }
+    setNotes(notes.map(n => ({ ...n, placed: true })))
+    setStatus(t.tidied); cheer()
   }
 
   return (
-    <div className={styles.doodle}>
-      <div className={styles.papers}>
-        <figure className={styles.paper}>
-          <canvas ref={mine} className={styles.canvas} aria-label={t.title} role="img" data-doodle="mine" />
-          <figcaption>{t.mine}</figcaption>
-        </figure>
-        <figure className={`${styles.paper} ${styles.itsPaper}`} aria-hidden="true">
-          <canvas ref={its} className={styles.canvas} data-doodle="its" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img ref={bird} className={styles.artist} src="/art/penguin/carry.webp" alt="" width={240} height={240} loading="lazy" />
-          <span ref={sign} className={styles.verdict} />
-          <figcaption>{t.its}</figcaption>
-        </figure>
+    <div className={styles.ideas}>
+      {/* desktop roamer moves in here (nap stop): it hides and the board's own penguin shows */}
+      <div className={styles.board} data-idea-board data-sorted={sorted ? '' : undefined} data-penguin-stop="board" data-penguin-only="desktop" data-penguin-at="1 1 -38 -10" data-penguin-nap="" aria-hidden="true">
+        {t.groups.map((g, i) => <span key={g} className={styles.boardHead} style={{ '--x': i ? 52 : 5 } as CSSProperties}>{g}</span>)}
+        {notes.map(n => {
+          const idea = t.ideas[n.key]
+          const slot = notes.filter(m => t.ideas[m.key].group === idea.group).indexOf(n)
+          const x = n.placed ? (idea.group ? 52 : 5) : n.x, y = n.placed ? 15 + slot * 19 : n.y
+          return (
+            <span key={n.key} className={styles.idea} data-note data-placed={n.placed ? '' : undefined}
+              style={{ '--x': x, '--y': y, '--r': `${n.placed ? 0 : n.r}deg`, '--d': `${n.placed ? slot * 70 + idea.group * 35 : 0}ms`, '--tint': ['#fbf9f2', '#f4e3a1', '#f2d9c9'][n.key % 3] } as CSSProperties}>
+              <i className={styles.tick} />{idea.text}
+            </span>
+          )
+        })}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className={styles.sorter} src="/art/penguin/happy.webp" alt="" width={240} height={240} loading="lazy" />
+        <span className={styles.sortedSign}>{t.done}</span>
       </div>
       <div className={styles.toyRow}>
-        <button type="button" className={styles.toyBtn} onClick={copyIt}><Sparkles size={18} aria-hidden="true" />{t.copy}</button>
-        <button type="button" className={styles.ghostBtn} onClick={clear}>{t.clear}</button>
+        <button type="button" className={styles.toyBtn} onClick={drop}>{full ? t.reset : t.drop}</button>
+        <button type="button" className={styles.toyBtn} onClick={tidy}><Sparkles size={18} aria-hidden="true" />{sorted ? t.mess : t.tidy}</button>
         <span className={styles.sr} role="status">{status}</span>
       </div>
     </div>

@@ -5,6 +5,7 @@ import {
   taipeiMonth,
   meetingWeekday,
   resolveDue,
+  dueSupported,
 } from "./contract.ts";
 const assert = (v: unknown) => {
   if (!v) throw new Error("Assertion failed");
@@ -226,24 +227,28 @@ Deno.test(
           title: "交設計稿",
           owner: "",
           due: { kind: "weekday", weekday: 5, week: "this" },
+          dueEvidence: "這週五前",
           source: "這週五前交設計稿",
         },
         {
           title: "跟供應商確認報價",
           owner: "",
           due: { kind: "weekday", weekday: 3, week: "this" },
+          dueEvidence: "週三",
           source: "記得週三要跟供應商確認報價",
         },
         {
           title: "提交報告",
           owner: "",
           due: { kind: "weekday", weekday: 1, week: "next" },
+          dueEvidence: "下週一前",
           source: "下週一前提交報告",
         },
         {
           title: "回覆信件",
           owner: "",
           due: { kind: "relative_days", days: 1 },
+          dueEvidence: "明天",
           source: "明天回覆信件",
         },
       ],
@@ -268,3 +273,62 @@ Deno.test('A participant called 我 is not a reliable speaker label',()=>{
  const result=validateResult({summary:'摘要',decisions:[],questions:[],tasks:[{title:'檢查薪資',owner:'我',due:{kind:'none'},source,ownerParticipantId:p.id,ownerEvidence:source,assignmentConfidence:'explicit',assignmentReason:'我'}]},source,[p]);
  assert(result.tasks[0].ownerParticipantId==='');
 })
+Deno.test("Due kinds need matching wording quoted from the task source", () => {
+  const src = (ev: string) => `這件事 ${ev} 要完成`;
+  const ok = (due: Parameters<typeof dueSupported>[0], ev: string) =>
+    dueSupported(due, ev, src(ev));
+  assert(ok({ kind: "relative_days", days: 1 }, "明天前"));
+  assert(ok({ kind: "relative_days", days: 3 }, "三天內"));
+  // Baseline eval: vague phrases disguised as day counts or weekdays.
+  assert(!ok({ kind: "relative_days", days: 15 }, "8 月中下旬、助理離職前"));
+  assert(!ok({ kind: "relative_days", days: 3 }, "過幾天"));
+  assert(!ok({ kind: "relative_days", days: 0 }, "會後"));
+  assert(!ok({ kind: "weekday", weekday: 7, week: "this" }, "9–10 月"));
+  assert(!ok({ kind: "weekday", weekday: 7, week: "this" }, "8 月最後一週"));
+  assert(ok({ kind: "weekday", weekday: 3, week: "next" }, "下週三"));
+  assert(ok({ kind: "date", date: "2026-09-30" }, "9/30 前"));
+  assert(!ok({ kind: "date", date: "2026-08-31" }, "8 月底前"));
+  // Evidence that is not in the source is never trusted.
+  assert(!dueSupported({ kind: "relative_days", days: 1 }, "明天", "沒有期限"));
+});
+Deno.test("Other-party commitments become the uploader's follow-ups", () => {
+  const them = {
+    id: "44444444-4444-4444-8444-444444444444",
+    name: "Scott",
+    organization: "納許",
+    aliases: [],
+    userId: "",
+    side: "theirs" as const,
+  };
+  const transcript = "Scott 會提供施工計畫書公版，下週三前給。";
+  const result = validateResult(
+    {
+      summary: "s",
+      decisions: [],
+      questions: [],
+      tasks: [
+        {
+          title: "提供施工計畫書公版",
+          owner: "Scott",
+          due: { kind: "relative_days", days: 15 },
+          dueEvidence: "下週三前",
+          ownerSide: "ours",
+          source: transcript,
+          ownerParticipantId: them.id,
+          ownerEvidence: "Scott 會提供施工計畫書公版",
+          assignmentConfidence: "explicit",
+          assignmentReason: "本人承諾",
+        },
+      ],
+    },
+    transcript,
+    [them],
+    "2026-08-12",
+  );
+  const task = result.tasks[0];
+  // The user-set side wins over the model's guess.
+  assert(task.followUp && task.ownerSide === "theirs");
+  assert(task.title === "追 Scott：提供施工計畫書公版");
+  // relative_days with weekday wording is rejected rather than trusted.
+  assert(task.dueDate === "");
+});

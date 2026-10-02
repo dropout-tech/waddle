@@ -16,7 +16,12 @@ export function ParticipantsEditor({
   onChange: (next: MeetingParticipant[]) => void;
   disabled: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const sideLabel = {
+    ours: t("我方"),
+    // "對方" already maps to "Partner" elsewhere (calendar sharing), so branch on lang.
+    theirs: lang === "en" ? "Other party" : "對方",
+  };
   const update = (id: string, patch: Partial<MeetingParticipant>) =>
     onChange(participants.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   return (
@@ -51,6 +56,30 @@ export function ParticipantsEditor({
               onChange={(e) => update(p.id, { organization: e.target.value })}
             />
           </label>
+          <div
+            role="group"
+            aria-label={t("與會者 {n} 立場", { n: i + 1 })}
+            className="flex gap-1 rounded-lg border border-border p-1 sm:col-span-2"
+          >
+            {(["ours", "theirs"] as const).map((side) => {
+              const on = (p.side ?? "ours") === side;
+              return (
+                <button
+                  key={side}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => update(p.id, { side })}
+                  className={`min-h-11 flex-1 rounded-md px-3 text-sm font-medium ${
+                    on
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {sideLabel[side]}
+                </button>
+              );
+            })}
+          </div>
           <label className="space-y-1 text-sm">
             {t("逐字稿別名（逗號分隔）")}
             <input
@@ -103,6 +132,7 @@ export function ParticipantsEditor({
               organization: "",
               aliases: [],
               userId: "",
+              side: "ours",
             },
           ])
         }
