@@ -135,6 +135,7 @@ export const dict: Record<string, string> = {
   '更多工具都在「⋯」': 'More tools live in "⋯"',
   '底部五個分頁': 'Five tabs at the bottom',
   '💧 喝水小提醒': '💧 Water reminder',
+  '🔔 App 關著也會提醒你': '🔔 Reminders even when the app is closed',
   '✨ 你準備好了！': "✨ You're all set!",
 
   // onboarding-tour.tsx — hints
@@ -152,6 +153,8 @@ export const dict: Record<string, string> = {
     '"Meeting" lists today\'s meetings so you can join the call directly. When tasks slip past their planned time, "Review" appears here so you can reschedule them one by one. "Done" lets you look back at finished tasks and your stats.',
   '設定一段時間，專心做一件事；預設是 25 分鐘的番茄鐘。可以搭配背景音樂或環境音，例如雨聲、海浪、咖啡廳。結束後會自動記到今天的日曆。':
     'Set a stretch of time and focus on one thing; the default is a 25-minute Pomodoro. Add music or ambient sound such as rain, waves or a cafe. When it ends, the session is logged on today\'s calendar automatically.',
+  '就算 Huddle 沒開著，手機也會跳通知提醒你：會議快開始、專注時間到、該喝水了。到「設定」→「一般設定」打開「會議提醒」和「背景提醒」；手機問要不要允許通知時，按「允許」就好。':
+    'Even when Huddle is closed, your phone can remind you that a meeting is about to start, your focus time is up, or it\'s time for water. Go to "Settings" → "General" and turn on "Meeting reminders" and "Background reminders". When your phone asks about notifications, tap "Allow".',
   '每 60 分鐘，Huddle 會提醒你喝口水。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。':
     'Every 60 minutes, Huddle reminds you to drink some water. Not now? Press "Snooze" and it comes back in five minutes. Change the interval in Settings, or turn it off entirely.',
   '角落這隻企鵝是你專屬的。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。牠偶爾會提醒你會議和過期的任務，但多半只是在說些荒謬的話。':

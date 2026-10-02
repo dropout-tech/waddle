@@ -8,6 +8,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { useI18n } from '@/lib/i18n/react'
 import { isImeComposing } from '@/lib/ime'
 import { hubAvailable } from '@/lib/floating-hub'
+import { isNative } from '@/lib/platform'
 
 // ─────────────────────────────────────────────────────────
 // Tour step definitions
@@ -43,8 +44,8 @@ interface TourStep {
   hint?: string
   /** Phones only: the bottom tab this step's target lives on. */
   mobileTab?: 'tasks' | 'calendar'
-  /** Dropped from the tour when the browser can't offer the feature. */
-  requires?: 'floating-hub'
+  /** Dropped from the tour when this device can't offer the feature. */
+  requires?: 'floating-hub' | 'native-app'
 }
 
 // Copy rules (2026-10-01 pass): written for a first-time, non-technical
@@ -63,6 +64,8 @@ const TIMER_BODY = '設定一段時間，專心做一件事；預設是 25 分�
 const WATER_BODY = '每 60 分鐘，Huddle 會提醒你喝口水。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。'
 const PET_BODY = '角落這隻企鵝是你專屬的。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。牠偶爾會提醒你會議和過期的任務，但多半只是在說些荒謬的話。'
 const PET_BODY_BEFORE_ADOPTION = '導覽結束後，你可以領養一隻專屬企鵝，牠會住在畫面角落。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。'
+const PHONE_ALERTS_TITLE = '🔔 App 關著也會提醒你'
+const PHONE_ALERTS_BODY = '就算 Huddle 沒開著，手機也會跳通知提醒你：會議快開始、專注時間到、該喝水了。到「設定」→「一般設定」打開「會議提醒」和「背景提醒」；手機問要不要允許通知時，按「允許」就好。'
 const ASSIGN_BODY = '打開任務，按右上角的小人圖示，就能把任務交給共享夥伴或組織成員。任務會出現在對方的清單和日曆；對方完成或退回，你都看得到。進度在帳號選單的「指派任務」；建立組織需要 Pro 會員。'
 
 // Mix of:
@@ -212,6 +215,12 @@ const DESKTOP_STEPS: TourStep[] = [
     body: WATER_BODY,
   },
   {
+    // iPhone / iPad app only — the website can't notify while it's closed.
+    requires: 'native-app',
+    title: PHONE_ALERTS_TITLE,
+    body: PHONE_ALERTS_BODY,
+  },
+  {
     target: '[data-tour="quick-links-bar"]',
     title: '常用連結',
     body: '把常開的網址放在這裡，例如 Notion、GitHub、Gmail。點一下，就在新分頁打開。',
@@ -313,6 +322,12 @@ const MOBILE_STEPS: TourStep[] = [
   {
     title: '💧 喝水小提醒',
     body: WATER_BODY,
+  },
+  {
+    // iPhone / iPad app only — the website can't notify while it's closed.
+    requires: 'native-app',
+    title: PHONE_ALERTS_TITLE,
+    body: PHONE_ALERTS_BODY,
   },
   {
     target: '[data-tour="pet"]',
@@ -561,6 +576,7 @@ interface OnboardingTourProps {
 
 const subscribeNever = () => () => {}
 const hubUnavailableOnServer = () => false
+const notNativeOnServer = () => false
 
 export function OnboardingTour({ open, paused = false, onComplete, onChoose }: OnboardingTourProps) {
   // Visible and listening. `open` alone still owns the reset-on-close below.
@@ -582,9 +598,12 @@ export function OnboardingTour({ open, paused = false, onComplete, onChoose }: O
   const isMobile = useIsMobile()
   // The 懸浮小視窗 launcher only exists in Chrome / Edge on a computer.
   const hubReady = useSyncExternalStore(subscribeNever, hubAvailable, hubUnavailableOnServer)
+  // Background phone notifications only exist inside the iOS app.
+  const nativeApp = useSyncExternalStore(subscribeNever, isNative, notNativeOnServer)
   const STEPS = useMemo(
-    () => (isMobile ? MOBILE_STEPS : DESKTOP_STEPS).filter((s) => s.requires !== 'floating-hub' || hubReady),
-    [isMobile, hubReady],
+    () => (isMobile ? MOBILE_STEPS : DESKTOP_STEPS).filter((s) =>
+      (s.requires !== 'floating-hub' || hubReady) && (s.requires !== 'native-app' || nativeApp)),
+    [isMobile, hubReady, nativeApp],
   )
   const step = STEPS[Math.min(stepIndex, STEPS.length - 1)]
   const isFirst = stepIndex === 0
