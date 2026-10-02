@@ -10,6 +10,7 @@ import { useDisplayColor } from '@/hooks/use-display-color'
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { useI18n } from '@/lib/i18n/react'
 import { t as translate } from '@/lib/i18n'
+import { AiReviewSection } from '@/components/ai-review/ai-review-section'
 
 interface ReportDashboardProps {
   workspaces: Workspace[]
@@ -375,6 +376,9 @@ export function ReportDashboard({ workspaces }: ReportDashboardProps) {
           ))}
         </div>
       </div>
+
+      {/* AI 回顧 — renders nothing until the server enables it (see AiReviewSection). */}
+      <AiReviewSection />
 
       {!hasActivity ? (
         <Reveal index={0}>

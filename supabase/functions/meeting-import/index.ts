@@ -10,6 +10,7 @@ import {
   meetingWeekday,
 } from "./contract.ts";
 import { MODEL, usageRecord, reservationError, failureResponse } from "./quota.mjs";
+import { AI_CONSENT } from "../_shared/ai-consent.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -197,8 +198,14 @@ Deno.serve(async (req) => {
     }
     const key = Deno.env.get("OPENAI_API_KEY");
     if (!key) return reply({ error: "AI_NOT_CONFIGURED" }, 503);
+    // F12 server-side consent check (design 9.2). Off unless the secret is
+    // exactly "true": then the call, arguments and error handling are the
+    // same as before. On: reserve_meeting_import_v3 checks the stored
+    // meeting_import consent and reserves in one transaction.
+    const consentEnforced =
+      Deno.env.get("MEETING_IMPORT_CONSENT_ENFORCED") === "true";
     const { data: reservation, error } = await admin.rpc(
-      "reserve_meeting_import_v2",
+      consentEnforced ? "reserve_meeting_import_v3" : "reserve_meeting_import_v2",
       {
         p_user: user.id,
         p_id: input.id,
@@ -206,9 +213,14 @@ Deno.serve(async (req) => {
         p_date: input.meetingDate,
         p_transcript: input.transcript,
         p_context: input.context,
+        ...(consentEnforced
+          ? { p_scope_version: AI_CONSENT.meeting_import.scopeVersion }
+          : {}),
       },
     );
     if (error) {
+      if (consentEnforced && error.message === "CONSENT_REQUIRED")
+        return reply({ error: "CONSENT_REQUIRED" }, 403);
       const { code, status } = reservationError(error.message);
       return reply({ error: code }, status);
     }

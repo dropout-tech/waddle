@@ -18,6 +18,7 @@ import { dict as pwa } from './dict/pwa'
 import { dict as widgets } from './dict/widgets'
 import { dict as googleCalendar } from './dict/google-calendar'
 import { dict as billing } from './dict/billing'
+import { dict as aiReview } from './dict/ai-review'
 
 // Merged English dictionary. Keys are the Traditional Chinese source strings
 // (see lib/i18n/index.ts). Split by feature area purely to keep files
@@ -44,6 +45,7 @@ export const en: Record<string, string> = {
   ...pwa,
   ...googleCalendar,
   ...billing,
+  ...aiReview,
   // Whiteboard canvas controls.
   "手寫筆記": "Handwritten note",
   "請選擇圖片檔案。": "Please choose an image file.",
