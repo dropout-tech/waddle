@@ -11,18 +11,12 @@ type RevenueCatSDK = Pick<PurchasesPlugin, 'configure' | 'isConfigured' | 'logIn
  */
 export const PURCHASE_CANCELLED_CODE = '1'
 export const PAYMENT_PENDING_CODE = '20'
-/**
- * RECEIPT_ALREADY_IN_USE / RECEIPT_IN_USE_BY_OTHER_SUBSCRIBER: this Apple ID's subscription belongs to
- * another Huddle account. Restore behavior is "Keep with original App User ID" (owner, 2026-10-02).
- */
-export const OWNED_BY_OTHER_ACCOUNT_CODES: readonly string[] = ['7', '13']
 /** INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE — the only status that may be shown as a free trial. */
 export const INTRO_ELIGIBLE_STATUS = 2
 function storeError(error: unknown): unknown {
   const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : ''
   if (code === PURCHASE_CANCELLED_CODE) return { userCancelled: true }
   if (code === PAYMENT_PENDING_CODE) return { paymentPending: true }
-  if (OWNED_BY_OTHER_ACCOUNT_CODES.includes(code)) return { ownedByOtherAccount: true }
   return error
 }
 

@@ -22,7 +22,6 @@ const NOTICE: Record<PaywallNotice, string> = {
   purchase_failed: '購買沒有完成。如果你看到扣款，請按「恢復購買」。',
   restore_failed: '恢復購買沒有成功，請稍後再試。',
   restore_nothing: '這個 Apple 帳號沒有可恢復的 Huddle Pro 訂閱。',
-  owned_elsewhere: '這個 Apple ID 的 Huddle Pro 訂閱已綁定另一個 Huddle 帳號，無法轉移。請登出後改用當初購買時的帳號登入；需要協助請聯絡客服。',
   activated: 'Huddle Pro 已生效。',
 }
 const serverPlaceholder = () => initialPaywallState

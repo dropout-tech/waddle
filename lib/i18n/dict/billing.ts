@@ -78,6 +78,4 @@ export const dict: Record<string, string> = {
   '恢復購買沒有成功，請稍後再試。': "Couldn't restore purchases. Please try again later.",
   '這個 Apple 帳號沒有可恢復的 Huddle Pro 訂閱。': 'This Apple account has no Huddle Pro subscription to restore.',
   'Huddle Pro 已生效。': 'Huddle Pro is now active.',
-  '這個 Apple ID 的 Huddle Pro 訂閱已綁定另一個 Huddle 帳號，無法轉移。請登出後改用當初購買時的帳號登入；需要協助請聯絡客服。':
-    "This Apple ID's Huddle Pro subscription belongs to another Huddle account and can't be moved. Sign out and sign in with the account you bought it with, or contact support for help.",
 }

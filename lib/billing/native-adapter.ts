@@ -11,16 +11,13 @@ export interface NativeBillingDriver {
     subscriptionPeriod?: string | null
     freeTrial?: { unit: string; count: number } | null
   }>>
-  /**
-   * Reject with { userCancelled: true }, { paymentPending: true } or { ownedByOtherAccount: true }
-   * (subscription bound to another Huddle account) for those outcomes; anything else is a failure.
-   */
+  /** Reject with { userCancelled: true } or { paymentPending: true } for those two outcomes; anything else is a failure. */
   purchase(packageIdentifier: string): Promise<void>
   /** hasActiveSubscription only picks the message to show; it never grants access. */
   restore(): Promise<{ hasActiveSubscription: boolean } | void>
   logOut(): Promise<void>
 }
-export type BillingResult<T> = { status: 'ready'; value: T } | { status: 'not_configured' | 'sign_in_required' | 'failed' | 'cancelled' | 'pending' | 'owned_elsewhere' }
+export type BillingResult<T> = { status: 'ready'; value: T } | { status: 'not_configured' | 'sign_in_required' | 'failed' | 'cancelled' | 'pending' }
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 /** Create a fresh session after every auth-user change; never accept an email as appUserID. */
@@ -49,8 +46,6 @@ export function createNativeBillingSession(options: {
       if (typeof error === 'object' && error !== null && 'userCancelled' in error && error.userCancelled === true) return { status: 'cancelled' }
       // Ask to Buy / bank verification: the store has not charged yet and will finish on its own later.
       if (typeof error === 'object' && error !== null && 'paymentPending' in error && error.paymentPending === true) return { status: 'pending' }
-      // Restore behavior is "Keep with original App User ID": the store refuses to move a subscription between accounts.
-      if (typeof error === 'object' && error !== null && 'ownedByOtherAccount' in error && error.ownedByOtherAccount === true) return { status: 'owned_elsewhere' }
       return { status: 'failed' }
     }
   }
