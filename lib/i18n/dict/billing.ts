@@ -2,6 +2,9 @@
 // Scope: Pro limits / free usage caps UI (lib/billing/*, components/billing/*,
 // membership usage meters, Google Calendar upgrade prompt).
 export const dict: Record<string, string> = {
+  // components/modals/settings-modal.tsx — tab label (kept here, not in web-billing.ts: the
+  // tab strip renders before the lazy subscription chunk has registered its own fragment)
+  '訂閱': 'Subscription',
   // lib/billing/plan-errors.ts — limit toasts
   '進行中的任務已達免費版上限。完成或刪除一些舊任務，或看看 Pro 方案，就能繼續新增。':
     "You've reached the free plan's limit for active tasks. Complete or delete a few old ones, or take a look at Pro, to keep adding.",

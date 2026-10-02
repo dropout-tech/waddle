@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
 
@@ -15,6 +15,7 @@ export const btnPrimary = cn(btnBase, 'bg-primary text-primary-foreground hover:
 export const btnSecondary = cn(btnBase, 'bg-secondary text-secondary-foreground hover:bg-secondary/80')
 export const btnOutline = cn(btnBase, 'border border-border bg-background text-foreground hover:bg-accent')
 export const btnDanger = cn(btnBase, 'border border-destructive/40 bg-background text-destructive hover:bg-destructive/10')
+export const btnDestructive = cn(btnBase, 'bg-destructive text-white hover:bg-destructive/90')
 
 export function BillingButton({
   variant = 'secondary',
@@ -22,8 +23,8 @@ export function BillingButton({
   className,
   children,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'outline' | 'danger'; busy?: boolean }) {
-  const cls = { primary: btnPrimary, secondary: btnSecondary, outline: btnOutline, danger: btnDanger }[variant]
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'destructive'; busy?: boolean }) {
+  const cls = { primary: btnPrimary, secondary: btnSecondary, outline: btnOutline, danger: btnDanger, destructive: btnDestructive }[variant]
   return (
     <button type="button" {...rest} disabled={rest.disabled || busy} aria-busy={busy || undefined} className={cn(cls, className)}>
       {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
@@ -43,7 +44,7 @@ export function Notice({
 }) {
   const toneCls = {
     info: 'bg-muted/60 text-foreground',
-    ok: 'bg-primary/10 text-foreground',
+    ok: 'bg-emerald-600/10 text-foreground',
     warn: 'border border-amber-500/40 bg-amber-500/10 text-foreground',
     error: 'border border-destructive/40 bg-destructive/10 text-foreground',
   }[tone]
@@ -68,6 +69,8 @@ export function ConfirmPanel({
   onBack,
   testId,
   danger,
+  strong,
+  emphasis,
 }: {
   title: string
   body: ReactNode
@@ -77,14 +80,19 @@ export function ConfirmPanel({
   onBack: () => void
   testId: string
   danger?: boolean
+  /** Solid destructive confirm button + stronger border (irreversible-feeling actions, e.g. refund). */
+  strong?: boolean
+  /** One bold line above the explanation. */
+  emphasis?: string
 }) {
   const { t } = useI18n()
   return (
-    <div data-testid={testId} role="alertdialog" aria-label={title} className="space-y-3 rounded-xl border border-border bg-card p-4">
+    <div data-testid={testId} role="alertdialog" aria-label={title} className={cn('space-y-3 rounded-xl border bg-card p-4', strong ? 'border-destructive/60 ring-1 ring-destructive/20' : 'border-border')}>
       <p className="text-sm font-semibold">{title}</p>
+      {emphasis && <p className="text-sm font-bold text-destructive" data-testid={`${testId}-emphasis`}>{emphasis}</p>}
       <div className="text-sm leading-6 text-muted-foreground">{body}</div>
       <div className="flex flex-col gap-2 sm:flex-row-reverse">
-        <BillingButton variant={danger ? 'danger' : 'primary'} busy={busy} onClick={onConfirm} data-testid={`${testId}-confirm`}>
+        <BillingButton variant={strong ? 'destructive' : danger ? 'danger' : 'primary'} busy={busy} onClick={onConfirm} data-testid={`${testId}-confirm`}>
           {confirmLabel}
         </BillingButton>
         <BillingButton variant="secondary" disabled={busy} onClick={onBack} data-testid={`${testId}-back`}>
@@ -110,6 +118,24 @@ export function BillingFrame({ title, intro, children }: { title: string; intro?
       </div>
     </main>
   )
+}
+
+/** Error shown next to a submit button; scrolls itself into view so it is never missed on a phone. */
+export function SubmitError({ children, testId }: { children: ReactNode; testId: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [children])
+  return (
+    <div ref={ref} className="scroll-mt-4">
+      <Notice tone="error" testId={testId}>{children}</Notice>
+    </div>
+  )
+}
+
+/** Stacked full-width actions on a phone, side by side from `sm`. */
+export function ButtonStack({ children }: { children: ReactNode }) {
+  return <div className="flex flex-col gap-2 sm:flex-row [&>*]:w-full sm:[&>*]:w-auto">{children}</div>
 }
 
 export function Spinner({ label }: { label: string }) {

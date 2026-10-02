@@ -144,8 +144,8 @@ export default function WebSubscriptionTab() {
             data-testid="sub-badge"
             className={cn(
               'rounded-full px-3 py-1 text-xs font-medium',
-              badge.tone === 'ok' && 'bg-primary/10 text-primary',
-              badge.tone === 'warn' && 'bg-amber-500/15 text-foreground',
+              badge.tone === 'ok' && 'bg-emerald-600/15 text-emerald-800 dark:text-emerald-300',
+              badge.tone === 'warn' && 'bg-amber-500/25 text-amber-900 dark:text-amber-200',
               badge.tone === 'muted' && 'bg-muted text-muted-foreground',
             )}
           >
@@ -163,17 +163,24 @@ export default function WebSubscriptionTab() {
           {sub.cancel_at_period_end && endIso && (
             <Row label={t('Pro 可使用到')} testId="sub-until">{date(endIso)}</Row>
           )}
-          {sub.status === 'past_due' && sub.grace_until && (
-            <Row label={t('請在這天前補付')} testId="sub-grace">{date(sub.grace_until)}</Row>
-          )}
           {card && <Row label={t('付款卡片')} testId="sub-card">{card}</Row>}
         </dl>
 
         {sub.status === 'past_due' && (
           <Notice tone="warn" testId="sub-pastdue">
+            {sub.grace_until && (
+              <strong className="mb-1 block" data-testid="sub-grace">
+                {t('請在 {date} 前補付，逾期 Pro 會停用。', { date: date(sub.grace_until) })}
+              </strong>
+            )}
             {sub.needs_customer_action
               ? t('你的銀行需要你本人確認這筆付款。請按「立即付款」完成，這段期間 Pro 照常可以使用。')
               : t('這一期的扣款沒有成功。請按「立即付款」，或更換信用卡；這段期間 Pro 照常可以使用。')}
+          </Notice>
+        )}
+        {sub.status === 'trialing' && !sub.cancel_at_period_end && endIso && (
+          <Notice tone="ok" testId="sub-trial-note">
+            <strong>{t('免費試用中，{date} 前取消不會扣款。', { date: date(endIso) })}</strong>
           </Notice>
         )}
         {sub.cancel_at_period_end && !refundOpen && (
@@ -211,10 +218,11 @@ export default function WebSubscriptionTab() {
         <ConfirmPanel
           testId="confirm-refund"
           title={t('要申請全額退款 {amount} 嗎？', { amount: formatMoney(refundable.amount_minor) })}
-          body={t('申請後訂閱會停止續訂，退款完成時 Pro 會立刻停止、回到免費版（資料不會被刪除）。款項會退回原本付款的信用卡，我們在收到申請隔天起 15 天內完成。')}
+          emphasis={t('退款完成後，Pro 會立刻停止，回到免費版。')}
+          body={t('申請後訂閱會停止續訂（你的資料不會被刪除）。款項會退回原本付款的信用卡，我們在收到申請隔天起 15 天內完成。')}
           confirmLabel={t('確認申請退款')}
           busy={busy}
-          danger
+          strong
           onConfirm={() => void run('refund', refundable.id)}
           onBack={() => setConfirming(null)}
         />
