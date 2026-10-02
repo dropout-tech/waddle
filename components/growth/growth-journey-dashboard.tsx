@@ -72,8 +72,6 @@ function DailyCheckIn({ today }: { today: string }) {
         <time dateTime={status?.check_in_date ?? today} className="text-sm text-muted-foreground">{dateLabel}</time>
       </header>
 
-      <IglooCard />
-
       <div className="mt-4 flex flex-col items-center rounded-2xl border border-border bg-card px-5 pb-6 pt-5 text-center shadow-sm sm:px-8 sm:pb-8">
         <div className="size-28 sm:size-32" aria-hidden={pose ? undefined : true}>
           {pose && (
@@ -124,6 +122,8 @@ function DailyCheckIn({ today }: { today: string }) {
       </div>
 
       <p className="mt-3 px-1 text-center text-xs leading-5 text-muted-foreground">{t('每天一小步，慢慢累積。每日台北時間 00:00 換日。')}</p>
+
+      <IglooCard />
 
       <CheckInLeaderboard score={status?.total_points} />
     </section>

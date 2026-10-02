@@ -13,8 +13,12 @@
  * (scripts/e2e/igloo-compute-verify.mjs).
  */
 
-/** Bricks per course, bottom → top. 35 bricks = about a week of 5 done things a day. */
-export const IGLOO_LAYERS: readonly number[] = [10, 8, 7, 6, 4]
+/**
+ * Bricks per course, bottom → top. 35 bricks = about a week of 5 done things
+ * a day. The bottom courses take few, big blocks so the dome's shape shows
+ * up after the first day or two.
+ */
+export const IGLOO_LAYERS: readonly number[] = [6, 7, 8, 8, 6]
 export const BRICKS_PER_IGLOO = IGLOO_LAYERS.reduce((a, b) => a + b, 0)
 /** Days without a new brick before the penguin sits down to wait. */
 export const WAITING_AFTER_DAYS = 2

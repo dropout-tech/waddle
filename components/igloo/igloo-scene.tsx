@@ -3,7 +3,7 @@
 import { useId, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { IGLOO_LAYERS, brickSlot, type IglooMood } from '@/lib/igloo/compute'
-import type { PetAccessory, PetColor } from '@/lib/pet/types'
+import { PET_COLOR_STYLES, type PetAccessory, type PetColor } from '@/lib/pet/types'
 import { PetSprite } from '@/components/pet/pet-sprite'
 import styles from './igloo.module.css'
 
@@ -22,15 +22,32 @@ const CX = 238
 const BASE = 204
 const R = 74
 const COURSE = R / IGLOO_LAYERS.length
-/** Where the penguin holds a brick (in scene units) — the flight starts here. */
-const HANDS = { x: 62, y: 190 }
-/** Painted plates (Codex CLI, 2026-10-03; prompts in the feat(igloo) commit message). */
+/** Painted plates (Codex CLI, 2026-10-03; raw files + prompts in the session's art-kit/igloo). */
 const BG_SRC = '/art/igloo/igloo-bg.webp'
 const DONE_SRC = '/art/igloo/igloo-done.webp'
-/** The finished-igloo painting: dome width and base line as fractions of the square image. */
+const SIT_SRC = '/art/igloo/penguin-sit.webp'
+const PAPER_SRC = '/art/paper-texture.jpg'
+/** The finished-igloo painting, as fractions of the square image (measured on the 1024px original). */
 const DONE_DOME_W = 0.776
 const DONE_BASE_Y = 0.84
-const DONE_CX = 0.5
+const DONE_TOP_Y = 0.225
+/** Rows above this hold the painted pennant — hidden on the main igloo, where an SVG one rises. */
+const DONE_CLIP_Y = 0.205
+
+/** Penguin box per pose, in % of the scene (left, bottom, width). Building stands at the igloo's left edge. */
+const SPOTS = {
+  carry: { left: 24, bottom: 7, width: 20 },
+  happy: { left: 24, bottom: 7, width: 20 },
+  sleep: { left: 22, bottom: 5, width: 21 },
+  sit: { left: 19, bottom: 4, width: 25 },
+} as const
+type Pose = keyof typeof SPOTS
+/** Where the carried brick sits (scene units): top-centre of the carry spot. */
+const HANDS = {
+  x: ((SPOTS.carry.left + SPOTS.carry.width / 2) / 100) * W,
+  y: H * (1 - SPOTS.carry.bottom / 100) - (SPOTS.carry.width / 100) * W * 0.9,
+}
+
 /** Back-row spots for finished igloos (dome base centre + scale vs the main igloo). */
 const VILLAGE = [
   { x: 330, y: 142, s: 0.3 },
@@ -43,30 +60,42 @@ const VILLAGE = [
 export const VILLAGE_MAX = VILLAGE.length
 const FLAKES = Array.from({ length: 9 }, (_, i) => ({
   x: 18 + ((i * 47) % 330),
-  r: 1.4 + (i % 3) * 0.6,
+  r: 1.2 + (i % 3) * 0.5,
   delay: -((i * 1.7) % 9),
   dur: 8 + (i % 4),
 }))
 
-/** Deterministic tiny wobble so bricks look hand-laid, not CAD. */
-const wob = (n: number, k: number) => (((Math.sin(n * 12.9898 + k * 78.233) * 43758.5453) % 1) - 0.5)
+/** Deterministic noise in [-0.5, 0.5) — same brick, same wobble, every render. */
+const wob = (n: number, k: number) => {
+  const v = Math.sin(n * 12.9898 + k * 78.233) * 43758.5453
+  return v - Math.floor(v) - 0.5
+}
 
-interface BrickGeom { x: number; y: number; w: number; h: number; key: string }
+interface BrickGeom { x: number; y: number; w: number; h: number; rx: number; key: string }
 
+/** One course of hand-cut blocks: lengths and heights vary a little (seeded, so idempotent). */
 function courseGeom(layer: number, count: number): BrickGeom[] {
-  const y = BASE - (layer + 1) * COURSE
+  const top = BASE - (layer + 1) * COURSE
   const bottom = layer * COURSE
   const half = Math.sqrt(Math.max(0, R * R - bottom * bottom)) + 1
-  const bw = (half * 2) / count
-  // Every other course is offset by half a brick, like real masonry.
-  const shift = layer % 2 === 1 ? bw * 0.18 : 0
-  return Array.from({ length: count }, (_, i) => ({
-    x: CX - half + i * bw + 0.7 + shift + wob(layer * 10 + i, 1) * 0.6,
-    y: y + 0.6 + wob(layer * 10 + i, 2) * 0.5,
-    w: bw - 1.4,
-    h: COURSE - 1.2,
-    key: `${layer}-${i}`,
-  }))
+  const weights = Array.from({ length: count }, (_, i) => 1 + wob(layer * 17 + i, 3) * 0.45)
+  const sum = weights.reduce((a, b) => a + b, 0)
+  // Every other course starts a little later, like real masonry.
+  let x = CX - half + (layer % 2 === 1 ? 2.5 : 0)
+  return weights.map((wgt, i) => {
+    const w = (wgt / sum) * half * 2
+    const h = COURSE - 1.4 + wob(layer * 17 + i, 5) * 1.6
+    const g = {
+      x: x + 0.8 + wob(layer * 17 + i, 1) * 0.5,
+      y: top + (COURSE - h) / 2 + wob(layer * 17 + i, 2) * 0.9,
+      w: w - 1.6,
+      h,
+      rx: 2.2 + wob(layer * 17 + i, 4) * 1.4,
+      key: `${layer}-${i}`,
+    }
+    x += w
+    return g
+  })
 }
 
 const ALL_BRICKS: BrickGeom[] = IGLOO_LAYERS.flatMap((n, layer) => courseGeom(layer, n))
@@ -78,30 +107,54 @@ function brickAt(n: number): BrickGeom {
   return ALL_BRICKS[offset + index]
 }
 
-function Door({ cx, base, s = 1 }: { cx: number; base: number; s?: number }) {
-  const w = 13 * s
-  const h = 24 * s
-  const o = w + 5 * s
+function Door({ cx, base, fill }: { cx: number; base: number; fill: string }) {
+  const w = 14
+  const h = 26
+  const o = w + 5.5
   return (
     <g>
-      <path d={`M${cx - o} ${base} L${cx - o} ${base - h + o * 0.3} A${o} ${o} 0 0 1 ${cx + o} ${base - h + o * 0.3} L${cx + o} ${base} Z`} className={styles.brick} />
+      <path d={`M${cx - o} ${base} L${cx - o} ${base - h + o * 0.3} A${o} ${o} 0 0 1 ${cx + o} ${base - h + o * 0.3} L${cx + o} ${base} Z`} fill={fill} className={styles.brick} />
       <path d={`M${cx - w} ${base} L${cx - w} ${base - h + w} A${w} ${w} 0 0 1 ${cx + w} ${base - h + w} L${cx + w} ${base} Z`} fill="var(--ig-door)" />
     </g>
   )
 }
 
-/** A finished igloo — the Codex painting, placed so its dome sits on (cx, base) at radius r. */
-function FinishedIgloo({ cx, base, r }: { cx: number; base: number; r: number }) {
+/** A finished igloo — the Codex painting, its dome sitting on (cx, base) at radius r. */
+function FinishedIgloo({ cx, base, r, clipId, className }: { cx: number; base: number; r: number; clipId?: string; className?: string }) {
   const size = (2 * r) / DONE_DOME_W
   return (
     <image
       href={DONE_SRC}
-      x={cx - size * DONE_CX}
+      x={cx - size / 2}
       y={base - size * DONE_BASE_Y}
       width={size}
       height={size}
       preserveAspectRatio="xMidYMid meet"
+      clipPath={clipId ? `url(#${clipId})` : undefined}
+      className={className}
     />
+  )
+}
+
+/** The penguin: the user's own colour; accessories only on the poses the overlay art fits. */
+function Penguin({ pose, look, rough }: { pose: Pose; look: { color: PetColor; accessory: PetAccessory }; rough: string }) {
+  if (pose === 'sleep') return <PetSprite color={look.color} accessory={look.accessory} pose="sleep" />
+  const filter = (PET_COLOR_STYLES[look.color] ?? PET_COLOR_STYLES.ink).body
+  const src = pose === 'sit' ? SIT_SRC : `/art/penguin/${pose}.webp`
+  return (
+    <span className={styles.figure}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- small static art, same as PetSprite */}
+      <img src={src} alt="" draggable={false} decoding="async" style={{ filter: filter === 'none' ? undefined : filter }} />
+      {pose === 'carry' && (
+        // An ice brick lifted overhead, painted over the card in the carry art.
+        <svg viewBox="0 0 100 100" className={styles.figureOverlay} aria-hidden="true">
+          <g filter={`url(#${rough})`}>
+            <rect x="24" y="1" width="54" height="22" rx="4" className={styles.brick} fill="var(--ig-brick)" />
+            <path d="M28 18 Q51 21 74 18" stroke="var(--ig-brick-shade)" strokeWidth="3" fill="none" strokeLinecap="round" />
+          </g>
+        </svg>
+      )}
+    </span>
   )
 }
 
@@ -112,6 +165,7 @@ export function IglooScene({
   placing = null,
   celebrating = false,
   hopKey = 0,
+  night = false,
   compact = false,
   className,
   label,
@@ -123,25 +177,33 @@ export function IglooScene({
   placing?: number | null
   celebrating?: boolean
   hopKey?: number
+  /** Night sky (moon, stars, dimmed plate) — independent of what the penguin is doing. */
+  night?: boolean
   compact?: boolean
   className?: string
   /** Accessible description of the whole picture. */
   label: string
 }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '')
+  const rough = `rough-${uid}`
+  const paper = `url(#paper-${uid})`
   const { completed, bricks, mood } = view
   // The day an igloo is finished it stays up front, whole, with its flag.
   const showFinished = bricks === 0 && completed > 0 && (celebrating || mood === 'proud')
   const villageCount = Math.min(VILLAGE.length, Math.max(0, showFinished ? completed - 1 : completed))
   const placed = useMemo(() => ALL_BRICKS.slice(0, Math.min(bricks, ALL_BRICKS.length)), [bricks])
   const flying = placing !== null && placing >= 0 && placing < ALL_BRICKS.length ? brickAt(placing) : null
-  const sleeping = mood === 'sleeping'
-  const showCarry = !sleeping && mood !== 'waiting' && !showFinished
+  const pose: Pose = showFinished ? 'happy' : mood === 'sleeping' ? 'sleep' : mood === 'waiting' ? 'sit' : 'carry'
+  const spot = SPOTS[pose]
+  const doneSize = (2 * R) / DONE_DOME_W
+  const domeTopY = BASE - doneSize * (DONE_BASE_Y - DONE_TOP_Y)
 
   return (
     <div
       className={cn(styles.scene, compact && styles.compact, className)}
       data-mood={mood}
+      data-night={night ? '' : undefined}
+      data-celebrating={celebrating ? '' : undefined}
       data-igloo-scene
       role="img"
       aria-label={label}
@@ -149,33 +211,41 @@ export function IglooScene({
       <svg viewBox={`0 0 ${W} ${H}`} className={styles.svg} aria-hidden="true">
         <defs>
           {/* Dry-brush look for the live SVG parts: wobble the edges, then sprinkle grain. */}
-          <filter id={`rough-${uid}`} x="-8%" y="-8%" width="116%" height="116%" colorInterpolationFilters="sRGB">
+          <filter id={rough} x="-8%" y="-8%" width="116%" height="116%" colorInterpolationFilters="sRGB">
             <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="7" result="warp" />
-            <feDisplacementMap in="SourceGraphic" in2="warp" scale="2.4" xChannelSelector="R" yChannelSelector="G" result="rough" />
+            <feDisplacementMap in="SourceGraphic" in2="warp" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="rough" />
             <feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="1" seed="3" result="fine" />
-            <feColorMatrix in="fine" type="matrix" values="0 0 0 0 0.36  0 0 0 0 0.28  0 0 0 0 0.2  -1.3 0 0 0 0.63" result="speck" />
+            <feColorMatrix in="fine" type="matrix" values="0 0 0 0 0.48  0 0 0 0 0.32  0 0 0 0 0.2  -1.3 0 0 0 0.6" result="speck" />
             <feComposite in="speck" in2="rough" operator="in" result="grain" />
             <feMerge>
               <feMergeNode in="rough" />
               <feMergeNode in="grain" />
             </feMerge>
           </filter>
+          {/* Paper-grain fill for the blocks, so they share the plate's tooth. */}
+          <pattern id={`paper-${uid}`} patternUnits="userSpaceOnUse" width="90" height="90">
+            <rect width="90" height="90" fill="var(--ig-brick)" />
+            <image href={PAPER_SRC} width="90" height="90" opacity="0.55" style={{ mixBlendMode: 'multiply' }} />
+          </pattern>
           <clipPath id={`dome-${uid}`}>
             <circle cx={CX} cy={BASE} r={R + 0.5} />
           </clipPath>
           <clipPath id={`built-${uid}`}>
             {placed.map((b) => <rect key={b.key} x={b.x - 2} y={b.y - 2} width={b.w + 4} height={b.h + 4} />)}
           </clipPath>
+          <clipPath id={`noflag-${uid}`}>
+            <rect x="0" y={BASE - doneSize * (DONE_BASE_Y - DONE_CLIP_Y)} width={W} height={H} />
+          </clipPath>
         </defs>
 
         <image href={BG_SRC} x="0" y="0" width={W} height={H} preserveAspectRatio="xMidYMid slice" />
-        {sleeping && (
+        {night && (
           <g>
-            <rect x="0" y="0" width={W} height={H} fill="#3d3024" opacity="0.26" />
-            <g filter={`url(#rough-${uid})`}>
-              <path d="M312 30 A15 15 0 1 0 326 56 A12 12 0 1 1 312 30 Z" fill="var(--ig-sun)" stroke="var(--ig-line)" strokeWidth="2" strokeLinejoin="round" />
+            <rect x="0" y="0" width={W} height={H} fill="#3d3024" opacity="0.28" />
+            <g filter={`url(#${rough})`}>
+              <path d="M312 30 A15 15 0 1 0 326 56 A12 12 0 1 1 312 30 Z" fill="var(--ig-sun)" stroke="var(--ig-line)" strokeWidth="1.4" strokeLinejoin="round" />
               {[[40, 34], [96, 20], [170, 38], [252, 22], [282, 58]].map(([x, y]) => (
-                <path key={`${x}`} d={`M${x} ${y - 3.5} L${x} ${y + 3.5} M${x - 3.5} ${y} L${x + 3.5} ${y}`} stroke="var(--ig-sun)" strokeWidth="2" strokeLinecap="round" />
+                <path key={`${x}`} d={`M${x} ${y - 3.5} L${x} ${y + 3.5} M${x - 3.5} ${y} L${x + 3.5} ${y}`} stroke="var(--ig-sun)" strokeWidth="1.8" strokeLinecap="round" />
               ))}
             </g>
           </g>
@@ -186,45 +256,57 @@ export function IglooScene({
           <FinishedIgloo key={i} cx={v.x} base={v.y} r={R * v.s} />
         ))}
 
-        {/* footprints from the penguin to the igloo */}
-        {Array.from({ length: 6 }, (_, i) => (
-          <ellipse key={i} cx={98 + i * 12} cy={222 - (i % 2) * 4} rx="2.6" ry="1.5" fill="var(--ig-snow-shade)" opacity={mood === 'waiting' ? 0.5 : 0.95} />
+        {/* footprints between the brick pile and the igloo */}
+        {Array.from({ length: 7 }, (_, i) => (
+          <ellipse key={i} cx={64 + i * 13} cy={226 - (i % 2) * 4} rx="2.6" ry="1.4" fill="var(--ig-snow-shade)" opacity={mood === 'waiting' ? 0.5 : 0.9} />
         ))}
 
-        {/* the brick pile next to the penguin */}
-        <g filter={`url(#rough-${uid})`}>
-          <rect x="96" y="208" width="18" height="10" rx="2.5" className={styles.brick} />
-          <rect x="115" y="208" width="18" height="10" rx="2.5" className={styles.brick} />
-          <rect x="105" y="198" width="18" height="10" rx="2.5" className={styles.brick} />
+        {/* the brick pile the penguin fetches from */}
+        <g filter={`url(#${rough})`}>
+          <rect x="34" y="208" width="19" height="10" rx="3" fill={paper} className={styles.brick} />
+          <rect x="54" y="209" width="17" height="9.5" rx="2.5" fill={paper} className={styles.brick} />
+          <rect x="43" y="198.5" width="18" height="10" rx="3" fill={paper} className={styles.brick} />
         </g>
 
         {/* the igloo under construction (or today's finished one) */}
-        {showFinished ? (
-          <FinishedIgloo cx={CX} base={BASE} r={R} />
-        ) : (
-          <g filter={`url(#rough-${uid})`}>
-            <path d={`M${CX - R} ${BASE} A${R} ${R} 0 0 1 ${CX + R} ${BASE}`} className={styles.ghost} />
-            {IGLOO_LAYERS.slice(0, -1).map((_, i) => {
-              const yy = (i + 1) * COURSE
-              const half = Math.sqrt(R * R - yy * yy)
-              return <path key={i} d={`M${CX - half} ${BASE - yy} L${CX + half} ${BASE - yy}`} className={styles.ghost} strokeOpacity={0.6} />
-            })}
+        {(!showFinished || celebrating) && (
+          <g filter={`url(#${rough})`} className={showFinished ? styles.fadeOut : undefined}>
+            {/* pencil under-drawing of the dome still to build */}
+            <g className={styles.ghost}>
+              <path d={`M${CX - R} ${BASE} A${R} ${R} 0 0 1 ${CX + R} ${BASE}`} />
+              <path d={`M${CX - R + 1.5} ${BASE - 0.5} A${R - 1} ${R + 0.5} 0 0 1 ${CX + R - 1} ${BASE}`} opacity="0.6" />
+              {IGLOO_LAYERS.slice(0, -1).map((_, i) => {
+                const yy = (i + 1) * COURSE
+                const half = Math.sqrt(R * R - yy * yy)
+                return <path key={i} d={`M${CX - half + 3} ${BASE - yy + wob(i, 9)} Q${CX} ${BASE - yy - 1.5} ${CX + half - 3} ${BASE - yy - wob(i, 8)}`} opacity="0.7" />
+              })}
+            </g>
             <g clipPath={`url(#dome-${uid})`}>
-              {placed.map((b, i) => (
+              {(showFinished ? ALL_BRICKS : placed).map((b, i) => (
                 <g key={b.key} className={i === placing ? styles.appear : undefined}>
-                  <rect x={b.x} y={b.y} width={b.w} height={b.h} rx="2.6" className={styles.brick} />
-                  <rect x={b.x + 1.2} y={b.y + b.h - 3} width={Math.max(0, b.w - 2.4)} height="1.8" rx="0.9" className={styles.brickShade} />
+                  <rect x={b.x} y={b.y} width={b.w} height={b.h} rx={b.rx} fill={paper} className={styles.brick} />
+                  <path d={`M${b.x + 2} ${b.y + b.h - 2.2} Q${b.x + b.w / 2} ${b.y + b.h - 1.2} ${b.x + b.w - 2} ${b.y + b.h - 2.2}`} className={styles.brickShade} />
                 </g>
               ))}
             </g>
-            {/* solid dome outline, only around what's built */}
-            <g clipPath={`url(#built-${uid})`}>
-              <path d={`M${CX - R} ${BASE} A${R} ${R} 0 0 1 ${CX + R} ${BASE}`} fill="none" stroke="var(--ig-line)" strokeWidth="2.6" />
+            {/* the dome's outline, only around what's built */}
+            <g clipPath={showFinished ? undefined : `url(#built-${uid})`}>
+              <path d={`M${CX - R} ${BASE} A${R} ${R} 0 0 1 ${CX + R} ${BASE}`} fill="none" stroke="var(--ig-line)" strokeWidth="1.6" />
             </g>
-            {bricks >= IGLOO_LAYERS[0] + IGLOO_LAYERS[1] && <Door cx={CX + 3} base={BASE} s={1.1} />}
+            {(showFinished || bricks >= IGLOO_LAYERS[0] + IGLOO_LAYERS[1]) && <Door cx={CX + 3} base={BASE} fill={paper} />}
           </g>
         )}
-        {!showFinished && <path d={`M${CX - R - 10} ${BASE + 1} Q${CX} ${BASE + 7} ${CX + R + 12} ${BASE + 1}`} fill="none" stroke="var(--ig-snow-shade)" strokeWidth="3" strokeLinecap="round" />}
+        {showFinished && (
+          <g>
+            <FinishedIgloo cx={CX} base={BASE} r={R} clipId={`noflag-${uid}`} className={celebrating ? styles.doneIn : undefined} />
+            {/* the terracotta pennant goes up */}
+            <g filter={`url(#${rough})`} className={celebrating ? styles.flagUp : undefined}>
+              <path d={`M${CX - 1} ${domeTopY + 2} L${CX - 1} ${domeTopY - 22}`} stroke="var(--ig-line)" strokeWidth="1.8" strokeLinecap="round" />
+              <path d={`M${CX - 1} ${domeTopY - 22} L${CX + 15} ${domeTopY - 17} L${CX - 1} ${domeTopY - 12} Z`} fill="var(--ig-flag)" stroke="var(--ig-line)" strokeWidth="1.3" strokeLinejoin="round" />
+            </g>
+          </g>
+        )}
+        {!showFinished && <path d={`M${CX - R - 10} ${BASE + 1} Q${CX} ${BASE + 6} ${CX + R + 12} ${BASE + 1}`} fill="none" stroke="var(--ig-snow-shade)" strokeWidth="3" strokeLinecap="round" />}
 
         {/* the brick in flight */}
         {flying && (
@@ -234,28 +316,12 @@ export function IglooScene({
             y={flying.y}
             width={flying.w}
             height={flying.h}
-            rx="2.6"
+            rx={flying.rx}
+            fill={paper}
             className={cn(styles.brick, styles.flying)}
-            filter={`url(#rough-${uid})`}
-            style={{ '--dx': `${HANDS.x - flying.x}px`, '--dy': `${HANDS.y - flying.y}px` } as React.CSSProperties}
+            filter={`url(#${rough})`}
+            style={{ '--dx': `${HANDS.x - (flying.x + flying.w / 2)}px`, '--dy': `${HANDS.y - (flying.y + flying.h / 2)}px` } as React.CSSProperties}
           />
-        )}
-
-        {/* the finished-igloo moment */}
-        {celebrating && (
-          <g>
-            {[[CX - 80, BASE - 70], [CX + 82, BASE - 76], [CX - 46, BASE - 94], [CX + 50, BASE - 96], [CX, BASE - 106], [CX - 96, BASE - 34], [CX + 98, BASE - 36]].map(([x, y], i) => (
-              <path
-                key={i}
-                className={styles.burst}
-                d={`M${x} ${y - 6} L${x + 1.6} ${y - 1.6} L${x + 6} ${y} L${x + 1.6} ${y + 1.6} L${x} ${y + 6} L${x - 1.6} ${y + 1.6} L${x - 6} ${y} L${x - 1.6} ${y - 1.6} Z`}
-                fill={i % 2 ? 'var(--ig-sun)' : 'var(--ig-flag)'}
-                stroke="var(--ig-line)"
-                strokeWidth="1.4"
-                strokeLinejoin="round"
-              />
-            ))}
-          </g>
         )}
 
         {/* light snowfall */}
@@ -268,22 +334,30 @@ export function IglooScene({
         )}
       </svg>
 
-      {/* the penguin (the user's own look) */}
-      <div className={styles.penguin} style={{ left: '9%', bottom: '8%', width: '16%' }} data-igloo-penguin>
-        <div key={hopKey} className={cn(styles.penguinInner, hopKey > 0 && mood !== 'waiting' && styles.hop)}>
-          <PetSprite color={look.color} accessory={look.accessory} pose={sleeping ? 'sleep' : 'stand'} blush={mood === 'proud' || celebrating} />
-          {showCarry && (
-            <svg viewBox="0 0 40 18" className={styles.carry} aria-hidden="true">
-              <g filter={`url(#rough-${uid})`}>
-                <rect x="2" y="2" width="36" height="14" rx="3" className={styles.brick} />
-                <rect x="5" y="11.5" width="30" height="2.2" rx="1.1" className={styles.brickShade} />
+      {/* the penguin (the user's own look); a new pose fades in rather than jumping */}
+      <div
+        key={pose}
+        className={cn(styles.penguin, styles.poseIn)}
+        style={{ left: `${spot.left}%`, bottom: `${spot.bottom}%`, width: `${spot.width}%` }}
+        data-igloo-penguin={pose}
+      >
+        <div key={hopKey} className={cn(styles.penguinInner, hopKey > 0 && pose === 'carry' && styles.hop)}>
+          <Penguin pose={pose} look={look} rough={rough} />
+        </div>
+        {pose === 'sit' && (
+          <>
+            {/* the snow drift it sits in, in front of its feet */}
+            <svg viewBox="0 0 100 30" className={styles.drift} aria-hidden="true">
+              <g filter={`url(#${rough})`}>
+                <path d="M2 29 Q8 13 26 15 Q38 6 52 12 Q66 5 78 14 Q94 13 98 29 Z" fill={paper} />
+                <path d="M2 29 Q8 13 26 15 Q38 6 52 12 Q66 5 78 14 Q94 13 98 29" fill="none" stroke="var(--ig-line)" strokeWidth="1.3" strokeLinecap="round" strokeOpacity="0.75" />
+                <path d="M30 22 Q42 18 52 21 M62 20 Q72 17 82 21" fill="none" stroke="var(--ig-brick-shade)" strokeWidth="1.6" strokeLinecap="round" />
               </g>
             </svg>
-          )}
-        </div>
-        {mood === 'waiting' && <span className={styles.snowMound} aria-hidden="true" />}
-        {mood === 'waiting' && <span className={styles.thinking} aria-hidden="true">…</span>}
-        {sleeping && (
+            <span className={styles.thinking} aria-hidden="true">…</span>
+          </>
+        )}
+        {pose === 'sleep' && (
           <span className={styles.zzz} aria-hidden="true">
             <span>z</span>
             <span>z</span>
@@ -294,8 +368,8 @@ export function IglooScene({
 
       {bubble && !compact && (
         <div key={bubble.key} className={styles.bubble} data-igloo-bubble aria-live="polite">
-          <strong className="mr-1.5">{bubble.name}</strong>
-          {bubble.text}
+          <span className={styles.nameTag} data-igloo-name>{bubble.name}</span>
+          <span data-igloo-bubble-text>{bubble.text}</span>
         </div>
       )}
     </div>

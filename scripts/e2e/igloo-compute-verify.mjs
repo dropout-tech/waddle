@@ -32,9 +32,9 @@ const NOW = at('2026-10-03', '15:00')
 const done = (id, day, hm = '10:00') => ({ id, isCompleted: true, completedAt: at(day, hm).toISOString() })
 const many = (n, day, prefix = 't') => Array.from({ length: n }, (_, i) => done(`${prefix}${i}`, day))
 
-check('constants: 35 bricks in 5 courses', () => {
+check('constants: 35 bricks in 5 courses, bottom courses fill first', () => {
   assert.equal(BRICKS_PER_IGLOO, 35)
-  assert.deepEqual([...IGLOO_LAYERS], [10, 8, 7, 6, 4])
+  assert.deepEqual([...IGLOO_LAYERS], [6, 7, 8, 8, 6])
 })
 
 check('0 bricks → fresh igloo, building, no last active day', () => {
@@ -153,10 +153,11 @@ check('ledger keeps bricks of deleted tasks; undated ledger rows still count', (
 
 check('brick slots fill bottom course first and stay in range', () => {
   assert.deepEqual(brickSlot(0), { layer: 0, index: 0 })
-  assert.deepEqual(brickSlot(9), { layer: 0, index: 9 })
-  assert.deepEqual(brickSlot(10), { layer: 1, index: 0 })
-  assert.deepEqual(brickSlot(34), { layer: 4, index: 3 })
-  assert.deepEqual(brickSlot(99), { layer: 4, index: 3 })
+  assert.deepEqual(brickSlot(5), { layer: 0, index: 5 })
+  assert.deepEqual(brickSlot(6), { layer: 1, index: 0 })
+  assert.deepEqual(brickSlot(13), { layer: 2, index: 0 })
+  assert.deepEqual(brickSlot(34), { layer: 4, index: 5 })
+  assert.deepEqual(brickSlot(99), { layer: 4, index: 5 })
 })
 
 check('catch-up line wording', () => {

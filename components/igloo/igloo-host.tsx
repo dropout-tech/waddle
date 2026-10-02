@@ -5,7 +5,7 @@ import { X } from 'lucide-react'
 import { useAuth } from '@/components/auth/auth-provider'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useI18n } from '@/lib/i18n/react'
-import { computeIgloo, localDay, type IglooState } from '@/lib/igloo/compute'
+import { computeIgloo, isSleepyHour, localDay, type IglooState } from '@/lib/igloo/compute'
 import { catchUpLine, iglooDoneLine, iglooLine } from '@/lib/igloo/lines'
 import { ledgerTasks, mergeIglooLedger, readIglooLocal, writeIglooLocal } from '@/lib/igloo/local'
 import { OPEN_IGLOO_EVENT, setIglooSnapshot } from '@/lib/igloo/store'
@@ -148,11 +148,14 @@ function IglooDialog({
   const [celebrating, setCelebrating] = useState(false)
   const [hopKey, setHopKey] = useState(0)
   const [running, setRunning] = useState(willReplay)
+  // At night the penguin finishes telling you the news before it dozes off.
+  const [awake, setAwake] = useState(false)
   const [bubble, setBubble] = useState<{ text: string; key: number } | null>(null)
   const timer = useRef<number | undefined>(undefined)
 
   const moodLine = iglooLine(state, lang, `${localDay(new Date())}:${name}`)
-  const caughtUp = replay ? replay.to - (replay.first ? 0 : replay.from) : 0
+  // The sky follows the real clock — a night-time replay happens under the moon.
+  const night = isSleepyHour(new Date().getHours())
 
   const say = useCallback((text: string) => setBubble((b) => ({ text, key: (b?.key ?? 0) + 1 })), [])
 
@@ -168,6 +171,13 @@ function IglooDialog({
       setRunning(false)
       setCelebrating(false)
       say(news > 0 ? catchUpLine(news, lang, first) : moodLine)
+      if (news > 0 && state.mood === 'sleeping') {
+        setAwake(true)
+        timer.current = window.setTimeout(() => {
+          setAwake(false)
+          say(moodLine)
+        }, reduced ? 0 : 2800)
+      }
     }
     if (to <= from || reduced) {
       timer.current = window.setTimeout(() => {
@@ -192,7 +202,7 @@ function IglooDialog({
             setCelebrating(false)
             step()
           } else done()
-        }, 1900)
+        }, 2600)
         return
       }
       timer.current = window.setTimeout(cur < to ? step : done, cur < to ? stepMs : 650)
@@ -208,7 +218,7 @@ function IglooDialog({
     completed: Math.floor(total / per),
     bricks: total % per,
     per,
-    mood: running ? ('building' as const) : state.mood,
+    mood: running || awake ? ('building' as const) : state.mood,
   }
   const inProgress = view.bricks === 0 && view.completed > 0 && (celebrating || view.mood === 'proud') ? per : view.bricks
   const iglooNo = inProgress === per ? view.completed : view.completed + 1
@@ -236,6 +246,8 @@ function IglooDialog({
       data-igloo-shown={total}
       data-igloo-mood={view.mood}
       data-igloo-replaying={running ? 'true' : 'false'}
+      data-igloo-celebrating={celebrating ? 'true' : 'false'}
+      data-igloo-awake={awake ? 'true' : 'false'}
       data-igloo-replay-count={willReplay && replay ? replay.to - replay.from : 0}
       data-igloo-today={state.bricksToday}
     >
@@ -264,6 +276,7 @@ function IglooDialog({
           placing={running ? placing : null}
           celebrating={celebrating}
           hopKey={hopKey}
+          night={night}
           label={sceneLabel}
         />
       </div>
@@ -282,7 +295,7 @@ function IglooDialog({
           />
         </div>
         {/* The bubble carries the mood line unless it's busy with the catch-up news. */}
-        {caughtUp > 0 && !running && <p className="mt-3 text-sm leading-6 text-foreground" data-igloo-line>{moodLine}</p>}
+        {!!bubble && bubble.text !== moodLine && !running && <p className="mt-3 text-sm leading-6 text-foreground" data-igloo-line>{moodLine}</p>}
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
           {t('今天 +{n} 塊', { n: state.bricksToday })}
           <span aria-hidden="true" className="mx-2">·</span>

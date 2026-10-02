@@ -13,8 +13,10 @@
  *   screenshot) and the total is +2 → delete the throwaway category + tasks
  *   (UI first, then a REST backstop) and prove nothing is left.
  * Then read-only contexts (every Supabase write intercepted): phone 390,
- * English (no CJK left in the dialog), dark mode, and a mocked "away for
- * 4 days" account (task completion dates rewritten) → waiting penguin.
+ * English (no CJK left in the dialog), dark mode, a mocked "away for
+ * 4 days" account (task completion dates rewritten) → waiting penguin, and
+ * extra bricks injected into this device's igloo ledger (localStorage only)
+ * for the village, the finished-igloo moment and a night-time replay.
  */
 import { chromium } from 'playwright'
 import { createClient } from '@supabase/supabase-js'
@@ -35,6 +37,7 @@ const CJK = /[㐀-鿿]/
 const READ_RPCS = /\/rpc\/(get_|preview_)/
 // The most recent 15:00 local that is already in the past (session tokens stay valid).
 const DAYTIME = new Date(); DAYTIME.setHours(15, 0, 0, 0); if (DAYTIME.getTime() > Date.now()) DAYTIME.setDate(DAYTIME.getDate() - 1)
+const NIGHT = new Date(); NIGHT.setHours(23, 30, 0, 0); if (NIGHT.getTime() > Date.now()) NIGHT.setDate(NIGHT.getDate() - 1)
 
 let failures = 0
 const results = []
@@ -165,6 +168,25 @@ async function shot(page, name, target) {
   return file
 }
 
+/** Add fake bricks to this device's igloo ledger (localStorage only — nothing is written to the account). */
+async function injectLedger(page, { fake = 0, agoDays = 0, seenDelta = 0 }) {
+  await page.evaluate(({ key, fake, agoDays, seenDelta }) => {
+    const v = JSON.parse(localStorage.getItem(key) ?? '{"tasks":{},"focus":{}}')
+    const at = new Date(Date.now() - agoDays * 86400000).toISOString()
+    for (let i = 0; i < fake; i++) v.tasks[`fake-${i}`] = at
+    v.seen = Object.keys(v.tasks).length - seenDelta
+    localStorage.setItem(key, JSON.stringify(v))
+    // nudge IglooHost to re-read the ledger
+    window.dispatchEvent(new CustomEvent('huddle:pomodoro-count', { detail: { date: '2000-01-01', count: 0 } }))
+  }, { key: `huddle-igloo-v1:${uid}`, fake, agoDays, seenDelta })
+  await page.waitForTimeout(400)
+}
+
+const freeze = (page) => page.evaluate(() => {
+  document.querySelector('[data-igloo-scene]')?.setAttribute('data-frozen', '')
+  for (const a of document.getAnimations()) a.pause()
+})
+
 async function closeDialog(page) {
   await page.keyboard.press('Escape')
   await dialog(page).waitFor({ state: 'detached', timeout: 5000 })
@@ -215,6 +237,8 @@ const countCompleted = async () => {
     await page.getByRole('menuitem', { name: '每日簽到' }).click()
     const card = page.locator('[data-igloo-card]')
     await card.waitFor({ timeout: 15000 })
+    await card.scrollIntoViewIfNeeded()
+    await page.waitForTimeout(300)
     await shot(page, 'igloo-growth-card-1440.png')
     await card.click()
     await dialog(page).waitFor({ timeout: 10000 })
@@ -314,6 +338,8 @@ const countCompleted = async () => {
     await page.getByRole('button', { name: '每日簽到' }).click()
     const card = page.locator('[data-igloo-card]')
     await card.waitFor({ timeout: 15000 })
+    await card.scrollIntoViewIfNeeded()
+    await page.waitForTimeout(300)
     await shot(page, 'igloo-growth-card-390.png')
     await card.click()
     await dialog(page).waitFor({ timeout: 10000 })
@@ -322,8 +348,18 @@ const countCompleted = async () => {
     assert.ok(box && box.x >= 0 && box.x + box.width <= 390, `dialog box ${JSON.stringify(box)}`)
     const scroll = await page.evaluate(() => document.documentElement.scrollWidth)
     assert.ok(scroll <= 390, `page scrollWidth ${scroll}`)
+    const x = await dialog(page).getByRole('button', { name: '關閉' }).boundingBox()
+    assert.ok(x.width >= 44 && x.height >= 44, `close button ${x.width}×${x.height}`)
+    const focus = await page.evaluate(() => {
+      const a = document.activeElement
+      return { onDialog: a?.hasAttribute('data-igloo-dialog'), ring: a?.matches(':focus-visible') && getComputedStyle(a).outlineStyle !== 'none' }
+    })
+    assert.ok(focus.onDialog && !focus.ring, `focus on open: ${JSON.stringify(focus)}`)
+    await page.keyboard.press('Tab')
+    const tabbed = await page.evaluate(() => ({ label: document.activeElement?.getAttribute('aria-label'), visible: document.activeElement?.matches(':focus-visible') }))
+    assert.ok(tabbed.label === '關閉' && tabbed.visible, `Tab → ${JSON.stringify(tabbed)}`)
     await shot(page, 'igloo-mobile-390.png')
-    return `dialog ${Math.round(box.width)}×${Math.round(box.height)} at x=${Math.round(box.x)}`
+    return `dialog ${Math.round(box.width)}×${Math.round(box.height)} at x=${Math.round(box.x)}; ✕ ${x.width}×${x.height}; open focus on dialog without ring, Tab → ✕ with focus-visible`
   })
   await context.close()
 }
@@ -338,10 +374,10 @@ const countCompleted = async () => {
     await waitReplayDone(page)
     const text = await dialog(page).evaluate((el) => {
       const c = el.cloneNode(true)
-      c.querySelectorAll('[data-igloo-bubble] strong').forEach((n) => n.remove())
+      c.querySelectorAll('[data-igloo-name]').forEach((n) => n.remove())
       return `${c.textContent} ${el.querySelector('[data-igloo-scene]')?.getAttribute('aria-label') ?? ''}`
     })
-    const name = await dialog(page).evaluate((el) => el.querySelector('[data-igloo-bubble] strong')?.textContent ?? '')
+    const name = await dialog(page).evaluate((el) => el.querySelector('[data-igloo-name]')?.textContent ?? '')
     const left = text.replaceAll(name, '')
     assert.ok(!CJK.test(left), `CJK found: ${left.match(/.{0,20}[㐀-鿿].{0,20}/)?.[0]}`)
     await shot(page, 'igloo-english-1440.png')
@@ -376,9 +412,80 @@ const countCompleted = async () => {
     const d = await readDialog(page)
     assert.equal(d.mood, 'waiting')
     assert.equal(d.today, 0)
+    assert.equal(await page.locator('[data-igloo-penguin="sit"]').count(), 1, 'sitting penguin')
     await page.evaluate(() => { for (const a of document.getAnimations()) a.pause() })
     await shot(page, 'igloo-waiting-390.png')
     return `mood=${d.mood}, today=${d.today}, total=${d.total}, bubble="${d.bubble}"`
+  })
+  await context.close()
+}
+
+// ─── 6) village + the finished-igloo moment (read-only, injected ledger) ──
+{
+  const context = await makeContext({ viewport: { width: 1440, height: 900 }, readOnly: true, fixedTime: DAYTIME })
+  const page = await context.newPage()
+  await openApp(page)
+  await step('village: 2 finished igloos stand in the back', async () => {
+    await injectLedger(page, { fake: 72, agoDays: 1, seenDelta: 0 })
+    await openViaEvent(page)
+    await waitReplayDone(page)
+    const d = await readDialog(page)
+    assert.ok(d.total >= 70, `total ${d.total}`)
+    await freeze(page)
+    await shot(page, 'igloo-village-1440.png', dialog(page))
+    await closeDialog(page)
+    return `total=${d.total}, progress="${d.progress}"`
+  })
+  await context.close()
+}
+{
+  const context = await makeContext({ viewport: { width: 1440, height: 900 }, readOnly: true, fixedTime: DAYTIME })
+  const page = await context.newPage()
+  await openApp(page)
+  await step('finishing an igloo: painting fades in, pennant rises, penguin cheers', async () => {
+    const live = await page.evaluate((key) => Object.keys(JSON.parse(localStorage.getItem(key) ?? '{"tasks":{}}').tasks).length, `huddle-igloo-v1:${uid}`)
+    // top the ledger up to exactly 70 (two igloos), replaying the last 2 bricks
+    await injectLedger(page, { fake: 70 - live, agoDays: 0, seenDelta: 2 })
+    await openViaEvent(page)
+    await page.waitForFunction(() => document.querySelector('[data-igloo-dialog]')?.getAttribute('data-igloo-celebrating') === 'true', null, { timeout: 20000 })
+    await page.waitForTimeout(2000) // pennant fully up
+    assert.equal(await page.locator('[data-igloo-penguin="happy"]').count(), 1, 'cheering penguin')
+    await freeze(page)
+    await shot(page, 'igloo-finished-moment-1440.png', dialog(page))
+    await page.evaluate(() => { for (const a of document.getAnimations()) a.play() })
+    await waitReplayDone(page)
+    const d = await readDialog(page)
+    assert.equal(d.mood, 'proud')
+    await closeDialog(page)
+    return `total=${d.total}, mood=${d.mood}, bubble="${d.bubble}"`
+  })
+  await context.close()
+}
+
+// ─── 7) a night-time replay (read-only, clock at 23:30) ──────────────────
+{
+  const context = await makeContext({ viewport: { width: 390, height: 844 }, mobile: true, readOnly: true, fixedTime: NIGHT })
+  const page = await context.newPage()
+  await openApp(page)
+  await step('night replay: moonlit scene, penguin awake while carrying, then dozes off', async () => {
+    await injectLedger(page, { fake: 6, agoDays: 0, seenDelta: 3 })
+    await openViaEvent(page)
+    const sc = page.locator('[data-igloo-scene]')
+    assert.equal(await sc.getAttribute('data-night'), '', 'night sky from the first frame')
+    await page.waitForFunction(() => document.querySelector('[data-igloo-dialog]')?.getAttribute('data-igloo-replaying') === 'true' && document.querySelector('[data-igloo-penguin="carry"]'), null, { timeout: 5000 })
+    await page.waitForTimeout(1300)
+    await freeze(page)
+    await shot(page, 'igloo-night-replay-mid-390.png', dialog(page))
+    await page.evaluate(() => { document.querySelector('[data-igloo-scene]')?.removeAttribute('data-frozen'); for (const a of document.getAnimations()) a.play() })
+    await waitReplayDone(page)
+    const awake = await page.locator('[data-igloo-penguin="carry"]').count()
+    await page.waitForSelector('[data-igloo-penguin="sleep"]', { timeout: 6000 })
+    await page.waitForTimeout(900)
+    const d = await readDialog(page)
+    assert.equal(d.mood, 'sleeping')
+    await freeze(page)
+    await shot(page, 'igloo-night-asleep-390.png', dialog(page))
+    return `awake right after the replay=${awake === 1}, then mood=${d.mood}, bubble="${d.bubble}"`
   })
   await context.close()
 }

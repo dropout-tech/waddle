@@ -72,7 +72,7 @@ export function iglooLine(state: IglooState, lang: Lang, seed = ''): string {
 export function catchUpLine(n: number, lang: Lang, firstVisit: boolean): string {
   if (firstVisit) {
     return lang === 'en'
-      ? `Everything you've finished so far became ${n} ice ${n === 1 ? 'brick' : 'bricks'}. I built them in.`
+      ? `Everything you've finished so far became ${n} ice ${n === 1 ? 'brick' : 'bricks'}. Stacked them on for you.`
       : `你之前做完的事，變成了 ${n} 塊冰磚，我都蓋上去了。`
   }
   return lang === 'en'

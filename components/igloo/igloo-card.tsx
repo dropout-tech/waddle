@@ -30,12 +30,13 @@ export function IglooCard() {
       type="button"
       onClick={openIgloo}
       data-igloo-card
-      className="group mt-4 flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left shadow-sm transition-colors hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-4 sm:p-4"
+      className="group mt-3 flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left shadow-sm transition-colors hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-4 sm:p-4"
     >
-      <span className="block w-32 shrink-0 sm:w-44">
+      <span className="block w-[46%] max-w-64 shrink-0">
         <IglooScene
           compact
           view={{ completed: state.completedIgloos, bricks: state.bricksInCurrent, per, mood: state.mood }}
+          night={state.mood === 'sleeping'}
           look={look}
           className="rounded-xl"
           label={t('冰屋場景：第 {n} 座冰屋蓋了 {x}/{per} 塊冰磚，村落裡有 {built} 座蓋好的冰屋。', { n, x, per, built: state.completedIgloos })}
