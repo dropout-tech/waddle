@@ -220,9 +220,8 @@ function assertMoved(r, name) {
   const info = `${name}: h=${r.height}px grab=${r.part} ${r.before.text} → ${r.after.text}`
   console.log(`[tb-verify] ${info}`)
   if (r.after.start === r.before.start) throw new Error(`start did not move (${info})`)
-  // computeDragRange keeps a moved block at least SNAP_MINUTES (15) long —
-  // existing shared rule (tasks too), so a 1-min block lands as 15 min.
-  const expectedLen = Math.max(lenBefore, 15)
+  // A move keeps the exact length — a 1-min block stays 1 min.
+  const expectedLen = lenBefore
   if (r.part !== 'body') throw new Error(`grab point is on the ${r.part}, not the move body (${info})`)
   if (lenAfter !== expectedLen) throw new Error(`length ${lenBefore}→${lenAfter} min, expected ${expectedLen}: resized not moved (${info})`)
 }
