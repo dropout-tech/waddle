@@ -13,6 +13,7 @@ import notoSansTCLatin from './fonts/files/fb4edce8a3cbfef3.woff2'
 import barlowLatin from './fonts/files/89232e6535d3b87e.woff2'
 import { AuthProvider } from '@/components/auth/auth-provider'
 import { NativeShell } from '@/components/native/native-shell'
+import { SentryInit } from '@/components/monitoring/sentry-init'
 import { PwaSetup } from '@/components/pwa/pwa-setup'
 import { ThemeProvider } from '@/components/theme-provider'
 import { FocusTimerProvider } from '@/components/timer/focus-timer-provider'
@@ -131,6 +132,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           disableTransitionOnChange
         >
           <NativeShell />
+          <SentryInit />
           <PwaSetup />
           <AuthProvider>
             <EnrollmentBridge />
