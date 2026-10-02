@@ -19,7 +19,7 @@ App Store Connect：Apple ID 6818073462、SKU huddle-ios-001、套件識別碼 c
 | 定價與供應狀況（App 本體免費、上架國家） | ✅ | 依交接紀錄：175 國扣歐盟 27 國已設 |
 | 歐盟《數位服務法》貿易商聲明 | ✅ | 第一版不上歐盟，不需聲明（日後加回歐盟再處理） |
 | 描述、關鍵字、宣傳文字、支援／行銷網址（英文＋繁中） | 🧑 | **草稿已備**：`docs/releases/2026-10-03-app-store-metadata-draft.md`（字數已實算在上限內），待老闆審後貼上 |
-| 截圖（iPhone 6.9 吋必備；有支援 iPad 則 iPad 13 吋也必備） | ⬜ | 要用新版 App（含購買畫面）實機或模擬器截。專案目前 `TARGETED_DEVICE_FAMILY = "1,2"`（`ios/App/App.xcodeproj/project.pbxproj` App target）＝有上 iPad，**iPad 截圖也是必填**；若不想做 iPad 版，工程端要改成只支援 iPhone（需老闆決定） |
+| 截圖（iPhone 6.9 吋必備） | ⬜ | 2026-10-03 老闆決定**只做 iPhone**：App 與小工具 `TARGETED_DEVICE_FAMILY = 1`（ad5a496），iPad 截圖不需要。要用新版 App（含購買畫面）實機或模擬器截 |
 | App 審查資訊（測試帳號、聯絡人、備註） | 🧑 | 審查備註英文稿已備（同 metadata 草稿第 5 節）；**審查帳號要老闆本人在 Supabase 建立**後填入帳密 |
 | 加密出口聲明 | ✅ | 2026-10-03 Info.plist 加 `ITSAppUsesNonExemptEncryption = false`（只用 HTTPS 標準加密）；上傳後後台不會再逐版詢問 |
 
@@ -41,11 +41,11 @@ App Store Connect：Apple ID 6818073462、SKU huddle-ios-001、套件識別碼 c
 | 項目 | 狀態 | 備註 |
 |---|---|---|
 | 購買畫面（含恢復購買、條款連結、自動續訂說明、試用顯示、到期日） | ✅ | PR #140 已合併。恢復購買 `components/billing/pro-purchase-card.tsx:266`；條款／隱私連結 `:270`、`:271`；自動續訂說明 `lib/billing/paywall-copy.ts:39`、`:48`；入口：頭像選單 →「會員與推薦」`components/user-menu.tsx:219` |
-| **iOS 打包時要開計費開關** | ⬜ | 購買畫面只在 `NEXT_PUBLIC_BILLING_ENABLED=true` 且有 `NEXT_PUBLIC_REVENUECAT_IOS_KEY` 時出現（`lib/billing/load-native-session.ts:8`–`:12`）。**送審版本機 .env.local 必須設這兩個值**，否則審查員找不到訂閱 → 以 2.1 退件 |
+| iOS 打包時要開計費開關 | 🟡 | 已加防呆：`pnpm cap:sync:release` 會先跑 `scripts/ios-release-preflight.mjs`，開關沒開、RevenueCat 不是 `appl_` 正式金鑰、版本不一致、iPad／Watch 又被打開時直接中止（ad5a496；正反測試皆通過）。**剩下**：老闆在本機 .env.local 填 `NEXT_PUBLIC_BILLING_ENABLED=true`、`NEXT_PUBLIC_REVENUECAT_IOS_KEY=appl_…`、`NEXT_PUBLIC_SENTRY_DSN` |
 | iOS 隱藏優惠碼／推薦碼輸入 | ✅ | 隨 #140 合併（main 的 WebOnly 機制） |
 | 網站購買頁在 App 內不可達 | ✅ | `/billing` 原生殼內直接導回首頁（`components/billing/billing-route.tsx:32`、`:36`）；設定的訂閱分頁原生不顯示（`components/modals/settings-modal.tsx:186`）；條款／隱私頁的 SHOPLINE 段落包在 WebOnly，App 內掛載後移除（`components/legal/web-only.tsx`） |
-| **條款頁「回到官網」會把 App 內使用者帶到行銷頁** | ⬜ 新缺口 | 購買畫面 → 服務條款 → 頁首／頁尾「回到官網」連到 `/about`（`components/legal/legal-page.tsx:11`、`:33`），`app/about/page.tsx` 在 App 內照樣顯示行銷頁，內容有「網站以信用卡付款、7 天全額退款」與「Pro 尚未開放購買」（`components/marketing/marketing-page.tsx:40`–`:52`）。違反 3.1.1 反導流、且與 App 內可購買矛盾。建議：原生殼內 legal-page 的官網連結改指向 `/`，或 `/about` 原生時導回首頁（要改程式，本次未改） |
-| **條款／隱私頁仍寫「目前沒有可購買的 Pro 訂閱」** | ⬜ 新缺口 | `app/terms/page.tsx:13`、`app/privacy/page.tsx:17`（不在 WebOnly 內，App 內看得到）。iOS 開賣版要先換成開賣版文案（法務草稿 `docs/legal/2026-10-01-pro-launch-copy-draft.md`），否則審查員點條款會看到「不能買」 |
+| 條款頁「回到官網」會把 App 內使用者帶到行銷頁 | ✅ | App 建置時頁首品牌與頁尾改指 `/`、文字「回到 Huddle」，網站版不變（b2b10ce；`components/legal/legal-page.tsx:14`、`:38`） |
+| 條款／隱私頁仍寫「目前沒有可購買的 Pro 訂閱」 | ✅ | App 建置＋`NEXT_PUBLIC_BILLING_ENABLED=true` 時 8 頁（中英）換成 App Store 開賣版；退款頁加入老闆 10-02 拍板的「Apple 7 天內不退由我們匯款退」（R4 版本 A）。網站版一字不變。驗證 `scripts/e2e/legal-iap-copy-verify.mjs` 三種建置 86 PASS／0 FAIL，反向測試 18 FAIL（b2b10ce＋後續 commit）。**文案待老闆審** |
 | 後端同步（webhook 部署、金鑰、定期對帳） | ✅ | 依交接紀錄 webhook 已部署打通 |
 | 審查員用測試購買時要能生效 | ✅ | PR #150（commit 3425bb5）：沙盒購買最多開通 Pro 24 小時 |
 | 六項 Pro 功能實際上鎖 | 🟡 | 用量門檻已做（#141 等）；送審前請以實機確認購買卡片列出的 5 項 Pro 內容（`pro-purchase-card.tsx:184`）都真的「免費版受限、Pro 解鎖」，否則 2.3 文不符實 |
@@ -56,12 +56,12 @@ App Store Connect：Apple ID 6818073462、SKU huddle-ios-001、套件識別碼 c
 | 版本號統一 | ✅ | 2026-10-03：小工具 0.1.0 → 1.0，與 App、Watch 一致（MARKETING_VERSION 1.0／build 1）。package.json 0.1.3 是桌面版版本，與 iOS 無關、不動。**若後台版本頁建的不是「1.0」**，要把 Xcode 的 MARKETING_VERSION 改成一致 |
 | 權限說明字串（相機／相簿） | ✅ | 2026-10-03 新增 NSCameraUsageDescription、NSPhotoLibraryUsageDescription、NSPhotoLibraryAddUsageDescription（`ios/App/App/Info.plist`）。原因：App 內選圖用 `<input type=file accept=image/*>`（任務、白板、工作區、記事本），iOS 會出現「拍照」選項，沒有相機說明字串一按就閃退；行事曆匯出圖片走分享單，「儲存影像」需要寫入相簿說明 |
 | Privacy Manifest（必要理由 API） | ✅ | 2026-10-03 新增 `ios/App/App/PrivacyInfo.xcprivacy` 並加入 App target 資源：UserDefaults（CA92.1，Preferences／Apple 登入／社群登入外掛用）、檔案時間戳（C617.1，Filesystem 外掛用）。Capacitor 本體與 RevenueCat SDK 自帶清單；小工具 target 原生碼沒用到必要理由 API，不需另加 |
-| **Apple Watch 仍會被打包進 iOS App** | ⬜ 新缺口 | 老闆決定第一版不帶，但 App target 仍有「Embed Watch Content」與 HuddleWatch 依賴（`project.pbxproj` App target buildPhases／dependencies），Archive 出來會含 Watch App。而且 Watch 用 UserDefaults（`ios/App/WatchShared/WatchLocalStore.swift:10`）卻沒有隱私清單。建議工程端移除 App target 的 Embed Watch Content 與 HuddleWatch 依賴（保留 target 不刪，之後再加回）；改完要重新 Archive 驗證 |
+| Apple Watch 不打包進 iOS App | ✅ | App 不再相依與嵌入 HuddleWatch（Watch target 保留，日後可加回）（ad5a496）。Release 模擬器建置 BUILD SUCCEEDED，產出 App.app 無 Watch 資料夾、UIDeviceFamily=[1]、App／小工具版本 1.0／1.0、含 PrivacyInfo.xcprivacy |
 | 背景音訊模式 | 🟡 | Info.plist `UIBackgroundModes = audio`（commit 57fb80d，專注計時背景音樂與浮動倒數）。合理用途，但審查常問，已寫進審查備註 |
 | Apple Watch | ✅ | 老闆決定第一版不帶（工程端移除見上一列） |
 | 刪除帳號、離線可用、原生功能 | ✅ | 2026-09-26 已做；刪帳號入口 `components/user-menu.tsx:337`、`components/modals/settings-modal.tsx:1093`；連動刪 RevenueCat PR #152 |
 | Sentry（iOS） | 🧑 | 網頁版已上線（PR #167）。iOS 要在打包前把 DSN 放進本機 .env.local；隱私問卷已含「當機資料／其他診斷資料，連結使用者」 |
-| iOS 新版打包上傳 | ⬜ | 尚未打包。順序：設好 .env.local（計費開關、RevenueCat iOS key、Sentry DSN）→ `pnpm cap:sync` → Xcode Archive → 上傳 |
+| iOS 新版打包上傳 | ⬜ | 尚未打包。順序：設好 .env.local（計費開關、RevenueCat iOS key、Sentry DSN）→ `pnpm cap:sync:release`（先自動檢查）→ Xcode Archive → 上傳 |
 
 ## 四、對外文案與法遵
 
