@@ -1,17 +1,11 @@
 #!/usr/bin/env bash
-# Disposable local cluster only. Applies every migration, then fires parallel
-# reservations to prove "one in-flight per account" and the withdraw/reserve
-# serialization hold under real concurrency.
-set -euo pipefail
-export LC_ALL=C
-ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-D=$(mktemp -d "${TMPDIR:-/tmp}/huddle-air.XXXXXX")
-trap 'pg_ctl -D "$D/data" -m immediate stop >/dev/null 2>&1 || true; rm -rf "$D"' EXIT
-initdb -D "$D/data" -A trust --no-locale --encoding=UTF8 -U postgres >/dev/null
-pg_ctl -D "$D/data" -l "$D/server.log" -o "-k $D -h '' -p 55473" start >/dev/null
-PSQL=(psql -X -q -At -h "$D" -p 55473 -U postgres -d postgres -v ON_ERROR_STOP=1)
-"${PSQL[@]}" -f "$ROOT/scripts/tests/account-suspension-bootstrap.sql"
-for f in "$ROOT"/supabase/migrations/*.sql; do "${PSQL[@]}" -f "$f" >/dev/null 2>&1 || { echo "migration failed: $f"; exit 1; }; done
+# Disposable local cluster only. Applies every migration and then the drafts
+# in supabase/migrations-draft/, then fires parallel reservations to prove
+# "one in-flight per account" and the withdraw/reserve serialization hold
+# under real concurrency.
+PORT=55473
+source "$(dirname "$0")/ai-review-harness.sh"
+PSQL+=(-At)
 U=00000000-0000-4000-8000-0000000000a1
 "${PSQL[@]}" -c "insert into auth.users(id,email) values('$U','a@example.invalid');
   select public.record_ai_consent('$U','ai_review','granted','v1','zh-TW',1,'{}','OpenAI','US','web',null);" >/dev/null
