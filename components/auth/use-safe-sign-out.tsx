@@ -67,9 +67,9 @@ export function useSafeSignOut(afterSignOut?: () => void) {
     >
       <AlertDialogContent data-unsynced-signout>
         <AlertDialogHeader>
-          <AlertDialogTitle>{t('還有筆記沒有同步')}</AlertDialogTitle>
+          <AlertDialogTitle>{t('還有內容沒有同步')}</AlertDialogTitle>
           <AlertDialogDescription>
-            {t('有 {count} 則筆記還沒同步。先打開記事本、確認內容已同步再登出；現在登出，這些內容會遺失。', {
+            {t('有 {count} 則筆記或便條紙還沒存到雲端。請連上網路、稍等幾秒再按一次登出（若筆記數量已達方案上限，請先刪掉一些筆記）；現在登出，這些內容會遺失。', {
               count: asking?.unsynced ?? 0,
             })}
           </AlertDialogDescription>

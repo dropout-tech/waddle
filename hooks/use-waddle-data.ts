@@ -15,7 +15,7 @@ import {
   timeBlockToRow,
   rowToSettings,
 } from '@/lib/supabase/mappers'
-import { toDateString, parseDateString, isSeriesStart, shiftSeries, seriesShiftIsExact } from '@/lib/calendar-utils'
+import { toDateString, parseDateString, isSeriesStart, shiftSeries, seriesShiftIsExact, overridesFollowingShift, shiftDateString } from '@/lib/calendar-utils'
 import { prefsToRow } from '@/lib/settings-auto'
 import { playTaskCompleteSound } from '@/lib/task-sound'
 import { hapticTaskComplete } from '@/lib/haptics'
@@ -2412,7 +2412,10 @@ export function useWaddleData(): UseWaddleData {
     endTime: string,
     recurrenceChoice?: import('@/components/modals/recurrence-choice-modal').RecurrenceChoice,
     targetDate?: string,
-    recordUndo: boolean = true
+    recordUndo: boolean = true,
+    /** Undo/redo of a series shift: exactly the overrides that moved with
+     *  it, instead of re-deriving them from exdates (see below). */
+    followOverrides?: string[]
   ) => {
     // A caller that drops an argument shifts the date into the start-time
     // slot (a wrapper did exactly that from 2026-09-25 to 10-01). Refuse
@@ -2453,6 +2456,10 @@ export function useWaddleData(): UseWaddleData {
     // start and, for 每週幾 series, its weekdays) by the drag's day offset.
     let seriesShifted = false
     let shiftedDays: number[] | undefined
+    let shiftedExdates: string[] | undefined
+    // "Only this" overrides still on their original day move along (see
+    // overridesFollowingShift); id → [as it was, new date].
+    const movedOverrides = new Map<string, [Task, string]>()
     if (task.isRecurring && recurrenceChoice === 'all' && date && targetDate && task.scheduledDate) {
       if (!seriesShiftIsExact(task, targetDate, date)) {
         // Not expressible as the same rule (every 2+ weeks, several weekdays,
@@ -2464,6 +2471,14 @@ export function useWaddleData(): UseWaddleData {
       const shifted = shiftSeries(task, targetDate, date)
       date = shifted.scheduledDate
       shiftedDays = shifted.daysOfWeek
+      shiftedExdates = shifted.exdates
+      const allTasks = workspacesRef.current.flatMap((w) => w.categories.flatMap((c) => c.tasks))
+      const following = followOverrides
+        ? allTasks.filter((t) => followOverrides.includes(t.id) && t.parentId === task!.id && !!t.scheduledDate)
+        : overridesFollowingShift(task, allTasks)
+      for (const o of following) {
+        movedOverrides.set(o.id, [o, shiftDateString(o.scheduledDate!, shifted.offset)])
+      }
       seriesShifted = true
     }
 
@@ -2482,9 +2497,12 @@ export function useWaddleData(): UseWaddleData {
                     scheduledEndTime: endTime,
                     ...(date ? { scheduledDate: date } : {}),
                     ...(shiftedDays && t.recurrence ? { recurrence: { ...t.recurrence, daysOfWeek: shiftedDays } } : {}),
+                    ...(shiftedExdates ? { exdates: shiftedExdates } : {}),
                     updatedAt: new Date().toISOString(),
                   }
-                : t
+                : movedOverrides.has(t.id)
+                  ? { ...t, scheduledDate: movedOverrides.get(t.id)![1], updatedAt: new Date().toISOString() }
+                  : t
             ),
           })),
         }))
@@ -2495,15 +2513,39 @@ export function useWaddleData(): UseWaddleData {
         scheduled_end_time: string
         scheduled_date?: string
         recurrence_days_of_week?: number[]
+        exdates?: string[]
       } = {
         scheduled_start_time: startTime,
         scheduled_end_time: endTime,
       }
       if (date) update.scheduled_date = date
       if (shiftedDays) update.recurrence_days_of_week = shiftedDays
+      if (shiftedExdates) update.exdates = shiftedExdates
+
+      // Overrides that follow a series shift are written BEFORE the series:
+      // an override left on its old day after the series' exdates moved would
+      // show next to the series' own occurrence there. Any failure puts the
+      // overrides already moved back (best effort) and the screen back.
+      const overrides = [...movedOverrides.values()]
+      const putOverridesBack = async (written: number) => {
+        for (const [before] of overrides.slice(0, written)) {
+          await supabase.from('tasks').update({ scheduled_date: before.scheduledDate }).eq('id', before.id)
+        }
+        restoreTaskSnapshot(task!)
+        overrides.forEach(([o]) => restoreTaskSnapshot(o))
+      }
 
       pendingWritesRef.current += 1; mutationSeqRef.current += 1
       try {
+        for (let i = 0; i < overrides.length; i++) {
+          const [before, newDate] = overrides[i]
+          const { error: overrideError } = await supabase.from('tasks').update({ scheduled_date: newDate }).eq('id', before.id)
+          if (overrideError) {
+            await putOverridesBack(i)
+            handleDbError('重新排程')(overrideError)
+            return
+          }
+        }
         // .select() so PostgREST returns the rows the UPDATE touched. If RLS
         // or a stale session silently filters the row out, error stays null
         // but data is empty — exactly the "task disappears" failure mode.
@@ -2514,10 +2556,12 @@ export function useWaddleData(): UseWaddleData {
           .select('id, scheduled_date, scheduled_start_time, scheduled_end_time')
         if (error) {
           console.error('[rescheduleTask] supabase error', { taskId, update, error })
+          if (overrides.length) await putOverridesBack(overrides.length)
           handleDbError('重新排程')(error)
           return
         }
         if (!data || data.length === 0) {
+          if (overrides.length) await putOverridesBack(overrides.length)
           const { data: { user } } = await supabase.auth.getUser()
           console.error('[rescheduleTask] 0 rows updated — RLS / stale session?', {
             taskId,
@@ -2546,16 +2590,17 @@ export function useWaddleData(): UseWaddleData {
         // weekdays move back too (passing the old start alone wouldn't).
         const shiftFrom = seriesShifted ? newDate : undefined
         const shiftBackFrom = seriesShifted ? beforeDate : undefined
+        const movedIds = seriesShifted ? [...movedOverrides.keys()] : undefined
         pushUndoableAction({
           label: translate('重排「{title}」', { title }),
           undo: () => {
             if (beforeStart && beforeEnd) {
-              return rescheduleTask(taskId, beforeDate, beforeStart, beforeEnd, 'all', shiftFrom, false)
+              return rescheduleTask(taskId, beforeDate, beforeStart, beforeEnd, 'all', shiftFrom, false, movedIds)
             }
             // Task was pending before — undo by unscheduling.
             return unscheduleTask(taskId, beforeDate, 'all', undefined, false)
           },
-          redo: () => rescheduleTask(taskId, newDate, startTime, endTime, 'all', shiftBackFrom, false),
+          redo: () => rescheduleTask(taskId, newDate, startTime, endTime, 'all', shiftBackFrom, false, movedIds),
         })
       }
       return
