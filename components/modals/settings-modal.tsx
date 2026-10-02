@@ -2,11 +2,13 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { X, Clock, Coffee, Save, Layers, Plus, Trash2, GripVertical, ChevronRight, CheckSquare, Crosshair, User, Pencil, Bell, AlertTriangle, Calendar, Sparkles, Moon, Eye, Volume2, Globe2, Link2, Copy, Share2, RefreshCw, Users, Loader2, Type } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { UserSettings, TimeBlock, SlotType, Workspace, NotificationSettings } from '@/lib/types'
 import { useI18n } from '@/lib/i18n/react'
+import { isNative } from '@/lib/platform'
 import type { Lang } from '@/lib/i18n'
 import { WidgetReminderSetting } from '@/components/widgets/widget-reminder-setting'
 import { FONT_SIZES, getFontSize, setFontSize, type FontSizeKey } from '@/lib/font-size'
@@ -108,7 +110,15 @@ interface SettingsModalProps {
   onSetPet?: (next: PetSettings) => Promise<void> | void
 }
 
-export type SettingsTab = 'general' | 'slotTypes' | 'notifications' | 'sharing'
+export type SettingsTab = 'general' | 'slotTypes' | 'notifications' | 'sharing' | 'subscription'
+
+// 訂閱 tab (website billing). The flag is inlined at build time and blanked for
+// the Capacitor export, so in the iOS bundle this whole branch — including the
+// dynamic import — is dead code and no purchase wording ships (Apple 3.1.1).
+const WebSubscriptionTab =
+  process.env.NEXT_PUBLIC_WEB_BILLING_ENABLED === 'true'
+    ? dynamic(() => import('@/components/billing/web-subscription-tab'), { ssr: false })
+    : null
 
 const PRESET_COLORS = PICKER_COLOR_HEXES
 
@@ -173,6 +183,7 @@ export function SettingsModal({
   onSetPet,
 }: SettingsModalProps) {
   const { lang, setLang, t } = useI18n()
+  const showSubscription = !!WebSubscriptionTab && !isNative()
   const [localSettings, setLocalSettings] = useState<UserSettings>(settings)
   const [localTimeBlocks, setLocalTimeBlocks] = useState<TimeBlock[]>(timeBlocks)
   // Ids known to exist: what the modal opened with plus whatever it saved
@@ -194,7 +205,7 @@ export function SettingsModal({
     slotIds.forEach((id) => known.slotTypes.add(id))
     onSaveProp(nextSettings, nextBlocks, removed)
   }
-  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab === 'subscription' && !showSubscription ? 'general' : initialTab)
   // Task-complete sound is a per-device pref stored in localStorage (same
   // pattern as timer sound), so it lives outside localSettings/UserSettings.
   const [taskSoundEnabled, setTaskSoundEnabledState] = useState<boolean>(() => getTaskCompleteSoundEnabled())
@@ -440,7 +451,7 @@ export function SettingsModal({
           <button
             onClick={() => setActiveTab('general')}
             className={cn(
-              'flex-1 px-4 py-2.5 text-sm font-medium transition-colors',
+              `flex-1 ${showSubscription ? 'px-1.5' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
               activeTab === 'general'
                 ? 'text-primary border-b-2 border-primary bg-primary/5'
                 : 'text-muted-foreground hover:text-foreground'
@@ -451,7 +462,7 @@ export function SettingsModal({
           <button
             onClick={() => setActiveTab('notifications')}
             className={cn(
-              'flex-1 px-4 py-2.5 text-sm font-medium transition-colors',
+              `flex-1 ${showSubscription ? 'px-1.5' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
               activeTab === 'notifications'
                 ? 'text-primary border-b-2 border-primary bg-primary/5'
                 : 'text-muted-foreground hover:text-foreground'
@@ -462,7 +473,7 @@ export function SettingsModal({
           <button
             onClick={() => setActiveTab('slotTypes')}
             className={cn(
-              'flex-1 px-4 py-2.5 text-sm font-medium transition-colors',
+              `flex-1 ${showSubscription ? 'px-1.5' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
               activeTab === 'slotTypes'
                 ? 'text-primary border-b-2 border-primary bg-primary/5'
                 : 'text-muted-foreground hover:text-foreground'
@@ -473,7 +484,7 @@ export function SettingsModal({
           <button
             onClick={() => setActiveTab('sharing')}
             className={cn(
-              'flex-1 px-4 py-2.5 text-sm font-medium transition-colors',
+              `flex-1 ${showSubscription ? 'px-1.5' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
               activeTab === 'sharing'
                 ? 'text-primary border-b-2 border-primary bg-primary/5'
                 : 'text-muted-foreground hover:text-foreground'
@@ -481,6 +492,20 @@ export function SettingsModal({
           >
             {t('共享')}
           </button>
+          {showSubscription && (
+            <button
+              onClick={() => setActiveTab('subscription')}
+              data-testid="settings-tab-subscription"
+              className={cn(
+                `flex-1 ${showSubscription ? 'px-1.5' : 'px-4'} py-2.5 text-sm font-medium transition-colors`,
+                activeTab === 'subscription'
+                  ? 'text-primary border-b-2 border-primary bg-primary/5'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {t('訂閱')}
+            </button>
+          )}
         </div>
 
         {/* Content */}
@@ -1351,17 +1376,28 @@ export function SettingsModal({
 
           {/* Sharing Tab */}
           {activeTab === 'sharing' && <SharingSettingsTab />}
+
+          {/* Subscription Tab (website billing, flag + non-native only) */}
+          {activeTab === 'subscription' && showSubscription && WebSubscriptionTab && <WebSubscriptionTab />}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border bg-secondary/20 pb-[max(env(safe-area-inset-bottom),1rem)] md:pb-4">
-          <Button variant="secondary" onClick={onClose}>
-            {t('取消')}
-          </Button>
-          <Button onClick={handleSave} className="gap-2">
-            <Save className="w-4 h-4" />
-            {t('儲存')}
-          </Button>
+          {activeTab === 'subscription' ? (
+            <Button variant="secondary" onClick={onClose}>
+              {t('關閉')}
+            </Button>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={onClose}>
+                {t('取消')}
+              </Button>
+              <Button onClick={handleSave} className="gap-2">
+                <Save className="w-4 h-4" />
+                {t('儲存')}
+              </Button>
+            </>
+          )}
         </div>
     </ModalShell>
   )

@@ -83,6 +83,23 @@ const cspDirectives = [
   `form-action 'self'`,
 ].join('; ')
 
+// Website subscription pages (/billing/*) load the SHOPLINE Payments SDK from
+// its CDN and talk to its API, so they get a slightly wider copy of the policy
+// above — nothing else changes, and every other route keeps the strict one.
+// (Design: docs/billing/2026-10-02-web-billing-design.md §5.3.) form-action is
+// widened to SLP only; if a bank's 3-D Secure page ever needs more, widen it
+// here, on /billing/* only (design risk R10).
+const SLP_ORIGIN = 'https://*.shoplinepayments.com'
+const billingCspDirectives = cspDirectives
+  .split('; ')
+  .map((directive) => {
+    const name = directive.split(' ')[0]
+    return ['script-src', 'style-src', 'img-src', 'font-src', 'connect-src', 'frame-src', 'form-action'].includes(name)
+      ? `${directive} ${SLP_ORIGIN}`
+      : directive
+  })
+  .join('; ')
+
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
@@ -95,6 +112,10 @@ const nextConfig = {
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN || '',
     NEXT_PUBLIC_APP_VERSION: appVersion,
     NEXT_PUBLIC_COMMIT_SHA: commitSha(),
+    // Website billing flag. Blanked for the Capacitor export so every
+    // `=== 'true'` branch is dead code there and no purchase wording or route
+    // UI is bundled into the iOS app (Apple 3.1.1). See components/billing/billing-route.tsx.
+    NEXT_PUBLIC_WEB_BILLING_ENABLED: isCapacitor ? '' : process.env.NEXT_PUBLIC_WEB_BILLING_ENABLED || '',
   },
   ...(isCapacitor
     ? {
@@ -118,6 +139,12 @@ const nextConfig = {
                 { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
                 { key: 'Content-Security-Policy', value: cspDirectives },
               ],
+            },
+            {
+              // Same security headers as above; only the CSP differs (SLP SDK).
+              // Declared after the catch-all so it is the one that applies.
+              source: '/billing/:path*',
+              headers: [{ key: 'Content-Security-Policy', value: billingCspDirectives }],
             },
             {
               // The PWA service worker must never be served stale by an HTTP
