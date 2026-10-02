@@ -153,28 +153,41 @@ struct InkHourglassSand:Shape {
         return p
     }
 }
-/// 當週日曆: the hand-inked calendar page with this week written inside as one
-/// row of seven dots, Monday first — days with something on them full, free
-/// days faint, today a big dot — underlined with one pen stroke, so it reads as
-/// "a row of days" (the earlier seven bars read as phone signal; InkMonth is a
-/// grid with one day circled, so the two stay apart side by side).
+/// 當週日曆: a wide hand-drawn week strip — one row of seven cells (Monday first)
+/// under two binder rings, today's cell inked solid, a dot in every other day
+/// that has something on it. Its outline is a long bar, so next to 月份's square
+/// page (InkMonth) the two read differently at a glance; the earlier seven bars
+/// of different heights read as phone signal.
 struct InkWeek:View {
     var counts:[Int];var today:Int
     var body:some View {
         GeometryReader{g in
             let k=min(g.size.width,g.size.height)/24
             let ox=(g.size.width-24*k)/2,oy=(g.size.height-24*k)/2
-            let wobble:[CGFloat]=[0.2,-0.25,0.1,-0.15,0.3,-0.1,0.05]
+            let P={(x:CGFloat,y:CGFloat)->CGPoint in CGPoint(x:ox+x*k,y:oy+y*k)}
+            let left:CGFloat=2.0,right:CGFloat=22.3,cell=(right-left)/7
             ZStack(alignment:.topLeading){
-                InkGlyph(d:InkPaths.calendarBlank).fill(style:FillStyle(eoFill:true))
+                // Strip outline: sides lean, corners overshoot a touch.
+                Path{p in
+                    p.move(to:P(1.4,8.7));p.addQuadCurve(to:P(22.9,8.1),control:P(12.0,7.8))
+                    p.addQuadCurve(to:P(22.6,17.3),control:P(23.2,12.8))
+                    p.addQuadCurve(to:P(1.8,17.6),control:P(12.2,18.2))
+                    p.addQuadCurve(to:P(1.9,8.0),control:P(1.3,12.9))
+                }.stroke(style:StrokeStyle(lineWidth:1.7*k,lineCap:.round,lineJoin:.round))
+                // Binder rings.
+                Path{p in p.move(to:P(6.6,5.6));p.addLine(to:P(6.9,10.0));p.move(to:P(17.2,5.4));p.addLine(to:P(17.0,9.8))}
+                    .stroke(style:StrokeStyle(lineWidth:1.8*k,lineCap:.round))
+                // Day dividers, light.
+                Path{p in for i in 1..<7 {let x=left+cell*CGFloat(i);p.move(to:P(x+0.15,9.9));p.addLine(to:P(x-0.1,16.1))}}
+                    .stroke(style:StrokeStyle(lineWidth:0.8*k,lineCap:.round)).opacity(0.55)
                 ForEach(0..<7,id:\.self){i in
-                    let busy=i < counts.count && counts[i] > 0,isToday=i == today
-                    let d:CGFloat=isToday ? 2.5:(busy ? 1.6:1.15)
-                    Circle().frame(width:d*k,height:d*k).opacity(isToday || busy ? 1:0.4)
-                        .position(x:ox+(5.9+CGFloat(i)*2.1)*k,y:oy+(14.4+wobble[i])*k)
+                    let cx=left+cell*(CGFloat(i)+0.5)
+                    if i == today {
+                        RoundedRectangle(cornerRadius:0.8*k).frame(width:(cell-0.9)*k,height:6.0*k).position(P(cx,12.9))
+                    } else if i < counts.count && counts[i] > 0 {
+                        Circle().frame(width:1.4*k,height:1.4*k).position(P(cx,12.9))
+                    }
                 }
-                Path{p in p.move(to:CGPoint(x:ox+5.0*k,y:oy+18.0*k));p.addQuadCurve(to:CGPoint(x:ox+19.4*k,y:oy+17.5*k),control:CGPoint(x:ox+12.0*k,y:oy+18.7*k))}
-                    .stroke(style:StrokeStyle(lineWidth:1.3*k,lineCap:.round))
             }
         }
     }

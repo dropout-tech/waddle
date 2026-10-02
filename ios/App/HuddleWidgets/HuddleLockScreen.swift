@@ -403,8 +403,9 @@ extension WidgetView {
                 hero("\(t.done)",unit:"/\(t.total)",size:26,small:14,gap:0).padding(.horizontal,3)
             }.gaugeStyle(.accessoryCircularCapacity).widgetURL(url(.tasks))
         } else if family == .accessoryCircular {
-            hCircle(t.open.isEmpty ? L("今天","today"):L("待辦","to do")){inkIcon(InkPaths.todo,circleIcon)} hero:{
-                if t.open.isEmpty {hero(L("完成","Done"),size:17)} else {hero("\(t.open.count)",unit:L("件",""),size:28)}
+            // Two layers only (glyph + 「3 件待辦」), as roomy as the 三件事 circle.
+            hCircle(nil){inkIcon(InkPaths.todo,16)} hero:{
+                if t.open.isEmpty {hero(L("完成","Done"),size:17)} else {hero("\(t.open.count)",unit:L("件待辦","to do"),size:26,small:12,gap:2)}
             }.widgetURL(url(.tasks))
         } else if entry.rectStyle == TodayRect.list.rawValue {
             // Second look: 前三件清單 — open ones first, a hand-drawn box per row, no big number.
@@ -470,7 +471,8 @@ extension WidgetView {
         let m=monthStat(s),wd=weekdayName(entry.date)
         if family == .accessoryCircular {
             disc{VStack(spacing:-2){
-                HStack(spacing:2){monthGlyph(12);Text(m.label).font(.system(size:11,weight:.bold,design:.rounded)).lineLimit(1)}.widgetAccentable()
+                // Just 「10月」 up top: the row has to clear the rim where the circle is narrow.
+                Text(m.label).font(.system(size:11,weight:.bold,design:.rounded)).lineLimit(1).widgetAccentable()
                 Text("\(m.day)").font(.system(size:28,weight:.bold,design:.rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
                 Text(wd).font(.system(size:10,weight:.semibold,design:.rounded)).lineLimit(1).opacity(0.85)
             }.padding(.horizontal,7).offset(y:2)}.widgetURL(url(.calendar))
@@ -496,9 +498,9 @@ extension WidgetView {
                 HStack(alignment:.firstTextBaseline,spacing:5){
                     Text(label).font(.system(size:13,weight:.bold,design:.rounded)).lineLimit(1).fixedSize().widgetAccentable()
                     if let first {
-                        if first.0 != "•" {Text(first.0).font(.system(size:14,weight:.semibold,design:.rounded)).monospacedDigit().lineLimit(1).fixedSize()}
+                        if first.0 != "•" {Text(first.0).font(.system(size:13,weight:.semibold,design:.rounded)).monospacedDigit().lineLimit(1).fixedSize()}
                         Text(first.1).font(.system(size:14,weight:.medium)).lineLimit(1).frame(minWidth:0,maxWidth:.infinity,alignment:.leading)
-                        if r.more > 0 {Text("+\(r.more)").font(.system(size:13,weight:.bold,design:.rounded)).lineLimit(1).fixedSize().opacity(0.7)}
+                        if r.more > 0 {Text("+\(r.more)").font(.system(size:12,weight:.bold,design:.rounded)).lineLimit(1).fixedSize().opacity(0.7)}
                     } else {
                         Text(L("沒有安排","Free")).font(.system(size:14,weight:.medium)).lineLimit(1).opacity(0.6).frame(maxWidth:.infinity,alignment:.leading)
                     }
@@ -535,7 +537,7 @@ extension WidgetView {
                             ZStack{
                                 Text("\(Int(key.suffix(2)) ?? 0)").font(.system(size:digit,weight:isToday ? .heavy:.medium,design:.rounded)).monospacedDigit()
                                     .opacity(isToday ? 1:0.85).offset(y:-1)
-                                if busy && !isToday {Circle().frame(width:2.2,height:2.2).offset(y:digit*0.6)}
+                                if busy && !isToday {Circle().frame(width:1.8,height:1.8).offset(y:digit*0.5)}
                                 if isToday {InkRing().stroke(style:StrokeStyle(lineWidth:1.3,lineCap:.round)).frame(width:digit*1.85,height:digit*1.45).widgetAccentable()}
                             }.frame(maxWidth:.infinity,maxHeight:.infinity)
                         } else {Color.clear.frame(maxWidth:.infinity,maxHeight:.infinity)}
