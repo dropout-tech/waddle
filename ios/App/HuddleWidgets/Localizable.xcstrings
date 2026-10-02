@@ -242,18 +242,18 @@
         }
       }
     },
-    "長方形可選七天點點或今明兩天行程。": {
+    "長方形可選本週件數或今明兩天行程。": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rectangular: seven-day dots or today and tomorrow."
+            "value": "Rectangular: this week's count, or today and tomorrow."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "長方形可選七天點點或今明兩天行程。"
+            "value": "長方形可選本週件數或今明兩天行程。"
           }
         }
       }
@@ -274,39 +274,39 @@
         }
       }
     },
-    "長方形可選迷你月格或今天日期＋本月有事天數。": {
+    "長方形可選今天日期或小月曆。": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rectangular: mini month or today's date with busy days left."
+            "value": "Rectangular: today's date, or a mini calendar."
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "長方形可選迷你月格或今天日期＋本月有事天數。"
+            "value": "長方形可選今天日期或小月曆。"
           }
         }
       }
     },
-    "圓形只顯示剩餘件數": {
+    "圓形改看完成進度圈": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Circular: tasks left only"
+            "value": "Circular: progress ring"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "圓形只顯示剩餘件數"
+            "value": "圓形改看完成進度圈"
           }
         }
       }
     },
-    "長方形改成前三件清單": {
+    "長方形改看前三件清單": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -317,7 +317,7 @@
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "長方形改成前三件清單"
+            "value": "長方形改看前三件清單"
           }
         }
       }
@@ -338,18 +338,18 @@
         }
       }
     },
-    "長方形改看日期＋本月有事天數": {
+    "長方形改看小月曆": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rectangular: date + busy days left"
+            "value": "Rectangular: mini calendar"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "長方形改看日期＋本月有事天數"
+            "value": "長方形改看小月曆"
           }
         }
       }

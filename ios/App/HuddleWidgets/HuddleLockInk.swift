@@ -176,3 +176,47 @@ struct InkWeek:View {
         }
     }
 }
+/// 今日任務's list rows: a small hand-drawn box (corners overshoot, sides lean),
+/// ticked with one stroke that flies out past the corner when the task is done.
+struct InkBox:View {
+    var checked:Bool
+    var body:some View {
+        GeometryReader{g in
+            let k=min(g.size.width,g.size.height)/24
+            InkBoxLine(checked:checked).stroke(style:StrokeStyle(lineWidth:2.6*k,lineCap:.round,lineJoin:.round))
+        }
+    }
+}
+struct InkBoxLine:Shape {
+    var checked:Bool
+    func path(in r:CGRect)->Path {
+        let P=penguinPoint(r)
+        var p=Path()
+        p.move(to:P(4.6,5.9));p.addQuadCurve(to:P(18.3,4.9),control:P(11.5,5.0))
+        p.addQuadCurve(to:P(18.9,19.0),control:P(19.0,12.0))
+        p.addQuadCurve(to:P(5.2,19.4),control:P(12.0,19.6))
+        p.addQuadCurve(to:P(4.4,4.4),control:P(4.3,12.2))
+        if checked {p.move(to:P(7.9,11.6));p.addLine(to:P(11.2,15.4));p.addQuadCurve(to:P(21.6,2.6),control:P(15.5,8.0))}
+        return p
+    }
+}
+/// A loose pen circle around today's date in the mini month: it doesn't quite
+/// close, the end runs on past the start like a quick pen loop.
+struct InkRing:Shape {
+    func path(in r:CGRect)->Path {
+        let cx=r.midX,cy=r.midY,rx=r.width/2,ry=r.height/2
+        let wobble:[CGFloat]=[1.0,1.06,0.97,1.04,0.95,1.03,1.0,0.96,1.05,1.08,1.12]
+        var pts:[CGPoint]=[]
+        for (i,w) in wobble.enumerated() {
+            let a=(-100.0+Double(i)*41.0)*Double.pi/180   // 410° in all: overshoots the start
+            pts.append(CGPoint(x:cx+rx*w*CGFloat(cos(a)),y:cy+ry*w*CGFloat(sin(a))))
+        }
+        var p=Path();p.move(to:pts[0])
+        for i in 1..<pts.count-1 {
+            let mid=CGPoint(x:(pts[i].x+pts[i+1].x)/2,y:(pts[i].y+pts[i+1].y)/2)
+            p.addQuadCurve(to:mid,control:pts[i])
+        }
+        p.addLine(to:pts[pts.count-1])
+        return p
+    }
+}

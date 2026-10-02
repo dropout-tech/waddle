@@ -9,11 +9,20 @@ import AppIntents
 // accessory families to their existing kinds instead. The legacy configurable
 // widget ("HuddleWidgets") gets the same faces for the matching 類型.
 //
-// One look per family since 2026-10-02 (hand-inked glyph + big number, see
-// Faces below). The old style switches stay declared on TodayLook / WeekLook /
-// MonthLook — their kinds, intents and parameter names are what keeps widgets
-// people already placed alive — but they no longer change anything, so their
-// parameterSummary is empty and the editor doesn't offer them.
+// Since 2026-10-02 every face is a hand-inked glyph + big number (see Faces
+// below). Where a family has a second look the widget gets an on/off option
+// (長按 → 編輯小工具); OFF is always the glyph + number face.
+//
+// The options keep their original parameter names (circleCount / rectList /
+// twoDays / summary) so widgets people already placed, and what they switched,
+// survive. Two of them flipped meaning when the default look changed — someone
+// who had turned one on before 2026-10-02 now sees the other look:
+//   circleCount  was 「圓形只顯示剩餘件數」 (OFF ring, ON count). Now OFF = the
+//                count face, ON = 完成進度圈 — an old ON shows the ring.
+//   summary      was 「長方形改看日期＋本月有事天數」 (OFF mini month, ON date).
+//                Now OFF = the date face, ON = 小月曆 — an old ON shows the grid.
+//   rectList / twoDays kept their meaning (ON = 前三件清單 / 今明兩天行程).
+// The titles were reworded to say what ON does now.
 //
 // Owner chose 「一直顯示」 for the Lock Screen (2026-10-01): these faces show real
 // titles and are NOT privacySensitive. Text follows the app's language
@@ -27,43 +36,44 @@ enum LockKind:String {
     var link:Kind {switch self {case .today:return .tasks;case .next:return .agenda;case .week:return .week;case .month:return .calendar}}
 }
 
-/// Values the old style switches map to (Entry.circleStyle / rectStyle); kept so the
-/// intents keep their shape. The faces no longer read them.
-enum TodayCircle:String {case ring,count}
+/// Look identifiers the faces switch on (Entry.circleStyle / rectStyle). The first
+/// case of each is the default (option OFF).
+enum TodayCircle:String {case count,ring}
 enum TodayRect:String {case next,list}
-enum WeekRect:String {case dots,twoDays="two-days"}
-enum MonthRect:String {case grid,summary}
+enum WeekRect:String {case total,twoDays="two-days"}
+enum MonthRect:String {case date,grid}
 
 protocol LockIntent:WidgetConfigurationIntent {static var lockKind:LockKind {get};var circleStyle:String {get};var rectStyle:String {get}}
 struct TodayLook:LockIntent {
     static var title:LocalizedStringResource="今日任務樣式"
     static var description=IntentDescription("圓形、長方形各有兩種樣式。")
     static var lockKind:LockKind {.today}
-    @Parameter(title:"圓形只顯示剩餘件數",default:false) var circleCount:Bool
-    @Parameter(title:"長方形改成前三件清單",default:false) var rectList:Bool
-    var circleStyle:String {(circleCount ? TodayCircle.count:.ring).rawValue};var rectStyle:String {(rectList ? TodayRect.list:.next).rawValue}
+    @Parameter(title:"圓形改看完成進度圈",default:false) var circleCount:Bool
+    @Parameter(title:"長方形改看前三件清單",default:false) var rectList:Bool
+    var circleStyle:String {(circleCount ? TodayCircle.ring:.count).rawValue};var rectStyle:String {(rectList ? TodayRect.list:.next).rawValue}
     static var parameterSummary:some ParameterSummary {
-        Summary()
+        When(widgetFamily:.equalTo,.accessoryCircular){Summary{\.$circleCount}} otherwise:{
+            When(widgetFamily:.equalTo,.accessoryRectangular){Summary{\.$rectList}} otherwise:{Summary()}}
     }
 }
 struct WeekLook:LockIntent {
     static var title:LocalizedStringResource="當週日曆樣式"
-    static var description=IntentDescription("長方形可選七天點點或今明兩天行程。")
+    static var description=IntentDescription("長方形可選本週件數或今明兩天行程。")
     static var lockKind:LockKind {.week}
     @Parameter(title:"長方形改看今明兩天行程",default:false) var twoDays:Bool
-    var circleStyle:String {""};var rectStyle:String {(twoDays ? WeekRect.twoDays:.dots).rawValue}
+    var circleStyle:String {""};var rectStyle:String {(twoDays ? WeekRect.twoDays:.total).rawValue}
     static var parameterSummary:some ParameterSummary {
-        Summary()
+        When(widgetFamily:.equalTo,.accessoryRectangular){Summary{\.$twoDays}} otherwise:{Summary()}
     }
 }
 struct MonthLook:LockIntent {
     static var title:LocalizedStringResource="月份樣式"
-    static var description=IntentDescription("長方形可選迷你月格或今天日期＋本月有事天數。")
+    static var description=IntentDescription("長方形可選今天日期或小月曆。")
     static var lockKind:LockKind {.month}
-    @Parameter(title:"長方形改看日期＋本月有事天數",default:false) var summary:Bool
-    var circleStyle:String {""};var rectStyle:String {(summary ? MonthRect.summary:.grid).rawValue}
+    @Parameter(title:"長方形改看小月曆",default:false) var summary:Bool
+    var circleStyle:String {""};var rectStyle:String {(summary ? MonthRect.grid:.date).rawValue}
     static var parameterSummary:some ParameterSummary {
-        Summary()
+        When(widgetFamily:.equalTo,.accessoryRectangular){Summary{\.$summary}} otherwise:{Summary()}
     }
 }
 // MARK: Providers
@@ -226,6 +236,18 @@ extension WidgetView {
             return !isDone(i) && (d > key || (d == key && String(t.prefix(5)) >= now))
         }
     }
+    /// (time or "•", title) for a day's open items, plus how many more there are.
+    func dayRows(_ s:Snapshot,_ key:String,max:Int)->(rows:[(String,String)],more:Int) {
+        // Today: what's still ahead (timed items already started drop off).
+        let now=key == todayKey ? WidgetView.clockFormat.string(from:entry.date):""
+        if let d=s.span?.first(where:{$0.date == key}) {
+            let open=d.items.filter{$0.done != true && ($0.time ?? "99") >= now}
+            let gone=d.items.count-open.count
+            return (open.prefix(max).map{($0.time ?? "•",$0.title)},Swift.max(0,d.total-gone-Swift.min(open.count,max)))
+        }
+        let a=s.agenda.filter{$0.date == key && !isDone($0) && String(($0.time ?? "99").prefix(5)) >= now}
+        return (a.prefix(max).map{(String(($0.time ?? "•").prefix(5)),$0.title)},Swift.max(0,a.count-max))
+    }
     func stickyURL(_ n:StickyInfo?)->URL {url(.sticky,n.map{Item(id:$0.id,title:"",subtitle:"")})}
     func stickyTime(_ iso:String)->String {
         let f=ISO8601DateFormatter();f.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
@@ -362,10 +384,32 @@ extension WidgetView {
     // MARK: 今日任務
     @ViewBuilder func todayFace(_ s:Snapshot)->some View {
         let t=todayStat(s)
-        if family == .accessoryCircular {
+        if family == .accessoryCircular,entry.circleStyle == TodayCircle.ring.rawValue {
+            // Second look: 完成進度圈 — the ring fills as today's tasks get done.
+            Gauge(value:t.total == 0 ? 0:Double(t.done)/Double(t.total),in:0...1){EmptyView()} currentValueLabel:{
+                VStack(spacing:-1){
+                    inkIcon(InkPaths.todo,12)
+                    hero("\(t.done)",unit:"/\(t.total)",size:20)
+                }.padding(.horizontal,2)
+            }.gaugeStyle(.accessoryCircularCapacity).widgetURL(url(.tasks))
+        } else if family == .accessoryCircular {
             hCircle(t.open.isEmpty ? L("今天","today"):L("待辦","to do")){inkIcon(InkPaths.todo,circleIcon)} hero:{
                 if t.open.isEmpty {hero(L("完成","Done"),size:17)} else {hero("\(t.open.count)",unit:L("件",""),size:28)}
             }.widgetURL(url(.tasks))
+        } else if entry.rectStyle == TodayRect.list.rawValue {
+            // Second look: 前三件清單 — open ones first, a hand-drawn box per row, no big number.
+            let rows=Array((t.open+s.tasks.filter{isDone($0)}).prefix(3))
+            VStack(alignment:.leading,spacing:2){
+                if rows.isEmpty {
+                    HStack(spacing:6){InkBox(checked:true).frame(width:15,height:15).widgetAccentable();Text(L("今天還沒有任務","Nothing planned today")).font(.system(size:14,weight:.medium)).lineLimit(1)}
+                }
+                ForEach(rows){i in
+                    HStack(spacing:6){
+                        InkBox(checked:isDone(i)).frame(width:15,height:15).widgetAccentable()
+                        Text(i.title).font(.system(size:14,weight:.medium)).lineLimit(1).strikethrough(isDone(i)).opacity(isDone(i) ? 0.6:1)
+                    }
+                }
+            }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading).widgetURL(url(.tasks,t.next))
         } else {
             hRect(t.next?.title ?? L("今天完成 \(t.done) 件","\(t.done) done today")){inkIcon(InkPaths.todo,rectIcon)} hero:{
                 if t.open.isEmpty {hero(L("都完成了","All done"),size:24)} else {hero("\(t.open.count)",unit:L("件待辦","to do"),size:34)}
@@ -392,6 +436,8 @@ extension WidgetView {
         if family == .accessoryCircular {
             hCircle(L("本週","this week")){weekGlyph(w,22)} hero:{hero("\(w.total)",unit:L("件",""),size:26)}
                 .widgetURL(url(.week,date:todayKey))
+        } else if entry.rectStyle == WeekRect.twoDays.rawValue {
+            twoDaysFace(s).widgetURL(url(.week,date:todayKey))
         } else {
             hRect(L("本週 · 今天 \(w.today) 件","This week · \(w.today) today")){weekGlyph(w,rectIcon)} hero:{hero("\(w.total)",unit:L("件","things"),size:34)}
                 .widgetURL(url(.week,date:todayKey))
@@ -407,11 +453,78 @@ extension WidgetView {
                 Text("\(m.day)").font(.system(size:30,weight:.bold,design:.rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
                 Text(wd).font(.system(size:10,weight:.semibold,design:.rounded)).lineLimit(1).opacity(0.85)
             }.padding(.horizontal,7)}.widgetURL(url(.calendar))
+        } else if entry.rectStyle == MonthRect.grid.rawValue {
+            inkMonth(s,m).widgetURL(url(.calendar))
         } else {
             hRect(L("還有 \(m.busyLeft) 天有安排","\(m.busyLeft) busy days left")){inkIcon(InkPaths.calendar,rectIcon)} hero:{
                 hero("\(m.day)",pre:m.label,unit:L("日 \(wd)",wd),size:34)
             }.widgetURL(url(.calendar))
         }
+    }
+
+    /// 當週日曆's second look: 今天／明天, up to two timed rows each, beside the ink clock.
+    func twoDaysFace(_ s:Snapshot)->some View {
+        let cal=Calendar(identifier:.gregorian)
+        let tomorrow=huddleDayFormat.string(from:cal.date(byAdding:.day,value:1,to:entry.date) ?? entry.date)
+        let days=[(L("今天","Today"),todayKey),(L("明天","Tmrw"),tomorrow)]
+        return HStack(alignment:.center,spacing:6){
+            inkIcon(InkPaths.clock,26)
+            VStack(alignment:.leading,spacing:2){
+                ForEach(days,id:\.1){label,key in
+                    let r=dayRows(s,key,max:2)
+                    HStack(alignment:.firstTextBaseline,spacing:4){
+                        VStack(alignment:.leading,spacing:0){
+                            Text(label).font(.system(size:12,weight:.bold,design:.rounded)).widgetAccentable()
+                            if r.more > 0 {Text("+\(r.more)").font(.system(size:9,weight:.semibold,design:.rounded)).opacity(0.7)}
+                        }.frame(width:isEN ? 38:26,alignment:.leading)
+                        VStack(alignment:.leading,spacing:0){
+                            if r.rows.isEmpty {Text(L("沒有安排","Free")).opacity(0.6)}
+                            ForEach(Array(r.rows.enumerated()),id:\.offset){_,row in
+                                HStack(spacing:3){Text(row.0).monospacedDigit().opacity(0.7);Text(row.1).lineLimit(1)}
+                            }
+                        }.font(.system(size:12,weight:.medium))
+                    }
+                }
+            }
+            Spacer(minLength:0)
+        }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.leading)
+    }
+    /// 月份's second look: a hand-drawn mini month — Monday first, today circled
+    /// with a loose pen loop, a dot under every day that has something on it.
+    func inkMonth(_ s:Snapshot,_ m:MonthStat)->some View {
+        let cal=Calendar(identifier:.gregorian),today=entry.date
+        let count=cal.range(of:.day,in:.month,for:today)?.count ?? 30
+        let start=cal.date(from:cal.dateComponents([.year,.month],from:today)) ?? today
+        let keys=(0..<count).map{huddleDayFormat.string(from:cal.date(byAdding:.day,value:$0,to:start) ?? start)}
+        let lead=(cal.component(.weekday,from:start)+5)%7
+        let cells:[String?]=Array(repeating:nil,count:lead)+keys.map{Optional($0)}
+        let rows=(cells.count+6)/7,digit:CGFloat=rows >= 6 ? 8.5:9.5
+        return HStack(alignment:.top,spacing:5){
+            VStack(alignment:.leading,spacing:1){
+                inkIcon(InkPaths.calendar,20)
+                Text(m.label).font(.system(size:13,weight:.bold,design:.rounded)).lineLimit(1).minimumScaleFactor(0.6).widgetAccentable()
+                Spacer(minLength:0)
+            }.frame(width:28,alignment:.leading)
+            VStack(spacing:0){
+                HStack(spacing:0){ForEach(0..<7,id:\.self){c in
+                    Text(weekLetters[c]).font(.system(size:7,weight:.semibold)).opacity(0.75).frame(maxWidth:.infinity)
+                }}.frame(height:8)
+                ForEach(0..<rows,id:\.self){r in
+                    HStack(spacing:0){ForEach(0..<7,id:\.self){c in
+                        let i=r*7+c
+                        if i < cells.count,let key=cells[i] {
+                            let isToday=key == todayKey,busy=dayCount(s,key) > 0
+                            ZStack{
+                                Text("\(Int(key.suffix(2)) ?? 0)").font(.system(size:digit,weight:isToday ? .heavy:(busy ? .bold:.medium),design:.rounded)).monospacedDigit()
+                                    .opacity(isToday || busy ? 1:0.6).offset(y:-1)
+                                if busy && !isToday {Circle().frame(width:2.2,height:2.2).offset(y:digit*0.55)}
+                                if isToday {InkRing().stroke(style:StrokeStyle(lineWidth:1.3,lineCap:.round)).frame(width:digit*1.85,height:digit*1.45).widgetAccentable()}
+                            }.frame(maxWidth:.infinity,maxHeight:.infinity)
+                        } else {Color.clear.frame(maxWidth:.infinity,maxHeight:.infinity)}
+                    }}
+                }
+            }
+        }.frame(maxWidth:.infinity,maxHeight:.infinity,alignment:.topLeading)
     }
 
     // MARK: 今天三件事 — sparkles everywhere (circle, rectangle and the inline SF symbol).
