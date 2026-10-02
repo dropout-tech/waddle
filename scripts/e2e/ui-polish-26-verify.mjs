@@ -256,6 +256,14 @@ async function checkSlashVsBar(page, label, simulatedKeyboard) {
   }
 }
 
+/** ⑥ The page must serve exactly the icon paths in huddle-icons.tsx (1.2× pen). */
+async function checkServedIcons(page, label) {
+  const src = readFileSync(path.join(process.cwd(), 'components/icons/huddle-icons.tsx'), 'utf8')
+  const want = /export const InkSettings = ink\(\n  'Settings',\n  '([^']+)'/.exec(src)?.[1]
+  const got = await page.locator('svg[data-ink-icon="Settings"] path').first().getAttribute('d').catch(() => null)
+  check(`⑥ ${label} served ink paths match the repo build`, !!want && got === want, `${got?.length} vs ${want?.length} chars`)
+}
+
 async function main() {
   const browser = await chromium.launch()
   const hasState = existsSync(STATE)
@@ -288,6 +296,7 @@ async function main() {
     await pD.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' })
     await pD.addStyleTag({ content: 'nextjs-portal{display:none!important}' })
     await checkPullTab(pD, lang, L)
+    await checkServedIcons(pD, L)
     await checkUserMenu(pD, lang, L)
     await openTestNote(pD)
     await checkNotebookIcons(pD, L)
@@ -312,6 +321,8 @@ async function main() {
     await sleep(1500)
     const tabbar = pM.locator('nav').filter({ has: pM.locator('svg[data-ink-icon="Calendar"]') }).last()
     if (await tabbar.count()) await tabbar.screenshot({ path: out(`${L}-tabbar`) })
+    // ④ boss picked the easel whiteboard over the star (2026-10-02).
+    check(`④ ${L} whiteboard tab uses the whiteboard icon`, (await tabbar.locator('svg[data-ink-icon="Whiteboard"]').count()) === 1 && (await tabbar.locator('svg[data-ink-icon="SparklesLg"]').count()) === 0)
     // On phones the avatar lives in the Tasks tab header.
     await dismissWater(pM)
     if (!(await pM.locator(`button[aria-label="${T[lang].userMenu}"]`).first().isVisible().catch(() => false))) {

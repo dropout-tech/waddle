@@ -39,9 +39,11 @@ const BOX = 24            // viewBox units
 const TARGET_STROKE = 2.5 // units; default pen (lucide is 2). Sheets override with { target }
 const MAX_EXTENT = 22.5   // longest side an icon may take inside the box
 const UP = 3              // supersampling before tracing
-// Global pen multiplier for weight comparisons (INK_WEIGHT=1.2 → 20% fatter
-// ink on every icon). 1 reproduces the shipped file byte for byte.
-const WEIGHT = Number(process.env.INK_WEIGHT || 1)
+// Global pen multiplier on every target below. 2026-10-02 the boss compared
+// 1 / 1.2 / 1.4 side by side (docs/reports/2026-10-02-ui-polish-26/) and chose
+// 1.2: the 2.5/3.1-unit pens read thin at 16px. INK_WEIGHT overrides it for
+// new comparisons.
+const WEIGHT = Number(process.env.INK_WEIGHT || 1.2)
 
 /**
  * Per-sheet grid + cell → icon name (`null` = cell not used), plus the pen:

@@ -31,7 +31,7 @@ import type { Workspace, Task, TimeBlock, SlotType, UserSettings, QuickLink, Scr
 import { DEFAULT_FOCUS_SETTINGS, type FocusSettings } from '@/lib/focus'
 import { QuickLinksBar } from '@/components/quick-links/quick-links-bar'
 // Mobile bottom tabs + the "+" FAB use the Huddle hand-inked set (DESIGN.md → 圖示).
-import { InkFocus, InkTasks, InkSparklesLg, InkCalendar, InkLink, InkPlusLg } from '@/components/icons/huddle-icons'
+import { InkFocus, InkTasks, InkWhiteboard, InkCalendar, InkLink, InkPlusLg } from '@/components/icons/huddle-icons'
 import { useI18n } from '@/lib/i18n/react'
 import { GrowthJourneyDashboard } from '@/components/growth/growth-journey-dashboard'
 import { HuddleFootprints } from '@/components/growth/huddle-footprints'
@@ -797,7 +797,8 @@ export function MainLayout({
             {
               key: 'scratch' as const,
               label: t('白板'),
-              Icon: InkSparklesLg,
+              // 2026-10-02 boss picked the easel whiteboard over the star.
+              Icon: InkWhiteboard,
               active: mobileScratchpadOpen,
               onClick: () => {
                 hapticSelection()
