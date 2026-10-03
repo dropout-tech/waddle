@@ -154,4 +154,30 @@ export const dict: Record<string, string> = {
   '帳號已切換，請重新開啟會議轉任務。': 'The signed-in account has changed. Please reopen meeting to tasks.',
   '暫時無法連線。內容仍留在此頁，可稍後重試或重新整理紀錄狀態。':
     'Could not connect right now. Your content stays on this page — try again later or refresh the note status.',
+  // meeting polish (2026-10): prefill from calendar, add-all, source link, follow-ups, done state
+  '整理這場會議': 'Organize this meeting',
+  '來自會議：{title}（{date}）': 'From meeting: {title} ({date})',
+  '全部加入': 'Add all',
+  '加入選取的 {count} 項': 'Add {count} selected',
+  '（{count} 項）': ' ({count})',
+  '不想加的項目，把前面的勾取消就好。指派給自己的直接加入，指派給夥伴的送出邀請，沒指派的存成 checklist。':
+    'To skip an item, just untick it. Items assigned to you are added directly, items assigned to a partner are sent as an invitation, and unassigned ones are saved as a checklist.',
+  '等對方的事': 'Waiting on others',
+  '會議裡對方答應的事。到期前記得追一下。':
+    'Things the other side promised in meetings. Remember to follow up before they are due.',
+  '來自「{title}」': 'From "{title}"',
+  '已過期 · {date}': 'Overdue · {date}',
+  '期限 {date}': 'Due {date}',
+  '沒有期限': 'No due date',
+  '開啟任務': 'Open task',
+  '看會議紀錄': 'View meeting notes',
+  '收合': 'Show less',
+  '顯示全部 {count} 項': 'Show all {count}',
+  '找不到這場會議紀錄，可能已不在最近 50 份內。':
+    'Could not find this meeting note — it may be outside the latest 50.',
+  '尚未完成': 'Not done yet',
+  '任務已不存在': 'Task no longer exists',
+  '追蹤提醒': 'Follow-up reminder',
+  '今天要追：{who} — {what}': 'Follow up today: {who} — {what}',
+  '今天要追：{what}': 'Follow up today: {what}',
 }
