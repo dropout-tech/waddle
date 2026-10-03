@@ -19,6 +19,7 @@ import { OverdueTaskReview } from '@/components/task-panel/overdue-task-review'
 import { useRecurringCompleteConfirm } from '@/components/task-panel/use-recurring-complete-confirm'
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { useMeetingReminders } from '@/hooks/use-meeting-reminders'
+import { useFollowupReminders } from '@/hooks/use-followup-reminders'
 import { useWaterReminder } from '@/hooks/use-water-reminder'
 import { useUndoShortcuts } from '@/hooks/use-undo-shortcuts'
 import { WaterReminderModal } from '@/components/modals/water-reminder-modal'
@@ -116,6 +117,8 @@ function HuddlePage() {
   const petVoice = petVoiceName(settings.pet)
   useEffect(() => { setPetVoice(settings.pet) }, [settings.pet])
   useMeetingReminders(workspaces, petVoice)
+  // Native: "今天要追" notifications for meeting follow-ups (hooks/use-followup-reminders.ts).
+  useFollowupReminders(workspaces)
 
   // Global ⌘Z / ⌘⇧Z — see hooks/use-undo-shortcuts.ts for the input-field guard.
   useUndoShortcuts()

@@ -20,13 +20,24 @@ import { petVoiced } from '@/lib/pet/voice'
 // iOS allows at most 64 pending local notifications; stay comfortably under.
 const MAX_SCHEDULED = 48
 
-/** Stable positive 31-bit int from a reminder-id string (LocalNotifications needs integer ids). */
-function hashId(s: string): number {
+// Notification id ranges are disjoint by construction so kinds can never overwrite
+// each other: meeting reminders 1..2_000_000_000, follow-up reminders
+// 2_000_000_001..2_099_999_999, widget reminders 2_100_000_001 and up (lib/widgets/reminders.ts).
+const MEETING_ID_SPAN = 2_000_000_000
+const FOLLOWUP_ID_BASE = 2_000_000_001
+const FOLLOWUP_ID_SPAN = 99_999_999
+
+function rawHash(s: string): number {
   let h = 0
   for (let i = 0; i < s.length; i++) {
     h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0
   }
-  return (Math.abs(h) % 2147483646) + 1
+  return Math.abs(h)
+}
+
+/** Stable positive int from a reminder-id string (LocalNotifications needs integer ids). */
+function hashId(s: string): number {
+  return (rawHash(s) % (MEETING_ID_SPAN - 1)) + 1
 }
 
 const trim = (s: string, max: number) => s.replace(/\s+/g, ' ').trim().slice(0, max)
@@ -54,6 +65,11 @@ async function ensureTapHandler() {
   tapHandlerRegistered = true
   const { LocalNotifications } = await import('@capacitor/local-notifications')
   await LocalNotifications.addListener('localNotificationActionPerformed', async (action) => {
+    const route = action.notification.extra?.route as string | undefined
+    if (route && route.startsWith('/') && !route.startsWith('//')) {
+      window.location.assign(route)
+      return
+    }
     const url = action.notification.extra?.meetingUrl as string | undefined
     if (url) {
       const { Browser } = await import('@capacitor/browser')
@@ -119,6 +135,73 @@ export async function syncMeetingReminders(
         body: text.body,
         schedule: { at: new Date(fireAt) },
         extra: { kind: 'meeting', meetingUrl: m.meetingUrl ?? null },
+      }
+    }),
+  })
+}
+
+// iOS keeps at most 64 pending local notifications: 48 meeting + 2 widget + this cap stays under.
+const MAX_FOLLOWUPS = 10
+const FOLLOWUP_HOUR = 9
+
+export interface FollowupReminderItem {
+  task_id: string
+  title: string
+  due_date: string | null
+  is_completed: boolean
+  counterpart: string | null
+}
+
+/**
+ * Reconcile native "chase it today" notifications with the open meeting follow-ups:
+ * one per follow-up task that has a due date and is not done, at 09:00 on the due day
+ * (only if that moment is still ahead). Everything of kind 'followup' is cancelled and
+ * re-scheduled as a batch, so a finished / deleted task or a changed due date disappears
+ * on the next sync (app open, or any data refetch). No-op on web. Needs the existing
+ * notification permission; never asks for it.
+ */
+export async function syncFollowupReminders(items: FollowupReminderItem[]): Promise<void> {
+  if (!isNative()) return
+  const { LocalNotifications } = await import('@capacitor/local-notifications')
+
+  const pending = await LocalNotifications.getPending()
+  const mine = pending.notifications.filter((n) => n.extra?.kind === 'followup')
+  if (mine.length > 0) {
+    await LocalNotifications.cancel({ notifications: mine.map((n) => ({ id: n.id })) })
+  }
+
+  const perm = await LocalNotifications.checkPermissions()
+  if (perm.display !== 'granted') return
+
+  const now = Date.now()
+  const due = items
+    .filter((f) => f.due_date && !f.is_completed && /^\d{4}-\d{2}-\d{2}$/.test(f.due_date))
+    .map((f) => {
+      const at = new Date(`${f.due_date}T${String(FOLLOWUP_HOUR).padStart(2, '0')}:00:00`)
+      return { f, at }
+    })
+    .filter(({ at }) => at.getTime() > now)
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+    .slice(0, MAX_FOLLOWUPS)
+  if (due.length === 0) return
+
+  await ensureTapHandler()
+  await LocalNotifications.schedule({
+    notifications: due.map(({ f, at }) => {
+      const who = trim(f.counterpart ?? '', 40)
+      const what = trim(f.title, 80)
+      const text = petVoiced({
+        title: t('追蹤提醒'),
+        body: who
+          ? t('今天要追：{who} — {what}', { who, what })
+          : t('今天要追：{what}', { what }),
+      })
+      return {
+        id: FOLLOWUP_ID_BASE + (rawHash(`followup:${f.task_id}`) % FOLLOWUP_ID_SPAN),
+        title: text.title,
+        body: text.body,
+        schedule: { at },
+        extra: { kind: 'followup', route: '/meetings/' },
       }
     }),
   })
