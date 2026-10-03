@@ -21,3 +21,13 @@ No password is hardcoded in this script. Provide a test account one of two ways:
    ```
 
 Missing both → the script exits 1 with instructions instead of running.
+
+## Creating test accounts — never let Supabase send mail
+
+Create throwaway users only with the admin API
+(`POST /auth/v1/admin/users` with `email_confirm: true`, or
+`auth.admin.createUser({ email_confirm: true })`). Never call `signUp`,
+`resetPasswordForEmail`, `signInWithOtp`, invite or magic-link endpoints from a
+script: Supabase's built-in mailer then sends to a made-up inbox, it bounces,
+and the project's email sending gets suspended (warning received 2026-10-03).
+`scripts/tests/no-auth-mail-in-scripts.test.mjs` enforces this.

@@ -1,6 +1,6 @@
 # SHOPLINE Payments（SLP）API 實作筆記：Huddle 網站訂閱
 
-查證日：2026-10-02。來源：docs.shoplinepayments.com（官方，頁面本身皆無日期標示，一律視為「日期不明、2026-10-02 讀取」，頁尾版權 2026）。
+查證日：2026-10-02（2026-10-03 複核，見第 13 節）。來源：docs.shoplinepayments.com（官方，頁面本身皆無日期標示，一律視為「日期不明、2026-10-02 讀取」，頁尾版權 2026）。
 第三方交叉來源：GitHub boyonglin/shopline-payments-skill、Ya19880104/ys-shopline-via-woocommerce（非官方，只作交叉比對）。
 
 ## 0. 讀這份筆記的注意事項
@@ -28,7 +28,7 @@
 | clientKey | 前端 SDK 的憑證（會出現在瀏覽器，可公開） | 同上 |
 | signKey | 驗證 Webhook(Event) 簽章的憑證；每個 Webhook URL 對應一把 signKey | 同上、https://docs.shoplinepayments.com/api/event/ |
 | 金鑰取得 | 登入 SLP 後台「設定 → 開發者管理」 | https://docs.shoplinepayments.com/overview/intergrationGuide/ |
-| 金額單位 | 以「分」：TWD × 100（NT$149 → 14900；NT$990 → 99000）。create/refund/capture/SDK init/webhook 皆如此 | create、refund、sdk/payment、guide/normal 頁 |
+| 金額單位 | 以「分」：TWD × 100（NT$150 → 15000；NT$990 → 99000）。create/refund/capture/SDK init/webhook 皆如此 | create、refund、sdk/payment、guide/normal 頁 |
 | 幣別 | `TWD`（目前僅支援） | create 頁、sdk/initData |
 | 速率限制 | 文件未載明數字；僅有錯誤碼 1904「Requests are too frequent」與 HTTP 429 | https://docs.shoplinepayments.com/appendix/errorCode/ |
 | 時區／時間格式 | 文件未載明（createTime 只標 String(32)；webhook `timestamp` 為毫秒 Unix） | create 頁 |
@@ -104,7 +104,7 @@ API 一覽（皆 POST，路徑接在 base URL 後）：
 
 欄位表：
 - customer/create body：`referenceCustomerId`(必)、`customer.email` 與 `customer.phoneNumber`(至少一個，電話含國碼如 +886…)、`shipping`(選)、`personalInfo`(選)、`attachData`(選)。回：`customerId`(32)、`referenceCustomerId`、`attachData`。
-- customer/token body：`customerId`（必，String 128。欄位說明寫「特店唯一客戶識別」，但 guide/quick 流程是傳 SLP 的 customerId，見第 12 節）。回：`customerId`、`customerToken`(String 64)、`expireTime`(整數，秒；具體時間文件未載明預設值)。
+- customer/token body：`customerId`（必，String 128。欄位說明寫「特店唯一客戶識別」，但 guide/quick 流程是傳 SLP 的 customerId，見第 12 節）。回：`customerId`、`customerToken`(String 64)、`expireTime`(整數，秒；頁面範例值 7200＝2 小時，是否固定為預設值文件未明說)。
 - paymentInstrument/query body：`customerId`(必)、選填 `paymentInstrument.instrumentId` / `instrumentType` / `instrumentStatus` / `instrumentStatusList`。回：`customerId`、`referenceCustomerId`、`paymentInstruments[]`，每筆 `instrumentId`、`instrumentType`、`instrumentStatus`、`instrumentCard{type,brand,holder,first(前6),last(後4),expireMonth,expireYear,expired,issuer,issuerCountry}`，另有選用 billing/descriptor。
 - unbind body：`customerId`(必)、`paymentInstrumentId`(必)。回：`customerId`、`paymentInstrumentId`、`unbindTime`。
 - 付款工具狀態：guide/quick 列 `SUCCESSED`（可用於快捷／定期）、`CREATED`（綁定中）、`DISABLED`（已解綁或系統停用）、`FAILED`；query API 頁列 `CREATED / ENABLED / SUCCESSED / DISABLED`。判斷「可扣款」以 `SUCCESSED` 為準，`ENABLED` 的語意文件未載明。
@@ -131,7 +131,7 @@ API 一覽（皆 POST，路徑接在 base URL 後）：
 ```json
 {
   "paySession": {},
-  "amount": { "value": 14900, "currency": "TWD" },
+  "amount": { "value": 15000, "currency": "TWD" },
   "confirm": {
     "paymentMethod": "CreditCard",
     "paymentBehavior": "Recurring",
@@ -143,7 +143,7 @@ API 一覽（皆 POST，路徑接在 base URL 後）：
   "client": { "ip": "<我方伺服器IP>" }
 }
 ```
-（範例的金額換成我們的 14900，原範例是 10000。）
+（範例的金額換成我們的月繳 15000，原範例是 10000。）
 
 create 頁欄位表標示為「必填」的頂層欄位：`acquirerType`(固定 `SDK`)、`referenceOrderId`(String 32)、`language`、`amount{value,currency}`、`returnUrl`(String 256)、`paySession`、`order`(含 products 與 shipping)、`confirm`、`customer`(`referenceCustomerId`、`personalInfo.lastName`)、`billing`(personalInfo、address)、`client.ip`。但 guide/quick 的 Recurring 範例省略了其中大部分（order、billing、returnUrl…）。哪些在 Recurring 可省略，文件未載明 → sandbox 實測，建議先把全部必填欄位都補上（數位商品 shipping 也要塞一個合理值，需向 SLP 確認），再逐項試著拿掉。
 
@@ -166,7 +166,7 @@ merchant-initiated 標記：沒有獨立旗標，等於 `paymentBehavior=Recurri
 - 建議（推測）：用「訂閱ID＋計費週期」編碼成決定性 referenceOrderId（≤32 字），重送時先 query 再決定，避免重複扣款。
 - idempotentKey 行為文件未載明，不要單靠它。
 
-Recurring 失敗相關錯誤碼 [官方 errorCode 頁]：4900 Need 3DS、4901 Need cvs、4902 Saved card payment other error（皆為顧客不在場無法完成）。官方 guide/quick 提醒：失敗時應停止對該付款工具再發起快捷與定期扣款（具體重試次數／節奏文件未載明）。另 1201 Card is cloning（綁卡後處理中，5 分鐘後重試）、1203 Card verification failed、4410 Duplicate payment。
+Recurring 失敗相關錯誤碼 [官方 errorCode 頁]：4900 Need 3DS、4901 Need cvs、4902 Saved card payment other error（皆為顧客不在場無法完成）。官方 guide/quick 提醒：付款工具被解綁或狀態變 `DISABLED`／`FAILED` 時，應停止對該工具發起快捷與定期扣款並請顧客重新綁卡（2026-10-03 複核更正，原寫「失敗時」；一般扣款失敗的重試次數／節奏文件未載明）。另 1201 Card is cloning（綁卡後處理中，5 分鐘後重試）、1203 Card verification failed、4410 Duplicate payment。
 
 ## 6. 退款、取消、查詢（題 5）
 
@@ -189,6 +189,7 @@ Recurring 失敗相關錯誤碼 [官方 errorCode 頁]：4900 Need 3DS、4901 Ne
 設定：SLP 後台「設定 → 開發者管理」為每個 webhook URL 設定，一個 URL 對應一把 signKey。要求 HTTPS（第三方；官方稱 HTTPS 請求）。
 
 Header：`apiVersion`（如 V1.2）、`merchantId`、`requestId`、`timestamp`(毫秒 Unix)、`sign`、`Content-Type: application/json`（`platformId`/`idempotentKey` 視情況）。
+（2026-10-03 複核：付款事件頁 …/model/payment/ 的 header 表有 `merchantId`、`requestId`；但通知總覽 …/event/model/ 的 header 表**只列** `apiVersion`、`timestamp`、`sign`。我們的 webhook 會拒收沒有 `merchantId` header 的通知（回 403），見第 12 節第 7 點。）
 Body：`id`(事件ID，≤35)、`type`、`created`(毫秒時間戳)、`data`(依事件而異)。
 
 簽章驗證（官方）：
@@ -243,7 +244,7 @@ payload 範例：
 - 測試卡（到期 03/30）：Visa 4147633700198405 / CVC 638；MasterCard 5149147700000300 / CVC 231；JCB 3565586700000200 / CVC 484。
 - 3DS 規則：金額為 3 的倍數 → 固定進 3D 流程，導到沙盒模擬頁手動選成功／失敗。
 - 非 3D 規則：把 TWD 金額去掉最小單位的「00」後，單數 → 成功，雙數 → 失敗（400 失敗、401 成功）。
-- 套到我們的價格 [推測，需實測]：NT$149（14900 分）不是 3 的倍數，去 00 得 149 為單數 → 成功路徑；NT$990 是 3 的倍數 → 走 3D 模擬頁。想測非 3D 的失敗路徑，用不是 3 的倍數的偶數金額（如 NT$200 → 去 00 後為 2 → 失敗）。「3 的倍數」是以元還是分判定，頁面未明說。
+- 套到我們的價格 [推測，需實測]（2026-10-03 依定價 150 更正）：**NT$150 與 NT$990 都是 3 的倍數**（以元或分算都是）→ 兩個正式價格在沙盒都會固定進 3D 流程；沒人在場的 Recurring 遇到 3D 預期會失敗（4900），所以**用正式價格在沙盒測不到「定期扣款成功」**。要測非 3D 成功路徑，沙盒價格要改成「不是 3 的倍數、去 00 後為單數」的金額，例如 NT$151、NT$991；非 3D 失敗路徑用 NT$200（去 00 後為 2，偶數）。注意：老闆決定沙盒直接用正式庫測（owner-checklist A3），改 `web_billing_config` 價格等於改正式設定，見 2026-10-03-docs-review.md。「3 的倍數」是以元還是分判定，頁面未明說（對 150／990 結果相同）。
 - Apple Pay 沙盒：需 macOS 10.14.1+ 或 iOS 12.1+，使用沙盒 Apple ID（見該頁），測試卡見 Apple 官方清單 https://developer.apple.com/apple-pay/sandbox-testing/（本次與訂閱無關）。
 - 其他方式（LINE Pay、街口、ATM）導向沙盒模擬頁選結果。
 - Sandbox 的 Webhook 是否會真的發送到我們設定的 URL：文件未載明，預期會 [推測]。
@@ -260,8 +261,8 @@ payload 範例：
 
 1. 使用者選方案 → Edge Function：建 SLP 會員（可略，建交易會自動建）→ 建交易 `CardBind`（referenceCustomerId = 使用者 ID）。
 2. 前端 SDK（bindCard.enable=true）→ `createPayment()` → Edge Function 轉 `paySession` 建交易 → 回 `nextAction` → `payment.pay()`。
-3. 收 `customer.instrument.binded` → 存 customerId、instrumentId、卡末四碼；訂閱狀態 = 試用中，trial_end = 現在 + 14 天。
-4. 試用到期日：排程 Edge Function 呼叫 Recurring（金額 14900 或 99000，referenceOrderId = 決定性編碼）→ 收 `trade.succeeded` → 訂閱啟用；失敗（4900/4901/4902 等）→ 通知使用者回站內用 QuickPayment 補付。
+3. 收 `customer.instrument.binded` → 存 customerId、instrumentId、卡末四碼；訂閱狀態 = 試用中，trial_end = 現在 + 14 天（對外寫「2 週」）。
+4. 試用到期日：排程 Edge Function 呼叫 Recurring（金額 15000 或 99000，referenceOrderId = 決定性編碼）→ 收 `trade.succeeded` → 訂閱啟用；失敗（4900/4901/4902 等）→ 通知使用者回站內用 QuickPayment 補付。
 5. 之後每期同樣 Recurring；取消訂閱 → 停止排程，必要時 unbind。退款走 refund API。
 
 ## 11. 本次查證統計
@@ -277,3 +278,13 @@ payload 範例：
 4. Recurring 範例精簡，但 create 頁欄位表標註大量必填（order、billing、returnUrl、language、acquirerType）。
 5. customer/token 的 `customerId` 欄位說明（特店唯一客戶識別，String 128）與流程（傳 SLP 會員 ID，回傳 String 32）不一致。
 6. 會員查詢在 guide/quick 為 GET，其餘 API 全為 POST。
+7. Webhook header：event/model 頁只列 `apiVersion`/`timestamp`/`sign`，model/payment 頁另列 `merchantId`/`requestId`/`Content-Type`。程式（`web-billing-webhook/handler.mjs:43`）要求 `merchantId` 等於我們的，否則回 403；若實際通知不帶 merchantId，所有 webhook 都會被拒、SLP 重送 16 次後放棄（開通仍靠 `status` 輪詢與排程對帳補上，但會慢 15 分鐘以上）。sandbox 第一次收到真實 webhook 時必驗。
+8. 付款查詢回應的卡片／付款工具位置：query 頁欄位表把 `payment`（內含 `creditCard`、`paymentInstrument.paymentInstrumentId`）列為**頂層**欄位，範例 JSON 則出現 `lastPayment`；本筆記第 4、5 節原寫的 `order.payment.*` 是 create 頁的寫法。程式 `normalizeTrade`（`_shared/web-billing/core.mjs:182-187`）只讀 `order.payment.*`，讀不到時改用付款工具查詢補（不會壞，但卡別／末四碼可能晚到），待沙盒校正。
+
+## 13. 2026-10-03 官方文件複核紀錄
+
+以 WebFetch 重新讀取下列官方頁（讀取經摘要模型，頁面無日期）：
+- 確認一致：trade/create（端點、sandbox／production base、header、`amount` 以分計、`referenceOrderId` String(32)、`autoConfirm` 僅 Recurring 為 true、`client.ip` String(32)）、trade/query（POST `/api/v1/trade/payment/get`，只收 `tradeOrderId`，**不能用 referenceOrderId 查**）、trade/cancel、trade/refund（`referenceOrderId` 為退款單號 ≤32、部分退款與上限仍未載明）、trade/refundQuery、customer/getToken、paymentInstrument/query（回應含 `referenceCustomerId`）、sdk/payment（CDN 與 npm 名稱）、sdk/initData（`textType` 與 `protocol` 並列）、guide/quick（CardBind 固定 1 元、付款工具四狀態、退款 180 天、會員查詢 GET）、event/model（HMAC-SHA256、`timestamp + "." + body`、範例 sign 32 碼 hex、事件清單含 `trade.refund.succeeded`）、model/payment（16 次重送與間隔、200 即停）、sandboxResource（帳號、測試卡、3 的倍數進 3D、單數成功雙數失敗）、appendix/errorCode（1001、1013、1200、1201、1203、1904、4410、4900–4902）。
+- 新增事實：guide/quick 明文「收到 `customer.instrument.unbinded` 或 `instrumentStatus` 變為 `DISABLED`／`FAILED` 時，應立即停止對該付款工具發起快捷付款和定期扣款，並通知顧客重新綁卡」，並建議**每次**快捷／定期扣款前先查付款工具為 `SUCCESSED` 且 `expired=false`。第 5 節原寫「失敗時應停止…」把觸發條件寫成「扣款失敗」，已更正於此：觸發條件是解綁／工具停用，不是一般扣款失敗。
+- 新增錯誤碼：4454 餘額不足、4459 卡片過期、4461 超過額度。
+- 無法以官方來源確認：1026（錯誤碼頁無此碼，可能在 SDK 錯誤碼頁，未複核）、webhook 時間容許度（官方無數字）、`idempotentKey` 行為、status／subStatus 完整列舉、沙盒共用帳號是否開通綁卡／Recurring。

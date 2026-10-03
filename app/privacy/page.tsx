@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { LegalPage, LegalSection } from '@/components/legal/legal-page'
 import { WebOnly } from '@/components/legal/web-only'
 import { SUPPORT_PHONE, SUPPORT_PHONE_TEL } from '@/lib/legal/operator'
+import { IN_APP_PURCHASE_LIVE } from '@/lib/legal/in-app-purchase'
 export const metadata: Metadata = { title: '資料與隱私說明｜Huddle', alternates: { canonical: '/privacy', languages: { 'zh-TW': '/privacy', en: '/en/privacy' } } }
 export default function PrivacyPage() {
   return <LegalPage page="privacy" title="資料與隱私說明" intro="這份說明整理目前版本使用的資料、用途，以及你可以進行的管理操作。">
@@ -14,7 +15,7 @@ export default function PrivacyPage() {
     <LegalSection title="分享範圍"><p>使用分享功能前，請確認接收對象與分享範圍。個人工作內容不會因下載桌面版而自動公開至官網；官網展示採用示意內容。你主動提供給他人的內容，可能由接收者另行保存。</p></LegalSection>
     <LegalSection title="管理、保存與刪除"><p>你可以在產品內查看、編輯與刪除內容，也可以在「設定」選擇「刪除帳號」。刪除是不可復原的操作，請先保留需要的內容；若操作失敗，請勿把錯誤訊息視為已完成刪除。</p><p>服務使用期間會保存提供功能所需的資料。帳號、上傳檔案、備份及系統紀錄的清除範圍與時間可能不同，本頁不保證所有副本會立即清除。透過 App Store 購買的訂閱不會因刪除帳號而取消，請先在 Apple 帳號中取消。<WebOnly>網站購買開放後，在網站購買的訂閱會在刪除帳號時一併停止續訂。</WebOnly>交易與帳務紀錄依法須保存者，不在立即刪除的範圍內（見〈訂閱與付款資料〉）。</p></LegalSection>
     <LegalSection title="你的個人資料權利"><p>依法你可以就個人資料請求查閱、複製、補充或更正、停止蒐集處理利用，以及刪除。產品內已提供內容編輯與帳號刪除操作；其他請求請來電 <a href={SUPPORT_PHONE_TEL}>{SUPPORT_PHONE}</a>，我們會先確認你是帳號本人，並盡快回覆。請不要在公開 GitHub 討論區提交身分證明或私人內容。</p><p>權利內容可參閱<a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=I0050021" target="_blank" rel="noreferrer">個人資料保護法第 3 條</a>。一般操作協助請見<Link href="/support">使用協助</Link>。</p></LegalSection>
-    <LegalSection title="訂閱與付款資料"><p>目前沒有啟用 Pro 付款流程。日後開放 Apple、Google Play 或訂閱管理服務時，會在啟用前補充交易、訂閱識別資訊及相關供應商的處理方式。註冊帳號不會自動產生訂閱。</p><p><strong>iPhone App 購買（App Store）——開放購買後適用</strong></p><p>在 iPhone App 購買 Huddle Pro 時，付款由 Apple 處理，我們不會取得你的信用卡或 Apple 帳號的付款資料。為了確認與管理你的訂閱狀態，我們委託 RevenueCat, Inc.（美國）提供訂閱管理服務：我們提供給它的是你的 Huddle 帳號識別碼，並由它向 Apple 取得你的購買紀錄（方案、購買與到期時間、交易編號、是否退款等）。這些資料存放於美國，只用於開通、續訂、恢復購買、客服與對帳，不會用於廣告，也不會出售。</p><p>你刪除 Huddle 帳號時，我們會一併要求 RevenueCat 刪除你的訂閱紀錄；若對方系統暫時無法處理，我們會自動重試，最遲 7 日內完成。Apple 依其政策保存的交易紀錄，由 Apple 處理。</p>
+    <LegalSection title="訂閱與付款資料">{IN_APP_PURCHASE_LIVE ? <><p>Huddle Pro 可在 iPhone App 內透過 App Store 訂閱，相關資料的處理方式說明如下。註冊帳號不會自動產生訂閱。</p><p><strong>iPhone App 購買（App Store）</strong></p><p>在 iPhone App 購買 Huddle Pro 時，付款由 Apple 處理，我們不會取得你的卡號或 Apple 帳號的付款資料。為了確認與管理你的訂閱狀態，我們委託 RevenueCat, Inc.（美國）提供訂閱管理服務：我們提供給它的是你的 Huddle 帳號識別碼，並由它向 Apple 取得你的購買紀錄（方案、購買與到期時間、交易編號、是否退款等）。這些資料存放於美國，只用於開通、續訂、恢復購買、客服與對帳，不會用於廣告，也不會出售。</p></> : <><p>目前沒有啟用 Pro 付款流程。日後開放 Apple、Google Play 或訂閱管理服務時，會在啟用前補充交易、訂閱識別資訊及相關供應商的處理方式。註冊帳號不會自動產生訂閱。</p><p><strong>iPhone App 購買（App Store）——開放購買後適用</strong></p><p>在 iPhone App 購買 Huddle Pro 時，付款由 Apple 處理，我們不會取得你的信用卡或 Apple 帳號的付款資料。為了確認與管理你的訂閱狀態，我們委託 RevenueCat, Inc.（美國）提供訂閱管理服務：我們提供給它的是你的 Huddle 帳號識別碼，並由它向 Apple 取得你的購買紀錄（方案、購買與到期時間、交易編號、是否退款等）。這些資料存放於美國，只用於開通、續訂、恢復購買、客服與對帳，不會用於廣告，也不會出售。</p></>}<p>你刪除 Huddle 帳號時，我們會一併要求 RevenueCat 刪除你的訂閱紀錄；若對方系統暫時無法處理，我們會自動重試，最遲 7 日內完成。Apple 依其政策保存的交易紀錄，由 Apple 處理。</p>
       <WebOnly>
         <p><strong>網站購買（信用卡）——網站購買開放後適用</strong></p>
         <p>為了收款、開通與續訂 Huddle Pro、處理免費試用、寄送收據、處理取消與退款、客服與對帳，以及依法保存帳務紀錄，網站購買開放後我們會處理以下資料：你的帳號 Email 與帳號識別碼、購買的方案與試用狀態、金額、幣別、付款與續訂時間、訂單與交易編號、扣款結果、退款紀錄，以及 SHOPLINE Payments 回傳的卡片資訊（卡別、發卡國家與卡號末四碼）。</p>
