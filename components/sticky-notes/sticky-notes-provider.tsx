@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { usePathname } from 'next/navigation'
 import { useAuth } from '@/components/auth/auth-provider'
 import { useStickyNotes } from '@/hooks/use-sticky-notes'
 import { clampNotePosition } from './sticky-note-card'
@@ -55,6 +56,10 @@ export function useStickyNotesToggle() {
  */
 export function StickyNotesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
+  // /float/* 是懸浮工作站的記事本／白板（iframe 或獨立小視窗）。那裡空間很小，
+  // 便條會整張蓋住內容，而且主視窗本來就看得到便條——這些頁面完全不載入、不顯示。
+  const pathname = usePathname()
+  const isFloatWindow = pathname?.startsWith('/float/') ?? false
   const [enabled, setEnabled] = useState(false)
   const [hydrated, setHydrated] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -83,7 +88,10 @@ export function StickyNotesProvider({ children }: { children: ReactNode }) {
 
   // The drawer works even while the glass layer is hidden, so opening it
   // must also trigger the (one-time) load.
-  const store = useStickyNotes(hydrated && (enabled || drawerOpen) && !!user, user?.id ?? null)
+  const store = useStickyNotes(
+    hydrated && (enabled || drawerOpen) && !!user && !isFloatWindow,
+    user?.id ?? null,
+  )
 
   // Pinning a note back only makes sense if the layer is visible.
   const { restoreNote } = store
@@ -132,8 +140,8 @@ export function StickyNotesProvider({ children }: { children: ReactNode }) {
   return (
     <StickyNotesContext.Provider value={value}>
       {children}
-      {hydrated && enabled && user && <StickyNotesLayer store={store} />}
-      {hydrated && drawerOpen && user && (
+      {hydrated && enabled && user && !isFloatWindow && <StickyNotesLayer store={store} />}
+      {hydrated && drawerOpen && user && !isFloatWindow && (
         <StickyNotesDrawer store={store} onClose={closeDrawer} onRestore={restoreFromDrawer} />
       )}
     </StickyNotesContext.Provider>
