@@ -27,8 +27,11 @@ export type PetLineCategory =
   | 'meeting' // 提醒模板：會議 {title} {time}
   | 'focusEnd' // 提醒模板：專注結束
   | 'checkIn' // 提醒模板：今天還沒簽到
+  | 'dailyLine' // 人生年曆：晚上問今天最想記住的事（點氣泡開輸入）
   | 'poke' // 連點反應
   | 'hello' // 剛領養
+  | 'brick' // 冰屋：完成任務搬一塊冰磚 {today} {left}
+  | 'igloo' // 冰屋：剛蓋好一座 {built}
 
 export interface PetLine {
   id: string
@@ -239,6 +242,11 @@ export const PET_LINES: PetLine[] = [
     ['今天還沒簽到。連續天數正在門口搓著鰭等你。', 'No check-in yet today. Your streak is waiting by the door, rubbing its flippers.'],
     ['我去簽到本偷看了一下，今天那格還空空的。', 'I peeked at the check-in book. Today\'s box is still empty.'],
   ]),
+  ...group('dailyLine', [
+    ['今天最想記住的是什麼？一句話就好，我幫你點亮今天那一格。', 'What do you most want to remember about today? One line is enough — I\'ll light up today\'s square.'],
+    ['晚上好。今天最想記住的是什麼？', 'Good evening. What do you most want to remember about today?'],
+    ['我在年曆前面等你。今天最想記住的是什麼？', 'I\'m waiting by your year grid. What do you most want to remember about today?'],
+  ]),
   ...group('poke', [
     ['嘿！那是我的肚子。', 'Hey! That\'s my tummy.'],
     ['再戳我就要變成企鵝麻糬了。', 'Poke me again and I\'ll turn into penguin mochi.'],
@@ -257,6 +265,16 @@ export const PET_LINES: PetLine[] = [
     ['嗨，我是{name}！以後我住在這個角落，偶爾說點奇怪的話。', 'Hi, I\'m {name}! I live in this corner now. I\'ll say odd things now and then.'],
     ['{name}報到！我會安靜待著，你需要笑一下的時候點我。', '{name} reporting for duty! I\'ll stay quiet. Tap me when you need a laugh.'],
     ['我是{name}，很圓，很友善，不太會飛。請多指教。', 'I\'m {name}. Very round, very friendly, not great at flying. Nice to meet you.'],
+  ]),
+  ...group('brick', [
+    ['+1 冰磚！今天搬了 {today} 塊。', '+1 ice brick! That\'s {today} today.'],
+    ['搬一塊冰磚上去，冰屋又高了一點。', 'One more ice brick up. The igloo grew a little.'],
+    ['這座冰屋還差 {left} 塊，我記下來了。', '{left} bricks to go on this igloo. Noted.'],
+    ['冰磚 +1。鰭有點痠，但很開心。', '+1 brick. Flippers a bit sore, but happy.'],
+  ]),
+  ...group('igloo', [
+    ['冰屋蓋好了！第 {built} 座，要不要去看看？', 'Igloo number {built} is done! Want to go see it?'],
+    ['最後一塊冰磚放上去了，第 {built} 座冰屋完工。', 'Last brick in place. Igloo number {built} is finished.'],
   ]),
 ]
 

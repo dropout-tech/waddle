@@ -13,6 +13,8 @@ export interface PetLocalState {
   /** Local YYYY-MM-DD stamps so once-a-day nudges stay once a day. */
   checkInNudged?: string
   nightNudged?: string
+  /** Local YYYY-MM-DD the evening 「今天最想記住的是什麼？」 was asked (人生年曆). */
+  dailyLineAsked?: string
   /** Local YYYY-MM-DD of the last overdue nudge (once a day). */
   overdueNudged?: string
   /** Local YYYY-MM-DD of the last meeting nudge (once a day). */
