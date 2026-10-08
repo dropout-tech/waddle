@@ -42,6 +42,8 @@ export interface BrainDumpDraft {
   fixedTime?: string
   /** 1–10, same scale as Task.urgency. Undefined = normal (5). */
   urgency?: number
+  /** One extra line of detail (AI only: place, person, what to bring…). */
+  note?: string
 }
 
 /** A busy span on the planned day, in minutes from 00:00. */

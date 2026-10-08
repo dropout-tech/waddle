@@ -71,4 +71,26 @@ export const dict: Record<string, string> = {
   '再試一次（{n}）': 'Try again ({n})',
   '這張還沒放進去': 'Not added yet',
   '找不到可以放任務的分類，先建立一個分類再試試。': 'There\'s no category to put tasks in yet. Create one and try again.',
+
+  // AI split → 未分類 inbox (spec v2, 2026-10-03)
+  '亂丟一段待辦，企鵝用 AI 拆好，放進「未分類」。': 'Jot down a messy list — the penguin splits it with AI and puts it in your inbox.',
+  '企鵝拆好了 {n} 件事，看看對不對？': 'The penguin found {n} to-dos. Look right?',
+  '今天的 AI 整理用完了（每天 {n} 次），先用簡單拆法。明天會再補滿；想不限次數可以升級 Pro。':
+    'Today\'s AI splits are used up ({n} a day), so the penguin used the simple splitter. They refill tomorrow; Pro has no daily limit.',
+  '企鵝連不上 AI，先用簡單拆法。': 'The penguin couldn\'t reach the AI, so it used the simple splitter.',
+  'Pro 會員的 AI 整理不限次數。': 'Pro members have unlimited AI splits.',
+  '今天還能用 AI 整理 {n} 次。': '{n} AI splits left today.',
+  '今天的 AI 整理用完了，會先用簡單拆法；明天會再補滿。': 'Today\'s AI splits are used up — the simple splitter will step in. They refill tomorrow.',
+  '按下「交給企鵝」後，這段文字會交給 AI 服務（OpenAI）拆成待辦；原文不會被保存。':
+    'When you tap "Hand it over", this text is sent to an AI service (OpenAI) to split into to-dos. The text itself isn\'t saved.',
+  '放進未分類（{n}）': 'Add to inbox ({n})',
+  '期限（可留空）': 'Due (optional)',
+  '備註（可留空）': 'Note (optional)',
+  '點便條可以改標題和期限；不想要的取消勾選就好。': 'Tap a note to change its name or due date. Untick anything you don\'t want.',
+  '拆好的待辦': 'Split to-dos',
+  '會放進「{name}」': 'Going into "{name}"',
+  '之後在任務清單慢慢整理就好。': 'Sort them out in your task list whenever you like.',
+  '沒有期限': 'No due date',
+  '企鵝把 {n} 件放進「{name}」': 'The penguin put {n} into "{name}"',
+  '到任務清單就看得到。': 'You\'ll find them in your task list.',
 }

@@ -1,107 +1,139 @@
-// ═══════════════════════════════════════════════════════════════════════
-// AI 解析器插座（目前沒接 → 自動退回本地規則 parseBrainDump）
-// ═══════════════════════════════════════════════════════════════════════
+// 丟給企鵝 — AI split client (Edge Function `brain-dump`) with the local
+// rule parser as a fallback.
 //
-// 老闆之後要接 AI 時，照下面四步，UI 和排程器都不用改：
+// The server (supabase/functions/brain-dump) asks gpt-4.1-mini to split the
+// text into to-dos and resolves every due date in code (meeting-import's
+// resolveDue: the model only classifies "明天 / 週五 / 10/9"). Free members
+// get 20 AI splits per day, Pro members no daily cap.
 //
-// 1. 新增 supabase/functions/brain-dump/（照 meeting-import 的分工）：
-//    - prompt.ts：system prompt 寫「把使用者亂丟的一段話拆成待辦；只分類
-//      時間的說法，不要自己算日期」。
-//    - contract.ts：用 zod 定義輸出，轉成 OpenAI `response_format:
-//      { type: 'json_schema', json_schema: { name: 'brain_dump', strict: true,
-//      schema } }`。每個 item 建議欄位：
-//        title           string（去掉時間詞後的自然標題）
-//        minutes         number | null（沒說就 null，前端用 guessMinutes 補）
-//        when            { kind: 'today' } | { kind: 'relative_days', days }
-//                        | { kind: 'weekday', weekday: 1-7, week: 'this'|'next' }
-//                        | { kind: 'date', date: 'YYYY-MM-DD' }   ← 就是 BrainDumpWhen
-//        due             同上或 { kind: 'none' }
-//        part            'morning' | 'afternoon' | 'evening' | null
-//        fixedTime       'HH:mm' | null
-//        urgent          boolean
-//      ⚠️ 和 meeting-import 的 resolveDue 同一個原則：日期「不讓模型心算」，
-//      模型只回 when/due 的種類，真正的 YYYY-MM-DD 一律由前端
-//      resolveWhen(when, now)（lib/brain-dump/parse.ts）算。
-//    - index.ts：驗 JWT、算用量（可參考 meeting-import/quota.mjs）、呼叫模型、
-//      用 contract 驗證後回傳 { items: [...] }。
-// 2. 在下方 `aiBrainDumpParser` 換成真的實作：
-//      supabase.functions.invoke('brain-dump', { body: { text, lang, timezone } })
-//    拿到 items 後用 fromAiItems(items, now) 轉成 BrainDumpDraft[] 回傳。
-// 3. 失敗、逾時、沒額度、離線 → 回 null（或丟錯），就會退回本地規則；
-//    使用者永遠拿得到結果。
-// 4. 若要讓使用者知道是 AI 排的，面板會拿到 source: 'ai'，可在 UI 加小字。
-//
-// 不需要改的地方：planDay（排程器）、預覽動畫、寫入行事曆都吃同一個
-// BrainDumpDraft 型別。
-// ═══════════════════════════════════════════════════════════════════════
+// Whenever AI is not available — function not deployed yet, offline, daily
+// limit reached, AI paused, any error or a 30 s timeout — the panel still gets
+// a result from parseBrainDump() and is told why, so the member is never stuck.
 
-import { BRAIN_DUMP_MAX_ITEMS, cleanTitle, dateKey, dayToken, guessMinutes, parseBrainDump, resolveWhen } from './parse'
-import type { BrainDumpDraft, BrainDumpLang, BrainDumpWhen, DayPart } from './types'
+import { createClient } from '@/lib/supabase/client'
+import { dateKey, dayTokenToDate, guessMinutes, parseBrainDump } from './parse'
+import type { BrainDumpDraft, BrainDumpLang } from './types'
 
 export interface BrainDumpParseInput {
   text: string
-  /** Device "now" — every relative date is anchored on this. */
+  /** Device "now" — the member's today anchors every relative date. */
   now: Date
   lang: BrainDumpLang
 }
 
-/**
- * The socket. Same input → same output type as the local parser.
- * Return `null` to mean "not connected / gave up" → local rules are used.
- */
-export type BrainDumpAiParser = (input: BrainDumpParseInput) => Promise<BrainDumpDraft[] | null>
-
-/** Not connected yet (tonight: no AI calls, no edge function). */
-export const aiBrainDumpParser: BrainDumpAiParser | null = null
-
-/** Shape the future edge function is expected to return per item. */
-export interface BrainDumpAiItem {
-  title: string
-  minutes: number | null
-  when: BrainDumpWhen
-  due: BrainDumpWhen | { kind: 'none' }
-  part: DayPart | null
-  fixedTime: string | null
-  urgent: boolean
+export interface BrainDumpQuota {
+  used: number
+  /** null = Pro, no daily cap. */
+  limit: number | null
+  remaining: number | null
+  enabled: boolean
 }
 
-/** Convert model output into drafts — dates resolved here, never by the model. */
-export function fromAiItems(items: BrainDumpAiItem[], now: Date): BrainDumpDraft[] {
-  return items.slice(0, BRAIN_DUMP_MAX_ITEMS).flatMap((item, i) => {
-    const title = cleanTitle(item.title ?? '')
-    if (!title) return []
-    const dueDate = item.due && item.due.kind !== 'none' ? resolveWhen(item.due, now) : undefined
-    const minutes = typeof item.minutes === 'number' && item.minutes > 0
-      ? Math.min(480, Math.max(5, Math.round(item.minutes / 5) * 5))
-      : undefined
-    const draft: BrainDumpDraft = {
-      id: `bd-${i}`,
-      source: item.title,
-      title,
-      estimatedMinutes: minutes ?? guessMinutes(title),
-      minutesGuessed: minutes === undefined,
-      day: dayToken(item.when ? resolveWhen(item.when, now) : dateKey(now), now),
-      ...(dueDate ? { dueDate } : {}),
-      ...(item.part ? { preferredPart: item.part } : {}),
-      ...(item.fixedTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(item.fixedTime) ? { fixedTime: item.fixedTime } : {}),
-      ...(item.urgent ? { urgency: 8 } : {}),
+export type BrainDumpFallback = 'limit' | 'unavailable'
+
+export interface BrainDumpParseResult {
+  drafts: BrainDumpDraft[]
+  source: 'ai' | 'local'
+  /** Why the local rules were used. */
+  fallback?: BrainDumpFallback
+  /** Daily limit (for the 'limit' message). */
+  limit?: number
+  quota?: BrainDumpQuota
+}
+
+const AI_TIMEOUT_MS = 30000
+
+class AiError extends Error {
+  constructor(public code: string, public limit?: number) {
+    super(code)
+  }
+}
+
+async function invoke<T>(body: Record<string, unknown>): Promise<T> {
+  const client = createClient()
+  const call = client.functions.invoke('brain-dump', { body })
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new AiError('TIMEOUT')), AI_TIMEOUT_MS)
+  })
+  try {
+    const { data, error } = await Promise.race([call, timeout])
+    if (error) {
+      let code = 'UNAVAILABLE'
+      let limit: number | undefined
+      try {
+        const payload = await (error as { context?: Response }).context?.json()
+        if (typeof payload?.error === 'string') code = payload.error
+        if (typeof payload?.limit === 'number') limit = payload.limit
+      } catch {
+        /* offline / not deployed */
+      }
+      throw new AiError(code, limit)
     }
-    return [draft]
+    return data as T
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** Today's AI quota, or null when the function can't be reached. */
+export async function fetchBrainDumpQuota(now = new Date()): Promise<BrainDumpQuota | null> {
+  try {
+    const q = await invoke<BrainDumpQuota>({ action: 'status', today: dateKey(now) })
+    return q && typeof q.used === 'number' ? q : null
+  } catch {
+    return null
+  }
+}
+
+interface SplitResponse extends Omit<BrainDumpQuota, 'enabled'> {
+  items: { title: string; dueDate: string; note: string }[]
+}
+
+/** Server items → drafts (dates already resolved by the server). */
+export function fromServerItems(items: SplitResponse['items']): BrainDumpDraft[] {
+  return items
+    .filter((x) => typeof x?.title === 'string' && x.title.trim())
+    .map((x, i) => ({
+      id: `bd-${i}`,
+      source: x.title,
+      title: x.title.trim(),
+      estimatedMinutes: guessMinutes(x.title),
+      minutesGuessed: true,
+      day: 'today',
+      ...(/^\d{4}-\d{2}-\d{2}$/.test(x.dueDate ?? '') ? { dueDate: x.dueDate } : {}),
+      ...(x.note?.trim() ? { note: x.note.trim() } : {}),
+    }))
+}
+
+/** Local drafts for the inbox: 「明天回信」 has no deadline word but clearly
+ *  belongs to tomorrow — that day becomes its due date. */
+export function localInboxDrafts(text: string, now: Date, lang: BrainDumpLang): BrainDumpDraft[] {
+  return parseBrainDump(text, now, lang).map((d) => {
+    if (d.dueDate || d.day === 'today') return d
+    return { ...d, dueDate: dayTokenToDate(d.day, now) }
   })
 }
 
-/** AI first when connected; any failure or empty answer → local rules. */
-export async function parseWithBestAvailable(
-  input: BrainDumpParseInput,
-  ai: BrainDumpAiParser | null = aiBrainDumpParser,
-): Promise<{ drafts: BrainDumpDraft[]; source: 'ai' | 'local' }> {
-  if (ai) {
-    try {
-      const drafts = await ai(input)
-      if (drafts && drafts.length) return { drafts, source: 'ai' }
-    } catch {
-      /* fall through to local rules */
+/** AI first; any failure → local rules, with the reason. */
+export async function parseWithBestAvailable(input: BrainDumpParseInput): Promise<BrainDumpParseResult> {
+  try {
+    const res = await invoke<SplitResponse>({
+      action: 'split',
+      text: input.text,
+      today: dateKey(input.now),
+      lang: input.lang,
+    })
+    return {
+      drafts: fromServerItems(Array.isArray(res?.items) ? res.items : []),
+      source: 'ai',
+      quota: { used: res.used, limit: res.limit, remaining: res.remaining, enabled: true },
     }
+  } catch (err) {
+    const local = localInboxDrafts(input.text, input.now, input.lang)
+    if (err instanceof AiError && err.code === 'DAILY_LIMIT') {
+      return { drafts: local, source: 'local', fallback: 'limit', limit: err.limit ?? 20 }
+    }
+    return { drafts: local, source: 'local', fallback: 'unavailable' }
   }
-  return { drafts: parseBrainDump(input.text, input.now, input.lang), source: 'local' }
 }

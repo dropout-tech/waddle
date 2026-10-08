@@ -11,7 +11,6 @@
   --note-edge: rgba(41, 43, 36, 0.14);
   --tape: rgba(237, 199, 71, 0.55);
   --tape-edge: rgba(41, 43, 36, 0.10);
-  --busy-bg: repeating-linear-gradient(135deg, rgba(102, 100, 90, 0.10) 0 6px, rgba(102, 100, 90, 0.04) 6px 12px);
 }
 :global(.dark) .root {
   --note-1: #3a3b33;
@@ -21,7 +20,6 @@
   --note-edge: rgba(243, 238, 221, 0.14);
   --tape: rgba(237, 199, 71, 0.32);
   --tape-edge: rgba(243, 238, 221, 0.12);
-  --busy-bg: repeating-linear-gradient(135deg, rgba(243, 238, 221, 0.08) 0 6px, rgba(243, 238, 221, 0.03) 6px 12px);
 }
 
 /* ───────── paper note ───────── */
@@ -107,12 +105,31 @@
   box-shadow: 0 10px 24px -14px rgba(41, 43, 36, 0.45);
 }
 
-/* ───────── timeline ───────── */
-.busy {
-  background: var(--busy-bg);
+/* ───────── into the inbox ───────── */
+.stow {
+  animation: bd-stow 520ms var(--bd-ease) var(--stow-delay, 0ms) both;
 }
-.nowLine {
-  background: var(--ring);
+@keyframes bd-stow {
+  from {
+    opacity: 1;
+    transform: rotate(var(--tilt, 0deg));
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--tx, 0px), var(--ty, 120px)) rotate(4deg) scale(0.3);
+  }
+}
+.inbox {
+  border-color: color-mix(in oklab, var(--primary) 40%, var(--border));
+  background: color-mix(in oklab, var(--primary) 5%, transparent);
+}
+.inboxGlow {
+  animation: bd-inbox 700ms ease-out 260ms both;
+}
+@keyframes bd-inbox {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.03); }
+  100% { transform: scale(1); }
 }
 
 /* ───────── penguin ───────── */
@@ -171,8 +188,12 @@
   .drop {
     animation: bd-fade 150ms ease-out both;
   }
-  .drop::after {
+  .drop::after,
+  .inboxGlow {
     animation: none;
+  }
+  .stow {
+    animation: bd-fade-out 150ms ease-out both;
   }
   .penguinNod,
   .penguinThink,
@@ -180,6 +201,10 @@
   .listening {
     animation: none;
   }
+}
+@keyframes bd-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 @keyframes bd-fade {
   from { opacity: 0; }

@@ -1,12 +1,15 @@
 'use client'
 
 import { useState, type ReactNode, type SyntheticEvent } from 'react'
-import { CalendarDays, ExternalLink, MapPin } from 'lucide-react'
+import Link from 'next/link'
+import { CalendarDays, ExternalLink, FileText, MapPin } from 'lucide-react'
 import type { PeerEvent } from '@/hooks/use-calendar-sharing'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useI18n } from '@/lib/i18n/react'
 import { handleExternalAnchorClick } from '@/lib/external-link'
 import { cn } from '@/lib/utils'
+import { toDateString } from '@/lib/calendar-utils'
+import { meetingPrefillHref } from '@/lib/meeting-followups'
 
 /**
  * The viewer's own Google Calendar events on the calendar views. Read-only:
@@ -106,6 +109,16 @@ function GoogleEventDetails({ event, children }: { event: PeerEvent; children: R
         )}
         {reply && <p className="text-xs text-foreground/80">{t('你的回覆：{reply}', { reply })}</p>}
         <p className="text-[11px] text-muted-foreground">{t('來自 Google 日曆（唯讀），請到 Google 日曆回覆或修改。')}</p>
+        {/* Title + date only: attendees are deliberately never read from Google. */}
+        <Link
+          href={meetingPrefillHref({ title: event.title, date: info.allDay && /^\d{4}-\d{2}-\d{2}/.test(info.startAt) ? info.startAt.slice(0, 10) : toDateString(start) })}
+          data-testid="organize-google-meeting"
+          onClick={stop}
+          className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-md border border-border px-3 text-sm font-medium text-foreground hover:bg-secondary"
+        >
+          <FileText className="h-4 w-4" aria-hidden />
+          {t('整理這場會議')}
+        </Link>
         {info.htmlLink && (
           <a
             href={info.htmlLink}
