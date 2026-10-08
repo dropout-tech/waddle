@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { LEGAL_UPDATED, SUPPORT_PHONE, SUPPORT_PHONE_TEL } from '@/lib/legal/operator'
+import { APP_SHELL_BUILD, IN_APP_PURCHASE_LIVE } from '@/lib/legal/in-app-purchase'
 
 const pages = [
   ['terms', '服務條款', 'Terms of use'], ['privacy', '隱私說明', 'Privacy'], ['refunds', '取消與退款', 'Cancellation & refunds'], ['support', '使用協助', 'Help'],
@@ -8,7 +9,9 @@ const pages = [
 
 export function LegalPage({ title, intro, children, page, locale = 'zh-TW' }: { title: string; intro: string; children: ReactNode; page: 'terms' | 'privacy' | 'refunds' | 'support'; locale?: 'zh-TW' | 'en' }) {
   const english = locale === 'en'
-  const home = english ? '/en/about' : '/about'
+  // Inside the iOS app the brand and footer link return to the app itself, never to the
+  // marketing page (it describes website purchases; Apple 3.1.1). Website build unchanged.
+  const home = APP_SHELL_BUILD ? '/' : english ? '/en/about' : '/about'
   const alternate = english ? `/${page}` : `/en/${page}`
   return (
     <div lang={locale} className="min-h-screen bg-background text-foreground">
@@ -25,12 +28,14 @@ export function LegalPage({ title, intro, children, page, locale = 'zh-TW' }: { 
         <p className="text-sm text-muted-foreground">{english ? `Service information · Updated ${LEGAL_UPDATED.en}` : `服務資訊 · ${LEGAL_UPDATED.zh}更新`}</p>
         <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
         <p className="mt-6 text-lg leading-8 text-muted-foreground">{intro}</p>
-        <div className="mt-10 rounded-xl border border-border bg-muted/40 px-5 py-4 text-sm leading-7">{english ? 'Huddle is currently free to use. Pro subscriptions are not available for purchase. Creating an account, downloading the app or signing in will not automatically charge you.' : 'Huddle 目前提供免費使用。Pro 訂閱尚未開放，註冊帳號、下載或登入都不會自動收費。'}</div>
+        <div className="mt-10 rounded-xl border border-border bg-muted/40 px-5 py-4 text-sm leading-7">{IN_APP_PURCHASE_LIVE
+          ? (english ? 'Huddle’s core features are currently free to use. Huddle Pro is an optional auto-renewing subscription that you can buy in the iPhone app through the App Store. Creating an account, downloading the app or signing in will not automatically charge you.' : 'Huddle 的核心功能目前免費使用。Huddle Pro 是選購的自動續訂訂閱，可在 iPhone App 內透過 App Store 購買；註冊帳號、下載或登入都不會自動收費。')
+          : english ? 'Huddle is currently free to use. Pro subscriptions are not available for purchase. Creating an account, downloading the app or signing in will not automatically charge you.' : 'Huddle 目前提供免費使用。Pro 訂閱尚未開放，註冊帳號、下載或登入都不會自動收費。'}</div>
         <div className="mt-12 space-y-10 text-base leading-8 [&_a]:underline [&_a]:underline-offset-4 [&_a]:break-words [&_li]:pl-1 [&_p+p]:mt-3 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-5">{children}</div>
       </main>
       <footer className="mx-auto max-w-3xl border-t border-border px-6 py-8 text-sm text-muted-foreground">
         <div className="flex flex-wrap gap-6">
-          <Link href={home} className="inline-flex min-h-11 items-center underline underline-offset-4">{english ? 'Back to Huddle' : '回到官網'}</Link>
+          <Link href={home} className="inline-flex min-h-11 items-center underline underline-offset-4">{english ? 'Back to Huddle' : APP_SHELL_BUILD ? '回到 Huddle' : '回到官網'}</Link>
           <Link href="/login" className="inline-flex min-h-11 items-center underline underline-offset-4">{english ? 'Open Huddle' : '開啟 Huddle'}</Link>
         </div>
         <p className="mt-4 leading-7" data-operator-footer>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ParticipantsEditor } from "./participants-editor";
 import type { MeetingParticipant, MeetingPeer } from "@/lib/meeting-import";
-import { ArrowLeft, FileText, Loader2, Upload } from "lucide-react";
+import { ArrowLeft, Check, FileText, Loader2, Upload } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toDateString } from "@/lib/calendar-utils";
 import {
@@ -15,6 +15,16 @@ import {
 } from "@/lib/meeting-import";
 import { useI18n } from "@/lib/i18n/react";
 import { meetingLimitFrom } from "@/lib/billing/plan-usage-core";
+import {
+  isPastDue,
+  isUuid,
+  listMeetingFollowups,
+  taskHref,
+  type MeetingFollowup,
+} from "@/lib/meeting-followups";
+import { syncFollowupReminders } from "@/lib/notifications";
+
+const FOLLOWUP_PREVIEW = 5;
 
 const field =
   "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -47,6 +57,18 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
   const request = useRef<{ fingerprint: string; id: string } | null>(null);
   const active = useRef(true);
   const actionLock = useRef(false);
+  // Read once from the URL on arrival (calendar "整理這場會議" / task "來自會議" links).
+  const pendingImport = useRef<string | null>(null);
+  const [wantImport, setWantImport] = useState<string | null>(null);
+  const resultRef = useRef<HTMLElement>(null);
+  const [followups, setFollowups] = useState<MeetingFollowup[]>([]);
+  const [showAllFollowups, setShowAllFollowups] = useState(false);
+  // task id -> is_completed, for the selected record's own imported tasks.
+  // A queried id missing from the answer means the task no longer exists.
+  const [doneState, setDoneState] = useState<{
+    key: string;
+    map: Record<string, boolean>;
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const target = category || categories[0]?.id || "";
   const select = useCallback((meeting: MeetingImport) => {
@@ -86,6 +108,93 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
     }
     return next;
   }, [userId]);
+  const loadFollowups = useCallback(async () => {
+    const items = await listMeetingFollowups(false);
+    if (!active.current) return;
+    setFollowups(items);
+    void syncFollowupReminders(items).catch(() => {});
+  }, []);
+  // One-shot URL prefill. Params are cleared right after reading so a refresh
+  // never overwrites what the user has typed since.
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    const wantedTitle = q.get("title");
+    const wantedDate = q.get("date");
+    const names = q.getAll("p");
+    const wantedImport = q.get("import");
+    if (!wantedTitle && !wantedDate && !names.length && !wantedImport) return;
+    if (wantedTitle) setTitle(wantedTitle.slice(0, 160));
+    if (wantedDate && /^\d{4}-\d{2}-\d{2}$/.test(wantedDate))
+      setMeetingDate(wantedDate);
+    const seen = new Set<string>();
+    const prefilled: MeetingParticipant[] = [];
+    for (const raw of names) {
+      const name = raw.trim().slice(0, 80);
+      if (!name || seen.has(name.toLowerCase())) continue;
+      seen.add(name.toLowerCase());
+      prefilled.push({
+        id: crypto.randomUUID(),
+        name,
+        organization: "",
+        aliases: [],
+        userId: "",
+        side: "ours",
+      });
+      if (prefilled.length >= 20) break;
+    }
+    if (prefilled.length) setParticipants(prefilled);
+    if (isUuid(wantedImport)) {
+      pendingImport.current = wantedImport;
+      setWantImport(wantedImport);
+    }
+    window.history.replaceState(window.history.state, "", location.pathname);
+  }, []);
+  // Once the record list is in, open the record the URL asked for.
+  useEffect(() => {
+    if (!wantImport || !list) return;
+    pendingImport.current = null;
+    setWantImport(null);
+    const found = list.meetings.find((m) => m.id === wantImport);
+    if (!found) {
+      setNotice(t("找不到這場會議紀錄，可能已不在最近 50 份內。"));
+      return;
+    }
+    select(found);
+    requestAnimationFrame(() =>
+      resultRef.current?.scrollIntoView({ block: "start" }),
+    );
+  }, [wantImport, list, select, t]);
+  useEffect(() => {
+    void loadFollowups();
+  }, [loadFollowups]);
+  // Completion state of the tasks this record added to my own list.
+  const selectedId = selected?.id;
+  const importedIds = selected
+    ? Object.values(selected.imported_tasks).filter(isUuid)
+    : [];
+  const importedKey = importedIds.join(",");
+  const doneById =
+    doneState && doneState.key === importedKey ? doneState.map : null;
+  useEffect(() => {
+    if (!importedKey) return;
+    let live = true;
+    void (async () => {
+      const { data, error } = await createClient()
+        .from("tasks")
+        .select("id,is_completed")
+        .in("id", importedKey.split(","));
+      if (!live || error || !data) return;
+      setDoneState({
+        key: importedKey,
+        map: Object.fromEntries(
+          data.map((r) => [r.id as string, r.is_completed === true]),
+        ),
+      });
+    })().catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [selectedId, importedKey]);
   useEffect(() => {
     active.current = true;
     meetingRequest<{ peers: MeetingPeer[] }>(userId, { action: "directory" })
@@ -256,6 +365,7 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
         const updated = latest.meetings.find((m) => m.id === selected.id);
         if (updated) setSelected(updated);
       }
+      void loadFollowups();
     } catch (e) {
       if (active.current)
         setError(t(e instanceof Error ? e.message : "任務未能建立"));
@@ -284,7 +394,16 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
   // if an older server leaves it out.
   const monthlyLimit = meetingLimitFrom(list?.limit);
   const available = list ? Math.max(0, monthlyLimit - list.used - list.pending) : 0;
+  const todayString = toDateString(new Date());
   const pending = selected?.status === "pending";
+  // Items still waiting for a decision (not imported, not sent to a partner):
+  // the add button says "add all" only when every one of them is checked.
+  const openCount =
+    selected?.result?.tasks.filter(
+      (_, i) =>
+        !selected.imported_tasks[String(i)] &&
+        !selected.assignments?.some((a) => a.source_index === i),
+    ).length ?? 0;
   const expired =
     pending && Date.parse(selected.created_at) <= observedAt - 300000;
 
@@ -344,6 +463,116 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
         )}
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_260px]">
           <section className="min-w-0">
+            {followups.length > 0 && (
+              <section
+                aria-label={t("等對方的事")}
+                data-testid="followups"
+                className="mb-10 rounded-lg border border-border p-4 sm:p-5"
+              >
+                <h2 className="text-lg font-semibold">{t("等對方的事")}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("會議裡對方答應的事。到期前記得追一下。")}
+                </p>
+                <ul className="mt-3 divide-y divide-border">
+                  {(showAllFollowups
+                    ? followups
+                    : followups.slice(0, FOLLOWUP_PREVIEW)
+                  ).map((f) => {
+                    const late = isPastDue(f.due_date, todayString);
+                    return (
+                      <li
+                        key={f.task_id}
+                        data-testid="followup-item"
+                        className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="break-words text-sm font-medium">
+                            {f.counterpart ? (
+                              <span className="mr-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                                {f.counterpart}
+                              </span>
+                            ) : null}
+                            {f.title}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            <span className="break-words">
+                              {t("來自「{title}」", { title: f.meeting_title })}
+                            </span>
+                            <span className="whitespace-nowrap">
+                              {" · "}
+                              {f.meeting_date}
+                            </span>
+                          </p>
+                          <p className="mt-2 text-xs">
+                          {f.due_date ? (
+                            <span
+                              className={
+                                late
+                                  ? "rounded-full bg-destructive/10 px-2 py-0.5 font-medium text-destructive"
+                                  : "text-muted-foreground"
+                              }
+                            >
+                              {late
+                                ? t("已過期 · {date}", { date: f.due_date })
+                                : t("期限 {date}", { date: f.due_date })}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              {t("沒有期限")}
+                            </span>
+                          )}
+                          </p>
+                        </div>
+                        {/* Same two-column slot on every row, whatever the text above. */}
+                        <div className="grid grid-cols-2 gap-2 text-sm sm:flex sm:flex-none">
+                          <Link
+                            href={taskHref(f.task_id)}
+                            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border px-3 hover:bg-muted"
+                          >
+                            {t("開啟任務")}
+                          </Link>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border px-3 hover:bg-muted disabled:opacity-50"
+                            onClick={() => {
+                              const found = list?.meetings.find(
+                                (m) => m.id === f.import_id,
+                              );
+                              if (!found) {
+                                setNotice(
+                                  t("找不到這場會議紀錄，可能已不在最近 50 份內。"),
+                                );
+                                return;
+                              }
+                              select(found);
+                              requestAnimationFrame(() =>
+                                resultRef.current?.scrollIntoView({
+                                  block: "start",
+                                }),
+                              );
+                            }}
+                          >
+                            {t("看會議紀錄")}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {followups.length > FOLLOWUP_PREVIEW && (
+                  <button
+                    type="button"
+                    className={`${button} mt-2 hover:bg-muted`}
+                    onClick={() => setShowAllFollowups((v) => !v)}
+                  >
+                    {showAllFollowups
+                      ? t("收合")
+                      : t("顯示全部 {count} 項", { count: followups.length })}
+                  </button>
+                )}
+              </section>
+            )}
             <details open={!selected || selected.status !== "succeeded"}>
               <summary className="mb-5 min-h-11 cursor-pointer py-2 text-sm font-medium">
                 {selected ? t("整理另一份會議") : t("新增會議紀錄")}
@@ -510,7 +739,8 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
             </details>
             {selected && (
               <section
-                className="mt-10 border-t border-border pt-8"
+                ref={resultRef}
+                className="mt-10 scroll-mt-4 border-t border-border pt-8"
                 aria-label={t("整理結果")}
               >
                 <h2 className="text-xl font-semibold">{selected.title}</h2>
@@ -613,6 +843,15 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                                   }[assignment.status],
                                 )
                               : t("已加入自己的任務");
+                            const ownTaskId = selected.imported_tasks[String(index)];
+                            const doneKind: "done" | "open" | "gone" | null =
+                              !assignment && ownTaskId && doneById
+                                ? ownTaskId in doneById
+                                  ? doneById[ownTaskId]
+                                    ? "done"
+                                    : "open"
+                                  : "gone"
+                                : null;
                             const update = (patch: Partial<MeetingTaskDraft>) =>
                               setDrafts((prev) =>
                                 prev.map((draft, i) =>
@@ -622,12 +861,20 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                             return (
                               <div key={index} className="py-5">
                                 <div className="flex items-start gap-3">
+                                  {imported ? (
+                                    <span
+                                      aria-hidden
+                                      className="flex min-h-11 min-w-11 items-center justify-center text-muted-foreground"
+                                    >
+                                      <Check size={20} strokeWidth={2.5} />
+                                    </span>
+                                  ) : (
                                   <label className="flex min-h-11 min-w-11 items-center justify-center">
                                     <input
                                       type="checkbox"
                                       aria-label={t("選取任務 {n}", { n: index + 1 })}
                                       className="h-5 w-5 accent-primary"
-                                      disabled={busy || imported}
+                                      disabled={busy}
                                       checked={checked.includes(index)}
                                       onChange={(e) =>
                                         setChecked((prev) =>
@@ -638,10 +885,24 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                                       }
                                     />
                                   </label>
+                                  )}
                                   <div className="min-w-0 flex-1 space-y-3">
                                     <label className="block space-y-1 text-sm">
                                       <span className="flex flex-wrap items-center gap-2">
-                                        {imported ? statusLabel : t("任務名稱")}
+                                        {imported ? <span>{statusLabel}</span> : t("任務名稱")}
+                                        {doneKind && (
+                                          <span
+                                            data-testid="done-badge"
+                                            data-state={doneKind}
+                                            className={`rounded-full px-2 py-0.5 text-xs font-medium ${doneKind === "done" ? "bg-primary/15 text-foreground" : "bg-muted text-muted-foreground"}`}
+                                          >
+                                            {doneKind === "done"
+                                              ? t("已完成")
+                                              : doneKind === "open"
+                                                ? t("尚未完成")
+                                                : t("任務已不存在")}
+                                          </span>
+                                        )}
                                         {task.followUp === true && (
                                           <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                                             {t("追蹤對方")}
@@ -721,9 +982,13 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                             );
                           })}
                         </div>
+                        <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+                          {t("不想加的項目，把前面的勾取消就好。指派給自己的直接加入，指派給夥伴的送出邀請，沒指派的存成 checklist。")}
+                        </p>
                         <button
                           type="button"
-                          className={`${button} mt-4 bg-primary text-primary-foreground hover:opacity-90`}
+                          data-testid="add-all"
+                          className={`${button} mt-3 w-full bg-primary text-primary-foreground hover:opacity-90 sm:w-auto`}
                           disabled={
                             busy ||
                             (checked.some(
@@ -735,7 +1000,14 @@ export function MeetingWorkspace({ userId }: { userId: string }) {
                           }
                           onClick={() => void importTasks()}
                         >
-                          {t("儲存並處理 {count} 個待辦", { count: checked.length })}
+                          {checked.length > 0 && checked.length < openCount
+                            ? t("加入選取的 {count} 項", { count: checked.length })
+                            : t("全部加入")}
+                          {checked.length > 0 && checked.length >= openCount && (
+                            <span className="opacity-80">
+                              {t("（{count} 項）", { count: checked.length })}
+                            </span>
+                          )}
                         </button>
                       </>
                     )}

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useMemo, type ReactNode } from 'react'
+import { useState, useRef, useMemo, useEffect, type ReactNode } from 'react'
+import Link from 'next/link'
 import { X, Calendar, Clock, AlertCircle, FileText, Save, Check, Trash2, Palette, ChevronDown, Repeat, List, CheckSquare, ListChecks, Link2, Users, MapPin, Video, ImagePlus, Loader2 } from 'lucide-react'
 import { detectMeetingProvider, MEETING_PROVIDER_LABEL } from '@/lib/meeting-utils'
 import { cn } from '@/lib/utils'
@@ -21,6 +22,7 @@ import { assertImageQuota, explainUploadError } from '@/lib/billing/plan-usage'
 import { planLimitCode } from '@/lib/billing/plan-errors'
 import { showPlanLimitToast } from '@/lib/billing/plan-limit-toast'
 import { toast } from 'sonner'
+import { getTaskMeetingSource, meetingPrefillHref, meetingRecordHref, parseAttendees, type MeetingSource } from '@/lib/meeting-followups'
 import { TaskAssignButton } from '@/components/assignments/task-assign-section'
 import type { AssignablePerson } from '@/lib/assignments'
 
@@ -106,6 +108,15 @@ export function TaskDetailModal({
   // Create mode: the person picked in the header, assigned after the insert.
   const [stagedAssignee, setStagedAssignee] = useState<AssignablePerson | null>(null)
   const [assignNotice, setAssignNotice] = useState('')
+  // Which saved meeting record this task was created from (null = not from one,
+  // or the lookup is unavailable — then nothing is shown).
+  const [meetingSource, setMeetingSource] = useState<MeetingSource | null>(null)
+  useEffect(() => {
+    if (!isOpen || isCreate || isAssignee || !task.id) return
+    let live = true
+    void getTaskMeetingSource(task.id).then((src) => { if (live) setMeetingSource(src) })
+    return () => { live = false; setMeetingSource(null) }
+  }, [isOpen, isCreate, isAssignee, task.id])
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description || '')
   const [urgency, setUrgency] = useState(task.urgency)
@@ -380,6 +391,18 @@ export function TaskDetailModal({
             {assignNotice && (
               <p data-testid="assign-notice" role="status" className="mt-1 text-xs text-muted-foreground">{assignNotice}</p>
             )}
+            {meetingSource && (
+              <Link
+                href={meetingRecordHref(meetingSource.import_id)}
+                data-testid="meeting-source-link"
+                className="mt-1 inline-flex min-h-11 max-w-full items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              >
+                <Users className="h-3 w-3 flex-shrink-0" aria-hidden />
+                <span className="truncate">
+                  {t('來自會議：{title}（{date}）', { title: meetingSource.title, date: meetingSource.meeting_date })}
+                </span>
+              </Link>
+            )}
           </div>
 
           {/* Assignee: every non-whitelisted control below is disabled via
@@ -542,6 +565,18 @@ export function TaskDetailModal({
                     )
                   })()}
                 </div>
+
+                {/* Hand this meeting to 會議轉任務 with title / date / attendees filled in. */}
+                {!isCreate && (
+                  <Link
+                    href={meetingPrefillHref({ title, date: scheduledDate || task.scheduledDate, attendees: parseAttendees(attendees) })}
+                    data-testid="organize-meeting"
+                    className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-secondary"
+                  >
+                    <FileText className="h-4 w-4" aria-hidden />
+                    {t('整理這場會議')}
+                  </Link>
+                )}
               </div>
             )}
           </div>
