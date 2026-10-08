@@ -318,8 +318,9 @@ export async function initSlpPayment(opts: InitPaymentOptions): Promise<SlpPayme
     paymentInstrument: {
       bindCard: {
         enable: opts.bindCard,
-        protocol: { switchVisible: true, defaultSwitchStatus: false, mustAccept: true },
-        textType: { paymentAgreement: true, subscribeAgreement: true },
+        // textType lives INSIDE protocol (https://docs.shoplinepayments.com/sdk/initData/).
+        protocol: { switchVisible: true, defaultSwitchStatus: false, mustAccept: true,
+          textType: { paymentAgreement: true, subscribeAgreement: true } },
       },
     },
   })

@@ -294,7 +294,7 @@ export function normalizeIp(raw) {
   let ip = text
   if (text.includes(':')) {
     try { ip = new URL(`http://[${text}]/`).hostname.replace(/^\[|\]$/g, '') } catch { return null }
-  }
+  } else if (!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(text)) return null
   return ip.length <= SLP_IP_MAX ? ip : null
 }
 export const PLACEHOLDER_IP = '0.0.0.0'

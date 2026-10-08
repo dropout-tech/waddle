@@ -4,6 +4,7 @@
 // the handler re-reads the user from the token). Secrets: SHOPLINE_API_KEY,
 // SHOPLINE_MERCHANT_ID, SHOPLINE_API_BASE, SHOPLINE_ORDER_PREFIX,
 // WEB_BILLING_SITE_URL. Any missing → every request answers 503 `unavailable`.
+// Optional SHOPLINE_SERVER_IP: used as client.ip only if the member's IP is unreadable.
 import { createRest, slpConfigProblem } from '../_shared/web-billing/core.mjs'
 import { createSlpClient } from '../_shared/web-billing/slp.mjs'
 import { createWebBillingHandler } from './handler.mjs'
@@ -26,6 +27,7 @@ Deno.serve(createWebBillingHandler({
     slpProblem: slpConfigProblem(slpConfig),
     prefix: slpConfig.prefix,
     siteUrl: env('WEB_BILLING_SITE_URL'),
+    serverIp: env('SHOPLINE_SERVER_IP') || null,
   },
   db: createRest({ fetch, url, serviceKey, anonKey }),
   slp: createSlpClient({ fetch, apiBase: slpConfig.apiBase, merchantId: slpConfig.merchantId, apiKey: slpConfig.apiKey, log }),

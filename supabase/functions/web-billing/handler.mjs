@@ -2,7 +2,7 @@
 // index.ts only reads env and injects fetch-based clients.
 // The member id ALWAYS comes from the verified JWT, never from the body.
 import {
-  applyAttemptResult, applyRefundResult, bearerToken, buildCreateBody, classifyCreateFailure, clientIp,
+  applyAttemptResult, applyRefundResult, bearerToken, buildCreateBody, classifyCreateFailure, clientIp, ipSource,
   DbError, fetchAttemptResult, isNativeOrigin, normalizeRefund, normalizeTrade, readBody, resolveTrade, tokenExpiry,
 } from '../_shared/web-billing/core.mjs'
 
@@ -20,7 +20,7 @@ const ACTIONS = new Set(['status', 'start', 'card_start', 'customer_token', 'pay
 const CHECKOUT_KIND = { start: 'start', card_start: 'card', pay_now: 'pay' }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-// config: { ready, slpProblem, prefix, siteUrl }
+// config: { ready, slpProblem, prefix, siteUrl, serverIp? }
 export function createWebBillingHandler({ config, db, slp, log = () => {}, now = () => Date.now() }) {
   return async (request) => {
     const reply = (status, body) => Response.json(body, { status, headers: { ...CORS, 'Cache-Control': 'no-store' } })
@@ -75,7 +75,11 @@ export function createWebBillingHandler({ config, db, slp, log = () => {}, now =
           expect_trial: body.expectTrial ?? null,
         })
         const ref = ctx.reference_order_id
-        const createBody = buildCreateBody({ ctx, paySession, locale, siteUrl: config.siteUrl, k: kind, clientIp: clientIp(request) })
+        const memberIp = clientIp(request)
+        const createBody = buildCreateBody({ ctx, paySession, locale, siteUrl: config.siteUrl, k: kind, clientIp: memberIp,
+          fallbackIp: config.serverIp, email: user.email })
+        const ipFrom = ipSource({ clientIp: memberIp, fallbackIp: config.serverIp })
+        if (ipFrom !== 'client') log({ fn: 'web-billing', step: 'create', ref, client_ip: ipFrom }) // 'placeholder' = 0.0.0.0 was sent
         const res = await slp.createPayment(createBody, { idempotentKey: ref })
         if (!res.ok) {
           await applyAttemptResult({ db, slp, referenceOrderId: ref, result: classifyCreateFailure(res), log })

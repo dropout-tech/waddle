@@ -109,6 +109,20 @@ test('web-billing start: member id from JWT only, deterministic order id as idem
   assert.deepEqual(db.ops('apply_payment_result')[0].args, { reference_order_id: REF, result: { status: 'pending', trade_order_id: 'T9', slp_status: 'PROCESSING', slp_sub_status: null } })
 })
 
+test('web-billing start: member e-mail goes into the three personalInfo blocks; unreadable member IP → server IP, logged', async () => {
+  const db = fakeDb({ start_checkout: ctxStart }, { user: { id: USER, email: 'member@example.com' } })
+  const slp = fakeSlp()
+  const logs = []
+  const handler = createWebBillingHandler({ config: { ...wbConfig, serverIp: '198.51.100.7' }, db, slp, log: (e) => logs.push(e), now: () => NOW })
+  const r = await handler(wbRequest({ action: 'start', plan: 'monthly', paySession: 'ps_1' }))
+  assert.equal(r.status, 200)
+  const [body] = slp.calls[0].args
+  for (const p of [body.customer.personalInfo, body.order.shipping.personalInfo, body.billing.personalInfo]) assert.equal(p.email, 'member@example.com')
+  assert.equal(body.client.ip, '198.51.100.7')
+  assert.equal(logs.find((l) => l.client_ip)?.client_ip, 'fallback')
+  assert.equal(JSON.stringify(logs).includes('member@example.com'), false, 'e-mail never logged')
+})
+
 test('web-billing start: SLP timeout → attempt marked unknown (never retried), 502 slp_error', async () => {
   const db = fakeDb({ start_checkout: { ...ctxStart, kind: 'first_purchase', behavior: 'CardBindPayment', amount_minor: 15000 } })
   const slp = fakeSlp({ createPayment: async () => ({ ok: false, kind: 'timeout' }) })
@@ -232,6 +246,16 @@ test('webhook: unsigned, badly signed, replayed, wrong merchant, oversized → r
   assert.equal(slp.calls.length, 0)
 })
 
+test('webhook: merchantId header is optional (not in the docs) but a different one is refused', async () => {
+  const db = fakeDb(); const slp = fakeSlp()
+  const noHeader = whRequest(tradeEvent())
+  const headers = new Headers(noHeader.headers); headers.delete('merchantId')
+  const absent = new Request(noHeader.url, { method: 'POST', headers, body: await noHeader.clone().text() })
+  assert.equal((await wh(db, slp)(absent)).status, 200, 'signed event without the header is accepted')
+  assert.equal((await wh(fakeDb(), slp)(whRequest(tradeEvent(), { merchant: 'M999' }))).status, 403)
+  assert.equal((await wh(fakeDb(), slp)(whRequest(tradeEvent(), { merchant: 'M123' }))).status, 200)
+})
+
 test('webhook: other developers\' orders (shared sandbox) and irrelevant types are acknowledged and ignored', async () => {
   const db = fakeDb(); const slp = fakeSlp()
   const r = await wh(db, slp)(whRequest(tradeEvent({ referenceOrderId: 'woo-12345' })))
@@ -312,7 +336,7 @@ test('webhook customer.instrument.binded: member found by referenceCustomerId, c
 
 // ── web-billing-cron ───────────────────────────────────────────────────────
 const crConfig = { ready: true, slpProblem: null, cronSecret: 'cron-secret-test', prefix: 'hs', siteUrl: 'https://huddle.example',
-  resendApiKey: 're_test', resendFrom: 'Huddle <billing@example.invalid>', serverIp: null }
+  resendApiKey: 're_test', resendFrom: 'Huddle <billing@example.invalid>', serverIp: '198.51.100.7' }
 const crRequest = (secret = 'cron-secret-test', method = 'POST') => new Request('https://fn.example/web-billing-cron', { method, headers: { 'x-cron-secret': secret }, body: method === 'POST' ? '{"job":"tick"}' : undefined })
 function fakeEmail() {
   const seen = { process: [], send: [] }
@@ -486,6 +510,30 @@ test('review #2 webhook: card binding event attaches the card to a first purchas
   assert.equal((await wh(db, slp)(whRequest(ev))).status, 200)
   const res = db.ops('apply_payment_result')[0].args
   assert.deepEqual([res.reference_order_id, res.result.status, res.result.customer_id, res.result.instrument.id], [REF, 'succeeded', 'CUS9', 'INS9'])
+})
+
+test('cron: no valid SHOPLINE_SERVER_IP → no charge is claimed or sent, loud warning, rest of the tick still runs', async () => {
+  for (const serverIp of [null, '', 'not-an-ip', '2001:db8:aaaa:bbbb:cccc:dddd:eeee:ffff']) {
+    const logs = []
+    const db = fakeDb(baseCron({}))
+    const slp = fakeSlp()
+    const res = await createCronHandler({ config: { ...crConfig, serverIp }, db, slp, email: fakeEmail(), fetch: async () => {}, now: () => NOW, log: (e) => logs.push(e) })(crRequest())
+    assert.equal(res.status, 200)
+    assert.equal(db.ops('claim_due').length, 0, `no claim with serverIp=${serverIp}`)
+    assert.equal(slp.calls.filter((c) => c.name === 'createPayment').length, 0)
+    assert.equal(logs.some((l) => l.warn === 'SHOPLINE_SERVER_IP_missing_or_invalid'), true)
+    assert.equal(db.ops('expire_due').length, 1, 'other steps are unaffected')
+  }
+})
+
+test('cron: the Recurring charge carries the server IP and paySession {}', async () => {
+  const db = fakeDb(baseCron({ claim_due: (() => { let done = false; return () => (done ? [] : (done = true, [{ reference_order_id: REF, behavior: 'Recurring', plan: 'monthly',
+    charge_amount_minor: 15000, customer_id: 'C', instrument_id: 'I', reference_customer_id: REFC }])) })() }))
+  const slp = fakeSlp()
+  await createCronHandler({ config: crConfig, db, slp, email: fakeEmail(), fetch: async () => {}, now: () => NOW })(crRequest())
+  const [body] = slp.calls.find((c) => c.name === 'createPayment').args
+  assert.equal(body.client.ip, '198.51.100.7')
+  assert.deepEqual(body.paySession, {})
 })
 
 test('review #6: a success whose amount SLP did not confirm as paid is logged (TODO SLP-Q6)', async () => {

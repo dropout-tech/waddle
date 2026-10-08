@@ -8,7 +8,7 @@
 // there is time left to send it, so nothing is claimed and then abandoned.
 import {
   applyAttemptResult, applyRefundResult, buildCreateBody, classifyCreateFailure, constantTimeEqual, DbError,
-  fetchAttemptResult, normalizeRefund, normalizeTrade,
+  fetchAttemptResult, normalizeIp, normalizeRefund, normalizeTrade,
 } from '../_shared/web-billing/core.mjs'
 
 export const TICK_BUDGET_MS = 120000
@@ -140,6 +140,15 @@ export function createCronHandler({ config, db, slp, email, fetch: fetchFn, log 
     // Step 3: claim ONE due subscription, send it, record the answer; repeat.
     async function chargeDue() {
       let sent = 0, succeeded = 0, failed = 0, undecided = 0
+      // client.ip for an unattended charge is "our server IP" (/guide/quick/:
+      // 特店伺服器 IP; /api/trade/create/: String(32), required). Without a valid
+      // SHOPLINE_SERVER_IP we would have to invent one (0.0.0.0), which SLP's
+      // risk control may reject. So: no charge is claimed or sent, the tick
+      // reports it loudly (the next tick retries once the secret is set).
+      if (!normalizeIp(config.serverIp)) {
+        log({ fn: 'web-billing-cron', step: 'charges', warn: 'SHOPLINE_SERVER_IP_missing_or_invalid', charges: 'skipped' })
+        return { sent, succeeded, failed, undecided, skipped: 'server_ip_missing' }
+      }
       while (sent < MAX_CHARGES_PER_TICK && left() > SLP_CALL_MS + 20000) {
         const claimed = await db.server('claim_due', { prefix: config.prefix, limit: 1 })
         const ctx = Array.isArray(claimed) ? claimed[0] : null
@@ -147,7 +156,7 @@ export function createCronHandler({ config, db, slp, email, fetch: fetchFn, log 
         sent++
         let result
         try {
-          const body = buildCreateBody({ ctx, locale: 'zh-TW', siteUrl: config.siteUrl, k: 'pay', clientIp: config.serverIp })
+          const body = buildCreateBody({ ctx, locale: 'zh-TW', siteUrl: config.siteUrl, k: 'pay', fallbackIp: config.serverIp })
           const res = await slp.createPayment(body, { idempotentKey: ctx.reference_order_id })
           result = res.ok ? normalizeTrade(res.data) : classifyCreateFailure(res)
         } catch {

@@ -3,8 +3,10 @@
 // `supabase functions deploy web-billing-cron --no-verify-jwt`; the caller
 // must send header x-cron-secret = WEB_BILLING_CRON_SECRET (constant-time
 // compare). Secrets: the SLP set (see web-billing), WEB_BILLING_CRON_SECRET,
-// RESEND_API_KEY, RESEND_FROM_ADDRESS, WEB_BILLING_SITE_URL; optional
-// SHOPLINE_SERVER_IP (client.ip for Recurring, TODO(SLP-Q4)). Missing → 503.
+// RESEND_API_KEY, RESEND_FROM_ADDRESS, WEB_BILLING_SITE_URL. Missing → 503.
+// SHOPLINE_SERVER_IP (client.ip for Recurring, ≤ 32 chars; REQUIRED for charging,
+// TODO(SLP-Q4)): without a valid value the tick still runs but sends no charges
+// (logged as SHOPLINE_SERVER_IP_missing_or_invalid).
 import { createRest, slpConfigProblem } from '../_shared/web-billing/core.mjs'
 import { createSlpClient } from '../_shared/web-billing/slp.mjs'
 import { processOutbox, renderEmail, sendEmail } from '../_shared/web-billing/email.mjs'
