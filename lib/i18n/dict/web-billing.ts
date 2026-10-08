@@ -7,6 +7,8 @@
 // wording (Apple 3.1.1) and `grep -r` over out/ checks exactly that.
 export const dict: Record<string, string> = {
   // error codes (docs/billing/2026-10-02-web-billing-contracts.md §1)
+  '付款功能即將開通。現在還無法付款，也不會向你收費。': "Payments are opening soon. You can't pay yet, and you won't be charged.",
+  '你目前使用免費版。開始 Pro 可以先免費試用，試用期內取消不會扣款。': "You're on the free plan. Start Pro with a free trial; cancel during the trial and you won't be charged.",
   '登入已過期，請重新登入後再試。': 'Your sign-in has expired. Please sign in again and retry.',
   '網站訂閱目前尚未對你的帳號開放。': 'Website subscriptions are not available for your account yet.',
   '這項功能只在網頁版提供。': 'This is only available on the website.',
