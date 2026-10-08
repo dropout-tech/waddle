@@ -640,8 +640,6 @@ function HuddlePage() {
 
       <BrainDumpHost
         workspaces={workspaces}
-        assignedTasks={assignedTasks}
-        timeBlocks={timeBlocks}
         settings={settings}
         createTask={createTask}
       />

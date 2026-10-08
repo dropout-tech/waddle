@@ -1,38 +1,20 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Mic, Square, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
-import { parseWithBestAvailable } from '@/lib/brain-dump/ai'
+import { fetchBrainDumpQuota, parseWithBestAvailable, type BrainDumpFallback, type BrainDumpQuota } from '@/lib/brain-dump/ai'
 import { addDays, dateKey, splitFragments } from '@/lib/brain-dump/parse'
-import { markConflicts, planDay, rebaseDrafts, toHHmm, toMinutes } from '@/lib/brain-dump/plan'
-import type { DayPlan, PlannedItem } from '@/lib/brain-dump/types'
-import type { Task, TimeBlock, Workspace } from '@/lib/types'
-import { BrainDumpPreview } from './brain-dump-preview'
+import type { BrainDumpDraft } from '@/lib/brain-dump/types'
+import { BrainDumpPreview, STOW_MS } from './brain-dump-preview'
 import { PenguinArt, type PenguinPose } from './penguin-art'
-import { collectBusy } from './brain-dump-utils'
 import { useSpeechDictation } from './use-speech-dictation'
 import styles from './brain-dump.module.css'
 
 export const BRAIN_DUMP_EXAMPLE = '明天要回康庭的信、下午去銀行、週五前把報價改完 一小時、還有記得運動'
-const DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240]
 
 type Phase = 'input' | 'thinking' | 'preview'
-
-interface PanelProps {
-  workspaces: Workspace[]
-  assignedTasks: Task[]
-  timeBlocks: TimeBlock[]
-  isMobile: boolean
-  text: string
-  onTextChange: (text: string) => void
-  onClose: () => void
-  /** Category the tasks land in unless the user picks another one. */
-  defaultCategoryId?: string
-  /** Writes the chosen items one by one; reports which notes didn't make it. */
-  onCommit: (items: PlannedItem[], today: string, categoryId: string) => Promise<CommitResult>
-}
 
 export interface CommitResult {
   created: number
@@ -40,62 +22,40 @@ export interface CommitResult {
   failedIds: string[]
 }
 
-// The category pick is remembered per device (only for this feature).
-const CATEGORY_KEY = 'huddle-brain-dump-category-v1'
-function readStoredCategory(): string | null {
-  try {
-    return window.localStorage.getItem(CATEGORY_KEY)
-  } catch {
-    return null
-  }
-}
-function writeStoredCategory(id: string) {
-  try {
-    window.localStorage.setItem(CATEGORY_KEY, id)
-  } catch {
-    /* private mode — keep in memory only */
-  }
+interface PanelProps {
+  isMobile: boolean
+  text: string
+  onTextChange: (text: string) => void
+  onClose: () => void
+  /** Name of the inbox category the tasks go into (未分類). */
+  inboxName: string
+  /** Writes the chosen drafts one by one; reports which didn't make it. */
+  onCommit: (drafts: BrainDumpDraft[]) => Promise<CommitResult>
+  /** Everything is in (after the into-the-inbox animation). */
+  onDone: (created: number) => void
 }
 
 function reducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile, text, onTextChange, onClose, defaultCategoryId, onCommit }: PanelProps) {
+export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxName, onCommit, onDone }: PanelProps) {
   const { t, lang } = useI18n()
   const [phase, setPhase] = useState<Phase>('input')
   const [notice, setNotice] = useState<'empty' | 'unparsed' | null>(null)
-  const [workStart, setWorkStart] = useState(9)
-  const [workEnd, setWorkEnd] = useState(22)
-  const [windowOpen, setWindowOpen] = useState(false)
   const [now, setNow] = useState<Date>(() => new Date())
-  const [plan, setPlan] = useState<DayPlan | null>(null)
-  const [items, setItems] = useState<PlannedItem[]>([])
+  const [drafts, setDrafts] = useState<BrainDumpDraft[]>([])
+  const [fallback, setFallback] = useState<BrainDumpFallback | null>(null)
+  const [limit, setLimit] = useState(20)
+  const [quota, setQuota] = useState<BrainDumpQuota | null>(null)
   const [excluded, setExcluded] = useState<Set<string>>(() => new Set())
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [stowing, setStowing] = useState(false)
   /** Notes whose write failed — the preview keeps only these, ready to retry. */
   const [failed, setFailed] = useState<Set<string>>(() => new Set())
   const [writtenCount, setWrittenCount] = useState(0)
-  const [rebased, setRebased] = useState(false)
   const [scraps, setScraps] = useState<string[]>([])
-  const categories = useMemo(
-    () => workspaces.filter((w) => !w.isArchived).flatMap((w) =>
-      w.categories.filter((c) => !c.isArchived).map((c) => ({
-        id: c.id,
-        label: c.name === w.name ? c.name : `${w.name} / ${c.name}`,
-      }))),
-    [workspaces],
-  )
-  const [categoryId, setCategoryIdState] = useState(() => {
-    const stored = readStoredCategory()
-    if (stored && categories.some((c) => c.id === stored)) return stored
-    return defaultCategoryId ?? categories[0]?.id ?? ''
-  })
-  const setCategoryId = (id: string) => {
-    setCategoryIdState(id)
-    writeStoredCategory(id)
-  }
   const textRef = useRef<HTMLTextAreaElement>(null)
   const runRef = useRef(0)
 
@@ -107,17 +67,28 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
   }, [onTextChange])
   const speech = useSpeechDictation(lang, appendSpoken)
 
-  const busy = useMemo(
-    () => (plan ? collectBusy(workspaces, assignedTasks, timeBlocks, now) : []),
-    [plan, workspaces, assignedTasks, timeBlocks, now],
-  )
-
   // Desktop: start typing right away (phones would pop the keyboard over the sheet).
   useEffect(() => {
     if (!isMobile) textRef.current?.focus()
   }, [isMobile])
 
-  useEffect(() => () => { runRef.current++ }, [])
+  // Today's AI quota (silently absent when the function isn't reachable).
+  useEffect(() => {
+    let alive = true
+    void fetchBrainDumpQuota().then((q) => {
+      if (alive) setQuota(q)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+  // Closing mid-request: a late answer must not touch an unmounted panel.
+  useEffect(() => {
+    const runs = runRef
+    return () => {
+      runs.current++
+    }
+  }, [])
 
   const submit = async () => {
     if (speech.listening) speech.stop()
@@ -133,22 +104,22 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
     setScraps(splitFragments(text).slice(0, 8))
     if (!quick) setPhase('thinking')
     const started = Date.now()
-    const { drafts } = await parseWithBestAvailable({ text, now: at, lang })
-    const minThink = quick ? 0 : Math.min(1500, 900 + Math.min(8, drafts.length) * 70)
-    const wait = minThink - (Date.now() - started)
+    const result = await parseWithBestAvailable({ text, now: at, lang })
+    const wait = (quick ? 0 : 1100) - (Date.now() - started)
     if (wait > 0) await new Promise((r) => setTimeout(r, wait))
     if (run !== runRef.current) return
-    if (!drafts.length) {
+    if (result.quota) setQuota(result.quota)
+    if (!result.drafts.length) {
       setPhase('input')
       setNotice('unparsed')
       return
     }
-    const occupied = collectBusy(workspaces, assignedTasks, timeBlocks, at)
-    const next = planDay(drafts, occupied, { now: at, workStart: workStart * 60, workEnd: workEnd * 60 })
     setNow(at)
-    setPlan(next)
-    setItems(next.items)
+    setDrafts(result.drafts)
+    setFallback(result.fallback ?? null)
+    if (result.limit) setLimit(result.limit)
     setExcluded(new Set())
+    setFailed(new Set())
     setSelectedId(null)
     setPhase('preview')
   }
@@ -157,15 +128,11 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
     runRef.current++
     setFailed(new Set())
     setWrittenCount(0)
-    setRebased(false)
     setPhase('input')
-    setPlan(null)
     setSelectedId(null)
     setNotice(null)
     window.setTimeout(() => textRef.current?.focus(), 0)
   }
-
-  const included = useCallback((id: string) => !excluded.has(id), [excluded])
 
   const toggle = (id: string) => {
     setExcluded((prev) => {
@@ -176,65 +143,43 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
     })
   }
 
-  const updateItem = (id: string, patch: { title?: string; minutes?: number; time?: string; date?: string }) => {
-    if (!plan) return
-    setItems((prev) => {
-      const edited = prev.map((item) => {
-        if (item.draft.id !== id) return item
-        const draft = { ...item.draft }
-        if (patch.title !== undefined) draft.title = patch.title
-        if (patch.minutes !== undefined) {
-          draft.estimatedMinutes = patch.minutes
-          draft.minutesGuessed = false
-        }
-        const date = patch.date || item.date
-        const time = patch.time !== undefined ? patch.time : item.start ?? ''
-        if (time && /^\d{2}:\d{2}$/.test(time)) {
-          const s = toMinutes(time)
-          return { draft, date, status: 'scheduled' as const, start: time, end: toHHmm(Math.min(24 * 60 - 1, s + draft.estimatedMinutes)) }
-        }
-        return { draft, date, status: 'pending' as const }
-      })
-      return markConflicts(edited, busy, plan.today, included)
-    })
+  const updateDraft = (id: string, patch: Partial<Pick<BrainDumpDraft, 'title' | 'dueDate' | 'note'>>) => {
+    setDrafts((prev) => prev.map((d) => {
+      if (d.id !== id) return d
+      const next = { ...d, ...patch }
+      if (!next.dueDate) delete next.dueDate
+      if (!next.note) delete next.note
+      return next
+    }))
   }
 
-  const chosen = items.filter((x) => !excluded.has(x.draft.id) && x.draft.title.trim())
+  const chosen = drafts.filter((d) => !excluded.has(d.id) && d.title.trim())
 
   const commit = async () => {
-    if (!plan || !chosen.length || saving) return
-    // Midnight passed while the preview was open: "today" is a new day.
-    // Re-plan for it and let the user look once more before writing.
-    const at = new Date()
-    if (dateKey(at) !== plan.today) {
-      const occupied = collectBusy(workspaces, assignedTasks, timeBlocks, at)
-      const next = planDay(rebaseDrafts(items, at), occupied, { now: at, workStart: workStart * 60, workEnd: workEnd * 60 })
-      setNow(at)
-      setPlan(next)
-      setItems(next.items)
-      setSelectedId(null)
-      setRebased(true)
-      return
-    }
-    setRebased(false)
+    if (!chosen.length || saving || stowing) return
     setSaving(true)
     let result: CommitResult
     try {
-      result = await onCommit(chosen, plan.today, categoryId)
+      result = await onCommit(chosen)
     } catch (err) {
       console.error('[brain-dump] commit failed', err)
-      result = { created: 0, failedIds: chosen.map((x) => x.draft.id) }
+      result = { created: 0, failedIds: chosen.map((d) => d.id) }
     } finally {
       setSaving(false)
     }
     if (result.failedIds.length) {
       const keep = new Set(result.failedIds)
-      setItems((prev) => prev.filter((x) => keep.has(x.draft.id)))
+      setDrafts((prev) => prev.filter((d) => keep.has(d.id)))
       setExcluded(new Set())
       setFailed(keep)
       setWrittenCount((n) => n + result.created)
       setSelectedId(null)
+      return
     }
+    const total = writtenCount + result.created
+    setSelectedId(null)
+    setStowing(true)
+    window.setTimeout(() => onDone(total), reducedMotion() ? 150 : STOW_MS + Math.min(8, chosen.length) * 70)
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -244,42 +189,36 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
     }
   }
 
-  // ── status line for the preview ──
-  const scheduledToday = items.filter((x) => x.status === 'scheduled' && x.date === plan?.today).length
-  const pendingCount = items.length - scheduledToday
-  let headline = ''
+  // ── preview status line ──
+  let headline = t('企鵝拆好了 {n} 件事，看看對不對？', { n: drafts.length })
   let headlinePose: PenguinPose = 'happy'
+  let previewNotice: string | undefined
   if (failed.size) {
     headline = writtenCount
-      ? t('已放進 {m} 件；還有 {n} 件沒放成功，網路順了再試一次就好。', { m: writtenCount, n: items.length })
-      : t('這 {n} 件還沒放進去，網路順了再試一次就好。', { n: items.length })
+      ? t('已放進 {m} 件；還有 {n} 件沒放成功，網路順了再試一次就好。', { m: writtenCount, n: drafts.length })
+      : t('這 {n} 件還沒放進去，網路順了再試一次就好。', { n: drafts.length })
     headlinePose = 'stand'
-  } else if (rebased) {
-    headline = t('已經過午夜了，幫你改排到今天，再看一次就好。')
+  } else if (fallback === 'limit') {
+    previewNotice = t('今天的 AI 整理用完了（每天 {n} 次），先用簡單拆法。明天會再補滿；想不限次數可以升級 Pro。', { n: limit })
     headlinePose = 'stand'
-  } else if (plan?.late) {
-    headline = t('夜深了，今天就到這裡吧。企鵝先把它們放進明天的待排區。')
-    headlinePose = 'sleep'
-  } else if (plan?.full) {
-    headline = t('今天已經滿滿的了，企鵝先把它們放進待排區，有空再拖進行事曆。')
+  } else if (fallback === 'unavailable') {
+    previewNotice = t('企鵝連不上 AI，先用簡單拆法。')
     headlinePose = 'stand'
-  } else if (pendingCount === 0) {
-    headline = t('排好了，{n} 件都放進今天的空檔。', { n: scheduledToday })
-  } else if (scheduledToday === 0) {
-    headline = t('這些都是之後的事，企鵝先放進待排區。')
-    headlinePose = 'stand'
-  } else {
-    headline = t('{n} 件放進今天的空檔，{m} 件先放待排。', { n: scheduledToday, m: pendingCount })
   }
 
-  const selected = items.find((x) => x.draft.id === selectedId) ?? null
-  const hourLabel = (h: number) => `${String(h).padStart(2, '0')}:00`
+  const selected = drafts.find((d) => d.id === selectedId) ?? null
+  const quotaLine = !quota || quota.enabled === false
+    ? null
+    : quota.limit === null
+      ? t('Pro 會員的 AI 整理不限次數。')
+      : quota.remaining !== null && quota.remaining > 0
+        ? t('今天還能用 AI 整理 {n} 次。', { n: quota.remaining })
+        : t('今天的 AI 整理用完了，會先用簡單拆法；明天會再補滿。')
 
   return (
     <div data-brain-dump-panel className={cn(styles.root, 'flex min-h-0 flex-1 flex-col')}>
       {/* Header */}
       <div className="flex items-start gap-3 px-5 pb-3 pt-4">
-        {/* The preview has its own big penguin — one is enough. */}
         {phase === 'input' && (
           <div className="h-11 w-11 flex-shrink-0">
             <PenguinArt pose="stand" />
@@ -287,7 +226,7 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
         )}
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-semibold text-foreground">{t('丟給企鵝')}</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('亂丟一串待辦，企鵝幫你排進今天的空檔。')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('亂丟一段待辦，企鵝用 AI 拆好，放進「未分類」。')}</p>
         </div>
         {!isMobile && (
           <button
@@ -310,6 +249,7 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
               id="brain-dump-text"
               ref={textRef}
               value={text}
+              maxLength={4000}
               onChange={(e) => {
                 onTextChange(e.target.value)
                 if (notice) setNotice(null)
@@ -376,47 +316,9 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
               </div>
             )}
 
-            <div className="text-xs text-muted-foreground">
-              <button
-                type="button"
-                onClick={() => setWindowOpen((v) => !v)}
-                aria-expanded={windowOpen}
-                className="inline-flex min-h-11 items-center underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
-              >
-                {t('排在 {start}–{end} 之間', { start: hourLabel(workStart), end: hourLabel(workEnd) })}
-              </button>
-              {windowOpen && (
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <label className="flex items-center gap-1.5">
-                    {t('從幾點')}
-                    <select
-                      value={workStart}
-                      onChange={(e) => {
-                        const v = Number(e.target.value)
-                        setWorkStart(v)
-                        if (workEnd <= v) setWorkEnd(Math.min(24, v + 1))
-                      }}
-                      className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
-                    >
-                      {Array.from({ length: 18 }, (_, i) => i + 5).map((h) => (
-                        <option key={h} value={h}>{hourLabel(h)}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    {t('到幾點')}
-                    <select
-                      value={workEnd}
-                      onChange={(e) => setWorkEnd(Number(e.target.value))}
-                      className="h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground"
-                    >
-                      {Array.from({ length: 24 - workStart }, (_, i) => workStart + i + 1).map((h) => (
-                        <option key={h} value={h}>{hourLabel(h)}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              )}
+            <div className="space-y-0.5 text-[11px] leading-relaxed text-muted-foreground" data-bd-disclosure>
+              <p>{t('按下「交給企鵝」後，這段文字會交給 AI 服務（OpenAI）拆成待辦；原文不會被保存。')}</p>
+              {quotaLine && <p data-bd-quota>{quotaLine}</p>}
             </div>
           </div>
         )}
@@ -448,33 +350,30 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
           </div>
         )}
 
-        {phase === 'preview' && plan && (
+        {phase === 'preview' && (
           <div>
             <BrainDumpPreview
-              headline={headline}
-              failedIds={failed}
-              finalPose={headlinePose}
-              plan={plan}
-              items={items}
-              busy={busy}
-              now={now}
+              drafts={drafts}
               excluded={excluded}
               selectedId={selectedId}
-              isMobile={isMobile}
+              headline={headline}
+              notice={previewNotice}
+              finalPose={headlinePose}
+              inboxName={inboxName}
+              failedIds={failed}
+              stowing={stowing}
               onToggle={toggle}
               onSelect={setSelectedId}
             />
-
-            {selected && (
+            {selected && !stowing && (
               <NoteEditor
-                key={selected.draft.id}
-                item={selected}
+                key={selected.id}
+                draft={selected}
                 now={now}
-                onChange={(patch) => updateItem(selected.draft.id, patch)}
+                onChange={(patch) => updateDraft(selected.id, patch)}
                 onDone={() => setSelectedId(null)}
               />
             )}
-
           </div>
         )}
       </div>
@@ -483,25 +382,10 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
       <div className="flex items-center justify-end gap-2 border-t border-border bg-card px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {phase === 'preview' ? (
           <>
-            {categories.length > 0 && (
-              <label className="mr-auto flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                <span className="hidden flex-shrink-0 sm:inline">{t('放進分類')}</span>
-                <select
-                  data-bd-category
-                  aria-label={t('放進分類')}
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="h-11 w-full min-w-0 max-w-[180px] truncate rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.label}</option>
-                  ))}
-                </select>
-              </label>
-            )}
             <button
               type="button"
               onClick={restart}
+              disabled={stowing}
               className="min-h-11 flex-shrink-0 rounded-lg px-3 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9 md:px-4"
             >
               {t('重來')}
@@ -509,14 +393,14 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
             <button
               type="button"
               onClick={() => void commit()}
-              disabled={!chosen.length || saving}
-              className="min-h-11 flex-shrink-0 whitespace-nowrap rounded-lg bg-primary px-4 md:px-5 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:min-h-9"
+              disabled={!chosen.length || saving || stowing}
+              className="min-h-11 flex-shrink-0 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:min-h-9 md:px-5"
             >
               {saving
                 ? t('放進去中…')
                 : failed.size
                   ? t('再試一次（{n}）', { n: chosen.length })
-                  : t('放進行事曆（{n}）', { n: chosen.length })}
+                  : t('放進未分類（{n}）', { n: chosen.length })}
             </button>
           </>
         ) : (
@@ -539,10 +423,10 @@ export function BrainDumpPanel({ workspaces, assignedTasks, timeBlocks, isMobile
   )
 }
 
-function NoteEditor({ item, now, onChange, onDone }: {
-  item: PlannedItem
+function NoteEditor({ draft, now, onChange, onDone }: {
+  draft: BrainDumpDraft
   now: Date
-  onChange: (patch: { title?: string; minutes?: number; time?: string; date?: string }) => void
+  onChange: (patch: Partial<Pick<BrainDumpDraft, 'title' | 'dueDate' | 'note'>>) => void
   onDone: () => void
 }) {
   const { t } = useI18n()
@@ -550,34 +434,31 @@ function NoteEditor({ item, now, onChange, onDone }: {
   useEffect(() => {
     ref.current?.scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' })
   }, [])
-  const minutes = item.draft.estimatedMinutes
-  const options = DURATIONS.includes(minutes) ? DURATIONS : [...DURATIONS, minutes].sort((a, b) => a - b)
   const field = 'h-11 w-full rounded-md border border-border bg-background px-2.5 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-9'
   return (
     <div ref={ref} className="mt-4 rounded-xl border border-border bg-secondary/40 p-3" data-bd-editor>
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5">
         <label className="col-span-2 flex flex-col gap-1 text-[11px] text-muted-foreground">
           {t('任務名稱')}
-          <input className={field} value={item.draft.title} maxLength={120} onChange={(e) => onChange({ title: e.target.value })} />
+          <input data-bd-edit-title className={field} value={draft.title} maxLength={200} onChange={(e) => onChange({ title: e.target.value })} />
         </label>
         <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
-          {t('時長')}
-          <select className={field} value={minutes} onChange={(e) => onChange({ minutes: Number(e.target.value) })}>
-            {options.map((m) => (
-              <option key={m} value={m}>{m < 60 ? t('{n} 分鐘', { n: m }) : m % 60 ? t('{h} 小時 {m} 分', { h: Math.floor(m / 60), m: m % 60 }) : t('{h} 小時', { h: m / 60 })}</option>
-            ))}
-          </select>
+          {t('期限（可留空）')}
+          <input
+            data-bd-edit-due
+            className={field}
+            type="date"
+            min={dateKey(now)}
+            max={dateKey(addDays(now, 730))}
+            value={draft.dueDate ?? ''}
+            onChange={(e) => onChange({ dueDate: e.target.value || undefined })}
+          />
         </label>
         <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
-          {t('時間（留空＝待排）')}
-          <input className={field} type="time" step={900} value={item.start ?? ''} onChange={(e) => onChange({ time: e.target.value })} />
+          {t('備註（可留空）')}
+          <input className={field} value={draft.note ?? ''} maxLength={200} onChange={(e) => onChange({ note: e.target.value })} />
         </label>
-        <label className="col-span-2 flex flex-col gap-1 text-[11px] text-muted-foreground sm:col-span-2">
-          {t('日期')}
-          <input className={field} type="date" min={dateKey(now)} max={dateKey(addDays(now, 365))} value={item.date} onChange={(e) => e.target.value && onChange({ date: e.target.value })} />
-        </label>
-        <div className="col-span-2 flex items-end justify-between gap-2">
-          {item.conflict ? <span className="text-xs text-primary">{t('跟已有的行程重疊')}</span> : <span />}
+        <div className="col-span-2 flex justify-end">
           <button
             type="button"
             onClick={onDone}

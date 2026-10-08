@@ -41,7 +41,6 @@ import { PenguinPet } from '@/components/pet/penguin-pet'
 import type { PetSettings } from '@/lib/pet/types'
 import { useWidgetLaunch } from '@/components/widgets/use-widget-launch'
 import { BrainDumpFab } from '@/components/brain-dump/brain-dump-entry'
-import { useBrainDumpShowToday } from '@/components/brain-dump/brain-dump-events'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
@@ -168,7 +167,6 @@ export function MainLayout({
     () => readStoredSize(PANEL_WIDTH_KEY, MIN_PANEL_WIDTH, MAX_PANEL_WIDTH) ?? DEFAULT_PANEL_WIDTH,
   )
   const [selectedDate, setSelectedDate] = useState(new Date())
-  useBrainDumpShowToday(() => setSelectedDate(new Date()))
   // Opens on the saved 預設視圖模式 (settings are loaded before this layout
   // mounts) on every device. 自動 (null, the default) keeps the behaviour from
   // before the setting existed: desktop 日, phones 週 (owner, 2026-09-26).
