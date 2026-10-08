@@ -3,12 +3,12 @@ import { daysSinceWeekStart, taskOccursOnDate, toDateString } from '@/lib/calend
 import { weekViewAlignDay } from '@/lib/settings-auto'
 import type { WidgetPet } from './pet'
 
-export const widgetKinds = ['overview', 'calendar', 'agenda', 'week', 'tasks', 'top-three', 'whiteboard', 'notebook', 'focus-note', 'focus', 'shortcuts', 'pet', 'month', 'sticky'] as const
+export const widgetKinds = ['overview', 'calendar', 'agenda', 'week', 'tasks', 'top-three', 'whiteboard', 'notebook', 'focus-note', 'focus', 'shortcuts', 'pet', 'month', 'sticky', 'quick-add'] as const
 export type WidgetKind = typeof widgetKinds[number]
 export const widgetNames: Record<WidgetKind, string> = {
   overview: '月曆＋今日任務', calendar: '可視化小月曆', agenda: '近期行程', week: '本週時間表', tasks: '任務清單',
   'top-three': '今天三件事', whiteboard: '白板', notebook: '記事本', 'focus-note': '專注記事', focus: '專注計時', shortcuts: '隨手記入口',
-  pet: '我的 Huddle', month: '大型月曆', sticky: '便條紙',
+  pet: '我的 Huddle', month: '大型月曆', sticky: '便條紙', 'quick-add': '快速新增任務',
 }
 export interface WidgetItem { id: string; title: string; subtitle: string; date?: string; time?: string; completed?: boolean; actionable?: boolean; revision?: string; thumbnail?: string }
 /** One scheduled slot for the native 本週時間表 widget (today + next 6 days). */
@@ -191,11 +191,15 @@ export function parseWidgetURL(raw: string): WidgetDestination | null {
  * this maps it onto a real screen:
  *   notebook → /notebook/?note=<id|new>   focus-note → /notebook/?note=focus
  *   sticky → /?widget=sticky&note=<id>     (sticky-note ids are not task ids)
+ *   quick-add → /?widget=quick-add         (one-line capture sheet; no id / date)
  *   everything else → /?widget=<kind>&date=&task=  (MainLayout, use-widget-launch.ts)
  */
 export function widgetPath(d: Pick<WidgetDestination, 'kind' | 'id' | 'date'>): string {
   if (d.kind === 'notebook') return d.id ? `/notebook/?note=${encodeURIComponent(d.id)}` : '/notebook/'
   if (d.kind === 'focus-note') return '/notebook/?note=focus'
+  // 快速新增任務: the destination is always the bare capture sheet — a stray id
+  // or date on the widget URL must never turn into a task / date selection.
+  if (d.kind === 'quick-add') return '/?widget=quick-add'
   const q = new URLSearchParams({ widget: d.kind === 'tasks' && d.id === 'new' ? 'new-task' : d.kind })
   if (d.date) q.set('date', d.date)
   if (d.kind === 'sticky') { if (d.id) q.set('note', d.id); return `/?${q}` }

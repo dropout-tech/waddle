@@ -34,6 +34,16 @@
 
 今日任務與日曆沿用 `taskOccursOnDate`，支援 recurrence/exdates；非重複未排程／到期未完成任務也可出現。小工具最多保留 20 筆任務與近期行程、8 則筆記、7 張每日白板，摘要上限 160 字。原生待同步佇列最多 50 筆。
 
+### 快速新增任務（`quick-add`，2026-10-08）
+
+主畫面上的「＋ 新增任務」小工具。網址 `huddle://widget/quick-add`（不帶 id／date），App 端對應成 `/?widget=quick-add`（`widgetPath`，lib/widgets/model.ts），由 `use-widget-launch.ts` 打開 `components/widgets/quick-add-sheet.tsx`：
+
+- 手機從底部升起（停在鍵盤上方），桌機置中小視窗；一個自動長高的輸入框、「加入」與「取消」。Enter 送出、Shift+Enter 換行，中文輸入法選字中的 Enter 不送出。
+- 送出走 `addTask`（use-waddle-data）寫進全域預設分類（`resolveGlobalDefaultCategory`，通常是「未分類」），不排日期；成功關閉並跳 toast，失敗時文字留在框內。取消／點背景／Esc 不建立任何任務。
+- 輸入內容轉成任務標題的規則獨立放在 `lib/widgets/quick-add.ts` 的 `quickAddTitles(raw)`（目前：整段當一筆、去頭尾空白）；之後要改成「貼多行拆多筆」等，只改這支。
+- 鍵盤：Capacitor iOS 建 WKWebView 時預設 `setKeyboardShouldRequireUserInteraction(false)`（`CAPBridgeViewController.swift`），程式呼叫 `focus()` 就能叫出鍵盤，不需額外原生設定；`NativeShell` 用 `KeyboardResize.Native`，面板貼底即在鍵盤上方。實機尚未驗收。
+- 驗證：`node scripts/e2e/quick-add-widget-verify.mjs`（Playwright，390／1280，截圖在 `docs/features/quick-add-widget/shots/`）。
+
 ## 驗證指令
 
 ```sh

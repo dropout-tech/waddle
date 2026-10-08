@@ -73,4 +73,16 @@ export const dict: Record<string, string> = {
   // widget-sync / widgets actions (2026-10 i18n sweep)
   '慢慢來，先專心一件事': 'Take it slow. Focus on one thing.',
   '小工具任務已變更，請在 App 確認最新內容': 'This task changed. Check the app for the latest.',
+
+  // 2026-10-08: 快速新增任務 widget + its capture sheet (components/widgets/quick-add-sheet.tsx).
+  // Copy is a first draft - 文案待老闆審.
+  '快速新增任務': 'Quick add task',
+  '點一下，打一句話，直接存成任務': 'Tap, type one line, and it is saved as a task',
+  '想到什麼，先記下來…': 'Jot down what comes to mind…',
+  '已加入「{place}」': 'Added to "{place}"',
+  '已加入 {n} 項任務到「{place}」': 'Added {n} tasks to "{place}"',
+  '已加入 {n} 項，其餘還留在輸入框': 'Added {n}. The rest is still in the box.',
+  '放進「{place}」': 'Goes to "{place}"',
+  '加入中…': 'Adding…',
+  '準備中…': 'Getting ready…',
 }

@@ -353,6 +353,38 @@
           }
         }
       }
+    },
+    "快速新增任務": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quick add task"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速新增任務"
+          }
+        }
+      }
+    },
+    "點一下，想到的事馬上記下來。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap once and jot down whatever comes to mind."
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "點一下，想到的事馬上記下來。"
+          }
+        }
+      }
     }
   }
 }

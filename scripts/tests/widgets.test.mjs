@@ -87,6 +87,19 @@ test('new widget kinds deep-link to real screens; sticky ids never become task i
  assert.equal(widgetPath({kind:'sticky',id:'3f2a-11'}),'/?widget=sticky&note=3f2a-11')
  assert.equal(widgetPath({kind:'month'}),'/?widget=month')
 })
+test('快速新增任務 widget: huddle://widget/quick-add opens the bare capture sheet; stray id/date never leak into the path',async()=>{
+ const {widgetPath}=mod
+ assert.equal(parseWidgetURL('huddle://widget/quick-add')?.kind,'quick-add')
+ assert.equal(widgetPath({kind:'quick-add'}),'/?widget=quick-add')
+ assert.equal(widgetPath({kind:'quick-add',id:'new',date:'2026-10-02'}),'/?widget=quick-add')
+ assert.equal(widgetPath(parseWidgetURL('huddle://widget/quick-add?id=abc&date=2026-10-02')),'/?widget=quick-add')
+ assert.ok(mod.widgetKinds.includes('quick-add'));assert.equal(mod.widgetNames['quick-add'],'快速新增任務')
+ assert.equal(parseWidgetURL('huddle://widget/quick-add/../../notebook'),null)
+ const {quickAddTitles}=await import('../../lib/widgets/quick-add.ts')
+ assert.deepEqual(quickAddTitles('  買牛奶  '),['買牛奶'])
+ assert.deepEqual(quickAddTitles('第一行\n第二行'),['第一行\n第二行'])
+ assert.deepEqual(quickAddTitles(''),[]);assert.deepEqual(quickAddTitles(' \n\t '),[])
+})
 test('water widgets are gone: no water kind; an old huddle://widget/water tap is ignored safely; snapshot keeps water for older widget builds',()=>{
  assert.ok(!mod.widgetKinds.includes('water'));assert.equal(mod.widgetNames.water,undefined)
  assert.equal(parseWidgetURL('huddle://widget/water'),null)
