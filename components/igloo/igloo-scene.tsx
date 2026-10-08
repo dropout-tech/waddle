@@ -25,9 +25,13 @@ export interface IglooView {
  */
 const BG_SRC = '/art/igloo/igloo-bg.webp'
 const BG_NIGHT_SRC = '/art/igloo/igloo-bg-night.webp'
-/** The ice block the penguin carries (cut from the carry pose) — what flies onto the igloo. */
+/**
+ * The ice block the penguin carries — a real block cut from the igloo painting
+ * (so it has the same grain and dry-brush edge); the same block is painted
+ * into the carry pose and is what flies onto the igloo.
+ */
 const BLOCK_SRC = '/art/igloo/ice-block.webp'
-const BLOCK_RATIO = 99 / 240
+const BLOCK_RATIO = 123 / 240
 const IGLOO_SRC = '/art/igloo/igloo-full.webp'
 const POSE_SRC = {
   carry: '/art/igloo/pose-carry.webp',
@@ -56,17 +60,24 @@ const ART_DOME_W = 931
 const ART_FLAG_BOTTOM = 198
 /** The painted snow patch under the igloo starts here — faded out, replaced by a soft shadow. */
 const ART_FADE: [number, number] = [868, 900]
-const COURSES: { y: [number, number]; edges: number[] }[] = [
+/**
+ * Per course: y range, the outer x limits (outside the dome is transparent
+ * anyway) and every painted seam as [x at the course's top, x at its bottom]
+ * — the upper courses' seams lean like the blocks of a dome, so each brick is
+ * a quadrilateral that follows its block, not an upright rectangle.
+ * Seam positions measured on the painting (darkest column near each seam).
+ */
+const COURSES: { y: [number, number]; x: [number, number]; seams: [number, number][] }[] = [
   // bottom row: edge block, block, door (arch legs + opening), block, edge block
-  { y: [704, 905], edges: [10, 136, 333, 684, 887, 1014] },
+  { y: [704, 905], x: [10, 1014], seams: [[138, 138], [329, 329], [686, 686], [887, 887]] },
   // the door arch counts as one block
-  { y: [562, 704], edges: [30, 249, 383, 640, 766, 995] },
-  { y: [422, 562], edges: [70, 210, 391, 627, 813, 955] },
-  { y: [298, 422], edges: [140, 311, 512, 709, 885] },
-  { y: [ART_FLAG_BOTTOM, 298], edges: [240, 418, 610, 790] },
+  { y: [562, 704], x: [30, 995], seams: [[255, 243], [386, 386], [635, 635], [757, 771]] },
+  { y: [422, 562], x: [70, 955], seams: [[224, 197], [392, 385], [623, 628], [792, 823]] },
+  { y: [298, 422], x: [140, 885], seams: [[331, 298], [508, 512], [688, 719]] },
+  { y: [ART_FLAG_BOTTOM, 298], x: [240, 790], seams: [[435, 409], [591, 615]] },
 ]
 /** How far a brick reaches past its seams, so the dark seam line is part of both neighbours. */
-const SEAM_PAD = 7
+const SEAM_PAD = 8
 /** Main igloo width in scene units → scale of the painting. */
 const DOME_W = 152
 const SCALE = DOME_W / ART_DOME_W
@@ -75,16 +86,23 @@ const R_SHADOW = DOME_W * 0.62
 const ART_X = CX - ART_CX * SCALE
 const ART_Y = BASE - ART_BASE * SCALE
 
-interface Slot { x: number; y: number; w: number; h: number }
+/** A brick: its outline polygon (painting px) and its centre. */
+interface Slot { points: string; cx: number; cy: number; w: number }
 
-const SLOTS: Slot[] = COURSES.flatMap((c) =>
-  c.edges.slice(1).map((e, i) => ({
-    x: c.edges[i] - SEAM_PAD,
-    y: c.y[0] - SEAM_PAD,
-    w: e - c.edges[i] + SEAM_PAD * 2,
-    h: c.y[1] - c.y[0] + SEAM_PAD * 2,
-  })),
-)
+const SLOTS: Slot[] = COURSES.flatMap((c) => {
+  const [y0, y1] = [c.y[0] - SEAM_PAD, c.y[1] + SEAM_PAD]
+  const cuts: [number, number][] = [[c.x[0], c.x[0]], ...c.seams, [c.x[1], c.x[1]]]
+  return cuts.slice(1).map(([rt, rb], i) => {
+    const [lt, lb] = cuts[i]
+    const pts = [[lt - SEAM_PAD, y0], [rt + SEAM_PAD, y0], [rb + SEAM_PAD, y1], [lb - SEAM_PAD, y1]]
+    return {
+      points: pts.map(([x, y]) => `${x},${y}`).join(' '),
+      cx: (lt + rt + lb + rb) / 4,
+      cy: (c.y[0] + c.y[1]) / 2,
+      w: (rt + rb - lt - lb) / 2,
+    }
+  })
+})
 if (process.env.NODE_ENV !== 'production' && SLOTS.length !== IGLOO_LAYERS.reduce((a, b) => a + b, 0)) {
   console.error('[igloo] painted blocks and IGLOO_LAYERS disagree')
 }
@@ -106,7 +124,7 @@ type Pose = keyof typeof SPOTS
 /** Where the carried block is (scene units) — the flying brick starts here. */
 const HANDS = {
   x: ((SPOTS.carry.left + SPOTS.carry.width * 0.5) / 100) * W,
-  y: H * (1 - SPOTS.carry.bottom / 100) - (SPOTS.carry.width / 100) * W * 0.79,
+  y: H * (1 - SPOTS.carry.bottom / 100) - (SPOTS.carry.width / 100) * W * 0.82,
 }
 /**
  * The user's accessory on the painted poses: translate + scale (in the
@@ -196,7 +214,7 @@ export function IglooScene({
   const spot = SPOTS[pose]
   const artTransform = `translate(${ART_X} ${ART_Y}) scale(${SCALE})`
   const flyFrom = flying
-    ? { dx: HANDS.x - (ART_X + (flying.x + flying.w / 2) * SCALE), dy: HANDS.y - (ART_Y + (flying.y + flying.h / 2) * SCALE) }
+    ? { dx: HANDS.x - (ART_X + flying.cx * SCALE), dy: HANDS.y - (ART_Y + flying.cy * SCALE) }
     : null
 
   return (
@@ -215,7 +233,7 @@ export function IglooScene({
           <mask id={`built-${uid}`} maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
             <g transform={artTransform}>
               {placed.map((s, i) => (
-                <rect key={i} x={s.x} y={s.y} width={s.w} height={s.h} fill="#fff" className={i === placing ? styles.appear : undefined} />
+                <polygon key={i} points={s.points} fill="#fff" className={i === placing ? styles.appear : undefined} />
               ))}
             </g>
           </mask>
@@ -297,8 +315,8 @@ export function IglooScene({
         {flying && flyFrom && (() => {
           const bw = Math.min(30, flying.w * SCALE)
           const bh = bw * BLOCK_RATIO
-          const cx = ART_X + (flying.x + flying.w / 2) * SCALE
-          const cy = ART_Y + (flying.y + flying.h / 2) * SCALE
+          const cx = ART_X + flying.cx * SCALE
+          const cy = ART_Y + flying.cy * SCALE
           return (
             <g
               key={`fly-${placing}`}
@@ -332,9 +350,12 @@ export function IglooScene({
         </div>
         {pose === 'sleep' && (
           <span className={styles.zzz} aria-hidden="true">
-            <span>z</span>
-            <span>z</span>
-            <span>Z</span>
+            {/* hand-drawn z's (brush strokes, not type) */}
+            {[0, 1, 2].map((i) => (
+              <svg key={i} viewBox="0 0 12 12" style={{ width: `${0.55 + i * 0.18}em` }}>
+                <path d="M2.2 2.6 Q6 1.8 9.6 2.4 Q6.4 5.8 2.6 9.4 Q6.2 9.9 10 9.2" fill="none" stroke="#5a3d22" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ))}
           </span>
         )}
       </div>
