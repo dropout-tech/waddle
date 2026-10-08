@@ -137,7 +137,7 @@ export const dict: Record<string, string> = {
   '💧 喝水小提醒': '💧 Water reminder',
   // Onboarding tour — brain dump, igloo, year in days (2026-10-03).
   '🐧 丟給企鵝': '🐧 Toss it to the penguin',
-  '腦袋很亂的時候，按「丟給企鵝」，把想到的事一口氣打進去（也可以用說的）。企鵝會拆成一件件任務，排進今天的空檔；你看過、勾一勾，再按「放進行事曆」才會真的存。': 'When your head is full, tap "Toss it to the penguin" and type everything at once (or say it). The penguin splits it into tasks and fits them into today\'s free time. Look it over, untick what you don\'t want, and nothing is saved until you tap "Add to calendar".',
+  '腦袋很亂的時候，按「丟給企鵝」，把想到的事一口氣打進去（也可以用說的）。企鵝會用 AI 拆成一件件任務、抓出截止日；你看過、勾一勾，按「放進未分類」就收進最上面的「未分類」。': 'When your head is full, tap "Toss it to the penguin" and type everything at once (or say it). The penguin uses AI to split it into tasks and spot due dates. Look it over, untick what you don\'t want, and tap "Add to inbox" to drop them into Uncategorized at the top.',
   '🧊 企鵝的冰屋': "🧊 The penguin's igloo",
   '每做完一件事、每完成一次專注，企鵝就搬一塊冰磚，慢慢蓋出一座冰屋。點企鵝打開選單，選「去冰屋看看」。幾天沒來也沒關係，冰磚不會少，牠會在雪地等你。': 'Every task you finish and every focus session you complete, the penguin carries one ice brick and slowly builds an igloo. Open the penguin\'s menu and choose "Visit the igloo". Away for a few days? No bricks are lost; it will wait for you in the snow.',
   '每做完一件事、每完成一次專注，企鵝就搬一塊冰磚，慢慢蓋出一座冰屋。領養企鵝後，點牠打開選單，選「去冰屋看看」。': 'Every task you finish and every focus session you complete, the penguin carries one ice brick and slowly builds an igloo. Once you adopt it, open its menu and choose "Visit the igloo".',
