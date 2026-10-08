@@ -13,6 +13,8 @@ interface WidgetLaunchTargets {
   openWhiteboard: () => void
   selectTask: (task: Task) => void
   createTask?: (date: string) => void
+  /** 快速新增任務 widget → the one-line capture sheet (quick-add-sheet.tsx). */
+  openQuickAdd?: () => void
 }
 
 function findTask(workspaces: Workspace[], id: string) {
@@ -24,7 +26,9 @@ function findTask(workspaces: Workspace[], id: string) {
  * and lands on the real screen: calendar kinds → 日曆 tab (week view, or month
  * for the plain 小月曆 tap), tasks → 任務 tab, whiteboard → 白板 overlay,
  * focus → expanded timer, sticky → the 便條紙
- * overlay (StickyNotesProvider), month → month view. A task id is held
+ * overlay (StickyNotesProvider), month → month view, quick-add → the
+ * 快速新增任務 capture sheet (no navigation; opens over whatever is showing).
+ * A task id is held
  * until the board has loaded and the task exists.
  */
 export function useWidgetLaunch(targets: WidgetLaunchTargets) {
@@ -53,6 +57,7 @@ export function useWidgetLaunch(targets: WidgetLaunchTargets) {
       else if (kind === 'whiteboard') t.openWhiteboard()
       else if (kind === 'focus') ft.setIsExpanded(true)
       else if (kind === 'new-task') t.createTask?.(toDateString(new Date()))
+      else if (kind === 'quick-add') t.openQuickAdd?.()
       else if (kind === 'sticky') {
         const note = q.get('note')
         window.dispatchEvent(new CustomEvent(STICKY_OPEN_EVENT, { detail: note && /^[a-zA-Z0-9-]{1,80}$/.test(note) ? note : null }))

@@ -40,6 +40,7 @@ import { useSoftKeyboard } from '@/hooks/use-soft-keyboard'
 import { PenguinPet } from '@/components/pet/penguin-pet'
 import type { PetSettings } from '@/lib/pet/types'
 import { useWidgetLaunch } from '@/components/widgets/use-widget-launch'
+import { QuickAddSheet } from '@/components/widgets/quick-add-sheet'
 import { BrainDumpFab } from '@/components/brain-dump/brain-dump-entry'
 
 interface MainLayoutProps {
@@ -53,7 +54,8 @@ interface MainLayoutProps {
   onReorderCategories?: (workspaceId: string, orderedCategoryIds: string[]) => void
   onToggleComplete: (taskId: string) => void
   onSelectTask: (task: Task, occurrenceDate?: string) => void
-  onAddTask: (categoryId: string, title: string) => void
+  // addTask resolves `false` when the write was refused (QuickAddSheet relies on that).
+  onAddTask: (categoryId: string, title: string) => void | boolean | Promise<boolean | void>
   onAddCategory?: (workspaceId: string, name: string) => void
   onDeleteCategory?: (categoryId: string) => void
   onDeleteTask?: (taskId: string, targetDate?: string, recurrenceChoice?: RecurrenceChoice) => void | Promise<void>
@@ -310,11 +312,16 @@ export function MainLayout({
   // Focus mode for journal/report (full screen view)
   const [focusMode, setFocusMode] = useState<'none' | 'journal' | 'report' | 'growth'>('none')
   
+  // 快速新增任務 widget (/?widget=quick-add): one-line capture sheet. MainLayout
+  // only mounts once the board has loaded, so a cold-start tap already has data.
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
+
   // Native widget taps (/?widget=…) → the real screen. See use-widget-launch.ts.
   useWidgetLaunch({
     workspaces, setSelectedDate, setMobileTab, setViewMode,
     openWhiteboard: () => { setMobileLinksOpen(false); setMobileFocusBoardOpen(false); setMobileScratchpadOpen(true) },
     selectTask: onSelectTask, createTask: onCreateCalendarTask,
+    openQuickAdd: () => setQuickAddOpen(true),
   })
 
   // The onboarding tour asks for the bottom tab its current step points at
@@ -488,6 +495,15 @@ export function MainLayout({
       startHour={startHour}
       endHour={endHour}
       selectedDate={selectedDate}
+    />
+  )
+  const quickAddSheet = (
+    <QuickAddSheet
+      open={quickAddOpen}
+      onClose={() => setQuickAddOpen(false)}
+      workspaces={workspaces}
+      defaultCategoryEnabled={settings.defaultCategoryEnabled}
+      onAddTask={onAddTask}
     />
   )
   const meetingDialog = <MeetingDialog open={meetingsOpen} onOpenChange={setMeetingsOpen} controller={meetingController} peers={sharePeers} tasks={allTasks} timeBlocks={timeBlocks} initialDate={selectedDate} inviteId={meetingInviteId}/>
@@ -937,6 +953,7 @@ export function MainLayout({
 
         {/* ⋯ → 匯出行程 opens this; it used to be mounted on desktop only. */}
         {exportModal}
+        {quickAddSheet}
       </div>
     )
   }
@@ -1253,6 +1270,7 @@ export function MainLayout({
 
       {/* Calendar Export Modal — image-of-schedule generator. */}
       {exportModal}
+      {quickAddSheet}
     </div>
   )
 }

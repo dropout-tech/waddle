@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, CalendarRange, CalendarClock, ListChecks, Star, PanelsTopLeft, NotebookPen, PencilLine, Timer, LayoutGrid, Bird, CalendarCheck, Smartphone, StickyNote, Calendar, Lock, type LucideIcon } from 'lucide-react'
+import { CalendarDays, CalendarRange, CalendarClock, ListChecks, Star, PanelsTopLeft, NotebookPen, PencilLine, Timer, LayoutGrid, Bird, CalendarCheck, Smartphone, StickyNote, Calendar, Lock, SquarePlus, type LucideIcon } from 'lucide-react'
 import { HuddleMascot } from '@/components/branding/waddle-mascot'
 import { useI18n } from '@/lib/i18n/react'
 import { isNative } from '@/lib/platform'
@@ -19,6 +19,7 @@ const WIDGETS: { name: string; body: string; Icon: LucideIcon }[] = [
   { name: '專注記事', body: '專注時冒出的想法，先記下來', Icon: PencilLine },
   { name: '專注計時', body: '在主畫面直接開始、暫停、結束', Icon: Timer },
   { name: '隨手記入口', body: '白板、記事本、專注記事一鍵直達', Icon: LayoutGrid },
+  { name: '快速新增任務', body: '點一下，打一句話，直接存成任務', Icon: SquarePlus },
   { name: '我的 Huddle', body: '你領養的企鵝，會提醒你接下來的事', Icon: Bird },
   { name: '大型月曆', body: '三週大月曆，每天的任務和行程一格一格看清楚', Icon: Calendar },
   { name: '便條紙', body: '最近的便條紙，像備忘錄一樣放在手邊', Icon: StickyNote },

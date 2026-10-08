@@ -32,10 +32,10 @@ struct Snapshot:Decodable {
 }
 struct PetInfo:Decodable {var adopted:Bool;var name:String;var color:String;var accessory:String;var lang:String;var overdue:Int;var overdueLine:String;var lines:[String]}
 enum Kind:String,AppEnum,CaseIterable {
-    case overview,calendar,agenda,week,tasks,topThree="top-three",whiteboard,notebook,focusNote="focus-note",focus,shortcuts,pet,month,sticky
+    case overview,calendar,agenda,week,tasks,topThree="top-three",whiteboard,notebook,focusNote="focus-note",focus,shortcuts,pet,month,sticky,quickAdd="quick-add"
     static var typeDisplayRepresentation:TypeDisplayRepresentation="小工具類型"
-    static var caseDisplayRepresentations:[Kind:DisplayRepresentation]=[.overview:"月曆＋今日任務",.calendar:"可視化小月曆",.agenda:"近期行程",.week:"本週時間表",.tasks:"任務清單",.topThree:"今天三件事",.whiteboard:"白板",.notebook:"記事本",.focusNote:"專注記事",.focus:"專注計時",.shortcuts:"隨手記入口",.pet:"我的 Huddle",.month:"大型月曆",.sticky:"便條紙"]
-    var title:String {switch self {case .overview:return "月曆＋今日任務";case .calendar:return "可視化小月曆";case .agenda:return "近期行程";case .week:return "本週時間表";case .tasks:return "任務清單";case .topThree:return "今天三件事";case .whiteboard:return "白板";case .notebook:return "記事本";case .focusNote:return "專注記事";case .focus:return "專注計時";case .shortcuts:return "隨手記入口";case .pet:return "我的 Huddle";case .month:return "大型月曆";case .sticky:return "便條紙"}}
+    static var caseDisplayRepresentations:[Kind:DisplayRepresentation]=[.overview:"月曆＋今日任務",.calendar:"可視化小月曆",.agenda:"近期行程",.week:"本週時間表",.tasks:"任務清單",.topThree:"今天三件事",.whiteboard:"白板",.notebook:"記事本",.focusNote:"專注記事",.focus:"專注計時",.shortcuts:"隨手記入口",.pet:"我的 Huddle",.month:"大型月曆",.sticky:"便條紙",.quickAdd:"快速新增任務"]
+    var title:String {switch self {case .overview:return "月曆＋今日任務";case .calendar:return "可視化小月曆";case .agenda:return "近期行程";case .week:return "本週時間表";case .tasks:return "任務清單";case .topThree:return "今天三件事";case .whiteboard:return "白板";case .notebook:return "記事本";case .focusNote:return "專注記事";case .focus:return "專注計時";case .shortcuts:return "隨手記入口";case .pet:return "我的 Huddle";case .month:return "大型月曆";case .sticky:return "便條紙";case .quickAdd:return "快速新增任務"}}
     /// Gallery blurb (「新增小工具」畫面每款各自的說明).
     var blurb:String {switch self {
         case .overview:return "本月月曆，加上今天要做的事，直接打勾。"
@@ -52,6 +52,7 @@ enum Kind:String,AppEnum,CaseIterable {
         case .pet:return "你領養的企鵝：提醒你接下來的事，點牠會呱一聲。"
         case .month:return "三週大月曆：任務、行程一格一格看清楚。"
         case .sticky:return "最近的便條紙，像備忘錄一樣放在手邊。"
+        case .quickAdd:return "點一下，想到的事馬上記下來。"
     }}
     /// Each split-out widget's own identifier. The legacy configurable widget
     /// keeps "HuddleWidgets" so copies already on a home screen survive.
@@ -68,6 +69,7 @@ enum Kind:String,AppEnum,CaseIterable {
         case .focus:return [.systemSmall,.systemMedium,.accessoryCircular,.accessoryRectangular,.accessoryInline]
         case .month:return [.systemLarge,.systemExtraLarge]
         case .sticky:return [.systemSmall,.systemMedium,.accessoryCircular,.accessoryRectangular,.accessoryInline]
+        case .quickAdd:return [.systemSmall,.accessoryCircular,.accessoryRectangular,.accessoryInline]
         case .agenda,.tasks,.whiteboard,.notebook:return [.systemSmall,.systemMedium,.systemLarge]
     }}
 }
@@ -177,6 +179,8 @@ func loadEntry(kind:Kind,category:String?=nil,noteID:String?=nil,now:Date=Date()
     return e
 }
 func makeTimeline(_ e:Entry)->Timeline<Entry> {
+    // 快速新增任務 shows nothing that changes (the app reloads every timeline on sign-in / publish): refresh once a day.
+    if e.kind == .quickAdd {return Timeline(entries:[e],policy:.after(Calendar.current.date(byAdding:.day,value:1,to:e.date) ?? e.date.addingTimeInterval(86400)))}
     if e.lock != nil || e.kind == .month || e.kind == .sticky {return glanceTimeline(e)}
     guard e.kind == .pet else {return Timeline(entries:[e],policy:.after(e.date.addingTimeInterval(900)))}
     // The penguin's bubble changes on its own: when today's next item starts,
@@ -236,9 +240,11 @@ struct WidgetView:View {
     }
     var body:some View {
         Group {
+            // 快速新增任務 needs no snapshot (signed out / not synced still shows and opens the app).
+            if kind == .quickAdd {quickAddView}
             // Every Lock Screen face (HuddleLockScreen.swift). Owner chose
             // "always show" for these, so no privacySensitive here.
-            if entry.lock != nil || isAccessory {accessoryView}
+            else if entry.lock != nil || isAccessory {accessoryView}
             else if kind == .pet,let s=entry.snapshot {petPanel(s).foregroundStyle(ink).widgetURL(petLink(s)).privacySensitive()}
             else if let s=entry.snapshot {
                 // Calendar-heavy widgets fill the whole frame: drop the title row
@@ -286,6 +292,7 @@ struct WidgetView:View {
         case .pet: petPanel(s)
         case .month: if family == .systemLarge || family == .systemExtraLarge {bigMonth(s)} else {calendar(s)}
         case .sticky: stickyPanel(s)
+        case .quickAdd: quickAddView
         }
     }
     var shortcuts:some View {HStack{ForEach([Kind.whiteboard,.notebook,.focusNote],id:\.self){k in Link(destination:url(k)){VStack(spacing:5){Image(systemName:k == .whiteboard ? "rectangle.3.group":k == .notebook ? "book":"pencil.line");Text(k.title).font(.system(size:10))}.frame(maxWidth:.infinity).padding(.vertical,8)}}}}
@@ -629,7 +636,7 @@ struct HuddleWidgets:Widget {
     var body:some WidgetConfiguration {
         AppIntentConfiguration(kind:"HuddleWidgets",intent:Configuration.self,provider:IntentProvider<Configuration>()){entry in WidgetView(entry:entry)}
             .configurationDisplayName("Huddle 小工具（可自訂）")
-            .description("一個小工具切換 14 款內容：長按 → 編輯小工具 → 類型。")
+            .description("一個小工具切換 15 款內容：長按 → 編輯小工具 → 類型。")
             .supportedFamilies([.systemSmall,.systemMedium,.systemLarge,.accessoryCircular,.accessoryRectangular,.accessoryInline])
     }
 }
@@ -654,6 +661,65 @@ struct FocusNoteWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.f
 struct FocusWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.focus)}}
 struct ShortcutsWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.shortcuts)}}
 struct PetWidget:Widget {var body:some WidgetConfiguration {fixedWidget(.pet)}}
+// MARK: 快速新增任務 — one tap opens the app's one-line task box (huddle://widget/quick-add).
+// Literal strings (not fixedWidget's String title) so the gallery name follows the device language via Localizable.xcstrings.
+struct QuickAddWidget:Widget {
+    var body:some WidgetConfiguration {
+        StaticConfiguration(kind:Kind.quickAdd.widgetKind,provider:FixedProvider(kind:.quickAdd)){WidgetView(entry:$0)}
+            .configurationDisplayName("快速新增任務").description("點一下，想到的事馬上記下來。").supportedFamilies(Kind.quickAdd.families)
+    }
+}
+/// Hand-brushed "+" : two strokes that lean and overshoot a little (DESIGN.md: lines that are too clean read like an icon font).
+struct QuickAddPlus:Shape {
+    func path(in r:CGRect)->Path {
+        let s=min(r.width,r.height),c=CGPoint(x:r.midX,y:r.midY)
+        func bar(_ w:CGFloat,_ h:CGFloat,_ deg:Double,_ dx:CGFloat,_ dy:CGFloat)->Path {
+            Path(roundedRect:CGRect(x:-w/2,y:-h/2,width:w,height:h),cornerRadius:min(w,h)/2).applying(CGAffineTransform(translationX:c.x+dx,y:c.y+dy).rotated(by:CGFloat(deg)*CGFloat.pi/180))
+        }
+        var p=Path();p.addPath(bar(s*0.94,s*0.2,-4,0,s*0.01));p.addPath(bar(s*0.2,s*0.88,3,-s*0.01,-s*0.02));return p
+    }
+}
+/// A not-quite-round blob behind the "+" (home screen).
+struct QuickAddBlob:Shape {
+    func path(in r:CGRect)->Path {
+        func pt(_ x:CGFloat,_ y:CGFloat)->CGPoint {CGPoint(x:r.minX+r.width*x,y:r.minY+r.height*y)}
+        var p=Path();p.move(to:pt(0.52,0.02))
+        p.addCurve(to:pt(0.98,0.5),control1:pt(0.78,0),control2:pt(1,0.24))
+        p.addCurve(to:pt(0.47,0.98),control1:pt(0.96,0.78),control2:pt(0.76,1))
+        p.addCurve(to:pt(0.02,0.5),control1:pt(0.2,0.98),control2:pt(0,0.78))
+        p.addCurve(to:pt(0.52,0.02),control1:pt(0.04,0.24),control2:pt(0.26,0))
+        p.closeSubpath();return p
+    }
+}
+extension WidgetView {
+    /// App language when the app has published (pet.lang / locale), else the device language — this widget works signed out.
+    var quickEN:Bool {entry.snapshot != nil ? isEN:(Locale.preferredLanguages.first ?? "").hasPrefix("en")}
+    func qa(_ zh:String,_ en:String)->String {quickEN ? en:zh}
+    @ViewBuilder var quickAddView:some View {
+        switch family {
+        case .accessoryCircular:
+            ZStack{AccessoryWidgetBackground();QuickAddPlus().fill(.foreground).frame(width:28,height:28).widgetAccentable()}.widgetURL(url(.quickAdd))
+        case .accessoryRectangular:
+            HStack(spacing:8){
+                QuickAddPlus().fill(.foreground).frame(width:30,height:30).widgetAccentable()
+                VStack(alignment:.leading,spacing:1){Text(qa("新增任務","New task")).font(.headline).widgetAccentable();Text(qa("想到就記下來","Jot it down")).font(.caption).lineLimit(1)}
+                Spacer(minLength:0)
+            }.frame(maxWidth:.infinity,alignment:.leading).widgetURL(url(.quickAdd))
+        case .accessoryInline:
+            Label(qa("新增任務","New task"),systemImage:"plus").widgetURL(url(.quickAdd))
+        default:
+            // Small. Medium / large only appear if someone picks 快速新增任務 in the legacy configurable widget.
+            let big=family == .systemLarge || family == .systemExtraLarge,blob:CGFloat=big ? 120:68
+            VStack(spacing:big ? 14:7){
+                ZStack{QuickAddBlob().fill(clay);QuickAddBlob().stroke(ink,style:StrokeStyle(lineWidth:big ? 3:2,lineJoin:.round));QuickAddPlus().fill(paper).frame(width:blob*0.58,height:blob*0.58)}.frame(width:blob,height:blob).rotationEffect(.degrees(-4)).widgetAccentable()
+                Text(qa("新增任務","New task")).font(.system(size:big ? 26:18,weight:.bold,design:.rounded))
+                Text(qa("想到的事，馬上記下來","Jot it down right away")).font(.system(size:big ? 14:11)).foregroundStyle(ink.opacity(0.65)).lineLimit(1).minimumScaleFactor(0.8)
+            }.frame(maxWidth:.infinity,maxHeight:.infinity)
+            .overlay(alignment:.topTrailing){Image("Huddle").resizable().scaledToFit().frame(width:22,height:22)}
+            .foregroundStyle(ink).widgetURL(url(.quickAdd))
+        }
+    }
+}
 
 /// Lock screen / Notification Center banner. Ink and background come from the
 /// same colour scheme so the text always contrasts its own tile: the system
@@ -696,7 +762,7 @@ struct HuddlePlanWidgets:WidgetBundle {
     var body:some Widget {PetWidget();OverviewWidget();CalendarWidget();AgendaWidget();WeekWidget();TasksWidget();TopThreeWidget()}
 }
 struct HuddleCaptureWidgets:WidgetBundle {
-    var body:some Widget {WhiteboardWidget();NotebookWidget();FocusNoteWidget();FocusWidget();ShortcutsWidget()}
+    var body:some Widget {WhiteboardWidget();NotebookWidget();FocusNoteWidget();FocusWidget();ShortcutsWidget();QuickAddWidget()}
 }
 /// Lock Screen glances + 便條紙 + 大型月曆 (HuddleLockScreen.swift, HuddleMonthSticky.swift).
 struct HuddleGlanceWidgets:WidgetBundle {
