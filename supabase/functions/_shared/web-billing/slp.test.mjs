@@ -103,6 +103,6 @@ test('every documented endpoint maps to its path and body', async () => {
   assert.deepEqual(calls.map((c) => c.url.replace('https://api-sandbox.shoplinepayments.com', '')), [
     SLP_PATHS.createRefund, SLP_PATHS.getRefund, SLP_PATHS.customerToken, SLP_PATHS.queryInstruments, SLP_PATHS.queryInstruments, SLP_PATHS.unbind])
   assert.deepEqual(JSON.parse(calls[1].init.body), { refundOrderId: 'R1' })
-  assert.deepEqual(JSON.parse(calls[4].init.body), { customerId: 'CUS1', paymentInstrument: { instrumentId: 'INS1' } })
+  assert.deepEqual(JSON.parse(calls[4].init.body), { customerId: 'CUS1', paymentInstrument: { paymentInstrumentId: 'INS1' } })
   assert.deepEqual(JSON.parse(calls[5].init.body), { customerId: 'CUS1', paymentInstrumentId: 'INS1' })
 })

@@ -4,9 +4,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import {
-  buildCreateBody, canTransition, classifyCreateFailure, constantTimeEqual, dbErrorCode, failureAction, fetchAttemptResult,
-  fromMinor, isChargeableMinor, isOurOrder, normalizeRefund, normalizeTrade, orderId, parseOrderId, referenceCustomerId,
-  refundId, requestId, resolveTrade, returnUrl, slpConfigProblem, SLP_BASES, toMinor, tokenExpiry, TRANSITIONS,
+  applyAttemptResult, buildCreateBody, canTransition, classifyCreateFailure, constantTimeEqual, dbErrorCode, failureAction, fetchAttemptResult,
+  fromMinor, instrumentUsable, ipSource, isChargeableMinor, isOurOrder, last4Of, normalizeInstrument, normalizeIp, normalizeRefund, normalizeTrade, orderId, parseOrderId, referenceCustomerId,
+  refundId, requestId, resolveTrade, returnUrl, slpConfigProblem, slpEmail, SLP_BASES, SLP_PLACEHOLDER_EMAIL, toMinor, tokenExpiry, TRANSITIONS,
   verifyWebhookSignature,
 } from './core.mjs'
 
@@ -138,12 +138,14 @@ test('create failures: timeouts / 5xx / 1001 are unknown (never retried), 4xx ar
 const ctxBase = { reference_order_id: 'hsAbCdEf0123456789c0001a01', order_ref: 'AbCdEf0123456789', plan: 'monthly', charge_amount_minor: 15000,
   reference_customer_id: 'e33d985b4bcb456f96589cc1085185ab', customer_id: 'CUS1', instrument_id: 'INS1' }
 
-test('create body: behaviours, minor amounts, deterministic order id, no paySession for Recurring', () => {
+test('create body: behaviours, minor amounts, deterministic order id, Recurring sends paySession {}', () => {
   const rec = buildCreateBody({ ctx: { ...ctxBase, behavior: 'Recurring' }, locale: 'zh-TW', siteUrl: 'https://h.example/', k: 'pay', clientIp: null })
   assert.equal(rec.referenceOrderId, ctxBase.reference_order_id)
   assert.deepEqual(rec.amount, { value: 15000, currency: 'TWD' })
   assert.deepEqual(rec.confirm, { paymentMethod: 'CreditCard', paymentBehavior: 'Recurring', autoConfirm: true, paymentCustomerId: 'CUS1', paymentInstrument: { paymentInstrumentId: 'INS1' } })
-  assert.equal('paySession' in rec, false)
+  // /guide/quick/ (定期扣款): "paySession | {} | 必傳，傳入空物件…不可省略"
+  assert.deepEqual(rec.paySession, {})
+  assert.equal(JSON.stringify(rec).includes('"paySession":{}'), true)
   assert.equal(rec.returnUrl, 'https://h.example/billing/return?ref=AbCdEf0123456789&k=pay')
   const bind = buildCreateBody({ ctx: { ...ctxBase, behavior: 'CardBind' }, paySession: 'ps_1', locale: 'en', siteUrl: 'https://h.example', k: 'start', clientIp: '1.2.3.4' })
   assert.deepEqual(bind.confirm, { paymentMethod: 'CreditCard', paymentBehavior: 'CardBind', autoConfirm: false, paymentInstrument: { savePaymentInstrument: true } })
@@ -228,6 +230,132 @@ test('misc: requestId is 32 hex and unique; token expiry forms; DB error codes',
   assert.equal(tokenExpiry(null, NOW), null)
   assert.equal(dbErrorCode({ message: 'WEB_BILLING:payment_in_progress' }), 'payment_in_progress')
   assert.equal(dbErrorCode({ message: 'duplicate key value' }), 'unavailable')
+})
+
+test('create body: required order/billing/personalInfo fields of /api/trade/create/ are all present', () => {
+  const body = buildCreateBody({ ctx: { ...ctxBase, behavior: 'CardBind' }, paySession: 'ps', locale: 'zh-TW', siteUrl: 'https://h.example', k: 'start',
+    clientIp: '1.2.3.4', email: 'member@example.com' })
+  assert.equal(typeof body.order.shipping.carrier, 'string')
+  assert.ok(body.order.shipping.carrier.length > 0 && body.order.shipping.carrier.length <= 64)
+  for (const addr of [body.order.shipping.address, body.billing.address]) {
+    assert.ok(typeof addr.street === 'string' && addr.street.length > 0 && addr.street.length <= 128, 'street is required (String(128))')
+    assert.equal(addr.countryCode, 'TW')
+  }
+  // "郵箱和電話二者需至少傳入其一" — three places, we have no phone → the e-mail
+  for (const p of [body.customer.personalInfo, body.order.shipping.personalInfo, body.billing.personalInfo]) {
+    assert.equal(p.email, 'member@example.com')
+  }
+  // not a member e-mail → neutral placeholder rather than an empty/invalid field
+  const anon = buildCreateBody({ ctx: { ...ctxBase, behavior: 'Recurring' }, locale: 'zh-TW', siteUrl: 'x', k: 'pay' })
+  assert.equal(anon.customer.personalInfo.email, SLP_PLACEHOLDER_EMAIL)
+  assert.equal(slpEmail('  A@b.co '), 'A@b.co')
+  for (const bad of [undefined, null, '', 'no-at-sign', 'a b@c.d', 'x'.repeat(130) + '@a.b']) assert.equal(slpEmail(bad), SLP_PLACEHOLDER_EMAIL)
+})
+
+test('client.ip: String(32) — canonical shortest form, never truncated; member ip → server ip → 0.0.0.0 (logged by ipSource)', () => {
+  assert.equal(normalizeIp('1.2.3.4'), '1.2.3.4')
+  assert.equal(normalizeIp('2001:db8::1'), '2001:db8::1')
+  // 39-char IPv6 whose zero runs compress to <= 32 → shortened, still the same address
+  assert.equal(normalizeIp('2001:0db8:0000:0000:0000:0000:0000:0001'), '2001:db8::1')
+  // a real 39-char address that cannot be compressed is refused, not cut
+  const long = '2001:db8:aaaa:bbbb:cccc:dddd:eeee:ffff'
+  assert.equal(long.length > 32, true)
+  assert.equal(normalizeIp(long), null)
+  for (const bad of [null, undefined, '', 'abc', '1.2.3.4; drop', '[::1']) assert.equal(normalizeIp(bad), null)
+  const ctx = { ...ctxBase, behavior: 'Recurring' }
+  const mk = (extra) => buildCreateBody({ ctx, locale: 'zh-TW', siteUrl: 'x', k: 'pay', ...extra }).client.ip
+  assert.equal(mk({ clientIp: long, fallbackIp: '9.9.9.9' }), '9.9.9.9')
+  assert.equal(mk({ clientIp: '1.2.3.4', fallbackIp: '9.9.9.9' }), '1.2.3.4')
+  assert.equal(mk({ fallbackIp: '9.9.9.9' }), '9.9.9.9')
+  assert.equal(mk({}), '0.0.0.0')
+  assert.deepEqual([ipSource({ clientIp: '1.2.3.4' }), ipSource({ clientIp: long, fallbackIp: '9.9.9.9' }), ipSource({})], ['client', 'fallback', 'placeholder'])
+  for (const out of [mk({ clientIp: long }), mk({ clientIp: long, fallbackIp: long })]) assert.ok(out.length <= 32)
+})
+
+test('instrument: only the official status SUCCESSED is chargeable, expired cards excluded; last may be Array or string', () => {
+  const mk = (over = {}, card = {}) => normalizeInstrument({ instrumentId: 'I1', instrumentStatus: 'SUCCESSED', instrumentCard: { brand: 'Visa', last: '1234', ...card }, ...over })
+  assert.equal(instrumentUsable(mk()), true)
+  for (const status of ['ENABLED', 'CREATED', 'FAILED', 'DISABLED', 'EXPIRED', 'expired', '', undefined]) {
+    assert.equal(instrumentUsable(mk({ instrumentStatus: status })), false, `status ${status}`)
+  }
+  assert.equal(instrumentUsable(mk({}, { expired: true })), false)
+  assert.equal(instrumentUsable(mk({}, { expired: 'true' })), false)
+  assert.equal(instrumentUsable(mk({}, { expired: false })), true)
+  assert.equal(instrumentUsable(mk({}, { expired: 'false' })), true)
+  assert.equal(mk().last4, '1234')
+  assert.equal(mk({}, { last: ['1234'] }).last4, '1234')
+  assert.equal(mk({}, { last: ['1', '2', '3', '4'] }).last4, '1234')
+  for (const bad of [['12345'], '12', [], null, { a: 1 }, ['12', 'ab']]) assert.equal(mk({}, { last: bad }).last4, null)
+  assert.equal(last4Of(null, ['9876']), '9876')
+})
+
+// ── Trade layouts ───────────────────────────────────────────────────────────
+// OFFICIAL FIELD TABLE of /api/trade/query/: payment / order / customer are
+// siblings of status; paid amount = payment.paidAmount, card = payment.creditCard,
+// card id = payment.paymentInstrument, SLP customer = order.customer / payment.paymentCustomerId.
+const OFFICIAL_TABLE_TRADE = Object.freeze({
+  tradeOrderId: 'T1', referenceOrderId: ctxBase.reference_order_id, status: 'SUCCEEDED', subStatus: 'AUTHORIZED',
+  order: { amount: { value: 15000, currency: 'TWD' }, customer: { referenceCustomerId: ctxBase.reference_customer_id, customerId: 'CUS7' } },
+  payment: { paymentMethod: 'CreditCard', paymentBehavior: 'Recurring', paidAmount: { value: 15000, currency: 'TWD' }, paymentCustomerId: 'CUS7',
+    creditCard: { type: 'DEBIT', bin: '400000', last4: '4321', brand: 'Visa', issuerCountry: 'TW' },
+    paymentInstrument: { paymentInstrumentId: 'PI7', savePaymentInstrument: true } },
+})
+// The flat RESPONSE EXAMPLE printed on the same pages (docs contradict their own table).
+const OFFICIAL_EXAMPLE_TRADE = Object.freeze({
+  tradeOrderId: '10010061012921418117718876160', status: 'SUCCEEDED', subStatus: 'AUTHORIZED',
+  amount: { value: 100000, currency: 'TWD' }, paidAmount: { value: 100000, currency: 'TWD' },
+  lastPayment: { brand: 'Visa', last4: '1234', paymentMethod: 'CreditCard', paymentInstrument: { paymentInstrumentId: '6456462132132', savePaymentInstrument: true } },
+  customer: { referenceCustomerId: 'cust_1', CustomerId: '12412dr133' },
+})
+
+test('normalizeTrade: official field-table layout is read (payment.paidAmount, payment.creditCard, payment.paymentInstrument, customer id)', () => {
+  const n = normalizeTrade(OFFICIAL_TABLE_TRADE)
+  assert.deepEqual([n.status, n.amount_minor, n.amount_source], ['succeeded', 15000, 'paid'])
+  assert.equal(n.customer_id, 'CUS7')
+  assert.deepEqual(n.instrument, { id: 'PI7', brand: 'Visa', issuer_country: 'TW', last4: '4321' })
+  // paid amount differs from the order amount: what was PAID wins
+  const part = normalizeTrade({ ...OFFICIAL_TABLE_TRADE, payment: { ...OFFICIAL_TABLE_TRADE.payment, paidAmount: { value: 1500 } } })
+  assert.deepEqual([part.amount_minor, part.amount_source], [1500, 'paid'])
+  // only order.amount present → marked as the order amount
+  const ordered = normalizeTrade({ status: 'SUCCEEDED', order: { amount: { value: 15000 } } })
+  assert.deepEqual([ordered.amount_minor, ordered.amount_source], [15000, 'order'])
+  // an empty-string customer id (event sample sends "") falls through to the next path
+  assert.equal(normalizeTrade({ ...OFFICIAL_TABLE_TRADE, order: { customer: { customerId: '' } } }).customer_id, 'CUS7')
+})
+
+test('normalizeTrade: the flat response example of the docs is accepted as a fallback', () => {
+  const n = normalizeTrade(OFFICIAL_EXAMPLE_TRADE)
+  assert.deepEqual([n.status, n.amount_minor, n.amount_source], ['succeeded', 100000, 'paid'])
+  assert.equal(n.customer_id, '12412dr133')
+  assert.deepEqual(n.instrument, { id: '6456462132132', brand: 'Visa', issuer_country: null, last4: '1234' })
+})
+
+test('amount check is armed under the official layout: amount_minor + amount_source=paid reach apply_payment_result, no "unconfirmed" log', async () => {
+  // Before the fix the old paths (top-level paidAmount / order.payment.*) did not exist in
+  // this layout → amount_minor was absent → web_billing_transitions.sql:315-316 skipped the check.
+  const sent = []
+  const logs = []
+  const db = { server: async (op, args) => { sent.push({ op, args }); return { applied: true } } }
+  const result = normalizeTrade(OFFICIAL_TABLE_TRADE)
+  await applyAttemptResult({ db, slp: {}, referenceOrderId: ctxBase.reference_order_id, result, log: (e) => logs.push(e) })
+  assert.equal(sent[0].args.result.amount_minor, 15000)
+  assert.equal(sent[0].args.result.amount_source, 'paid')
+  assert.deepEqual(logs, [])
+  // the same trade under the OLD assumed paths yields nothing → would be logged as unconfirmed
+  const legacyBlind = normalizeTrade({ status: 'SUCCEEDED', payment: {}, order: {} })
+  assert.equal('amount_minor' in legacyBlind, false)
+  await applyAttemptResult({ db, slp: {}, referenceOrderId: ctxBase.reference_order_id, result: legacyBlind, log: (e) => logs.push(e) })
+  assert.equal(logs[0].amount, 'unconfirmed')
+})
+
+test('binding via the official layout: card id from payment.paymentInstrument selects the card among several', async () => {
+  const two = fakeSlp({ queryInstruments: async () => ({ ok: true, data: { referenceCustomerId: ctxBase.reference_customer_id,
+    paymentInstruments: [{ instrumentId: 'PI6', instrumentStatus: 'SUCCESSED' }, { instrumentId: 'PI7', instrumentStatus: 'SUCCESSED', instrumentCard: { last: ['4321'], brand: 'Visa' } }] } }) })
+  const r = await resolveTrade(two, { ...ctxBase, kind: 'first_purchase', known_instruments: [] }, OFFICIAL_TABLE_TRADE)
+  assert.equal(r.status, 'succeeded')
+  assert.equal(r.instrument.id, 'PI7')
+  assert.equal(r.customer_id, 'CUS7')
+  assert.equal(r.amount_minor, 15000)
 })
 
 test('review #2: first purchase paid but card unconfirmable → succeeded WITHOUT card (member gets Pro); binding waits', async () => {

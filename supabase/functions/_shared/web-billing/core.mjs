@@ -129,26 +129,50 @@ export async function verifyWebhookSignature({ rawBody, timestamp, sign, signKey
 const SUCCEEDED = new Set(['SUCCEEDED'])
 const FAILED = new Set(['FAILED', 'EXPIRED', 'CANCELLED', 'CANCELED', 'CLOSED'])
 const str = (v, max = 64) => (typeof v === 'string' && v ? v.slice(0, max) : typeof v === 'number' ? String(v) : null)
+const firstStr = (max, ...vs) => { for (const v of vs) { const r = str(v, max); if (r) return r } return null }
 const intOrNull = (v) => (Number.isInteger(v) ? v : typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : null)
+
+// instrumentCard.last is typed "Array" on the official query page while every
+// example shows a plain string ("1234"): accept both (an array is joined, so
+// ["1234"] and ["1","2","3","4"] both read as 1234). Only exactly four digits
+// are ever kept.
+// https://docs.shoplinepayments.com/api/customer-paymentInstrument/paymentInstrument/query/
+export function last4Of(...candidates) {
+  for (const c of candidates) {
+    const text = Array.isArray(c) ? c.map((x) => String(x ?? '')).join('')
+      : typeof c === 'string' || typeof c === 'number' ? String(c) : ''
+    if (/^\d{4}$/.test(text)) return text
+  }
+  return null
+}
+// instrumentCard.expired is typed String ("true"/"false") but the examples show
+// a JSON boolean: accept both. Unknown/absent counts as not expired.
+const isExpired = (v) => v === true || (typeof v === 'string' && v.trim().toLowerCase() === 'true')
 
 export function normalizeInstrument(raw) {
   if (!raw || typeof raw !== 'object') return null
   const card = raw.instrumentCard ?? raw.card ?? {}
   const id = str(raw.instrumentId ?? raw.paymentInstrumentId, 128)
   if (!id) return null
-  const last4 = str(card.last ?? card.last4, 8)
   return {
     id,
     brand: str(card.brand, 20),
     issuer_country: str(card.issuerCountry ?? raw.issuerCountry, 8),
-    last4: last4 && /^\d{4}$/.test(last4) ? last4 : null,
+    last4: last4Of(card.last, card.last4),
     status: str(raw.instrumentStatus, 20),
+    expired: isExpired(card.expired),
   }
 }
-// TODO(SLP-sandbox §12-2): 'SUCCESSED' is documented as chargeable; 'ENABLED'
-// appears in the query API without a definition — accepted until sandbox says otherwise.
+// Official status codes (https://docs.shoplinepayments.com/appendix/paymentInstrumentCode/):
+// CREATED / SUCCESSED / FAILED / DISABLED. Chargeable = SUCCESSED and not
+// expired (https://docs.shoplinepayments.com/guide/quick/, last paragraph).
+// TODO(SLP-sandbox): the query page's own response example shows
+// instrumentStatus "ENABLED", which the appendix does not define. We follow the
+// appendix + guide; if the sandbox really answers ENABLED, a freshly bound card
+// stays unmatched (a first purchase is still recorded as paid, without a card).
+export const USABLE_INSTRUMENT_STATUS = 'SUCCESSED'
 export function instrumentUsable(inst) {
-  return Boolean(inst && (inst.status === 'SUCCESSED' || inst.status === 'ENABLED'))
+  return Boolean(inst && inst.status === USABLE_INSTRUMENT_STATUS && !inst.expired)
 }
 
 export function normalizeTrade(trade) {
@@ -165,26 +189,37 @@ export function normalizeTrade(trade) {
     result.failure_msg = str(trade?.paymentMsg?.msg, 200)
     result.failure_kind = failureAction(code).kind
   }
-  // Prefer what SLP says was PAID. TODO(SLP-Q6): whether payment/get always
-  // carries paidAmount is undocumented; without it we fall back to the order
-  // amount SLP stored (still SLP's record, so unit errors show) and mark it,
-  // instead of blocking every charge. applyAttemptResult logs the fallback.
-  const paid = intOrNull(trade?.paidAmount?.value)
-  const amount = paid ?? intOrNull(trade?.amount?.value)
+  // Prefer what SLP says was PAID. Official layout (field tables of
+  // /api/trade/query/ and /api/trade/create/, and the trade.succeeded sample on
+  // /api/event/model/): `payment.paidAmount.value` and `order.amount.value`,
+  // with `payment` and `order` as siblings of `status`. The two response
+  // EXAMPLES on the query/create pages instead show a flat layout (`paidAmount`,
+  // `amount`, `lastPayment`); the docs contradict themselves, so the official
+  // table paths win and the flat ones are fallbacks.
+  // TODO(SLP-sandbox): confirm which layout the real API returns. With no
+  // amount at all, applyAttemptResult logs `amount: unconfirmed` and the DB
+  // skips the R9 amount check.
+  const paid = intOrNull(trade?.payment?.paidAmount?.value) ?? intOrNull(trade?.paidAmount?.value)
+  const ordered = intOrNull(trade?.order?.amount?.value) ?? intOrNull(trade?.amount?.value)
+  const amount = paid ?? ordered
   if (result.status === 'succeeded' && amount != null) {
     result.amount_minor = amount
     result.amount_source = paid != null ? 'paid' : 'order'
   }
-  // TODO(SLP-sandbox): where payment/get puts the SLP customer and card is not
-  // documented; these are the paths the create-trade field table suggests.
-  result.customer_id = str(trade?.paymentCustomerId ?? trade?.customer?.customerId ?? trade?.order?.customer?.customerId
-    ?? trade?.confirm?.paymentCustomerId, 128)
-  const instId = str(trade?.order?.payment?.paymentInstrument?.paymentInstrumentId
-    ?? trade?.paymentInstrument?.paymentInstrumentId ?? trade?.confirm?.paymentInstrument?.paymentInstrumentId, 128)
+  // SLP customer id: official order.customer.customerId (the flat create
+  // example spells it `CustomerId`); payment.paymentCustomerId also carries it
+  // for quick-pay / recurring. Empty strings (the event sample sends "") skip on.
+  result.customer_id = firstStr(128, trade?.order?.customer?.customerId, trade?.payment?.paymentCustomerId,
+    trade?.customer?.customerId, trade?.customer?.CustomerId, trade?.paymentCustomerId, trade?.confirm?.paymentCustomerId,
+    trade?.order?.payment?.paymentCustomerId)
+  // The card of THIS payment: official payment.paymentInstrument /
+  // payment.creditCard; flat example `lastPayment`; then the older guesses.
+  const instId = firstStr(128, trade?.payment?.paymentInstrument?.paymentInstrumentId,
+    trade?.lastPayment?.paymentInstrument?.paymentInstrumentId, trade?.order?.payment?.paymentInstrument?.paymentInstrumentId,
+    trade?.paymentInstrument?.paymentInstrumentId, trade?.confirm?.paymentInstrument?.paymentInstrumentId)
   if (instId) {
-    const cc = trade?.order?.payment?.creditCard ?? {}
-    result.instrument = { id: instId, brand: str(cc.brand, 20), issuer_country: str(cc.issuerCountry, 8),
-      last4: /^\d{4}$/.test(String(cc.last4 ?? '')) ? String(cc.last4) : null }
+    const cc = trade?.payment?.creditCard ?? trade?.order?.payment?.creditCard ?? trade?.lastPayment ?? {}
+    result.instrument = { id: instId, brand: str(cc.brand, 20), issuer_country: str(cc.issuerCountry, 8), last4: last4Of(cc.last4, cc.last) }
   }
   return result
 }
@@ -218,13 +253,51 @@ export function classifyCreateFailure(res) {
 // ── Building the SLP "create payment" body (SLP notes §4, §5) ───────────────
 // TODO(SLP-Q12): the create page marks order / billing / personalInfo /
 // returnUrl / language as required while the Recurring example omits them.
-// Following the notes we send all of them with neutral placeholders (no
-// personal data: we never collect names or addresses); trim after sandbox.
-export const SLP_PLACEHOLDERS = Object.freeze({
-  personalInfo: { lastName: 'Huddle' },
-  billing: { personalInfo: { lastName: 'Huddle' }, address: { countryCode: 'TW' } },
-  shipping: { shippingMethod: 'NONE', personalInfo: { lastName: 'Huddle' }, address: { countryCode: 'TW' } },
-})
+// Following the notes we send all of them with neutral placeholders (we never
+// collect names or addresses); trim after sandbox.
+// Required fields per https://docs.shoplinepayments.com/api/trade/create/ :
+//   order.shipping.carrier, order.shipping.address.street, billing.address.street
+//   (all "必填", free text: the carrier / street fields only give examples such
+//   as 黑貓宅配 — there is no enumeration), and for customer.personalInfo,
+//   order.shipping.personalInfo and billing.personalInfo "郵箱和電話二者需至少傳入其一".
+// We have no phone number, so the member's login e-mail is sent (SLP is listed
+// as a processor in the privacy page). No e-mail → a neutral placeholder.
+// TODO(SLP-sandbox): whether SLP validates these (and whether a placeholder
+// e-mail / street is accepted, or triggers risk-control rules) is untested.
+export const SLP_PLACEHOLDER_EMAIL = 'noreply@lazy72.com'
+export const SLP_PLACEHOLDER_STREET = 'N/A (digital service)'
+export const SLP_PLACEHOLDER_CARRIER = 'NONE'
+export function slpEmail(email) {
+  const e = typeof email === 'string' ? email.trim() : ''
+  return e && e.length <= 128 && /^[^\s@]+@[^\s@]+$/.test(e) ? e : SLP_PLACEHOLDER_EMAIL
+}
+export function slpPlaceholders(email) {
+  const personalInfo = () => ({ lastName: 'Huddle', email: slpEmail(email) })
+  const address = () => ({ countryCode: 'TW', street: SLP_PLACEHOLDER_STREET })
+  return {
+    personalInfo: personalInfo(),
+    billing: { personalInfo: personalInfo(), address: address() },
+    shipping: { shippingMethod: 'NONE', carrier: SLP_PLACEHOLDER_CARRIER, personalInfo: personalInfo(), address: address() },
+  }
+}
+
+// client.ip is String(32) per /api/trade/create/ ("Recurring: 特店辦公室 IP";
+// the guide says "特店伺服器 IP"). A full IPv6 literal can be 39 characters, so
+// the address is first rewritten in its shortest canonical form (the WHATWG URL
+// parser compresses zero runs and drops brackets/zone ids); if it still exceeds
+// 32 characters it is NOT truncated (a cut-off address is a wrong address) and
+// the caller falls back to another value and logs it.
+export const SLP_IP_MAX = 32
+export function normalizeIp(raw) {
+  const text = typeof raw === 'string' ? raw.trim() : ''
+  if (!/^[0-9a-fA-F:.]{3,45}$/.test(text)) return null
+  let ip = text
+  if (text.includes(':')) {
+    try { ip = new URL(`http://[${text}]/`).hostname.replace(/^\[|\]$/g, '') } catch { return null }
+  } else if (!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(text)) return null
+  return ip.length <= SLP_IP_MAX ? ip : null
+}
+export const PLACEHOLDER_IP = '0.0.0.0'
 // TODO(SLP-sandbox): accepted language codes are not documented.
 export function slpLanguage(locale) {
   return locale === 'en' ? 'en' : 'zh-TW'
@@ -234,8 +307,17 @@ export function returnUrl(siteUrl, orderRef, k) {
   return `${base}/billing/return?ref=${encodeURIComponent(orderRef)}&k=${encodeURIComponent(k)}`
 }
 // ctx = row returned by web_start_checkout / web_claim_due.
-export function buildCreateBody({ ctx, paySession, locale, siteUrl, k, clientIp }) {
+// email = the member's login e-mail (optional, see slpEmail). clientIp = the
+// member's IP (customer-present); fallbackIp = our server IP, used when the
+// member's is unknown / too long. Both missing → '0.0.0.0' (callers are
+// expected to have logged / refused before that; see ipSource).
+export function ipSource({ clientIp, fallbackIp }) {
+  if (normalizeIp(clientIp)) return 'client'
+  return normalizeIp(fallbackIp) ? 'fallback' : 'placeholder'
+}
+export function buildCreateBody({ ctx, paySession, locale, siteUrl, k, clientIp, fallbackIp, email }) {
   const behavior = ctx.behavior
+  const placeholders = slpPlaceholders(email)
   const amount = { value: ctx.charge_amount_minor, currency: 'TWD' }
   if (!isChargeableMinor(amount.value)) throw new Error('refusing to send an out-of-range amount')
   const confirm = { paymentMethod: 'CreditCard', paymentBehavior: behavior, autoConfirm: behavior === 'Recurring' }
@@ -249,18 +331,23 @@ export function buildCreateBody({ ctx, paySession, locale, siteUrl, k, clientIp 
     amount,
     returnUrl: returnUrl(siteUrl, ctx.order_ref ?? parseOrderId(ctx.reference_order_id)?.orderRef ?? '', k ?? 'pay'),
     confirm,
-    customer: { referenceCustomerId: ctx.reference_customer_id, personalInfo: SLP_PLACEHOLDERS.personalInfo },
+    customer: { referenceCustomerId: ctx.reference_customer_id, personalInfo: placeholders.personalInfo },
     order: {
       products: [{ id: `huddle-pro-${ctx.plan}`, name: ctx.plan === 'annual' ? 'Huddle Pro (annual)' : 'Huddle Pro (monthly)',
         quantity: 1, amount }],
-      shipping: SLP_PLACEHOLDERS.shipping,
+      shipping: placeholders.shipping,
     },
-    billing: SLP_PLACEHOLDERS.billing,
+    billing: placeholders.billing,
     // TODO(SLP-Q4): customer-present = the member's IP; Recurring = "our server
-    // IP" (Edge Functions have no fixed IP).
-    client: { ip: clientIp || '0.0.0.0' },
+    // IP" (Edge Functions have no fixed IP; SHOPLINE_SERVER_IP is required).
+    client: { ip: normalizeIp(clientIp) ?? normalizeIp(fallbackIp) ?? PLACEHOLDER_IP },
+    // https://docs.shoplinepayments.com/guide/quick/ (定期扣款): "paySession |
+    // {} | 必傳，傳入空物件…該欄位不可省略". Customer-present calls pass the
+    // SDK's string. TODO(SLP-sandbox): the create page's example writes the
+    // empty value as the string "{}", the guide as the object {} — we send the
+    // guide's object.
+    paySession: behavior === 'Recurring' ? {} : paySession,
   }
-  if (behavior !== 'Recurring') body.paySession = paySession
   return body
 }
 

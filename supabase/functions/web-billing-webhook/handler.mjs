@@ -40,7 +40,16 @@ export function createWebhookHandler({ config, db, slp, log = () => {}, now = ()
       signKey: config.signKey, nowMs: now(),
     })
     if (!check.ok) return reply(401, { error: 'unauthorized' })
-    if (!constantTimeEqual(request.headers.get('merchantId') ?? '', config.merchantId)) return reply(403, { error: 'unexpected_merchant' })
+    // https://docs.shoplinepayments.com/api/event/ lists only `timestamp` and
+    // `sign` as webhook headers; a `merchantId` header is not documented. The
+    // HMAC above already proves the sender (it is keyed with OUR signKey), so
+    // this is a secondary check: compared only when the header is present, and
+    // a present-but-different one is rejected. Absent → accepted.
+    // TODO(SLP-sandbox): confirm whether real deliveries carry the header.
+    const sentMerchant = request.headers.get('merchantId')
+    if (sentMerchant != null && sentMerchant !== '' && !constantTimeEqual(sentMerchant, config.merchantId)) {
+      return reply(403, { error: 'unexpected_merchant' })
+    }
     let event
     try { event = JSON.parse(raw) } catch { return reply(400, { error: 'invalid_json' }) }
     const id = event?.id

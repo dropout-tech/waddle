@@ -65,8 +65,13 @@ export function createSlpClient({ fetch: fetchFn, apiBase, merchantId, apiKey, t
     // TODO(SLP-sandbox §12-5): docs disagree whether this takes SLP's customerId
     // or ours; the guide flow passes SLP's, so do we.
     customerToken: (customerId) => call('customerToken', { customerId }),
+    // Official field table (https://docs.shoplinepayments.com/api/customer-paymentInstrument/paymentInstrument/query/):
+    // request `paymentInstrument.paymentInstrumentId`. The page's own request
+    // example writes `instrumentId` instead (and the RESPONSE items use
+    // `instrumentId`); we follow the field table.
+    // TODO(SLP-sandbox): confirm which spelling the live API accepts.
     queryInstruments: (customerId, instrumentId) => call('queryInstruments',
-      instrumentId ? { customerId, paymentInstrument: { instrumentId } } : { customerId }),
+      instrumentId ? { customerId, paymentInstrument: { paymentInstrumentId: instrumentId } } : { customerId }),
     unbind: (customerId, paymentInstrumentId) => call('unbind', { customerId, paymentInstrumentId }),
   }
 }
