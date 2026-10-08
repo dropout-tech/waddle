@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Laugh, Moon, Settings2, VolumeX } from 'lucide-react'
+import { Home, Laugh, Moon, Settings2, VolumeX } from 'lucide-react'
 import { useI18n } from '@/lib/i18n/react'
 import { createClient } from '@/lib/supabase/client'
 import { useFocusTimer } from '@/components/timer/focus-timer-provider'
@@ -10,6 +10,10 @@ import { isTaskOverdue } from '@/lib/task-utils'
 import { toDateString } from '@/lib/calendar-utils'
 import { pickLine, renderLine, type PetLineCategory } from '@/lib/pet/lines'
 import { isPetMuted, localDate, readPetLocal, writePetLocal } from '@/lib/pet/local'
+import { getIglooSnapshot, openIgloo } from '@/lib/igloo/store'
+import { hasDailyLine } from '@/lib/life-grid/data'
+import { localToday } from '@/lib/life-grid/compute'
+import { openLifeGrid } from '@/lib/life-grid/events'
 import { CELEBRATE_CHANCE, IDLE_DAILY_CAP, IDLE_MINUTES, type PetSettings } from '@/lib/pet/types'
 import type { Workspace } from '@/lib/types'
 import { PetSprite, type PetPose } from './pet-sprite'
@@ -161,7 +165,8 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   const timer = useFocusTimer()
   const focusBusy = timer.state === 'running' || timer.state === 'paused'
 
-  const [bubble, setBubble] = useState<{ text: string; n: number } | null>(null)
+  // `action`: a bubble you can tap (the evening 人生年曆 question opens today's input).
+  const [bubble, setBubble] = useState<{ text: string; n: number; action?: () => void } | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [act, setAct] = useState<Act>('')
   const [actKey, setActKey] = useState(0)
@@ -232,13 +237,14 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
     actTimer.current = window.setTimeout(() => setAct(''), ms)
   }, [])
 
-  const say = useCallback((text: string, opts: { auto?: boolean; act?: Act } = {}) => {
+  const say = useCallback((text: string, opts: { auto?: boolean; act?: Act; action?: () => void } = {}) => {
     window.clearTimeout(bubbleTimer.current)
     setPose('stand')
     setMenuOpen(false)
-    setBubble((b) => ({ text, n: (b?.n ?? 0) + 1 }))
+    setBubble((b) => ({ text, n: (b?.n ?? 0) + 1, action: opts.action }))
     const chars = Array.from(text).length
-    const ms = Math.min(9000, Math.max(4000, 2200 + chars * (lang === 'en' ? 45 : 110)))
+    // A question you can answer stays up longer than a passing remark.
+    const ms = opts.action ? 20_000 : Math.min(9000, Math.max(4000, 2200 + chars * (lang === 'en' ? 45 : 110)))
     bubbleTimer.current = window.setTimeout(() => setBubble(null), ms)
     if (opts.act !== undefined) {
       if (opts.act) playAct(opts.act, opts.act === 'shy' ? 1400 : 700)
@@ -329,6 +335,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   }, [workspaces])
   const prevCompleted = useRef<Set<string> | null>(null)
   const lastCelebrate = useRef(0)
+  const iglooAnnounced = useRef<number | null>(null)
   useEffect(() => {
     const prev = prevCompleted.current
     prevCompleted.current = completedIds
@@ -337,9 +344,27 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
     for (const id of completedIds) if (!prev.has(id)) { fresh = true; break }
     if (!fresh || Date.now() - lastCelebrate.current < 60_000) return
     if (!shown || quiet || menuOpen || isPetMuted()) return
-    if (Math.random() >= CELEBRATE_CHANCE) return // only now and then
-    lastCelebrate.current = Date.now()
-    say(line(['celebrate']), { auto: true, act: 'jump' })
+    // The igloo state (lib/igloo/store) is republished by IglooHost in the
+    // same commit, after this effect — read it a beat later.
+    const lucky = Math.random() < CELEBRATE_CHANCE
+    const id = window.setTimeout(() => {
+      const igloo = getIglooSnapshot()
+      // Finishing an igloo is rare (about weekly) — always worth one line.
+      if (igloo && igloo.finishedToday && igloo.bricksInCurrent === 0 && iglooAnnounced.current !== igloo.completedIgloos) {
+        iglooAnnounced.current = igloo.completedIgloos
+        lastCelebrate.current = Date.now()
+        say(line(['igloo'], { built: igloo.completedIgloos }), { auto: true, act: 'jump' })
+        return
+      }
+      if (!lucky) return // only now and then
+      lastCelebrate.current = Date.now()
+      if (igloo && Math.random() < 0.5) {
+        say(line(['brick'], { today: igloo.bricksToday, left: igloo.bricksPerIgloo - igloo.bricksInCurrent }), { auto: true, act: 'hop' })
+      } else {
+        say(line(['celebrate']), { auto: true, act: 'jump' })
+      }
+    }, 80)
+    return () => window.clearTimeout(id)
   }, [completedIds, workspaces.length, shown, quiet, menuOpen, say, line])
 
   // Focus timer finished → speak even though we were quiet during it.
@@ -361,6 +386,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
     if (!nextIdleAt.current) nextIdleAt.current = Date.now() + jitter() * 0.5
 
     let checkInBusy = false
+    let dailyLineBusy = false
     const tick = async () => {
       if (!canAuto()) return
       const now = new Date()
@@ -406,6 +432,28 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
           /* offline — skip today's nudge */
         } finally {
           checkInBusy = false
+        }
+      }
+
+      // 3b) 人生年曆 — after 20:00 (21:00 for a low-chattiness penguin), once a
+      //     day, only if today (the device's local day, same as the grid) has no line yet.
+      //     Tapping the bubble opens the grid with today's input focused.
+      const askFrom = pet.chattiness === 'low' ? 21 : 20
+      if (hour >= askFrom && local.dailyLineAsked !== today && !dailyLineBusy) {
+        dailyLineBusy = true
+        writePetLocal({ dailyLineAsked: today })
+        try {
+          const supabase = createClient()
+          const { data: { session } } = await supabase.auth.getSession()
+          const uid = session?.user.id
+          if (uid && !(await hasDailyLine(supabase, uid, localToday())) && canAuto()) {
+            say(line(['dailyLine']), { auto: true, act: 'hop', action: () => openLifeGrid({ focusToday: true }) })
+            return
+          }
+        } catch {
+          /* offline — skip today's question */
+        } finally {
+          dailyLineBusy = false
         }
       }
 
@@ -521,9 +569,10 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
     pressStart.current = null
   }
 
-  const menuAction = (kind: 'joke' | 'hour' | 'today' | 'settings') => {
+  const menuAction = (kind: 'joke' | 'igloo' | 'hour' | 'today' | 'settings') => {
     setMenuOpen(false)
     if (kind === 'joke') return say(line(['joke']), { act: 'hop' })
+    if (kind === 'igloo') return openIgloo()
     if (kind === 'hour') {
       writePetLocal({ mutedUntil: Date.now() + 60 * 60 * 1000 })
       return say(t('好，我安靜一小時。'), { act: '' })
@@ -557,7 +606,9 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
       data-yield={yielding ? '' : undefined}
       data-paused={pageHidden ? '' : undefined}
     >
-      <div className={styles.mover} style={{ transform: `translateX(${offsetX}px)` }}>
+      {/* Desktop: while asking the evening question the penguin steps off the
+          hour gutter (its home) so the time labels behind it stay readable. */}
+      <div className={styles.mover} style={{ transform: `translateX(${offsetX + (bubble?.action && !isMobile ? 58 : 0)}px)` }}>
         <button
           ref={buttonRef}
           type="button"
@@ -614,14 +665,31 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
               className={styles.bubble}
               data-side={side}
               data-pet-bubble
+              data-actionable={bubble.action ? '' : undefined}
               onPointerEnter={() => window.clearTimeout(bubbleTimer.current)}
               onPointerLeave={() => {
                 window.clearTimeout(bubbleTimer.current)
-                bubbleTimer.current = window.setTimeout(() => setBubble(null), 2500)
+                bubbleTimer.current = window.setTimeout(() => setBubble(null), bubble.action ? 8000 : 2500)
               }}
             >
               <span className={styles.bubbleName}>{pet.name}</span>
               {bubble.text}
+              {bubble.action && (
+                // Covers the whole bubble: tap anywhere on the question to answer it.
+                <button
+                  type="button"
+                  className={styles.bubbleAction}
+                  onClick={() => {
+                    const run = bubble.action
+                    window.clearTimeout(bubbleTimer.current)
+                    setBubble(null)
+                    run?.()
+                  }}
+                  data-pet-bubble-action
+                >
+                  {t('寫下來')} →
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -638,6 +706,9 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
           >
             <button type="button" role="menuitem" className={styles.menuItem} onClick={() => menuAction('joke')}>
               <Laugh className="w-4 h-4" aria-hidden="true" />{t('講個笑話')}
+            </button>
+            <button type="button" role="menuitem" className={styles.menuItem} onClick={() => menuAction('igloo')} data-pet-igloo>
+              <Home className="w-4 h-4" aria-hidden="true" />{t('去冰屋看看')}
             </button>
             <button type="button" role="menuitem" className={styles.menuItem} onClick={() => menuAction('hour')}>
               <VolumeX className="w-4 h-4" aria-hidden="true" />{t('安靜 1 小時')}

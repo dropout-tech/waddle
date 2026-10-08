@@ -15,6 +15,8 @@ import { InkNotebook } from '@/components/icons/huddle-icons'
 import { ModalShell } from '@/components/modals/modal-shell'
 import { useDisplayColor } from '@/hooks/use-display-color'
 import { useNotebookOverlay } from '@/components/notebook/notebook-overlay-provider'
+import { LifeGridIcon } from '@/components/life-grid/life-grid-icon'
+import { openLifeGrid } from '@/lib/life-grid/events'
 import { useI18n } from '@/lib/i18n/react'
 import {
   Command,
@@ -144,6 +146,10 @@ export function CommandPalette({
               <CommandItem value={t('開記事本')} onSelect={() => runAction(openNotebook)}>
                 <InkNotebook />
                 <span>{t('開記事本')}</span>
+              </CommandItem>
+              <CommandItem value={t('開人生年曆')} onSelect={() => runAction(() => openLifeGrid())}>
+                <LifeGridIcon />
+                <span>{t('開人生年曆')}</span>
               </CommandItem>
               <CommandItem value={t('返回日曆')} onSelect={() => runAction(onReturnToCalendar)}>
                 <LayoutGrid />

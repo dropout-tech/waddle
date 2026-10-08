@@ -135,6 +135,15 @@ export const dict: Record<string, string> = {
   '更多工具都在「⋯」': 'More tools live in "⋯"',
   '底部五個分頁': 'Five tabs at the bottom',
   '💧 喝水小提醒': '💧 Water reminder',
+  // Onboarding tour — brain dump, igloo, year in days (2026-10-03).
+  '🐧 丟給企鵝': '🐧 Toss it to the penguin',
+  '腦袋很亂的時候，按「丟給企鵝」，把想到的事一口氣打進去（也可以用說的）。企鵝會用 AI 拆成一件件任務、抓出截止日；你看過、勾一勾，按「放進未分類」就收進最上面的「未分類」。': 'When your head is full, tap "Toss it to the penguin" and type everything at once (or say it). The penguin uses AI to split it into tasks and spot due dates. Look it over, untick what you don\'t want, and tap "Add to inbox" to drop them into Uncategorized at the top.',
+  '🧊 企鵝的冰屋': "🧊 The penguin's igloo",
+  '每做完一件事、每完成一次專注，企鵝就搬一塊冰磚，慢慢蓋出一座冰屋。點企鵝打開選單，選「去冰屋看看」。幾天沒來也沒關係，冰磚不會少，牠會在雪地等你。': 'Every task you finish and every focus session you complete, the penguin carries one ice brick and slowly builds an igloo. Open the penguin\'s menu and choose "Visit the igloo". Away for a few days? No bricks are lost; it will wait for you in the snow.',
+  '每做完一件事、每完成一次專注，企鵝就搬一塊冰磚，慢慢蓋出一座冰屋。領養企鵝後，點牠打開選單，選「去冰屋看看」。': 'Every task you finish and every focus session you complete, the penguin carries one ice brick and slowly builds an igloo. Once you adopt it, open its menu and choose "Visit the igloo".',
+  '📔 人生年曆': '📔 Year in Days',
+  '同一個選單裡的「人生年曆」：一天一格，每天留一句最想記住的事，那一格就會亮起來。晚上企鵝也會來問你一句。一年下來，就是一整年有在好好過的證據。': 'In the same menu, "Year in Days": one square per day. Write one line you want to remember and that square lights up. The penguin will ask you in the evening too. By the end of the year, you have proof of a year well lived.',
+  '「⋯」裡的「人生年曆」：一天一格，每天留一句最想記住的事，那一格就會亮起來。晚上企鵝也會來問你一句。一年下來，就是一整年有在好好過的證據。': 'Under "⋯", "Year in Days": one square per day. Write one line you want to remember and that square lights up. The penguin will ask you in the evening too. By the end of the year, you have proof of a year well lived.',
   '🔔 App 關著也會提醒你': '🔔 Reminders even when the app is closed',
   '✨ 你準備好了！': "✨ You're all set!",
 

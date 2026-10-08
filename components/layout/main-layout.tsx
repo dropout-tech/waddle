@@ -40,6 +40,7 @@ import { useSoftKeyboard } from '@/hooks/use-soft-keyboard'
 import { PenguinPet } from '@/components/pet/penguin-pet'
 import type { PetSettings } from '@/lib/pet/types'
 import { useWidgetLaunch } from '@/components/widgets/use-widget-launch'
+import { BrainDumpFab } from '@/components/brain-dump/brain-dump-entry'
 
 interface MainLayoutProps {
   workspaces: Workspace[]
@@ -910,6 +911,8 @@ export function MainLayout({
             <InkPlusLg className="w-6 h-6" aria-hidden="true" />
           </button>
         )}
+
+        {focusMode === 'none' && mobileTab === 'calendar' && !mobileScratchpadOpen && !mobileLinksOpen && !mobileFocusBoardOpen && <BrainDumpFab />}
 
         {/* Penguin pet — sits on the tab bar's top edge, left side (the
             timer pill owns the right). Steps aside for overlay tabs and

@@ -64,6 +64,14 @@ const TIMER_BODY = '設定一段時間，專心做一件事；預設是 25 分�
 const WATER_BODY = '每 60 分鐘，Huddle 會提醒你喝口水。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。'
 const PET_BODY = '角落這隻企鵝是你專屬的。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。牠偶爾會提醒你會議和過期的任務，但多半只是在說些荒謬的話。'
 const PET_BODY_BEFORE_ADOPTION = '導覽結束後，你可以領養一隻專屬企鵝，牠會住在畫面角落。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。'
+const BRAIN_DUMP_TITLE = '🐧 丟給企鵝'
+const BRAIN_DUMP_BODY = '腦袋很亂的時候，按「丟給企鵝」，把想到的事一口氣打進去（也可以用說的）。企鵝會用 AI 拆成一件件任務、抓出截止日；你看過、勾一勾，按「放進未分類」就收進最上面的「未分類」。'
+const IGLOO_TITLE = '🧊 企鵝的冰屋'
+const IGLOO_BODY = '每做完一件事、每完成一次專注，企鵝就搬一塊冰磚，慢慢蓋出一座冰屋。點企鵝打開選單，選「去冰屋看看」。幾天沒來也沒關係，冰磚不會少，牠會在雪地等你。'
+const IGLOO_BODY_BEFORE_ADOPTION = '每做完一件事、每完成一次專注，企鵝就搬一塊冰磚，慢慢蓋出一座冰屋。領養企鵝後，點牠打開選單，選「去冰屋看看」。'
+const LIFE_GRID_TITLE = '📔 人生年曆'
+const LIFE_GRID_BODY = '同一個選單裡的「人生年曆」：一天一格，每天留一句最想記住的事，那一格就會亮起來。晚上企鵝也會來問你一句。一年下來，就是一整年有在好好過的證據。'
+const LIFE_GRID_BODY_PHONE = '「⋯」裡的「人生年曆」：一天一格，每天留一句最想記住的事，那一格就會亮起來。晚上企鵝也會來問你一句。一年下來，就是一整年有在好好過的證據。'
 const PHONE_ALERTS_TITLE = '🔔 App 關著也會提醒你'
 const PHONE_ALERTS_BODY = '就算 Huddle 沒開著，手機也會跳通知提醒你：會議快開始、專注時間到、該喝水了。到「設定」→「一般設定」打開「會議提醒」和「背景提醒」；手機問要不要允許通知時，按「允許」就好。'
 const ASSIGN_BODY = '打開任務，按右上角的小人圖示，就能把任務交給共享夥伴或組織成員。任務會出現在對方的清單和日曆；對方完成或退回，你都看得到。進度在帳號選單的「指派任務」；建立組織需要 Pro 會員。'
@@ -121,6 +129,13 @@ const DESKTOP_STEPS: TourStep[] = [
     padding: 0,
   },
   {
+    target: '[data-tour="brain-dump"]',
+    title: BRAIN_DUMP_TITLE,
+    body: BRAIN_DUMP_BODY,
+    placement: 'bottom',
+    padding: 6,
+  },
+  {
     target: '[data-tour="view-modes"]',
     title: '切換日、週、月',
     body: '看細節用「日」，排一週用「週」，看整個月用「月」。',
@@ -163,6 +178,13 @@ const DESKTOP_STEPS: TourStep[] = [
     target: '[data-tour="calendar-export"]',
     title: '📅 每日簽到',
     body: '同一個選單裡的「每日簽到」：每天簽到一次，累積分數。頁面下方有匿名排行榜，只顯示小企鵝編號，不顯示帳號。',
+    placement: 'bottom',
+    padding: 6,
+  },
+  {
+    target: '[data-tour="calendar-export"]',
+    title: LIFE_GRID_TITLE,
+    body: LIFE_GRID_BODY,
     placement: 'bottom',
     padding: 6,
   },
@@ -236,6 +258,14 @@ const DESKTOP_STEPS: TourStep[] = [
     padding: 6,
   },
   {
+    target: '[data-tour="pet"]',
+    title: IGLOO_TITLE,
+    body: IGLOO_BODY,
+    bodyWithoutTarget: IGLOO_BODY_BEFORE_ADOPTION,
+    placement: 'right',
+    padding: 6,
+  },
+  {
     title: '✨ 你準備好了！',
     body: '最後一步：你想怎麼開始？',
   },
@@ -304,6 +334,14 @@ const MOBILE_STEPS: TourStep[] = [
     padding: 6,
   },
   {
+    target: '[data-tour="mobile-brain-dump"]',
+    mobileTab: 'calendar',
+    title: BRAIN_DUMP_TITLE,
+    body: BRAIN_DUMP_BODY,
+    placement: 'top',
+    padding: 6,
+  },
+  {
     target: '[data-tour="mobile-tabs"]',
     title: '底部五個分頁',
     body: '「重點」看各分類的進度，「任務」是完整清單，「白板」隨手記想法，「日曆」排時間，「連結」放常開的網址。',
@@ -339,12 +377,29 @@ const MOBILE_STEPS: TourStep[] = [
     padding: 6,
   },
   {
+    target: '[data-tour="pet"]',
+    mobileTab: 'calendar',
+    title: IGLOO_TITLE,
+    body: IGLOO_BODY,
+    bodyWithoutTarget: IGLOO_BODY_BEFORE_ADOPTION,
+    placement: 'top',
+    padding: 6,
+  },
+  {
     target: '[data-tour="mobile-more"]',
     mobileTab: 'calendar',
     title: '📅 每日簽到 ＆ 會議轉任務',
     body: '「⋯」裡的「每日簽到」：每天簽到一次，累積分數。「⋯」→「帳號」→「會議轉任務」：貼上會議逐字稿，Huddle 會幫你整理出待辦。',
     placement: 'bottom',
     padding: 4,
+  },
+  {
+    target: '[data-tour="mobile-more"]',
+    mobileTab: 'calendar',
+    title: LIFE_GRID_TITLE,
+    body: LIFE_GRID_BODY_PHONE,
+    placement: 'bottom',
+    padding: 6,
   },
   {
     title: '🤝 指派任務 ＆ 組織',

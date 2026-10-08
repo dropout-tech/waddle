@@ -193,7 +193,8 @@
   overflow-wrap: anywhere;
 }
 .bubble[data-side='right'] {
-  left: calc(100% - 6px);
+  /* starts past the calendar's hour gutter so the time labels stay readable */
+  left: calc(100% + 10px);
   bottom: 62%;
   border-bottom-left-radius: 4px;
 }
@@ -201,6 +202,35 @@
   left: 0;
   bottom: calc(100% + 8px);
   border-bottom-left-radius: 4px;
+}
+/* Answerable bubble (人生年曆 evening question): the button's ::after
+   stretches over the whole bubble, so a tap anywhere on it answers. */
+.bubble[data-actionable] {
+  cursor: pointer;
+}
+.bubbleAction {
+  display: block;
+  margin-top: 6px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.bubbleAction::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.bubbleAction:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 .bubbleName {
   display: block;
