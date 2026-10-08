@@ -24,6 +24,10 @@ export interface IglooView {
  * finished one.
  */
 const BG_SRC = '/art/igloo/igloo-bg.webp'
+const BG_NIGHT_SRC = '/art/igloo/igloo-bg-night.webp'
+/** The ice block the penguin carries (cut from the carry pose) — what flies onto the igloo. */
+const BLOCK_SRC = '/art/igloo/ice-block.webp'
+const BLOCK_RATIO = 99 / 240
 const IGLOO_SRC = '/art/igloo/igloo-full.webp'
 const POSE_SRC = {
   carry: '/art/igloo/pose-carry.webp',
@@ -102,7 +106,7 @@ type Pose = keyof typeof SPOTS
 /** Where the carried block is (scene units) — the flying brick starts here. */
 const HANDS = {
   x: ((SPOTS.carry.left + SPOTS.carry.width * 0.5) / 100) * W,
-  y: H * (1 - SPOTS.carry.bottom / 100) - (SPOTS.carry.width / 100) * W * 0.81,
+  y: H * (1 - SPOTS.carry.bottom / 100) - (SPOTS.carry.width / 100) * W * 0.79,
 }
 /**
  * The user's accessory on the painted poses: translate + scale (in the
@@ -110,7 +114,7 @@ const HANDS = {
  * pose's eyes onto each pose's eyes. Measured on the art.
  */
 const ACCESSORY_FIT: Partial<Record<Pose, { x: number; y: number; s: number }>> = {
-  carry: { x: 61.2, y: 76.9, s: 0.543 },
+  carry: { x: 57.3, y: 75.1, s: 0.517 },
   cheer: { x: 41.6, y: 40.3, s: 0.623 },
   sit: { x: 47.5, y: 33.2, s: 0.636 },
 }
@@ -215,13 +219,6 @@ export function IglooScene({
               ))}
             </g>
           </mask>
-          {flying && (
-            <mask id={`slot-${uid}`} maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
-              <g transform={artTransform}>
-                <rect x={flying.x} y={flying.y} width={flying.w} height={flying.h} fill="#fff" />
-              </g>
-            </mask>
-          )}
           <clipPath id={`noflag-${uid}`}>
             <rect x="0" y={ART_Y + ART_FLAG_BOTTOM * SCALE} width={W} height={H} />
           </clipPath>
@@ -248,17 +245,8 @@ export function IglooScene({
           </radialGradient>
         </defs>
 
-        <image href={BG_SRC} x="0" y="0" width={W} height={H} preserveAspectRatio="xMidYMid slice" />
-        {night && (
-          <g>
-            <rect x="0" y="0" width={W} height={H} fill="#3a2a1c" opacity="0.32" />
-            <circle cx="314" cy="42" r="26" fill={`url(#glow-${uid})`} opacity="0.5" />
-            <path d="M310 27 A16 16 0 1 0 330 52 A13 13 0 1 1 310 27 Z" fill="#f6dc8e" stroke="#5a3d22" strokeWidth="1.2" strokeLinejoin="round" />
-            {[[40, 34], [96, 20], [170, 38], [252, 22], [282, 62]].map(([x, y]) => (
-              <circle key={`${x}`} cx={x} cy={y} r="1.6" fill="#f6dc8e" opacity="0.9" />
-            ))}
-          </g>
-        )}
+        {/* day / night: two paintings of the same snowfield (the night one has its own moon) */}
+        <image href={night ? BG_NIGHT_SRC : BG_SRC} x="0" y="0" width={W} height={H} preserveAspectRatio="xMidYMid slice" />
 
         {/* the village: one painted igloo per finished one */}
         {VILLAGE.slice(0, villageCount).map((v, i) => {
@@ -305,16 +293,22 @@ export function IglooScene({
           </g>
         )}
 
-        {/* the brick in flight: the very brick of the painting it will become, lit up */}
-        {flying && flyFrom && (
-          <g
-            key={`fly-${placing}`}
-            className={styles.flying}
-            style={{ '--dx': `${flyFrom.dx}px`, '--dy': `${flyFrom.dy}px` } as React.CSSProperties}
-          >
-            <image href={IGLOO_SRC} x={ART_X} y={ART_Y} width={SIZE} height={SIZE} mask={`url(#slot-${uid})`} />
-          </g>
-        )}
+        {/* the brick in flight: the same painted ice block the penguin is holding */}
+        {flying && flyFrom && (() => {
+          const bw = Math.min(30, flying.w * SCALE)
+          const bh = bw * BLOCK_RATIO
+          const cx = ART_X + (flying.x + flying.w / 2) * SCALE
+          const cy = ART_Y + (flying.y + flying.h / 2) * SCALE
+          return (
+            <g
+              key={`fly-${placing}`}
+              className={styles.flying}
+              style={{ '--dx': `${flyFrom.dx}px`, '--dy': `${flyFrom.dy}px` } as React.CSSProperties}
+            >
+              <image href={BLOCK_SRC} x={cx - bw / 2} y={cy - bh / 2} width={bw} height={bh} />
+            </g>
+          )
+        })()}
 
         {/* light snowfall */}
         {!compact && (
