@@ -15,6 +15,7 @@ import {
   formatMoney,
   isLive,
   runNextAction,
+  SLP_CONFIGURED,
   toWebBillingError,
   webBillingAvailable,
   webBillingErrorMessage,
@@ -34,6 +35,10 @@ export default function BillingViews({ view }: { view: BillingView }) {
   const { session, loading } = useAuth()
 
   if (!webBillingAvailable()) return null
+  // No SHOPLINE keys yet: show the whole purchase page (prices, terms, trial) to
+  // everyone, signed in or not, with "payments coming soon" where the card form
+  // goes. No network call is made.
+  if (!SLP_CONFIGURED && view === 'purchase') return <PurchaseView preview />
   if (loading) {
     return (
       <BillingFrame title="Huddle Pro">
@@ -52,23 +57,34 @@ export default function BillingViews({ view }: { view: BillingView }) {
   if (view === 'return') return <ReturnView />
   if (view === 'card') return <CardView />
   if (view === 'pay') return <PayView />
-  return <PurchaseView />
+  return <PurchaseView preview={false} />
 }
 
 const SETTINGS_SUB = '/?settings=subscription'
 
 // ── /billing ────────────────────────────────────────────────────────────────
 
-function PurchaseView() {
-  const { lang, t } = useI18n()
-  const router = useRouter()
+/** Public offer shown while SHOPLINE is not configured (TWD minor units, 14-day trial). */
+const PREVIEW_SNAPSHOT: WebBillingSnapshot = {
+  checkout_available: true,
+  trial_eligible: true,
+  apple_active: false,
+  prices: { monthly: 15000, annual: 99000, currency: 'TWD' },
+  trial_days: 14,
+  subscription: null,
+  card: null,
+  payments: [],
+  open_refund: null,
+}
+
+function PurchaseView({ preview }: { preview: boolean }) {
+  if (preview) return <PurchaseForm snapshot={PREVIEW_SNAPSHOT} reload={async () => {}} preview />
+  return <PurchaseLoader />
+}
+
+function PurchaseLoader() {
+  const { t } = useI18n()
   const { snapshot, error, loading, reload } = useWebBilling()
-  const [plan, setPlan] = useState<WebPlan>('monthly')
-  const [agreed, setAgreed] = useState(false)
-  const [ready, setReady] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-  const paymentRef = useRef<SlpPayment | null>(null)
   const title = t('開始使用 Pro')
 
   if (loading) return <BillingFrame title={title}><Spinner label={t('讀取方案資料中…')} /></BillingFrame>
@@ -93,6 +109,19 @@ function PurchaseView() {
       </BillingFrame>
     )
   }
+  return <PurchaseForm snapshot={snapshot} reload={reload} preview={false} />
+}
+
+function PurchaseForm({ snapshot, reload, preview }: { snapshot: WebBillingSnapshot; reload: () => Promise<void>; preview: boolean }) {
+  const { lang, t } = useI18n()
+  const router = useRouter()
+  const [plan, setPlan] = useState<WebPlan>('monthly')
+  const [agreed, setAgreed] = useState(false)
+  const [ready, setReady] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const paymentRef = useRef<SlpPayment | null>(null)
+  const title = t('開始使用 Pro')
 
   const price = snapshot.prices[plan]
   const trial = snapshot.trial_eligible && snapshot.trial_days > 0
@@ -171,7 +200,9 @@ function PurchaseView() {
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold">{t('信用卡')}</h2>
-        <SlpPaymentForm amountMinor={price} bindCard paymentRef={paymentRef} onReadyChange={setReady} />
+        {preview
+          ? <Notice testId="billing-coming-soon">{t('付款功能即將開通。現在還無法付款，也不會向你收費。')}</Notice>
+          : <SlpPaymentForm amountMinor={price} bindCard paymentRef={paymentRef} onReadyChange={setReady} />}
       </section>
 
       <label className="flex cursor-pointer items-start gap-3 text-sm leading-6">

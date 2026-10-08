@@ -11,6 +11,7 @@ import {
   formatDeadline,
   formatMoney,
   isLive,
+  SLP_CONFIGURED,
   toWebBillingError,
   webBillingErrorMessage,
   type WebBillingSnapshot,
@@ -27,6 +28,24 @@ type Confirming = 'cancel' | 'refund' | null
  * is a link to /billing/* so the SLP SDK (and its wider CSP) stays off the main app.
  */
 export default function WebSubscriptionTab() {
+  // No SHOPLINE keys yet: nobody can have a subscription, so do not call the
+  // (not yet deployed) billing backend at all; just offer the purchase page.
+  if (!SLP_CONFIGURED) return <SubscriptionPreview />
+  return <WebSubscriptionLive />
+}
+
+function SubscriptionPreview() {
+  const { t } = useI18n()
+  return (
+    <div className="space-y-4" data-testid="sub-none">
+      <SectionTitle>{t('訂閱')}</SectionTitle>
+      <p className="text-sm text-muted-foreground">{t('你目前使用免費版。開始 Pro 可以先免費試用，試用期內取消不會扣款。')}</p>
+      <Link href="/billing" data-testid="sub-start" className={cn(btnPrimary, 'w-full sm:w-auto')}>{t('開始免費試用')}</Link>
+    </div>
+  )
+}
+
+function WebSubscriptionLive() {
   const { lang, t } = useI18n()
   const { snapshot, error, loading, reload, set } = useWebBilling()
   const [confirming, setConfirming] = useState<Confirming>(null)

@@ -7,7 +7,7 @@ import { ArrowDown, ArrowRight, ChevronDown, Download, Play } from 'lucide-react
 import { setLang } from '@/lib/i18n'
 import { brandQuote } from '@/lib/brand'
 import { useIsNativeShell } from '@/components/legal/web-only'
-import { SUPPORT_PHONE, SUPPORT_PHONE_TEL } from '@/lib/legal/operator'
+import { OPERATOR_NAME, SUPPORT_EMAIL, SUPPORT_PHONE, SUPPORT_PHONE_TEL } from '@/lib/legal/operator'
 import { FeatureFilm } from './feature-film'
 import { FirstVisitIntro } from './first-visit-intro'
 import { PromoLoop } from './promo-loop'
@@ -83,6 +83,43 @@ const copy = {
   },
 } as const
 
+// Same switch as lib/legal/web-sales.ts, repeated here on purpose: this file ships
+// to the browser, and the bundler only folds `process.env.*` to a constant (and then
+// drops the dead strings) inside the module that reads it, not across an import.
+const WEB_SALES_LIVE = process.env.HUDDLE_APP_SHELL_BUILD !== '1' && process.env.NEXT_PUBLIC_WEB_BILLING_ENABLED === 'true'
+
+// Website "on sale" wording (lib/legal/web-sales.ts). Merged over `copy` only when
+// the website checkout flag is on; in the iOS export WEB_SALES_LIVE is the
+// constant false, so none of this ships in the app (Apple 3.1.1(a)). The object is
+// built inside a `WEB_SALES_LIVE ? … : null` so the bundler drops the strings: a
+// plain top-level const survived dead-code elimination in the Capacitor export.
+const liveCopy = !WEB_SALES_LIVE ? null : {
+  zh: {
+    priceIntro: '核心功能免費使用。需要更多 AI 整理、建立組織或串接 Google 日曆時，再升級 Pro。',
+    freeBody: '任務、行程、專注計時、記事本與白板，跨裝置同步。免費版上限：進行中任務 150 個、筆記 100 則、圖片 200 MB、AI 會議整理每月 5 次。',
+    upgrade: '升級 Pro', month: '／月', year: '或 NT$990／年（比月繳一年省 NT$810）',
+    proBody: '進行中任務與記事本筆記不設數量上限、圖片 20 GB、AI 會議整理每月 20 次、建立組織、串接 Google 日曆。首次開始可享 2 週免費試用。',
+    priceNote: '價格以新台幣計，已含稅（如適用），沒有其他費用。首次開始 Pro 可享 2 週免費試用（需綁定信用卡，試用結束自動扣款，試用期內取消不收費，每人限一次）。網站以信用卡付款；Pro 為線上服務，付款後立即開通，沒有實體寄送。月繳或年繳會自動續訂，可隨時在帳號設定線上取消；試用結束後第一次扣款（或年繳續訂扣款）後 7 天內可申請全額退款。詳見頁尾的服務條款與取消與退款。',
+    questions: [
+      ['可以免費使用嗎？', '可以。核心功能免費，註冊帳號不會自動收費。免費版有用量上限，需要更多時再升級 Pro。'],
+      ['Pro 怎麼取消？', '在網站購買的 Pro，登入後到「設定」→「訂閱」線上取消，取消後不再扣款，Pro 可使用到已付費期間結束。'],
+      ['可以退款嗎？', '網站購買的 Pro，試用結束後第一次扣款起 7 天內可申請全額退款，年繳方案續訂扣款後 7 天內也可以。詳見「取消與退款」。'],
+    ],
+  },
+  en: {
+    priceIntro: 'Core features are free. Upgrade to Pro when you need more AI summaries, your own organizations or Google Calendar.',
+    freeBody: 'Tasks, calendars, focus timers, notebooks and the whiteboard, synced across devices. Free plan limits: 150 open tasks, 100 notes, 200 MB of images and 5 AI meeting summaries a month.',
+    upgrade: 'Upgrade to Pro', month: ' / month', year: 'or NT$990 / year (save NT$810 compared with paying monthly)',
+    proBody: 'No limit on open tasks and notes, 20 GB of images, 20 AI meeting summaries a month, your own organizations and Google Calendar. Your first time, start with a 2-week free trial.',
+    priceNote: 'Prices are in New Taiwan dollars and include any applicable tax, with no additional fees. Your first time starting Pro, you get a 2-week free trial (credit card required; charged automatically when the trial ends; cancel during the trial and you pay nothing; one trial per person). Website payments are by credit card; Pro is an online service that is available as soon as payment succeeds, and nothing is shipped. Plans renew monthly or yearly until you cancel online in your account settings, and you can get a full refund within 7 days of the first charge after your trial (or of an annual renewal charge). See the Terms of use and Cancellation & refunds in the footer.',
+    questions: [
+      ['Can I use Huddle for free?', 'Yes. Core features are free, and creating an account never starts a paid subscription. The free plan has usage limits; upgrade to Pro if you need more.'],
+      ['How do I cancel Pro?', 'If you bought on the website, sign in and cancel online under Settings → Subscription. You will not be charged again, and Pro stays active until the end of the period you have paid for.'],
+      ['Can I get a refund?', 'For Pro bought on the website, you can get a full refund within 7 days of the first charge after your trial, and within 7 days of an annual renewal. See Cancellation & refunds.'],
+    ],
+  },
+} as const
+
 // Hand-drawn illustrations (public/art/). Wide scenes come from the film
 // storyboard (public/art/film/); square "spot" drawings sit on the paper.
 const PILLAR_ART = [
@@ -99,7 +136,10 @@ function clauses(text: string) {
 }
 
 export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
-  const t = copy[locale]
+  const live = WEB_SALES_LIVE && liveCopy ? liveCopy[locale] : null
+  const t = live
+    ? { ...copy[locale], ...live, questions: [live.questions[0], live.questions[1], live.questions[2], ...copy[locale].questions.slice(1)] as readonly (readonly [string, string])[] }
+    : copy[locale]
   const en = locale === 'en'
   const base = en ? '/en' : ''
   const quote = brandQuote(en ? 'en' : 'zh')
@@ -285,7 +325,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
             <img src="/art/film/C-06.webp" width={1280} height={720} alt="" loading="lazy" decoding="async" />
           </picture>
         </div>
-        <div className={styles.plans}><article data-penguin-stop="price" data-penguin-at="0.86 0 0 -3"><h3>{t.free}</h3><p className={styles.price}>NT$0</p><p>{t.freeBody}</p><Link href="/signup" onClick={toLang} className={styles.primary}>{t.start}<ArrowRight size={19} aria-hidden="true" /></Link></article><article className={styles.pro}><h3>Pro <span>{t.soon}</span></h3><p className={styles.price}>NT$150<small>{t.month}</small></p><p className={styles.annual}>{t.year}</p><p>{t.proBody}</p></article></div>
+        <div className={styles.plans}><article data-penguin-stop="price" data-penguin-at="0.86 0 0 -3"><h3>{t.free}</h3><p className={styles.price}>NT$0</p><p>{t.freeBody}</p><Link href="/signup" onClick={toLang} className={styles.primary}>{t.start}<ArrowRight size={19} aria-hidden="true" /></Link></article><article className={styles.pro}><h3>{live ? 'Pro' : <>Pro <span>{t.soon}</span></>}</h3><p className={styles.price}>NT$150<small>{t.month}</small></p><p className={styles.annual}>{t.year}</p><p>{t.proBody}</p>{live ? <Link href="/billing" onClick={toLang} className={styles.primary} data-testid="pro-upgrade">{live.upgrade}<ArrowRight size={19} aria-hidden="true" /></Link> : null}</article></div>
         {native ? null : <p className={styles.priceNote} data-price-note>{t.priceNote}</p>}
       </section>}
 
@@ -303,7 +343,7 @@ export function MarketingPage({ locale = 'zh' }: { locale?: 'zh' | 'en' }) {
       </section>}
 
       <section className={styles.faq} aria-labelledby="faq-title"><div><h2 id="faq-title">{t.faqTitle}</h2><CheckInToy locale={locale} /></div><div>{t.questions.map(([q, a]) => <details key={q}><summary>{q}<ChevronDown size={22} aria-hidden="true" /></summary><p>{a}</p></details>)}</div></section>
-      <footer className={styles.footer}><Hammock /><div><Link href={`${base}/about`} className={styles.brand}>Huddle.</Link><p>{t.footerLine}</p><p className={styles.operatorLine} data-operator-footer>{t.operatorLine}<a href={SUPPORT_PHONE_TEL}>{SUPPORT_PHONE}</a>{en ? ' · ' : '｜'}<Link href={`${base}/terms#operator`}>{t.operatorLink}</Link></p></div><nav aria-label={en ? 'Service information' : '服務資訊'}>{['terms', 'privacy', 'refunds', 'support'].map((path, i) => <Link href={`${base}/${path}`} key={path}>{t.legal[i]}</Link>)}<a href="#top">{t.all}<ArrowDown className={styles.up} size={15} aria-hidden="true" /></a></nav></footer>
+      <footer className={styles.footer}><Hammock /><div><Link href={`${base}/about`} className={styles.brand}>Huddle.</Link><p>{t.footerLine}</p><p className={styles.operatorLine} data-operator-footer>{live ? <>{en ? `Huddle is operated by ${OPERATOR_NAME.en}, an individual in Taiwan. Email: ` : `Huddle 由${OPERATOR_NAME.zh}個人經營。客服信箱：`}<a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>{en ? ' · Phone: ' : '｜客服電話：'}</> : t.operatorLine}<a href={SUPPORT_PHONE_TEL}>{SUPPORT_PHONE}</a>{en ? ' · ' : '｜'}<Link href={`${base}/terms#operator`}>{t.operatorLink}</Link></p></div><nav aria-label={en ? 'Service information' : '服務資訊'}>{['terms', 'privacy', 'refunds', 'support'].map((path, i) => <Link href={`${base}/${path}`} key={path}>{t.legal[i]}</Link>)}<a href="#top">{t.all}<ArrowDown className={styles.up} size={15} aria-hidden="true" /></a></nav></footer>
       <RoamingPenguin locale={locale} />
       {/* First visit: the promo film plays first, with sound (portal above everything). */}
       <FirstVisitIntro locale={locale} copy={t.intro} fontClass={posterFonts} />

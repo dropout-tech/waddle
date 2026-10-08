@@ -22,6 +22,15 @@ Object.assign(en, webBillingDict)
 /** Build-time flag. Always false in the Capacitor export (see next.config.mjs). */
 export const WEB_BILLING_FLAG = process.env.NEXT_PUBLIC_WEB_BILLING_ENABLED === 'true'
 
+/**
+ * SHOPLINE front-end keys present at build time. Without them the card form can
+ * never load, so the pages show "payments are coming soon" instead of a form that
+ * would only fail, and make no request to the (not yet deployed) backend.
+ */
+export const SLP_CONFIGURED = Boolean(
+  process.env.NEXT_PUBLIC_SHOPLINE_CLIENT_KEY && process.env.NEXT_PUBLIC_SHOPLINE_MERCHANT_ID,
+)
+
 /** Flag on AND not inside the native shell. */
 export function webBillingAvailable(): boolean {
   return WEB_BILLING_FLAG && !isNative()
