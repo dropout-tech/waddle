@@ -32,8 +32,8 @@
 
 /* ── the igloo: one painting, revealed brick by brick ───── */
 .ghost {
-  opacity: 0.16;
-  filter: sepia(0.4) saturate(0.6);
+  /* the finished painting at ~18%: a soft warm shadow, not a line drawing */
+  opacity: 0.18;
 }
 /* a newly placed brick: the mask brick fades in as the flying one lands */
 .appear {

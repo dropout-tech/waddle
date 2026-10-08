@@ -40,57 +40,50 @@ const BASE = 206
 
 /**
  * The igloo painting, measured on its 1024px original: dome centre and base,
- * the five painted courses (bottom → top, y ranges) with the x of the painted
- * seams between blocks, and where the pennant starts.
+ * and for each painted course (bottom → top) its y range and the x edges of
+ * every painted block (the painted seams). One brick = one whole painted
+ * block, so a brick is either fully there or not there at all — never cut.
+ * IGLOO_LAYERS (lib/igloo/compute.ts) must match these block counts.
  */
 const ART = 1024
 const ART_CX = 510
 const ART_BASE = 880
 const ART_DOME_W = 931
 const ART_FLAG_BOTTOM = 198
-const COURSES: { y: [number, number]; x: [number, number]; seams: number[] }[] = [
-  { y: [704, 930], x: [10, 1014], seams: [136, 333, 510, 684, 887] },
-  { y: [562, 708], x: [30, 995], seams: [249, 383, 640, 766] },
-  { y: [422, 566], x: [70, 955], seams: [210, 391, 627, 813] },
-  { y: [298, 426], x: [140, 885], seams: [311, 512, 709] },
-  { y: [ART_FLAG_BOTTOM, 302], x: [240, 790], seams: [418, 610] },
+/** The painted snow patch under the igloo starts here — faded out, replaced by a soft shadow. */
+const ART_FADE: [number, number] = [868, 900]
+const COURSES: { y: [number, number]; edges: number[] }[] = [
+  // bottom row: edge block, block, door (arch legs + opening), block, edge block
+  { y: [704, 905], edges: [10, 136, 333, 684, 887, 1014] },
+  // the door arch counts as one block
+  { y: [562, 704], edges: [30, 249, 383, 640, 766, 995] },
+  { y: [422, 562], edges: [70, 210, 391, 627, 813, 955] },
+  { y: [298, 422], edges: [140, 311, 512, 709, 885] },
+  { y: [ART_FLAG_BOTTOM, 298], edges: [240, 418, 610, 790] },
 ]
+/** How far a brick reaches past its seams, so the dark seam line is part of both neighbours. */
+const SEAM_PAD = 7
 /** Main igloo width in scene units → scale of the painting. */
 const DOME_W = 152
 const SCALE = DOME_W / ART_DOME_W
 const SIZE = ART * SCALE
+const R_SHADOW = DOME_W * 0.62
 const ART_X = CX - ART_CX * SCALE
 const ART_Y = BASE - ART_BASE * SCALE
 
 interface Slot { x: number; y: number; w: number; h: number }
 
-/**
- * Brick n of an igloo → its slot in painting pixels. Each course's target
- * count (IGLOO_LAYERS) is shared out over the painted blocks by width, and a
- * block that gets more than one brick is split evenly — so mask edges fall
- * on painted seams wherever possible. Deterministic, so idempotent.
- */
-function buildSlots(): Slot[] {
-  const out: Slot[] = []
-  IGLOO_LAYERS.forEach((n, layer) => {
-    const c = COURSES[layer]
-    const edges = [c.x[0], ...c.seams, c.x[1]]
-    const blocks = edges.slice(1).map((e, i) => [edges[i], e] as const)
-    const total = c.x[1] - c.x[0]
-    const raw = blocks.map(([a, b]) => ((b - a) / total) * n)
-    const counts = raw.map((r) => Math.max(1, Math.floor(r)))
-    let left = n - counts.reduce((a, b) => a + b, 0)
-    const order = raw.map((r, i) => [r - Math.floor(r), i] as const).sort((a, b) => b[0] - a[0])
-    for (let k = 0; left > 0; k = (k + 1) % order.length, left--) counts[order[k][1]]++
-    for (let k = order.length - 1; left < 0; k--, left++) if (counts[order[k][1]] > 1) counts[order[k][1]]--
-    blocks.forEach(([a, b], i) => {
-      const step = (b - a) / counts[i]
-      for (let j = 0; j < counts[i]; j++) out.push({ x: a + j * step - 3, y: c.y[0] - 3, w: step + 6, h: c.y[1] - c.y[0] + 6 })
-    })
-  })
-  return out
+const SLOTS: Slot[] = COURSES.flatMap((c) =>
+  c.edges.slice(1).map((e, i) => ({
+    x: c.edges[i] - SEAM_PAD,
+    y: c.y[0] - SEAM_PAD,
+    w: e - c.edges[i] + SEAM_PAD * 2,
+    h: c.y[1] - c.y[0] + SEAM_PAD * 2,
+  })),
+)
+if (process.env.NODE_ENV !== 'production' && SLOTS.length !== IGLOO_LAYERS.reduce((a, b) => a + b, 0)) {
+  console.error('[igloo] painted blocks and IGLOO_LAYERS disagree')
 }
-const SLOTS = buildSlots()
 const slotOf = (n: number) => {
   const { layer, index } = brickSlot(n)
   let offset = 0
@@ -214,13 +207,9 @@ export function IglooScene({
     >
       <svg viewBox={`0 0 ${W} ${H}`} className={styles.svg} aria-hidden="true">
         <defs>
-          {/* Brick-shaped mask edges: wobble them so they read as hand-cut, not ruled. */}
-          <filter id={`cut-${uid}`} x="-5%" y="-5%" width="110%" height="110%">
-            <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="11" result="warp" />
-            <feDisplacementMap in="SourceGraphic" in2="warp" scale="14" xChannelSelector="R" yChannelSelector="G" />
-          </filter>
+          {/* Whole painted blocks only; their edges run along the painted seams. */}
           <mask id={`built-${uid}`} maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
-            <g transform={artTransform} filter={`url(#cut-${uid})`}>
+            <g transform={artTransform}>
               {placed.map((s, i) => (
                 <rect key={i} x={s.x} y={s.y} width={s.w} height={s.h} fill="#fff" className={i === placing ? styles.appear : undefined} />
               ))}
@@ -228,7 +217,7 @@ export function IglooScene({
           </mask>
           {flying && (
             <mask id={`slot-${uid}`} maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
-              <g transform={artTransform} filter={`url(#cut-${uid})`}>
+              <g transform={artTransform}>
                 <rect x={flying.x} y={flying.y} width={flying.w} height={flying.h} fill="#fff" />
               </g>
             </mask>
@@ -239,6 +228,19 @@ export function IglooScene({
           <clipPath id={`flag-${uid}`}>
             <rect x="0" y="0" width={W} height={ART_Y + ART_FLAG_BOTTOM * SCALE} />
           </clipPath>
+          {/* Fade out the painted snow patch under an igloo (it read as a hard white disc). */}
+          <linearGradient id={`fadeg-${uid}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset={ART_FADE[0] / ART} stopColor="#fff" />
+            <stop offset={ART_FADE[1] / ART} stopColor="#000" />
+          </linearGradient>
+          <mask id={`fade-${uid}`} maskContentUnits="objectBoundingBox">
+            <rect width="1" height="1" fill={`url(#fadeg-${uid})`} />
+          </mask>
+          <radialGradient id={`shadow-${uid}`}>
+            <stop offset="0%" stopColor="#c9a46a" stopOpacity="0.45" />
+            <stop offset="70%" stopColor="#d9b98a" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#d9b98a" stopOpacity="0" />
+          </radialGradient>
           <radialGradient id={`glow-${uid}`}>
             <stop offset="0%" stopColor="#ffe9a8" stopOpacity="0.95" />
             <stop offset="55%" stopColor="#f6c862" stopOpacity="0.35" />
@@ -261,7 +263,12 @@ export function IglooScene({
         {/* the village: one painted igloo per finished one */}
         {VILLAGE.slice(0, villageCount).map((v, i) => {
           const b = iglooBox(v.x, v.y, v.s)
-          return <image key={i} href={IGLOO_SRC} x={b.x} y={b.y} width={b.size} height={b.size} />
+          return (
+            <g key={i}>
+              <ellipse cx={v.x} cy={v.y + 1} rx={R_SHADOW * v.s} ry={7 * v.s + 1} fill={`url(#shadow-${uid})`} />
+              <image href={IGLOO_SRC} x={b.x} y={b.y} width={b.size} height={b.size} mask={`url(#fade-${uid})`} />
+            </g>
+          )
         })}
 
         {/* footprints in the snow between the penguin and the igloo */}
@@ -272,9 +279,14 @@ export function IglooScene({
         {/* the moment an igloo is finished: a warm glow like the film's light bursts */}
         {celebrating && <circle cx={CX} cy={BASE - 50} r="105" fill={`url(#glow-${uid})`} className={styles.glow} />}
 
+        {/* a soft snow shadow under the igloo instead of the painted disc */}
+        <ellipse cx={CX} cy={BASE + 2} rx={R_SHADOW} ry="9" fill={`url(#shadow-${uid})`} />
+
         {showFinished ? (
           <g>
-            <image href={IGLOO_SRC} x={ART_X} y={ART_Y} width={SIZE} height={SIZE} clipPath={`url(#noflag-${uid})`} />
+            <g mask={`url(#fade-${uid})`}>
+              <image href={IGLOO_SRC} x={ART_X} y={ART_Y} width={SIZE} height={SIZE} clipPath={`url(#noflag-${uid})`} />
+            </g>
             {/* the painted pennant goes up */}
             <g className={celebrating ? styles.flagUp : undefined}>
               <image href={IGLOO_SRC} x={ART_X} y={ART_Y} width={SIZE} height={SIZE} clipPath={`url(#flag-${uid})`} />
@@ -282,10 +294,14 @@ export function IglooScene({
           </g>
         ) : (
           <g>
-            {/* the whole igloo, faintly, as the sketch of what's to come */}
-            <image href={IGLOO_SRC} x={ART_X} y={ART_Y} width={SIZE} height={SIZE} clipPath={`url(#noflag-${uid})`} className={styles.ghost} />
-            {/* …and the same painting revealed brick by brick */}
-            <image href={IGLOO_SRC} x={ART_X} y={ART_Y} width={SIZE} height={SIZE} mask={`url(#built-${uid})`} />
+            {/* the whole igloo as a faint shadow of what's to come */}
+            <g mask={`url(#fade-${uid})`}>
+              <image href={IGLOO_SRC} x={ART_X} y={ART_Y} width={SIZE} height={SIZE} clipPath={`url(#noflag-${uid})`} className={styles.ghost} />
+            </g>
+            {/* …and the same painting revealed one whole block at a time */}
+            <g mask={`url(#fade-${uid})`}>
+              <image href={IGLOO_SRC} x={ART_X} y={ART_Y} width={SIZE} height={SIZE} mask={`url(#built-${uid})`} />
+            </g>
           </g>
         )}
 
