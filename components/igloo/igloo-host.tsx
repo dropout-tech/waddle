@@ -333,8 +333,9 @@ function IglooDialog({
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary" aria-hidden="true">
           <div
-            className="h-full origin-left rounded-full bg-primary transition-transform duration-500 ease-out motion-reduce:transition-none"
-            style={{ transform: `scaleX(${inProgress / per})` }}
+            className="h-full origin-left rounded-full transition-transform duration-500 ease-out motion-reduce:transition-none"
+            // terracotta in both themes (dark mode's primary is mustard)
+            style={{ transform: `scaleX(${inProgress / per})`, background: '#c4552f' }}
           />
         </div>
         {/* The bubble carries the mood line unless it's busy with the catch-up news. */}

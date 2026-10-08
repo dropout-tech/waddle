@@ -32,9 +32,11 @@ const NOW = at('2026-10-03', '15:00')
 const done = (id, day, hm = '10:00') => ({ id, isCompleted: true, completedAt: at(day, hm).toISOString() })
 const many = (n, day, prefix = 't') => Array.from({ length: n }, (_, i) => done(`${prefix}${i}`, day))
 
-check('constants: 35 bricks in 5 courses, bottom courses fill first', () => {
-  assert.equal(BRICKS_PER_IGLOO, 35)
-  assert.deepEqual([...IGLOO_LAYERS], [6, 7, 8, 8, 6])
+const P = BRICKS_PER_IGLOO
+
+check('constants: 22 bricks in 5 courses = the blocks painted in the igloo art', () => {
+  assert.equal(P, 22)
+  assert.deepEqual([...IGLOO_LAYERS], [5, 5, 5, 4, 3])
 })
 
 check('0 bricks → fresh igloo, building, no last active day', () => {
@@ -55,8 +57,8 @@ check('ignores not-completed tasks', () => {
 })
 
 check('exactly one igloo finished today → proud, next igloo empty', () => {
-  const s = computeIgloo(many(35, '2026-10-03'), {}, NOW)
-  assert.equal(s.totalBricks, 35)
+  const s = computeIgloo(many(P, '2026-10-03'), {}, NOW)
+  assert.equal(s.totalBricks, P)
   assert.equal(s.completedIgloos, 1)
   assert.equal(s.iglooIndex, 1)
   assert.equal(s.bricksInCurrent, 0)
@@ -65,20 +67,20 @@ check('exactly one igloo finished today → proud, next igloo empty', () => {
 })
 
 check('igloo finished yesterday → today it is just building again', () => {
-  const s = computeIgloo(many(35, '2026-10-02'), {}, NOW)
+  const s = computeIgloo(many(P, '2026-10-02'), {}, NOW)
   assert.equal(s.completedIgloos, 1)
   assert.equal(s.finishedToday, false)
   assert.equal(s.mood, 'building')
   assert.equal(s.daysIdle, 1)
 })
 
-check('crossing into the third igloo (30 old + 45 today = 75)', () => {
-  const s = computeIgloo([...many(30, '2026-09-28', 'old'), ...many(45, '2026-10-03', 'new')], {}, NOW)
-  assert.equal(s.totalBricks, 75)
+check('crossing into the third igloo (P-2 old + P+7 today = 2P+5)', () => {
+  const s = computeIgloo([...many(P - 2, '2026-09-28', 'old'), ...many(P + 7, '2026-10-03', 'new')], {}, NOW)
+  assert.equal(s.totalBricks, 2 * P + 5)
   assert.equal(s.completedIgloos, 2)
   assert.equal(s.iglooIndex, 2)
   assert.equal(s.bricksInCurrent, 5)
-  assert.equal(s.bricksToday, 45)
+  assert.equal(s.bricksToday, P + 7)
   assert.equal(s.finishedToday, true)
   assert.equal(s.mood, 'proud')
 })
@@ -110,7 +112,7 @@ check('late night (23:30 and 02:00) → sleeping', () => {
 })
 
 check('proud beats sleeping (finished an igloo at 23:40)', () => {
-  const s = computeIgloo(many(35, '2026-10-03'), {}, at('2026-10-03', '23:40'))
+  const s = computeIgloo(many(P, '2026-10-03'), {}, at('2026-10-03', '23:40'))
   assert.equal(s.mood, 'proud')
 })
 
@@ -196,11 +198,11 @@ check('pomodoros on a shared device go to the account that was signed in', () =>
 
 check('brick slots fill bottom course first and stay in range', () => {
   assert.deepEqual(brickSlot(0), { layer: 0, index: 0 })
-  assert.deepEqual(brickSlot(5), { layer: 0, index: 5 })
-  assert.deepEqual(brickSlot(6), { layer: 1, index: 0 })
-  assert.deepEqual(brickSlot(13), { layer: 2, index: 0 })
-  assert.deepEqual(brickSlot(34), { layer: 4, index: 5 })
-  assert.deepEqual(brickSlot(99), { layer: 4, index: 5 })
+  assert.deepEqual(brickSlot(4), { layer: 0, index: 4 })
+  assert.deepEqual(brickSlot(5), { layer: 1, index: 0 })
+  assert.deepEqual(brickSlot(10), { layer: 2, index: 0 })
+  assert.deepEqual(brickSlot(21), { layer: 4, index: 2 })
+  assert.deepEqual(brickSlot(99), { layer: 4, index: 2 })
 })
 
 check('catch-up line wording', () => {

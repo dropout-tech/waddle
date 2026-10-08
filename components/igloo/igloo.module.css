@@ -16,6 +16,7 @@
   border-radius: 1rem;
   background: #f3dfb4;
   isolation: isolate;
+  container-type: inline-size;
 }
 :global(.dark) .scene {
   filter: brightness(0.92);
@@ -32,8 +33,8 @@
 
 /* ── the igloo: one painting, revealed brick by brick ───── */
 .ghost {
-  opacity: 0.16;
-  filter: sepia(0.4) saturate(0.6);
+  /* the finished painting at ~18%: a soft warm shadow, not a line drawing */
+  opacity: 0.18;
 }
 /* a newly placed brick: the mask brick fades in as the flying one lands */
 .appear {
@@ -43,7 +44,7 @@
   0%, 70% { opacity: 0; }
   100% { opacity: 1; }
 }
-/* the brick in flight is lit up, then dims back as it lands */
+/* the carried block flies from the penguin to its place, then hands over to the painting */
 .flying {
   transform-box: fill-box;
   transform-origin: 50% 50%;
@@ -52,23 +53,19 @@
 }
 @keyframes fly {
   0% {
-    transform: translate(var(--dx), var(--dy)) scale(0.85);
-    filter: brightness(1.35) drop-shadow(0 0 3px rgba(255, 220, 140, 0.9));
+    transform: translate(var(--dx), var(--dy)) scale(0.9);
     opacity: 1;
   }
   55% {
     transform: translate(calc(var(--dx) * 0.4), calc(var(--dy) * 0.4 - 24px)) scale(1);
-    filter: brightness(1.35) drop-shadow(0 0 4px rgba(255, 220, 140, 0.9));
     opacity: 1;
   }
-  80% {
+  85% {
     transform: translate(0, 0) scale(1);
-    filter: brightness(1.3) drop-shadow(0 0 3px rgba(255, 220, 140, 0.8));
     opacity: 1;
   }
   100% {
     transform: translate(0, 0) scale(1);
-    filter: brightness(1) drop-shadow(0 0 0 rgba(255, 220, 140, 0));
     opacity: 0;
   }
 }
@@ -216,7 +213,19 @@
   font-size: 0.82rem;
   line-height: 1.45;
   box-shadow: 0 2px 0 rgba(116, 80, 47, 0.14);
+  text-wrap: pretty; /* no lonely 「了。」 on the last line */
   animation: pop 220ms ease-out both;
+}
+/* phone-sized scene: a wide, short bubble in the sky — two lines, clear of the igloo roof */
+@container (max-width: 460px) {
+  .bubble {
+    top: 8%;
+    left: 3%;
+    max-width: 94%;
+    padding: 0.4rem 0.6rem 0.3rem;
+    font-size: 0.72rem;
+    line-height: 1.4;
+  }
 }
 .nameTag {
   position: absolute;

@@ -35,6 +35,7 @@ const CAT = `${PREFIX}分類${Date.now() % 100000}`
 const TASKS = [`${PREFIX}任務一`, `${PREFIX}任務二`]
 const CJK = /[㐀-鿿]/
 const READ_RPCS = /\/rpc\/(get_|preview_)/
+const { BRICKS_PER_IGLOO: PER } = await import('../../lib/igloo/compute.ts')
 // The most recent 15:00 local that is already in the past (session tokens stay valid).
 const DAYTIME = new Date(); DAYTIME.setHours(15, 0, 0, 0); if (DAYTIME.getTime() > Date.now()) DAYTIME.setDate(DAYTIME.getDate() - 1)
 const NIGHT = new Date(); NIGHT.setHours(23, 30, 0, 0); if (NIGHT.getTime() > Date.now()) NIGHT.setDate(NIGHT.getDate() - 1)
@@ -160,7 +161,8 @@ async function openViaEvent(page) {
 
 async function waitReplayDone(page) {
   await page.waitForFunction(() => document.querySelector('[data-igloo-dialog]')?.getAttribute('data-igloo-replaying') === 'false', null, { timeout: 30000 })
-  await page.waitForTimeout(400)
+  // the penguin's new pose fades in over 700ms after the replay — don't photograph it half-faded
+  await page.waitForTimeout(1000)
 }
 
 async function readDialog(page) {
@@ -240,7 +242,7 @@ const countCompleted = async () => {
     const db = await countCompleted()
     assert.equal(d.shown, d.total, 'shown == total after replay')
     assert.equal(d.total, db, `igloo total ${d.total} vs completed tasks in DB ${db}`)
-    assert.equal(d.bricks, d.total % 35, 'bricks drawn on the current igloo')
+    assert.equal(d.bricks, d.total % PER, 'bricks drawn on the current igloo (whole painted blocks)')
     return `total=${d.total} (DB completed=${db}), drawn=${d.bricks}, mood=${d.mood}, progress="${d.progress}"`
   })
   await step('desktop 1440 screenshot (line under the scene matches the pose)', async () => {
@@ -375,10 +377,13 @@ const countCompleted = async () => {
       return { onDialog: a?.hasAttribute('data-igloo-dialog'), ring: a?.matches(':focus-visible') && getComputedStyle(a).outlineStyle !== 'none' }
     })
     assert.ok(focus.onDialog && !focus.ring, `focus on open: ${JSON.stringify(focus)}`)
+    // the screenshot is how it looks when opened by touch: no focus ring anywhere
+    const ringNow = await page.evaluate(() => [...document.querySelectorAll('[data-igloo-dialog] *')].some((n) => n.matches(':focus-visible')))
+    assert.equal(ringNow, false, 'no focus ring on open')
+    await shot(page, 'igloo-mobile-390.png')
     await page.keyboard.press('Tab')
     const tabbed = await page.evaluate(() => ({ label: document.activeElement?.getAttribute('aria-label'), visible: document.activeElement?.matches(':focus-visible') }))
     assert.ok(tabbed.label === '關閉' && tabbed.visible, `Tab → ${JSON.stringify(tabbed)}`)
-    await shot(page, 'igloo-mobile-390.png')
     return `dialog ${Math.round(box.width)}×${Math.round(box.height)} at x=${Math.round(box.x)}; ✕ ${x.width}×${x.height}; open focus on dialog without ring, Tab → ✕ with focus-visible`
   })
   await context.close()
@@ -446,11 +451,11 @@ const countCompleted = async () => {
   const page = await context.newPage()
   await openApp(page)
   await step('village: 2 finished igloos stand in the back', async () => {
-    await injectLedger(page, { fake: 72, agoDays: 1, seenDelta: 0 })
+    await injectLedger(page, { fake: 2 * PER + 2, agoDays: 1, seenDelta: 0 })
     await openViaEvent(page)
     await waitReplayDone(page)
     const d = await readDialog(page)
-    assert.ok(d.total >= 70, `total ${d.total}`)
+    assert.ok(d.total >= 2 * PER, `total ${d.total}`)
     await freeze(page)
     await shot(page, 'igloo-village-1440.png', dialog(page))
     await closeDialog(page)
@@ -464,8 +469,8 @@ const countCompleted = async () => {
   await openApp(page)
   await step('finishing an igloo: painting fades in, pennant rises, penguin cheers', async () => {
     const live = await page.evaluate((key) => Object.keys(JSON.parse(localStorage.getItem(key) ?? '{"tasks":{}}').tasks).length, `huddle-igloo-v1:${uid}`)
-    // a natural day: everything up to yesterday, then 4 done today that finish igloo no. 2 (70 bricks)
-    await injectLedger(page, { fake: 70 - live - 4, agoDays: 2, seenDelta: 0, prefix: 'past' })
+    // a natural day: everything up to yesterday, then 4 done today that finish igloo no. 2
+    await injectLedger(page, { fake: 2 * PER - live - 4, agoDays: 2, seenDelta: 0, prefix: 'past' })
     await injectLedger(page, { fake: 4, agoDays: 0, seenDelta: 2, prefix: 'today' })
     await openViaEvent(page)
     await page.waitForFunction(() => document.querySelector('[data-igloo-dialog]')?.getAttribute('data-igloo-celebrating') === 'true', null, { timeout: 20000 })
