@@ -161,7 +161,8 @@ async function openViaEvent(page) {
 
 async function waitReplayDone(page) {
   await page.waitForFunction(() => document.querySelector('[data-igloo-dialog]')?.getAttribute('data-igloo-replaying') === 'false', null, { timeout: 30000 })
-  await page.waitForTimeout(400)
+  // the penguin's new pose fades in over 700ms after the replay — don't photograph it half-faded
+  await page.waitForTimeout(1000)
 }
 
 async function readDialog(page) {
@@ -376,10 +377,13 @@ const countCompleted = async () => {
       return { onDialog: a?.hasAttribute('data-igloo-dialog'), ring: a?.matches(':focus-visible') && getComputedStyle(a).outlineStyle !== 'none' }
     })
     assert.ok(focus.onDialog && !focus.ring, `focus on open: ${JSON.stringify(focus)}`)
+    // the screenshot is how it looks when opened by touch: no focus ring anywhere
+    const ringNow = await page.evaluate(() => [...document.querySelectorAll('[data-igloo-dialog] *')].some((n) => n.matches(':focus-visible')))
+    assert.equal(ringNow, false, 'no focus ring on open')
+    await shot(page, 'igloo-mobile-390.png')
     await page.keyboard.press('Tab')
     const tabbed = await page.evaluate(() => ({ label: document.activeElement?.getAttribute('aria-label'), visible: document.activeElement?.matches(':focus-visible') }))
     assert.ok(tabbed.label === '關閉' && tabbed.visible, `Tab → ${JSON.stringify(tabbed)}`)
-    await shot(page, 'igloo-mobile-390.png')
     return `dialog ${Math.round(box.width)}×${Math.round(box.height)} at x=${Math.round(box.x)}; ✕ ${x.width}×${x.height}; open focus on dialog without ring, Tab → ✕ with focus-visible`
   })
   await context.close()

@@ -16,6 +16,7 @@
   border-radius: 1rem;
   background: #f3dfb4;
   isolation: isolate;
+  container-type: inline-size;
 }
 :global(.dark) .scene {
   filter: brightness(0.92);
@@ -212,7 +213,19 @@
   font-size: 0.82rem;
   line-height: 1.45;
   box-shadow: 0 2px 0 rgba(116, 80, 47, 0.14);
+  text-wrap: pretty; /* no lonely 「了。」 on the last line */
   animation: pop 220ms ease-out both;
+}
+/* phone-sized scene: a wide, short bubble in the sky — two lines, clear of the igloo roof */
+@container (max-width: 460px) {
+  .bubble {
+    top: 8%;
+    left: 3%;
+    max-width: 94%;
+    padding: 0.4rem 0.6rem 0.3rem;
+    font-size: 0.72rem;
+    line-height: 1.4;
+  }
 }
 .nameTag {
   position: absolute;
