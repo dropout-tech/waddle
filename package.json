@@ -14,7 +14,7 @@
     "build:cap": "BUILD_TARGET=capacitor next build",
     "cap:sync": "pnpm build:cap && cap sync ios",
     "ios:preflight": "node scripts/ios-release-preflight.mjs",
-    "cap:sync:release": "node scripts/ios-release-preflight.mjs && pnpm cap:sync",
+    "cap:sync:release": "node scripts/ios-release-preflight.mjs && pnpm cap:sync && node scripts/ios-bundle-check.mjs",
     "cap:open": "cap open ios",
     "cap:run": "pnpm cap:sync && cap run ios",
     "start": "next start -p ${PORT:-3000}",
