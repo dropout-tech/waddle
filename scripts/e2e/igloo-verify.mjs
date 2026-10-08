@@ -174,7 +174,7 @@ async function readDialog(page) {
     today: Number(el.getAttribute('data-igloo-today')),
     bubble: el.querySelector('[data-igloo-bubble]')?.textContent ?? '',
     progress: el.querySelector('[data-igloo-progress]')?.textContent ?? '',
-    bricks: el.querySelectorAll('[data-igloo-scene] mask[id^="built"] rect').length,
+    bricks: el.querySelectorAll('[data-igloo-scene] mask[id^="built"] polygon').length,
   }))
 }
 

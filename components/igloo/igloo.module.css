@@ -187,12 +187,14 @@
   font-size: 0.8em;
   line-height: 1;
 }
-.zzz span {
+.zzz svg {
   display: inline-block;
+  vertical-align: bottom;
+  overflow: visible;
   animation: zzz 2.4s ease-out infinite;
 }
-.zzz span:nth-child(2) { animation-delay: 0.8s; }
-.zzz span:nth-child(3) { animation-delay: 1.6s; }
+.zzz svg:nth-child(2) { animation-delay: 0.8s; }
+.zzz svg:nth-child(3) { animation-delay: 1.6s; }
 @keyframes zzz {
   0% { transform: translate(0, 0); opacity: 0; }
   30% { opacity: 1; }
@@ -257,7 +259,7 @@
   .poseIn,
   .penguinInner,
   .hop,
-  .zzz span,
+  .zzz svg,
   .bubble {
     animation: none !important;
   }
