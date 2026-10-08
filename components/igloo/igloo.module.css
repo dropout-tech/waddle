@@ -1,29 +1,20 @@
-/* 企鵝的冰屋 — a Codex-painted snow plate (public/art/igloo/) with the
-   live parts (bricks, door, flying brick) drawn in SVG on top. Their line
-   colour is sampled from the plate's dry-brush browns (igloo-bg ≈ #886040,
-   igloo-done ≈ #5c3018), their fill is paper grain, and an
-   feTurbulence/feDisplacementMap filter roughens the edges — so the two
-   materials read as one painting (DESIGN.md 紙本輕版). No cold blues.
-   Dark mode keeps the paper picture as a dimmed sticker (DESIGN.md
-   插畫用法). Motion is transform/opacity only (ease-out, no bounce) and is
-   off under reduced motion. */
+/* 企鵝的冰屋 — painted in the promo film's style (Codex CLI, art in
+   public/art/igloo/): a golden snow plate, one finished-igloo painting that
+   is revealed brick by brick through a mask, and painted penguin poses.
+   No vector strokes on top, so everything reads as one frame of the film.
+   Dark mode shows the scene as a dimmed sticker (DESIGN.md 插畫用法).
+   Motion is transform/opacity/filter only (ease-out, no bounce) and is off
+   under reduced motion. */
 
 .scene {
-  --ig-brick: #f5ead6;
-  --ig-brick-shade: #dcc6a3;
-  --ig-line: #74502f;
-  --ig-pencil: rgba(116, 80, 47, 0.2);
-  --ig-door: #4a3424;
-  --ig-flag: #c4552f;
-  --ig-sun: #e8bf4a;
-  --ig-flake: #fbf6ea;
-  --ig-snow-shade: #e0d0b2;
+  --ig-line: #5a3d22;
+  --ig-flake: #fff6df;
   position: relative;
   width: 100%;
   aspect-ratio: 3 / 2;
   overflow: hidden;
   border-radius: 1rem;
-  background: #f4efe2;
+  background: #f3dfb4;
   isolation: isolate;
 }
 :global(.dark) .scene {
@@ -39,80 +30,67 @@
   display: block;
 }
 
-/* ── bricks ───────────────────────────────────────────── */
-.brick {
-  stroke: var(--ig-line);
-  stroke-width: 1.4;
-  stroke-linejoin: round;
+/* ── the igloo: one painting, revealed brick by brick ───── */
+.ghost {
+  opacity: 0.16;
+  filter: sepia(0.4) saturate(0.6);
 }
-.brickShade {
-  fill: none;
-  stroke: var(--ig-brick-shade);
-  stroke-width: 1.6;
-  stroke-linecap: round;
-}
-/* the dome still to build: a faint pencil under-drawing */
-.ghost path {
-  fill: none;
-  stroke: var(--ig-pencil);
-  stroke-width: 0.8;
-  stroke-linecap: round;
-}
-/* The real brick fades in as the flying one lands on it. */
+/* a newly placed brick: the mask brick fades in as the flying one lands */
 .appear {
-  animation: appear 520ms ease-out both;
+  animation: appear 560ms ease-out both;
 }
 @keyframes appear {
-  0%, 75% { opacity: 0; }
+  0%, 70% { opacity: 0; }
   100% { opacity: 1; }
 }
-/* The brick flies from the penguin's flippers to its slot. */
+/* the brick in flight is lit up, then dims back as it lands */
 .flying {
   transform-box: fill-box;
   transform-origin: 50% 50%;
   pointer-events: none;
-  animation: fly 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fly 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @keyframes fly {
   0% {
-    transform: translate(var(--dx), var(--dy)) scale(0.8);
+    transform: translate(var(--dx), var(--dy)) scale(0.85);
+    filter: brightness(1.35) drop-shadow(0 0 3px rgba(255, 220, 140, 0.9));
     opacity: 1;
   }
   55% {
-    transform: translate(calc(var(--dx) * 0.4), calc(var(--dy) * 0.4 - 26px)) scale(0.95);
+    transform: translate(calc(var(--dx) * 0.4), calc(var(--dy) * 0.4 - 24px)) scale(1);
+    filter: brightness(1.35) drop-shadow(0 0 4px rgba(255, 220, 140, 0.9));
     opacity: 1;
   }
-  85% {
+  80% {
     transform: translate(0, 0) scale(1);
+    filter: brightness(1.3) drop-shadow(0 0 3px rgba(255, 220, 140, 0.8));
     opacity: 1;
   }
   100% {
     transform: translate(0, 0) scale(1);
+    filter: brightness(1) drop-shadow(0 0 0 rgba(255, 220, 140, 0));
     opacity: 0;
   }
 }
 
-/* ── an igloo is finished: bricks → painting, pennant goes up ── */
-.fadeOut {
-  animation: fadeOut 900ms ease-out 200ms both;
+/* ── an igloo is finished: warm glow, the pennant goes up ── */
+.glow {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: glow 2400ms ease-out both;
 }
-@keyframes fadeOut {
-  to { opacity: 0; }
-}
-.doneIn {
-  animation: doneIn 900ms ease-out 200ms both;
-}
-@keyframes doneIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes glow {
+  0% { opacity: 0; transform: scale(0.6); }
+  35% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0.55; transform: scale(1.05); }
 }
 .flagUp {
   transform-box: fill-box;
   transform-origin: 50% 100%;
-  animation: flagUp 900ms cubic-bezier(0.22, 1, 0.36, 1) 900ms both;
+  animation: flagUp 900ms cubic-bezier(0.22, 1, 0.36, 1) 500ms both;
 }
 @keyframes flagUp {
-  from { transform: translateY(14px) scaleY(0.3); opacity: 0; }
+  from { transform: translateY(12px); opacity: 0; }
   to { transform: none; opacity: 1; }
 }
 
@@ -173,7 +151,7 @@
   animation: lean 2.4s ease-in-out infinite;
 }
 /* the moment an igloo is finished: rises a little and settles (no bounce) */
-[data-igloo-penguin='happy'] .penguinInner {
+[data-igloo-penguin='cheer'] .penguinInner {
   animation: rise 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 /* waiting: sits in the snow and now and then looks down the path */
@@ -184,8 +162,8 @@
   animation: hop 380ms ease-out 1 !important;
 }
 @keyframes lean {
-  0%, 100% { transform: rotate(4deg); }
-  50% { transform: rotate(6deg) translateY(-1.5%); }
+  0%, 100% { transform: rotate(1deg); }
+  50% { transform: rotate(3deg) translateY(-1.5%); }
 }
 @keyframes rise {
   0% { transform: translateY(0); }
@@ -197,18 +175,9 @@
   55%, 85% { transform: rotate(3deg); }
 }
 @keyframes hop {
-  0% { transform: rotate(4deg) translateY(0); }
-  45% { transform: rotate(5deg) translateY(-7%); }
-  100% { transform: rotate(4deg) translateY(0); }
-}
-
-.drift {
-  position: absolute;
-  left: -16%;
-  width: 132%;
-  bottom: -5%;
-  height: auto;
-  overflow: visible;
+  0% { transform: rotate(1deg) translateY(0); }
+  45% { transform: rotate(2deg) translateY(-6%); }
+  100% { transform: rotate(1deg) translateY(0); }
 }
 
 .zzz {
@@ -231,16 +200,6 @@
   0% { transform: translate(0, 0); opacity: 0; }
   30% { opacity: 1; }
   100% { transform: translate(6px, -14px); opacity: 0; }
-}
-
-.thinking {
-  position: absolute;
-  top: 2%;
-  right: 4%;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--ig-line);
-  opacity: 0.6;
 }
 
 /* ── speech bubble with the penguin's name tag ────────── */
@@ -283,8 +242,7 @@
 @media (prefers-reduced-motion: reduce) {
   .appear,
   .flying,
-  .fadeOut,
-  .doneIn,
+  .glow,
   .flagUp,
   .flake,
   .poseIn,
@@ -296,7 +254,6 @@
   }
   .flake,
   .flying { display: none; }
-  .fadeOut { opacity: 0; }
 }
 
 /* Screenshots / tests can freeze every animation in the scene. */

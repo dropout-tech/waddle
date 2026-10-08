@@ -172,7 +172,7 @@ async function readDialog(page) {
     today: Number(el.getAttribute('data-igloo-today')),
     bubble: el.querySelector('[data-igloo-bubble]')?.textContent ?? '',
     progress: el.querySelector('[data-igloo-progress]')?.textContent ?? '',
-    bricks: el.querySelectorAll('[data-igloo-scene] svg g[clip-path^="url(#dome"] > g').length,
+    bricks: el.querySelectorAll('[data-igloo-scene] mask[id^="built"] rect').length,
   }))
 }
 
@@ -470,7 +470,7 @@ const countCompleted = async () => {
     await openViaEvent(page)
     await page.waitForFunction(() => document.querySelector('[data-igloo-dialog]')?.getAttribute('data-igloo-celebrating') === 'true', null, { timeout: 20000 })
     await page.waitForTimeout(2000) // pennant fully up
-    assert.equal(await page.locator('[data-igloo-penguin="happy"]').count(), 1, 'cheering penguin')
+    assert.equal(await page.locator('[data-igloo-penguin="cheer"]').count(), 1, 'cheering penguin')
     await freeze(page)
     await shot(page, 'igloo-finished-moment-1440.png', dialog(page))
     await page.evaluate(() => { for (const a of document.getAnimations()) a.play() })
