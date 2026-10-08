@@ -502,6 +502,27 @@ trialing/active/past_due ──刪除帳號────→ expired（cancel_reas
 - 仍未做：`web-billing-admin` 後台、`delete-account` 整合（`web_account_closing`）、`revenuecat-webhook` 記錄 Apple 試用、P7 漲價工具、iOS 模擬器實點、真 SLP／Resend 實測。
 - 已知低風險（沙盒驗）：年繳會員若一直沒對到卡，提醒信照寄但到期不扣且無結束通知；SLP 若沿用舊卡片 ID 又不回傳，換卡會在 1 小時後被判放棄；轉 unknown 的續訂扣款每輪都會查一次 SLP。
 
+
+### 2026-10-08 對照官方文件修正（分支 fix/slp-doc-alignment；仍無金鑰，全部只靠官方文件頁原始 HTML 對照＋假後端測試）
+
+目的：拿到沙盒金鑰那天一次跑通。依據頁面：`/api/trade/create/`、`/api/trade/query/`、`/guide/quick/`、`/api/customer-paymentInstrument/paymentInstrument/query/`、`/sdk/initData/`、`/api/event/`、`/appendix/paymentInstrumentCode/`。
+
+已改（程式位置見各檔註解，每處都附官方 URL）：
+1. **Recurring 也送 `paySession: {}`**（guide/quick：必傳空物件、不可省略）。`core.mjs buildCreateBody`。
+2. **查詢交易解析改官方欄位表路徑**：`payment.paidAmount`、`order.amount`、`payment.creditCard`／`payment.paymentInstrument`、`order.customer.customerId`／`payment.paymentCustomerId`；舊的平面路徑（`paidAmount`、`lastPayment`、`customer.CustomerId`）留作 fallback。原因：官方欄位表與其自家回應範例互相矛盾（表是巢狀、範例是平的）。修前在官方巢狀結構下金額讀成 null，`web_billing_transitions.sql` 的金額相符檢查（R9）被整段跳過；修後有測試證明 `amount_minor`＋`amount_source='paid'` 會送進 `apply_payment_result`。
+3. **建立交易必填欄位補齊**：`order.shipping.carrier`、shipping／billing `address.street`、三處 `personalInfo` 的 email（帶會員登入 Email；隱私頁已列 SLP 為處理者；非 Email 格式時用中性占位 `noreply@lazy72.com`）。`web-billing` 的 `user.email`；排程扣款（cron）沒有會員 Email，用占位。
+4. **付款工具可扣款狀態**只認官方附錄的 `SUCCESSED`，排除 `ENABLED`（附錄未定義）與已過期卡（`expired` 字串或布林皆可）。
+5. **以 ID 查付款工具**請求欄位改官方欄位表的 `paymentInstrument.paymentInstrumentId`（該頁自家請求範例寫 `instrumentId`，也矛盾）。`slp.mjs`。
+6. **`instrumentCard.last` 官方型別是 Array**：陣列／字串都能解成末四碼，非 4 位數一律丟棄。
+7. **`client.ip` 官方上限 32 字元**：先轉成最短標準寫法（IPv6 零段壓縮），仍超過就不截斷（截斷等於寫錯位址），改用備援 IP 並記 log。
+8. **排程扣款的 `SHOPLINE_SERVER_IP` 改為必填**：沒設或不合法 → 該 tick 不認領也不送任何扣款，log `SHOPLINE_SERVER_IP_missing_or_invalid`，其餘步驟（對帳、到期、寄信）照跑；不再默默送 `0.0.0.0`。`web-billing`（會員在場）讀不到會員 IP 時用同一個 secret 當備援並記 log。`.env.local.example` 已註明。**上線前待辦：用 `supabase secrets set SHOPLINE_SERVER_IP=<對外固定 IP>`；Edge Function 沒有固定出口 IP（TODO SLP-Q4），請向 SLP 確認可填什麼。**
+9. **webhook 的 `merchantId` header**：官方只列 `timestamp`、`sign` 兩個 header。改成「有帶才比對、帶了不符才拒絕（403）、沒帶放行」；驗簽（HMAC）仍是主要防線。
+10. **SDK `textType` 移入 `bindCard.protocol` 內**（sdk/initData）。`lib/billing/web-billing-client.ts`。
+11. **`/billing/*` 專屬 CSP**：本機 `pnpm build` 後 `next start`，`curl -I` 實測 `/billing`、`/billing/return`、`/billing/card`、`/billing/pay` 都只回一條 CSP 且含 `https://*.shoplinepayments.com`，`/`、`/login` 回全站 CSP——沒被蓋掉，不需修改。
+
+留待沙盒確認（程式內標 `TODO(SLP-sandbox)`）：實際回應用巢狀還是平面欄位；查詢付款工具請求用 `paymentInstrumentId` 還是 `instrumentId`；狀態值是否真有 `ENABLED`；`paySession` 空值是物件 `{}` 還是字串 `"{}"`；佔位 Email／街道／carrier 是否被驗證或觸發風控；Recurring 的 `client.ip` 可填什麼；webhook 實際是否帶 `merchantId` header。
+
+未動（另案，需 migration）：webhook 的 `customer.instrument.unbinded`／`updated`。
 ---
 
 ## 9. 待向 SLP 窗口確認的問題（老闆可直接轉貼）
