@@ -10,7 +10,7 @@ function windowOpenPolicy(raw, allowedOrigin, preload, platform = process.platfo
         // to show above another app's full-screen Space — plain alwaysOnTop, even
         // with visibleOnFullScreen, stays on the desktop Space. The cost: a panel
         // never makes Huddle the active app, so ⌘C/⌘V/⌘A/⌘Z go to the frontmost
-        // app instead (verified with a real keyboard), hence off by default.
+        // app instead (verified with a real keyboard), so users can switch it off.
         ...(target.pathname === '/floating-host.html'
           ? { alwaysOnTop: true, title: 'Huddle', ...(platform === 'darwin' && target.searchParams.get('overFullscreen') === '1' ? { type: 'panel' } : {}) }
           : {}),

@@ -568,7 +568,7 @@ export function SettingsModal({
             </div>
           </div>
 
-          {/* Mac 桌面版才渲染：懸浮視窗要不要蓋在全螢幕 App 上（裝置層級，預設關）。 */}
+          {/* Mac 桌面版才渲染：懸浮視窗要不要蓋在全螢幕 App 上（裝置層級，預設開）。 */}
           <DesktopFloatSettings />
 
           {/* 企鵝 — reads the live `settings.pet` (not localSettings): it saves
