@@ -434,7 +434,7 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
                 ? t('放進去中…')
                 : failed.size
                   ? t('再試一次（{n}）', { n: chosen.length })
-                  : t('放進未分類（{n}）', { n: chosen.length })}
+                  : t('放進排程（{n}）', { n: chosen.length })}
             </button>
           </>
         ) : (

@@ -84,7 +84,7 @@ export const dict: Record<string, string> = {
   '今天的 AI 整理用完了，會先用簡單拆法；明天會再補滿。': 'Today\'s AI splits are used up — the simple splitter will step in. They refill tomorrow.',
   '按下「交給企鵝」後，這段文字會交給 AI 服務（OpenAI）拆成待辦；原文不會被保存。':
     'When you tap "Hand it over", this text is sent to an AI service (OpenAI) to split into to-dos. The text itself isn\'t saved.',
-  '放進未分類（{n}）': 'Add to inbox ({n})',
+  '放進排程（{n}）': 'Add to schedule ({n})',
   '期限（可留空）': 'Due (optional)',
   '備註（可留空）': 'Note (optional)',
   '點便條可以改標題和期限；不想要的取消勾選就好。': 'Tap a note to change its name or due date. Untick anything you don\'t want.',
