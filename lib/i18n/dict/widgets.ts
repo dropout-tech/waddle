@@ -45,6 +45,8 @@ export const dict: Record<string, string> = {
   '每一款都列在裡面，左右滑動選好大小後點「加入小工具」': 'Every widget is listed there. Swipe to pick a size, then tap Add Widget',
   'Huddle · 專注完成': 'Huddle · Focus complete',
   '辛苦了，留下這次專注的收穫。': 'Nice work. Jot down what this session got done.',
+  'Huddle · 休息結束': 'Huddle · Break is over',
+  '休息時間到了，準備好就開始下一段專注吧。': "Break time is up. Start your next focus session whenever you're ready.",
   'Huddle · 喝水提醒': 'Huddle · Water break',
   '喝口水，休息一下。': 'Have a sip of water and take a short break.',
   '{name}：呱！': '{name}: Honk!',

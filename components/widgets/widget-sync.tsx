@@ -26,7 +26,7 @@ type Timer=ReturnType<typeof useFocusTimer>
 /** Live Activity / focus widget payload, derived from the in-memory timer only (no network). */
 function focusOf(timer:Timer,notes:NotebookNote[],today:string):WidgetSnapshot['focus'] {
   const s=timer.session
-  return {mode:s?.mode,state:timer.state,title:s?.label ?? t('慢慢來，先專心一件事'),seconds:timer.displayTime,endAt:s && timer.state==='running' && s.mode==='pomodoro' ? s.startedAt.getTime()+s.pausedMs+s.targetSeconds*1000:null,note:focusNoteExcerpt(notes,today,s?.label),...(s?.mode==='pomodoro' ? {total:s.targetSeconds} : {})}
+  return {mode:s?.mode,phase:s?.phase,state:timer.state,title:s?.label ?? t('慢慢來，先專心一件事'),seconds:timer.displayTime,endAt:s && timer.state==='running' && s.mode==='pomodoro' ? s.startedAt.getTime()+s.pausedMs+s.targetSeconds*1000:null,note:focusNoteExcerpt(notes,today,s?.label),...(s?.mode==='pomodoro' ? {total:s.targetSeconds} : {})}
 }
 
 export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null,weekStartDay=null}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[];pet?:PetSettings|null;weekStartDay?:number|null}) {
