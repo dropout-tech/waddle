@@ -20,9 +20,12 @@ publicHoistPattern:
   - '*sharp*'
   - '@img/*'
 
-onlyBuiltDependencies:
-  - electron
-  - sharp
+# Was "onlyBuiltDependencies" in package.json; pnpm 11+ only knows allowBuilds
+# (pnpm 10.26+ reads it too). Moot while ignoreScripts is on, kept for when
+# someone runs `pnpm rebuild`.
+allowBuilds:
+  electron: true
+  sharp: true
 
 patchedDependencies:
   '@capacitor-community/apple-sign-in': patches/@capacitor-community__apple-sign-in.patch
