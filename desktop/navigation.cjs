@@ -6,11 +6,13 @@ function windowOpenPolicy(raw, allowedOrigin, preload, platform = process.platfo
       action: 'allow',
       overrideBrowserWindowOptions: {
         autoHideMenuBar: true,
-        // macOS 'panel' (NSWindowStyleMaskNonactivatingPanel) is what lets the
-        // floating hub show above another app's full-screen Space; plain
-        // alwaysOnTop only floats within the desktop Space it was opened on.
+        // Opt-in (settings, ?overFullscreen=1): a macOS 'panel' is the only way
+        // to show above another app's full-screen Space — plain alwaysOnTop, even
+        // with visibleOnFullScreen, stays on the desktop Space. The cost: a panel
+        // never makes Huddle the active app, so ⌘C/⌘V/⌘A/⌘Z go to the frontmost
+        // app instead (verified with a real keyboard), hence off by default.
         ...(target.pathname === '/floating-host.html'
-          ? { alwaysOnTop: true, title: 'Huddle', ...(platform === 'darwin' ? { type: 'panel' } : {}) }
+          ? { alwaysOnTop: true, title: 'Huddle', ...(platform === 'darwin' && target.searchParams.get('overFullscreen') === '1' ? { type: 'panel' } : {}) }
           : {}),
         webPreferences: {
           preload,

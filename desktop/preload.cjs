@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('huddleDesktop', {
   platform: process.platform,
   isDesktop: true,
+  floatOverFullscreen: process.platform === 'darwin',
   clearNotifications: () => ipcRenderer.invoke('desktop-notification-clear'),
   notificationStatus: () => ipcRenderer.invoke('desktop-notification-status'),
   showNotification: payload => ipcRenderer.invoke('desktop-notification-show', payload),

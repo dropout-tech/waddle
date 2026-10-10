@@ -18,6 +18,8 @@ declare global {
     huddleDesktop?: {
       platform: string
       isDesktop: boolean
+      /** Mac 桌面殼 0.1.4 起：懸浮視窗可選擇蓋在全螢幕 App 上。 */
+      floatOverFullscreen?: boolean
       beginOAuth: () => Promise<string>
       openOAuth: (url: string) => Promise<void>
       clearNotifications?: () => Promise<void>
