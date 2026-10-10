@@ -891,7 +891,7 @@ export function SettingsModal({
               <label className="flex items-center justify-between cursor-pointer">
                 <div className="flex-1 pr-4">
                   <div className="text-sm text-foreground">{t('喝水提醒')}</div>
-                  <div className="text-xs text-muted-foreground">{t('每隔一段時間，Huddle 會跳出來提醒你補水（晚上 10 點到早上 8 點不打擾，可用「勿擾時段」調整）')}</div>
+                  <div className="text-xs text-muted-foreground">{t('每隔一段時間，Huddle 會跳出來提醒你補水（晚上 10 點到早上 8 點一律不打擾，「勿擾時段」可以再加上其他不想被打擾的時間）')}</div>
                 </div>
                 <input
                   type="checkbox"
@@ -1785,7 +1785,7 @@ function NotificationsSettingsTab({
               <h3 className="text-sm font-semibold text-foreground">{t('勿擾時段')}</h3>
             </div>
             <p className="pl-6 -mt-1 text-xs text-muted-foreground">
-              {t('勿擾時段內不會跳出喝水提醒。「允許緊急通知」開著時，會議提醒照常提醒；關掉的話，這段時間的會議提醒也會跳過。')}
+              {t('勿擾時段內不會跳出喝水提醒（晚上 10 點到早上 8 點本來就不會）。「允許緊急通知」開著時，會議提醒照常提醒；關掉的話，這段時間的會議提醒也會跳過。')}
             </p>
 
             <div className="space-y-3 pl-6">

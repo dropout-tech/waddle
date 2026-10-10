@@ -5,7 +5,7 @@ import { getLang, t } from '@/lib/i18n'
 import { petVoiced } from '@/lib/pet/voice'
 import { MAX_WATER_REMINDERS } from '@/lib/notifications/budget'
 import { isFocusRunning, planWaterReminders } from '@/lib/water-reminder'
-import { resolveQuietHours, waterQuietWindow } from '@/lib/quiet-hours'
+import { resolveQuietHours, waterQuietWindows } from '@/lib/quiet-hours'
 const KIND='huddle-widget'
 // Ids: one focus-end note, then a chain of MAX_WATER_REMINDERS water notes right after it (all < 2^31).
 const FOCUS_ID=2100000001, WATER_ID=2100000002
@@ -40,10 +40,10 @@ export async function syncWidgetReminders(snapshot:WidgetSnapshot,opts:WidgetRem
   // Said by the adopted penguin (wording only, lib/pet/voice.ts); a rename re-schedules.
   const voice=snapshot.pet?.adopted?snapshot.pet.name:null
   // 喝水提醒 is a chain, not one note: spaced by the interval, never inside the quiet window
-  // (the user's 勿擾時段, else 22:00–08:00), held back until a running focus stretch ends.
+  // (22:00–08:00 plus the user's 勿擾時段), held back until a running focus stretch ends.
   // The hour in the key tops the chain up while the app stays open (notes that already fired drop out of it).
-  const waterQuiet=waterQuietWindow(resolveQuietHours(opts.quietHours)), waterEvery=opts.waterIntervalMin??60
-  const key=JSON.stringify([snapshot.accountId,enabled,snapshot.focus.state,snapshot.focus.phase,snapshot.focus.endAt,snapshot.water.enabled,snapshot.water.nextAt,waterEvery,waterQuiet.startMin,waterQuiet.endMin,Math.floor(Date.now()/3_600_000),voice,getLang()])
+  const waterQuiet=waterQuietWindows(resolveQuietHours(opts.quietHours)), waterEvery=opts.waterIntervalMin??60
+  const key=JSON.stringify([snapshot.accountId,enabled,snapshot.focus.state,snapshot.focus.phase,snapshot.focus.endAt,snapshot.water.enabled,snapshot.water.nextAt,waterEvery,JSON.stringify(waterQuiet),Math.floor(Date.now()/3_600_000),voice,getLang()])
   if(signature===key)return
   sequence=sequence.catch(()=>{}).then(async()=>{
     if(snapshot.accountId!==currentAccount)return
