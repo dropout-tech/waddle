@@ -379,8 +379,8 @@ extension WidgetView {
             Group {
                 if st.running,st.f.countdown,let end=st.f.endAt {Label{Text(timerInterval:entry.date...end,countsDown:true)} icon:{Image(systemName:"hourglass")}}
                 else if st.running,let ref=st.f.startRef {Label{Text(ref,style:.timer)} icon:{Image(systemName:"hourglass")}}
-                else if st.f.state == "paused" {Label(L("專注暫停 · 剩 \(mmss(st.f.frozen))","Focus paused · \(mmss(st.f.frozen))"),systemImage:"pause.fill")}
-                else if st.expired {Label(L("專注完成","Focus done"),systemImage:"checkmark")}
+                else if st.f.state == "paused" {Label(st.f.onBreak ? L("休息暫停 · 剩 \(mmss(st.f.frozen))","Break paused · \(mmss(st.f.frozen))"):L("專注暫停 · 剩 \(mmss(st.f.frozen))","Focus paused · \(mmss(st.f.frozen))"),systemImage:"pause.fill")}
+                else if st.expired {Label(st.f.onBreak ? L("休息結束","Break's over"):L("專注完成","Focus done"),systemImage:"checkmark")}
                 else {Label(L("開始專注","Start a focus session"),systemImage:"hourglass")}
             }.widgetURL(url(.focus))
         case .sticky:
@@ -567,7 +567,7 @@ extension WidgetView {
         if family == .accessoryCircular {
             Group {
                 if live {
-                    hCircle(st.running ? L("專注中","focus"):L("暫停","paused")){hourglass(18)} hero:{focusClock(st,17,align:.center)}
+                    hCircle(st.running ? (st.f.onBreak ? L("休息中","break"):L("專注中","focus")):L("暫停","paused")){hourglass(18)} hero:{focusClock(st,17,align:.center)}
                 } else {
                     hCircle(nil){hourglass(26)} hero:{hero(st.expired ? L("完成","Done"):L("專注","Focus"),size:15)}
                 }
@@ -576,8 +576,11 @@ extension WidgetView {
             Group {
                 if live {
                     // The task name only when it fits whole; otherwise just 專注中／暫停.
-                    let state=st.running ? L("專注中","Focusing"):L("暫停","Paused")
-                    hRect(icon:{hourglass(rectIcon)},hero:{focusClock(st,32)}){fitLine(s.focus.title.isEmpty ? [state]:["\(state) · \(s.focus.title)",state])}
+                    // A break's title is only 「休息 N 分」, so 休息中 says it all.
+                    let state=st.running ? (st.f.onBreak ? L("休息中","On break"):L("專注中","Focusing")):L("暫停","Paused")
+                    hRect(icon:{hourglass(rectIcon)},hero:{focusClock(st,32)}){fitLine(s.focus.title.isEmpty || st.f.onBreak ? [state]:["\(state) · \(s.focus.title)",state])}
+                } else if st.expired && st.f.onBreak {
+                    hRect(L("隨時再開始","Next round")){hourglass(rectIcon)} hero:{hero(L("休息結束","Break over"),size:24)}
                 } else if st.expired {
                     hRect(L("打開 Huddle 記下收穫","Open Huddle to jot it down")){hourglass(rectIcon)} hero:{hero(L("專注完成","Done"),size:24)}
                 } else {
