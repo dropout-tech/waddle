@@ -49,9 +49,15 @@ const trim = (s: string, max: number) => s.replace(/\s+/g, ' ').trim().slice(0, 
 // Meeting and follow-up reminders carry the title of someone's private meeting, and a
 // scheduled iOS notification outlives the session that created it. Each one is tagged
 // with the account that scheduled it (`extra.accountId`); setReminderAccount() — called
-// by the auth provider on every sign-in / sign-out / account switch — cancels the ones
-// that are not the current account's. Nothing is scheduled while nobody is signed in.
-let reminderAccount: string | null = null
+// by the auth provider — cancels the ones that are not the current account's.
+//
+// Three states, because "no session yet" is not "signed out":
+//   undefined  not known (cold start before the session resolves, or it could not be read —
+//              e.g. an expired token and no network). Everything pending is LEFT ALONE and
+//              nothing is rescheduled, so a flaky start never wipes the user's reminders.
+//   null       explicitly signed out (SIGNED_OUT). Their notifications are cancelled.
+//   string     the signed-in user id. Other accounts' notifications are cancelled.
+let reminderAccount: string | null | undefined = undefined
 
 /** The plugin calls below run one job at a time, so a cancel can never interleave with a half-done schedule. */
 let queue: Promise<unknown> = Promise.resolve()
@@ -74,19 +80,39 @@ export function foreignReminderIds(
 }
 
 /**
- * Tell the reminder layer who is signed in (null = nobody). Cancels every pending meeting /
- * follow-up notification that does not belong to that account — untagged ones left by an older
- * app version included. Safe to call on every auth event. Native only (web schedules nothing ahead).
+ * Tell the reminder layer who is signed in (a user id), or that they explicitly signed out (null).
+ * Cancels every pending meeting / follow-up notification that does not belong to that account — untagged
+ * ones left by an older app version included. Repeating the same answer (every TOKEN_REFRESHED) costs nothing.
+ * Native only (web schedules nothing ahead). Never call it with null just because a session is missing:
+ * use onAuthEventForReminders().
  */
 export async function setReminderAccount(account: string | null): Promise<void> {
+  const unchanged = reminderAccount === account
   reminderAccount = account
-  if (!isNative()) return
+  if (!isNative() || unchanged) return
   await serial(async () => {
     const { LocalNotifications } = await import('@capacitor/local-notifications')
     const pending = await LocalNotifications.getPending()
     const ids = foreignReminderIds(pending.notifications, account)
     if (ids.length > 0) await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) })
   })
+}
+
+/** What an auth event means for the reminder owner. Pure. */
+export function reminderAccountChange(event: string, userId: string | null | undefined): { kind: 'set'; id: string } | { kind: 'clear' } | { kind: 'keep' } {
+  // Any event that carries a session names the user — TOKEN_REFRESHED included, which is how a cold
+  // start that began offline (no session yet) recovers once the token is refreshed.
+  if (userId) return { kind: 'set', id: userId }
+  // No session is only "signed out" when Supabase says so; INITIAL_SESSION with null can simply mean
+  // an expired token that could not be refreshed yet.
+  return event === 'SIGNED_OUT' ? { kind: 'clear' } : { kind: 'keep' }
+}
+
+/** The auth provider's single entry point: apply reminderAccountChange() for an auth event (or the initial getSession). */
+export async function onAuthEventForReminders(event: string, userId: string | null | undefined): Promise<void> {
+  const change = reminderAccountChange(event, userId)
+  if (change.kind === 'set') await setReminderAccount(change.id)
+  else if (change.kind === 'clear') await setReminderAccount(null)
 }
 
 /**
@@ -150,8 +176,10 @@ async function scheduleMeetingReminders(
   meetings: MeetingTaskRef[],
   lead: ReminderLead,
   quiet: QuietHoursSetting,
-  account: string | null,
+  account: string | null | undefined,
 ): Promise<void> {
+  // Who is signed in is not known yet: neither cancel nor reschedule — what is pending stays as it is.
+  if (account === undefined) return
   const { LocalNotifications } = await import('@capacitor/local-notifications')
 
   // Reconcile only meetings; focus and water reminders have their own namespace.
@@ -231,7 +259,8 @@ export function syncFollowupReminders(items: FollowupReminderItem[]): Promise<vo
   return serial(() => scheduleFollowupReminders(items, account))
 }
 
-async function scheduleFollowupReminders(items: FollowupReminderItem[], account: string | null): Promise<void> {
+async function scheduleFollowupReminders(items: FollowupReminderItem[], account: string | null | undefined): Promise<void> {
+  if (account === undefined) return // see scheduleMeetingReminders
   const { LocalNotifications } = await import('@capacitor/local-notifications')
 
   const pending = await LocalNotifications.getPending()

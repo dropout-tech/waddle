@@ -8,6 +8,8 @@
 // Run: node --test scripts/tests/native-reminder-budget.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { pathToFileURL } from 'node:url'
+import { resolve } from 'node:path'
 import { installFakeLocalNotifications, installFakeLocalStorage, installReminderTestEnv } from './reminder-test-env.mjs'
 
 installReminderTestEnv()
@@ -299,4 +301,78 @@ test('leftovers from an older app version (no account tag) are cleaned up at the
   ]
   await N.setReminderAccount('acct-I')
   assert.deepEqual(plugin.pending.map((n) => n.id), [2100000001])
+})
+
+// ── a flaky cold start must not silence (or wipe) the reminders ──────────────────────────
+
+/** A fresh copy of lib/notifications as a newly launched app would have it (module state unset). */
+let coldCounter = 0
+const coldStart = () => import(pathToFileURL(resolve('lib/notifications/index.ts')).href + `?cold-start-${++coldCounter}`)
+
+test('reminderAccountChange: any event with a session names the owner; only SIGNED_OUT clears; a missing session elsewhere means "not known"', () => {
+  assert.deepEqual(N.reminderAccountChange('TOKEN_REFRESHED', 'u1'), { kind: 'set', id: 'u1' })
+  assert.deepEqual(N.reminderAccountChange('INITIAL_SESSION', 'u1'), { kind: 'set', id: 'u1' })
+  assert.deepEqual(N.reminderAccountChange('SIGNED_IN', 'u2'), { kind: 'set', id: 'u2' })
+  assert.deepEqual(N.reminderAccountChange('SIGNED_OUT', null), { kind: 'clear' })
+  assert.deepEqual(N.reminderAccountChange('SIGNED_OUT', undefined), { kind: 'clear' })
+  assert.deepEqual(N.reminderAccountChange('INITIAL_SESSION', null), { kind: 'keep' }, 'expired token + no network looks like this')
+  assert.deepEqual(N.reminderAccountChange('INITIAL_SESSION', undefined), { kind: 'keep' })
+  assert.deepEqual(N.reminderAccountChange('TOKEN_REFRESHED', null), { kind: 'keep' })
+})
+
+test('offline cold start (no session) then TOKEN_REFRESHED: reminders survive the start, are rebuilt on refresh (old code: wiped, then never rescheduled)', async () => {
+  reset()
+  const meetings = () => Meetings.collectMeetings(tree(oneOff('standup', 1), oneOff('review', 2)))
+  const followups = [{ task_id: 'f1', title: '報價', due_date: dayStr(2), is_completed: false, counterpart: '甲公司' }]
+
+  // Yesterday: the app was running, signed in, reminders scheduled.
+  const day1 = await coldStart()
+  await day1.onAuthEventForReminders('INITIAL_SESSION', 'acct-cold')
+  await day1.syncMeetingReminders(meetings(), 10)
+  await day1.syncFollowupReminders(followups)
+  const scheduledIds = plugin.pending.map((n) => n.id).sort((a, b) => a - b)
+  assert.equal(scheduledIds.length, 3)
+
+  // Today: cold start, the token is expired and there is no network → getSession() = null.
+  const day2 = await coldStart()
+  await day2.onAuthEventForReminders('INITIAL_SESSION', null)
+  // The hooks run anyway (user is null) and call the sync functions.
+  await day2.syncMeetingReminders([], 10)
+  await day2.syncFollowupReminders([])
+  assert.deepEqual(plugin.pending.map((n) => n.id).sort((a, b) => a - b), scheduledIds, 'nothing cancelled, nothing overwritten while the account is unknown')
+
+  // Network is back: the only event is TOKEN_REFRESHED, with the session.
+  await day2.onAuthEventForReminders('TOKEN_REFRESHED', 'acct-cold')
+  await day2.syncMeetingReminders(meetings(), 10)
+  await day2.syncFollowupReminders(followups)
+  assert.deepEqual(plugin.pending.map((n) => n.id).sort((a, b) => a - b), scheduledIds, 'rescheduled for the same owner')
+  assert.ok(plugin.pending.every((n) => n.extra.accountId === 'acct-cold'))
+
+  // A later sync with new data works (the account is not stuck empty).
+  await day2.syncMeetingReminders(Meetings.collectMeetings(tree(oneOff('standup', 1))), 10)
+  assert.equal(kind('meeting').length, 1)
+})
+
+test('only an explicit SIGNED_OUT removes the notifications; a different user id after a refresh removes the old owner\'s', async () => {
+  reset()
+  const app = await coldStart()
+  await app.onAuthEventForReminders('INITIAL_SESSION', 'acct-X')
+  await app.syncMeetingReminders(Meetings.collectMeetings(tree(oneOff('x1', 1))), 10)
+  assert.equal(kind('meeting').length, 1)
+
+  await app.onAuthEventForReminders('INITIAL_SESSION', undefined) // a missing session is not a sign-out
+  await app.onAuthEventForReminders('TOKEN_REFRESHED', 'acct-X') // same owner: nothing happens
+  assert.equal(kind('meeting').length, 1)
+
+  await app.onAuthEventForReminders('SIGNED_OUT', null)
+  assert.equal(kind('meeting').length, 0)
+
+  // Account switch without an explicit sign-out in between (the session simply belongs to someone else now).
+  const other = await coldStart()
+  await other.onAuthEventForReminders('SIGNED_IN', 'acct-Y1')
+  await other.syncMeetingReminders(Meetings.collectMeetings(tree(oneOff('y1', 1))), 10)
+  await other.onAuthEventForReminders('TOKEN_REFRESHED', 'acct-Y2')
+  assert.equal(kind('meeting').length, 0, 'Y1\'s meeting titles are gone once the session belongs to Y2')
+  await other.syncMeetingReminders(Meetings.collectMeetings(tree(oneOff('y2', 1))), 10)
+  assert.deepEqual(kind('meeting').map((n) => n.extra.accountId), ['acct-Y2'])
 })

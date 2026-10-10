@@ -6,8 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 import { isNative } from '@/lib/platform'
 import { setDesktopNotificationAccount } from '@/lib/desktop-notifications'
 import { clearWidgetReminders } from '@/lib/widgets/reminders'
-import { setReminderAccount } from '@/lib/notifications'
-import { setWidgetAccount } from '@/lib/widgets/native'
+import { onAuthEventForReminders } from '@/lib/notifications'
+import { setWidgetAccount, widgetAccount } from '@/lib/widgets/native'
 import { WidgetLinks } from '@/components/widgets/widget-links'
 import { DeepLinkHandler } from './deep-link-handler'
 import { resetSharedSelf } from '@/lib/operations/client'
@@ -49,7 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setMonitoringUser(data.session?.user.id ?? null)
       void setWidgetAccount(data.session?.user.id ?? null).catch(() => {})
       void clearWidgetReminders(data.session?.user.id ?? null).catch(() => {})
-      void setReminderAccount(data.session?.user.id ?? null).catch(() => {})
+      // A missing session here may just be an expired token with no network: that is "not known", not "signed out".
+      void onAuthEventForReminders('INITIAL_SESSION', data.session?.user.id).catch(() => {})
       setSession(data.session)
       setLoading(false)
     })
@@ -58,6 +59,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return
       setDesktopNotificationAccount(nextSession?.user.id ?? null)
       setMonitoringUser(nextSession?.user.id ?? null)
+      // Meeting / follow-up notifications are scheduled ahead on the phone: signing out or switching accounts must
+      // take the previous account's titles off the lock screen, while a refreshed token (or any event with a
+      // session) just confirms who the owner is — that is also how an offline cold start recovers.
+      void onAuthEventForReminders(_event, nextSession?.user.id).catch(() => {})
+      if (_event === 'TOKEN_REFRESHED' && nextSession && widgetAccount().accountId !== nextSession.user.id) {
+        // Same recovery for the home-screen widgets: the cold start registered nobody, and nothing else would.
+        void setWidgetAccount(nextSession.user.id).catch(() => {})
+        void clearWidgetReminders(nextSession.user.id).catch(() => {})
+      }
       if (_event !== 'TOKEN_REFRESHED') {
         if (_event !== 'INITIAL_SESSION') {
           resetSharedSelf()
@@ -65,9 +75,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         void setWidgetAccount(nextSession?.user.id ?? null).catch(() => {})
         void clearWidgetReminders(nextSession?.user.id ?? null).catch(() => {})
-        // Meeting / follow-up notifications are scheduled ahead on the phone: signing out or
-        // switching accounts must take the previous account's titles off the lock screen.
-        void setReminderAccount(nextSession?.user.id ?? null).catch(() => {})
       }
       setSession(nextSession)
       setLoading(false)
