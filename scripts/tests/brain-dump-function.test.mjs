@@ -178,6 +178,25 @@ test('clock time: spoken hour → 24h in code, with the 1–7 → afternoon rule
   assert.deepEqual(run('凌晨12點半睡', { time: clock(12, 30, 'am'), timeEvidence: '凌晨12點半' }).time, { kind: 'clock', time: '00:30' })
 })
 
+test("clock time: the quote's own 上午/下午 words beat the model's label; 中午 and 半夜 are not plain pm", () => {
+  // model forgot the meridiem or got it wrong → the words in the quote decide
+  assert.deepEqual(run('下午八點看電影', { time: clock(8, 0, 'none'), timeEvidence: '下午八點' }).time, { kind: 'clock', time: '20:00' })
+  assert.deepEqual(run('晚上8點看電影', { time: clock(8, 0, 'am'), timeEvidence: '晚上8點' }).time, { kind: 'clock', time: '20:00' })
+  assert.deepEqual(run('凌晨三點去機場', { time: clock(3, 0, 'none'), timeEvidence: '凌晨三點' }).time, { kind: 'clock', time: '03:00' })
+  assert.deepEqual(run('上午九點開會', { time: clock(9, 0, 'pm'), timeEvidence: '上午九點' }).time, { kind: 'clock', time: '09:00' })
+  assert.deepEqual(run('call mom tonight at 8', { time: clock(8, 0, 'none'), timeEvidence: 'tonight at 8' }).time, { kind: 'clock', time: '20:00' })
+  assert.deepEqual(run('standup 9 in the morning', { time: clock(9, 0, 'pm'), timeEvidence: '9 in the morning' }).time, { kind: 'clock', time: '09:00' })
+  // 中午 is not "pm": 11點半 is still before noon, 1點 is after
+  assert.deepEqual(run('中午11點半吃飯', { time: clock(11, 30, 'pm'), timeEvidence: '中午11點半' }).time, { kind: 'clock', time: '11:30' })
+  assert.deepEqual(run('中午1點開會', { time: clock(1, 0, 'pm'), timeEvidence: '中午1點' }).time, { kind: 'clock', time: '13:00' })
+  // 半夜: 2點 is 02:00, 11點 is 23:00, 12點 is midnight (no same-day time)
+  assert.deepEqual(run('半夜兩點起床', { time: clock(2, 0, 'none'), timeEvidence: '半夜兩點' }).time, { kind: 'clock', time: '02:00' })
+  assert.deepEqual(run('半夜11點睡', { time: clock(11, 0, 'none'), timeEvidence: '半夜11點' }).time, { kind: 'clock', time: '23:00' })
+  assert.equal(run('半夜12點睡', { time: clock(12, 0, 'none'), timeEvidence: '半夜12點' }).time, undefined)
+  // both cues in one quote → ambiguous → the model's label stands
+  assert.deepEqual(run('下午三點到晚上', { time: clock(3, 0, 'pm'), timeEvidence: '下午三點到晚上' }).time, { kind: 'clock', time: '15:00' })
+})
+
 test('clock time: 「晚上12點」 is midnight, not noon; impossible hours/minutes drop the time', () => {
   assert.equal(run('晚上12點睡覺', { time: clock(12, 0, 'pm'), timeEvidence: '晚上12點' }).time, undefined)
   assert.equal(run('25點開會', { time: clock(25, 0, 'none'), timeEvidence: '25點' }).time, undefined)

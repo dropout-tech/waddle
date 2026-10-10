@@ -276,6 +276,18 @@ test('local rules: 中午 is 12:00 sharp, 晚間8點 is 20:00, English tonight /
   assert.equal(mid.draft.fixedTime, undefined)
 })
 
+test('local rules: 中午11點半 stays before noon; 半夜 hours; 傍晚 / 清晨 prefixes', () => {
+  const t = (text) => parseBrainDump(text, NOW).map((d) => d.fixedTime)
+  assert.deepEqual(t('中午11點半吃飯'), ['11:30'])
+  assert.deepEqual(t('中午12點吃飯'), ['12:00'])
+  assert.deepEqual(t('中午1點開會'), ['13:00'])
+  assert.deepEqual(t('半夜兩點起床'), ['02:00'])
+  assert.deepEqual(t('半夜11點睡'), ['23:00'])
+  assert.deepEqual(t('半夜12點睡'), [undefined])
+  assert.deepEqual(t('傍晚6點散步'), ['18:00'])
+  assert.deepEqual(t('清晨5點跑步'), ['05:00'])
+})
+
 test('local rules: a stated duration is kept, a guessed one is not used for the block', () => {
   assert.equal(span(planLocal('下午去銀行')[0]), `${TODAY} 12:00-12:30`)
   assert.equal(span(planLocal('下午運動 一個半小時')[0]), `${TODAY} 12:00-13:30`)

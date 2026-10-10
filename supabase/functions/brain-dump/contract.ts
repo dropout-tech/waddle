@@ -194,15 +194,27 @@ export function dueEvidenceOk(due: Due, evidence: string, source: string): boole
 
 // ───────────────────────── time of day & duration ─────────────────────────
 
+// Words in the quote that settle morning vs afternoon by themselves. They beat
+// the model's label: 「下午八點」 is 20:00 even if the model said "none".
+// (中午 and 半夜 are special-cased in clockTo24h: 「中午11點」 is still morning.)
+const AM_CUE = /凌晨|清晨|早上|早晨|上午|一早|今早|明早|\ba\.?m\.?(?![a-z])|\bmorning\b/i;
+const PM_CUE = /下午|午後|傍晚|晚上|晚間|今晚|明晚|\bp\.?m\.?(?![a-z])|\b(?:afternoon|evening|tonight|night)\b/i;
+function meridiemCue(quote: string): "am" | "pm" | null {
+  const am = AM_CUE.test(quote);
+  const pm = PM_CUE.test(quote);
+  return am === pm ? null : am ? "am" : "pm";
+}
+
 /**
- * Spoken hour → 24h "HH:mm". The rule for a hour written WITHOUT 上午/下午 is
+ * Spoken hour → 24h "HH:mm". The rule for an hour written WITHOUT 上午/下午 is
  * the same one the on-device parser uses (lib/brain-dump/parse.ts
  * normaliseClock; scripts/tests/brain-dump-function.test.mjs checks the two
- * agree on every hour): 1–7 点 reads as the afternoon (「3點開會」= 15:00),
- * 8–12 stay as written (「9點」= 09:00, 「12點」= noon), 13+ is already 24h.
- * With a meridiem: pm adds 12 below noon, am turns 12 into 0.
+ * agree on every hour when there is no quote): 1–7 點 reads as the afternoon
+ * (「3點開會」= 15:00), 8–12 stay as written (「9點」= 09:00, 「12點」= noon),
+ * 13+ is already 24h. With a meridiem: pm adds 12 below noon, am turns 12
+ * into 0. The quote's own words win over the model's meridiem label.
  * Returns null for anything that is not a real, same-day time — including
- * 「晚上12點」, which is midnight (the next day), not noon.
+ * 「晚上12點」 / 「半夜12點」, which are midnight (the next day), not noon.
  */
 export function clockTo24h(
   hour: number,
@@ -212,13 +224,21 @@ export function clockTo24h(
 ): string | null {
   if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  const said = meridiemCue(evidence) ?? meridiem;
   let h = hour;
   if (hour >= 13) {
     // Written as 24h ("15:00", "下午15:00"): trust the digits.
-  } else if (meridiem === "pm") {
+  } else if (/[半深]夜/.test(evidence)) {
+    // 「半夜兩點」 = 02:00, 「半夜11點」 = 23:00; anything else is not a time.
+    if (hour >= 1 && hour <= 5) h = hour;
+    else if (hour >= 9 && hour <= 11) h = hour + 12;
+    else return null;
+  } else if (/中午|正午/.test(evidence) && (hour === 10 || hour === 11)) {
+    h = hour; // 「中午11點半」 is before noon
+  } else if (said === "pm") {
     if (hour === 12 && /[晚夜]|night|midnight/i.test(evidence)) return null;
     if (hour < 12) h = hour + 12;
-  } else if (meridiem === "am") {
+  } else if (said === "am") {
     if (hour === 12) h = 0;
   } else if (hour >= 1 && hour <= 7) {
     h = hour + 12;
@@ -228,7 +248,8 @@ export function clockTo24h(
 
 // Words that make a quote a time of day at all (checked on the quote, so a
 // model that "finds" 3pm in a sentence without one gets nothing scheduled).
-const CLOCK_WORDS = /[點点时時:：]|\b\d{1,2}\s*(?:a\.?m\.?|p\.?m\.?)(?![a-z])|\b(?:noon|midnight)\b|\d\s*h\b/i;
+const CLOCK_WORDS =
+  /[點点时時:：]|\b\d{1,2}\s*(?:a\.?m\.?|p\.?m\.?)(?![a-z])|\bat\s+\d{1,2}\b|\b\d{1,2}\s+(?:o'?clock|in the (?:morning|afternoon|evening))|\b(?:noon|midnight)\b|\d\s*h\b/i;
 const PART_WORDS: Record<"morning" | "noon" | "afternoon" | "evening", RegExp> = {
   morning: /早上|早晨|上午|清晨|一早|今早|明早|凌晨|morning/i,
   noon: /中午|正午|午間|noon|midday/i,

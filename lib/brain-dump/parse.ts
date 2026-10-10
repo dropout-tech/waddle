@@ -251,17 +251,26 @@ function parseFragment(fragment: string, now: Date): FragmentInfo {
   })
 
   // 4 — clock time (a day part written right before it is part of the match)
-  take(new RegExp(`(早上|上午|中午|下午|晚上|傍晚|凌晨|晚間|午後|清晨)?\\s*(\\d{1,2}|${ZH_NUM})\\s*[點点](?![點点心子兒])\\s*(半|(\\d{1,2}|${ZH_NUM})\\s*分?)?`), (m) => {
+  take(new RegExp(`(早上|上午|中午|下午|晚上|傍晚|凌晨|晚間|午後|清晨|半夜|深夜)?\\s*(\\d{1,2}|${ZH_NUM})\\s*[點点](?![點点心子兒])\\s*(半|(\\d{1,2}|${ZH_NUM})\\s*分?)?`), (m) => {
     const before = rest.slice(0, m.index).trimEnd().slice(-1)
     // 「差一點」「早一點」「有點」 are not 1 o'clock.
     if (!m[1] && /[差早晚快慢多少好有]/.test(before)) return false
     const part = m[1] ? PART_ZH[m[1]] : info.part
     const h = parseNumber(m[2])
     const min = m[3] === '半' ? 30 : m[4] ? parseNumber(m[4]) : 0
-    const t = m[1] === '中午' && h <= 2 ? hhmm(h === 12 ? 12 : h + 12, min) : normaliseClock(h, min, part)
+    let t: string | null
+    if (m[1] === '半夜' || m[1] === '深夜') {
+      // 「半夜兩點」 is 02:00, 「半夜11點」 is 23:00; 「半夜12點」 is midnight (no same-day time).
+      t = h >= 1 && h <= 5 ? hhmm(h, min) : h >= 9 && h <= 11 ? hhmm(h + 12, min) : null
+    } else if (m[1] === '中午') {
+      // 「中午12點」 noon, 「中午1點」 13:00, but 「中午11點半」 is still before noon.
+      t = h >= 10 && h <= 12 ? hhmm(h, min) : h >= 1 && h <= 3 ? hhmm(h + 12, min) : normaliseClock(h, min, part)
+    } else {
+      t = normaliseClock(h, min, part)
+    }
     if (!t) return false
     info.fixedTime = t
-    if (m[1]) info.part = PART_ZH[m[1]]
+    if (m[1] && PART_ZH[m[1]]) info.part = PART_ZH[m[1]]
   })
   if (!info.fixedTime) {
     take(/(?:\bat\s+|@\s*)?\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)(?![a-z])/i, (m) => {

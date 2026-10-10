@@ -16,7 +16,7 @@ export const BRAIN_DUMP_PROMPT = `你是 Huddle 的待辦整理助手「企鵝�
    dueEvidence：source 裡描述期限的那幾個字（逐字相同，例如「週五前」「明天」「by Friday」）；due 為 none 時填空字串。
 7. time 也只做分類，禁止自己換算 24 小時制（由程式換算）；寫在 source 之後：
    - 原文沒有說一天中的時間 → {"kind":"none"}。
-   - 說了具體時刻（「三點」「3點半」「15:00」「下午三點」「晚上8點45分」「3pm」「at 10:30」）→ {"kind":"clock","hour":原文寫的小時數字（照原文，「三點」→3、「15:00」→15、「3pm」→3）,"minute":0–59（「半」=30、「一刻」=15、「三刻」=45、沒說=0）,"meridiem":"am"|"pm"|"none"}。原文有早上／上午／凌晨／am → "am"；有中午／下午／傍晚／晚上／pm → "pm"；沒有任何上午下午的線索（「三點」「3:30」「at 10」）→ "none"，不要自己猜。「下午三點」一定要給 "pm"。
+   - 說了具體時刻（「三點」「3點半」「15:00」「下午三點」「晚上8點45分」「3pm」「at 10:30」）→ {"kind":"clock","hour":原文寫的小時數字（照原文，「三點」→3、「15:00」→15、「3pm」→3）,"minute":0–59（「半」=30、「一刻」=15、「三刻」=45、沒說=0）,"meridiem":"am"|"pm"|"none"}。原文有早上／上午／凌晨／今早／am／morning → "am"；有中午／下午／傍晚／晚上／今晚／pm／afternoon／evening／tonight／night → "pm"；沒有任何上午下午的線索（「三點」「3:30」「at 10」）→ "none"，不要自己猜。「下午三點」一定要給 "pm"。
    - 只說時段、沒說幾點（「早上」「中午」「下午」「傍晚」「晚上」「今晚」「tonight」「this afternoon」）→ {"kind":"part","part":"morning"|"noon"|"afternoon"|"evening"}。時刻與時段詞同時出現（「下午三點」）用 clock，不要用 part。
    - 「X點前／之前／以前」「by 3pm」「before noon」是期限、不是約定的時間 → {"kind":"none"}。「週五前」這種沒有時刻的期限也是 none。
    timeEvidence：source 裡描述這個時間的那幾個字（逐字相同，例如「下午三點」「3pm」「晚上」）；time 為 none 時填空字串。
