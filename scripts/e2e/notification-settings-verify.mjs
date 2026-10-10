@@ -170,13 +170,24 @@ async function installBackend(context, { notifications, meta }) {
 }
 
 // Fake Notification (permission already granted) + the language, installed before the app runs.
-const INIT = ({ lang }) => {
+const INIT = ({ lang, desktop }) => {
   try {
     localStorage.setItem('waddle.waterReminder.enabled', '0')
     localStorage.removeItem('waddle.meetingReminder.minutes')
     localStorage.setItem('waddle-language-v1', lang)
+    if (desktop) localStorage.setItem('huddle.desktopNotifications.enabled', '1')
   } catch {}
   window.__notes = []
+  window.__desk = []
+  if (desktop) {
+    // The Electron preload bridge (desktop/preload.cjs), reduced to what the notification path touches.
+    window.huddleDesktop = {
+      platform: 'linux', isDesktop: true,
+      clearNotifications: async () => {},
+      notificationStatus: async () => ({ supported: true, permission: 'unknown', lastError: null }),
+      showNotification: async (payload) => { window.__desk.push(payload); return { status: 'submitted' } },
+    }
+  }
   class FakeNotification {
     constructor(title, opts) { window.__notes.push({ title, body: opts?.body ?? '', tag: opts?.tag ?? '' }) }
     close() {}
@@ -208,12 +219,12 @@ if (!storageState) {
 }
 
 /** Open the app at fake time `time` with the stored notification settings `notifications`. */
-async function openApp({ time = at(9, 0), notifications = settings(), lang = 'zh-TW', viewport = { width: 1280, height: 800 } } = {}) {
+async function openApp({ time = at(9, 0), notifications = settings(), lang = 'zh-TW', viewport = { width: 1280, height: 800 }, desktop = false } = {}) {
   assert.ok(time.getTime() < Date.now() - 60_000, 'scenario time must be earlier than the real clock')
   const context = await browser.newContext({ storageState, viewport, locale: lang === 'en' ? 'en-US' : 'zh-TW' })
   const meta = {}
   await installBackend(context, { notifications, meta })
-  await context.addInitScript(INIT, { lang })
+  await context.addInitScript(INIT, { lang, desktop })
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
@@ -259,6 +270,7 @@ async function openApp({ time = at(9, 0), notifications = settings(), lang = 'zh
       return (await b.count()) ? (await b.innerText()).trim() : ''
     },
     notes: () => page.evaluate(() => window.__notes),
+    desk: () => page.evaluate(() => window.__desk),
     tick: async (ms = 31_000) => { await page.clock.fastForward(ms); await page.waitForTimeout(300) },
     tickTo: async (d) => { const now = await page.evaluate(() => Date.now()); await page.clock.fastForward(Math.max(1, d.getTime() - now)); await page.waitForTimeout(400) },
     shot: (name) => page.screenshot({ path: path.join(SHOT_DIR, name) }),
@@ -565,6 +577,25 @@ await withSettings({ appearance: { showBadgeCount: false } }, async (a) => {
   const dlg = await a.openNotificationSettings()
   await dlg.getByText('這是你自己指定的提醒時間', { exact: false }).waitFor({ timeout: 5000 })
   ok('G8 the settings page explains it (own alarm, not affected by 勿擾時段; phone vs web/Mac)')
+  await a.close()
+}
+
+// Mac app: goes through the existing desktop-notification bridge instead of the browser's Notification.
+{
+  const a = await openApp({ time: at(7, 0), desktop: true, notifications: settings({ scheduling: { dailyPlanningReminder: true, planningReminderTime: '08:00' } }) })
+  await a.tick(); await a.tick()
+  assert.deepEqual(await a.desk(), [], 'G9: nothing before 08:00')
+  await a.tickTo(at(8, 0, 40))
+  const desk = await a.desk()
+  assert.equal(desk.length, 1, `G9: one desktop notification (${JSON.stringify(desk)})`)
+  assert.equal(desk[0].title, 'Huddle · 每日規劃')
+  assert.equal(desk[0].id, `planning:${dayStr(0)}`, 'G9: id carries the date (the Mac main process also de-duplicates on it)')
+  assert.ok(['meeting', 'focus', 'water', 'test'].includes(desk[0].kind), `G9: kind ${desk[0].kind} must be one the packaged Mac app already accepts (desktop/notifications.cjs)`)
+  assert.deepEqual(await a.notes(), [], 'G9: the browser Notification is not used when the Mac bridge is there')
+  await a.tick(); await a.tick()
+  assert.equal((await a.desk()).length, 1, 'G9: once per day')
+  ok('G9 Mac app: one desktop notification at 08:00 through the existing bridge (accepted kind, dated id), not repeated, browser Notification untouched')
+  assert.deepEqual(a.errors, [], `G9: no page errors (${a.errors})`)
   await a.close()
 }
 

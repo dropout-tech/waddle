@@ -11,6 +11,7 @@ const R = await import('../../lib/notifications/task-reminders.ts')
 const S = await import('../../lib/notifications/settings.ts')
 const Bell = await import('../../lib/notifications/daily-bell.ts')
 const Plan = await import('../../lib/notifications/daily-planning.ts')
+const Mappers = await import('../../lib/supabase/mappers.ts')
 
 const NOW = new Date(2026, 9, 10, 12, 0, 0) // Sat 2026-10-10 12:00 local
 const pad = (n) => String(n).padStart(2, '0')
@@ -290,6 +291,19 @@ test('mergeNotificationSettings: a blob missing quietHours (or anything) no long
   assert.deepEqual(messy.someNewerField, { keep: 1 }, 'unknown keys survive a round trip')
   // Idempotent: merging an already-merged blob changes nothing.
   assert.deepEqual(S.mergeNotificationSettings(messy), messy)
+})
+
+test('loading a user_settings row (rowToSettings): a blob missing sections is completed from the defaults, the pet is split out as before', () => {
+  const fallback = { notifications: S.DEFAULT_NOTIFICATION_SETTINGS, slotTypes: [], quickLinks: [], dayViewDays: 1, weekViewDays: 7, keepCompletedTodayInList: true, showCategoryPrefix: true, defaultCategoryEnabled: true }
+  const row = { calendar_start_hour: 0, calendar_end_hour: 24, notifications: { enabled: true, overdue: { enabled: true, criticalDays: 5, showInBell: true, dailyDigest: true }, pet: { adopted: true, name: 'P' } } }
+  const out = Mappers.rowToSettings(row, fallback)
+  assert.deepEqual(out.notifications.quietHours, S.DEFAULT_NOTIFICATION_SETTINGS.quietHours, 'old: undefined → the tab crashed on quietHours.enabled')
+  assert.deepEqual(out.notifications.appearance, S.DEFAULT_NOTIFICATION_SETTINGS.appearance)
+  assert.equal(out.notifications.overdue.criticalDays, 5, 'what was saved wins')
+  assert.equal('pet' in out.notifications, false, 'the pet still rides in the blob but is not part of notifications')
+  assert.equal(out.pet.name, 'P')
+  assert.deepEqual(Mappers.rowToSettings({ ...row, notifications: {} }, fallback).notifications, S.DEFAULT_NOTIFICATION_SETTINGS, 'empty blob → defaults, as before')
+  assert.deepEqual(Mappers.rowToSettings({ ...row, notifications: null }, fallback).notifications, S.DEFAULT_NOTIFICATION_SETTINGS)
 })
 
 test('computeTaskReminders accepts a blob with sections missing (the bell used to read these straight off the object)', () => {
