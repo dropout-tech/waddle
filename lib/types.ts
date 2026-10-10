@@ -393,8 +393,11 @@ export interface NotificationSettings {
   staleTasks: {
     enabled: boolean
     daysUntilStale: number // Days without activity to consider stale (default: 14)
-    includeUnscheduled: boolean // Include tasks without schedule
-    includeNoDueDate: boolean // Include tasks without due date
+    // includeUnscheduled / includeNoDueDate: NO LONGER USED, kept only so stored blobs keep their shape. A stale task is
+    // by definition one with no due date that is not on the calendar, so both sub-switches were just a second master
+    // switch (off = the card can never appear). Removed from the settings page; nothing reads them.
+    includeUnscheduled: boolean
+    includeNoDueDate: boolean
   }
   
   // High priority alerts

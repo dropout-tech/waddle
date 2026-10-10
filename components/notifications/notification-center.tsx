@@ -20,10 +20,10 @@ import type { Task, Workspace } from '@/lib/types'
 import { toDateString } from '@/lib/calendar-utils'
 import { useI18n } from '@/lib/i18n/react'
 import { brandQuote } from '@/lib/brand'
-import { t } from '@/lib/i18n'
 import { useUserSettings } from '@/components/user-settings-context'
 import { useAuth } from '@/components/auth/auth-provider'
 import { mergeNotificationSettings } from '@/lib/notifications/settings'
+import { oldestOverdueMessage } from '@/lib/notifications/relative-time'
 import {
   arrangeBell,
   collectOpenTasks,
@@ -63,16 +63,6 @@ interface Notification {
   message: string
   tasks?: Task[]
   actionLabel?: string
-}
-
-// Format relative time
-const formatRelativeTime = (days: number): string => {
-  if (days === 0) return t('今天')
-  if (days === 1) return t('昨天')
-  if (days < 7) return t('{n} 天前', { n: days })
-  if (days < 30) return t('{n} 週前', { n: Math.floor(days / 7) })
-  if (days < 365) return t('{n} 個月前', { n: Math.floor(days / 30) })
-  return t('{n} 年前', { n: Math.floor(days / 365) })
 }
 
 export function NotificationCenter({
@@ -176,10 +166,7 @@ export function NotificationCenter({
         return {
           ...base,
           title: t('{n} 個任務已經放了一陣子', { n: item.count }),
-          message: t(
-            '最久的一件是{time}的。有些也許已經不用做了——放心整理掉，留下真正想做的就好。',
-            { time: formatRelativeTime(item.meta.oldestDays ?? 0) },
-          ),
+          message: oldestOverdueMessage(item.meta.oldestDays ?? 0),
           actionLabel: t('整理任務'),
         }
       case 'recent-overdue':

@@ -114,6 +114,45 @@ test('signing out removes it; switching account drops the other account\'s; the 
   assert.deepEqual(N.foreignReminderIds([{ id: 7, extra: { kind: 'planning', accountId: 'acct-B' } }], 'acct-B'), [])
 })
 
+test('first-time permission: ask FIRST, schedule only once granted (the sync from saved settings alone never asks, so it schedules nothing)', async () => {
+  reset()
+  await N.setReminderAccount('acct-A')
+  plugin.permission = 'prompt'
+  plugin.promptAnswer = 'granted'
+  await N.syncDailyPlanningReminder(cfgOf(true, '08:00'))
+  assert.equal(planning().length, 0, 'the old toggle: permission still undecided when the sync ran → nothing scheduled (and nothing re-ran it later)')
+  assert.equal(plugin.permission, 'prompt', 'the sync never prompts')
+  const granted = await N.enableDailyPlanningReminder({ hour: 8, minute: 30 })
+  assert.equal(granted, true)
+  assert.equal(plugin.permission, 'granted', 'the prompt was shown and allowed')
+  assert.equal(planning().length, 1, 'allowed → the reminder is pending right away')
+  assert.deepEqual(planning()[0].schedule, { on: { hour: 8, minute: 30 }, repeats: true })
+  assert.equal(planning()[0].extra.accountId, 'acct-A')
+})
+
+test('first-time permission denied: nothing scheduled, the caller is told so (the switch stays off); an earlier grant skips the prompt', async () => {
+  reset()
+  await N.setReminderAccount('acct-A')
+  plugin.permission = 'prompt'
+  plugin.promptAnswer = 'denied'
+  assert.equal(await N.enableDailyPlanningReminder({ hour: 8, minute: 0 }), false)
+  assert.equal(planning().length, 0)
+  assert.equal(plugin.permission, 'denied')
+  plugin.permission = 'granted'
+  assert.equal(await N.enableDailyPlanningReminder({ hour: 21, minute: 5 }), true)
+  assert.deepEqual(planning()[0].schedule.on, { hour: 21, minute: 5 })
+  plugin.promptAnswer = 'granted'
+})
+
+test('unsaved draft: closing the settings page re-syncs the SAVED settings (enabled=false) and removes what the draft scheduled', async () => {
+  reset()
+  await N.setReminderAccount('acct-A')
+  assert.equal(await N.enableDailyPlanningReminder({ hour: 8, minute: 0 }), true)
+  assert.equal(planning().length, 1)
+  await N.syncDailyPlanningReminder(cfgOf(false, '08:00')) // what the hook runs when the modal closes without 儲存
+  assert.equal(planning().length, 0)
+})
+
 test('the id is its own: clear of meeting, follow-up, focus and water ids, and below 2^31', () => {
   const id = N.PLANNING_REMINDER_ID
   assert.ok(Number.isInteger(id) && id < 2 ** 31 - 1)

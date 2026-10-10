@@ -48,7 +48,8 @@ import {
   type ReminderLead,
 } from '@/lib/meeting-reminder'
 import { DesktopNotificationSettings } from './desktop-notification-settings'
-import { requestReminderPermission, syncMeetingReminders } from '@/lib/notifications'
+import { enableDailyPlanningReminder, requestReminderPermission, syncMeetingReminders } from '@/lib/notifications'
+import { planningReminderConfig } from '@/lib/notifications/daily-planning'
 import { mergeNotificationSettings } from '@/lib/notifications/settings'
 import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 import { PICKER_COLOR_HEXES, WORKSPACE_COLORS } from '@/lib/palette'
@@ -1575,26 +1576,6 @@ function NotificationsSettingsTab({
                       <span className="text-xs text-muted-foreground">{t('天')}</span>
                     </div>
                   </div>
-
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-muted-foreground">{t('包含未排程任務')}</span>
-                    <input
-                      type="checkbox"
-                      checked={notifications.staleTasks.includeUnscheduled}
-                      onChange={(e) => updateNestedField('staleTasks', 'includeUnscheduled', e.target.checked)}
-                      className="w-4 h-4 rounded border-border accent-primary"
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-muted-foreground">{t('包含無截止日任務')}</span>
-                    <input
-                      type="checkbox"
-                      checked={notifications.staleTasks.includeNoDueDate}
-                      onChange={(e) => updateNestedField('staleTasks', 'includeNoDueDate', e.target.checked)}
-                      className="w-4 h-4 rounded border-border accent-primary"
-                    />
-                  </label>
                 </>
               )}
             </div>
@@ -1711,17 +1692,26 @@ function NotificationsSettingsTab({
                 <input
                   type="checkbox"
                   checked={notifications.scheduling.dailyPlanningReminder}
-                  onChange={(e) => {
-                    updateNestedField('scheduling', 'dailyPlanningReminder', e.target.checked)
+                  onChange={async (e) => {
+                    const on = e.target.checked
                     // iOS only schedules a notification the user has allowed, and the permission prompt has to come
-                    // from a tap — this one. (Best effort: the bell card works without it.)
-                    if (e.target.checked && isNative()) void requestReminderPermission().catch(() => {})
+                    // from a tap — this one. Same order as the meeting-reminder buttons: ask first, and only when it is
+                    // granted schedule (enableDailyPlanningReminder) and switch the setting on; denied → stays off.
+                    if (on && isNative()) {
+                      const { hour, minute } = planningReminderConfig(notifications)
+                      const granted = await enableDailyPlanningReminder({ hour, minute }).catch(() => false)
+                      if (!granted) {
+                        alert(t('通知權限被拒，請在系統設定中允許 Huddle 顯示通知後再試'))
+                        return
+                      }
+                    }
+                    updateNestedField('scheduling', 'dailyPlanningReminder', on)
                   }}
                   className="w-4 h-4 rounded border-border accent-primary"
                 />
               </label>
               <p className="-mt-1 text-xs text-muted-foreground">
-                {t('這是你自己指定的提醒時間，不受勿擾時段影響。手機會準時推播；網頁與 Mac 要開著 Huddle 才會提醒。')}
+                {t('這是你自己指定的提醒時間，不受勿擾時段影響。手機會準時推播；網頁與 Mac 要在設定時刻起 4 小時內開著 Huddle 才會跳系統通知，網頁版還要先允許瀏覽器通知，否則只會出現在鈴鐺裡。')}
               </p>
 
               {notifications.scheduling.dailyPlanningReminder && (

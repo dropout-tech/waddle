@@ -36,8 +36,30 @@ export function planningTimePassed(now: Date, cfg: Pick<PlanningReminderConfig, 
 }
 
 /**
- * Web / Mac (the app is open): fire once, the first time we look after today's reminder time — and never
- * twice on the same local day. `lastFiredDate` is the "YYYY-MM-DD" stored the last time it fired.
+ * A system notification for "plan your day" only makes sense near the time the user picked: opening Huddle at 9 pm
+ * must not say 「排一下今天」. So the web / Mac notification is only sent within this long after the set time.
+ * (The bell card is not limited by it: it appears at the set time and stays until dismissed.)
+ */
+export const PLANNING_NOTIFY_WINDOW_MS = 4 * 60 * 60 * 1000
+
+/**
+ * The latest occurrence of the set time that is not in the future (today's, or yesterday's if today's has not come yet —
+ * which is what makes a late-evening time like 23:00 still count after midnight), the "YYYY-MM-DD" of that occurrence
+ * (the key stored once it fired), and whether `now` is still inside the notification window.
+ */
+export function planningFireWindow(
+  now: Date,
+  cfg: Pick<PlanningReminderConfig, 'hour' | 'minute'>,
+): { start: Date; key: string; inWindow: boolean } {
+  let start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), cfg.hour, cfg.minute, 0, 0)
+  if (start.getTime() > now.getTime()) start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, cfg.hour, cfg.minute, 0, 0)
+  return { start, key: toDateString(start), inWindow: now.getTime() - start.getTime() < PLANNING_NOTIFY_WINDOW_MS }
+}
+
+/**
+ * Web / Mac (the app is open): send the system notification once, the first time we look within
+ * PLANNING_NOTIFY_WINDOW_MS after the set time — never twice for the same occurrence, and not at all when Huddle is
+ * only opened later than that. `lastFiredDate` is the key stored the last time it fired.
  */
 export function planningReminderDue(args: {
   now: Date
@@ -45,8 +67,8 @@ export function planningReminderDue(args: {
   lastFiredDate: string | null
 }): boolean {
   if (!args.cfg.enabled) return false
-  if (args.lastFiredDate === toDateString(args.now)) return false
-  return planningTimePassed(args.now, args.cfg)
+  const w = planningFireWindow(args.now, args.cfg)
+  return w.inWindow && args.lastFiredDate !== w.key
 }
 
 /** localStorage key (per account) holding the day the web / Mac reminder last fired. */

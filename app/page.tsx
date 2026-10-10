@@ -123,10 +123,6 @@ function HuddlePage() {
   useMeetingReminders(workspaces, petVoice, settings.notifications?.quietHours)
   // Native: "今天要追" notifications for meeting follow-ups (hooks/use-followup-reminders.ts).
   useFollowupReminders(workspaces)
-  // 每日規劃提醒 (設定 › 提醒設定): iOS repeating notification / web + Mac once-a-day while open.
-  // `ready`: until the real settings are loaded they are the defaults (switch off) — acting on those would cancel the
-  // phone's pending reminder on every offline / slow cold start.
-  useDailyPlanningReminder(settings.notifications, petVoice, !isLoading)
 
   // Global ⌘Z / ⌘⇧Z — see hooks/use-undo-shortcuts.ts for the input-field guard.
   useUndoShortcuts()
@@ -207,6 +203,10 @@ function HuddlePage() {
   }, [selectedTask, workspaces, assignedTasks, taskMode])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('general')
+  // 每日規劃提醒 (設定 › 提醒設定): iOS repeating notification / web + Mac within 4 hours of the set time while open.
+  // `ready`: until the real settings are loaded they are the defaults (switch off) — acting on those would cancel the
+  // phone's pending reminder on every offline / slow cold start. `isSettingsOpen`: see the hook.
+  useDailyPlanningReminder(settings.notifications, petVoice, !isLoading, isSettingsOpen)
   const [isOverdueReviewOpen, setIsOverdueReviewOpen] = useState(false)
 
   // Email links ("/?settings=subscription") open Settings → 訂閱 directly. The

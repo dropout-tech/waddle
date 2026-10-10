@@ -12,6 +12,8 @@ const S = await import('../../lib/notifications/settings.ts')
 const Bell = await import('../../lib/notifications/daily-bell.ts')
 const Plan = await import('../../lib/notifications/daily-planning.ts')
 const Mappers = await import('../../lib/supabase/mappers.ts')
+const Rel = await import('../../lib/notifications/relative-time.ts')
+const { setLang } = await import('../../lib/i18n/index.ts')
 
 const NOW = new Date(2026, 9, 10, 12, 0, 0) // Sat 2026-10-10 12:00 local
 const pad = (n) => String(n).padStart(2, '0')
@@ -102,6 +104,16 @@ test('overdue.dailyDigest: one card on top counting overdue / due today / due to
   assert.equal(item(run([task({ dueDate: day(9) })], cfg()), 'daily-digest'), undefined, 'a quiet day has no digest')
 })
 
+test('the digest\'s due-today / due-tomorrow parts follow the due switches (a task the user turned reminders off for is not mentioned)', () => {
+  const tasks = [task({ dueDate: day(-1) }), task({ dueDate: day(0) }), task({ dueDate: day(1) })]
+  const digest = (patch) => item(run(tasks, cfg(patch)), 'daily-digest')?.meta
+  assert.deepEqual(digest({}), { overdue: 1, dueToday: 1, dueTomorrow: 1 })
+  assert.deepEqual(digest({ dueSoon: { notifyOnDueDay: false } }), { overdue: 1, dueToday: 0, dueTomorrow: 1 })
+  assert.deepEqual(digest({ dueSoon: { notifyDayBefore: false } }), { overdue: 1, dueToday: 1, dueTomorrow: 0 })
+  assert.deepEqual(digest({ dueSoon: { enabled: false } }), { overdue: 1, dueToday: 0, dueTomorrow: 0 })
+  assert.equal(item(run([task({ dueDate: day(0) })], cfg({ dueSoon: { notifyOnDueDay: false } })), 'daily-digest'), undefined, 'nothing left to summarise → no digest')
+})
+
 test('a muted master switch (enabled: false) produces nothing at all', () => {
   assert.deepEqual(run([task({ dueDate: day(-9) })], cfg({ enabled: false })), [])
 })
@@ -117,7 +129,7 @@ test('dueSoon.daysBeforeDue sets the window (old: hard-coded 3)', () => {
   assert.deepEqual(ids(run([task({ dueDate: day(1) })], cfg({ dueSoon: { enabled: false }, overdue: { dailyDigest: false } }))), [])
 })
 
-test('dueSoon.notifyOnDueDay: on → its own high-priority card; off → the same tasks fold into the general card', () => {
+test('dueSoon.notifyOnDueDay: on → its own high-priority card; off → tasks due today appear nowhere in the bell (as the old bell did)', () => {
   const t0 = task({ dueDate: day(0) })
   const t2 = task({ dueDate: day(2) })
   const on = run([t0, t2], cfg({ overdue: { dailyDigest: false } }))
@@ -125,7 +137,9 @@ test('dueSoon.notifyOnDueDay: on → its own high-priority card; off → the sam
   assert.equal(item(on, 'due-today').priority, 'high')
   const off = run([t0, t2], cfg({ overdue: { dailyDigest: false }, dueSoon: { notifyOnDueDay: false } }))
   assert.deepEqual(ids(off), ['due-soon'])
-  assert.deepEqual(item(off, 'due-soon').tasks.map((t) => t.id), [t0.id, t2.id], 'today first, then by due date')
+  assert.deepEqual(item(off, 'due-soon').tasks.map((t) => t.id), [t2.id], 'NOT folded into the general card')
+  assert.deepEqual(ids(run([t0], cfg({ overdue: { dailyDigest: false }, dueSoon: { notifyOnDueDay: false } }))), [], 'a day with only today-due tasks: empty bell')
+  assert.deepEqual(legacyIds([t0, t2], NOW), ['due-today', 'due-soon'], 'legacy (switch on) is the same as the new default')
 })
 
 test('dueSoon.notifyDayBefore: on → a "due tomorrow" card; off → folded into the general card', () => {
@@ -171,23 +185,25 @@ test('staleTasks.daysUntilStale (old: hard-coded 14)', () => {
   assert.deepEqual(legacyIds([task({ createdAt: ago(10) })], NOW), [])
 })
 
-test('staleTasks.includeUnscheduled / includeNoDueDate decide which tasks count', () => {
+test('stale = the OLD definition: no due date, not on the calendar, created ≥ N days ago (same cards as the old bell)', () => {
   const base = { overdue: { dailyDigest: false } }
-  const plain = task({ createdAt: ago(30) })                                 // not scheduled, no due date
-  const dated = task({ createdAt: ago(30), dueDate: day(20) })               // not scheduled, due far away
-  const planned = task({ createdAt: ago(30), scheduledDate: day(2) })        // on the calendar → never "forgotten"
-  const all = [plain, dated, planned]
-  const listed = (settings) => item(run(all, cfg({ ...base, staleTasks: settings })), 'stale-tasks')?.tasks.map((t) => t.id)
-  assert.deepEqual(listed({}), [plain.id, dated.id], 'default: everything that is off the calendar; the planned one is left alone')
-  assert.deepEqual(listed({ includeNoDueDate: false }), [dated.id], 'no-due-date tasks drop out')
-  assert.equal(listed({ includeUnscheduled: false }), undefined, 'tasks that are not on the calendar are what "stale" means → off = no card')
-})
-
-test('stale never repeats a task already shown as overdue or due soon', () => {
-  const tasks = [task({ createdAt: ago(30), dueDate: day(-1) }), task({ createdAt: ago(30), dueDate: day(2) })]
-  assert.equal(item(run(tasks, cfg({ overdue: { dailyDigest: false } })), 'stale-tasks'), undefined)
-  // …but with due-soon switched off the near-due one has no other card, so it is listed.
-  assert.equal(item(run(tasks, cfg({ overdue: { dailyDigest: false }, dueSoon: { enabled: false } })), 'stale-tasks').count, 1)
+  const plain = task({ createdAt: ago(30) })                                 // not scheduled, no due date → stale
+  const dated = task({ createdAt: ago(30), dueDate: day(20) })               // a due date = not forgotten
+  const planned = task({ createdAt: ago(30), scheduledDate: day(2) })        // on the calendar = not forgotten
+  const late = task({ createdAt: ago(30), dueDate: day(-3) })                // past due → the overdue card, not stale
+  const all = [plain, dated, planned, late]
+  const listed = (staleSettings) => item(run(all, cfg({ ...base, staleTasks: staleSettings })), 'stale-tasks')?.tasks.map((t) => t.id)
+  assert.deepEqual(listed({}), [plain.id])
+  assert.deepEqual(legacyIds(all, NOW).includes('stale-tasks'), true)
+  assert.deepEqual(legacyIds([dated, planned, late], NOW).includes('stale-tasks'), false, 'old bell: none of these three is stale either')
+  // The two removed sub-switches have no effect any more (they were only a second master switch).
+  assert.deepEqual(listed({ includeUnscheduled: false }), [plain.id])
+  assert.deepEqual(listed({ includeNoDueDate: false }), [plain.id])
+  assert.deepEqual(listed({ includeUnscheduled: false, includeNoDueDate: false }), [plain.id])
+  // The number and the section switch still do.
+  assert.equal(listed({ daysUntilStale: 31 }), undefined)
+  assert.deepEqual(listed({ daysUntilStale: 30 }), [plain.id])
+  assert.equal(listed({ enabled: false }), undefined)
 })
 
 // ── high priority ──
@@ -407,14 +423,54 @@ test('planningReminderConfig: master ∧ section ∧ switch; time falls back to 
   assert.deepEqual(c({ scheduling: { dailyPlanningReminder: true, planningReminderTime: 'oops' } }), { enabled: true, time: '08:00', hour: 8, minute: 0 })
 })
 
-test('planningReminderDue: after the time, once per local day, never when off (quiet hours are not consulted)', () => {
+test('planningReminderDue: within 4 hours after the time, once per occurrence, never when off (quiet hours are not consulted)', () => {
   const on = Plan.planningReminderConfig(cfg({ scheduling: { dailyPlanningReminder: true, planningReminderTime: '08:00' }, quietHours: { enabled: true, startTime: '00:00', endTime: '23:00' } }))
-  const due = (h, m, last) => Plan.planningReminderDue({ now: new Date(2026, 9, 10, h, m), cfg: on, lastFiredDate: last })
-  assert.equal(due(7, 59, null), false)
+  const due = (h, m, last, day = 10) => Plan.planningReminderDue({ now: new Date(2026, 9, day, h, m), cfg: on, lastFiredDate: last })
+  assert.equal(due(7, 59, null), false, 'before the time')
   assert.equal(due(8, 0, null), true)
-  assert.equal(due(15, 0, null), true, 'the app opened late in the day: still fires once')
-  assert.equal(due(15, 0, '2026-10-10'), false, 'already fired today')
-  assert.equal(due(8, 0, '2026-10-09'), true, 'yesterday does not count')
+  assert.equal(due(11, 59, null), true, 'last minute of the 4-hour window')
+  assert.equal(due(12, 0, null), false, '4 hours exactly → closed')
+  assert.equal(due(21, 0, null), false, 'opened at 9 pm: no 「排一下今天」 system notification')
+  assert.equal(due(9, 0, '2026-10-10'), false, 'already fired for today\'s occurrence')
+  assert.equal(due(8, 0, '2026-10-09'), true, 'yesterday\'s does not count')
   assert.equal(Plan.planningReminderDue({ now: new Date(2026, 9, 10, 9, 0), cfg: { ...on, enabled: false }, lastFiredDate: null }), false)
   assert.equal(Plan.planningLastFiredKey('u1') === Plan.planningLastFiredKey('u2'), false)
+})
+
+test('planningFireWindow: a late-evening time still works after midnight (the occurrence is yesterday\'s), the window is 4 h', () => {
+  const late = Plan.planningReminderConfig(cfg({ scheduling: { dailyPlanningReminder: true, planningReminderTime: '23:00' } }))
+  const w = (day, h, m) => Plan.planningFireWindow(new Date(2026, 9, day, h, m), late)
+  assert.deepEqual([w(10, 22, 59).key, w(10, 22, 59).inWindow], ['2026-10-09', false], 'before 23:00 the latest occurrence is yesterday\'s, long over')
+  assert.deepEqual([w(10, 23, 0).key, w(10, 23, 0).inWindow], ['2026-10-10', true])
+  assert.deepEqual([w(11, 1, 0).key, w(11, 1, 0).inWindow], ['2026-10-10', true], 'after midnight it is still the 10th\'s occurrence')
+  assert.equal(w(11, 2, 59).inWindow, true)
+  assert.equal(w(11, 3, 0).inWindow, false)
+  const due = (day, h, m, last) => Plan.planningReminderDue({ now: new Date(2026, 9, day, h, m), cfg: late, lastFiredDate: last })
+  assert.equal(due(11, 1, 0, '2026-10-10'), false, 'fired at 23:30 → not again at 01:00')
+  assert.equal(due(11, 1, 0, null), true, 'not yet fired: 01:00 is still inside the window')
+  assert.equal(Plan.PLANNING_NOTIFY_WINDOW_MS, 4 * 3600 * 1000)
+})
+
+test('bell planning card is NOT limited by the 4-hour window: from the set time on, all day', () => {
+  const at = (h, m) => item(run([], cfg({ scheduling: { dailyPlanningReminder: true, planningReminderTime: '08:00' } }), new Date(2026, 9, 10, h, m)), 'daily-planning')
+  assert.ok(at(8, 0))
+  assert.ok(at(21, 0), 'still there at 9 pm')
+})
+
+test('relative time wording: singular for exactly 1, plural otherwise (day / week / month / year); Chinese keeps a space before the number', () => {
+  const en = (d) => { setLang('en'); return Rel.relativeDaysAgo(d) }
+  const cases = [[2, '2 days ago'], [6, '6 days ago'], [7, '1 week ago'], [13, '1 week ago'], [14, '2 weeks ago'], [29, '4 weeks ago'], [30, '1 month ago'], [59, '1 month ago'], [60, '2 months ago'], [364, '12 months ago'], [365, '1 year ago'], [729, '1 year ago'], [730, '2 years ago']]
+  for (const [d, want] of cases) assert.equal(en(d), want, `en ${d} days`)
+  setLang('en')
+  assert.equal(Rel.oldestOverdueMessage(7).startsWith('The oldest one is from 1 week ago.'), true, Rel.oldestOverdueMessage(7))
+  for (let d = 2; d < 800; d++) assert.equal(/\b1 (days|weeks|months|years) ago/.test(en(d)), false, `en ${d}: "1 weeks ago"-style plural error`)
+  for (const [d, want] of [[3, '最久的一件是 3 天前的。'], [7, '最久的一件是 1 週前的。'], [21, '最久的一件是 3 週前的。'], [45, '最久的一件是 1 個月前的。'], [400, '最久的一件是 1 年前的。']]) {
+    setLang('zh-TW')
+    assert.equal(Rel.oldestOverdueMessage(d).startsWith(want), true, `zh ${d}: ${Rel.oldestOverdueMessage(d)}`)
+  }
+  setLang('zh-TW')
+  assert.equal(Rel.oldestOverdueMessage(1).startsWith('最久的一件是昨天的。'), true, 'a word (昨天) needs no extra space')
+  setLang('en')
+  assert.equal(/[\u3400-\u9fff]/.test(Rel.oldestOverdueMessage(9)), false, 'English message has no Chinese')
+  setLang('zh-TW')
 })

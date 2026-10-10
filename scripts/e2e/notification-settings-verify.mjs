@@ -80,7 +80,7 @@ const settings = (patch = {}) => {
 }
 
 // ── the synthetic task list (offsets are days from the scenario's "today") ──
-// open tasks: 15 → undated ones are 6 (40 %), 4 urgent ones are scheduled in the future.
+// open tasks: 16 → undated ones are 6 (37.5 %), 4 urgent ones are scheduled in the future, one old task has a due date.
 const FIXTURE = [
   { k: 'od10', title: 'Overdue ten days', due: -10, ws: 'B' },
   { k: 'od5', title: 'Overdue five days', due: -5, ws: 'B' },
@@ -88,6 +88,7 @@ const FIXTURE = [
   { k: 'd1', title: 'Due tomorrow', due: 1 },
   { k: 'd3', title: 'Due in three days', due: 3 },
   { k: 'stale', title: 'Old undated task', created: -20 },
+  { k: 'dated-old', title: 'Old dated task', created: -30, due: 20 }, // has a due date → never stale
   ...[0, 1, 2, 3].map((i) => ({ k: `u${i}`, title: `Urgent ${i}`, urgency: 9, sched: 5 + i })),
   ...[0, 1, 2, 3, 4].map((i) => ({ k: `n${i}`, title: `Undated ${i}` })),
 ]
@@ -301,7 +302,9 @@ const ID_ORDER_DEFAULT = ['daily-digest', 'critical-overdue', 'recent-overdue', 
   assert.deepEqual(await a.headers(), ['today', 'overdue', 'due_soon', 'stale'], 'A1: grouped by type, in order')
   const digest = (await a.items())[0].text
   assert.ok(digest.includes('2 件逾期') && digest.includes('今天 1 件到期') && digest.includes('明天 1 件到期'), `A1: digest wording (${digest.replace(/\n/g, ' | ')})`)
-  ok('A1 stock settings → digest + 2 overdue cards + today/tomorrow/soon + stale, grouped under 4 headers', ids.join(' '))
+  const critText = (await a.items()).find((i) => i.id === 'critical-overdue').text
+  assert.ok(critText.includes('最久的一件是 1 週前的'), `A1: space before the number (${critText.replace(/\n/g, ' | ')})`)
+  ok('A1 stock settings → digest + 2 overdue cards + today/tomorrow/soon + stale, grouped under 4 headers; "最久的一件是 1 週前的" (space before the number)', ids.join(' '))
   await a.shot('A-default-open.png')
   assert.equal(await a.badge(), '7', 'A2: while the panel is open the badge still agrees with it')
   await a.closeBell()
@@ -365,15 +368,12 @@ await withSettings({ staleTasks: { daysUntilStale: 30 } }, async (a) => {
 await withSettings({ staleTasks: { daysUntilStale: 1 } }, async (a) => {
   const s = get(await a.items(), 'stale-tasks')
   assert.ok(s.text.includes('6 個任務靜靜躺了 1 天以上'), `B4b: ${s.text.replace(/\n/g, ' | ')}`)
-  ok('B4b staleTasks.daysUntilStale → 1: the 5 tasks made yesterday join in (6 tasks, wording says "1 天以上")')
+  ok('B4b staleTasks.daysUntilStale → 1: the 5 tasks made yesterday join in (6 tasks, wording says "1 天以上"); the 30-day-old task WITH a due date stays out')
 })
-await withSettings({ staleTasks: { includeNoDueDate: false } }, async (a) => {
-  assert.ok(!(await a.ids()).includes('stale-tasks'), 'B5: every stale candidate here has no due date')
-  ok('B5 staleTasks.includeNoDueDate off → undated tasks are not stale')
-})
-await withSettings({ staleTasks: { includeUnscheduled: false } }, async (a) => {
-  assert.ok(!(await a.ids()).includes('stale-tasks'))
-  ok('B5b staleTasks.includeUnscheduled off → no stale card')
+await withSettings({ staleTasks: { includeNoDueDate: false, includeUnscheduled: false } }, async (a) => {
+  const s = get(await a.items(), 'stale-tasks')
+  assert.ok(s && s.text.includes('1 個任務靜靜躺了 14 天以上'), `B5: the two retired sub-switches change nothing (${s?.text})`)
+  ok('B5 staleTasks.includeNoDueDate / includeUnscheduled (retired, no longer on the page) are ignored even when stored as off')
 })
 await withSettings({ dueSoon: { daysBeforeDue: 1 } }, async (a) => {
   const ids = await a.ids()
@@ -386,13 +386,17 @@ await withSettings({ dueSoon: { daysBeforeDue: 7 } }, async (a) => {
 })
 await withSettings({ dueSoon: { notifyOnDueDay: false } }, async (a) => {
   const items = await a.items()
-  assert.ok(!has(items, 'due-today') && get(items, 'due-soon').text.includes('Due today'), 'B7: folded into the general card')
-  ok('B7 dueSoon.notifyOnDueDay off → no separate "today" card; the task folds into 這幾天到期')
+  assert.ok(!has(items, 'due-today') && !get(items, 'due-soon').text.includes('Due today'), 'B7: not folded into the general card either')
+  const all = items.map((i) => i.text).join('\n')
+  assert.ok(!all.includes('Due today'), 'B7: the task due today is nowhere in the bell')
+  assert.ok(!get(items, 'daily-digest').text.includes('今天 1 件到期'), 'B7: …nor counted in the digest')
+  ok('B7 dueSoon.notifyOnDueDay off → tasks due today appear nowhere in the bell (not in a card, not in the digest) — as the old bell did')
 })
 await withSettings({ dueSoon: { notifyDayBefore: false } }, async (a) => {
   const items = await a.items()
   assert.ok(!has(items, 'due-tomorrow') && get(items, 'due-soon').text.includes('Due tomorrow'), 'B8')
-  ok('B8 dueSoon.notifyDayBefore off → no separate "tomorrow" card; folded in')
+  assert.ok(!get(items, 'daily-digest').text.includes('明天'), 'B8: the digest stops mentioning tomorrow')
+  ok('B8 dueSoon.notifyDayBefore off → no separate "tomorrow" card (stays in the general list); digest drops the tomorrow part')
 })
 await withSettings({ highPriority: { maxBeforeAlert: 3 } }, async (a) => {
   const c = get(await a.items(), 'too-many-urgent')
@@ -406,7 +410,11 @@ await withSettings({ highPriority: { maxBeforeAlert: 3, minUrgency: 10 } }, asyn
 await withSettings({ scheduling: { percentThreshold: 30 } }, async (a) => {
   const c = get(await a.items(), 'unscheduled-tasks')
   assert.ok(c && c.text.includes('不少任務還沒排程') && c.text.includes('6 個任務'), `B10 (${c?.text})`)
-  ok('B10 scheduling.percentThreshold 50 → 30: 40 % unscheduled now triggers the card (old bell: only above 50 %)')
+  ok('B10 scheduling.percentThreshold 50 → 30: 37.5 % unscheduled now triggers the card (old bell: only above 50 %)')
+})
+await withSettings({ scheduling: { percentThreshold: 40 } }, async (a) => {
+  assert.ok(!(await a.ids()).includes('unscheduled-tasks'), 'B10: 37.5 % < 40 %')
+  ok('B10a scheduling.percentThreshold → 40: 37.5 % unscheduled is below it, no card')
 })
 await withSettings({ scheduling: { percentThreshold: 30, remindUnscheduled: false } }, async (a) => {
   assert.ok(!(await a.ids()).includes('unscheduled-tasks'))
@@ -575,9 +583,38 @@ await withSettings({ appearance: { showBadgeCount: false } }, async (a) => {
   assert.equal((await a.notes()).length, 1)
   ok('G7 time set to 13:30 → silent at 09:00, fires at 13:30')
   const dlg = await a.openNotificationSettings()
-  await dlg.getByText('這是你自己指定的提醒時間', { exact: false }).waitFor({ timeout: 5000 })
-  ok('G8 the settings page explains it (own alarm, not affected by 勿擾時段; phone vs web/Mac)')
+  const note = dlg.getByText('這是你自己指定的提醒時間', { exact: false })
+  await note.waitFor({ timeout: 5000 })
+  const noteText = await note.innerText()
+  assert.ok(noteText.includes('4 小時') && noteText.includes('允許瀏覽器通知') && noteText.includes('只會出現在鈴鐺裡'), `G8: ${noteText}`)
+  ok('G8 the settings page explains it (own alarm, not affected by 勿擾時段; phone vs web/Mac; 4-hour window; web needs browser notifications allowed, otherwise bell only)')
+  assert.equal(await dlg.getByText('包含未排程任務').count() + (await dlg.getByText('包含無截止日任務').count()), 0, 'G8b: the two retired stale sub-switches are gone from the page')
+  ok('G8b the 閒置任務提醒 section no longer shows 包含未排程任務 / 包含無截止日任務')
   await a.close()
+}
+
+// The system notification only goes out within 4 hours after the set time.
+{
+  const plan = settings({ scheduling: { dailyPlanningReminder: true, planningReminderTime: '08:00' } })
+  const late = await openApp({ time: at(21, 0), notifications: plan })
+  await late.tick(); await late.tick()
+  assert.deepEqual(await late.notes(), [], 'G10: opened at 9 pm → no 「排一下今天」 system notification')
+  await late.openBell()
+  assert.ok((await late.ids()).includes('daily-planning'), 'G10: …but the bell card is there')
+  ok('G10 Huddle opened at 21:00 (set time 08:00) → NO system notification, the bell still shows the planning card')
+  await late.close()
+
+  const inside = await openApp({ time: at(7, 0), notifications: plan })
+  await inside.tickTo(at(11, 30))
+  assert.equal((await inside.notes()).length, 1, 'G11: 3.5 h after the set time is still inside the window')
+  ok('G11 first look at 11:30 (3.5 h after 08:00) → notification sent')
+  await inside.close()
+
+  const outside = await openApp({ time: at(7, 0), notifications: plan })
+  await outside.tickTo(at(12, 30))
+  assert.deepEqual(await outside.notes(), [], 'G11b: 4.5 h after is outside the window')
+  ok('G11b first look at 12:30 (4.5 h after 08:00) → no notification')
+  await outside.close()
 }
 
 // Mac app: goes through the existing desktop-notification bridge instead of the browser's Notification.
@@ -611,6 +648,9 @@ await withSettings({ appearance: { showBadgeCount: false } }, async (a) => {
   assert.ok(!CJK.test(panelText), `H1: Chinese left in the English bell: ${panelText.match(/.{0,20}[㐀-鿿]+.{0,20}/g)?.join(' || ')}`)
   assert.ok(!CJK.test(header.join(' ')), 'H1: header')
   ok('H1 English: bell with 9 kinds of card (digest, planning, overdue×2, due×3, stale, urgent) → no Chinese characters', ids.join(' '))
+  const critEn = (await a.items()).find((i) => i.id === 'critical-overdue').text
+  assert.ok(critEn.includes('from 1 week ago') && !/\b1 (days|weeks|months|years)\b/.test(critEn), `H1b: singular unit (${critEn.replace(/\n/g, ' | ')})`)
+  ok('H1b English: "The oldest one is from 1 week ago" (singular for 1, not "1 weeks")')
   await a.shot('H-english-bell.png')
   await a.closeBell()
   const dlg = await a.openNotificationSettings()
@@ -620,6 +660,7 @@ await withSettings({ appearance: { showBadgeCount: false } }, async (a) => {
   await dlg.getByText('Daily planning reminder', { exact: true }).waitFor({ timeout: 5000 })
   const left = tabText.match(/.{0,30}[㐀-鿿]+.{0,30}/g)
   assert.ok(!left, `H2: Chinese left in the English 提醒設定 tab: ${left?.join(' || ')}`)
+  assert.ok(tabText.includes('browser notifications allowed') && tabText.includes('only appears in the bell'), 'H2: the planning note says the web needs browser notifications')
   await a.shot('H-english-settings.png')
   ok('H2 English: the whole 提醒設定 tab (incl. the new planning note) has no Chinese characters', `workspace names ignored: ${names.join(', ')}`)
   assert.deepEqual(a.errors, [])

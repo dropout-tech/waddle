@@ -10,10 +10,11 @@
 //   overdue.enabled / showInBell   the 逾期 cards (showInBell off → no cards; the digest below is separate)
 //   overdue.criticalDays           overdue by at least N days → "放了一陣子" (high), fewer → "剛過了預定日" (medium)
 //   overdue.dailyDigest            one "今天的摘要" card on top: N overdue / M due today / K due tomorrow
+//                                  (the two due parts follow dueSoon.enabled / notifyOnDueDay / notifyDayBefore)
 //   dueSoon.daysBeforeDue          tasks due within N days (today included) are listed
-//   dueSoon.notifyOnDueDay         on: tasks due today get their own high-priority card; off: they fold into the general
-//   dueSoon.notifyDayBefore        on: tasks due tomorrow get their own card;              off: they fold into the general list
-//   staleTasks.*                   see the stale block below
+//   dueSoon.notifyOnDueDay         on: tasks due today get their own high-priority card; off: they appear nowhere (as before)
+//   dueSoon.notifyDayBefore        on: tasks due tomorrow get their own card;              off: they stay in the general list
+//   staleTasks.enabled / daysUntilStale   no due date, not on the calendar, created at least N days ago
 //   highPriority.*                 tasks with urgency ≥ minUrgency; more than maxBeforeAlert of them → one "急件有點多" card
 //   scheduling.remindUnscheduled / percentThreshold   unscheduled share ≥ threshold (and at least 5 tasks) → one card
 //   scheduling.dailyPlanningReminder / planningReminderTime   after that time of day, a planning card appears
@@ -109,7 +110,7 @@ export function computeTaskReminders(input: { tasks: Task[]; settings: unknown; 
   const cards: TaskReminderItem[] = []
 
   // ── overdue ──
-  // Always computed: the digest and the stale list need it even when the overdue cards are off.
+  // Always computed: the digest needs it even when the overdue cards are off.
   const overdueAll = open.filter((t) => isTaskOverdue(t, todayStr))
   const overdueDays = (t: Task) => today - dayNumber(getTaskOverdueDate(t, todayStr))
   const overduePriority = (tasks: Task[], base: ReminderPriority): ReminderPriority => {
@@ -159,11 +160,9 @@ export function computeTaskReminders(input: { tasks: Task[]; settings: unknown; 
   const dueToday = due.filter((d) => d.days === 0).map((d) => d.task)
   const dueTomorrow = due.filter((d) => d.days === 1).map((d) => d.task)
   const dueLater = due.filter((d) => d.days >= 2).map((d) => d.task)
-  const general: Task[] = [
-    ...(cfg.dueSoon.notifyOnDueDay ? [] : dueToday),
-    ...(cfg.dueSoon.notifyDayBefore ? [] : dueTomorrow),
-    ...dueLater,
-  ]
+  // 到期當天提醒 off: tasks due today are listed nowhere in the bell (what the old bell did) — not folded into the
+  // general card. 到期前一天提醒 off: tomorrow's tasks just stay in the general card (the old bell never split them out).
+  const general: Task[] = [...(cfg.dueSoon.notifyDayBefore ? [] : dueTomorrow), ...dueLater]
   if (cfg.dueSoon.notifyOnDueDay && dueToday.length > 0) {
     cards.push({ id: 'due-today', type: 'due_soon', priority: 'high', tasks: dueToday, count: dueToday.length, daily: false, meta: {} })
   }
@@ -171,23 +170,19 @@ export function computeTaskReminders(input: { tasks: Task[]; settings: unknown; 
     cards.push({ id: 'due-tomorrow', type: 'due_soon', priority: 'medium', tasks: dueTomorrow, count: dueTomorrow.length, daily: false, meta: {} })
   }
   if (general.length > 0) {
-    // Sorted by due date again: today / tomorrow may have been folded in.
+    // Sorted by due date again: tomorrow's tasks may have been folded in.
     const sorted = [...general].sort((a, b) => dayNumber(a.dueDate) - dayNumber(b.dueDate))
     cards.push({ id: 'due-soon', type: 'due_soon', priority: 'low', tasks: sorted, count: sorted.length, daily: false, meta: { windowDays } })
   }
 
   // ── stale ──
-  // "靜靜躺著的任務" = open, created at least daysUntilStale days ago, not on the calendar. A task that has a date
-  // (scheduled, or due) is not forgotten: past dates are the overdue cards, near dues are the due cards.
-  //   includeUnscheduled  off → tasks that are not on the calendar do not count, which is every stale candidate, so
-  //                       the card goes away (turn the whole section off instead if that is what you want)
-  //   includeNoDueDate    off → only tasks that DO have a (future) due date count
-  if (cfg.staleTasks.enabled && cfg.staleTasks.includeUnscheduled) {
-    const covered = new Set<string>([...overdueAll, ...due.map((d) => d.task)].map((t) => t.id))
+  // "靜靜躺著的任務" = open, no due date, not on the calendar, created at least daysUntilStale days ago (the old
+  // definition). A due date means it is not forgotten: past ones are the overdue cards, near ones the due cards.
+  // (staleTasks.includeUnscheduled / includeNoDueDate are no longer used — see lib/types.ts.)
+  if (cfg.staleTasks.enabled) {
     const stale = open
       .filter((t) => {
-        if (t.scheduledDate || covered.has(t.id)) return false
-        if (!t.dueDate && !cfg.staleTasks.includeNoDueDate) return false
+        if (t.scheduledDate || t.dueDate) return false
         const age = today - dayNumber(toDateString(new Date(t.createdAt)))
         return Number.isFinite(age) && age >= cfg.staleTasks.daysUntilStale
       })
@@ -242,8 +237,9 @@ export function computeTaskReminders(input: { tasks: Task[]; settings: unknown; 
   const pinned: TaskReminderItem[] = []
   if (cfg.overdue.enabled && cfg.overdue.dailyDigest) {
     const tomorrow = today + 1
-    const todayCount = open.filter((t) => dayNumber(t.dueDate) === today).length
-    const tomorrowCount = open.filter((t) => dayNumber(t.dueDate) === tomorrow).length
+    // The due-today / due-tomorrow parts follow the same switches as the cards they summarise.
+    const todayCount = cfg.dueSoon.enabled && cfg.dueSoon.notifyOnDueDay ? open.filter((t) => dayNumber(t.dueDate) === today).length : 0
+    const tomorrowCount = cfg.dueSoon.enabled && cfg.dueSoon.notifyDayBefore ? open.filter((t) => dayNumber(t.dueDate) === tomorrow).length : 0
     if (overdueAll.length + todayCount + tomorrowCount > 0) {
       pinned.push({
         id: 'daily-digest',

@@ -5,9 +5,8 @@ import { useAuth } from '@/components/auth/auth-provider'
 import { useI18n } from '@/lib/i18n/react'
 import { t } from '@/lib/i18n'
 import { isNative } from '@/lib/platform'
-import { toDateString } from '@/lib/calendar-utils'
 import { syncDailyPlanningReminder } from '@/lib/notifications'
-import { planningLastFiredKey, planningReminderConfig, planningReminderDue } from '@/lib/notifications/daily-planning'
+import { planningFireWindow, planningLastFiredKey, planningReminderConfig, planningReminderDue } from '@/lib/notifications/daily-planning'
 import { notifyDesktop } from '@/lib/desktop-notifications'
 
 /**
@@ -15,27 +14,31 @@ import { notifyDesktop } from '@/lib/desktop-notifications'
  *
  *  - iOS: ONE repeating local notification at the chosen time, kept in step with the settings
  *    (lib/notifications/index.ts syncDailyPlanningReminder) — it fires with the app closed.
- *  - Web / Mac: while Huddle is open, the first look after the chosen time that day fires it once (a Mac
+ *  - Web / Mac: while Huddle is open, the first look within 4 hours after the chosen time fires it once (a Mac
  *    desktop notification through the existing notifyDesktop, or a browser Notification when permission is
- *    ALREADY granted — it never asks), at most once per local day (localStorage, per account). The bell shows the
- *    planning card from that time on whatever the permissions are (lib/notifications/task-reminders.ts).
+ *    ALREADY granted — it never asks), at most once per occurrence (localStorage, per account); opened later than
+ *    that, no system notification that day. The bell shows the planning card from the chosen time on whatever the
+ *    permissions are (lib/notifications/task-reminders.ts).
  *
  * It is the user's own alarm: 勿擾時段 is not consulted.
  *
+ * `settingsOpen` = the settings modal is open (iOS sync waits until it closes; see the effect below).
  * `ready` = the saved settings have really been loaded. Before that `notifications` is the default (switch off), and
  * acting on it would cancel the phone's pending reminder on every cold start that is slow or offline.
  */
-export function useDailyPlanningReminder(notifications: unknown, petVoice: string | null = null, ready = true) {
+export function useDailyPlanningReminder(notifications: unknown, petVoice: string | null = null, ready = true, settingsOpen = false) {
   const { user } = useAuth()
   const userId = user?.id ?? null
   const { lang } = useI18n()
   const { enabled, hour, minute } = planningReminderConfig(notifications)
 
-  // iOS. petVoice / lang are only here to re-schedule when the notification's wording changes.
+  // iOS. petVoice / lang are only here to re-schedule when the notification's wording changes. While the settings
+  // modal is open the switch there may already have scheduled one from an unsaved draft
+  // (enableDailyPlanningReminder); this effect runs again when the modal closes and puts the SAVED settings back.
   useEffect(() => {
-    if (!ready || !isNative()) return
+    if (!ready || !isNative() || settingsOpen) return
     void syncDailyPlanningReminder({ enabled, hour, minute }).catch(() => {})
-  }, [ready, enabled, hour, minute, userId, petVoice, lang])
+  }, [ready, settingsOpen, enabled, hour, minute, userId, petVoice, lang])
 
   // Web / Mac.
   useEffect(() => {
@@ -50,9 +53,9 @@ export function useDailyPlanningReminder(notifications: unknown, petVoice: strin
         /* unreadable storage: treated as "not fired yet" */
       }
       if (!planningReminderDue({ now, cfg: { enabled, hour, minute }, lastFiredDate: last })) return
-      const today = toDateString(now)
+      const today = planningFireWindow(now, { hour, minute }).key
       // Remember BEFORE showing, and give up when it cannot be remembered — otherwise a throwing
-      // Notification (or blocked storage) would retry every 30 seconds for the rest of the day.
+      // Notification (or blocked storage) would retry every 30 seconds for the whole window.
       try {
         window.localStorage.setItem(key, today)
       } catch {

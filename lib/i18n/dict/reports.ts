@@ -61,10 +61,10 @@ export const dict: Record<string, string> = {
   '{n} 小時': '{n}h',
 
   // notification-center.tsx
-  '{n} 天前': '{n} days ago',
-  '{n} 週前': '{n} weeks ago',
-  '{n} 個月前': '{n} months ago',
-  '{n} 年前': '{n} years ago',
+  '{n} 天前': '{n} {n|day|days} ago',
+  '{n} 週前': '{n} {n|week|weeks} ago',
+  '{n} 個月前': '{n} {n|month|months} ago',
+  '{n} 年前': '{n} {n|year|years} ago',
   '{n} 個任務已經放了一陣子': '{n} {n|task has|tasks have} been sitting for a while',
   '最久的一件是{time}的。有些也許已經不用做了——放心整理掉，留下真正想做的就好。':
     'The oldest one is from {time}. Some of these might not need doing anymore — feel free to clear them out and keep what you actually want to do.',
@@ -76,7 +76,7 @@ export const dict: Record<string, string> = {
   '還有時間，可以慢慢做——一件一件來就好。': "There's still time — take it one thing at a time.",
   '{n} 個任務這幾天到期': '{n} {n|task is|tasks are} due in the next few days',
   '接下來 {days} 天會陸續到期，先挑個順手的時段放上日曆，到時候就從容多了。':
-    "These are due over the next {days} days — put them on the calendar at a time that works, and you'll feel more at ease when they arrive.",
+    "These are due over the next {days} {days|day|days} — put them on the calendar at a time that works, and you'll feel more at ease when they arrive.",
   '{n} 個任務明天到期': '{n} {n|task is|tasks are} due tomorrow',
   '先看看要不要準備什麼，順手把它們放上日曆吧。': "See if anything needs preparing, and put them on the calendar while you're at it.",
   '{n} 個任務靜靜躺了 {days} 天以上': '{n} {n|task has|tasks have} been quietly sitting for {days}+ days',
@@ -96,7 +96,7 @@ export const dict: Record<string, string> = {
   '通知中心': 'Notification Center',
   '一切順利！': 'All clear!',
   '目前沒有需要注意的事項': 'Nothing needs your attention right now',
-  '還有 {n} 個任務...': '{n} more tasks...',
+  '還有 {n} 個任務...': '{n} more {n|task|tasks}...',
   // notification-center.tsx — daily cards, group headers, long lists
   '今天的摘要': "Today's summary",
   '{n} 件逾期': '{n} overdue',

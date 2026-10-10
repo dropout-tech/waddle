@@ -34,7 +34,9 @@ export function installReminderTestEnv() {
  * `pending` persists between calls, scheduling an id that already exists replaces it, cancel removes by id.
  */
 export function installFakeLocalNotifications() {
-  const state = { pending: [], permission: 'granted' }
+  // permission 'prompt' = never asked yet: requestPermissions() shows the (fake) system prompt and the user's answer
+  // (`promptAnswer`, default 'granted') becomes the permission — like the real iOS plugin.
+  const state = { pending: [], permission: 'granted', promptAnswer: 'granted' }
   globalThis.__LN = {
     getPending: async () => ({ notifications: state.pending.map((n) => ({ ...n })) }),
     cancel: async ({ notifications }) => {
@@ -42,7 +44,10 @@ export function installFakeLocalNotifications() {
       state.pending = state.pending.filter((n) => !ids.has(n.id))
     },
     checkPermissions: async () => ({ display: state.permission }),
-    requestPermissions: async () => ({ display: state.permission }),
+    requestPermissions: async () => {
+      if (state.permission === 'prompt') state.permission = state.promptAnswer
+      return { display: state.permission }
+    },
     schedule: async ({ notifications }) => {
       for (const n of notifications) state.pending = state.pending.filter((p) => p.id !== n.id)
       state.pending.push(...notifications.map((n) => ({ ...n })))

@@ -361,3 +361,19 @@ async function scheduleDailyPlanning(
     ],
   })
 }
+
+/**
+ * The 每日規劃提醒 switch was turned ON in the settings page (a tap): ask for notification permission FIRST, and only
+ * when it is granted schedule the reminder (the same order as the meeting-reminder buttons). Resolves false when the
+ * user said no — nothing is scheduled and the caller should leave the switch off. Scheduling here, not later from the
+ * saved settings, is what makes the very first grant work: the sync that follows 儲存 only checks the permission, and
+ * the prompt may not have been answered when it ran. (If the settings are then not saved, the page re-syncs from the
+ * saved settings when the modal closes — hooks/use-daily-planning-reminder.ts.) Native only; web / Mac have nothing to ask.
+ */
+export async function enableDailyPlanningReminder(cfg: Pick<PlanningReminderConfig, 'hour' | 'minute'>): Promise<boolean> {
+  if (!isNative()) return true
+  const granted = await requestReminderPermission()
+  if (!granted) return false
+  await syncDailyPlanningReminder({ enabled: true, hour: cfg.hour, minute: cfg.minute })
+  return true
+}
