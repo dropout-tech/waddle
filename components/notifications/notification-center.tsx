@@ -269,11 +269,13 @@ export function NotificationCenter({
   useEffect(() => {
     onCountChange?.(totalCount, hasHighPriority)
   }, [onCountChange, totalCount, hasHighPriority])
-  // Opening the bell is how the daily cards get "read".
+  // Looking at the bell is how the daily cards get "read": they count on the badge until the panel that showed
+  // them is closed (so the badge and the panel agree while it is open).
   const dailyIdsKey = items.filter((i) => i.daily).map((i) => i.id).join(',')
   useEffect(() => {
     if (!isOpen || !dailyIdsKey) return
-    updateDailyBell(dailyKey, todayStr, (state) => markSeen(state, dailyIdsKey.split(',')))
+    const shown = dailyIdsKey.split(',')
+    return () => updateDailyBell(dailyKey, todayStr, (state) => markSeen(state, shown))
   }, [isOpen, dailyIdsKey, dailyKey, todayStr])
   // Opened from outside (mobile ⋯ menu): refresh the meeting inbox the same
   // way the bell click does.
