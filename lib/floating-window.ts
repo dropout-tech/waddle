@@ -39,6 +39,24 @@ function pipApi(): DocumentPictureInPicture | null {
   return api ?? null
 }
 
+/**
+ * Mac 桌面版：懸浮視窗要不要也蓋在其他 App 的全螢幕畫面上（裝置層級偏好，預設開——
+ * 老闆 2026-10-10 拍板；使用者在設定關掉才會存 '0'）。
+ * 打開時桌面殼會把它開成「面板」視窗——代價是 Huddle 不在前景時，⌘C/⌘V/⌘A/⌘Z
+ * 會被系統送去前景的 App（見 desktop/navigation.cjs）。下次開懸浮視窗時生效。
+ */
+export const FLOAT_OVER_FULLSCREEN_KEY = 'huddle.desktop.floatOverFullscreen'
+export function canFloatOverFullscreen(): boolean {
+  return typeof window !== 'undefined' && window.huddleDesktop?.floatOverFullscreen === true
+}
+export function floatOverFullscreenEnabled(): boolean {
+  if (!canFloatOverFullscreen()) return false
+  try { return window.localStorage.getItem(FLOAT_OVER_FULLSCREEN_KEY) !== '0' } catch { return true }
+}
+export function setFloatOverFullscreenEnabled(enabled: boolean) {
+  try { window.localStorage.setItem(FLOAT_OVER_FULLSCREEN_KEY, enabled ? '1' : '0') } catch {}
+}
+
 /** 這個瀏覽器支不支援「永遠置頂」的懸浮視窗。 */
 export function supportsPip(): boolean {
   return isDesktop() || pipApi() !== null
@@ -145,7 +163,8 @@ export async function openPipWindow(opts: { width: number; height: number }): Pr
   // Electron exposes Document PiP, but its blank child is not a usable native
   // window. Use a same-origin host so React keeps sharing the main timer state.
   if (isDesktop()) {
-    const child = openPopupWindow('/floating-host.html', { ...opts, name: 'huddle-floating-hub' })
+    const host = floatOverFullscreenEnabled() ? '/floating-host.html?overFullscreen=1' : '/floating-host.html'
+    const child = openPopupWindow(host, { ...opts, name: 'huddle-floating-hub' })
     if (!child) return null
     return await new Promise<Window | null>((resolve) => {
       const deadline = Date.now() + 12000

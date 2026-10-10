@@ -12,6 +12,9 @@ export const dict: Record<string, string> = {
   // 字級（settings 一般頁；「標準」沿用 calendar.ts 既有的 'Standard'）
   '字級': 'Text size',
   '調整全站文字大小，懸浮小視窗也會跟著變': 'Scales text across the app — the floating window follows too',
+  // Mac 桌面版：懸浮視窗蓋在全螢幕 App 上（desktop-float-settings.tsx）
+  '懸浮視窗蓋在全螢幕 App 上': 'Float over full-screen apps',
+  '其他 App 全螢幕時也看得到懸浮視窗。限制：Huddle 不在前景時，懸浮視窗裡的 ⌘C、⌘V、⌘A、⌘Z 不會作用（打字和按鈕正常）。下次打開懸浮視窗時生效。': 'Keeps the floating window visible over other apps in full screen. Limitation: while Huddle isn’t the active app, ⌘C, ⌘V, ⌘A and ⌘Z don’t work inside it (typing and buttons do). Takes effect the next time you open the floating window.',
   '小': 'Small',
   '大': 'Large',
   '特大': 'Extra large',

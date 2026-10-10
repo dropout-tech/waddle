@@ -10,7 +10,9 @@ struct Item: Decodable, Identifiable {
 struct Day: Decodable, Identifiable {var date:String;var day:Int;var inMonth:Bool;var count:Int;var id:String{date}}
 struct FocusInfo:Decodable {var mode:String?;var state:String;var title:String;var endAt:Double?;var seconds:Int;var note:String
     /// Session length in seconds (for the lock-screen progress ring). Optional: older app builds don't send it.
-    var total:Int?}
+    var total:Int?
+    /// "work" | "break" — a pomodoro break counts down too, but it is not a focus session. Optional: older app builds don't send it.
+    var phase:String?}
 struct WaterInfo:Decodable {var enabled:Bool;var nextAt:Double?;var count:Int}
 /// One scheduled slot for the 本週時間表 widget (7 days from `weekStart`, "HH:mm", "#rrggbb").
 struct Slot:Decodable {var date:String;var start:String;var end:String;var title:String;var color:String}
@@ -412,11 +414,14 @@ struct WidgetView:View {
         }
     }
     // MARK: 專注計時 — the app's snapshot, replayed with any queued widget taps on top.
-    struct FocusFace {var state:String;var countdown:Bool;var endAt:Date?=nil;var startRef:Date?=nil;var frozen:Int}
+    struct FocusFace {var state:String;var countdown:Bool;var endAt:Date?=nil;var startRef:Date?=nil;var frozen:Int;var onBreak:Bool=false}
     func focusFace(_ s:Snapshot)->FocusFace {
         let countdown=(s.focus.mode ?? "pomodoro") == "pomodoro"
         let generated=ISO8601DateFormatter().date(from:s.generatedAt) ?? entry.date
         var f=FocusFace(state:s.focus.state == "completed" ? "idle":s.focus.state,countdown:countdown,frozen:max(0,s.focus.seconds))
+        // A break the app is running (or paused). Widget taps only pause/resume/stop it — a
+        // "start" can only come from idle, which is never a break.
+        f.onBreak=s.focus.phase == "break" && (s.focus.state == "running" || s.focus.state == "paused")
         if f.state == "running" {
             if countdown {f.endAt=s.focus.endAt.map{Date(timeIntervalSince1970:$0/1000)} ?? generated.addingTimeInterval(Double(f.frozen))}
             else {f.startRef=generated.addingTimeInterval(-Double(f.frozen))}
@@ -450,7 +455,7 @@ struct WidgetView:View {
         let expired=f.state == "running" && f.countdown && (f.endAt ?? .distantFuture) <= entry.date
         let clock=Font.system(size:family == .systemSmall ? 30:34,weight:.medium,design:.rounded)
         let face=VStack(alignment:.leading,spacing:2){
-            Text(f.state == "stopped" ? "這段專注結束了":s.focus.title).font(.caption).lineLimit(1)
+            Text(f.state == "stopped" ? (f.onBreak ? "休息結束了":"這段專注結束了"):s.focus.title).font(.caption).lineLimit(1)
             Group {
                 if f.state == "running",!expired,f.countdown,let end=f.endAt {Text(timerInterval:entry.date...end,countsDown:true)}
                 else if f.state == "running",!f.countdown,let ref=f.startRef {Text(ref,style:.timer)}
@@ -463,7 +468,7 @@ struct WidgetView:View {
             case "running" where !expired: focusButton("暫停","pause.fill","pause",s);focusButton("結束","stop.fill","stop",s)
             case "paused": focusButton("繼續","play.fill","resume",s,primary:true);focusButton("結束","stop.fill","stop",s)
             // Finished (or ended from here): the reflection note lives in the app.
-            default: Link(destination:url(.focus)){Text("開啟 Huddle 記錄 ↗").font(.caption.weight(.semibold)).frame(maxWidth:.infinity,minHeight:44).background(ink.opacity(0.08),in:RoundedRectangle(cornerRadius:12))}
+            default: Link(destination:url(.focus)){Text(f.onBreak ? "開啟 Huddle ↗":"開啟 Huddle 記錄 ↗").font(.caption.weight(.semibold)).frame(maxWidth:.infinity,minHeight:44).background(ink.opacity(0.08),in:RoundedRectangle(cornerRadius:12))}
             }
         }
         if family == .systemMedium {
@@ -732,7 +737,10 @@ struct FocusLiveActivityView:View {
     var body:some View {
         HStack {
             Image("Huddle").resizable().scaledToFit().frame(width:42,height:42)
-            VStack(alignment:.leading){Text("Huddle · 專注").font(.headline);Text(state.paused ? "休息一下，等等繼續":"慢慢來，先專心一件事").font(.caption).foregroundStyle(ink.opacity(0.75))}
+            VStack(alignment:.leading){
+                Text(state.onBreak == true ? "Huddle · 休息":"Huddle · 專注").font(.headline)
+                Text(state.onBreak == true ? (state.paused ? "休息先暫停，等等繼續":"起來動一動，喝口水") : (state.paused ? "休息一下，等等繼續":"慢慢來，先專心一件事")).font(.caption).foregroundStyle(ink.opacity(0.75))
+            }
             Spacer()
             if !state.paused && state.endAt>Date(){Text(timerInterval:Date()...state.endAt,countsDown:true).monospacedDigit().frame(width:72)}
             else {Text(String(format:"%02d:%02d",state.seconds/60,state.seconds%60)).monospacedDigit()}
@@ -748,9 +756,9 @@ struct HuddleFocusLiveActivity: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading){Image("Huddle").resizable().scaledToFit().frame(width:36,height:36)}
-                DynamicIslandExpandedRegion(.trailing){Text("專注中")}
+                DynamicIslandExpandedRegion(.trailing){Text(context.state.onBreak == true ? "休息中":"專注中")}
                 DynamicIslandExpandedRegion(.bottom){if !context.state.paused && context.state.endAt>Date(){Text(timerInterval:Date()...context.state.endAt,countsDown:true).monospacedDigit()}else{Text("暫停中")}}
-            } compactLeading: { Image(systemName:"timer") } compactTrailing: { Text(context.state.paused ? "暫停":"專注") } minimal: {Image(systemName:"timer")}
+            } compactLeading: { Image(systemName:"timer") } compactTrailing: { Text(context.state.paused ? "暫停":context.state.onBreak == true ? "休息":"專注") } minimal: {Image(systemName:"timer")}
                 .widgetURL(URL(string:"huddle://widget/focus"))
         }
     }

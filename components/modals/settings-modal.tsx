@@ -48,6 +48,7 @@ import {
   type ReminderLead,
 } from '@/lib/meeting-reminder'
 import { DesktopNotificationSettings } from './desktop-notification-settings'
+import { DesktopFloatSettings } from './desktop-float-settings'
 import { enableDailyPlanningReminder, requestReminderPermission, syncMeetingReminders } from '@/lib/notifications'
 import { planningReminderConfig } from '@/lib/notifications/daily-planning'
 import { mergeNotificationSettings } from '@/lib/notifications/settings'
@@ -519,6 +520,9 @@ export function SettingsModal({
               ))}
             </div>
           </div>
+
+          {/* Mac 桌面版才渲染：懸浮視窗要不要蓋在全螢幕 App 上（裝置層級，預設開）。 */}
+          <DesktopFloatSettings />
 
           {/* 企鵝 — reads the live `settings.pet` (not localSettings): it saves
               on every change through onSetPet, outside this modal's draft. */}

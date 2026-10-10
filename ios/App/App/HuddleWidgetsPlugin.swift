@@ -32,7 +32,8 @@ public class HuddleWidgetsPlugin: CAPPlugin, CAPBridgedPlugin {
             guard running || paused else{return}
             let seconds=focus["seconds"] as? Int ?? 0
             let end=(focus["endAt"] as? Double).map{Date(timeIntervalSince1970:$0/1000)} ?? Date().addingTimeInterval(Double(seconds))
-            let content=ActivityContent(state:FocusActivity.ContentState(endAt:end,paused:paused,seconds:seconds),staleDate:end)
+            let onBreak=focus["phase"] as? String == "break"
+            let content=ActivityContent(state:FocusActivity.ContentState(endAt:end,paused:paused,seconds:seconds,onBreak:onBreak),staleDate:end)
             if let activity=Activity<FocusActivity>.activities.first(where:{$0.attributes.accountId == owner && $0.attributes.epoch == epoch}) {await activity.update(content)}
             else if running && ActivityAuthorizationInfo().areActivitiesEnabled { _ = try? Activity.request(attributes:FocusActivity(accountId:owner,epoch:epoch),content:content,pushType:nil) }
         }
