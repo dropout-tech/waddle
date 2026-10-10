@@ -4,6 +4,8 @@
 // Run before archiving a build that will be uploaded to App Store Connect
 // (`pnpm cap:sync:release` runs it first). It fails fast on the mistakes that
 // would get the build rejected or ship a broken purchase flow:
+//   - Supabase URL / anon key missing or not the production project → the app
+//     boots into "出了點小狀況" (2026-10-08: packaged from a checkout with no .env.local)
 //   - billing flag off  → reviewer cannot find the subscription (2.1 / 3.1.2)
 //   - RevenueCat test_ key → the SDK deliberately crashes Release builds
 //   - App / widget version mismatch → upload is refused
@@ -39,6 +41,18 @@ function loadEnv() {
 
 // ── 1. Build-time environment ──
 const env = loadEnv()
+// Production Supabase project. NEXT_PUBLIC_* values are inlined into the static
+// export at `next build` time, so a build made without them (for example in a
+// second working copy that has no .env.local) boots straight into a Supabase client error.
+const PROD_SUPABASE_REF = 'jnikcndiexjojgvicohf'
+const SUPABASE_ENV_MISSING_HINT = 'missing; the app would crash on launch with "URL and API key are required". '
+  + 'Packaging from a worktree? 在 worktree 打包請先從主資料夾複製 .env.local'
+const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+check(supabaseUrl.includes(PROD_SUPABASE_REF), `NEXT_PUBLIC_SUPABASE_URL points at the production project (${PROD_SUPABASE_REF})`,
+  supabaseUrl
+    ? 'it points at a different Supabase project; use the production URL (and 在 worktree 打包請先從主資料夾複製 .env.local)'
+    : SUPABASE_ENV_MISSING_HINT)
+check(Boolean(env.NEXT_PUBLIC_SUPABASE_ANON_KEY), 'NEXT_PUBLIC_SUPABASE_ANON_KEY is set', SUPABASE_ENV_MISSING_HINT)
 check(env.NEXT_PUBLIC_BILLING_ENABLED === 'true', 'NEXT_PUBLIC_BILLING_ENABLED=true',
   'set it in .env.local, otherwise the purchase screen is hidden and review will reject the build')
 const rcKey = env.NEXT_PUBLIC_REVENUECAT_IOS_KEY ?? ''

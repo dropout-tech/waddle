@@ -41,7 +41,7 @@ App Store Connect：Apple ID 6818073462、SKU huddle-ios-001、套件識別碼 c
 | 項目 | 狀態 | 備註 |
 |---|---|---|
 | 購買畫面（含恢復購買、條款連結、自動續訂說明、試用顯示、到期日） | ✅ | PR #140 已合併。恢復購買 `components/billing/pro-purchase-card.tsx:266`；條款／隱私連結 `:270`、`:271`；自動續訂說明 `lib/billing/paywall-copy.ts:39`、`:48`；入口：頭像選單 →「會員與推薦」`components/user-menu.tsx:219` |
-| iOS 打包時要開計費開關 | 🟡 | 已加防呆：`pnpm cap:sync:release` 會先跑 `scripts/ios-release-preflight.mjs`，開關沒開、RevenueCat 不是 `appl_` 正式金鑰、版本不一致、iPad／Watch 又被打開時直接中止（ad5a496；正反測試皆通過）。**剩下**：老闆在本機 .env.local 填 `NEXT_PUBLIC_BILLING_ENABLED=true`、`NEXT_PUBLIC_REVENUECAT_IOS_KEY=appl_…`、`NEXT_PUBLIC_SENTRY_DSN` |
+| iOS 打包時要開計費開關 | 🟡 | 已加防呆：`pnpm cap:sync:release` 會先跑 `scripts/ios-release-preflight.mjs`，開關沒開、RevenueCat 不是 `appl_` 正式金鑰、版本不一致、iPad／Watch 又被打開時直接中止（ad5a496；正反測試皆通過）。2026-10-08 補兩道：preflight 多檢查 `NEXT_PUBLIC_SUPABASE_URL`（須是正式專案 `jnikcndiexjojgvicohf`）與 `NEXT_PUBLIC_SUPABASE_ANON_KEY` 有值（在沒有 .env.local 的 worktree 打包會讓 App 一開就卡「出了點小狀況」；在 worktree 打包請先從主資料夾複製 .env.local）；打包完再由 `scripts/ios-bundle-check.mjs` 確認包裡真的含正式 Supabase 網址，沒有就中止。**剩下**：老闆在本機 .env.local 填 `NEXT_PUBLIC_BILLING_ENABLED=true`、`NEXT_PUBLIC_REVENUECAT_IOS_KEY=appl_…`、`NEXT_PUBLIC_SENTRY_DSN` |
 | iOS 隱藏優惠碼／推薦碼輸入 | ✅ | 隨 #140 合併（main 的 WebOnly 機制） |
 | 網站購買頁在 App 內不可達 | ✅ | `/billing` 原生殼內直接導回首頁（`components/billing/billing-route.tsx:32`、`:36`）；設定的訂閱分頁原生不顯示（`components/modals/settings-modal.tsx:186`）；條款／隱私頁的 SHOPLINE 段落包在 WebOnly，App 內掛載後移除（`components/legal/web-only.tsx`） |
 | 條款頁「回到官網」會把 App 內使用者帶到行銷頁 | ✅ | App 建置時頁首品牌與頁尾改指 `/`、文字「回到 Huddle」，網站版不變（b2b10ce；`components/legal/legal-page.tsx:14`、`:38`） |
