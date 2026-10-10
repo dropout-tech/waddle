@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useI18n } from '@/lib/i18n/react'
 import { canFloatOverFullscreen, floatOverFullscreenEnabled, setFloatOverFullscreenEnabled } from '@/lib/floating-window'
 
-/** Mac 桌面版（0.1.4 起）才有：懸浮視窗要不要蓋在其他 App 的全螢幕畫面上。預設關——有 ⌘ 快捷鍵的取捨。 */
+/** Mac 桌面版（0.1.4 起）才有：懸浮視窗要不要蓋在其他 App 的全螢幕畫面上。預設開；有 ⌘ 快捷鍵的取捨，使用者可在這裡關掉。 */
 export function DesktopFloatSettings() {
   const { t } = useI18n()
   // 只在使用者打開設定後才渲染（不走伺服器端），直接讀裝置偏好即可。

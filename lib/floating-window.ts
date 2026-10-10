@@ -40,7 +40,8 @@ function pipApi(): DocumentPictureInPicture | null {
 }
 
 /**
- * Mac 桌面版：懸浮視窗要不要也蓋在其他 App 的全螢幕畫面上（裝置層級偏好，預設關）。
+ * Mac 桌面版：懸浮視窗要不要也蓋在其他 App 的全螢幕畫面上（裝置層級偏好，預設開——
+ * 老闆 2026-10-10 拍板；使用者在設定關掉才會存 '0'）。
  * 打開時桌面殼會把它開成「面板」視窗——代價是 Huddle 不在前景時，⌘C/⌘V/⌘A/⌘Z
  * 會被系統送去前景的 App（見 desktop/navigation.cjs）。下次開懸浮視窗時生效。
  */
@@ -50,7 +51,7 @@ export function canFloatOverFullscreen(): boolean {
 }
 export function floatOverFullscreenEnabled(): boolean {
   if (!canFloatOverFullscreen()) return false
-  try { return window.localStorage.getItem(FLOAT_OVER_FULLSCREEN_KEY) === '1' } catch { return false }
+  try { return window.localStorage.getItem(FLOAT_OVER_FULLSCREEN_KEY) !== '0' } catch { return true }
 }
 export function setFloatOverFullscreenEnabled(enabled: boolean) {
   try { window.localStorage.setItem(FLOAT_OVER_FULLSCREEN_KEY, enabled ? '1' : '0') } catch {}
