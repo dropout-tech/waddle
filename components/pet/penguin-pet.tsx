@@ -5,7 +5,7 @@ import { Home, Laugh, Moon, Settings2, VolumeX } from 'lucide-react'
 import { useI18n } from '@/lib/i18n/react'
 import { createClient } from '@/lib/supabase/client'
 import { useFocusTimer } from '@/components/timer/focus-timer-provider'
-import { collectMeetings, meetingStartAsDate } from '@/lib/meeting-reminder'
+import { collectMeetings, meetingOccurrenceKey, pickMeetingNudge, rememberNudgedMeeting } from '@/lib/meeting-reminder'
 import { isTaskOverdue } from '@/lib/task-utils'
 import { toDateString } from '@/lib/calendar-utils'
 import { pickLine, renderLine, type PetLineCategory } from '@/lib/pet/lines'
@@ -397,16 +397,12 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
 
       const today = localDate(now)
 
-      // 1) meeting within 10 minutes — a real reminder, once a day.
-      for (const m of local.meetingNudged === today ? [] : collectMeetings(workspaces)) {
-        const start = meetingStartAsDate(m)
-        if (!start) continue
-        const until = start.getTime() - nowMs
-        if (until > 0 && until <= MEETING_LEAD_MS) {
-          writePetLocal({ meetingNudged: today })
-          say(line(['meeting'], { title: m.title, time: Math.max(1, Math.ceil(until / 60_000)) }), { auto: true, act: 'jump' })
-          return
-        }
+      // 1) meeting within 10 minutes — a real reminder, once per meeting (each occurrence of a repeating one too).
+      const soon = pickMeetingNudge(collectMeetings(workspaces), local.meetingNudgedKeys, nowMs, MEETING_LEAD_MS)
+      if (soon) {
+        writePetLocal({ meetingNudgedKeys: rememberNudgedMeeting(local.meetingNudgedKeys, meetingOccurrenceKey(soon.meeting), today) })
+        say(line(['meeting'], { title: soon.meeting.title, time: Math.max(1, Math.ceil(soon.untilMs / 60_000)) }), { auto: true, act: 'jump' })
+        return
       }
 
       // 2) late night — once per night.

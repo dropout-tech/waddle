@@ -10,15 +10,18 @@ import { desktopNotificationsEnabled } from '@/lib/desktop-notifications'
 import { isNative } from '@/lib/platform'
 import {
   ensureNotificationPermission,
+  meetingOccurrenceKey,
   meetingStartAsDate,
   type MeetingTaskRef,
   type ReminderLead,
 } from '@/lib/meeting-reminder'
+import { meetingReminderSuppressed, resolveQuietHours, type QuietHoursSetting } from '@/lib/quiet-hours'
+import { MAX_FOLLOWUP_REMINDERS, MAX_MEETING_REMINDERS } from '@/lib/notifications/budget'
 import { t } from '@/lib/i18n'
 import { petVoiced } from '@/lib/pet/voice'
 
-// iOS allows at most 64 pending local notifications; stay comfortably under.
-const MAX_SCHEDULED = 48
+// iOS allows at most 64 pending local notifications. Each kind's share lives in
+// lib/notifications/budget.ts (the meeting share is derived so the sum cannot pass 64).
 
 // Notification id ranges are disjoint by construction so kinds can never overwrite
 // each other: meeting reminders 1..2_000_000_000, follow-up reminders
@@ -41,6 +44,50 @@ function hashId(s: string): number {
 }
 
 const trim = (s: string, max: number) => s.replace(/\s+/g, ' ').trim().slice(0, max)
+
+// ── Whose notifications are these? ──
+// Meeting and follow-up reminders carry the title of someone's private meeting, and a
+// scheduled iOS notification outlives the session that created it. Each one is tagged
+// with the account that scheduled it (`extra.accountId`); setReminderAccount() — called
+// by the auth provider on every sign-in / sign-out / account switch — cancels the ones
+// that are not the current account's. Nothing is scheduled while nobody is signed in.
+let reminderAccount: string | null = null
+
+/** The plugin calls below run one job at a time, so a cancel can never interleave with a half-done schedule. */
+let queue: Promise<unknown> = Promise.resolve()
+function serial<T>(job: () => Promise<T>): Promise<T> {
+  const run = queue.then(job, job)
+  queue = run.catch(() => {})
+  return run
+}
+
+const ACCOUNT_SCOPED_KINDS = ['meeting', 'followup']
+
+/** Which pending notifications must go when the signed-in account becomes `account` (null = nobody). Pure. */
+export function foreignReminderIds(
+  pending: { id: number; extra?: Record<string, unknown> | null }[],
+  account: string | null,
+): number[] {
+  return pending
+    .filter((n) => ACCOUNT_SCOPED_KINDS.includes(String(n.extra?.kind)) && (account === null || n.extra?.accountId !== account))
+    .map((n) => n.id)
+}
+
+/**
+ * Tell the reminder layer who is signed in (null = nobody). Cancels every pending meeting /
+ * follow-up notification that does not belong to that account — untagged ones left by an older
+ * app version included. Safe to call on every auth event. Native only (web schedules nothing ahead).
+ */
+export async function setReminderAccount(account: string | null): Promise<void> {
+  reminderAccount = account
+  if (!isNative()) return
+  await serial(async () => {
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    const pending = await LocalNotifications.getPending()
+    const ids = foreignReminderIds(pending.notifications, account)
+    if (ids.length > 0) await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) })
+  })
+}
 
 /**
  * Request notification permission. Branches to the native permission prompt on
@@ -81,14 +128,30 @@ async function ensureTapHandler() {
 /**
  * Reconcile scheduled native reminders with the current set of meetings.
  * Cancels previously scheduled meeting reminders and re-schedules the upcoming
- * ones (future fire-times only, capped at MAX_SCHEDULED). No-op on web.
+ * ones (future fire-times only, capped at MAX_MEETING_REMINDERS, soonest first).
+ * `meetings` should come from collectMeetings(), which expands a recurring series
+ * into one entry per occurrence; each occurrence gets its own stable notification
+ * id (hash of "<task id>@<date>T<time>"). `quietHours` is the saved 勿擾時段:
+ * meetings are "urgent", so only with 允許緊急通知 off are the reminders that would
+ * fire inside the window left out. No-op on web.
  */
-export async function syncMeetingReminders(
+export function syncMeetingReminders(
   meetings: MeetingTaskRef[],
   lead: ReminderLead,
+  quietHours?: unknown,
 ): Promise<void> {
-  if (!isNative()) return
+  if (!isNative()) return Promise.resolve()
+  const account = reminderAccount
+  const quiet = resolveQuietHours(quietHours)
+  return serial(() => scheduleMeetingReminders(meetings, lead, quiet, account))
+}
 
+async function scheduleMeetingReminders(
+  meetings: MeetingTaskRef[],
+  lead: ReminderLead,
+  quiet: QuietHoursSetting,
+  account: string | null,
+): Promise<void> {
   const { LocalNotifications } = await import('@capacitor/local-notifications')
 
   // Reconcile only meetings; focus and water reminders have their own namespace.
@@ -100,7 +163,7 @@ export async function syncMeetingReminders(
     })
   }
 
-  if (lead === null) return
+  if (lead === null || !account) return
 
   const perm = await LocalNotifications.checkPermissions()
   if (perm.display !== 'granted') return
@@ -114,16 +177,20 @@ export async function syncMeetingReminders(
       return start ? { m, fireAt: start.getTime() - leadMs } : null
     })
     .filter((x): x is { m: MeetingTaskRef; fireAt: number } => x !== null && x.fireAt > now)
+    .filter(({ fireAt }) => !meetingReminderSuppressed(fireAt, quiet))
     .sort((a, b) => a.fireAt - b.fireAt)
-    .slice(0, MAX_SCHEDULED)
+    .slice(0, MAX_MEETING_REMINDERS)
 
   if (upcoming.length === 0) return
 
   await ensureTapHandler()
 
+  // Signed out (or switched account) while we waited on the plugin: schedule nothing.
+  if (reminderAccount !== account) return
+
   await LocalNotifications.schedule({
     notifications: upcoming.map(({ m, fireAt }) => {
-      const reminderId = `${m.id}@${m.scheduledDate}T${m.scheduledStartTime}`
+      const reminderId = meetingOccurrenceKey(m)
       const bodyLines = [t('{time} 開始（{lead} 分鐘後）', { time: m.scheduledStartTime, lead })]
       if (m.location) bodyLines.push(t('地點：{location}', { location: trim(m.location, 80) }))
       if (m.attendees) bodyLines.push(t('參與者：{attendees}', { attendees: trim(m.attendees, 120) }))
@@ -134,14 +201,12 @@ export async function syncMeetingReminders(
         title: text.title,
         body: text.body,
         schedule: { at: new Date(fireAt) },
-        extra: { kind: 'meeting', meetingUrl: m.meetingUrl ?? null },
+        extra: { kind: 'meeting', meetingUrl: m.meetingUrl ?? null, accountId: account },
       }
     }),
   })
 }
 
-// iOS keeps at most 64 pending local notifications: 48 meeting + 2 widget + this cap stays under.
-const MAX_FOLLOWUPS = 10
 const FOLLOWUP_HOUR = 9
 
 export interface FollowupReminderItem {
@@ -160,8 +225,13 @@ export interface FollowupReminderItem {
  * on the next sync (app open, or any data refetch). No-op on web. Needs the existing
  * notification permission; never asks for it.
  */
-export async function syncFollowupReminders(items: FollowupReminderItem[]): Promise<void> {
-  if (!isNative()) return
+export function syncFollowupReminders(items: FollowupReminderItem[]): Promise<void> {
+  if (!isNative()) return Promise.resolve()
+  const account = reminderAccount
+  return serial(() => scheduleFollowupReminders(items, account))
+}
+
+async function scheduleFollowupReminders(items: FollowupReminderItem[], account: string | null): Promise<void> {
   const { LocalNotifications } = await import('@capacitor/local-notifications')
 
   const pending = await LocalNotifications.getPending()
@@ -170,6 +240,7 @@ export async function syncFollowupReminders(items: FollowupReminderItem[]): Prom
     await LocalNotifications.cancel({ notifications: mine.map((n) => ({ id: n.id })) })
   }
 
+  if (!account) return
   const perm = await LocalNotifications.checkPermissions()
   if (perm.display !== 'granted') return
 
@@ -182,10 +253,11 @@ export async function syncFollowupReminders(items: FollowupReminderItem[]): Prom
     })
     .filter(({ at }) => at.getTime() > now)
     .sort((a, b) => a.at.getTime() - b.at.getTime())
-    .slice(0, MAX_FOLLOWUPS)
+    .slice(0, MAX_FOLLOWUP_REMINDERS)
   if (due.length === 0) return
 
   await ensureTapHandler()
+  if (reminderAccount !== account) return
   await LocalNotifications.schedule({
     notifications: due.map(({ f, at }) => {
       const who = trim(f.counterpart ?? '', 40)
@@ -201,7 +273,7 @@ export async function syncFollowupReminders(items: FollowupReminderItem[]): Prom
         title: text.title,
         body: text.body,
         schedule: { at },
-        extra: { kind: 'followup', route: '/meetings/' },
+        extra: { kind: 'followup', route: '/meetings/', accountId: account },
       }
     }),
   })

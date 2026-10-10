@@ -119,7 +119,7 @@ function HuddlePage() {
   // voice before the reminder hook below re-schedules with it.
   const petVoice = petVoiceName(settings.pet)
   useEffect(() => { setPetVoice(settings.pet) }, [settings.pet])
-  useMeetingReminders(workspaces, petVoice)
+  useMeetingReminders(workspaces, petVoice, settings.notifications?.quietHours)
   // Native: "今天要追" notifications for meeting follow-ups (hooks/use-followup-reminders.ts).
   useFollowupReminders(workspaces)
 
@@ -143,7 +143,10 @@ function HuddlePage() {
     const id = window.setTimeout(() => setTourGraceDone(true), WATER_GRACE_AFTER_TOUR_MS)
     return () => window.clearTimeout(id)
   }, [inTourGrace])
-  const water = useWaterReminder(isLoading || tourOpen || inTourGrace)
+  const water = useWaterReminder({
+    paused: isLoading || tourOpen || inTourGrace,
+    quietHours: settings.notifications?.quietHours,
+  })
 
   // Slot types — generated dynamically from current workspaces, plus static
   // built-in time-block types (break/buffer/focus) and any user customs.
@@ -585,7 +588,7 @@ function HuddlePage() {
       <UserSettingsProvider value={settings}>
       <NotebookOverlayProvider>
       <LifeGridOverlayProvider>
-      {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} pet={settings.pet} weekStartDay={settings.weekStartDay} />}
+      {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} pet={settings.pet} weekStartDay={settings.weekStartDay} quietHours={settings.notifications?.quietHours} />}
       <MainLayout
         workspaces={workspaces}
         assignedTasks={assignedTasks}

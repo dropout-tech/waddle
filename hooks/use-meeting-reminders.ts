@@ -7,9 +7,13 @@ import {
   collectMeetings,
   getReminderLead,
   getFiredRemindersAndPrune,
+  isMeetingReminderDue,
+  meetingFiredKey,
   persistFiredReminders,
   meetingStartAsDate,
+  wasMeetingReminded,
 } from '@/lib/meeting-reminder'
+import { resolveQuietHours } from '@/lib/quiet-hours'
 import { detectMeetingProvider } from '@/lib/meeting-utils'
 import { isNative } from '@/lib/platform'
 import { syncMeetingReminders } from '@/lib/notifications'
@@ -29,20 +33,36 @@ import { t } from '@/lib/i18n'
  * - Notification permission is 'granted'
  * - The reminder window has been reached (now ≥ startTime − lead)
  * - The meeting hasn't started yet (now < startTime)
- * - We haven't already fired for this meeting (deduped via localStorage)
+ * - We haven't already fired for this occurrence at this lead (deduped via
+ *   localStorage; a repeating meeting has one occurrence per date, and changing
+ *   the lead re-arms it)
+ * - Not dropped by 勿擾時段: meetings are "urgent", so only with 允許緊急通知
+ *   off are reminders that fall inside the quiet window skipped
  */
-/** `petVoice` = the adopted penguin's name (lib/pet/voice.ts): a change re-schedules native reminders in its voice. */
-export function useMeetingReminders(workspaces: Workspace[], petVoice: string | null = null) {
+const quietField = (q: unknown, key: string): unknown =>
+  q && typeof q === 'object' ? (q as Record<string, unknown>)[key] : undefined
+
+/**
+ * `petVoice` = the adopted penguin's name (lib/pet/voice.ts): a change re-schedules native reminders in its voice.
+ * `quietHours` = the raw saved `notifications.quietHours` (may be missing/partial).
+ */
+export function useMeetingReminders(workspaces: Workspace[], petVoice: string | null = null, quietHours?: unknown) {
   const { user } = useAuth()
   const sourceAccount = user?.id ?? null
+  // Primitives so an unrelated settings save doesn't re-run the effect (and re-schedule iOS notifications).
+  const quietEnabled = quietField(quietHours, 'enabled')
+  const quietStart = quietField(quietHours, 'startTime')
+  const quietEnd = quietField(quietHours, 'endTime')
+  const quietUrgent = quietField(quietHours, 'allowUrgent')
   useEffect(() => {
     if (typeof window === 'undefined') return
+    const quiet = resolveQuietHours({ enabled: quietEnabled, startTime: quietStart, endTime: quietEnd, allowUrgent: quietUrgent })
 
     // Native: schedule local notifications ahead of time so reminders fire even
     // when the app is backgrounded/closed. Re-sync whenever the meeting set
     // changes. (The lead-time pref is re-synced from the settings modal.)
     if (isNative()) {
-      void syncMeetingReminders(collectMeetings(workspaces), getReminderLead())
+      void syncMeetingReminders(collectMeetings(workspaces), getReminderLead(), quiet)
       return
     }
 
@@ -68,14 +88,15 @@ export function useMeetingReminders(workspaces: Workspace[], petVoice: string | 
         const start = meetingStartAsDate(m)
         if (!start) continue
         const startMs = start.getTime()
-        const reminderAt = startMs - lead * 60 * 1000
 
-        // Window: reminder time has been reached AND meeting hasn't started.
-        if (now < reminderAt) continue
-        if (now >= startMs) continue
+        // Window: reminder time has been reached AND meeting hasn't started
+        // (and 勿擾時段 doesn't swallow it — same rule the iOS pre-scheduling uses).
+        if (!isMeetingReminderDue({ startMs, lead, now, quiet })) continue
 
-        const reminderId = `${m.id}@${m.scheduledDate}T${m.scheduledStartTime}`
-        if (fired.has(reminderId)) continue
+        // One key per occurrence AND lead: a weekly meeting is reminded every week, and
+        // switching 5→15 minutes can remind again. Keys saved before the lead was part of the key still count.
+        const reminderId = meetingFiredKey(m, lead)
+        if (wasMeetingReminded(fired, m, lead)) continue
 
         const minutesUntil = Math.round((startMs - now) / 60000)
         // Trim user-controlled text before sending to the OS toast.
@@ -152,5 +173,5 @@ export function useMeetingReminders(workspaces: Workspace[], petVoice: string | 
     check()
     const id = window.setInterval(check, 30 * 1000)
     return () => { disposed = true; window.clearInterval(id) }
-  }, [workspaces, sourceAccount, petVoice])
+  }, [workspaces, sourceAccount, petVoice, quietEnabled, quietStart, quietEnd, quietUrgent])
 }

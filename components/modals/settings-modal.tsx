@@ -866,7 +866,7 @@ export function SettingsModal({
                       setReminderLead(value)
                       // Native: reschedule the ahead-of-time notifications now
                       // that the lead changed (web reschedules via its poll).
-                      void syncMeetingReminders(collectMeetings(workspaces), value)
+                      void syncMeetingReminders(collectMeetings(workspaces), value, settings.notifications?.quietHours)
                     }}
                     className={cn(
                       'px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',

@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { isNative } from '@/lib/platform'
 import { setDesktopNotificationAccount } from '@/lib/desktop-notifications'
 import { clearWidgetReminders } from '@/lib/widgets/reminders'
+import { setReminderAccount } from '@/lib/notifications'
 import { setWidgetAccount } from '@/lib/widgets/native'
 import { WidgetLinks } from '@/components/widgets/widget-links'
 import { DeepLinkHandler } from './deep-link-handler'
@@ -48,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setMonitoringUser(data.session?.user.id ?? null)
       void setWidgetAccount(data.session?.user.id ?? null).catch(() => {})
       void clearWidgetReminders(data.session?.user.id ?? null).catch(() => {})
+      void setReminderAccount(data.session?.user.id ?? null).catch(() => {})
       setSession(data.session)
       setLoading(false)
     })
@@ -63,6 +65,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         void setWidgetAccount(nextSession?.user.id ?? null).catch(() => {})
         void clearWidgetReminders(nextSession?.user.id ?? null).catch(() => {})
+        // Meeting / follow-up notifications are scheduled ahead on the phone: signing out or
+        // switching accounts must take the previous account's titles off the lock screen.
+        void setReminderAccount(nextSession?.user.id ?? null).catch(() => {})
       }
       setSession(nextSession)
       setLoading(false)
