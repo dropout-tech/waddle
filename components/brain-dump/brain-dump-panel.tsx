@@ -218,7 +218,7 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
   return (
     <div data-brain-dump-panel className={cn(styles.root, 'flex min-h-0 flex-1 flex-col')}>
       {/* Header */}
-      <div className="flex items-start gap-3 px-5 pb-3 pt-4">
+      <div className="flex items-start gap-3 px-5 pb-2 pt-4">
         {phase === 'input' && (
           <div className="h-11 w-11 flex-shrink-0">
             <PenguinArt pose="stand" />
@@ -240,8 +240,8 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
         )}
       </div>
 
-      {/* Body */}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4" data-bd-phase={phase}>
+      {/* Body — pt-1 keeps the textarea's focus ring from being clipped by the scroll edge */}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 pt-1" data-bd-phase={phase}>
         {phase === 'input' && (
           <div className="space-y-3">
             <label htmlFor="brain-dump-text" className="sr-only">{t('想做的事')}</label>
