@@ -101,6 +101,8 @@ export function parseNumber(raw: string): number {
 }
 
 const ZH_NUM = '[一二兩两三四五六七八九十]{1,3}'
+/** 「三點前」 is a deadline, but 「三點前往銀行」 (前往 = go to) is not. */
+const NOT_QIAN_WORD = '(?![往進进來来去面方後后年天日一輩辈台臺端])'
 const WEEKDAY_ZH: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 7, 天: 7, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7 }
 const WEEKDAY_EN: [RegExp, number][] = [
   [/^mon/i, 1], [/^tue/i, 2], [/^wed/i, 3], [/^thu/i, 4], [/^fri/i, 5], [/^sat/i, 6], [/^sun/i, 7],
@@ -124,6 +126,8 @@ interface FragmentInfo {
   when?: BrainDumpWhen
   due?: BrainDumpWhen
   urgent?: boolean
+  /** A time of day given as a deadline (「三點前」) — words removed, nothing scheduled. */
+  deadlineTime?: boolean
 }
 
 function hhmm(h: number, m: number): string {
@@ -131,10 +135,19 @@ function hhmm(h: number, m: number): string {
 }
 
 /** Turn a spoken hour into 24h, using the day part / am-pm when given.
- *  Bare 1–7 without a part reads as afternoon (「3點開會」 is 15:00). */
-function normaliseClock(hRaw: number, m: number, part: DayPart | undefined, ampm?: 'am' | 'pm'): string | null {
+ *
+ *  The rule for an hour written WITHOUT 上午/下午 (kept in code, never left to
+ *  a model; the Edge Function's clockTo24h in
+ *  supabase/functions/brain-dump/contract.ts is the same rule and a test
+ *  checks the two agree):
+ *    - 1–7 點 reads as the afternoon (「3點開會」 is 15:00)
+ *    - 8–12 stay as written (「9點」 is 09:00, 「12點」 is noon), 13+ is 24h
+ *    - with a part: 下午／晚上 add 12 below noon, 早上 stays; with am/pm: the usual
+ *  「晚上12點」 is midnight — the next day — so it is no time at all (null). */
+export function normaliseClock(hRaw: number, m: number, part: DayPart | undefined, ampm?: 'am' | 'pm'): string | null {
   let h = hRaw
   if (!Number.isFinite(h) || !Number.isFinite(m) || m < 0 || m > 59) return null
+  if (!ampm && part === 'evening' && h === 12) return null
   if (ampm === 'pm' && h < 12) h += 12
   else if (ampm === 'am' && h === 12) h = 0
   else if (!ampm && (part === 'afternoon' || part === 'evening') && h < 12) h += 12
@@ -193,6 +206,17 @@ function parseFragment(fragment: string, now: Date): FragmentInfo {
     if (!d) return false
     info.due = { kind: 'date', date: d }
   })
+  // 「三點前」「下午3點半之前」「3:30前」/ "by 3pm" / "before 15:00": the time a thing
+  // is DUE, not an appointment — cut out of the title and never scheduled.
+  take(new RegExp(`(早上|上午|中午|下午|晚上|傍晚|凌晨|晚間|午後)?\\s*(?:\\d{1,2}|${ZH_NUM})\\s*[點点](?![點点心子兒])\\s*(?:半|(?:\\d{1,2}|${ZH_NUM})\\s*分?)?\\s*(?:之|以)?前${NOT_QIAN_WORD}`), () => {
+    info.deadlineTime = true
+  })
+  take(new RegExp(`\\d{1,2}\\s*[:：]\\s*\\d{2}\\s*(?:之|以)?前${NOT_QIAN_WORD}`), () => {
+    info.deadlineTime = true
+  })
+  take(/\b(?:by|before|until|till)\s+(?:\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)(?![a-z])|\d{1,2}:\d{2}\b|noon\b)/i, () => {
+    info.deadlineTime = true
+  })
 
   // 3 — which day
   take(/(大後天|後天|明天|明日|明早|明晚|今天|今日|今晚|今早)/, (m) => {
@@ -227,7 +251,7 @@ function parseFragment(fragment: string, now: Date): FragmentInfo {
   })
 
   // 4 — clock time (a day part written right before it is part of the match)
-  take(new RegExp(`(早上|上午|中午|下午|晚上|傍晚|凌晨)?\\s*(\\d{1,2}|${ZH_NUM})\\s*[點点](?![點点心子兒])\\s*(半|(\\d{1,2}|${ZH_NUM})\\s*分?)?`), (m) => {
+  take(new RegExp(`(早上|上午|中午|下午|晚上|傍晚|凌晨|晚間|午後|清晨)?\\s*(\\d{1,2}|${ZH_NUM})\\s*[點点](?![點点心子兒])\\s*(半|(\\d{1,2}|${ZH_NUM})\\s*分?)?`), (m) => {
     const before = rest.slice(0, m.index).trimEnd().slice(-1)
     // 「差一點」「早一點」「有點」 are not 1 o'clock.
     if (!m[1] && /[差早晚快慢多少好有]/.test(before)) return false
