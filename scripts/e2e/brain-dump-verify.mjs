@@ -194,7 +194,7 @@ async function runMain(page, label, { mobile, failThird, state }) {
   if (REAL_AI) {
     await step(`${label}: real AI → write into 未分類`, async () => {
       CLEAN_TITLES.push(...notes.map((n) => n.title))
-      await dialog.getByRole('button', { name: /放進未分類/ }).click()
+      await dialog.getByRole('button', { name: /放進排程/ }).click()
       await dialog.waitFor({ state: 'hidden', timeout: 15000 })
       await shot(page, `${label}-real-ai-after-write`)
     })
@@ -202,9 +202,9 @@ async function runMain(page, label, { mobile, failThird, state }) {
   }
   await step(`${label}: untick, re-tick, edit title + due date`, async () => {
     await dialog.getByRole('checkbox', { name: /不要這件：運動/ }).click()
-    await dialog.getByRole('button', { name: /放進未分類（3）/ }).waitFor({ timeout: 2000 })
+    await dialog.getByRole('button', { name: /放進排程（3）/ }).waitFor({ timeout: 2000 })
     await dialog.getByRole('checkbox', { name: /要這件：運動/ }).click()
-    await dialog.getByRole('button', { name: /放進未分類（4）/ }).waitFor({ timeout: 2000 })
+    await dialog.getByRole('button', { name: /放進排程（4）/ }).waitFor({ timeout: 2000 })
     await dialog.getByRole('button', { name: '調整「去銀行」' }).click()
     await dialog.locator('[data-bd-edit-title]').fill(EDITED)
     await dialog.locator('[data-bd-edit-due]').fill(plus(2))
@@ -226,7 +226,7 @@ async function runMain(page, label, { mobile, failThird, state }) {
           await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: 'e2e: simulated outage', code: 'E2E' }) })
         } else await route.continue()
       })
-      await dialog.getByRole('button', { name: /放進未分類（4）/ }).click()
+      await dialog.getByRole('button', { name: /放進排程（4）/ }).click()
       await dialog.getByRole('button', { name: '再試一次（1）' }).waitFor({ timeout: 15000 })
       await dialog.getByText('已放進 3 件；還有 1 件沒放成功').waitFor({ timeout: 3000 })
       const left = await readNotes(page)
@@ -238,7 +238,7 @@ async function runMain(page, label, { mobile, failThird, state }) {
     })
   } else {
     await step(`${label}: write`, async () => {
-      await dialog.getByRole('button', { name: /放進未分類（4）/ }).click()
+      await dialog.getByRole('button', { name: /放進排程（4）/ }).click()
     })
   }
   await step(`${label}: notes slide into the inbox → toast → saved in 未分類 with due dates`, async () => {

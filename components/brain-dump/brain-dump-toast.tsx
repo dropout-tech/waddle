@@ -6,7 +6,7 @@ import styles from './brain-dump.module.css'
 
 /** The "done" toast for 丟給企鵝 only (rendered via sonner's toast.custom,
  *  so the app-wide toast look is unchanged): happy penguin + terracotta. */
-export function BrainDumpToast({ created, failed, inboxName }: { created: number; failed: number; inboxName: string }) {
+export function BrainDumpToast({ created, failed, inboxName, scheduled = 0 }: { created: number; failed: number; inboxName: string; scheduled?: number }) {
   const { t } = useI18n()
   const main = t('企鵝把 {n} 件放進「{name}」', { n: created, name: t(inboxName || '未分類') })
   return (
@@ -21,7 +21,11 @@ export function BrainDumpToast({ created, failed, inboxName }: { created: number
       <div className="min-w-0">
         <p className="text-sm font-semibold text-primary">{main}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {failed > 0 ? t('還有 {n} 件沒放成功，可以再試一次。', { n: failed }) : t('到任務清單就看得到。')}
+          {failed > 0
+            ? t('還有 {n} 件沒放成功，可以再試一次。', { n: failed })
+            : scheduled > 0
+              ? t('其中 {m} 件已排進行事曆。', { m: scheduled })
+              : t('到任務清單就看得到。')}
         </p>
       </div>
     </div>

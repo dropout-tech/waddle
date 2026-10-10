@@ -28,8 +28,10 @@ export interface PlanOptions {
 
 export const STEP = 15
 export const LATE_THRESHOLD = 30
-const PART_WINDOW: Record<DayPart, [number, number]> = {
+export const PART_WINDOW: Record<DayPart, [number, number]> = {
   morning: [0, 12 * 60],
+  // Only the AI says a bare 「中午」; around lunch, not the whole afternoon.
+  noon: [11 * 60 + 30, 13 * 60 + 30],
   afternoon: [12 * 60, 18 * 60],
   evening: [18 * 60, 24 * 60],
 }

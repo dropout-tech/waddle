@@ -4,7 +4,9 @@
 
 export type BrainDumpLang = 'zh-TW' | 'en'
 
-export type DayPart = 'morning' | 'afternoon' | 'evening'
+/** 'noon' only comes from the AI (「中午」 with no hour); the local rules read
+ *  「中午」 as 12:00 sharp. */
+export type DayPart = 'morning' | 'noon' | 'afternoon' | 'evening'
 
 /**
  * WHEN something should happen, as a *kind of expression* — never a
@@ -31,14 +33,17 @@ export interface BrainDumpDraft {
   source: string
   title: string
   estimatedMinutes: number
-  /** True when no duration was written and we guessed from keywords. */
+  /** True when no duration was written and we guessed from keywords
+   *  (scheduling then uses 30 min, not the guess). */
   minutesGuessed: boolean
   /** 'today' | 'tomorrow' | YYYY-MM-DD (any other day). */
   day: string
   /** YYYY-MM-DD — from 「週五前」/"by Friday". */
   dueDate?: string
+  /** A part of the day was said but no hour (「晚上」) — see schedule.ts R2. */
   preferredPart?: DayPart
-  /** HH:mm — from 「下午3點」/"at 3pm". */
+  /** HH:mm (24h) — from 「下午3點」/"at 3pm". Wins over preferredPart. Both
+   *  absent = no time was said, so the to-do is not put on the calendar. */
   fixedTime?: string
   /** 1–10, same scale as Task.urgency. Undefined = normal (5). */
   urgency?: number

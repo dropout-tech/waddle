@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Mic, Square, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
 import { fetchBrainDumpQuota, parseWithBestAvailable, type BrainDumpFallback, type BrainDumpQuota } from '@/lib/brain-dump/ai'
 import { addDays, dateKey, splitFragments } from '@/lib/brain-dump/parse'
-import type { BrainDumpDraft } from '@/lib/brain-dump/types'
+import { scheduleDrafts, withManualTime, type ScheduleOutcome, type ScheduleSlot } from '@/lib/brain-dump/schedule'
+import type { BrainDumpDraft, BusyInterval } from '@/lib/brain-dump/types'
 import { BrainDumpPreview, STOW_MS } from './brain-dump-preview'
 import { PenguinArt, type PenguinPose } from './penguin-art'
 import { useSpeechDictation } from './use-speech-dictation'
@@ -16,8 +17,17 @@ export const BRAIN_DUMP_EXAMPLE = '明天要回康庭的信、下午去銀行、
 
 type Phase = 'input' | 'thinking' | 'preview'
 
+/** One to-do to write, with the calendar slot the preview showed for it. */
+export interface CommitItem {
+  draft: BrainDumpDraft
+  /** Set when it goes onto the calendar (scheduled date + start/end). */
+  slot?: ScheduleSlot
+}
+
 export interface CommitResult {
   created: number
+  /** How many of the created ones were put on the calendar. */
+  scheduled: number
   /** draft ids that could not be written (refused or threw). */
   failedIds: string[]
 }
@@ -29,17 +39,20 @@ interface PanelProps {
   onClose: () => void
   /** Name of the inbox category the tasks go into (未分類). */
   inboxName: string
+  /** What is already on a day (YYYY-MM-DD): tasks, time blocks, assigned
+   *  tasks. Read on the device only, to find free gaps — never sent anywhere. */
+  busyForDate: (date: string) => BusyInterval[]
   /** Writes the chosen drafts one by one; reports which didn't make it. */
-  onCommit: (drafts: BrainDumpDraft[]) => Promise<CommitResult>
+  onCommit: (items: CommitItem[]) => Promise<CommitResult>
   /** Everything is in (after the into-the-inbox animation). */
-  onDone: (created: number) => void
+  onDone: (created: number, scheduled: number) => void
 }
 
 function reducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxName, onCommit, onDone }: PanelProps) {
+export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxName, busyForDate, onCommit, onDone }: PanelProps) {
   const { t, lang } = useI18n()
   const [phase, setPhase] = useState<Phase>('input')
   const [notice, setNotice] = useState<'empty' | 'unparsed' | null>(null)
@@ -55,6 +68,12 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
   /** Notes whose write failed — the preview keeps only these, ready to retry. */
   const [failed, setFailed] = useState<Set<string>>(() => new Set())
   const [writtenCount, setWrittenCount] = useState(0)
+  const [writtenScheduled, setWrittenScheduled] = useState(0)
+  // The calendar as the plan sees it. It follows live changes, except while
+  // writing: each task created there would otherwise block its own slot and
+  // make the notes still on screen jump around.
+  const [busy, setBusy] = useState(() => busyForDate)
+  if (busy !== busyForDate && !saving && !stowing) setBusy(() => busyForDate)
   const [scraps, setScraps] = useState<string[]>([])
   const textRef = useRef<HTMLTextAreaElement>(null)
   const runRef = useRef(0)
@@ -128,6 +147,7 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
     runRef.current++
     setFailed(new Set())
     setWrittenCount(0)
+    setWrittenScheduled(0)
     setPhase('input')
     setSelectedId(null)
     setNotice(null)
@@ -143,6 +163,11 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
     })
   }
 
+  /** The time field: a typed time replaces what the text said, empty = not on the calendar. */
+  const setDraftTime = (id: string, time: string) => {
+    setDrafts((prev) => prev.map((d) => (d.id === id ? withManualTime(d, time) : d)))
+  }
+
   const updateDraft = (id: string, patch: Partial<Pick<BrainDumpDraft, 'title' | 'dueDate' | 'note'>>) => {
     setDrafts((prev) => prev.map((d) => {
       if (d.id !== id) return d
@@ -153,17 +178,20 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
     }))
   }
 
-  const chosen = drafts.filter((d) => !excluded.has(d.id) && d.title.trim())
+  const chosen = useMemo(() => drafts.filter((d) => !excluded.has(d.id) && d.title.trim()), [drafts, excluded])
+  // Where each ticked note lands on the calendar (R1–R5, schedule.ts). Unticked
+  // notes are left out so the others don't route around something not coming.
+  const plan = useMemo(() => scheduleDrafts(chosen, { now, busy }), [chosen, now, busy])
 
   const commit = async () => {
     if (!chosen.length || saving || stowing) return
     setSaving(true)
     let result: CommitResult
     try {
-      result = await onCommit(chosen)
+      result = await onCommit(chosen.map((draft) => ({ draft, slot: plan.get(draft.id)?.slot })))
     } catch (err) {
       console.error('[brain-dump] commit failed', err)
-      result = { created: 0, failedIds: chosen.map((d) => d.id) }
+      result = { created: 0, scheduled: 0, failedIds: chosen.map((d) => d.id) }
     } finally {
       setSaving(false)
     }
@@ -173,13 +201,15 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
       setExcluded(new Set())
       setFailed(keep)
       setWrittenCount((n) => n + result.created)
+      setWrittenScheduled((n) => n + result.scheduled)
       setSelectedId(null)
       return
     }
     const total = writtenCount + result.created
+    const scheduledTotal = writtenScheduled + result.scheduled
     setSelectedId(null)
     setStowing(true)
-    window.setTimeout(() => onDone(total), reducedMotion() ? 150 : STOW_MS + Math.min(8, chosen.length) * 70)
+    window.setTimeout(() => onDone(total, scheduledTotal), reducedMotion() ? 150 : STOW_MS + Math.min(8, chosen.length) * 70)
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -226,7 +256,7 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
         )}
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-semibold text-foreground">{t('丟給企鵝')}</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('亂丟一段待辦，企鵝用 AI 拆好，放進「未分類」。')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('亂丟一段待辦，企鵝用 AI 拆好放進「未分類」；說了時間的會排進行事曆。')}</p>
         </div>
         {!isMobile && (
           <button
@@ -361,6 +391,8 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
               finalPose={headlinePose}
               inboxName={inboxName}
               failedIds={failed}
+              plan={plan}
+              now={now}
               stowing={stowing}
               onToggle={toggle}
               onSelect={setSelectedId}
@@ -369,8 +401,10 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
               <NoteEditor
                 key={selected.id}
                 draft={selected}
+                outcome={plan.get(selected.id)}
                 now={now}
                 onChange={(patch) => updateDraft(selected.id, patch)}
+                onTime={(time) => setDraftTime(selected.id, time)}
                 onDone={() => setSelectedId(null)}
               />
             )}
@@ -400,7 +434,7 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
                 ? t('放進去中…')
                 : failed.size
                   ? t('再試一次（{n}）', { n: chosen.length })
-                  : t('放進未分類（{n}）', { n: chosen.length })}
+                  : t('放進排程（{n}）', { n: chosen.length })}
             </button>
           </>
         ) : (
@@ -423,10 +457,13 @@ export function BrainDumpPanel({ isMobile, text, onTextChange, onClose, inboxNam
   )
 }
 
-function NoteEditor({ draft, now, onChange, onDone }: {
+function NoteEditor({ draft, outcome, now, onChange, onTime, onDone }: {
   draft: BrainDumpDraft
+  /** Where this note landed (undefined while it is unticked). */
+  outcome?: ScheduleOutcome
   now: Date
   onChange: (patch: Partial<Pick<BrainDumpDraft, 'title' | 'dueDate' | 'note'>>) => void
+  onTime: (time: string) => void
   onDone: () => void
 }) {
   const { t } = useI18n()
@@ -455,9 +492,23 @@ function NoteEditor({ draft, now, onChange, onDone }: {
           />
         </label>
         <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+          {t('時間（可留空）')}
+          {/* The time the text said, else where a day part landed; typing replaces it, clearing = not on the calendar. */}
+          <input
+            data-bd-edit-time
+            className={field}
+            type="time"
+            value={draft.fixedTime ?? outcome?.slot?.start ?? ''}
+            onChange={(e) => onTime(e.target.value)}
+          />
+        </label>
+        <label className="col-span-2 flex flex-col gap-1 text-[11px] text-muted-foreground">
           {t('備註（可留空）')}
           <input className={field} value={draft.note ?? ''} maxLength={200} onChange={(e) => onChange({ note: e.target.value })} />
         </label>
+        <p className="col-span-2 -mt-1 text-[11px] leading-snug text-muted-foreground">
+          {t('時間會排在期限那天；沒有期限就是今天。留空就不排進行事曆。')}
+        </p>
         <div className="col-span-2 flex justify-end">
           <button
             type="button"

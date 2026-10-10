@@ -14,7 +14,10 @@
 //
 // Actions
 //   { action: "status", today }              → { used, limit, remaining, enabled }
-//   { action: "split", text, today, lang }   → { items: [{ title, dueDate, note }], used, limit, remaining }
+//   { action: "split", text, today, lang }   → { items: [{ title, dueDate, note, time?, durationMinutes? }], used, limit, remaining }
+//     time? = { kind: "clock", time: "HH:mm" } | { kind: "part", part: morning|noon|afternoon|evening }
+//     (only when the member said a time of day; absent otherwise) — the app decides
+//     the actual calendar slot on the device from the member's own calendar.
 // Errors: UNAUTHORIZED 401, ACCOUNT_SUSPENDED 403, INVALID_INPUT 400,
 // INPUT_TOO_LARGE 413, DAILY_LIMIT 429 (+limit), RATE_LIMIT 429, AI_PAUSED 503,
 // AI_NOT_CONFIGURED 503, DATABASE_ERROR 503, GENERATION_FAILED 502 (refunded).
@@ -105,7 +108,9 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         temperature: 0.2,
-        max_completion_tokens: 3000,
+        // Each item now also carries time / duration fields (~60 more tokens),
+        // so 20 items no longer fit in the old 3000 cap.
+        max_completion_tokens: 4500,
         store: false,
         response_format: {
           type: "json_schema",
