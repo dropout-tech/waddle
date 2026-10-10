@@ -73,7 +73,8 @@ export const dict: Record<string, string> = {
   '找不到可以放任務的分類，先建立一個分類再試試。': 'There\'s no category to put tasks in yet. Create one and try again.',
 
   // AI split → 未分類 inbox (spec v2, 2026-10-03)
-  '亂丟一段待辦，企鵝用 AI 拆好，放進「未分類」。': 'Jot down a messy list — the penguin splits it with AI and puts it in your inbox.',
+  '亂丟一段待辦，企鵝用 AI 拆好放進「未分類」；說了時間的會排進行事曆。':
+    'Jot down a messy list — the penguin splits it with AI into your inbox, and anything with a time goes onto your calendar.',
   '企鵝拆好了 {n} 件事，看看對不對？': 'The penguin found {n} to-dos. Look right?',
   '今天的 AI 整理用完了（每天 {n} 次），先用簡單拆法。明天會再補滿；想不限次數可以升級 Pro。':
     'Today\'s AI splits are used up ({n} a day), so the penguin used the simple splitter. They refill tomorrow; Pro has no daily limit.',
@@ -87,10 +88,19 @@ export const dict: Record<string, string> = {
   '期限（可留空）': 'Due (optional)',
   '備註（可留空）': 'Note (optional)',
   '點便條可以改標題和期限；不想要的取消勾選就好。': 'Tap a note to change its name or due date. Untick anything you don\'t want.',
+  '點便條可以改標題、期限和時間；不想要的取消勾選就好。': 'Tap a note to change its name, due date or time. Untick anything you don\'t want.',
   '拆好的待辦': 'Split to-dos',
   '會放進「{name}」': 'Going into "{name}"',
   '之後在任務清單慢慢整理就好。': 'Sort them out in your task list whenever you like.',
   '沒有期限': 'No due date',
   '企鵝把 {n} 件放進「{name}」': 'The penguin put {n} into "{name}"',
   '到任務清單就看得到。': 'You\'ll find them in your task list.',
+
+  // Time of day → calendar (2026-10-10). Wording for the owner to review.
+  '{day} {start}–{end}': '{day} {start}–{end}',
+  '時間已過，先不排': 'That time has passed — not scheduled',
+  '那個時段沒有空檔，先不排': 'No free slot then — not scheduled',
+  '時間（可留空）': 'Time (optional)',
+  '時間會排在期限那天；沒有期限就是今天。留空就不排進行事曆。': 'It goes on the due date, or today if there is none. Leave it blank to keep it off the calendar.',
+  '其中 {m} 件排進了行事曆，其餘到任務清單就看得到。': '{m} of them went onto your calendar; the rest are in your task list.',
 }

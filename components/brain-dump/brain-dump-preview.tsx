@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { CalendarClock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n/react'
 import { InkArchive } from '@/components/icons/huddle-icons'
+import type { ScheduleOutcome } from '@/lib/brain-dump/schedule'
 import type { BrainDumpDraft } from '@/lib/brain-dump/types'
-import { formatMonthDay } from './brain-dump-utils'
+import { formatMonthDay, formatSlot } from './brain-dump-utils'
 import { PenguinArt, type PenguinPose } from './penguin-art'
 import styles from './brain-dump.module.css'
 
@@ -27,6 +29,11 @@ interface PreviewProps {
   inboxName: string
   /** Notes whose write failed (marked, kept for retry). */
   failedIds?: Set<string>
+  /** Where each ticked note lands on the calendar (schedule.ts); a note with
+   *  no entry, or an entry with neither slot nor reason, is just "to the inbox". */
+  plan: Map<string, ScheduleOutcome>
+  /** The clock the plan was made with (「今天」「明天」 labels). */
+  now: Date
   /** True once everything is written: notes slide into the inbox. */
   stowing?: boolean
   onToggle: (id: string) => void
@@ -40,7 +47,7 @@ interface PreviewProps {
  * successful write they slide down into the tray.
  */
 export function BrainDumpPreview({
-  drafts, excluded, selectedId, headline, notice, finalPose, inboxName, failedIds, stowing, onToggle, onSelect,
+  drafts, excluded, selectedId, headline, notice, finalPose, inboxName, failedIds, plan, now, stowing, onToggle, onSelect,
 }: PreviewProps) {
   const { t } = useI18n()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -106,7 +113,7 @@ export function BrainDumpPreview({
         <div role="status" className="min-w-0">
           <p className="text-sm font-medium text-foreground">{headline}</p>
           {notice && <p className="mt-1 text-xs text-primary" data-bd-notice>{notice}</p>}
-          <p className="mt-0.5 text-xs text-muted-foreground">{t('點便條可以改標題和期限；不想要的取消勾選就好。')}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t('點便條可以改標題、期限和時間；不想要的取消勾選就好。')}</p>
         </div>
       </div>
 
@@ -117,6 +124,8 @@ export function BrainDumpPreview({
             draft={d}
             off={excluded.has(d.id)}
             failed={!!failedIds?.has(d.id)}
+            outcome={plan.get(d.id)}
+            now={now}
             selected={selectedId === d.id}
             className={cn('relative min-h-11', stowing ? styles.stow : !settled && styles.drop)}
             style={noteStyle(d)}
@@ -164,11 +173,13 @@ function InkCheck({ checked }: { checked: boolean }) {
 }
 
 function NoteCard({
-  draft, off, failed, selected, className, style, tint, onToggle, onSelect,
+  draft, off, failed, outcome, now, selected, className, style, tint, onToggle, onSelect,
 }: {
   draft: BrainDumpDraft
   off: boolean
   failed?: boolean
+  outcome?: ScheduleOutcome
+  now: Date
   selected: boolean
   className?: string
   style?: CSSProperties
@@ -178,11 +189,15 @@ function NoteCard({
 }) {
   const { t, lang } = useI18n()
   const id = draft.id
+  const slot = off ? undefined : outcome?.slot
+  const reason = off ? undefined : outcome?.reason
   return (
     <div
       role="listitem"
       data-bd-note={id}
       data-bd-due={draft.dueDate ?? ''}
+      data-bd-when={slot ? `${slot.date} ${slot.start}-${slot.end}` : undefined}
+      data-bd-no-slot={reason}
       data-off={off ? '' : undefined}
       data-bd-failed={failed ? '' : undefined}
       data-selected={selected ? '' : undefined}
@@ -214,6 +229,20 @@ function NoteCard({
           {draft.dueDate ? t('{date} 前', { date: formatMonthDay(draft.dueDate, lang) }) : t('沒有期限')}
           {draft.note ? ` · ${draft.note}` : ''}
         </span>
+        {slot && (
+          <span className="mt-0.5 flex items-start gap-1 text-[11px] font-medium leading-tight text-primary">
+            <CalendarClock className="mt-px h-3 w-3 flex-shrink-0" aria-hidden="true" />
+            <span className="min-w-0 tabular-nums">
+              {formatSlot(slot, now, lang, t)}
+              {slot.conflict ? <span className="font-normal opacity-80">{` · ${t('跟已有的行程重疊')}`}</span> : null}
+            </span>
+          </span>
+        )}
+        {reason && (
+          <span className="mt-0.5 text-[11px] leading-tight opacity-70">
+            {reason === 'past' ? t('時間已過，先不排') : t('那個時段沒有空檔，先不排')}
+          </span>
+        )}
         {failed && <span className="truncate text-[11px] leading-tight text-primary">{t('這張還沒放進去')}</span>}
       </button>
     </div>
