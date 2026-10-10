@@ -134,6 +134,7 @@ export const dict: Record<string, string> = {
   '每日規劃提醒': 'Daily planning reminder',
   '提醒時間': 'Reminder time',
   '每日規劃提醒時間': 'Daily planning reminder time',
+  '這是你自己指定的提醒時間，不受勿擾時段影響。手機會準時推播；網頁與 Mac 要開著 Huddle 才會提醒。': "This is a time you chose yourself, so quiet hours don't apply. Your phone notifies you on the dot; on the web and Mac, Huddle has to be open.",
   '勿擾時段': 'Quiet hours',
   '啟用勿擾時段': 'Enable quiet hours',
   '時段': 'Hours',

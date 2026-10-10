@@ -49,6 +49,7 @@ import {
 } from '@/lib/meeting-reminder'
 import { DesktopNotificationSettings } from './desktop-notification-settings'
 import { requestReminderPermission, syncMeetingReminders } from '@/lib/notifications'
+import { mergeNotificationSettings } from '@/lib/notifications/settings'
 import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 import { PICKER_COLOR_HEXES, WORKSPACE_COLORS } from '@/lib/palette'
 import { resolveDefaultWorkspace, sortWorkspacesForDisplay } from '@/lib/default-category'
@@ -122,55 +123,6 @@ const WebSubscriptionTab =
     : null
 
 const PRESET_COLORS = PICKER_COLOR_HEXES
-
-// Default notification settings
-const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
-  enabled: true,
-  overdue: {
-    enabled: true,
-    criticalDays: 7,
-    showInBell: true,
-    dailyDigest: true,
-  },
-  dueSoon: {
-    enabled: true,
-    daysBeforeDue: 3,
-    notifyOnDueDay: true,
-    notifyDayBefore: true,
-  },
-  staleTasks: {
-    enabled: true,
-    daysUntilStale: 14,
-    includeUnscheduled: true,
-    includeNoDueDate: true,
-  },
-  highPriority: {
-    enabled: true,
-    minUrgency: 8,
-    alertWhenTooMany: true,
-    maxBeforeAlert: 5,
-  },
-  scheduling: {
-    enabled: true,
-    remindUnscheduled: true,
-    percentThreshold: 50,
-    dailyPlanningReminder: false,
-    planningReminderTime: '08:00',
-  },
-  workspaceOverrides: {},
-  quietHours: {
-    enabled: false,
-    startTime: '22:00',
-    endTime: '08:00',
-    allowUrgent: true,
-  },
-  appearance: {
-    showBadgeCount: true,
-    groupByType: true,
-    autoCollapse: false,
-    maxVisible: 10,
-  },
-}
 
 export function SettingsModal({
   isOpen,
@@ -1418,7 +1370,9 @@ function NotificationsSettingsTab({
   onUpdate: (notifications: NotificationSettings) => void
 }) {
   const { t } = useI18n()
-  const notifications = settings.notifications || DEFAULT_NOTIFICATION_SETTINGS
+  // Tolerant read: a saved blob missing a section (older rows have no quietHours, say) is filled in from the
+  // defaults instead of crashing this tab on `notifications.quietHours.enabled`.
+  const notifications = mergeNotificationSettings(settings.notifications)
 
   const updateField = <K extends keyof NotificationSettings>(
     key: K,
@@ -1757,10 +1711,18 @@ function NotificationsSettingsTab({
                 <input
                   type="checkbox"
                   checked={notifications.scheduling.dailyPlanningReminder}
-                  onChange={(e) => updateNestedField('scheduling', 'dailyPlanningReminder', e.target.checked)}
+                  onChange={(e) => {
+                    updateNestedField('scheduling', 'dailyPlanningReminder', e.target.checked)
+                    // iOS only schedules a notification the user has allowed, and the permission prompt has to come
+                    // from a tap — this one. (Best effort: the bell card works without it.)
+                    if (e.target.checked && isNative()) void requestReminderPermission().catch(() => {})
+                  }}
                   className="w-4 h-4 rounded border-border accent-primary"
                 />
               </label>
+              <p className="-mt-1 text-xs text-muted-foreground">
+                {t('這是你自己指定的提醒時間，不受勿擾時段影響。手機會準時推播；網頁與 Mac 要開著 Huddle 才會提醒。')}
+              </p>
 
               {notifications.scheduling.dailyPlanningReminder && (
                 <div className="flex items-center justify-between">

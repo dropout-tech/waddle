@@ -17,6 +17,7 @@ import {
 } from '@/lib/meeting-reminder'
 import { meetingReminderSuppressed, resolveQuietHours, type QuietHoursSetting } from '@/lib/quiet-hours'
 import { MAX_FOLLOWUP_REMINDERS, MAX_MEETING_REMINDERS } from '@/lib/notifications/budget'
+import type { PlanningReminderConfig } from '@/lib/notifications/daily-planning'
 import { t } from '@/lib/i18n'
 import { petVoiced } from '@/lib/pet/voice'
 
@@ -25,7 +26,8 @@ import { petVoiced } from '@/lib/pet/voice'
 
 // Notification id ranges are disjoint by construction so kinds can never overwrite
 // each other: meeting reminders 1..2_000_000_000, follow-up reminders
-// 2_000_000_001..2_099_999_999, widget reminders 2_100_000_001 and up (lib/widgets/reminders.ts).
+// 2_000_000_001..2_099_999_999, widget reminders 2_100_000_001..2_100_000_013 (focus + the water chain,
+// lib/widgets/reminders.ts), and the one repeating 每日規劃提醒 at 2_110_000_001 (all below 2^31).
 const MEETING_ID_SPAN = 2_000_000_000
 const FOLLOWUP_ID_BASE = 2_000_000_001
 const FOLLOWUP_ID_SPAN = 99_999_999
@@ -67,7 +69,7 @@ function serial<T>(job: () => Promise<T>): Promise<T> {
   return run
 }
 
-const ACCOUNT_SCOPED_KINDS = ['meeting', 'followup']
+const ACCOUNT_SCOPED_KINDS = ['meeting', 'followup', 'planning']
 
 /** Which pending notifications must go when the signed-in account becomes `account` (null = nobody). Pure. */
 export function foreignReminderIds(
@@ -305,5 +307,57 @@ async function scheduleFollowupReminders(items: FollowupReminderItem[], account:
         extra: { kind: 'followup', route: '/meetings/', accountId: account },
       }
     }),
+  })
+}
+
+// ── 每日規劃提醒 ──
+
+/** The single repeating 每日規劃提醒 (one repeating request = one slot of the iOS budget). */
+export const PLANNING_REMINDER_ID = 2_110_000_001
+/** Opened by tapping the notification: the home screen. */
+const PLANNING_ROUTE = '/'
+
+/**
+ * Keep the iOS 每日規劃提醒 in step with the saved settings: when `cfg.enabled`, ONE notification that repeats
+ * every day at `cfg.time` (local wall-clock time, so travel and DST follow the phone); otherwise none. The text is
+ * fixed and carries no numbers (a pre-scheduled number would be stale by the time it fires). It is the user's own
+ * alarm, so 勿擾時段 is not consulted. Replaces whatever 'planning' notification is pending, so changing the time
+ * or switching it off takes effect at once; signing out removes it (kind 'planning' is account-scoped, see
+ * setReminderAccount). Needs the existing notification permission; never asks for it. No-op on web.
+ */
+export function syncDailyPlanningReminder(cfg: Pick<PlanningReminderConfig, 'enabled' | 'hour' | 'minute'>): Promise<void> {
+  if (!isNative()) return Promise.resolve()
+  const account = reminderAccount
+  return serial(() => scheduleDailyPlanning(cfg, account))
+}
+
+async function scheduleDailyPlanning(
+  cfg: Pick<PlanningReminderConfig, 'enabled' | 'hour' | 'minute'>,
+  account: string | null | undefined,
+): Promise<void> {
+  if (account === undefined) return // see scheduleMeetingReminders
+  const { LocalNotifications } = await import('@capacitor/local-notifications')
+
+  const pending = await LocalNotifications.getPending()
+  const mine = pending.notifications.filter((n) => n.extra?.kind === 'planning')
+  if (mine.length > 0) await LocalNotifications.cancel({ notifications: mine.map((n) => ({ id: n.id })) })
+
+  if (!account || !cfg.enabled) return
+  const perm = await LocalNotifications.checkPermissions()
+  if (perm.display !== 'granted') return
+
+  await ensureTapHandler()
+  if (reminderAccount !== account) return
+  const text = petVoiced({ title: t('Huddle · 每日規劃'), body: t('花一分鐘看看待辦，把接下來的時間排一排。') })
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: PLANNING_REMINDER_ID,
+        title: text.title,
+        body: text.body,
+        schedule: { on: { hour: cfg.hour, minute: cfg.minute }, repeats: true },
+        extra: { kind: 'planning', route: PLANNING_ROUTE, accountId: account },
+      },
+    ],
   })
 }

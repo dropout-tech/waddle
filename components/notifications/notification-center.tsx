@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMeetingNotifications } from '@/hooks/use-meeting-notifications'
 import {
@@ -17,12 +17,29 @@ import {
 import { InkBellLg } from '@/components/icons/huddle-icons'
 import { cn } from '@/lib/utils'
 import type { Task, Workspace } from '@/lib/types'
-import { getTaskOverdueDate, isTaskOverdue } from '@/lib/task-utils'
 import { toDateString } from '@/lib/calendar-utils'
 import { useI18n } from '@/lib/i18n/react'
 import { brandQuote } from '@/lib/brand'
 import { t } from '@/lib/i18n'
 import { useUserSettings } from '@/components/user-settings-context'
+import { useAuth } from '@/components/auth/auth-provider'
+import { mergeNotificationSettings } from '@/lib/notifications/settings'
+import {
+  arrangeBell,
+  collectOpenTasks,
+  computeTaskReminders,
+  type BellGroup,
+  type TaskReminderItem,
+} from '@/lib/notifications/task-reminders'
+import {
+  dailyBellKey,
+  markDismissed,
+  markSeen,
+  parseDailyBell,
+  readDailyBellRaw,
+  subscribeDailyBell,
+  updateDailyBell,
+} from '@/lib/notifications/daily-bell'
 
 interface NotificationCenterProps {
   workspaces: Workspace[]
@@ -40,19 +57,12 @@ interface NotificationCenterProps {
 
 interface Notification {
   id: string
-  type: 'overdue' | 'due_soon' | 'stale' | 'insight' | 'reminder'
+  type: TaskReminderItem['type']
   priority: 'high' | 'medium' | 'low'
   title: string
   message: string
   tasks?: Task[]
   actionLabel?: string
-  createdAt: Date
-}
-
-// Calculate days difference
-const daysDiff = (date1: Date, date2: Date): number => {
-  const diffTime = date1.getTime() - date2.getTime()
-  return Math.floor(diffTime / (1000 * 60 * 60 * 24))
 }
 
 // Format relative time
@@ -100,237 +110,171 @@ export function NotificationCenter({
     else setInnerOpen(next)
   }
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
-  // 設定 › 提醒設定: the master switch and each section's on/off decide
-  // which task reminders reach the bell. (Meeting-invite messages below are
-  // not task reminders and always show.) Missing settings = all on.
-  const reminderPrefs = useUserSettings()?.notifications
-  const remindersOn = reminderPrefs?.enabled !== false
-  const overdueOn = remindersOn && reminderPrefs?.overdue?.enabled !== false && reminderPrefs?.overdue?.showInBell !== false
-  const dueSoonOn = remindersOn && reminderPrefs?.dueSoon?.enabled !== false
-  const dueTodayOn = dueSoonOn && reminderPrefs?.dueSoon?.notifyOnDueDay !== false
-  const staleOn = remindersOn && reminderPrefs?.staleTasks?.enabled !== false
-  const tooManyUrgentOn = remindersOn && reminderPrefs?.highPriority?.enabled !== false && reminderPrefs?.highPriority?.alertWhenTooMany !== false
-  const unscheduledOn = remindersOn && reminderPrefs?.scheduling?.enabled !== false && reminderPrefs?.scheduling?.remindUnscheduled !== false
+  const [showAll, setShowAll] = useState(false)
 
-  // Gather all tasks from workspaces
-  const allTasks = useMemo(() => {
-    if (!workspaces || workspaces.length === 0) return []
-    const tasks: Task[] = []
-    workspaces.forEach((ws) => {
-      if (!ws.isArchived) {
-        ws.categories?.forEach((cat) => {
-          if (!cat.isArchived) {
-            tasks.push(
-              ...(cat.tasks?.filter((t) => !t.isCompleted && !t.isArchived) ||
-                []),
-            )
-          }
-        })
+  // 設定 › 提醒設定: every switch and number there is applied by lib/notifications/task-reminders.ts
+  // (computeTaskReminders / arrangeBell). Meeting-invite messages below are not task reminders and always show.
+  // A stored blob that lacks a section is filled in from the defaults (lib/notifications/settings.ts).
+  const storedPrefs = useUserSettings()?.notifications
+  const prefs = useMemo(() => mergeNotificationSettings(storedPrefs), [storedPrefs])
+
+  // "Now" moves while the bell stays mounted: the planning card appears at its time and the day rolls over.
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    const tick = () => setNowMs(Date.now())
+    const id = window.setInterval(tick, 60 * 1000)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', tick)
+    }
+  }, [])
+  const todayStr = toDateString(new Date(nowMs))
+
+  // Per-day memory of the two daily cards (digest, planning): seen → no longer counted on the badge; dismissed → hidden.
+  // Lives in localStorage per account (lib/notifications/daily-bell.ts); a state from another day counts as empty.
+  const userId = useAuth().user?.id ?? null
+  const dailyKey = dailyBellKey(userId)
+  const dailyRaw = useSyncExternalStore(
+    subscribeDailyBell,
+    () => readDailyBellRaw(dailyKey),
+    () => null,
+  )
+  const daily = useMemo(() => parseDailyBell(dailyRaw, todayStr), [dailyRaw, todayStr])
+
+  // Gather all open tasks from workspaces
+  const allTasks = useMemo(() => collectOpenTasks(workspaces), [workspaces])
+
+  // Which reminders apply right now (pure; see lib/notifications/task-reminders.ts), minus the ones dismissed.
+  const items = useMemo(
+    () =>
+      computeTaskReminders({ tasks: allTasks, settings: prefs, now: new Date(nowMs) }).filter(
+        (i) => !dismissedIds.has(i.id) && !(i.daily && daily.dismissed.includes(i.id)),
+      ),
+    [allTasks, prefs, nowMs, dismissedIds, daily.dismissed],
+  )
+
+  // The words for one reminder item.
+  const describe = (item: TaskReminderItem): Notification => {
+    const base = { id: item.id, type: item.type, priority: item.priority, tasks: item.tasks }
+    switch (item.id) {
+      case 'daily-digest': {
+        const parts: string[] = []
+        if (item.meta.overdue) parts.push(t('{n} 件逾期', { n: item.meta.overdue }))
+        if (item.meta.dueToday) parts.push(t('今天 {n} 件到期', { n: item.meta.dueToday }))
+        if (item.meta.dueTomorrow) parts.push(t('明天 {n} 件到期', { n: item.meta.dueTomorrow }))
+        return { ...base, tasks: undefined, title: t('今天的摘要'), message: parts.join(english ? ', ' : '、') }
       }
-    })
-    return tasks
-  }, [workspaces])
-
-  // Generate notifications based on task analysis
-  const notifications = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const notifs: Notification[] = []
-
-    const todayStr = toDateString(today)
-
-    // 1. Tasks whose calendar slot or due date has passed. Recurring masters
-    // and meetings are intentionally excluded by isTaskOverdue so the cleanup
-    // flow cannot rewrite an entire series.
-    const overdueTasks = overdueOn
-      ? allTasks.filter((task) => isTaskOverdue(task, todayStr))
-      : []
-
-    if (overdueTasks.length > 0) {
-      // Group by how long overdue
-      const criticalOverdue = overdueTasks.filter((t) => {
-        const days = daysDiff(
-          today,
-          new Date(`${getTaskOverdueDate(t, todayStr)}T00:00:00`),
-        )
-        return days >= 7
-      })
-      const recentOverdue = overdueTasks.filter((t) => {
-        const days = daysDiff(
-          today,
-          new Date(`${getTaskOverdueDate(t, todayStr)}T00:00:00`),
-        )
-        return days < 7
-      })
-
-      if (criticalOverdue.length > 0) {
-        const oldestTask = criticalOverdue.reduce((oldest, task) => {
-          return getTaskOverdueDate(task, todayStr)! <
-            getTaskOverdueDate(oldest, todayStr)!
-            ? task
-            : oldest
-        })
-        const daysOverdue = daysDiff(
-          today,
-          new Date(`${getTaskOverdueDate(oldestTask, todayStr)}T00:00:00`),
-        )
-
-        notifs.push({
-          id: 'critical-overdue',
-          type: 'overdue',
-          priority: 'high',
-          title: t('{n} 個任務已經放了一陣子', { n: criticalOverdue.length }),
+      case 'daily-planning':
+        return {
+          ...base,
+          tasks: undefined,
+          title: t('每日規劃時間到了'),
+          message: t('花一分鐘看看待辦，把接下來的時間排一排。'),
+        }
+      case 'critical-overdue':
+        return {
+          ...base,
+          title: t('{n} 個任務已經放了一陣子', { n: item.count }),
           message: t(
             '最久的一件是{time}的。有些也許已經不用做了——放心整理掉，留下真正想做的就好。',
-            { time: formatRelativeTime(daysOverdue) },
+            { time: formatRelativeTime(item.meta.oldestDays ?? 0) },
           ),
-          tasks: criticalOverdue,
           actionLabel: t('整理任務'),
-          createdAt: new Date(),
-        })
-      }
-
-      if (recentOverdue.length > 0) {
-        notifs.push({
-          id: 'recent-overdue',
-          type: 'overdue',
-          priority: 'medium',
-          title: t('{n} 個任務剛過了預定日', { n: recentOverdue.length }),
+        }
+      case 'recent-overdue':
+        return {
+          ...base,
+          title: t('{n} 個任務剛過了預定日', { n: item.count }),
           message: t('日子過了也沒關係，挑個合適的時段重新安排就好。'),
-          tasks: recentOverdue,
           actionLabel: t('查看任務'),
-          createdAt: new Date(),
-        })
-      }
-    }
-
-    // 2. Due soon (within 3 days)
-    const dueSoonTasks = allTasks.filter((task) => {
-      if (!dueSoonOn || !task.dueDate) return false
-      const dueDate = new Date(task.dueDate)
-      dueDate.setHours(0, 0, 0, 0)
-      const daysUntil = daysDiff(dueDate, today)
-      return daysUntil >= 0 && daysUntil <= 3
-    })
-
-    if (dueSoonTasks.length > 0) {
-      const todayTasks = dueSoonTasks.filter(
-        (t) => daysDiff(new Date(t.dueDate!), today) === 0,
-      )
-      const upcomingTasks = dueSoonTasks.filter(
-        (t) => daysDiff(new Date(t.dueDate!), today) > 0,
-      )
-
-      if (dueTodayOn && todayTasks.length > 0) {
-        notifs.push({
-          id: 'due-today',
-          type: 'due_soon',
-          priority: 'high',
-          title: t('今天排了 {n} 件事', { n: todayTasks.length }),
+        }
+      case 'due-today':
+        return {
+          ...base,
+          title: t('今天排了 {n} 件事', { n: item.count }),
           message: t('還有時間，可以慢慢做——一件一件來就好。'),
-          tasks: todayTasks,
           actionLabel: t('查看任務'),
-          createdAt: new Date(),
-        })
-      }
-
-      if (upcomingTasks.length > 0) {
-        notifs.push({
-          id: 'due-soon',
-          type: 'due_soon',
-          priority: 'low',
-          title: t('{n} 個任務這幾天到期', { n: upcomingTasks.length }),
+        }
+      case 'due-tomorrow':
+        return {
+          ...base,
+          title: t('{n} 個任務明天到期', { n: item.count }),
+          message: t('先看看要不要準備什麼，順手把它們放上日曆吧。'),
+          actionLabel: t('查看任務'),
+        }
+      case 'due-soon':
+        return {
+          ...base,
+          title: t('{n} 個任務這幾天到期', { n: item.count }),
           message: t(
-            '接下來三天會陸續到期，先挑個順手的時段放上日曆，到時候就從容多了。',
+            '接下來 {days} 天會陸續到期，先挑個順手的時段放上日曆，到時候就從容多了。',
+            { days: item.meta.windowDays ?? 3 },
           ),
-          tasks: upcomingTasks,
           actionLabel: t('查看任務'),
-          createdAt: new Date(),
-        })
-      }
+        }
+      case 'stale-tasks':
+        return {
+          ...base,
+          title: t('{n} 個任務靜靜躺了 {days} 天以上', { n: item.count, days: item.meta.staleDays ?? 14 }),
+          message: t('還想做的話，挑個日子放上日曆；不想做了也沒關係，歸檔就好。'),
+          actionLabel: t('整理任務'),
+        }
+      case 'too-many-urgent':
+        return {
+          ...base,
+          title: t('急件好像有點多'),
+          message: t(
+            '有 {n} 個任務的優先等級在 {level}/10 以上。全部都急，反而不知道從哪開始——挑出真正的前幾名，其他的緩緩也可以。',
+            { n: item.count, level: item.meta.level ?? 8 },
+          ),
+          actionLabel: t('調整優先順序'),
+        }
+      case 'unscheduled-tasks':
+        return {
+          ...base,
+          title: item.meta.majority ? t('多數任務未排程') : t('不少任務還沒排程'),
+          message: t('有 {n} 個任務還沒排到日曆上。挑個時段放進去，比較容易把事情做完。', { n: item.count }),
+          actionLabel: t('排程任務'),
+        }
     }
+  }
 
-    // 3. Stale tasks (created long ago, no due date, not scheduled)
-    const staleTasks = allTasks.filter((task) => {
-      if (!staleOn || task.dueDate || task.scheduledDate) return false
-      const createdAt = new Date(task.createdAt)
-      const daysOld = daysDiff(today, createdAt)
-      return daysOld >= 14
-    })
-
-    if (staleTasks.length > 0) {
-      notifs.push({
-        id: 'stale-tasks',
-        type: 'stale',
-        priority: 'low',
-        title: t('{n} 個任務靜靜躺了兩週', { n: staleTasks.length }),
-        message: t(
-          '還想做的話，挑個日子放上日曆；不想做了也沒關係，歸檔就好。',
-        ),
-        tasks: staleTasks,
-        actionLabel: t('整理任務'),
-        createdAt: new Date(),
-      })
+  // Order / group / cut the list the way 設定 › 顯示設定 asks.
+  const arranged = useMemo(
+    () => arrangeBell(items, prefs.appearance, showAll),
+    [items, prefs.appearance, showAll],
+  )
+  const groupLabel = (group: BellGroup): string => {
+    switch (group) {
+      case 'today':
+        return t('今天')
+      case 'overdue':
+        return t('已逾期')
+      case 'due_soon':
+        return t('快到期')
+      case 'stale':
+        return t('閒置中')
+      default:
+        return t('小建議')
     }
+  }
 
-    // 4. Insights and suggestions
-    const totalPending = allTasks.length
-    const highUrgencyTasks = allTasks.filter((t) => t.urgency >= 8)
-    const noScheduleTasks = allTasks.filter(
-      (t) => !t.scheduledDate && !t.dueDate,
-    )
-
-    if (tooManyUrgentOn && highUrgencyTasks.length >= 5) {
-      notifs.push({
-        id: 'too-many-urgent',
-        type: 'insight',
-        priority: 'medium',
-        title: t('急件好像有點多'),
-        message: t(
-          '有 {n} 個任務都標了高優先。全部都急，反而不知道從哪開始——挑出真正的前幾名，其他的緩緩也可以。',
-          { n: highUrgencyTasks.length },
-        ),
-        tasks: highUrgencyTasks,
-        actionLabel: t('調整優先順序'),
-        createdAt: new Date(),
-      })
-    }
-
-    if (
-      unscheduledOn &&
-      noScheduleTasks.length > totalPending * 0.5 &&
-      noScheduleTasks.length >= 5
-    ) {
-      notifs.push({
-        id: 'unscheduled-tasks',
-        type: 'reminder',
-        priority: 'low',
-        title: t('多數任務未排程'),
-        message: t(
-          '有 {n} 個任務還沒排到日曆上。挑個時段放進去，比較容易把事情做完。',
-          {
-            n: noScheduleTasks.length,
-          },
-        ),
-        tasks: noScheduleTasks.slice(0, 5),
-        actionLabel: t('排程任務'),
-        createdAt: new Date(),
-      })
-    }
-
-    // Filter out dismissed notifications
-    return notifs.filter((n) => !dismissedIds.has(n.id))
-  }, [allTasks, dismissedIds, t, overdueOn, dueSoonOn, dueTodayOn, staleOn, tooManyUrgentOn, unscheduledOn])
-
-  // Count by priority
-  const highPriorityCount = notifications.filter(
-    (n) => n.priority === 'high',
-  ).length
-  const totalCount = notifications.length + meetingInbox.unreadCount
+  // Badge: everything listed, except daily cards that were already seen today. 顯示通知數量徽章 off → no number anywhere.
+  const unreadItems = items.filter((i) => !(i.daily && daily.seen.includes(i.id)))
+  const highPriorityCount = unreadItems.filter((i) => i.priority === 'high').length
+  const listedCount = items.length + meetingInbox.unreadCount
+  const totalCount = prefs.appearance.showBadgeCount ? unreadItems.length + meetingInbox.unreadCount : 0
   const hasHighPriority = highPriorityCount > 0
   useEffect(() => {
     onCountChange?.(totalCount, hasHighPriority)
   }, [onCountChange, totalCount, hasHighPriority])
+  // Opening the bell is how the daily cards get "read".
+  const dailyIdsKey = items.filter((i) => i.daily).map((i) => i.id).join(',')
+  useEffect(() => {
+    if (!isOpen || !dailyIdsKey) return
+    updateDailyBell(dailyKey, todayStr, (state) => markSeen(state, dailyIdsKey.split(',')))
+  }, [isOpen, dailyIdsKey, dailyKey, todayStr])
   // Opened from outside (mobile ⋯ menu): refresh the meeting inbox the same
   // way the bell click does.
   const refreshInbox = meetingInbox.refresh
@@ -340,6 +284,7 @@ export function NotificationCenter({
 
   const dismissNotification = (id: string) => {
     setDismissedIds((prev) => new Set([...prev, id]))
+    if (items.find((i) => i.id === id)?.daily) updateDailyBell(dailyKey, todayStr, (state) => markDismissed(state, id))
   }
 
   const getPriorityColor = (priority: string) => {
@@ -366,6 +311,7 @@ export function NotificationCenter({
       case 'insight':
         return Sparkles
       case 'reminder':
+      case 'planning':
         return Calendar
       default:
         return Bell
@@ -434,9 +380,9 @@ export function NotificationCenter({
               <div className="flex items-center gap-2">
                 <Bell className="w-4 h-4 text-primary" />
                 <span className="font-semibold text-sm">{t('通知中心')}</span>
-                {totalCount > 0 && (
+                {listedCount > 0 && (
                   <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary">
-                    {totalCount}
+                    {listedCount}
                   </span>
                 )}
               </div>
@@ -516,7 +462,7 @@ export function NotificationCenter({
                     : '顯示最新 50 則，讀取後會接續顯示較早通知。'}
                 </p>
               )}
-              {notifications.length === 0 &&
+              {items.length === 0 &&
               meetingInbox.unreadCount === 0 &&
               !meetingInbox.error ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
@@ -532,11 +478,24 @@ export function NotificationCenter({
                 </div>
               ) : (
                 <div className="divide-y divide-border">
-                  {notifications.map((notification) => {
+                  {arranged.rows.map((row) => {
+                    if (row.kind === 'header') {
+                      return (
+                        <div
+                          key={`group-${row.group}`}
+                          data-bell-group={row.group}
+                          className="px-4 pt-3 pb-1 text-[10px] font-medium tracking-wide text-muted-foreground bg-secondary/20"
+                        >
+                          {groupLabel(row.group)}
+                        </div>
+                      )
+                    }
+                    const notification = describe(row.item)
                     const TypeIcon = getTypeIcon(notification.type)
                     return (
                       <div
                         key={notification.id}
+                        data-bell-item={notification.id}
                         className="p-4 hover:bg-secondary/30 transition-colors"
                       >
                         <div className="flex gap-3">
@@ -639,8 +598,20 @@ export function NotificationCenter({
             </div>
 
             {/* Footer */}
-            {notifications.length > 0 && (
+            {items.length > 0 && (
               <div className="px-4 py-3 border-t border-border bg-secondary/20">
+                {(arranged.hidden > 0 || showAll) && arranged.total > prefs.appearance.maxVisible && (
+                  <button
+                    type="button"
+                    data-bell-show-all
+                    onClick={() => setShowAll((v) => !v)}
+                    className="mb-2 w-full text-center text-xs text-primary underline"
+                  >
+                    {showAll
+                      ? t('只顯示前 {n} 則', { n: prefs.appearance.maxVisible })
+                      : t('顯示其餘 {n} 則', { n: arranged.hidden })}
+                  </button>
+                )}
                 <p className="text-[10px] text-muted-foreground text-center">
                   {brandQuote(lang).quote}
                 </p>
