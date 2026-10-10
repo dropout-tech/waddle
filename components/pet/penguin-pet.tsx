@@ -368,15 +368,17 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   }, [completedIds, workspaces.length, shown, quiet, menuOpen, say, line])
 
   // Focus timer finished → speak even though we were quiet during it.
+  // A pomodoro break ending gets its own lines — it is not a focus session.
   const prevTimerState = useRef(timer.state)
+  const timerPhase = timer.session?.phase
   useEffect(() => {
     const prev = prevTimerState.current
     prevTimerState.current = timer.state
     if (timer.state === 'completed' && (prev === 'running' || prev === 'paused')) {
       if (!shown || isPetMuted()) return
-      say(line(['focusEnd']), { auto: true, act: 'jump' })
+      say(line([timerPhase === 'break' ? 'breakEnd' : 'focusEnd']), { auto: true, act: 'jump' })
     }
-  }, [timer.state, shown, say, line])
+  }, [timer.state, timerPhase, shown, say, line])
 
   // Idle / reminder tick.
   useEffect(() => {

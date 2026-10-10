@@ -33,7 +33,7 @@ export interface WidgetSnapshot {
   weekStart?: string
   days: { date: string; day: number; inMonth: boolean; count: number }[]
   /** `total` = the pomodoro's full length in seconds (lock-screen ring); optional. */
-  focus: { mode?: 'pomodoro' | 'stopwatch'; state: string; title: string; endAt: number | null; seconds: number; note: string; total?: number }
+  focus: { mode?: 'pomodoro' | 'stopwatch'; phase?: 'work' | 'break'; state: string; title: string; endAt: number | null; seconds: number; note: string; total?: number }
   water: { enabled: boolean; nextAt: number | null; count: number }
   /** 「我的 Huddle」 widget (lib/widgets/pet.ts). Optional: the Swift side decodes it as optional too. */
   pet?: WidgetPet

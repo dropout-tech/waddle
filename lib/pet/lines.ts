@@ -26,6 +26,7 @@ export type PetLineCategory =
   | 'overdue' // 提醒模板：逾期任務 {count}
   | 'meeting' // 提醒模板：會議 {title} {time}
   | 'focusEnd' // 提醒模板：專注結束
+  | 'breakEnd' // 提醒模板：番茄鐘的休息結束（別說成專注結束）
   | 'checkIn' // 提醒模板：今天還沒簽到
   | 'dailyLine' // 人生年曆：晚上問今天最想記住的事（點氣泡開輸入）
   | 'poke' // 連點反應
@@ -234,6 +235,12 @@ export const PET_LINES: PetLine[] = [
     ['專注結束。我在旁邊安靜了整整一段，好難，給我們兩個一點掌聲。', 'Focus complete. I stayed quiet the whole time. That was hard. Applause for both of us.'],
     ['你專心的樣子好帥。現在讓眼睛看看遠方休息一下。', 'You looked great focusing. Now rest your eyes on something far away.'],
     ['完成一段專注！要不要先走兩步，再回來下一段？', 'Focus block complete! How about a short walk before the next one?'],
+  ]),
+  ...group('breakEnd', [
+    ['休息結束！我已經把冰塊擺好，準備好就開始下一段。', 'Break\'s over! I lined up the ice cubes. Start the next round whenever you\'re ready.'],
+    ['叮！休息時間到了。伸個懶腰，像企鵝剛睡醒那樣。', 'Ding! Break time is up. Stretch it out like a penguin waking up.'],
+    ['休息完畢。水喝了嗎？喝了的話，我們再來一段。', 'Break done. Had some water? Then let\'s go one more round.'],
+    ['休息時間結束囉，不急，想繼續時再按開始就好。', 'Break\'s over. No rush; tap start when you feel like it.'],
   ]),
   ...group('checkIn', [
     ['今天還沒簽到喔。我已經在簽到本上畫了一隻企鵝等你。', 'You haven\'t checked in today. I doodled a penguin on the sign-in sheet for you.'],
