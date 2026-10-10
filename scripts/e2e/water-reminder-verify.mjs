@@ -558,6 +558,30 @@ if (run('P1')) {
   await a.close()
 }
 
+if (run('P3')) {
+  // The 任務 tab: the card floats over the list like a toast — it must not hide the tab bar or the pill.
+  const a = await openApp({ time: at(14, 0), pet: PET, viewport: PHONE, phone: true })
+  await a.page.locator('[data-tour="mobile-tabs"]').getByRole('tab', { name: '任務' }).click()
+  await a.page.waitForTimeout(600)
+  await a.makeDue(); await a.page.waitForTimeout(300); await a.runFor(3600); await a.page.waitForTimeout(800)
+  // Here the penguin's corner sits on the list's 「新增任務」 row, so it steps aside (data-yield) as
+  // it always does — A can't be seen → the drop takes over (老闆: 任何 A 無法正常顯示的情況).
+  const petYield = await a.page.evaluate(() => document.querySelector('[data-pet]')?.hasAttribute('data-yield'))
+  if (petYield) {
+    assert.equal(await a.dropOpen(), true, 'P3: penguin stepped aside → the drop')
+    assert.equal(await a.cardOpen(), false)
+    ok('P3 任務 tab: the penguin is stepping aside for a list control → the drop shows instead (fallback)')
+  } else {
+    assert.equal(await a.cardOpen(), true, 'P3: penguin visible → its card')
+    ok('P3 任務 tab: the penguin is visible → it brings the water')
+  }
+  const d = await a.rect('[data-water-drop] button')
+  const tabs = await a.rect('[data-tour="mobile-tabs"]')
+  if (d) assert.ok(d.b <= tabs.y + 1 && d.w >= 44, 'P3: drop above the tab bar, ≥ 44')
+  await a.shot('c-mobile-tasks-tab')
+  await a.close()
+}
+
 if (run('P2')) {
   const a = await openApp({ time: at(14, 0), pet: PET, petLocal: 'muted', viewport: PHONE, phone: true })
   await a.makeDue()

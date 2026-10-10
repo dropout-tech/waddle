@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/lib/i18n/react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { WATER_DROP_VISIBLE_MS } from '@/lib/water-moment'
+import { hapticSelection } from '@/lib/haptics'
 import { WaterSettingsPanel } from './water-settings-panel'
+import { useControlYield, useIsScrolling } from '@/components/timer/use-floating-dodge'
 import styles from './water-drop.module.css'
 
 type DropState = 'here' | 'tap' | 'fade'
@@ -38,6 +40,18 @@ export function WaterDrop({
   const [besidePet, setBesidePet] = useState(false)
   const [reduced] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const dropRef = useRef<HTMLButtonElement>(null)
+  // Same manners as the timer pill (components/timer/use-floating-dodge.ts): while the list
+  // scrolls the finger belongs to the list; if the drop would cover a small control that has no
+  // 44×44 left, it steps up out of the way.
+  const { scrolling } = useIsScrolling(state === 'here')
+  const blocked = useControlYield(state === 'here' && !settingsOpen, dropRef)
+  const [lifted, setLifted] = useState(false)
+  useEffect(() => {
+    // latch: once lifted it stays up (dropping back would cover the control again and oscillate)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirrors the probe's external DOM result
+    if (blocked) setLifted(true)
+  }, [blocked])
   const press = useRef<{ x: number; y: number; timer?: number; long?: boolean } | null>(null)
   const cbs = useRef({ onDrink, onIgnore })
   useEffect(() => {
@@ -106,6 +120,7 @@ export function WaterDrop({
 
   const drink = () => {
     if (state !== 'here') return
+    hapticSelection()
     setSettingsOpen(false)
     setState('tap')
   }
@@ -121,6 +136,8 @@ export function WaterDrop({
       data-mobile={isMobile ? '' : undefined}
       data-beside-pet={besidePet ? '' : undefined}
       data-state={state}
+      data-lifted={lifted ? '' : undefined}
+      data-scrolling={scrolling ? '' : undefined}
       data-hint={hint && !settingsOpen ? 'on' : 'off'}
       data-water-drop
       data-hide-on-keyboard
@@ -130,6 +147,7 @@ export function WaterDrop({
         <small>{t('點一下就好')}</small>
       </div>
       <button
+        ref={dropRef}
         type="button"
         className={styles.drop}
         aria-label={afterFocus ? t('剛好休息，喝一口水吧：喝過了就點一下') : t('喝水提醒：喝過了就點一下')}
@@ -162,9 +180,11 @@ export function WaterDrop({
         onPointerMove={(e) => {
           const p = press.current
           if (!p || p.long) return
-          if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > SWIPE_PX) {
+          const dx = e.clientX - p.x
+          const dy = e.clientY - p.y
+          if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy)) {
             clearPress()
-            drink() // swiped it away = had a sip
+            drink() // swiped sideways = had a sip (a vertical drag scrolls the page instead)
           }
         }}
         onPointerUp={() => {

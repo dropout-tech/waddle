@@ -19,6 +19,7 @@ import type { Workspace } from '@/lib/types'
 import { PetSprite, type PetPose } from './pet-sprite'
 import { PetWaterCard, PetWaterCheer, PetWaterInHand, type PetWaterPhase } from './pet-water'
 import { getWaterPetRequest, setPetWaterReady, subscribeWaterMoment } from '@/lib/water-moment'
+import { hapticTaskComplete } from '@/lib/haptics'
 import { PetAdoptCard } from './pet-adopt-card'
 import styles from './pet.module.css'
 
@@ -349,6 +350,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
 
   const waterCheers = () => {
     getWaterPetRequest()?.handlers.drink()
+    hapticTaskComplete() // the clink, on the phone
     clearWaterTimers()
     if (reduced) {
       say(t('咕嚕。好喝！'), { act: '' })

@@ -10,7 +10,12 @@
   bottom: 88px;
   width: 56px;
   height: 64px;
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* stepped up off a small control it would otherwise cover */
+.wrap[data-lifted] { transform: translateY(-56px); }
+/* while the page scrolls, the finger belongs to the page */
+.wrap[data-scrolling] .drop { pointer-events: none; }
 .wrap[data-mobile] {
   right: auto;
   left: 16px;
@@ -30,7 +35,7 @@
   background: transparent;
   color: var(--foreground);
   cursor: pointer;
-  touch-action: none;
+  touch-action: pan-y; /* vertical drags scroll the page; sideways = swipe it away */
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   user-select: none;
