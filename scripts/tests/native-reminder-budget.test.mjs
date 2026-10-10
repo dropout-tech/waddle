@@ -36,10 +36,12 @@ const kind = (k) => plugin.pending.filter((n) => n.extra?.kind === k)
 const reset = () => { plugin.pending = []; plugin.permission = 'granted' }
 
 test('budget constants: every kind\'s share adds up to at most the iOS limit of 64', () => {
-  const total = Budget.MAX_MEETING_REMINDERS + Budget.MAX_FOLLOWUP_REMINDERS + Budget.MAX_FOCUS_REMINDERS + Budget.MAX_WATER_REMINDERS
+  const total =
+    Budget.MAX_MEETING_REMINDERS + Budget.MAX_FOLLOWUP_REMINDERS + Budget.MAX_FOCUS_REMINDERS + Budget.MAX_WATER_REMINDERS + Budget.MAX_DAILY_PLANNING_REMINDERS
   assert.equal(Budget.IOS_PENDING_NOTIFICATION_LIMIT, 64)
-  assert.ok(total <= 64, `total ${total}`)
-  assert.equal(Budget.MAX_MEETING_REMINDERS, 40, 'meetings were 48; lowered to make room for the water chain')
+  assert.ok(total <= 63, `total ${total} (one slot is kept spare)`)
+  assert.equal(Budget.MAX_DAILY_PLANNING_REMINDERS, 1, 'a slot is reserved for the upcoming 每日規劃提醒')
+  assert.equal(Budget.MAX_MEETING_REMINDERS, 39, 'meetings were 48; lowered for the water chain, and once more for the reserved daily-planning slot')
 })
 
 test('weekly meeting: one notification per upcoming occurrence, each with its own stable id (old code: one, for the first week only)', async () => {
@@ -90,6 +92,8 @@ test('all kinds together stay within 64 pending notifications, even with far mor
   assert.equal(kind('followup').length, Budget.MAX_FOLLOWUP_REMINDERS)
   assert.equal(kind('huddle-widget').length, Budget.MAX_FOCUS_REMINDERS + Budget.MAX_WATER_REMINDERS)
   assert.ok(plugin.pending.length <= 64, `pending ${plugin.pending.length}`)
+  // Everything that exists today plus the reserved daily-planning slot still fits.
+  assert.ok(plugin.pending.length + Budget.MAX_DAILY_PLANNING_REMINDERS <= 64, 'room left for the repeating daily-planning reminder')
   assert.equal(new Set(plugin.pending.map((n) => n.id)).size, plugin.pending.length, 'no two notifications share an id (a clash would silently drop one)')
   // The soonest 40 meetings are the ones kept.
   const fireTimes = kind('meeting').map((n) => new Date(n.schedule.at).getTime())
