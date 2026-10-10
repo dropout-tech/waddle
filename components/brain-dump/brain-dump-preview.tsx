@@ -234,13 +234,13 @@ function NoteCard({
             <CalendarClock className="mt-px h-3 w-3 flex-shrink-0" aria-hidden="true" />
             <span className="min-w-0 tabular-nums">
               {formatSlot(slot, now, lang, t)}
-              {slot.conflict ? <span className="font-normal opacity-80">{` · ${t('跟已有的行程重疊')}`}</span> : null}
+              {slot.conflict ? <span className="font-normal opacity-80">{` · ${t('跟已有的行程重疊，照樣排入')}`}</span> : null}
             </span>
           </span>
         )}
         {reason && (
           <span className="mt-0.5 text-[11px] leading-tight opacity-70">
-            {reason === 'past' ? t('時間已過，先不排') : t('那個時段沒有空檔，先不排')}
+            {reason === 'past' ? t('時間已過，只記日期、不排時段') : t('那個時段沒有空檔，只記日期、不排時段')}
           </span>
         )}
         {failed && <span className="truncate text-[11px] leading-tight text-primary">{t('這張還沒放進去')}</span>}

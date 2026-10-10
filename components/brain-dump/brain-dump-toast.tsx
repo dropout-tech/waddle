@@ -24,7 +24,7 @@ export function BrainDumpToast({ created, failed, inboxName, scheduled = 0 }: { 
           {failed > 0
             ? t('還有 {n} 件沒放成功，可以再試一次。', { n: failed })
             : scheduled > 0
-              ? t('其中 {m} 件排進了行事曆，其餘到任務清單就看得到。', { m: scheduled })
+              ? t('其中 {m} 件已排進行事曆。', { m: scheduled })
               : t('到任務清單就看得到。')}
         </p>
       </div>

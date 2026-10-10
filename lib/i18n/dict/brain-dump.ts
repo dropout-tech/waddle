@@ -6,7 +6,7 @@ export const dict: Record<string, string> = {
   // entry points
   '丟給企鵝': 'Toss it to the penguin',
   '丟給企鵝 (P)': 'Toss it to the penguin (P)',
-  '丟給企鵝：把一串待辦排進今天': 'Toss it to the penguin: turn a messy list into today\'s plan',
+  '丟給企鵝：一段話拆成待辦，說了時間的排進行事曆': 'Toss it to the penguin: split a messy list into to-dos; anything with a time goes on the calendar',
 
   // input
   '亂丟一串待辦，企鵝幫你排進今天的空檔。': 'Jot down everything on your mind — the penguin fits it into today\'s free time.',
@@ -48,7 +48,7 @@ export const dict: Record<string, string> = {
   '{time} 已經過了，先放待排 · {dur}': '{time} has passed — to schedule · {dur}',
   '{day}・待排 · {dur}': '{day} · to schedule · {dur}',
   '{date} 前': 'by {date}',
-  '跟已有的行程重疊': 'Overlaps something already planned',
+  '跟已有的行程重疊，照樣排入': 'Overlaps something already planned — added anyway',
   '要這件：{title}': 'Keep: {title}',
   '不要這件：{title}': 'Skip: {title}',
   '調整「{title}」': 'Adjust "{title}"',
@@ -98,9 +98,9 @@ export const dict: Record<string, string> = {
 
   // Time of day → calendar (2026-10-10). Wording for the owner to review.
   '{day} {start}–{end}': '{day} {start}–{end}',
-  '時間已過，先不排': 'That time has passed — not scheduled',
-  '那個時段沒有空檔，先不排': 'No free slot then — not scheduled',
+  '時間已過，只記日期、不排時段': 'That time has passed — date only, not on the timeline',
+  '那個時段沒有空檔，只記日期、不排時段': 'No free slot then — date only, not on the timeline',
   '時間（可留空）': 'Time (optional)',
   '時間會排在期限那天；沒有期限就是今天。留空就不排進行事曆。': 'It goes on the due date, or today if there is none. Leave it blank to keep it off the calendar.',
-  '其中 {m} 件排進了行事曆，其餘到任務清單就看得到。': '{m} of them went onto your calendar; the rest are in your task list.',
+  '其中 {m} 件已排進行事曆。': '{m} of them are on your calendar.',
 }

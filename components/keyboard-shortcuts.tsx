@@ -37,7 +37,7 @@ const GROUPS: ShortcutGroup[] = [
   {
     title: '任務',
     items: [
-      { keys: ['P'], label: '丟給企鵝：把一串待辦排進今天' },
+      { keys: ['P'], label: '丟給企鵝：一段話拆成待辦，說了時間的排進行事曆' },
       { keys: ['點擊'], label: '開啟任務詳情' },
       { keys: ['Enter', 'Space'], label: '在聚焦的任務塊上開啟詳情' },
       { keys: ['拖拉'], label: '改變任務的時段或日期' },
