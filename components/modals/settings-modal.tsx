@@ -48,6 +48,7 @@ import {
   type ReminderLead,
 } from '@/lib/meeting-reminder'
 import { DesktopNotificationSettings } from './desktop-notification-settings'
+import { DesktopFloatSettings } from './desktop-float-settings'
 import { requestReminderPermission, syncMeetingReminders } from '@/lib/notifications'
 import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 import { PICKER_COLOR_HEXES, WORKSPACE_COLORS } from '@/lib/palette'
@@ -566,6 +567,9 @@ export function SettingsModal({
               ))}
             </div>
           </div>
+
+          {/* Mac 桌面版才渲染：懸浮視窗要不要蓋在全螢幕 App 上（裝置層級，預設關）。 */}
+          <DesktopFloatSettings />
 
           {/* 企鵝 — reads the live `settings.pet` (not localSettings): it saves
               on every change through onSetPet, outside this modal's draft. */}

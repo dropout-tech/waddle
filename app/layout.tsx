@@ -21,6 +21,7 @@ import { OperationsNotices } from '@/components/operations/announcements'
 import { EnrollmentBridge } from '@/components/operations/enrollment-bridge'
 import { ImageCleanupBridge } from '@/components/storage/image-cleanup-bridge'
 import { FloatingHub } from '@/components/floating/floating-hub'
+import { DesktopFocusTray } from '@/components/timer/desktop-focus-tray'
 import { StickyNotesProvider } from '@/components/sticky-notes/sticky-notes-provider'
 import { BRAND_TITLE } from '@/lib/brand'
 import { Toaster } from 'sonner'
@@ -149,6 +150,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                   三分頁共用）。掛在 FocusTimerProvider 裡面，計時器分頁
                   才吃得到同一份計時狀態。 */}
               <FloatingHub />
+              {/* Mac 桌面版選單列的「專注 24:59」；其他環境不渲染任何東西。 */}
+              <DesktopFocusTray />
               {/* 便條紙玻璃層：跟懸浮工作站一樣掛在 router outlet 之上，
                   換頁／切分頁都不卸載，所有頁面共用同一組便條。開關與
                   「新增便條紙」動作在 UserMenu 裡（頂部使用者選單）。 */}
