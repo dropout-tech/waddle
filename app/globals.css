@@ -885,6 +885,14 @@ html[data-desktop-titlebar='mac'] body::before {
 html[data-desktop-titlebar='mac'] :is(.h-screen, .h-\[100dvh\]:not([class~="sm:h-[90dvh]"])) {
   height: calc(100dvh - var(--desktop-titlebar-height));
 }
+/* ModalShell's centered card is h-[100dvh] on phones but md:h-auto on desktop.
+   The rule above is unlayered, so it beats Tailwind's md:h-auto and stretched
+   every desktop modal to ~90% of the window (丟給企鵝 showed a big blank gap). */
+@media (min-width: 48rem) {
+  html[data-desktop-titlebar='mac'] .h-\[100dvh\].md\:h-auto {
+    height: auto;
+  }
+}
 html[data-desktop-titlebar='mac'] .min-h-screen {
   min-height: calc(100dvh - var(--desktop-titlebar-height));
 }
