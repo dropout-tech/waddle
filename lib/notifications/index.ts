@@ -17,6 +17,7 @@ import {
 } from '@/lib/meeting-reminder'
 import { meetingReminderSuppressed, resolveQuietHours, type QuietHoursSetting } from '@/lib/quiet-hours'
 import { MAX_FOLLOWUP_REMINDERS, MAX_MEETING_REMINDERS } from '@/lib/notifications/budget'
+import type { PlanningReminderConfig } from '@/lib/notifications/daily-planning'
 import { t } from '@/lib/i18n'
 import { petVoiced } from '@/lib/pet/voice'
 
@@ -25,7 +26,8 @@ import { petVoiced } from '@/lib/pet/voice'
 
 // Notification id ranges are disjoint by construction so kinds can never overwrite
 // each other: meeting reminders 1..2_000_000_000, follow-up reminders
-// 2_000_000_001..2_099_999_999, widget reminders 2_100_000_001 and up (lib/widgets/reminders.ts).
+// 2_000_000_001..2_099_999_999, widget reminders 2_100_000_001..2_100_000_013 (focus + the water chain,
+// lib/widgets/reminders.ts), and the one repeating 每日規劃提醒 at 2_110_000_001 (all below 2^31).
 const MEETING_ID_SPAN = 2_000_000_000
 const FOLLOWUP_ID_BASE = 2_000_000_001
 const FOLLOWUP_ID_SPAN = 99_999_999
@@ -49,9 +51,15 @@ const trim = (s: string, max: number) => s.replace(/\s+/g, ' ').trim().slice(0, 
 // Meeting and follow-up reminders carry the title of someone's private meeting, and a
 // scheduled iOS notification outlives the session that created it. Each one is tagged
 // with the account that scheduled it (`extra.accountId`); setReminderAccount() — called
-// by the auth provider on every sign-in / sign-out / account switch — cancels the ones
-// that are not the current account's. Nothing is scheduled while nobody is signed in.
-let reminderAccount: string | null = null
+// by the auth provider — cancels the ones that are not the current account's.
+//
+// Three states, because "no session yet" is not "signed out":
+//   undefined  not known (cold start before the session resolves, or it could not be read —
+//              e.g. an expired token and no network). Everything pending is LEFT ALONE and
+//              nothing is rescheduled, so a flaky start never wipes the user's reminders.
+//   null       explicitly signed out (SIGNED_OUT). Their notifications are cancelled.
+//   string     the signed-in user id. Other accounts' notifications are cancelled.
+let reminderAccount: string | null | undefined = undefined
 
 /** The plugin calls below run one job at a time, so a cancel can never interleave with a half-done schedule. */
 let queue: Promise<unknown> = Promise.resolve()
@@ -61,7 +69,7 @@ function serial<T>(job: () => Promise<T>): Promise<T> {
   return run
 }
 
-const ACCOUNT_SCOPED_KINDS = ['meeting', 'followup']
+const ACCOUNT_SCOPED_KINDS = ['meeting', 'followup', 'planning']
 
 /** Which pending notifications must go when the signed-in account becomes `account` (null = nobody). Pure. */
 export function foreignReminderIds(
@@ -74,19 +82,39 @@ export function foreignReminderIds(
 }
 
 /**
- * Tell the reminder layer who is signed in (null = nobody). Cancels every pending meeting /
- * follow-up notification that does not belong to that account — untagged ones left by an older
- * app version included. Safe to call on every auth event. Native only (web schedules nothing ahead).
+ * Tell the reminder layer who is signed in (a user id), or that they explicitly signed out (null).
+ * Cancels every pending meeting / follow-up notification that does not belong to that account — untagged
+ * ones left by an older app version included. Repeating the same answer (every TOKEN_REFRESHED) costs nothing.
+ * Native only (web schedules nothing ahead). Never call it with null just because a session is missing:
+ * use onAuthEventForReminders().
  */
 export async function setReminderAccount(account: string | null): Promise<void> {
+  const unchanged = reminderAccount === account
   reminderAccount = account
-  if (!isNative()) return
+  if (!isNative() || unchanged) return
   await serial(async () => {
     const { LocalNotifications } = await import('@capacitor/local-notifications')
     const pending = await LocalNotifications.getPending()
     const ids = foreignReminderIds(pending.notifications, account)
     if (ids.length > 0) await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) })
   })
+}
+
+/** What an auth event means for the reminder owner. Pure. */
+export function reminderAccountChange(event: string, userId: string | null | undefined): { kind: 'set'; id: string } | { kind: 'clear' } | { kind: 'keep' } {
+  // Any event that carries a session names the user — TOKEN_REFRESHED included, which is how a cold
+  // start that began offline (no session yet) recovers once the token is refreshed.
+  if (userId) return { kind: 'set', id: userId }
+  // No session is only "signed out" when Supabase says so; INITIAL_SESSION with null can simply mean
+  // an expired token that could not be refreshed yet.
+  return event === 'SIGNED_OUT' ? { kind: 'clear' } : { kind: 'keep' }
+}
+
+/** The auth provider's single entry point: apply reminderAccountChange() for an auth event (or the initial getSession). */
+export async function onAuthEventForReminders(event: string, userId: string | null | undefined): Promise<void> {
+  const change = reminderAccountChange(event, userId)
+  if (change.kind === 'set') await setReminderAccount(change.id)
+  else if (change.kind === 'clear') await setReminderAccount(null)
 }
 
 /**
@@ -150,8 +178,10 @@ async function scheduleMeetingReminders(
   meetings: MeetingTaskRef[],
   lead: ReminderLead,
   quiet: QuietHoursSetting,
-  account: string | null,
+  account: string | null | undefined,
 ): Promise<void> {
+  // Who is signed in is not known yet: neither cancel nor reschedule — what is pending stays as it is.
+  if (account === undefined) return
   const { LocalNotifications } = await import('@capacitor/local-notifications')
 
   // Reconcile only meetings; focus and water reminders have their own namespace.
@@ -231,7 +261,8 @@ export function syncFollowupReminders(items: FollowupReminderItem[]): Promise<vo
   return serial(() => scheduleFollowupReminders(items, account))
 }
 
-async function scheduleFollowupReminders(items: FollowupReminderItem[], account: string | null): Promise<void> {
+async function scheduleFollowupReminders(items: FollowupReminderItem[], account: string | null | undefined): Promise<void> {
+  if (account === undefined) return // see scheduleMeetingReminders
   const { LocalNotifications } = await import('@capacitor/local-notifications')
 
   const pending = await LocalNotifications.getPending()
@@ -276,5 +307,57 @@ async function scheduleFollowupReminders(items: FollowupReminderItem[], account:
         extra: { kind: 'followup', route: '/meetings/', accountId: account },
       }
     }),
+  })
+}
+
+// ── 每日規劃提醒 ──
+
+/** The single repeating 每日規劃提醒 (one repeating request = one slot of the iOS budget). */
+export const PLANNING_REMINDER_ID = 2_110_000_001
+/** Opened by tapping the notification: the home screen. */
+const PLANNING_ROUTE = '/'
+
+/**
+ * Keep the iOS 每日規劃提醒 in step with the saved settings: when `cfg.enabled`, ONE notification that repeats
+ * every day at `cfg.time` (local wall-clock time, so travel and DST follow the phone); otherwise none. The text is
+ * fixed and carries no numbers (a pre-scheduled number would be stale by the time it fires). It is the user's own
+ * alarm, so 勿擾時段 is not consulted. Replaces whatever 'planning' notification is pending, so changing the time
+ * or switching it off takes effect at once; signing out removes it (kind 'planning' is account-scoped, see
+ * setReminderAccount). Needs the existing notification permission; never asks for it. No-op on web.
+ */
+export function syncDailyPlanningReminder(cfg: Pick<PlanningReminderConfig, 'enabled' | 'hour' | 'minute'>): Promise<void> {
+  if (!isNative()) return Promise.resolve()
+  const account = reminderAccount
+  return serial(() => scheduleDailyPlanning(cfg, account))
+}
+
+async function scheduleDailyPlanning(
+  cfg: Pick<PlanningReminderConfig, 'enabled' | 'hour' | 'minute'>,
+  account: string | null | undefined,
+): Promise<void> {
+  if (account === undefined) return // see scheduleMeetingReminders
+  const { LocalNotifications } = await import('@capacitor/local-notifications')
+
+  const pending = await LocalNotifications.getPending()
+  const mine = pending.notifications.filter((n) => n.extra?.kind === 'planning')
+  if (mine.length > 0) await LocalNotifications.cancel({ notifications: mine.map((n) => ({ id: n.id })) })
+
+  if (!account || !cfg.enabled) return
+  const perm = await LocalNotifications.checkPermissions()
+  if (perm.display !== 'granted') return
+
+  await ensureTapHandler()
+  if (reminderAccount !== account) return
+  const text = petVoiced({ title: t('Huddle · 每日規劃'), body: t('花一分鐘看看待辦，把接下來的時間排一排。') })
+  await LocalNotifications.schedule({
+    notifications: [
+      {
+        id: PLANNING_REMINDER_ID,
+        title: text.title,
+        body: text.body,
+        schedule: { on: { hour: cfg.hour, minute: cfg.minute }, repeats: true },
+        extra: { kind: 'planning', route: PLANNING_ROUTE, accountId: account },
+      },
+    ],
   })
 }

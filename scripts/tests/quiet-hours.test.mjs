@@ -91,11 +91,37 @@ test('deferOutOfQuietWindow: lands on 08:00 wall-clock across a DST change (Amer
   }
 })
 
-test('waterQuietWindow: built-in night when quiet hours are off, the user\'s window when on', () => {
-  assert.deepEqual(Q.waterQuietWindow(Q.resolveQuietHours(undefined)), NIGHT)
-  assert.deepEqual(Q.waterQuietWindow(Q.resolveQuietHours({ enabled: false, startTime: '13:00', endTime: '14:00' })), NIGHT, 'a saved-but-disabled window is ignored')
-  assert.deepEqual(Q.waterQuietWindow(Q.resolveQuietHours({ enabled: true, startTime: '23:30', endTime: '07:00' })), { startMin: 23 * 60 + 30, endMin: 7 * 60 })
-  assert.deepEqual(Q.waterQuietWindow(Q.resolveQuietHours({ enabled: true, startTime: '12:00', endTime: '12:00' })), NIGHT, 'empty user window → night protection stays')
+test('waterQuietWindows: the built-in night is ALWAYS there; the user\'s 勿擾時段 is added on top (union)', () => {
+  const lunch = { startMin: 12 * 60, endMin: 13 * 60 }
+  assert.deepEqual(Q.waterQuietWindows(Q.resolveQuietHours(undefined)), [NIGHT])
+  assert.deepEqual(Q.waterQuietWindows(Q.resolveQuietHours({ enabled: false, startTime: '13:00', endTime: '14:00' })), [NIGHT], 'a saved-but-disabled window is ignored')
+  assert.deepEqual(Q.waterQuietWindows(Q.resolveQuietHours({ enabled: true, startTime: '12:00', endTime: '13:00' })), [NIGHT, lunch], 'lunch quiet hours must NOT switch the night off')
+  assert.deepEqual(Q.waterQuietWindows(Q.resolveQuietHours({ enabled: true, startTime: '12:00', endTime: '12:00' })), [NIGHT], 'empty user window → night only')
+})
+
+test('waterQuietWindows: if night + the user\'s window would cover the whole day, the user\'s window alone applies', () => {
+  const sleepsByDay = Q.resolveQuietHours({ enabled: true, startTime: '08:00', endTime: '22:00' }) // night shift worker
+  assert.deepEqual(Q.waterQuietWindows(sleepsByDay), [{ startMin: 8 * 60, endMin: 22 * 60 }])
+  const w = Q.waterQuietWindows(sleepsByDay)
+  assert.equal(Q.isInQuietWindow(at(3, 0), w), false, 'awake at 03:00 → can be reminded')
+  assert.equal(Q.isInQuietWindow(at(12, 0), w), true)
+  // 08:00–21:00 + night still leaves 21:00–22:00 free, so the union is kept.
+  const almost = Q.resolveQuietHours({ enabled: true, startTime: '08:00', endTime: '21:00' })
+  assert.equal(Q.waterQuietWindows(almost).length, 2)
+})
+
+test('several windows: isInQuietWindow is a union, deferOutOfQuietWindow chains touching windows', () => {
+  const night = NIGHT
+  const morning = { startMin: 7 * 60, endMin: 9 * 60 }
+  const both = [night, morning]
+  assert.equal(Q.isInQuietWindow(at(8, 30, 0, 11), both), true, '08:30 is outside the night but inside the user window')
+  assert.equal(Q.isInQuietWindow(at(9, 0, 0, 11), both), false)
+  assert.equal(hhmm(Q.deferOutOfQuietWindow(at(6, 0, 0, 11), both)), '10/11 09:00', '06:00 → night ends 08:00, which is inside 07–09 → 09:00')
+  assert.equal(hhmm(Q.deferOutOfQuietWindow(at(23, 0), both)), '10/11 09:00', '23:00 → next morning 09:00')
+  const lunch = [night, { startMin: 12 * 60, endMin: 13 * 60 }]
+  assert.equal(hhmm(Q.deferOutOfQuietWindow(at(12, 15), lunch)), '10/10 13:00')
+  assert.equal(Q.deferOutOfQuietWindow(at(15, 0), lunch), at(15, 0))
+  assert.equal(Q.deferOutOfQuietWindow(at(15, 0), []), at(15, 0))
 })
 
 test('meetingReminderSuppressed: meetings are urgent — only dropped when 允許緊急通知 is off AND the fire time is inside the window', () => {

@@ -4,7 +4,7 @@ import { notifyDesktop } from '@/lib/desktop-notifications'
 import { t } from '@/lib/i18n'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFocusTimer } from '@/components/timer/focus-timer-provider'
-import { resolveQuietHours, waterQuietWindow } from '@/lib/quiet-hours'
+import { resolveQuietHours, waterQuietWindows } from '@/lib/quiet-hours'
 import {
   DEFAULT_WATER_INTERVAL,
   SNOOZE_MINUTES,
@@ -69,8 +69,8 @@ export function useWaterReminder({
 
   // The poll below lives in an effect keyed only on `paused`; it reads these
   // through refs so a timer or settings change is seen without re-arming it.
-  const quietWindow = waterQuietWindow(resolveQuietHours(quietHours))
-  const quietRef = useRef(quietWindow)
+  const quiet = resolveQuietHours(quietHours)
+  const quietRef = useRef(waterQuietWindows(quiet))
   const focusRunningRef = useRef(focusRunning)
   const focusEndedAtRef = useRef(0)
   /** The due time (ms) that was held back by focus — the flag only applies to that very reminder. */
@@ -80,10 +80,10 @@ export function useWaterReminder({
   const checkRef = useRef<() => void>(() => {})
 
   // Declared before the poll effect so a settings change is already in the ref when it runs.
-  const { startMin, endMin } = quietWindow
+  const { enabled: quietOn, startTime: quietStart, endTime: quietEnd, allowUrgent: quietUrgent } = quiet
   useEffect(() => {
-    quietRef.current = { startMin, endMin }
-  }, [startMin, endMin])
+    quietRef.current = waterQuietWindows({ enabled: quietOn, startTime: quietStart, endTime: quietEnd, allowUrgent: quietUrgent })
+  }, [quietOn, quietStart, quietEnd, quietUrgent])
 
   useEffect(() => {
     if (typeof window === 'undefined') return

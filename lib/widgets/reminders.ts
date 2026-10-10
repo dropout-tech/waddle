@@ -5,7 +5,7 @@ import { getLang, t } from '@/lib/i18n'
 import { petVoiced } from '@/lib/pet/voice'
 import { MAX_WATER_REMINDERS } from '@/lib/notifications/budget'
 import { isFocusRunning, planWaterReminders } from '@/lib/water-reminder'
-import { resolveQuietHours, waterQuietWindow } from '@/lib/quiet-hours'
+import { resolveQuietHours, waterQuietWindows } from '@/lib/quiet-hours'
 const KIND='huddle-widget'
 // Ids: one focus-end note, then a chain of MAX_WATER_REMINDERS water notes right after it (all < 2^31).
 const FOCUS_ID=2100000001, WATER_ID=2100000002
@@ -40,10 +40,13 @@ export async function syncWidgetReminders(snapshot:WidgetSnapshot,opts:WidgetRem
   // Said by the adopted penguin (wording only, lib/pet/voice.ts); a rename re-schedules.
   const voice=snapshot.pet?.adopted?snapshot.pet.name:null
   // 喝水提醒 is a chain, not one note: spaced by the interval, never inside the quiet window
-  // (the user's 勿擾時段, else 22:00–08:00), held back until a running focus stretch ends.
+  // (22:00–08:00 plus the user's 勿擾時段), held back until a running focus stretch ends.
   // The hour in the key tops the chain up while the app stays open (notes that already fired drop out of it).
-  const waterQuiet=waterQuietWindow(resolveQuietHours(opts.quietHours)), waterEvery=opts.waterIntervalMin??60
-  const key=JSON.stringify([snapshot.accountId,enabled,snapshot.focus.state,snapshot.focus.phase,snapshot.focus.endAt,snapshot.water.enabled,snapshot.water.nextAt,waterEvery,waterQuiet.startMin,waterQuiet.endMin,Math.floor(Date.now()/3_600_000),voice,getLang()])
+  const waterQuiet=waterQuietWindows(resolveQuietHours(opts.quietHours)), waterEvery=opts.waterIntervalMin??60
+  // A running stopwatch has no end time to hold the chain until, so while it counts the chain is not scheduled at
+  // all (anything already pending is cancelled); pausing or stopping changes state → re-planned within a second.
+  const stopwatchRunning=snapshot.focus.mode==='stopwatch'&&isFocusRunning(snapshot.focus.state,snapshot.focus.phase)
+  const key=JSON.stringify([snapshot.accountId,enabled,snapshot.focus.mode,snapshot.focus.state,snapshot.focus.phase,snapshot.focus.endAt,snapshot.water.enabled,snapshot.water.nextAt,waterEvery,JSON.stringify(waterQuiet),Math.floor(Date.now()/3_600_000),voice,getLang()])
   if(signature===key)return
   sequence=sequence.catch(()=>{}).then(async()=>{
     if(snapshot.accountId!==currentAccount)return
@@ -54,7 +57,7 @@ export async function syncWidgetReminders(snapshot:WidgetSnapshot,opts:WidgetRem
     // A pomodoro break counts down too — its end is 休息結束, never 專注完成.
     const onBreak=snapshot.focus.phase==='break'
     if(snapshot.focus.state==='running'&&snapshot.focus.endAt&&snapshot.focus.endAt>Date.now()) items.push({id:FOCUS_ID,...petVoiced(onBreak?{title:t('Huddle · 休息結束'),body:t('休息時間到了，準備好就開始下一段專注吧。')}:{title:t('Huddle · 專注完成'),body:t('辛苦了，留下這次專注的收穫。')},voice),schedule:{at:new Date(snapshot.focus.endAt)},extra:{kind:KIND,accountId:snapshot.accountId,destination:onBreak?'focus':'focus-note'}})
-    if(snapshot.water.enabled) {
+    if(snapshot.water.enabled&&!stopwatchRunning) {
       const focusEndsAt=isFocusRunning(snapshot.focus.state,snapshot.focus.phase)?snapshot.focus.endAt:null
       planWaterReminders({nextDueAt:snapshot.water.nextAt,now:Date.now(),intervalMin:waterEvery,quiet:waterQuiet,max:MAX_WATER_REMINDERS,focusEndsAt}).forEach((at,i)=>items.push({id:WATER_ID+i,...petVoiced({title:t('Huddle · 喝水提醒'),body:t('喝口水，休息一下。')},voice),schedule:{at:new Date(at)},extra:{kind:KIND,accountId:snapshot.accountId,destination:'water'}}))
     }

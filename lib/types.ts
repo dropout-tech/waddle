@@ -418,7 +418,7 @@ export interface NotificationSettings {
   workspaceOverrides: Record<string, {
     enabled: boolean // Enable/disable notifications for this workspace
     overduePriority: 'high' | 'medium' | 'low' | 'default'
-    muteUntil?: string // ISO date string to temporarily mute
+    muteUntil?: string // ISO date string to temporarily mute (no UI, not applied anywhere yet)
   }>
   
   // Quiet hours
@@ -433,7 +433,7 @@ export interface NotificationSettings {
   appearance: {
     showBadgeCount: boolean
     groupByType: boolean // Group notifications by type
-    autoCollapse: boolean // Auto-collapse read notifications
+    autoCollapse: boolean // Auto-collapse read notifications (no UI, not applied anywhere yet)
     maxVisible: number // Max notifications to show at once (default: 10)
   }
 }

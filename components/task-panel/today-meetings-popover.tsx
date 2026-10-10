@@ -13,7 +13,8 @@ import { useI18n } from '@/lib/i18n/react'
 
 interface TodayMeetingsPopoverProps {
   workspaces: Workspace[]
-  onSelectTask?: (task: Task) => void
+  /** Same contract as the calendar's: the series master plus the date of the occurrence that was clicked. */
+  onSelectTask?: (task: Task, occurrenceDate?: string) => void
 }
 
 /**
@@ -195,11 +196,14 @@ export function TodayMeetingsPopover({ workspaces, onSelectTask }: TodayMeetings
                             // The on-task-select callback expects a full Task;
                             // we only have MeetingTaskRef. Hand off the id —
                             // the parent looks it up against the live workspaces.
+                            // A repeating meeting is one master task: pass the date of THIS
+                            // occurrence too (as clicking it on the calendar does), or the detail
+                            // opens on the series' first day and 「只有這次／這次及以後」 has no date to act on.
                             if (onSelectTask) {
                               const t = findTaskById(workspaces, m.id)
                               if (t) {
                                 setOpen(false)
-                                onSelectTask(t)
+                                onSelectTask(t, m.scheduledDate)
                               }
                             }
                           }}

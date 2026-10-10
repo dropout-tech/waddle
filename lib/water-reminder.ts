@@ -7,7 +7,7 @@
 // the tab doesn't reset the clock — otherwise a quick tab-restart would
 // silently push the next nudge a full hour out.
 
-import { deferOutOfQuietWindow, isInQuietWindow, type QuietWindow } from '@/lib/quiet-hours'
+import { deferOutOfQuietWindow, isInQuietWindow, type QuietSpec } from '@/lib/quiet-hours'
 
 export const WATER_REMINDER_ENABLED_KEY = 'waddle.waterReminder.enabled'
 export const WATER_REMINDER_INTERVAL_KEY = 'waddle.waterReminder.intervalMinutes'
@@ -125,7 +125,7 @@ export type WaterVerdict = 'wait' | 'quiet' | 'focus' | 'show'
  *  show  — due and free to appear
  * Quiet outranks focus so nothing is shown (or marked "after focus") at night.
  */
-export function waterReminderVerdict(p: { now: number; due: number; quiet: QuietWindow; focusBusy: boolean }): WaterVerdict {
+export function waterReminderVerdict(p: { now: number; due: number; quiet: QuietSpec; focusBusy: boolean }): WaterVerdict {
   if (p.now < p.due) return 'wait'
   if (isInQuietWindow(p.now, p.quiet)) return 'quiet'
   if (p.focusBusy) return 'focus'
@@ -133,7 +133,7 @@ export function waterReminderVerdict(p: { now: number; due: number; quiet: Quiet
 }
 
 /** The stored due time, pushed to the end of the quiet window when it lands inside one (what widgets display). */
-export function effectiveWaterDueAt(due: number | null, quiet: QuietWindow): number | null {
+export function effectiveWaterDueAt(due: number | null, quiet: QuietSpec): number | null {
   return due === null ? null : deferOutOfQuietWindow(due, quiet)
 }
 
@@ -150,7 +150,7 @@ export function planWaterReminders(p: {
   nextDueAt: number | null
   now: number
   intervalMin: number
-  quiet: QuietWindow | null
+  quiet: QuietSpec
   max: number
   focusEndsAt?: number | null
 }): number[] {

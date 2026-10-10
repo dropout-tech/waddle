@@ -75,16 +75,19 @@ export const dict: Record<string, string> = {
   '今天排了 {n} 件事': "{n} {n|thing|things} on today's schedule",
   '還有時間，可以慢慢做——一件一件來就好。': "There's still time — take it one thing at a time.",
   '{n} 個任務這幾天到期': '{n} {n|task is|tasks are} due in the next few days',
-  '接下來三天會陸續到期，先挑個順手的時段放上日曆，到時候就從容多了。':
-    "These are due over the next three days — put them on the calendar at a time that works, and you'll feel more at ease when they arrive.",
-  '{n} 個任務靜靜躺了兩週': '{n} {n|task has|tasks have} been quietly sitting for two weeks',
+  '接下來 {days} 天會陸續到期，先挑個順手的時段放上日曆，到時候就從容多了。':
+    "These are due over the next {days} days — put them on the calendar at a time that works, and you'll feel more at ease when they arrive.",
+  '{n} 個任務明天到期': '{n} {n|task is|tasks are} due tomorrow',
+  '先看看要不要準備什麼，順手把它們放上日曆吧。': "See if anything needs preparing, and put them on the calendar while you're at it.",
+  '{n} 個任務靜靜躺了 {days} 天以上': '{n} {n|task has|tasks have} been quietly sitting for {days}+ days',
   '還想做的話，挑個日子放上日曆；不想做了也沒關係，歸檔就好。':
     "If you still want to do them, pick a day and put them on the calendar. If not, that's fine too — just archive them.",
   '急件好像有點多': 'Quite a few urgent items',
-  '有 {n} 個任務都標了高優先。全部都急，反而不知道從哪開始——挑出真正的前幾名，其他的緩緩也可以。':
-    "{n} tasks are marked high priority. When everything's urgent, it's hard to know where to start — pick out the real top few and let the rest wait.",
+  '有 {n} 個任務的優先等級在 {level}/10 以上。全部都急，反而不知道從哪開始——挑出真正的前幾名，其他的緩緩也可以。':
+    "{n} tasks are rated {level}/10 or higher. When everything's urgent, it's hard to know where to start — pick out the real top few and let the rest wait.",
   '調整優先順序': 'Adjust priorities',
   '多數任務未排程': 'Most tasks are unscheduled',
+  '不少任務還沒排程': 'Quite a few tasks are unscheduled',
   '有 {n} 個任務還沒排到日曆上。挑個時段放進去，比較容易把事情做完。':
     "{n} tasks haven't made it onto the calendar yet. Pick a time slot for them — it's easier to get things done that way.",
   '排程任務': 'Schedule tasks',
@@ -94,6 +97,20 @@ export const dict: Record<string, string> = {
   '一切順利！': 'All clear!',
   '目前沒有需要注意的事項': 'Nothing needs your attention right now',
   '還有 {n} 個任務...': '{n} more tasks...',
+  // notification-center.tsx — daily cards, group headers, long lists
+  '今天的摘要': "Today's summary",
+  '{n} 件逾期': '{n} overdue',
+  '今天 {n} 件到期': '{n} due today',
+  '明天 {n} 件到期': '{n} due tomorrow',
+  '每日規劃時間到了': 'Time for your daily planning',
+  '花一分鐘看看待辦，把接下來的時間排一排。': 'Take a minute to look over your to-dos and plan the time ahead.',
+  'Huddle · 每日規劃': 'Huddle · Daily planning',
+  '已逾期': 'Overdue',
+  '快到期': 'Due soon',
+  '閒置中': 'Sitting idle',
+  '小建議': 'Suggestions',
+  '顯示其餘 {n} 則': 'Show the other {n}',
+  '只顯示前 {n} 則': 'Show only the first {n}',
   '全部歸檔': 'Archive all',
 
   // onboarding-tour.tsx — chrome

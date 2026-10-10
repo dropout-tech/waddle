@@ -14,6 +14,7 @@ import type {
 import { normalizeFocusSettings } from '@/lib/focus'
 import { prefsFromRow } from '@/lib/settings-auto'
 import { normalizePet } from '@/lib/pet/types'
+import { mergeNotificationSettings } from '@/lib/notifications/settings'
 
 type TaskRow = Database['public']['Tables']['tasks']['Row']
 type TaskInsert = Database['public']['Tables']['tasks']['Insert']
@@ -244,8 +245,10 @@ export function rowToSettings(
   const { pet: rawPet, ...notificationsBlob } = (row.notifications && typeof row.notifications === 'object' && !Array.isArray(row.notifications))
     ? (row.notifications as Record<string, unknown>)
     : {}
+  // Deep merge: a blob that lacks one section (e.g. quietHours, written before it existed) used to be taken
+  // as-is and crashed the 提醒設定 tab; now every missing section / field comes from the defaults.
   const notifications = Object.keys(notificationsBlob).length > 0
-    ? (notificationsBlob as unknown as UserSettings['notifications'])
+    ? mergeNotificationSettings(notificationsBlob)
     : fallbackSettings.notifications
 
   return {

@@ -8,6 +8,8 @@
 // Run: node --test scripts/tests/native-reminder-budget.test.mjs
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { pathToFileURL } from 'node:url'
+import { resolve } from 'node:path'
 import { installFakeLocalNotifications, installFakeLocalStorage, installReminderTestEnv } from './reminder-test-env.mjs'
 
 installReminderTestEnv()
@@ -36,10 +38,12 @@ const kind = (k) => plugin.pending.filter((n) => n.extra?.kind === k)
 const reset = () => { plugin.pending = []; plugin.permission = 'granted' }
 
 test('budget constants: every kind\'s share adds up to at most the iOS limit of 64', () => {
-  const total = Budget.MAX_MEETING_REMINDERS + Budget.MAX_FOLLOWUP_REMINDERS + Budget.MAX_FOCUS_REMINDERS + Budget.MAX_WATER_REMINDERS
+  const total =
+    Budget.MAX_MEETING_REMINDERS + Budget.MAX_FOLLOWUP_REMINDERS + Budget.MAX_FOCUS_REMINDERS + Budget.MAX_WATER_REMINDERS + Budget.MAX_DAILY_PLANNING_REMINDERS
   assert.equal(Budget.IOS_PENDING_NOTIFICATION_LIMIT, 64)
-  assert.ok(total <= 64, `total ${total}`)
-  assert.equal(Budget.MAX_MEETING_REMINDERS, 40, 'meetings were 48; lowered to make room for the water chain')
+  assert.ok(total <= 63, `total ${total} (one slot is kept spare)`)
+  assert.equal(Budget.MAX_DAILY_PLANNING_REMINDERS, 1, 'a slot is reserved for the upcoming 每日規劃提醒')
+  assert.equal(Budget.MAX_MEETING_REMINDERS, 39, 'meetings were 48; lowered for the water chain, and once more for the reserved daily-planning slot')
 })
 
 test('weekly meeting: one notification per upcoming occurrence, each with its own stable id (old code: one, for the first week only)', async () => {
@@ -90,6 +94,8 @@ test('all kinds together stay within 64 pending notifications, even with far mor
   assert.equal(kind('followup').length, Budget.MAX_FOLLOWUP_REMINDERS)
   assert.equal(kind('huddle-widget').length, Budget.MAX_FOCUS_REMINDERS + Budget.MAX_WATER_REMINDERS)
   assert.ok(plugin.pending.length <= 64, `pending ${plugin.pending.length}`)
+  // Everything that exists today plus the reserved daily-planning slot still fits.
+  assert.ok(plugin.pending.length + Budget.MAX_DAILY_PLANNING_REMINDERS <= 64, 'room left for the repeating daily-planning reminder')
   assert.equal(new Set(plugin.pending.map((n) => n.id)).size, plugin.pending.length, 'no two notifications share an id (a clash would silently drop one)')
   // The soonest 40 meetings are the ones kept.
   const fireTimes = kind('meeting').map((n) => new Date(n.schedule.at).getTime())
@@ -124,7 +130,7 @@ test('water: a chain of reminders (old code: one), spaced by the interval, none 
   assert.equal(new Date(water[0].schedule.at).getTime(), Quiet.deferOutOfQuietWindow(now + 100 * MIN, Quiet.WATER_NIGHT_WINDOW))
 })
 
-test('water: the user\'s 勿擾時段 replaces the built-in night; switching the reminder off clears the chain', async () => {
+test('water: the user\'s 勿擾時段 is added to the built-in night; switching the reminder off clears the chain', async () => {
   reset()
   await N.setReminderAccount('acct-D')
   await Widgets.clearWidgetReminders('acct-D')
@@ -139,8 +145,13 @@ test('water: the user\'s 勿擾時段 replaces the built-in night; switching the
   await Widgets.syncWidgetReminders(snap(true, now + 5 * MIN), { waterIntervalMin: 30, quietHours })
   const water = kind('huddle-widget').filter((n) => n.extra.destination === 'water')
   assert.equal(water.length, Budget.MAX_WATER_REMINDERS)
-  const mine = Quiet.waterQuietWindow(Quiet.resolveQuietHours(quietHours))
-  for (const n of water) assert.equal(Quiet.isInQuietWindow(new Date(n.schedule.at).getTime(), mine), false)
+  const mine = Quiet.waterQuietWindows(Quiet.resolveQuietHours(quietHours)) // night ∪ 12:00–18:00
+  for (const n of water) {
+    const t = new Date(n.schedule.at).getTime()
+    assert.equal(Quiet.isInQuietWindow(t, mine), false)
+    const h = new Date(t).getHours()
+    assert.ok(h >= 8 && h < 12 || h >= 18 && h < 22, `${new Date(t)} must be in neither the custom window nor the night`)
+  }
   await Widgets.syncWidgetReminders(snap(false, now + 5 * MIN), { waterIntervalMin: 30, quietHours })
   assert.equal(kind('huddle-widget').filter((n) => n.extra.destination === 'water').length, 0)
 })
@@ -168,6 +179,49 @@ test('water: a running pomodoro holds the background reminder until just after i
   }, { waterIntervalMin: 60 })
   const during = Math.min(...kind('huddle-widget').filter((n) => n.extra.destination === 'water').map((n) => new Date(n.schedule.at).getTime()))
   assert.equal(during, Quiet.deferOutOfQuietWindow(now + 10 * MIN, Quiet.WATER_NIGHT_WINDOW))
+})
+
+test('stopwatch focus has no end time: while it runs the water chain is NOT scheduled (and a pending one is cancelled); pause / stop brings it back', async () => {
+  reset()
+  await N.setReminderAccount('acct-S')
+  await Widgets.clearWidgetReminders('acct-S')
+  await Widgets.enableWidgetReminders('acct-S')
+  const now = Date.now()
+  const water = () => kind('huddle-widget').filter((n) => n.extra.destination === 'water').length
+  const snap = (focus) => ({
+    accountId: 'acct-S', pet: null,
+    water: { enabled: true, nextAt: now + 30 * MIN, count: 0 },
+    focus: { mode: 'stopwatch', state: 'idle', phase: undefined, title: 'x', seconds: 0, note: '', endAt: null, ...focus },
+  })
+  const sync = (focus) => Widgets.syncWidgetReminders(snap(focus), { waterIntervalMin: 60 })
+
+  await sync({})
+  assert.equal(water(), Budget.MAX_WATER_REMINDERS, 'idle: chain scheduled')
+  await sync({ state: 'running', phase: 'work', seconds: 12 })
+  assert.equal(water(), 0, 'stopwatch running: the chain is cancelled and not re-added (old code kept all 12)')
+  assert.equal(kind('huddle-widget').length, 0, 'a stopwatch has no end-of-focus note either')
+  await sync({ state: 'running', phase: 'work', seconds: 300 })
+  assert.equal(water(), 0, 'still running a few minutes later (the ticking seconds are not part of the signature)')
+  await sync({ state: 'paused', phase: 'work', seconds: 300 })
+  assert.equal(water(), Budget.MAX_WATER_REMINDERS, 'paused: chain back')
+  await sync({ state: 'running', phase: 'work', seconds: 301 })
+  assert.equal(water(), 0, 'resumed: cancelled again')
+  await sync({ state: 'idle' })
+  assert.equal(water(), Budget.MAX_WATER_REMINDERS, 'stopped: chain back')
+})
+
+test('pomodoro focus is unchanged: the chain waits until the focus ends instead of disappearing', async () => {
+  reset()
+  await N.setReminderAccount('acct-P')
+  await Widgets.clearWidgetReminders('acct-P')
+  await Widgets.enableWidgetReminders('acct-P')
+  const now = Date.now()
+  await Widgets.syncWidgetReminders({
+    accountId: 'acct-P', pet: null,
+    water: { enabled: true, nextAt: now + 10 * MIN, count: 0 },
+    focus: { mode: 'pomodoro', state: 'running', phase: 'work', title: 'x', seconds: 1500, note: '', endAt: now + 25 * MIN },
+  }, { waterIntervalMin: 60 })
+  assert.equal(kind('huddle-widget').filter((n) => n.extra.destination === 'water').length, Budget.MAX_WATER_REMINDERS)
 })
 
 test('meetings are "urgent": 勿擾時段 drops a meeting reminder only with 允許緊急通知 off', async () => {
@@ -247,4 +301,78 @@ test('leftovers from an older app version (no account tag) are cleaned up at the
   ]
   await N.setReminderAccount('acct-I')
   assert.deepEqual(plugin.pending.map((n) => n.id), [2100000001])
+})
+
+// ── a flaky cold start must not silence (or wipe) the reminders ──────────────────────────
+
+/** A fresh copy of lib/notifications as a newly launched app would have it (module state unset). */
+let coldCounter = 0
+const coldStart = () => import(pathToFileURL(resolve('lib/notifications/index.ts')).href + `?cold-start-${++coldCounter}`)
+
+test('reminderAccountChange: any event with a session names the owner; only SIGNED_OUT clears; a missing session elsewhere means "not known"', () => {
+  assert.deepEqual(N.reminderAccountChange('TOKEN_REFRESHED', 'u1'), { kind: 'set', id: 'u1' })
+  assert.deepEqual(N.reminderAccountChange('INITIAL_SESSION', 'u1'), { kind: 'set', id: 'u1' })
+  assert.deepEqual(N.reminderAccountChange('SIGNED_IN', 'u2'), { kind: 'set', id: 'u2' })
+  assert.deepEqual(N.reminderAccountChange('SIGNED_OUT', null), { kind: 'clear' })
+  assert.deepEqual(N.reminderAccountChange('SIGNED_OUT', undefined), { kind: 'clear' })
+  assert.deepEqual(N.reminderAccountChange('INITIAL_SESSION', null), { kind: 'keep' }, 'expired token + no network looks like this')
+  assert.deepEqual(N.reminderAccountChange('INITIAL_SESSION', undefined), { kind: 'keep' })
+  assert.deepEqual(N.reminderAccountChange('TOKEN_REFRESHED', null), { kind: 'keep' })
+})
+
+test('offline cold start (no session) then TOKEN_REFRESHED: reminders survive the start, are rebuilt on refresh (old code: wiped, then never rescheduled)', async () => {
+  reset()
+  const meetings = () => Meetings.collectMeetings(tree(oneOff('standup', 1), oneOff('review', 2)))
+  const followups = [{ task_id: 'f1', title: '報價', due_date: dayStr(2), is_completed: false, counterpart: '甲公司' }]
+
+  // Yesterday: the app was running, signed in, reminders scheduled.
+  const day1 = await coldStart()
+  await day1.onAuthEventForReminders('INITIAL_SESSION', 'acct-cold')
+  await day1.syncMeetingReminders(meetings(), 10)
+  await day1.syncFollowupReminders(followups)
+  const scheduledIds = plugin.pending.map((n) => n.id).sort((a, b) => a - b)
+  assert.equal(scheduledIds.length, 3)
+
+  // Today: cold start, the token is expired and there is no network → getSession() = null.
+  const day2 = await coldStart()
+  await day2.onAuthEventForReminders('INITIAL_SESSION', null)
+  // The hooks run anyway (user is null) and call the sync functions.
+  await day2.syncMeetingReminders([], 10)
+  await day2.syncFollowupReminders([])
+  assert.deepEqual(plugin.pending.map((n) => n.id).sort((a, b) => a - b), scheduledIds, 'nothing cancelled, nothing overwritten while the account is unknown')
+
+  // Network is back: the only event is TOKEN_REFRESHED, with the session.
+  await day2.onAuthEventForReminders('TOKEN_REFRESHED', 'acct-cold')
+  await day2.syncMeetingReminders(meetings(), 10)
+  await day2.syncFollowupReminders(followups)
+  assert.deepEqual(plugin.pending.map((n) => n.id).sort((a, b) => a - b), scheduledIds, 'rescheduled for the same owner')
+  assert.ok(plugin.pending.every((n) => n.extra.accountId === 'acct-cold'))
+
+  // A later sync with new data works (the account is not stuck empty).
+  await day2.syncMeetingReminders(Meetings.collectMeetings(tree(oneOff('standup', 1))), 10)
+  assert.equal(kind('meeting').length, 1)
+})
+
+test('only an explicit SIGNED_OUT removes the notifications; a different user id after a refresh removes the old owner\'s', async () => {
+  reset()
+  const app = await coldStart()
+  await app.onAuthEventForReminders('INITIAL_SESSION', 'acct-X')
+  await app.syncMeetingReminders(Meetings.collectMeetings(tree(oneOff('x1', 1))), 10)
+  assert.equal(kind('meeting').length, 1)
+
+  await app.onAuthEventForReminders('INITIAL_SESSION', undefined) // a missing session is not a sign-out
+  await app.onAuthEventForReminders('TOKEN_REFRESHED', 'acct-X') // same owner: nothing happens
+  assert.equal(kind('meeting').length, 1)
+
+  await app.onAuthEventForReminders('SIGNED_OUT', null)
+  assert.equal(kind('meeting').length, 0)
+
+  // Account switch without an explicit sign-out in between (the session simply belongs to someone else now).
+  const other = await coldStart()
+  await other.onAuthEventForReminders('SIGNED_IN', 'acct-Y1')
+  await other.syncMeetingReminders(Meetings.collectMeetings(tree(oneOff('y1', 1))), 10)
+  await other.onAuthEventForReminders('TOKEN_REFRESHED', 'acct-Y2')
+  assert.equal(kind('meeting').length, 0, 'Y1\'s meeting titles are gone once the session belongs to Y2')
+  await other.syncMeetingReminders(Meetings.collectMeetings(tree(oneOff('y2', 1))), 10)
+  assert.deepEqual(kind('meeting').map((n) => n.extra.accountId), ['acct-Y2'])
 })

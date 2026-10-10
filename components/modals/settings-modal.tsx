@@ -49,6 +49,7 @@ import {
 } from '@/lib/meeting-reminder'
 import { DesktopNotificationSettings } from './desktop-notification-settings'
 import { requestReminderPermission, syncMeetingReminders } from '@/lib/notifications'
+import { mergeNotificationSettings } from '@/lib/notifications/settings'
 import { DeleteAccountButton } from '@/components/auth/delete-account-button'
 import { PICKER_COLOR_HEXES, WORKSPACE_COLORS } from '@/lib/palette'
 import { resolveDefaultWorkspace, sortWorkspacesForDisplay } from '@/lib/default-category'
@@ -122,55 +123,6 @@ const WebSubscriptionTab =
     : null
 
 const PRESET_COLORS = PICKER_COLOR_HEXES
-
-// Default notification settings
-const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
-  enabled: true,
-  overdue: {
-    enabled: true,
-    criticalDays: 7,
-    showInBell: true,
-    dailyDigest: true,
-  },
-  dueSoon: {
-    enabled: true,
-    daysBeforeDue: 3,
-    notifyOnDueDay: true,
-    notifyDayBefore: true,
-  },
-  staleTasks: {
-    enabled: true,
-    daysUntilStale: 14,
-    includeUnscheduled: true,
-    includeNoDueDate: true,
-  },
-  highPriority: {
-    enabled: true,
-    minUrgency: 8,
-    alertWhenTooMany: true,
-    maxBeforeAlert: 5,
-  },
-  scheduling: {
-    enabled: true,
-    remindUnscheduled: true,
-    percentThreshold: 50,
-    dailyPlanningReminder: false,
-    planningReminderTime: '08:00',
-  },
-  workspaceOverrides: {},
-  quietHours: {
-    enabled: false,
-    startTime: '22:00',
-    endTime: '08:00',
-    allowUrgent: true,
-  },
-  appearance: {
-    showBadgeCount: true,
-    groupByType: true,
-    autoCollapse: false,
-    maxVisible: 10,
-  },
-}
 
 export function SettingsModal({
   isOpen,
@@ -891,7 +843,7 @@ export function SettingsModal({
               <label className="flex items-center justify-between cursor-pointer">
                 <div className="flex-1 pr-4">
                   <div className="text-sm text-foreground">{t('喝水提醒')}</div>
-                  <div className="text-xs text-muted-foreground">{t('每隔一段時間，Huddle 會跳出來提醒你補水（晚上 10 點到早上 8 點不打擾，可用「勿擾時段」調整）')}</div>
+                  <div className="text-xs text-muted-foreground">{t('每隔一段時間，Huddle 會跳出來提醒你補水（晚上 10 點到早上 8 點一律不打擾，「勿擾時段」可以再加上其他不想被打擾的時間）')}</div>
                 </div>
                 <input
                   type="checkbox"
@@ -1418,7 +1370,9 @@ function NotificationsSettingsTab({
   onUpdate: (notifications: NotificationSettings) => void
 }) {
   const { t } = useI18n()
-  const notifications = settings.notifications || DEFAULT_NOTIFICATION_SETTINGS
+  // Tolerant read: a saved blob missing a section (older rows have no quietHours, say) is filled in from the
+  // defaults instead of crashing this tab on `notifications.quietHours.enabled`.
+  const notifications = mergeNotificationSettings(settings.notifications)
 
   const updateField = <K extends keyof NotificationSettings>(
     key: K,
@@ -1757,10 +1711,18 @@ function NotificationsSettingsTab({
                 <input
                   type="checkbox"
                   checked={notifications.scheduling.dailyPlanningReminder}
-                  onChange={(e) => updateNestedField('scheduling', 'dailyPlanningReminder', e.target.checked)}
+                  onChange={(e) => {
+                    updateNestedField('scheduling', 'dailyPlanningReminder', e.target.checked)
+                    // iOS only schedules a notification the user has allowed, and the permission prompt has to come
+                    // from a tap — this one. (Best effort: the bell card works without it.)
+                    if (e.target.checked && isNative()) void requestReminderPermission().catch(() => {})
+                  }}
                   className="w-4 h-4 rounded border-border accent-primary"
                 />
               </label>
+              <p className="-mt-1 text-xs text-muted-foreground">
+                {t('這是你自己指定的提醒時間，不受勿擾時段影響。手機會準時推播；網頁與 Mac 要開著 Huddle 才會提醒。')}
+              </p>
 
               {notifications.scheduling.dailyPlanningReminder && (
                 <div className="flex items-center justify-between">
@@ -1785,7 +1747,7 @@ function NotificationsSettingsTab({
               <h3 className="text-sm font-semibold text-foreground">{t('勿擾時段')}</h3>
             </div>
             <p className="pl-6 -mt-1 text-xs text-muted-foreground">
-              {t('勿擾時段內不會跳出喝水提醒。「允許緊急通知」開著時，會議提醒照常提醒；關掉的話，這段時間的會議提醒也會跳過。')}
+              {t('勿擾時段內不會跳出喝水提醒（晚上 10 點到早上 8 點本來就不會）。「允許緊急通知」開著時，會議提醒照常提醒；關掉的話，這段時間的會議提醒也會跳過。')}
             </p>
 
             <div className="space-y-3 pl-6">

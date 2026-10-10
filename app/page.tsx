@@ -22,6 +22,7 @@ import { useRecurringCompleteConfirm } from '@/components/task-panel/use-recurri
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { useMeetingReminders } from '@/hooks/use-meeting-reminders'
 import { useFollowupReminders } from '@/hooks/use-followup-reminders'
+import { useDailyPlanningReminder } from '@/hooks/use-daily-planning-reminder'
 import { useWaterReminder } from '@/hooks/use-water-reminder'
 import { useUndoShortcuts } from '@/hooks/use-undo-shortcuts'
 import { WaterReminder } from '@/components/water/water-reminder'
@@ -122,6 +123,10 @@ function HuddlePage() {
   useMeetingReminders(workspaces, petVoice, settings.notifications?.quietHours)
   // Native: "今天要追" notifications for meeting follow-ups (hooks/use-followup-reminders.ts).
   useFollowupReminders(workspaces)
+  // 每日規劃提醒 (設定 › 提醒設定): iOS repeating notification / web + Mac once-a-day while open.
+  // `ready`: until the real settings are loaded they are the defaults (switch off) — acting on those would cancel the
+  // phone's pending reminder on every offline / slow cold start.
+  useDailyPlanningReminder(settings.notifications, petVoice, !isLoading)
 
   // Global ⌘Z / ⌘⇧Z — see hooks/use-undo-shortcuts.ts for the input-field guard.
   useUndoShortcuts()

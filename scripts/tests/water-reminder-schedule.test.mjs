@@ -45,11 +45,13 @@ test('verdict: quiet outranks focus — nothing is shown (or flagged "after focu
   assert.equal(W.waterReminderVerdict({ now: at(23, 0), due: at(22, 30), quiet: NIGHT, focusBusy: true }), 'quiet')
 })
 
-test('verdict follows the user\'s own 勿擾時段 instead of the built-in night', () => {
-  const lunch = Q.waterQuietWindow(Q.resolveQuietHours({ enabled: true, startTime: '12:00', endTime: '13:00' }))
+test('verdict: the user\'s 勿擾時段 is added to the built-in night, it does not replace it', () => {
+  const lunch = Q.waterQuietWindows(Q.resolveQuietHours({ enabled: true, startTime: '12:00', endTime: '13:00' }))
   assert.equal(W.waterReminderVerdict({ now: at(12, 30), due: at(12, 0), quiet: lunch, focusBusy: false }), 'quiet')
   assert.equal(W.waterReminderVerdict({ now: at(13, 0), due: at(12, 0), quiet: lunch, focusBusy: false }), 'show')
-  assert.equal(W.waterReminderVerdict({ now: at(23, 0), due: at(22, 0), quiet: lunch, focusBusy: false }), 'show', 'night is no longer special once the user picked a window')
+  assert.equal(W.waterReminderVerdict({ now: at(23, 0), due: at(22, 0), quiet: lunch, focusBusy: false }), 'quiet', 'lunch window set → 23:00 is STILL quiet')
+  assert.equal(W.waterReminderVerdict({ now: at(3, 0, 0, 11), due: at(22, 0), quiet: lunch, focusBusy: false }), 'quiet', '03:00 too')
+  assert.equal(W.waterReminderVerdict({ now: at(8, 0, 0, 11), due: at(22, 0), quiet: lunch, focusBusy: false }), 'show', 'and it shows once the night is over')
 })
 
 test('isFocusRunning: only a counting work phase (pomodoro or stopwatch)', () => {
@@ -111,6 +113,27 @@ test('chain: never more than `max`, strictly increasing, never inside the window
           if (i > 0) assert.ok(plan[i] > plan[i - 1], 'strictly increasing')
         }
       }
+    }
+  }
+})
+
+test('chain: lunch 勿擾時段 + a 20:00 schedule → NOTHING between 00:00 and 08:00, nothing at lunch (night protection survives a custom window)', () => {
+  const quiet = Q.waterQuietWindows(Q.resolveQuietHours({ enabled: true, startTime: '12:00', endTime: '13:00' }))
+  const plan = W.planWaterReminders({ nextDueAt: at(20, 0), now: at(19, 30), intervalMin: 60, quiet, max: 12 })
+  assert.deepEqual(plan.map(label), [
+    '10日20:00', '10日21:00',
+    '11日08:00', '11日09:00', '11日10:00', '11日11:00', '11日13:00', '11日14:00', '11日15:00', '11日16:00', '11日17:00', '11日18:00',
+  ])
+  for (const t of plan) {
+    const h = new Date(t).getHours()
+    assert.ok(h >= 8 && h < 22, `${label(t)} is inside 22:00–08:00`)
+    assert.ok(h !== 12, `${label(t)} falls in the lunch window`)
+  }
+  // Every start minute, both windows: never inside either.
+  for (let minute = 0; minute < 24 * 60; minute += 11) {
+    const nextDueAt = at(Math.floor(minute / 60), minute % 60)
+    for (const t of W.planWaterReminders({ nextDueAt, now: nextDueAt - 5 * MIN, intervalMin: 30, quiet, max: 12 })) {
+      assert.equal(Q.isInQuietWindow(t, quiet), false, label(t))
     }
   }
 })

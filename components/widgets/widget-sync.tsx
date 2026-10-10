@@ -11,7 +11,7 @@ import { HuddleWidgets, publishWidgets, widgetAccount } from '@/lib/widgets/nati
 import { rowToTask } from '@/lib/supabase/mappers'
 import { createClient } from '@/lib/supabase/client'
 import { effectiveWaterDueAt, getWaterNextDueAt, getWaterReminderEnabled, getWaterReminderInterval, recordWaterFromWidget } from '@/lib/water-reminder'
-import { resolveQuietHours, waterQuietWindow } from '@/lib/quiet-hours'
+import { resolveQuietHours, waterQuietWindows } from '@/lib/quiet-hours'
 import { applyWidgetActions, withWatchFocus, WATCH_FOCUS_TTL_MS } from '@/lib/widgets/actions'
 import { widgetPet } from '@/lib/widgets/pet'
 import { getIglooSnapshot } from '@/lib/igloo/store'
@@ -88,7 +88,7 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null,weekStar
         }
         snapshot.boards = snapshot.boards.map(b => ({...b, thumbnail: boardThumbnail(x.boards[b.id] ?? [])}))
         // nextAt = when the next reminder can actually appear: a due time inside the quiet window waits for its end.
-        snapshot.water={enabled:getWaterReminderEnabled(),nextAt:effectiveWaterDueAt(getWaterNextDueAt(),waterQuietWindow(resolveQuietHours(latest.current.quietHours))),count:0}
+        snapshot.water={enabled:getWaterReminderEnabled(),nextAt:effectiveWaterDueAt(getWaterNextDueAt(),waterQuietWindows(resolveQuietHours(latest.current.quietHours))),count:0}
         // 「我的 Huddle」: look + ready-rendered lines; the widget picks the bubble itself.
         const overdue=x.workspaces.filter(w=>!w.isArchived).flatMap(w=>w.categories.filter(c=>!c.isArchived).flatMap(c=>c.tasks)).filter(t=>isTaskOverdue(t,snapshot.today)).length
         snapshot.pet=widgetPet(x.pet,{overdue,lang:getLang(),day:snapshot.today,igloo:getIglooSnapshot()})
@@ -127,6 +127,9 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null,weekStar
     const next={...last,generatedAt:new Date().toISOString(),focus:focusOf(timer,notes??notebook.notes,last.today)}
     lastSnap.current=next
     void publishWidgets(next).catch(()=>{})
+    // Background reminders follow the timer at once too, without waiting for (or depending on) the network-bound
+    // full sync: a running stopwatch cancels the water chain, pause / stop brings it back.
+    void syncWidgetReminders(next,{waterIntervalMin:getWaterReminderInterval(),quietHours:latest.current.quietHours}).catch(()=>{})
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only focus transitions, not every tick
   },[timer.state,timer.session])
   return null

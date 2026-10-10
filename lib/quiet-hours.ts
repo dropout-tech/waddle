@@ -9,8 +9,12 @@
 //  - A window is half-open [start, end) in LOCAL time and may cross midnight
 //    (22:00 → 08:00). start === end is an EMPTY window (never quiet) — a
 //    mistyped identical pair must not silence a reminder around the clock.
-//  - Water reminders are never "urgent": they obey the user's window when quiet
-//    hours are on, and a built-in night window (22:00–08:00) when they are off.
+//  - Water reminders are never "urgent": they stay quiet during the built-in night
+//    (22:00–08:00, always) AND during the user's own 勿擾時段 when that is on — the
+//    UNION of the two. (A 12:00–13:00 lunch window must not switch the night off.)
+//    If that union would leave no free minute at all (e.g. the user sleeps 08:00–22:00),
+//    the built-in night is dropped and the user's window alone applies, so the
+//    reminder can still appear when they are awake.
 //  - Meeting reminders ARE urgent: with allowUrgent (the default) they ignore
 //    quiet hours; with allowUrgent off a reminder whose fire time falls inside
 //    the window is dropped (not delayed — a delayed meeting reminder would
@@ -36,8 +40,13 @@ export const DEFAULT_QUIET_HOURS: QuietHoursSetting = {
   allowUrgent: true,
 }
 
-/** Water reminders stay quiet at night even when the user never turned 勿擾時段 on. */
+/** Water reminders stay quiet at night whatever the user's 勿擾時段 says. */
 export const WATER_NIGHT_WINDOW: QuietWindow = { startMin: 22 * 60, endMin: 8 * 60 }
+
+/** One window, several (their union), or none. */
+export type QuietSpec = QuietWindow | readonly QuietWindow[] | null
+
+const windowsOf = (w: QuietSpec): readonly QuietWindow[] => (w === null ? [] : 'startMin' in w ? [w] : w)
 
 /** "HH:mm" → minutes after midnight, or null when it is not a valid 24h clock time. */
 export function parseClockMinutes(value: unknown): number | null {
@@ -74,33 +83,61 @@ export function quietWindowOf(q: QuietHoursSetting): QuietWindow | null {
   return { startMin, endMin }
 }
 
-/** Window the water reminder obeys: the user's when set, otherwise the built-in night. */
-export function waterQuietWindow(q: QuietHoursSetting): QuietWindow {
-  return quietWindowOf(q) ?? WATER_NIGHT_WINDOW
+function inWindowAt(minute: number, w: QuietWindow): boolean {
+  if (w.startMin === w.endMin) return false
+  return w.startMin < w.endMin ? minute >= w.startMin && minute < w.endMin : minute >= w.startMin || minute < w.endMin
+}
+
+/** Do these windows together cover every minute of the day? */
+function coversWholeDay(ws: readonly QuietWindow[]): boolean {
+  for (let m = 0; m < 24 * 60; m++) if (!ws.some((w) => inWindowAt(m, w))) return false
+  return true
+}
+
+/**
+ * Windows the water reminder obeys: the built-in night, plus the user's own 勿擾時段 when it is on
+ * (union — see the header). Falls back to the user's window alone if the union would cover the whole day.
+ */
+export function waterQuietWindows(q: QuietHoursSetting): readonly QuietWindow[] {
+  const mine = quietWindowOf(q)
+  if (!mine) return [WATER_NIGHT_WINDOW]
+  const both = [WATER_NIGHT_WINDOW, mine]
+  return coversWholeDay(both) ? [mine] : both
 }
 
 function minuteOfDay(d: Date): number {
   return d.getHours() * 60 + d.getMinutes()
 }
 
-/** Is local time `ms` inside the window? [start, end), crossing midnight when end < start. */
-export function isInQuietWindow(ms: number, w: QuietWindow | null): boolean {
-  if (!w || w.startMin === w.endMin) return false
-  const m = minuteOfDay(new Date(ms))
-  return w.startMin < w.endMin ? m >= w.startMin && m < w.endMin : m >= w.startMin || m < w.endMin
+/** Is local time `ms` inside the window (or any of them)? [start, end), crossing midnight when end < start. */
+export function isInQuietWindow(ms: number, w: QuietSpec): boolean {
+  const minute = minuteOfDay(new Date(ms))
+  return windowsOf(w).some((x) => inWindowAt(minute, x))
 }
 
-/**
- * `ms` itself when it is outside the window; otherwise the moment the window
- * ends (the next `endMin` on the local clock). Uses calendar arithmetic, not
- * "+N hours", so month/year rollover and DST days land on the right wall-clock time.
- */
-export function deferOutOfQuietWindow(ms: number, w: QuietWindow | null): number {
-  if (!w || !isInQuietWindow(ms, w)) return ms
+/** The moment the window containing `ms` ends: the next `endMin` on the local clock. Calendar arithmetic, not "+N hours". */
+function endOfWindow(ms: number, w: QuietWindow): number {
   const d = new Date(ms)
   // Crossing window and we are before midnight → it ends tomorrow; otherwise today.
   const dayOffset = w.startMin > w.endMin && minuteOfDay(d) >= w.startMin ? 1 : 0
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + dayOffset, Math.floor(w.endMin / 60), w.endMin % 60, 0, 0).getTime()
+}
+
+/**
+ * `ms` itself when it is outside every window; otherwise the first moment after `ms` that is outside all of
+ * them (month/year rollover and DST days land on the right wall-clock time). Windows that touch or overlap
+ * chain: 06:00 with a 22–08 night and a 07–09 user window resolves to 09:00.
+ */
+export function deferOutOfQuietWindow(ms: number, w: QuietSpec): number {
+  const list = windowsOf(w)
+  let t = ms
+  for (let hop = 0; hop < 8; hop++) {
+    const minute = minuteOfDay(new Date(t))
+    const hit = list.find((x) => inWindowAt(minute, x))
+    if (!hit) return t
+    t = endOfWindow(t, hit)
+  }
+  return t
 }
 
 /**
