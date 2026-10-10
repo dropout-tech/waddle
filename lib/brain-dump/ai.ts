@@ -3,15 +3,19 @@
 //
 // The server (supabase/functions/brain-dump) asks gpt-4.1-mini to split the
 // text into to-dos and resolves every due date in code (meeting-import's
-// resolveDue: the model only classifies "明天 / 週五 / 10/9"). Free members
-// get 20 AI splits per day, Pro members no daily cap.
+// resolveDue: the model only classifies "明天 / 週五 / 10/9"). It also reports
+// a time of day / length when the member said one (checked and converted to
+// 24h server-side); where that lands on the calendar is decided on the device
+// (schedule.ts) — the member's calendar is never sent. Free members get 20 AI
+// splits per day, Pro members no daily cap.
 //
 // Whenever AI is not available — function not deployed yet, offline, daily
 // limit reached, AI paused, any error or a 30 s timeout — the panel still gets
 // a result from parseBrainDump() and is told why, so the member is never stuck.
 
 import { createClient } from '@/lib/supabase/client'
-import { dateKey, dayTokenToDate, guessMinutes, parseBrainDump } from './parse'
+import { fromServerItems, localInboxDrafts, type ServerItem } from './drafts'
+import { dateKey } from './parse'
 import type { BrainDumpDraft, BrainDumpLang } from './types'
 
 export interface BrainDumpParseInput {
@@ -87,32 +91,7 @@ export async function fetchBrainDumpQuota(now = new Date()): Promise<BrainDumpQu
 }
 
 interface SplitResponse extends Omit<BrainDumpQuota, 'enabled'> {
-  items: { title: string; dueDate: string; note: string }[]
-}
-
-/** Server items → drafts (dates already resolved by the server). */
-export function fromServerItems(items: SplitResponse['items']): BrainDumpDraft[] {
-  return items
-    .filter((x) => typeof x?.title === 'string' && x.title.trim())
-    .map((x, i) => ({
-      id: `bd-${i}`,
-      source: x.title,
-      title: x.title.trim(),
-      estimatedMinutes: guessMinutes(x.title),
-      minutesGuessed: true,
-      day: 'today',
-      ...(/^\d{4}-\d{2}-\d{2}$/.test(x.dueDate ?? '') ? { dueDate: x.dueDate } : {}),
-      ...(x.note?.trim() ? { note: x.note.trim() } : {}),
-    }))
-}
-
-/** Local drafts for the inbox: 「明天回信」 has no deadline word but clearly
- *  belongs to tomorrow — that day becomes its due date. */
-export function localInboxDrafts(text: string, now: Date, lang: BrainDumpLang): BrainDumpDraft[] {
-  return parseBrainDump(text, now, lang).map((d) => {
-    if (d.dueDate || d.day === 'today') return d
-    return { ...d, dueDate: dayTokenToDate(d.day, now) }
-  })
+  items: ServerItem[]
 }
 
 /** AI first; any failure → local rules, with the reason. */
