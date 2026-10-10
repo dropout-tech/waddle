@@ -28,6 +28,8 @@ const results = []
 const ok = (name, detail = '') => { results.push(['PASS', name]); console.log(`PASS  ${name}${detail ? ' — ' + detail : ''}`) }
 const skip = (name, why) => { results.push(['SKIP', name]); console.log(`SKIP  ${name} — ${why}`) }
 const writes = []
+/** Every intercepted write with its body, so a scenario can assert WHAT the app tried to save. */
+const writeLog = []
 
 // ── time ────────────────────────────────────────────────────────────────────────────────
 const today = new Date()
@@ -61,6 +63,9 @@ async function installBackend(context, { quiet, meetings }) {
     const isRead = method === 'GET' || method === 'HEAD' || (method === 'POST' && READ_RPCS.test(url.pathname))
     if (!isRead) {
       writes.push(`${method} ${url.pathname}`)
+      let body = null
+      try { body = req.postDataJSON() } catch { body = req.postData() }
+      writeLog.push({ method, path: url.pathname, body })
       return route.fulfill({ status: 204, body: '' })
     }
     if (method === 'GET' && url.pathname.endsWith('/user_settings')) {
@@ -226,12 +231,28 @@ async function openApp({ time, quiet, meetings, water = true, lead = null, viewp
 }
 
 {
+  // Lunch-only 勿擾時段: the built-in night must stay on (union), and the lunch hour is quiet too.
   const quiet = { enabled: true, startTime: '12:00', endTime: '13:00', allowUrgent: true }
   const a = await openApp({ time: at(3, 0), quiet })
   await a.makeDue()
-  await a.page.waitForTimeout(400)
-  assert.equal(await a.modalOpen(), true, 'W4: 03:00 is outside the user window')
-  ok('W4 the user\'s own window REPLACES the built-in night (12:00–13:00 set → 03:00 is allowed)')
+  await a.tick(); await a.tick()
+  assert.equal(await a.modalOpen(), false, 'W4: 03:00 stays quiet even though the user only set a lunch window')
+  assert.deepEqual(await a.notes(), [])
+  ok('W4 勿擾時段 = lunch only (12:00–13:00) → 03:00 is STILL quiet (night protection is not replaced)')
+  await a.tickTo(at(8, 0, 20))
+  assert.equal(await a.modalOpen(), true, 'W4b: opens once the night is over')
+  ok('W4b ...and opens right after 08:00')
+  await a.close()
+}
+{
+  const quiet = { enabled: true, startTime: '12:00', endTime: '13:00', allowUrgent: true }
+  const a = await openApp({ time: at(12, 20), quiet })
+  await a.makeDue()
+  await a.tick()
+  assert.equal(await a.modalOpen(), false, 'W4c: lunch hour is quiet')
+  await a.tickTo(at(13, 0, 20))
+  assert.equal(await a.modalOpen(), true, 'W4d: lunch over → opens')
+  ok('W4c/d the lunch hour itself is quiet, and the popup opens at 13:00')
   await a.close()
 }
 
@@ -329,6 +350,34 @@ for (const [allowUrgent, expected] of [[true, 1], [false, 0]]) {
   const n = (await a.notes()).filter((x) => x.title.includes('早班交接')).length
   assert.equal(n, expected, `M2: allowUrgent=${allowUrgent} → ${expected} notification(s), got ${n}`)
   ok(`M2 勿擾時段 on, 允許緊急通知=${allowUrgent ? '開' : '關'} → meeting reminder ${expected ? 'still arrives' : 'skipped'}`)
+  await a.close()
+}
+
+// ───────────── 今日會議 popover → the clicked occurrence, not the series' first day ─────────────
+{
+  const todayStr = iso(today)
+  const before = writeLog.length
+  const a = await openApp({ time: at(9, 30), meetings: MEETINGS, water: false })
+  await a.page.locator('button[aria-haspopup="dialog"][title*="今天有"]').first().click()
+  // Scoped to the popover: the same title also appears on the calendar and in the task list.
+  await a.page.locator('[role=dialog][aria-label="今日會議"] button', { hasText: '每日站會' }).first().click()
+  const titleInput = a.page.locator('input[value="每日站會"]').first()
+  await titleInput.waitFor({ timeout: 10000 })
+  await titleInput.fill('每日站會（只改今天）')
+  await a.page.getByRole('button', { name: '儲存', exact: true }).click()
+  await a.page.getByText('只改這一天').first().click()
+  await a.page.getByRole('button', { name: '套用', exact: true }).click()
+  await a.page.waitForTimeout(800)
+  const mine = writeLog.slice(before)
+  const insert = mine.find((w) => w.method === 'POST' && w.path.endsWith('/rest/v1/tasks'))
+  assert.ok(insert, `T1: 「只改這一天」 wrote a detached occurrence (writes: ${JSON.stringify(mine.map((w) => w.method + ' ' + w.path))})`)
+  const row = Array.isArray(insert.body) ? insert.body[0] : insert.body
+  assert.equal(row.scheduled_date, todayStr, 'T1: the detached copy sits on TODAY, not on the series\' first day')
+  assert.equal(row.title, '每日站會（只改今天）')
+  const exdates = mine.find((w) => w.method === 'PATCH' && w.path.endsWith('/rest/v1/tasks') && w.body && w.body.exdates)
+  assert.ok(exdates && exdates.body.exdates.includes(todayStr), `T1: the series skips exactly today (${JSON.stringify(exdates?.body)})`)
+  ok('T1 今日會議 → click a repeating meeting → 「只改這一天」 saves THIS day (copy dated today + series exdates [today])', `${row.scheduled_date}`)
+  assert.deepEqual(a.errors, [])
   await a.close()
 }
 
