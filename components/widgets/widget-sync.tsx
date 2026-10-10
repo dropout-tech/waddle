@@ -127,6 +127,9 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null,weekStar
     const next={...last,generatedAt:new Date().toISOString(),focus:focusOf(timer,notes??notebook.notes,last.today)}
     lastSnap.current=next
     void publishWidgets(next).catch(()=>{})
+    // Background reminders follow the timer at once too, without waiting for (or depending on) the network-bound
+    // full sync: a running stopwatch cancels the water chain, pause / stop brings it back.
+    void syncWidgetReminders(next,{waterIntervalMin:getWaterReminderInterval(),quietHours:latest.current.quietHours}).catch(()=>{})
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only focus transitions, not every tick
   },[timer.state,timer.session])
   return null

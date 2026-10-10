@@ -179,6 +179,49 @@ test('water: a running pomodoro holds the background reminder until just after i
   assert.equal(during, Quiet.deferOutOfQuietWindow(now + 10 * MIN, Quiet.WATER_NIGHT_WINDOW))
 })
 
+test('stopwatch focus has no end time: while it runs the water chain is NOT scheduled (and a pending one is cancelled); pause / stop brings it back', async () => {
+  reset()
+  await N.setReminderAccount('acct-S')
+  await Widgets.clearWidgetReminders('acct-S')
+  await Widgets.enableWidgetReminders('acct-S')
+  const now = Date.now()
+  const water = () => kind('huddle-widget').filter((n) => n.extra.destination === 'water').length
+  const snap = (focus) => ({
+    accountId: 'acct-S', pet: null,
+    water: { enabled: true, nextAt: now + 30 * MIN, count: 0 },
+    focus: { mode: 'stopwatch', state: 'idle', phase: undefined, title: 'x', seconds: 0, note: '', endAt: null, ...focus },
+  })
+  const sync = (focus) => Widgets.syncWidgetReminders(snap(focus), { waterIntervalMin: 60 })
+
+  await sync({})
+  assert.equal(water(), Budget.MAX_WATER_REMINDERS, 'idle: chain scheduled')
+  await sync({ state: 'running', phase: 'work', seconds: 12 })
+  assert.equal(water(), 0, 'stopwatch running: the chain is cancelled and not re-added (old code kept all 12)')
+  assert.equal(kind('huddle-widget').length, 0, 'a stopwatch has no end-of-focus note either')
+  await sync({ state: 'running', phase: 'work', seconds: 300 })
+  assert.equal(water(), 0, 'still running a few minutes later (the ticking seconds are not part of the signature)')
+  await sync({ state: 'paused', phase: 'work', seconds: 300 })
+  assert.equal(water(), Budget.MAX_WATER_REMINDERS, 'paused: chain back')
+  await sync({ state: 'running', phase: 'work', seconds: 301 })
+  assert.equal(water(), 0, 'resumed: cancelled again')
+  await sync({ state: 'idle' })
+  assert.equal(water(), Budget.MAX_WATER_REMINDERS, 'stopped: chain back')
+})
+
+test('pomodoro focus is unchanged: the chain waits until the focus ends instead of disappearing', async () => {
+  reset()
+  await N.setReminderAccount('acct-P')
+  await Widgets.clearWidgetReminders('acct-P')
+  await Widgets.enableWidgetReminders('acct-P')
+  const now = Date.now()
+  await Widgets.syncWidgetReminders({
+    accountId: 'acct-P', pet: null,
+    water: { enabled: true, nextAt: now + 10 * MIN, count: 0 },
+    focus: { mode: 'pomodoro', state: 'running', phase: 'work', title: 'x', seconds: 1500, note: '', endAt: now + 25 * MIN },
+  }, { waterIntervalMin: 60 })
+  assert.equal(kind('huddle-widget').filter((n) => n.extra.destination === 'water').length, Budget.MAX_WATER_REMINDERS)
+})
+
 test('meetings are "urgent": 勿擾時段 drops a meeting reminder only with 允許緊急通知 off', async () => {
   reset()
   await N.setReminderAccount('acct-F')
