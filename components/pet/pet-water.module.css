@@ -1,8 +1,8 @@
 /* 喝水提醒 A「企鵝送水來」— the glass in the penguin's wing, its card, and the 乾杯 moment.
    Transform/opacity only, ease-out, no bounce (DESIGN.md). Phase comes in as data-phase:
      arrive  0–250 nothing · 250–550 glass pops into the wing (the walk itself is the pet's mover)
-     cheers  150–560 raise · 560 clink (sparks + drops) · 950–1600 sip at the beak, water drains ·
-             your glass slides in from the card side and fades in place (no drifting) · 3500 glass gone
+     cheers  150–560 raises the glass to you (a toast — your own glass is the real one you're holding) ·
+             560 sparkle · 950–1600 sips from the side of its beak (eyes stay clear), water drains · 3500 gone
    Everything here sits inside the pet's sprite box, so % = share of the penguin. */
 
 .glass {
@@ -14,8 +14,7 @@
   transform-origin: 50% 85%;
   pointer-events: none;
 }
-.glass svg,
-.yours svg {
+.glass svg {
   display: block;
   width: 100%;
   height: 100%;
@@ -31,24 +30,11 @@
 .glass[data-phase='later'],
 .glass[data-phase='leave'] { animation: fadeOut 300ms ease-out 1100ms both; }
 
-/* your glass: slides in level from the right, clinks, tips once at the same moment, fades where it is */
-.yours {
-  position: absolute;
-  left: 112%;
-  bottom: 26%;
-  width: 52%;
-  height: 64%;
-  opacity: 0;
-  transform-origin: 50% 85%;
-  pointer-events: none;
-  animation: yours 1700ms cubic-bezier(0.22, 1, 0.36, 1) 150ms both;
-}
-.yours .water { animation: drain 650ms ease-in-out 950ms both; }
-
+/* the toast sparkle above the raised rim (sits clear of the 乾杯！ line) */
 .sparks {
   position: absolute;
-  left: 84%;
-  bottom: 76%;
+  left: 66%;
+  bottom: 30%;
   width: 60%;
   height: 60%;
   opacity: 0;
@@ -79,7 +65,7 @@
   animation: pop 240ms ease-out both;
 }
 .card[data-mobile] {
-  left: -16px;
+  left: -44px;
   bottom: 62px;
   width: min(300px, calc(100vw - 96px));
   padding: 12px 12px 12px 14px;
@@ -130,7 +116,7 @@
 .cheer {
   position: absolute;
   z-index: 1;
-  left: calc(100% + 14px);
+  left: calc(100% + 30px); /* right of the sparkle, never on it */
   bottom: 30px;
   width: max-content;
   padding: 8px 14px;
@@ -143,28 +129,22 @@
   pointer-events: none;
   animation: pop 200ms ease-out both, fadeOut 300ms ease-out 1500ms both;
 }
-.cheer[data-mobile] { left: -16px; bottom: 62px; }
+.cheer[data-mobile] { left: 70px; bottom: 0; }
 .cheer b { font-size: 18px; font-weight: 600; letter-spacing: 0.04em; margin-right: 8px; }
 .cheer span { font-size: 13px; color: var(--muted-foreground); }
+.cheer[data-mobile] b,
+.cheer[data-mobile] span { display: block; margin-right: 0; }
 
 @keyframes pop { from { opacity: 0; transform: translateY(4px) scale(0.96); } to { opacity: 1; transform: none; } }
 @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
 @keyframes glassIn { from { opacity: 0; transform: translateY(18%) scale(0.6); } to { opacity: 1; transform: none; } }
 @keyframes raiseSip {
   0% { transform: none; }
-  24% { transform: translate(14%, -46%) rotate(14deg); }
-  47% { transform: translate(14%, -46%) rotate(14deg); }
-  62% { transform: translate(-60%, -62%) rotate(-58deg); }
-  85% { transform: translate(-60%, -62%) rotate(-58deg); }
+  24% { transform: translate(4%, -30%) rotate(10deg) scale(1.1); }
+  47% { transform: translate(4%, -30%) rotate(10deg) scale(1.1); }
+  62% { transform: translate(-22%, -20%) rotate(-25deg); }
+  85% { transform: translate(-22%, -20%) rotate(-25deg); }
   100% { transform: none; }
-}
-@keyframes yours {
-  0% { opacity: 0; transform: translateX(45%); }
-  24% { opacity: 1; transform: translateX(-12%) rotate(-14deg); }
-  47% { opacity: 1; transform: translateX(-12%) rotate(-14deg); }
-  62% { opacity: 1; transform: translateX(-12%) rotate(-30deg); }
-  82% { opacity: 1; transform: translateX(-12%) rotate(-30deg); }
-  100% { opacity: 0; transform: translateX(-12%) rotate(-30deg); }
 }
 @keyframes drain { from { transform: scaleY(1); } to { transform: scaleY(0.12); } }
 @keyframes spark { 0% { opacity: 0; transform: scale(0.5); } 30% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.15); } }
@@ -176,13 +156,10 @@
   /* fade only: no raise / clink / walk — the glass just appears and the card fades */
   .glass[data-phase],
   .glass[data-phase] .water,
-  .yours,
-  .yours .water,
   .sparks,
   .sparks circle {
     animation: none !important;
   }
-  .yours,
   .sparks { display: none; }
   .card { animation: fadeIn 200ms linear both; }
   .cheer { animation: fadeIn 200ms linear both, fadeOut 300ms linear 1200ms both; }

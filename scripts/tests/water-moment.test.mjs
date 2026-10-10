@@ -33,23 +33,33 @@ test('the retry is shorter than every interval the user can pick (it is a nudge,
   assert.equal(M.WATER_DROP_VISIBLE_MS, 60_000)
 })
 
-test('store: readiness and requests notify subscribers only on change', () => {
+test('copy variant: 「剛好休息」 only while a break is really running', () => {
+  assert.equal(M.waterVariant({ onBreak: true, dueAfterFocus: true }), 'break')
+  assert.equal(M.waterVariant({ onBreak: true, dueAfterFocus: false }), 'break', 'due during a break it simply is break time')
+  assert.equal(M.waterVariant({ onBreak: false, dueAfterFocus: true }), 'focusEnded', 'paused / stopped focus is not a break')
+  assert.equal(M.waterVariant({ onBreak: false, dueAfterFocus: false }), 'normal')
+})
+
+test('store: pet state and requests notify subscribers only on change', () => {
   let calls = 0
   const off = M.subscribeWaterMoment(() => { calls++ })
-  M.setPetWaterReady(true)
-  M.setPetWaterReady(true)
-  assert.equal(M.getPetWaterReady(), true)
+  assert.equal(M.getPetWaterState(), 'off', 'no penguin until one says so')
+  M.setPetWaterState('ready')
+  M.setPetWaterState('ready')
+  assert.equal(M.getPetWaterState(), 'ready')
   assert.equal(calls, 1)
-  const req = { id: 1, afterFocus: true, handlers: { drink() {}, later() {}, disable() {} } }
+  M.setPetWaterState('wait')
+  assert.equal(calls, 2)
+  const req = { id: 1, variant: 'break', handlers: { drink() {}, later() {}, disable() {} } }
   M.setWaterPetRequest(req)
   M.setWaterPetRequest(req)
   assert.equal(M.getWaterPetRequest(), req)
-  assert.equal(calls, 2)
+  assert.equal(calls, 3)
   M.setWaterPetRequest(null)
-  M.setPetWaterReady(false)
-  assert.equal(calls, 4)
+  M.setPetWaterState('off')
+  assert.equal(calls, 5)
   off()
-  M.setPetWaterReady(true)
-  assert.equal(calls, 4, 'unsubscribed listeners stay quiet')
-  M.setPetWaterReady(false)
+  M.setPetWaterState('ready')
+  assert.equal(calls, 5, 'unsubscribed listeners stay quiet')
+  M.setPetWaterState('off')
 })

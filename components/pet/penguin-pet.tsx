@@ -18,7 +18,7 @@ import { CELEBRATE_CHANCE, IDLE_DAILY_CAP, IDLE_MINUTES, type PetSettings } from
 import type { Workspace } from '@/lib/types'
 import { PetSprite, type PetPose } from './pet-sprite'
 import { PetWaterCard, PetWaterCheer, PetWaterInHand, type PetWaterPhase } from './pet-water'
-import { getWaterPetRequest, setPetWaterReady, subscribeWaterMoment } from '@/lib/water-moment'
+import { WATER_COVER_SELECTOR, getWaterPetRequest, setPetWaterState, subscribeWaterMoment, type WaterVariant } from '@/lib/water-moment'
 import { hapticTaskComplete } from '@/lib/haptics'
 import { PetAdoptCard } from './pet-adopt-card'
 import styles from './pet.module.css'
@@ -31,7 +31,7 @@ const MEETING_LEAD_MS = 10 * 60 * 1000
 const COMBO_MS = 1300
 const LONG_PRESS_MS = 500
 /** Anything that means "a modal / takeover is up" — the penguin steps aside. */
-const HIDE_SELECTOR = '[role="dialog"]:not([data-pet-ui]):not([data-onboarding-tour]), [data-pet-hide]'
+const HIDE_SELECTOR = WATER_COVER_SELECTOR
 
 const CONTROL_SELECTOR =
   'button, a[href], input, select, textarea, summary, [role="button"], [role="tab"], [role="switch"], [role="menuitem"], [role="checkbox"], [contenteditable="true"]'
@@ -182,7 +182,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   const [pageHidden, setPageHidden] = useState(false)
   const [reduced, setReduced] = useState(false)
   // 喝水提醒 A (lib/water-moment.ts): walking over with a glass → card → 乾杯 / 等等再喝 → home.
-  const [water, setWater] = useState<{ id: number; phase: PetWaterPhase; afterFocus: boolean } | null>(null)
+  const [water, setWater] = useState<{ id: number; phase: PetWaterPhase; variant: WaterVariant } | null>(null)
   const [waterAway, setWaterAway] = useState(false) // standing at the delivery spot (not at home)
   const [happy, setHappy] = useState(false)
   const [muted, setMuted] = useState(() => isPetMuted())
@@ -243,11 +243,12 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
     const id = window.setInterval(() => setMuted(isPetMuted()), 5000)
     return () => window.clearInterval(id)
   }, [])
-  const waterReady = shown && !pageHidden && !yielding && !muted
+  // off: nothing to send for a while → the drop. wait: just covered (a dialog, a background tab) → A waits.
+  const waterState = muted || hidden || yielding ? 'off' : domHidden || pageHidden ? 'wait' : 'ready'
   useEffect(() => {
-    setPetWaterReady(waterReady)
-  }, [waterReady])
-  useEffect(() => () => setPetWaterReady(false), [])
+    setPetWaterState(waterState)
+  }, [waterState])
+  useEffect(() => () => setPetWaterState('off'), [])
 
   // ── speaking ──────────────────────────────────────────────────────────
   const playAct = useCallback((next: Act, ms: number) => {
@@ -317,6 +318,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   useEffect(() => {
     const cur = waterRef.current
     if (waterReq && waterReq.id !== cur?.id) {
+      if (!shown || pageHidden) return // covered right now — walk over once it can be seen
       clearWaterTimers()
       window.clearTimeout(bubbleTimer.current)
       setBubble(null)
@@ -327,10 +329,10 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
       setHappy(false)
       if (reduced) {
         setWaterAway(true)
-        setWater({ id: waterReq.id, phase: 'card', afterFocus: waterReq.afterFocus })
+        setWater({ id: waterReq.id, phase: 'card', variant: waterReq.variant })
         return
       }
-      setWater({ id: waterReq.id, phase: 'arrive', afterFocus: waterReq.afterFocus })
+      setWater({ id: waterReq.id, phase: 'arrive', variant: waterReq.variant })
       playAct('hop', 450)
       waterAfter(550, () => {
         setWaterAway(true)
@@ -346,7 +348,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
       clearWaterTimers()
       waterGoHome('leave', 0)
     }
-  }, [waterReq, reduced, playAct, waterAfter, clearWaterTimers, waterGoHome])
+  }, [waterReq, shown, pageHidden, reduced, playAct, waterAfter, clearWaterTimers, waterGoHome])
 
   const waterCheers = () => {
     getWaterPetRequest()?.handlers.drink()
@@ -709,9 +711,9 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   const homeStyle: React.CSSProperties = isMobile
     ? { left: 16, bottom: 'calc(61px + env(safe-area-inset-bottom))', width: size, height: size }
     : { left: desktopLeft, bottom: 10, width: size, height: size }
-  // 喝水提醒 A: where it stands with the glass. Desktop: ~100px into the day column. Phone: a step
-  // right, lifted off the tab bar and a bit bigger, so it doesn't look glued to the tab bar.
-  const waterX = waterAway ? (isMobile ? 16 : 104) : 0
+  // 喝水提醒 A: where it stands with the glass — always out of the hour-label gutter (desktop: ~100px
+  // into the day column; phone: past the 55px gutter), lifted off the tab bar and a bit bigger on a phone.
+  const waterX = waterAway ? (isMobile ? 44 : 104) : 0
   const waterY = waterAway && isMobile ? -8 : 0
 
   return (
@@ -782,7 +784,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
         {water?.phase === 'card' && (
           <PetWaterCard
             name={pet.name}
-            afterFocus={water.afterFocus}
+            variant={water.variant}
             isMobile={isMobile}
             onCheers={waterCheers}
             onLater={waterLater}

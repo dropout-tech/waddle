@@ -47,6 +47,8 @@ import { getWaterIgnoredOnce, planAfterIgnore, setWaterIgnoredOnce } from '@/lib
  *     · a focus stretch is running (pomodoro work phase / stopwatch, not paused,
  *       not a break). Shown WATER_AFTER_FOCUS_DELAY_MS after it ends, once the
  *       timer's own farewell is out of the way. Breaks do not hold it back.
+ *   `onBreak` is true when it opened while a pomodoro BREAK is actually running — only then may the
+ *   copy say 「剛好休息」 (a paused or stopped focus stretch is not a break; 驗收 2026-10-10).
  *   `dueAfterFocus` is true when the popup that opened had been held back by
  *   focus, so the copy can say "剛好休息，喝口水".
  */
@@ -63,9 +65,15 @@ export function useWaterReminder({
   const [isOpen, setIsOpen] = useState(false)
   const [enabled, setEnabledState] = useState(false)
   const [dueAfterFocus, setDueAfterFocus] = useState(false)
+  const [onBreak, setOnBreak] = useState(false)
 
   const { state: timerState, session } = useFocusTimer()
   const focusRunning = isFocusRunning(timerState, session?.phase)
+  const breakRunning = timerState === 'running' && session?.phase === 'break'
+  const breakRunningRef = useRef(breakRunning)
+  useEffect(() => {
+    breakRunningRef.current = breakRunning
+  }, [breakRunning])
 
   // The poll below lives in an effect keyed only on `paused`; it reads these
   // through refs so a timer or settings change is seen without re-arming it.
@@ -129,6 +137,7 @@ export function useWaterReminder({
       if (shownForDueRef.current !== due) {
         shownForDueRef.current = due
         setDueAfterFocus(heldByFocusDueRef.current === due)
+        setOnBreak(breakRunningRef.current)
       }
       setIsOpen((prev) => prev || true)
     }
@@ -178,6 +187,7 @@ export function useWaterReminder({
     heldByFocusDueRef.current = null
     shownForDueRef.current = null
     setDueAfterFocus(false)
+    setOnBreak(false)
   }, [])
 
   const dismiss = useCallback(() => {
@@ -214,7 +224,7 @@ export function useWaterReminder({
     setIsOpen(false)
   }, [resetShown])
 
-  return { isOpen: isOpen && !paused, enabled, dueAfterFocus, dismiss, snooze, disable, ignore }
+  return { isOpen: isOpen && !paused, enabled, dueAfterFocus, onBreak, dismiss, snooze, disable, ignore }
 }
 
 export { DEFAULT_WATER_INTERVAL }

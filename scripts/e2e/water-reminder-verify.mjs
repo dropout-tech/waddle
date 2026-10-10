@@ -29,6 +29,8 @@ if (SHOTS) mkdirSync(SHOTS, { recursive: true })
 const ONLY = process.env.E2E_ONLY ? new Set(process.env.E2E_ONLY.split(',')) : null
 const run = (id) => !ONLY || ONLY.has(id)
 const PET = { adopted: true, enabled: true, name: 'Huddle', color: 'ink', accessory: 'scarf', chattiness: 'low', quietDuringFocus: true }
+/** Adopted but switched off: no penguin on screen AND no 「領養你的企鵝」 card in the way → the drop (C). */
+const PET_OFF = { ...PET, enabled: false }
 const CJK = /[\u3400-\u9fff\uff01-\uff5e\u3000-\u303f]/
 const MIN = 60_000
 const READ_RPCS = /\/rpc\/(get_|preview_)/
@@ -75,6 +77,13 @@ async function installBackend(context, { quiet, meetings, pet }) {
       let body = null
       try { body = req.postDataJSON() } catch { body = req.postData() }
       writeLog.push({ method, path: url.pathname, body })
+      // A finished pomodoro saves its time block and reads the row back; answer like PostgREST would
+      // (still local — nothing reaches Supabase) so the app doesn't pop a 「儲存失敗」 toast over the shot.
+      if (method === 'POST' && url.pathname.endsWith('/time_blocks') && body && typeof body === 'object') {
+        const rows = (Array.isArray(body) ? body : [body]).map((r) => ({ id: crypto.randomUUID(), created_at: new Date().toISOString(), updated_at: new Date().toISOString(), ...r }))
+        const single = /vnd\.pgrst\.object/.test(req.headers()['accept'] || '')
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(single ? rows[0] : rows) })
+      }
       return route.fulfill({ status: 204, body: '' })
     }
     if (method === 'GET' && url.pathname.endsWith('/user_settings')) {
@@ -200,7 +209,14 @@ async function openApp({ time, quiet, meetings, water = true, lead = null, viewp
     freeze: (ms) => page.evaluate((t) => document.getAnimations().forEach((x) => { try { x.pause(); x.currentTime = t } catch {} }), ms),
     resume: () => page.evaluate(() => document.getAnimations().forEach((x) => { try { x.play() } catch {} })),
     /** Stop the fake clock from also flowing in real time (screenshots take a while); runFor still advances it. */
-    pauseClock: async () => { const now = await page.evaluate(() => Date.now()); await page.clock.pauseAt(new Date(now + 1)) },
+    // The fake clock keeps flowing while we read it, so aim a little ahead and retry if we still lost the race
+    // (that race was the old "Cannot fast-forward to the past").
+    pauseClock: async () => {
+      for (let i = 0; ; i++) {
+        const now = await page.evaluate(() => Date.now())
+        try { await page.clock.pauseAt(new Date(now + 1500)); return } catch (e) { if (i >= 4 || !/past/i.test(String(e))) throw e }
+      }
+    },
     shot: async (name, opts = {}) => { if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, ...opts }) },
     rect: (sel) => page.evaluate((q) => { const e = document.querySelector(q); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right, b: r.bottom } }, sel),
     notes: () => page.evaluate(() => window.__notes),
@@ -323,9 +339,8 @@ if (run('W5')) {
   assert.equal(await a.dropOpen(), true, 'W5c: appears a few seconds after focus ended')
   ok('W5c ...the drop appears ~4 s after the focus stretch ended')
   const ask = await a.drop.innerText()
-  assert.ok(ask.includes('剛好休息，喝一口？'), `W5d: break copy on the drop (got "${ask}")`)
-  ok('W5d dueAfterFocus → the drop says 「剛好休息，喝一口？」', JSON.stringify(ask.split('\n')[0]))
-  await a.shot('c-desktop-break')
+  assert.ok(ask.includes('專注告一段落，喝一口？') && !ask.includes('剛好休息'), `W5d: paused focus is not a break → neutral copy (got "${ask}")`)
+  ok('W5d focus paused (no break) → 「專注告一段落，喝一口？」, NOT 「剛好休息」', JSON.stringify(ask.split('\n')[0]))
   await a.drop.locator('button').first().click()
   await a.runFor(1000)
   await a.makeDue()
@@ -401,6 +416,8 @@ if (run('A1')) {
   assert.ok(text.includes('我端了一杯水來。') && text.includes('乾杯') && text.includes('等等再喝'), `A1: card copy (got "${text}")`)
   const btn = await a.rect('[data-pet-button]')
   assert.ok(btn.x - home.x > 90, `A1: the penguin walked over (${Math.round(btn.x - home.x)} px from home)`)
+  const cal = await a.rect('[data-tour="calendar-panel"]')
+  assert.ok(btn.x >= cal.x + 56, `A1: at the delivery spot it stands clear of the hour labels (penguin x ${Math.round(btn.x)}, gutter ends ${Math.round(cal.x + 56)})`)
   const cardR = await a.rect('[data-pet-water-card]')
   const timer = await a.rect('[data-tour="focus-timer"]')
   assert.ok(cardR.x >= 0 && cardR.r <= DESK.width && cardR.y >= 0 && cardR.b <= DESK.height, 'A1: card inside the window')
@@ -495,9 +512,67 @@ if (run('A4')) {
   await a.runFor(2100)
   assert.equal(await a.cardOpen(), true, 'A4: the penguin comes after the focus stretch')
   const text = await a.card.innerText()
-  assert.ok(text.includes('剛好休息，順便喝口水。') && text.includes('我已經倒好了。'), `A4: break copy (got "${text}")`)
-  ok('A4 focus → nothing; focus ends → the penguin brings it with 「剛好休息，順便喝口水。我已經倒好了。」')
+  assert.ok(text.includes('這段專注告一段落。') && !text.includes('剛好休息'), `A4: paused focus → neutral copy (got "${text}")`)
+  ok('A4 focus → nothing; focus paused → the penguin comes with 「這段專注告一段落。喝口水吧，我已經倒好了。」 (no 「剛好休息」)')
+  await a.close()
+}
+
+/** A real pomodoro: 25 min of work runs out, the timer holds 2.6 s, the 5-min break starts on its own. */
+async function finishPomodoroIntoBreak(a) {
+  await startFocus(a)
+  await a.makeDue()
+  await a.tick(); await a.tick()
+  assert.equal(await a.modalOpen(), false, 'nothing while the work phase runs')
+  await a.page.clock.fastForward(25 * MIN)
+  await a.page.waitForTimeout(300)
+  await a.runFor(3000) // completion hold → break starts
+  const breakPill = a.page.locator('[aria-label="休息計時迷你顯示"]')
+  await breakPill.first().waitFor({ timeout: 5000 })
+  await a.runFor(5000) // water looks again ~4 s after the work phase ended
+  // 「這段時間做了什麼？」 is up now: the penguin hides under it, so A waits (no drop sneaks in behind it).
+  const log = a.page.getByRole('dialog', { name: '這段時間做了什麼？' })
+  await log.waitFor({ timeout: 5000 })
+  assert.equal(await a.cardOpen(), false, 'no card under the dialog')
+  await a.runFor(4000)
+  return { breakPill, log }
+}
+
+if (run('A5')) {
+  const a = await openApp({ time: at(14, 0), pet: PET, viewport: DESK })
+  const { breakPill, log } = await finishPomodoroIntoBreak(a)
+  assert.equal(await a.dropOpen(), false, 'A5: the penguin is only covered by the dialog → it waits, no drop instead')
+  await log.getByRole('button', { name: '跳過' }).click()
+  await a.page.waitForTimeout(700)
+  await a.runFor(2100)
+  await a.card.first().waitFor({ timeout: 5000 })
+  await a.page.waitForTimeout(1500)
+  const text = await a.card.innerText()
+  const pill = await breakPill.first().innerText()
+  assert.ok(text.includes('剛好休息，順便喝口水。'), `A5: break copy (got "${text}")`)
+  assert.ok(/0?4:\d\d/.test(pill), `A5: the break countdown is on screen (got "${pill}")`)
+  ok('A5 pomodoro runs out → break starts → 「這段時間做了什麼？」 closed → the penguin brings it: 「剛好休息，順便喝口水。」, break countdown visible', JSON.stringify(pill))
   await a.shot('a-desktop-break')
+  await a.close()
+}
+
+if (run('C3')) {
+  const a = await openApp({ time: at(14, 0), pet: PET_OFF, viewport: DESK })
+  const { breakPill, log } = await finishPomodoroIntoBreak(a)
+  const stateUnder = await a.drop.getAttribute('data-state')
+  await a.runFor(70_000)
+  assert.equal(await a.drop.getAttribute('data-state'), 'here', `C3: 70 s under the dialog did not count (was ${stateUnder})`)
+  ok('C3 a drop hidden behind 「這段時間做了什麼？」 does not count down (70 s later still there)')
+  await log.getByRole('button', { name: '跳過' }).click()
+  await a.page.waitForTimeout(700)
+  assert.equal(await a.dropOpen(), true, 'C3: the drop during the break')
+  assert.equal(await a.page.locator('[data-pet-adopt]').count(), 0, 'C3: no adoption card in the way')
+  const ask = await a.drop.innerText()
+  assert.ok(ask.includes('剛好休息，喝一口？'), `C3: break copy on the drop (got "${ask}")`)
+  const askShown = await a.page.evaluate(() => getComputedStyle(document.querySelector('[data-water-drop] > [aria-hidden="true"]')).opacity)
+  assert.equal(askShown, '1', 'C3: the question is still out — its 6 s only start once the dialog is gone')
+  const pill = await breakPill.first().innerText()
+  ok('C3 no penguin + pomodoro break → the drop says 「剛好休息，喝一口？」 next to the break countdown', JSON.stringify(pill))
+  await a.shot('c-desktop-break')
   await a.close()
 }
 
@@ -546,9 +621,15 @@ if (run('C2')) {
   ok('C2 90 s with the tab in the background → the drop has not started evaporating')
   await a.runFor(45_000)
   assert.equal(await a.drop.getAttribute('data-state'), 'here', 'C2: 45 s visible is not enough')
-  await a.runFor(15_500)
-  assert.equal(await a.drop.getAttribute('data-state'), 'fade', 'C2: ~61 s visible → evaporating')
-  ok('C2b only visible time counts: 45 s → still there, 61 s → evaporates')
+  // ~2 s were visible before the tab went away (+ pausing the clock); from here it should go at ~60 s visible.
+  let goneAfter = null
+  for (let s = 1; s <= 25; s++) {
+    await a.runFor(1_000)
+    const st = await a.page.evaluate(() => document.querySelector('[data-water-drop]')?.getAttribute('data-state') ?? 'gone')
+    if (st !== 'here') { goneAfter = s; break }
+  }
+  assert.ok(goneAfter !== null && goneAfter >= 10 && goneAfter <= 16, `C2: starts evaporating at ~60 s of VISIBLE time (45 + ${goneAfter} s visible, the 90 s in the background not counted)`)
+  ok('C2b only visible time counts: 45 s → still there, evaporates at ~60 s visible', `45 + ${goneAfter} s`)
   await a.close()
 }
 
@@ -567,6 +648,7 @@ if (run('P1')) {
   assert.ok(btns.every(([w, h]) => w >= 44 && h >= 44), `P1: every button ≥ 44 pt (${JSON.stringify(btns)})`)
   assert.ok(pen.b <= tabs.y - 4, `P1: penguin lifted off the tab bar (gap ${Math.round(tabs.y - pen.b)} px)`)
   assert.ok(pen.h >= 46, `P1: penguin bigger while it holds the glass (${Math.round(pen.h)} px)`)
+  assert.ok(pen.x >= 55, `P1: clear of the 55 px hour-label gutter (penguin x ${Math.round(pen.x)})`)
   ok('P1 390 px: card inside the screen, above the tab bar, clear of the timer pill; buttons ≥ 44; penguin 1.3× and off the tab bar', `buttons ${JSON.stringify(btns)}, penguin ${Math.round(pen.h)} px, gap ${Math.round(tabs.y - pen.b)} px`)
   await a.shot('a-mobile-card')
   await a.card.getByRole('button', { name: '乾杯', exact: true }).click()
@@ -596,10 +678,44 @@ if (run('P3')) {
     assert.equal(await a.cardOpen(), true, 'P3: penguin visible → its card')
     ok('P3 任務 tab: the penguin is visible → it brings the water')
   }
+  await a.runFor(500)
+  const covered = await a.page.evaluate(() => {
+    const wrap = document.querySelector('[data-water-drop]')
+    const parts = [wrap.querySelector('button'), ...[...wrap.children].filter((e) => e.getAttribute('aria-hidden') === 'true' && getComputedStyle(e).display !== 'none' && getComputedStyle(e).opacity !== '0')]
+    const SEL = 'button, a[href], input, summary, label, [role="button"], [role="checkbox"], [role="tab"], h1, h2, h3, h4, h5, h6, [role="heading"], [draggable="true"]'
+    const out = []
+    wrap.style.visibility = 'hidden'
+    for (const el of parts) {
+      const r = el.getBoundingClientRect()
+      for (let y = r.top + 2; y < r.bottom; y += 6) for (let x = r.left + 2; x < r.right; x += 6) {
+        const hit = document.elementFromPoint(x, y)
+        const text = hit && [...hit.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())
+        if (hit && hit !== document.body && (hit.closest(SEL) || hit.closest('img, svg, canvas') || text || getComputedStyle(hit).cursor === 'pointer')) out.push(`${hit.tagName} "${(hit.closest(SEL) || hit).textContent.trim().slice(0, 10)}"`)
+      }
+    }
+    wrap.style.visibility = ''
+    return [...new Set(out)]
+  })
+  assert.deepEqual(covered, [], `P3: the drop / its question cover no control, heading, text or icon (covered: ${covered.join(', ')})`)
   const d = await a.rect('[data-water-drop] button')
-  const tabs = await a.rect('[data-tour="mobile-tabs"]')
-  if (d) assert.ok(d.b <= tabs.y + 1 && d.w >= 44, 'P3: drop above the tab bar, ≥ 44')
+  ok('P3b the drop and its question sit where they cover no row, button, group title, text or icon (only background)', `drop at (${Math.round(d.x)},${Math.round(d.y)}), chip: ${await a.drop.getAttribute('data-chip')}`)
   await a.shot('c-mobile-tasks-tab')
+  await a.close()
+}
+
+if (run('B1')) {
+  // The bell on a phone (⋯ → 通知), 2× — with a penguin adopted there is no 「領養你的企鵝」 card on top of it.
+  const a = await openApp({ time: at(9, 0), pet: PET, viewport: PHONE, phone: true })
+  await a.page.locator('[data-tour="mobile-more"]').click()
+  await a.page.getByRole('menuitem', { name: /^(通知|Notifications)/ }).click()
+  await a.page.locator('[data-bell-item], :text("一切順利！"), :text("All clear!")').first().waitFor({ timeout: 15000 })
+  await a.page.waitForTimeout(400)
+  assert.equal(await a.page.locator('[data-pet-adopt]').count(), 0, 'B1: no adoption card covering the list')
+  const overflow = await a.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  assert.ok(overflow <= 0, `B1: no horizontal overflow (${overflow}px)`)
+  const n = await a.page.locator('[data-bell-item]').count()
+  ok('B1 phone bell (2×): nothing on top of the list, no horizontal overflow', `${n} cards`)
+  await a.shot('mobile-bell')
   await a.close()
 }
 
@@ -615,18 +731,27 @@ if (run('P2')) {
   const tabs = await a.rect('[data-tour="mobile-tabs"]')
   const pet = await a.rect('[data-pet-button]')
   assert.ok(d.w >= 44 && d.h >= 44, `P2: drop target ≥ 44 (${d.w}×${d.h})`)
-  assert.ok(d.b <= tabs.y + 1, 'P2: sits on top of the tab bar')
+  // The tappable area really is ≥ 44×44 on both sides: every point of a 44×44 box centred on the drop hits it.
+  const hits = await a.page.evaluate(() => {
+    const b = document.querySelector('[data-water-drop] button').getBoundingClientRect()
+    const cx = b.x + b.width / 2, cy = b.y + b.height / 2
+    const pts = []
+    for (const dx of [-21, 0, 21]) for (const dy of [-21, 0, 21]) pts.push(!!document.elementFromPoint(cx + dx, cy + dy)?.closest('[data-water-drop] button'))
+    return pts
+  })
+  assert.ok(hits.every(Boolean), `P2: a 44×44 box around the drop is all tappable (${hits})`)
+  assert.ok(d.b <= tabs.y + 1, 'P2: above the tab bar')
   assert.ok(!overlap(d, pet), 'P2: next to the muted penguin, not on it')
   const far = fab ? Math.hypot((fab.x + fab.r) / 2 - (d.x + d.r) / 2, (fab.y + fab.b) / 2 - (d.y + d.b) / 2) : 999
   assert.ok(far > 150, `P2: far from the + button (${Math.round(far)} px)`)
   const contrast = await a.page.evaluate(() => {
     const lum = (c) => { const m = c.match(/[\d.]+/g).map(Number); const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }; return 0.2126 * f(m[0]) + 0.7152 * f(m[1]) + 0.0722 * f(m[2]) }
-    const ask = document.querySelector('[data-water-drop] [aria-hidden="true"]')
+    const ask = document.querySelector('[data-water-drop] > [aria-hidden="true"]')
     const bg = getComputedStyle(ask).backgroundColor
     return [...ask.children].map((el) => { const a = lum(getComputedStyle(el).color), b = lum(bg); return ((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)).toFixed(2) })
   })
   assert.ok(contrast.every((c) => Number(c) >= 4.5), `P2: question + hint text ≥ 4.5:1 (${contrast})`)
-  ok('P2 390 px drop: ≥ 44 pt, on the tab bar beside the muted penguin, far from ＋, text contrast AA', `drop ${Math.round(d.w)}×${Math.round(d.h)}, ${Math.round(far)} px from ＋, contrast ${contrast.join(' / ')}`)
+  ok('P2 390 px drop: tappable area ≥ 44×44 both ways (9-point hit test), above the tab bar, beside the muted penguin, far from ＋, text contrast AA', `drop ${Math.round(d.w)}×${Math.round(d.h)}, ${Math.round(far)} px from ＋, contrast ${contrast.join(' / ')}`)
   await a.shot('c-mobile-drop')
   await a.close()
 }

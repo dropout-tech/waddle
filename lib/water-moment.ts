@@ -18,8 +18,12 @@
 export const WATER_DROP_VISIBLE_MS = 60_000
 /** C: an evaporated drop asks again this much later… */
 export const WATER_IGNORE_RETRY_MINUTES = 15
-/** A: the penguin may be out of sight this long (a dialog, the layout hiding it) before C takes over. */
+/** A: the penguin may be unavailable this long (muted, the layout hiding it, stepping aside) before C takes over. */
 export const WATER_PET_GRACE_MS = 3_000
+
+/** Something that covers the whole screen for a while (a dialog, the immersive timer): the penguin hides under
+ *  it (penguin-pet.tsx uses the same rule) and the drop's countdown doesn't run behind it. */
+export const WATER_COVER_SELECTOR = '[role="dialog"]:not([data-pet-ui]):not([data-onboarding-tour]), [data-pet-hide]'
 
 export const WATER_IGNORED_KEY = 'waddle.waterReminder.ignoredOnce'
 
@@ -66,15 +70,36 @@ export interface WaterPetHandlers {
   disable: () => void
 }
 
+/**
+ * Which words to use:
+ *   break      — a pomodoro break is actually running → 「剛好休息…」
+ *   focusEnded — it waited for a focus stretch that was paused / stopped (no break) → 「這段專注告一段落…」
+ *   normal     — everything else.
+ */
+export type WaterVariant = 'normal' | 'focusEnded' | 'break'
+
+export function waterVariant(p: { onBreak: boolean; dueAfterFocus: boolean }): WaterVariant {
+  if (p.onBreak) return 'break'
+  return p.dueAfterFocus ? 'focusEnded' : 'normal'
+}
+
 export interface WaterPetRequest {
   /** New id = a new delivery (the pet starts walking over). */
   id: number
-  /** The reminder had waited for a focus stretch to end → 「剛好休息」 copy. */
-  afterFocus: boolean
+  variant: WaterVariant
   handlers: WaterPetHandlers
 }
 
-let petReady = false
+/**
+ * ready — on screen and free to walk over;
+ * wait  — only covered for now (a dialog such as 「這段時間做了什麼？」 after a pomodoro, or a background
+ *         tab): A waits for it instead of falling back;
+ * off   — no penguin to send (not adopted / switched off / muted / hidden by the layout / stepping aside
+ *         for a control): C.
+ */
+export type PetWaterState = 'ready' | 'wait' | 'off'
+
+let petState: PetWaterState = 'off'
 let request: WaterPetRequest | null = null
 const listeners = new Set<() => void>()
 const emit = () => listeners.forEach((fn) => fn())
@@ -86,13 +111,12 @@ export function subscribeWaterMoment(fn: () => void): () => void {
   }
 }
 
-/** True while a penguin is on screen, visible, and not muted — i.e. A can be shown. */
-export const getPetWaterReady = () => petReady
+export const getPetWaterState = () => petState
 export const getWaterPetRequest = () => request
 
-export function setPetWaterReady(ready: boolean) {
-  if (petReady === ready) return
-  petReady = ready
+export function setPetWaterState(next: PetWaterState) {
+  if (petState === next) return
+  petState = next
   emit()
 }
 

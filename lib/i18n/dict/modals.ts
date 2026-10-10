@@ -264,6 +264,11 @@ export const dict: Record<string, string> = {
   '喝一口，再慢慢繼續。': 'Take a sip, then carry on.',
   '剛好休息，順便喝口水。': 'Break time — perfect for a sip.',
   '我已經倒好了。': "It's already poured.",
+  // a focus stretch that was paused / stopped (not a break) — no 「剛好休息」 there
+  '這段專注告一段落。': 'That focus stretch is done.',
+  '喝口水吧，我已經倒好了。': "Have some water — it's poured.",
+  '專注告一段落，喝一口？': 'Focus done — sip?',
+  '專注告一段落，喝一口水吧：喝過了就點一下': 'Focus done — have a sip of water, then tap',
   '乾杯': 'Cheers',
   '等等再喝': 'Later',
   '乾杯！': 'Cheers!',

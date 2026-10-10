@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
 import { useI18n } from '@/lib/i18n/react'
 import { WaterSettingsPanel } from '@/components/water/water-settings-panel'
+import type { WaterVariant } from '@/lib/water-moment'
 import styles from './pet-water.module.css'
 
 /**
@@ -28,7 +29,7 @@ function Glass() {
   )
 }
 
-/** Inside the penguin's sprite box: its glass, plus your glass + the clink while toasting. */
+/** Inside the penguin's sprite box: its glass, and the little toast sparkle while it raises it to you. */
 export function PetWaterInHand({ phase }: { phase: PetWaterPhase }) {
   return (
     <>
@@ -37,9 +38,6 @@ export function PetWaterInHand({ phase }: { phase: PetWaterPhase }) {
       </span>
       {phase === 'cheers' && (
         <>
-          <span className={styles.yours} aria-hidden="true">
-            <Glass />
-          </span>
           <svg className={styles.sparks} viewBox="0 0 60 60" aria-hidden="true">
             <g stroke={INK} strokeWidth="2.6" strokeLinecap="round" fill="none">
               <path d="M30 14 L30 4" />
@@ -61,14 +59,14 @@ export function PetWaterInHand({ phase }: { phase: PetWaterPhase }) {
 /** The small card beside the penguin: 乾杯 / 等等再喝 / ⋯ (on/off + interval in place). */
 export function PetWaterCard({
   name,
-  afterFocus,
+  variant,
   isMobile,
   onCheers,
   onLater,
   onDisable,
 }: {
   name: string
-  afterFocus: boolean
+  variant: WaterVariant
   isMobile: boolean
   onCheers: () => void
   onLater: () => void
@@ -86,9 +84,9 @@ export function PetWaterCard({
     >
       <span className={styles.name}>{name}</span>
       <p id="pet-water-msg" className={styles.msg}>
-        {afterFocus ? t('剛好休息，順便喝口水。') : t('我端了一杯水來。')}
+        {variant === 'break' ? t('剛好休息，順便喝口水。') : variant === 'focusEnded' ? t('這段專注告一段落。') : t('我端了一杯水來。')}
         <br />
-        {afterFocus ? t('我已經倒好了。') : t('喝一口，再慢慢繼續。')}
+        {variant === 'normal' ? t('喝一口，再慢慢繼續。') : variant === 'break' ? t('我已經倒好了。') : t('喝口水吧，我已經倒好了。')}
       </p>
       {showSettings && <WaterSettingsPanel className={styles.settings} onDisable={onDisable} />}
       <div className={styles.acts}>

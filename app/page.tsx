@@ -738,6 +738,7 @@ function HuddlePage() {
       <WaterReminder
         isOpen={water.isOpen}
         dueAfterFocus={water.dueAfterFocus}
+        onBreak={water.onBreak}
         onDrink={water.dismiss}
         onSnooze={water.snooze}
         onDisable={water.disable}

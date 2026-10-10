@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/lib/i18n/react'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { WATER_DROP_VISIBLE_MS } from '@/lib/water-moment'
+import { WATER_COVER_SELECTOR, WATER_DROP_VISIBLE_MS, type WaterVariant } from '@/lib/water-moment'
 import { hapticSelection } from '@/lib/haptics'
 import { WaterSettingsPanel } from './water-settings-panel'
 import { useControlYield, useIsScrolling } from '@/components/timer/use-floating-dodge'
+import { findFreeSpot, isRectClear, type FreeSpot } from './free-spot'
 import styles from './water-drop.module.css'
 
 type DropState = 'here' | 'tap' | 'fade'
@@ -19,15 +20,15 @@ const SWIPE_PX = 36
  * 喝水提醒 C「輕輕一滴」: used when there is no penguin to bring the water (lib/water-moment.ts).
  * A drop settles in the corner with a short question that tucks itself away after a few seconds.
  * Tap / click (or swipe it away) = had a sip. Right click / long press = on/off + interval.
- * Left alone for 60 s of VISIBLE time (a background tab doesn't count) it evaporates → onIgnore.
+ * Left alone for 60 s of VISIBLE time (a background tab or a dialog on top doesn't count) it evaporates → onIgnore.
  */
 export function WaterDrop({
-  afterFocus,
+  variant,
   onDrink,
   onIgnore,
   onDisable,
 }: {
-  afterFocus: boolean
+  variant: WaterVariant
   onDrink: () => void
   onIgnore: () => void
   onDisable: () => void
@@ -37,15 +38,18 @@ export function WaterDrop({
   const [state, setState] = useState<DropState>('here')
   const [hint, setHint] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [besidePet, setBesidePet] = useState(false)
+  // Phone: where it sits (null = its default corner, see water-drop.module.css)
+  const [spot, setSpot] = useState<FreeSpot | null>(null)
   const [reduced] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const wrapRef = useRef<HTMLDivElement>(null)
   const dropRef = useRef<HTMLButtonElement>(null)
+  const askRef = useRef<HTMLDivElement>(null)
+  const startRef = useRef<{ x: number; y: number } | null>(null)
   // Same manners as the timer pill (components/timer/use-floating-dodge.ts): while the list
   // scrolls the finger belongs to the list; if the drop would cover a small control that has no
   // 44×44 left, it steps up out of the way.
   const { scrolling } = useIsScrolling(state === 'here')
-  const blocked = useControlYield(state === 'here' && !settingsOpen, dropRef)
+  const blocked = useControlYield(!isMobile && state === 'here' && !settingsOpen, dropRef)
   const [lifted, setLifted] = useState(false)
   useEffect(() => {
     // latch: once lifted it stays up (dropping back would cover the control again and oscillate)
@@ -58,27 +62,52 @@ export function WaterDrop({
     cbs.current = { onDrink, onIgnore }
   }, [onDrink, onIgnore])
 
-  // Phone: a muted penguin still sits in the corner — stand next to it, not on it.
+  // Phone: never sit on anything you can tap or on a heading (a list row, 「＋ 新增任務」, a group
+  // title, a muted penguin, the tab bar…). Start from the bottom-left corner on the tab bar; if that
+  // isn't clear, take the nearest clear spot (components/water/free-spot.ts). Re-checked every few
+  // seconds and whenever a scroll settles, because the list moves underneath.
   useEffect(() => {
-    if (!isMobile) return
-    const check = () => {
-      const pet = document.querySelector<HTMLElement>('[data-pet]')
-      // fixed-position: offsetParent is always null, so look at the box itself
-      setBesidePet(!!pet && pet.getBoundingClientRect().width > 0 && !pet.hasAttribute('data-yield'))
+    if (!isMobile || state !== 'here' || scrolling || settingsOpen) return
+    const place = () => {
+      const wrap = wrapRef.current
+      if (!wrap) return
+      const r = wrap.getBoundingClientRect()
+      if (!startRef.current) startRef.current = { x: r.x, y: r.y } // first run: still at the default corner
+      if (isRectClear({ x: r.x, y: r.y, w: r.width, h: r.height }, [wrap]) && startRef.current.x === r.x && startRef.current.y === r.y && askClear(wrap)) return
+      const next = findFreeSpot({
+        hide: [wrap],
+        drop: { w: r.width, h: r.height },
+        chip: { w: askRef.current?.offsetWidth ?? 120, h: askRef.current?.offsetHeight ?? 46 },
+        start: startRef.current,
+      })
+      setSpot((prev) => (prev && next && prev.x === next.x && prev.y === next.y && prev.chip === next.chip ? prev : next))
     }
-    check()
-    const id = window.setInterval(check, 1000)
-    return () => window.clearInterval(id)
-  }, [isMobile])
+    const askClear = (wrap: HTMLElement) => {
+      const a = askRef.current?.getBoundingClientRect()
+      return !a || a.width === 0 || isRectClear({ x: a.x, y: a.y, w: a.width, h: a.height }, [wrap])
+    }
+    const first = window.setTimeout(place, 0)
+    const id = window.setInterval(() => {
+      const wrap = wrapRef.current
+      if (!wrap) return
+      const r = wrap.getBoundingClientRect()
+      if (!isRectClear({ x: r.x, y: r.y, w: r.width, h: r.height }, [wrap])) place()
+    }, 2500)
+    const onResize = () => {
+      startRef.current = null
+      setSpot(null)
+    }
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.clearTimeout(first)
+      window.clearInterval(id)
+      window.removeEventListener('resize', onResize)
+    }
+  }, [isMobile, state, scrolling, settingsOpen])
 
-  // The question tucks itself away; the drop stays.
-  useEffect(() => {
-    const id = window.setTimeout(() => setHint(false), HINT_MS)
-    return () => window.clearTimeout(id)
-  }, [])
-
-  // Evaporate after 60 s on a visible page. Each tick counts at most 2 s, so a sleeping laptop
-  // or a background tab never eats the countdown; the settings panel being open pauses it.
+  // Evaporate after 60 s on a visible page (and tuck the question away after 6 s of it). Each tick
+  // counts at most 2 s, so a sleeping laptop, a background tab or a dialog on top never eats the
+  // countdown; the settings panel being open pauses it.
   useEffect(() => {
     if (state !== 'here' || settingsOpen) return
     let visible = 0
@@ -87,7 +116,10 @@ export function WaterDrop({
       const now = Date.now()
       const dt = Math.min(Math.max(0, now - last), 2000)
       last = now
-      if (document.visibilityState === 'visible') visible += dt
+      // only time it could actually be seen: a visible tab, nothing covering the screen
+      if (document.visibilityState === 'visible' && !document.querySelector(WATER_COVER_SELECTOR)) visible += dt
+      // the question tucks itself away after a few seconds you could actually see it; the drop stays
+      if (visible >= HINT_MS) setHint(false)
       if (visible >= WATER_DROP_VISIBLE_MS) setState('fade')
     }, 1000)
     return () => window.clearInterval(id)
@@ -124,6 +156,7 @@ export function WaterDrop({
     setSettingsOpen(false)
     setState('tap')
   }
+  const question = variant === 'break' ? t('剛好休息，喝一口？') : variant === 'focusEnded' ? t('專注告一段落，喝一口？') : t('喝口水嗎？')
   const clearPress = () => {
     if (press.current?.timer) window.clearTimeout(press.current.timer)
     press.current = null
@@ -134,23 +167,30 @@ export function WaterDrop({
       ref={wrapRef}
       className={styles.wrap}
       data-mobile={isMobile ? '' : undefined}
-      data-beside-pet={besidePet ? '' : undefined}
       data-state={state}
+      data-chip={isMobile ? (spot ? spot.chip : 'above') : undefined}
+      style={isMobile && spot ? { left: spot.x, top: spot.y, right: 'auto', bottom: 'auto' } : undefined}
       data-lifted={lifted ? '' : undefined}
       data-scrolling={scrolling ? '' : undefined}
       data-hint={hint && !settingsOpen ? 'on' : 'off'}
       data-water-drop
       data-hide-on-keyboard
     >
-      <div className={styles.ask} aria-hidden="true">
-        <b>{afterFocus ? t('剛好休息，喝一口？') : t('喝口水嗎？')}</b>
+      <div ref={askRef} className={styles.ask} aria-hidden="true">
+        <b>{question}</b>
         <small>{t('點一下就好')}</small>
       </div>
       <button
         ref={dropRef}
         type="button"
         className={styles.drop}
-        aria-label={afterFocus ? t('剛好休息，喝一口水吧：喝過了就點一下') : t('喝水提醒：喝過了就點一下')}
+        aria-label={
+          variant === 'break'
+            ? t('剛好休息，喝一口水吧：喝過了就點一下')
+            : variant === 'focusEnded'
+              ? t('專注告一段落，喝一口水吧：喝過了就點一下')
+              : t('喝水提醒：喝過了就點一下')
+        }
         title={isMobile ? undefined : t('點一下＝喝過了（右鍵：提醒設定）')}
         onClick={() => {
           if (press.current?.long) return
@@ -231,7 +271,7 @@ export function WaterDrop({
       </button>
       {/* Announced once when the drop appears. */}
       <span className="sr-only" role="status">
-        {state === 'here' ? (afterFocus ? t('剛好休息，喝一口？') : t('喝口水嗎？')) : ''}
+        {state === 'here' ? question : ''}
       </span>
       {settingsOpen && (
         <div className={styles.settings}>

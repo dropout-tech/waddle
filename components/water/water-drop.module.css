@@ -21,7 +21,6 @@
   left: 16px;
   bottom: calc(63px + env(safe-area-inset-bottom));
 }
-.wrap[data-mobile][data-beside-pet] { left: 62px; }
 
 .drop {
   position: relative;
@@ -130,7 +129,8 @@
   animation: askIn 400ms cubic-bezier(0.22, 1, 0.36, 1) 500ms backwards;
   transition: opacity 250ms ease-out, transform 250ms ease-out;
 }
-.wrap[data-mobile] .ask {
+/* phone: the question goes wherever free-spot.ts found room (data-chip) */
+.wrap[data-chip='above'] .ask {
   right: auto;
   left: 2px;
   top: auto;
@@ -138,10 +138,17 @@
   margin-top: 0;
   transform-origin: 0 100%;
 }
+.wrap[data-chip='right'] .ask {
+  right: auto;
+  left: calc(100% + 6px);
+  transform-origin: 0 50%;
+}
+.wrap[data-chip='none'] .ask { display: none; }
 .ask b { font-size: 14px; font-weight: 600; line-height: 1.35; }
 .ask small { font-size: 12.5px; line-height: 1.35; color: var(--muted-foreground); }
 .wrap[data-hint='off'] .ask { opacity: 0; transform: translateX(8px) scale(0.92); }
-.wrap[data-mobile][data-hint='off'] .ask { transform: translateY(6px) scale(0.92); }
+.wrap[data-chip='above'][data-hint='off'] .ask { transform: translateY(6px) scale(0.92); }
+.wrap[data-chip='right'][data-hint='off'] .ask { transform: translateX(-8px) scale(0.92); }
 .wrap[data-hint='off']:hover .ask,
 .wrap[data-hint='off']:focus-within .ask { opacity: 1; transform: none; }
 
