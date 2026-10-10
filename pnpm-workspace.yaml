@@ -44,4 +44,13 @@ overrides:
   'replace>minimatch': '3.1.5'
   '@xmldom/xmldom@<0.8.15': '^0.8.15'
   '@xmldom/xmldom@>=0.9.0 <0.9.12': '^0.9.12'
-  '@capacitor/cli@8>tar': '^7.5.22'
+  # 2026-10-10 audit. tar 6 sits under @capacitor/assets > @capacitor/cli@5,
+  # which @capacitor/assets declares but never requires (no reference in its
+  # dist), so moving it to tar 7 can't break the icon generator. Also covers
+  # electron-builder's tar 7.5.15 and @capacitor/cli 8.
+  'tar@<7.5.22': '^7.5.22'
+  'handlebars@>=4.0.0 <4.7.10': '^4.7.10'
+  'source-map-js@<1.2.2': '^1.2.2'
+  # sharp 0.32 → 0.35 for the icon generator (dev tool only); same sharp the
+  # Next build already uses. Checked by running capacitor-assets generate.
+  '@capacitor/assets>sharp': '^0.35.5'
