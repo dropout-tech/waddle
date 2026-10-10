@@ -177,9 +177,10 @@ const EN_DATE =
 const EN_RELATIVE =
   /\b(today|tonight|tomorrow|tmrw?|day after tomorrow|in \d+ days?|within \d+ days?)\b/i;
 const EN_VAGUE = /\b(few|couple|some|several)\b/i;
-// 「下午去銀行」「3點開會」: a time of day with no other date word means today.
+// 「下午去銀行」「3點開會」「三點前寄出」: a time of day with no other date word
+// means today. Chinese numerals count too (「三點」 used to lose its date).
 const TIME_OF_DAY =
-  /(早上|上午|中午|下午|傍晚|晚上|今早|今晚|\d{1,2}\s*[點点]|\b\d{1,2}\s*(am|pm)\b|\bthis (morning|afternoon|evening)\b|\btonight\b)/i;
+  /(早上|上午|中午|下午|傍晚|晚上|今早|今晚|(?:\d{1,2}|[一二兩两三四五六七八九十]{1,3})\s*[點点]|\b\d{1,2}\s*(am|pm)\b|\bthis (morning|afternoon|evening)\b|\btonight\b)/i;
 
 export function dueEvidenceOk(due: Due, evidence: string, source: string): boolean {
   if (due.kind === "none") return true;

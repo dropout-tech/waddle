@@ -290,3 +290,11 @@ test('clockTo24h agrees with the on-device parser (lib/brain-dump/parse.ts norma
   assert.equal(C.clockTo24h(8, 0, 'none'), '08:00')
   assert.equal(C.clockTo24h(12, 0, 'none'), '12:00')
 })
+
+test('today from a spoken hour written in Chinese numerals (「三點前寄出報價」「三點回信」)', () => {
+  const today = { kind: 'relative_days', days: 0 }
+  assert.equal(C.dueEvidenceOk(today, '三點前', '三點前寄出報價'), true)
+  assert.equal(C.dueEvidenceOk(today, '三點', '三點回信'), true)
+  assert.equal(C.dueEvidenceOk(today, '十一點半', '十一點半看牙醫'), true)
+  assert.equal(C.dueEvidenceOk(today, '有空', '有空整理房間'), false)
+})
