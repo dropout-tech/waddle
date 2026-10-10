@@ -112,7 +112,8 @@ test('water: a chain of reminders (old code: one), spaced by the interval, none 
   let water = kind('huddle-widget').filter((n) => n.extra.destination === 'water').sort((a, b) => new Date(a.schedule.at) - new Date(b.schedule.at))
   assert.equal(water.length, Budget.MAX_WATER_REMINDERS)
   const times = water.map((n) => new Date(n.schedule.at).getTime())
-  assert.equal(times[0], now + 40 * MIN)
+  // (If "in 40 minutes" happens to be night, the first one waits for morning — the test must not depend on the hour it runs.)
+  assert.equal(times[0], Quiet.deferOutOfQuietWindow(now + 40 * MIN, Quiet.WATER_NIGHT_WINDOW))
   for (const t of times) assert.equal(Quiet.isInQuietWindow(t, Quiet.WATER_NIGHT_WINDOW), false, `${new Date(t)} must not be inside 22:00–08:00`)
   for (let i = 1; i < times.length; i++) assert.ok(times[i] - times[i - 1] >= 60 * MIN, 'at least one interval apart')
 
@@ -120,7 +121,7 @@ test('water: a chain of reminders (old code: one), spaced by the interval, none 
   await Widgets.syncWidgetReminders(snap(now + 100 * MIN), { waterIntervalMin: 60 })
   water = kind('huddle-widget').filter((n) => n.extra.destination === 'water').sort((a, b) => new Date(a.schedule.at) - new Date(b.schedule.at))
   assert.equal(water.length, Budget.MAX_WATER_REMINDERS)
-  assert.equal(new Date(water[0].schedule.at).getTime(), now + 100 * MIN)
+  assert.equal(new Date(water[0].schedule.at).getTime(), Quiet.deferOutOfQuietWindow(now + 100 * MIN, Quiet.WATER_NIGHT_WINDOW))
 })
 
 test('water: the user\'s 勿擾時段 replaces the built-in night; switching the reminder off clears the chain', async () => {

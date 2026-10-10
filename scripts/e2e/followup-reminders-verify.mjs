@@ -16,7 +16,7 @@ const root = ${JSON.stringify(root)}
 const stubs = {
   '@/lib/platform': 'export const isNative=()=>true; export const isDesktop=()=>false',
   '@/lib/desktop-notifications': 'export const desktopNotificationsEnabled=()=>false',
-  '@/lib/meeting-reminder': 'export const ensureNotificationPermission=async()=>true; export const meetingStartAsDate=()=>null',
+  '@/lib/meeting-reminder': 'export const ensureNotificationPermission=async()=>true; export const meetingStartAsDate=()=>null; export const meetingOccurrenceKey=()=>""',
   '@capacitor/local-notifications': 'export const LocalNotifications=globalThis.__LN',
 }
 const tryFile = (base) => [base, base+'.ts', base+'/index.ts'].find((f) => existsSync(f) && !(f===base && !/\\.[a-z]+$/.test(base)))
@@ -49,7 +49,8 @@ globalThis.window = { localStorage: { getItem: () => null, setItem() {} }, navig
 globalThis.document = { documentElement: {} }
 Object.defineProperty(globalThis, 'navigator', { value: { language: 'zh-TW' }, configurable: true })
 
-const { syncFollowupReminders } = await import(pathToFileURL(path.join(root, 'lib/notifications/index.ts')).href)
+const { syncFollowupReminders, setReminderAccount } = await import(pathToFileURL(path.join(root, 'lib/notifications/index.ts')).href)
+await setReminderAccount('acct-1') // reminders are scheduled (and tagged) only for a signed-in account
 let n = 0
 const ok = (c, m) => { assert(c, m); n++; console.log('PASS: ' + m) }
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

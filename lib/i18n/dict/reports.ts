@@ -164,8 +164,8 @@ export const dict: Record<string, string> = {
     'Set a stretch of time and focus on one thing; the default is a 25-minute Pomodoro. Add music or ambient sound such as rain, waves or a cafe. When it ends, the session is logged on today\'s calendar automatically.',
   '就算 Huddle 沒開著，手機也會跳通知提醒你：會議快開始、專注時間到、該喝水了。到「設定」→「一般設定」打開「會議提醒」和「背景提醒」；手機問要不要允許通知時，按「允許」就好。':
     'Even when Huddle is closed, your phone can remind you that a meeting is about to start, your focus time is up, or it\'s time for water. Go to "Settings" → "General" and turn on "Meeting reminders" and "Background reminders". When your phone asks about notifications, tap "Allow".',
-  '每 60 分鐘，Huddle 會提醒你喝口水。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。':
-    'Every 60 minutes, Huddle reminds you to drink some water. Not now? Press "Snooze" and it comes back in five minutes. Change the interval in Settings, or turn it off entirely.',
+  '每隔一段時間，Huddle 會提醒你喝口水，晚上不會打擾你。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。':
+    'Every so often, Huddle reminds you to drink some water, and it stays quiet at night. Not now? Press "Snooze" and it comes back in five minutes. Change the interval in Settings, or turn it off entirely.',
   '角落這隻企鵝是你專屬的。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。牠偶爾會提醒你會議和過期的任務，但多半只是在說些荒謬的話。':
     'The penguin in the corner is yours. Tap it for a joke; to quiet it down, long-press (right-click on a computer) to open its menu. Now and then it reminds you about meetings and overdue tasks, but mostly it just says absurd things.',
   '導覽結束後，你可以領養一隻專屬企鵝，牠會住在畫面角落。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。':
