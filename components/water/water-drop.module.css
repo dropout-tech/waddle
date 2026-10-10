@@ -1,0 +1,185 @@
+/* 喝水提醒 C「輕輕一滴」— never blocks anything. Transform/opacity only, ease-out, no bounce.
+   appear 0–700 drift down 18px & grow in · 450–1100 a ring where it lands · 500–900 the question slides out
+   tap    0–260 squash · 120–760 two rings · 150–900 「咕嚕」 rises and fades
+   fade   0–1500 lifts, thins out and blurs a little, three vapour curls (ignored for 60 s of visible time) */
+
+.wrap {
+  position: fixed;
+  z-index: var(--z-index-dropdown, 30);
+  right: 28px;
+  bottom: 88px;
+  width: 56px;
+  height: 64px;
+}
+.wrap[data-mobile] {
+  right: auto;
+  left: 16px;
+  bottom: calc(63px + env(safe-area-inset-bottom));
+}
+.wrap[data-mobile][data-beside-pet] { left: 62px; }
+
+.drop {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+.drop:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.body {
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 53px;
+  transform-origin: 50% 100%;
+  animation: dropIn 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.breathe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 100%;
+  animation: breathe 3.6s ease-in-out 700ms infinite;
+}
+.breathe svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.hi { animation: shimmer 3.6s ease-in-out 700ms infinite; }
+.land {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 46px;
+  height: 12px;
+  margin-left: -23px;
+  border-radius: 50%;
+  border: 2px solid rgba(95, 147, 167, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  animation: land 650ms ease-out 450ms both;
+}
+.rings { position: absolute; left: 50%; bottom: 8px; width: 0; height: 0; pointer-events: none; }
+.rings span {
+  position: absolute;
+  left: -30px;
+  top: -9px;
+  width: 60px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2.4px solid #5f93a7;
+  opacity: 0;
+}
+.rings span + span { left: -18px; top: -5px; width: 36px; height: 10px; border-color: #9fc6d3; }
+.gulp {
+  position: absolute;
+  left: 50%;
+  bottom: 44px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3f7186;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+:global(.dark) .gulp { color: #a9d0dc; }
+.vapor {
+  position: absolute;
+  left: 50%;
+  top: -14px;
+  width: 40px;
+  height: 26px;
+  margin-left: -20px;
+  opacity: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* the question: desktop to the left of the drop, phone above it (clear of the timer pill on the right) */
+.ask {
+  position: absolute;
+  right: calc(100% + 6px);
+  top: 50%;
+  margin-top: -22px;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 8px 22px -14px rgba(41, 43, 36, 0.5);
+  white-space: nowrap;
+  transform-origin: 100% 50%;
+  pointer-events: none;
+  animation: askIn 400ms cubic-bezier(0.22, 1, 0.36, 1) 500ms backwards;
+  transition: opacity 250ms ease-out, transform 250ms ease-out;
+}
+.wrap[data-mobile] .ask {
+  right: auto;
+  left: 2px;
+  top: auto;
+  bottom: calc(100% + 4px);
+  margin-top: 0;
+  transform-origin: 0 100%;
+}
+.ask b { font-size: 14px; font-weight: 600; line-height: 1.35; }
+.ask small { font-size: 12.5px; line-height: 1.35; color: var(--muted-foreground); }
+.wrap[data-hint='off'] .ask { opacity: 0; transform: translateX(8px) scale(0.92); }
+.wrap[data-mobile][data-hint='off'] .ask { transform: translateY(6px) scale(0.92); }
+.wrap[data-hint='off']:hover .ask,
+.wrap[data-hint='off']:focus-within .ask { opacity: 1; transform: none; }
+
+.wrap[data-state='tap'] .body { animation: squash 260ms ease-in both; }
+.wrap[data-state='tap'] .rings span { animation: ring 640ms ease-out 120ms both; }
+.wrap[data-state='tap'] .rings span + span { animation: ring 640ms ease-out 220ms both; }
+.wrap[data-state='tap'] .gulp { animation: gulp 750ms ease-out 150ms both; }
+.wrap[data-state='tap'] .ask,
+.wrap[data-state='fade'] .ask { opacity: 0; }
+.wrap[data-state='fade'] .body { animation: evaporate 1500ms ease-in both; }
+.wrap[data-state='fade'] .vapor { animation: vapor 1500ms ease-out both; }
+
+.settings {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  width: 288px;
+  padding: 6px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--popover, var(--card));
+  box-shadow: 0 12px 28px -16px rgba(41, 43, 36, 0.6);
+}
+.wrap[data-mobile] .settings { right: auto; left: 0; width: min(288px, calc(100vw - 32px)); }
+
+@keyframes dropIn { from { opacity: 0; transform: translateY(-18px) scale(0.7); } to { opacity: 1; transform: none; } }
+@keyframes land { from { opacity: 0.9; transform: scale(0.4); } to { opacity: 0; transform: scale(1.5); } }
+@keyframes askIn { from { opacity: 0; transform: translateX(10px) scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035, 0.975); } }
+@keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@keyframes squash { 0% { opacity: 1; transform: none; } 70% { opacity: 1; transform: translateY(6px) scale(1.35, 0.42); } 100% { opacity: 0; transform: translateY(8px) scale(1.5, 0.2); } }
+@keyframes ring { from { opacity: 0.9; transform: scale(0.35); } to { opacity: 0; transform: scale(1.6); } }
+@keyframes gulp { 0% { opacity: 0; transform: translate(-50%, 6px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -18px); } }
+@keyframes evaporate { from { opacity: 1; transform: none; filter: blur(0); } to { opacity: 0; transform: translateY(-12px) scale(0.85); filter: blur(2px); } }
+@keyframes vapor { 0% { opacity: 0; transform: translateY(6px); } 35% { opacity: 0.9; } 100% { opacity: 0; transform: translateY(-14px); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .body { animation: fadeIn 200ms linear both; }
+  .breathe, .hi, .land, .rings span, .vapor { animation: none !important; }
+  .ask { animation: fadeIn 200ms linear backwards; transition: opacity 200ms linear; transform: none !important; }
+  .wrap[data-state='tap'] .body,
+  .wrap[data-state='fade'] .body { animation: fadeOut 250ms linear both; }
+  .wrap[data-state='tap'] .gulp { animation: fadeIn 150ms linear both; transform: translateX(-50%); }
+}

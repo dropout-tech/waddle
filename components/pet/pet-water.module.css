@@ -1,0 +1,190 @@
+/* 喝水提醒 A「企鵝送水來」— the glass in the penguin's wing, its card, and the 乾杯 moment.
+   Transform/opacity only, ease-out, no bounce (DESIGN.md). Phase comes in as data-phase:
+     arrive  0–250 nothing · 250–550 glass pops into the wing (the walk itself is the pet's mover)
+     cheers  150–560 raise · 560 clink (sparks + drops) · 950–1600 sip at the beak, water drains ·
+             your glass slides in from the card side and fades in place (no drifting) · 3500 glass gone
+   Everything here sits inside the pet's sprite box, so % = share of the penguin. */
+
+.glass {
+  position: absolute;
+  right: -20%;
+  bottom: 12%;
+  width: 46%;
+  height: 56%;
+  transform-origin: 50% 85%;
+  pointer-events: none;
+}
+.glass svg,
+.yours svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.water {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.glass[data-phase='arrive'] { animation: glassIn 300ms cubic-bezier(0.22, 1, 0.36, 1) 250ms both; }
+.glass[data-phase='cheers'] { animation: raiseSip 1700ms cubic-bezier(0.22, 1, 0.36, 1) 150ms both, fadeOut 300ms ease-out 3500ms both; }
+.glass[data-phase='cheers'] .water { animation: drain 650ms ease-in-out 950ms both; }
+.glass[data-phase='later'],
+.glass[data-phase='leave'] { animation: fadeOut 300ms ease-out 1100ms both; }
+
+/* your glass: slides in level from the right, clinks, tips once at the same moment, fades where it is */
+.yours {
+  position: absolute;
+  left: 112%;
+  bottom: 26%;
+  width: 52%;
+  height: 64%;
+  opacity: 0;
+  transform-origin: 50% 85%;
+  pointer-events: none;
+  animation: yours 1700ms cubic-bezier(0.22, 1, 0.36, 1) 150ms both;
+}
+.yours .water { animation: drain 650ms ease-in-out 950ms both; }
+
+.sparks {
+  position: absolute;
+  left: 84%;
+  bottom: 76%;
+  width: 60%;
+  height: 60%;
+  opacity: 0;
+  overflow: visible;
+  pointer-events: none;
+  animation: spark 420ms ease-out 560ms both;
+}
+.sparks circle { transform-box: fill-box; }
+.sparks .d1 { animation: dropL 420ms ease-out 560ms both; }
+.sparks .d2 { animation: dropR 420ms ease-out 560ms both; }
+.sparks .d3 { animation: dropU 420ms ease-out 560ms both; }
+
+/* ── the card next to the penguin (desktop: to its right; phone: above it) ── */
+.card {
+  position: absolute;
+  z-index: 1;
+  left: calc(100% + 14px);
+  bottom: 30px;
+  width: 268px;
+  pointer-events: auto;
+  padding: 11px 14px 12px;
+  border-radius: 14px;
+  border-bottom-left-radius: 4px;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 8px 22px -14px rgba(41, 43, 36, 0.55);
+  animation: pop 240ms ease-out both;
+}
+.card[data-mobile] {
+  left: -16px;
+  bottom: 62px;
+  width: min(300px, calc(100vw - 96px));
+  padding: 12px 12px 12px 14px;
+}
+.name {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  margin-bottom: 2px;
+}
+.msg {
+  font-size: 14px;
+  line-height: 1.55;
+}
+.acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  cursor: pointer;
+  transition: background-color 150ms ease-out, color 150ms ease-out;
+}
+.btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.primary { background: var(--primary); color: var(--primary-foreground); }
+.primary:hover { filter: brightness(1.06); }
+.ghost { background: transparent; color: var(--muted-foreground); }
+.ghost:hover { background: var(--muted); color: var(--foreground); }
+.more { margin-left: auto; width: 36px; padding: 0; background: transparent; color: var(--muted-foreground); }
+.more:hover,
+.more[aria-expanded='true'] { background: var(--muted); color: var(--foreground); }
+.card[data-mobile] .btn { min-height: 44px; font-size: 15px; flex: 1; }
+.card[data-mobile] .more { flex: none; width: 44px; }
+.settings { margin-top: 10px; }
+
+/* 乾杯 replaces the card with a short line (no empty card left behind) */
+.cheer {
+  position: absolute;
+  z-index: 1;
+  left: calc(100% + 14px);
+  bottom: 30px;
+  width: max-content;
+  padding: 8px 14px;
+  border-radius: 14px;
+  border-bottom-left-radius: 4px;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 8px 22px -14px rgba(41, 43, 36, 0.55);
+  pointer-events: none;
+  animation: pop 200ms ease-out both, fadeOut 300ms ease-out 1500ms both;
+}
+.cheer[data-mobile] { left: -16px; bottom: 62px; }
+.cheer b { font-size: 18px; font-weight: 600; letter-spacing: 0.04em; margin-right: 8px; }
+.cheer span { font-size: 13px; color: var(--muted-foreground); }
+
+@keyframes pop { from { opacity: 0; transform: translateY(4px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes glassIn { from { opacity: 0; transform: translateY(18%) scale(0.6); } to { opacity: 1; transform: none; } }
+@keyframes raiseSip {
+  0% { transform: none; }
+  24% { transform: translate(14%, -46%) rotate(14deg); }
+  47% { transform: translate(14%, -46%) rotate(14deg); }
+  62% { transform: translate(-60%, -62%) rotate(-58deg); }
+  85% { transform: translate(-60%, -62%) rotate(-58deg); }
+  100% { transform: none; }
+}
+@keyframes yours {
+  0% { opacity: 0; transform: translateX(45%); }
+  24% { opacity: 1; transform: translateX(-12%) rotate(-14deg); }
+  47% { opacity: 1; transform: translateX(-12%) rotate(-14deg); }
+  62% { opacity: 1; transform: translateX(-12%) rotate(-30deg); }
+  82% { opacity: 1; transform: translateX(-12%) rotate(-30deg); }
+  100% { opacity: 0; transform: translateX(-12%) rotate(-30deg); }
+}
+@keyframes drain { from { transform: scaleY(1); } to { transform: scaleY(0.12); } }
+@keyframes spark { 0% { opacity: 0; transform: scale(0.5); } 30% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.15); } }
+@keyframes dropL { to { transform: translate(-9px, -10px); } }
+@keyframes dropR { to { transform: translate(9px, -9px); } }
+@keyframes dropU { to { transform: translate(0, -13px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* fade only: no raise / clink / walk — the glass just appears and the card fades */
+  .glass[data-phase],
+  .glass[data-phase] .water,
+  .yours,
+  .yours .water,
+  .sparks,
+  .sparks circle {
+    animation: none !important;
+  }
+  .yours,
+  .sparks { display: none; }
+  .card { animation: fadeIn 200ms linear both; }
+  .cheer { animation: fadeIn 200ms linear both, fadeOut 300ms linear 1200ms both; }
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

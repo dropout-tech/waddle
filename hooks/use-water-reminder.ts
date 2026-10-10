@@ -11,12 +11,14 @@ import {
   WATER_AFTER_FOCUS_DELAY_MS,
   getWaterNextDueAt,
   getWaterReminderEnabled,
+  getWaterReminderInterval,
   isFocusRunning,
   scheduleNextWaterReminder,
   setWaterNextDueAt,
   setWaterReminderEnabled,
   waterReminderVerdict,
 } from '@/lib/water-reminder'
+import { getWaterIgnoredOnce, planAfterIgnore, setWaterIgnoredOnce } from '@/lib/water-moment'
 
 /**
  * Polls every 30s to see whether the next water reminder is due, and
@@ -179,13 +181,25 @@ export function useWaterReminder({
   }, [])
 
   const dismiss = useCallback(() => {
+    setWaterIgnoredOnce(false)
     scheduleNextWaterReminder()
     resetShown()
     setIsOpen(false)
   }, [resetShown])
 
   const snooze = useCallback(() => {
+    setWaterIgnoredOnce(false)
     setWaterNextDueAt(Date.now() + SNOOZE_MINUTES * 60 * 1000)
+    resetShown()
+    setIsOpen(false)
+  }, [resetShown])
+
+  /** The drop (C) evaporated untouched: ask again in 15 min; a second ignore in a row ends the
+   *  round (full interval). See lib/water-moment.ts planAfterIgnore. */
+  const ignore = useCallback(() => {
+    const plan = planAfterIgnore({ ignoredBefore: getWaterIgnoredOnce(), now: Date.now(), intervalMin: getWaterReminderInterval() })
+    setWaterIgnoredOnce(plan.ignoredOnce)
+    setWaterNextDueAt(plan.nextDueAt)
     resetShown()
     setIsOpen(false)
   }, [resetShown])
@@ -193,13 +207,14 @@ export function useWaterReminder({
   /** Turn the whole feature off from inside the popup (the popup's gear).
    *  Settings can re-enable it later; its own toggle re-arms the schedule. */
   const disable = useCallback(() => {
+    setWaterIgnoredOnce(false)
     setWaterReminderEnabled(false)
     setEnabledState(false)
     resetShown()
     setIsOpen(false)
   }, [resetShown])
 
-  return { isOpen: isOpen && !paused, enabled, dueAfterFocus, dismiss, snooze, disable }
+  return { isOpen: isOpen && !paused, enabled, dueAfterFocus, dismiss, snooze, disable, ignore }
 }
 
 export { DEFAULT_WATER_INTERVAL }

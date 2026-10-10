@@ -253,18 +253,31 @@ export const dict: Record<string, string> = {
   '選擇顏色 {color}': 'Choose color {color}',
   '時長 {duration}': 'Duration {duration}',
 
-  // ── water-reminder-modal.tsx ────────────────────────────────────────────
+  // ── 喝水提醒 (components/water/*, components/pet/pet-water.tsx) ─────────────
+  // A「企鵝送水來」card + C「輕輕一滴」drop (老闆 2026-10-10). Only reminds, never records.
   '已關閉喝水提醒': 'Water reminder turned off',
   '想恢復時：右上角「設定」→ 一般 → 喝水提醒': 'To turn it back on: top-right "Settings" → General → Water reminder',
   '關掉後不再跳出，設定 → 一般 可重新開啟': "Won't pop up once turned off — re-enable in Settings → General",
   '提醒間隔': 'Reminder interval',
-  '該喝水囉～': 'Time to hydrate~',
-  '搖搖擺擺地工作了一陣子，': "You've been waddling through work for a while,",
-  '記得補一口水，再慢慢繼續。': 'take a sip of water, then carry on.',
   '該喝水囉': 'Time to hydrate',
-  '好，去喝水': "OK, I'll drink",
-  '再過一下': 'Snooze',
-  'Huddle 拿著水杯': 'Huddle holding a glass of water',
+  '喝水提醒設定': 'Water reminder settings',
+  '我端了一杯水來。': 'I brought you a glass of water.',
+  '喝一口，再慢慢繼續。': 'Take a sip, then carry on.',
+  '剛好休息，順便喝口水。': 'Break time — perfect for a sip.',
+  '我已經倒好了。': "It's already poured.",
+  '乾杯': 'Cheers',
+  '等等再喝': 'Later',
+  '乾杯！': 'Cheers!',
+  '一起喝一口。': "Let's both take a sip.",
+  '咕嚕。好喝！': 'Gulp. That hit the spot!',
+  '好，我等一下再端來。': "Okay, I'll bring it back in a bit.",
+  '喝口水嗎？': 'Sip of water?',
+  '剛好休息，喝一口？': 'On a break — sip?',
+  '點一下就好': 'Just tap it',
+  '喝水提醒：喝過了就點一下': "Water reminder: tap once you've had a sip",
+  '剛好休息，喝一口水吧：喝過了就點一下': "On a break — have a sip of water, then tap",
+  '點一下＝喝過了（右鍵：提醒設定）': 'Click = had a sip (right-click: reminder settings)',
+  '咕嚕': 'Gulp',
 
   // ── workspace-settings-modal.tsx ────────────────────────────────────────
   '圖片大小不能超過 2MB': 'Image must be under 2MB',

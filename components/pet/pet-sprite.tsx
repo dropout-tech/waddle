@@ -28,20 +28,26 @@ export function PetSprite({
   pose = 'stand',
   blink = false,
   blush = false,
+  happy = false,
   className,
+  children,
 }: {
   color: PetColor
   accessory: PetAccessory
   pose?: PetPose
   blink?: boolean
   blush?: boolean
+  /** Eyes shut in a smile (lids + two ink arcs) — sipping water with you (喝水提醒 A, 老闆 2026-10-10). */
+  happy?: boolean
   className?: string
+  /** Props held in front of the body (e.g. the water glass); inherits the sprite's transforms. */
+  children?: React.ReactNode
 }) {
   const palette = PET_COLOR_STYLES[color] ?? PET_COLOR_STYLES.ink
   const accent = palette.accent
   const standing = pose === 'stand'
   return (
-    <span className={cn(styles.sprite, className)} data-pose={pose} data-blink={blink ? '' : undefined} aria-hidden="true">
+    <span className={cn(styles.sprite, className)} data-pose={pose} data-blink={blink || happy ? '' : undefined} aria-hidden="true">
       <span className={styles.body} style={{ filter: palette.body === 'none' ? undefined : palette.body }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- tiny static sprite, next/image adds wrappers + lazy logic we don't want */}
         <img src={`/art/penguin/${pose}.webp`} alt="" width={240} height={240} draggable={false} decoding="async" />
@@ -55,6 +61,9 @@ export function PetSprite({
               <ellipse cx="60" cy="114" rx="16" ry="9" fill="#e79a86" />
               <ellipse cx="192" cy="114" rx="16" ry="9" fill="#e79a86" />
             </g>
+            {happy && (
+              <path d="M66 88 Q82.5 74 99 88 M141.5 88 Q158 74 174.5 88" fill="none" stroke={INK} strokeWidth="7" strokeLinecap="round" />
+            )}
           </svg>
         )}
       </span>
@@ -63,6 +72,7 @@ export function PetSprite({
           <Accessory kind={accessory} accent={accent} />
         </svg>
       )}
+      {children}
     </span>
   )
 }

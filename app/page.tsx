@@ -24,7 +24,7 @@ import { useMeetingReminders } from '@/hooks/use-meeting-reminders'
 import { useFollowupReminders } from '@/hooks/use-followup-reminders'
 import { useWaterReminder } from '@/hooks/use-water-reminder'
 import { useUndoShortcuts } from '@/hooks/use-undo-shortcuts'
-import { WaterReminderModal } from '@/components/modals/water-reminder-modal'
+import { WaterReminder } from '@/components/water/water-reminder'
 import { toDateString } from '@/lib/calendar-utils'
 import { findTaskById } from '@/lib/task-utils'
 import { resolveDefaultCategory, resolveGlobalDefaultCategory } from '@/lib/default-category'
@@ -729,11 +729,14 @@ function HuddlePage() {
       <KeyboardShortcutsHint />
       <DailyClearCelebration />
       <IglooHost workspaces={workspaces} pet={settings.pet} onSetPet={setPet} />
-      <WaterReminderModal
+      {/* 喝水提醒: the penguin brings a glass (A), or a drop in the corner when there's no penguin (C). */}
+      <WaterReminder
         isOpen={water.isOpen}
+        dueAfterFocus={water.dueAfterFocus}
         onDrink={water.dismiss}
         onSnooze={water.snooze}
         onDisable={water.disable}
+        onIgnore={water.ignore}
       />
     </ErrorBoundary>
   )
