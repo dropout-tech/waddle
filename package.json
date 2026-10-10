@@ -28,13 +28,13 @@
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
-    "@capacitor/android": "8.3.4",
+    "@capacitor/android": "8.4.3",
     "@capacitor/app": "^8.1.0",
     "@capacitor/browser": "^8.0.3",
-    "@capacitor/core": "^8.3.4",
+    "@capacitor/core": "~8.4.3",
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/haptics": "^8.0.2",
-    "@capacitor/ios": "^8.3.4",
+    "@capacitor/ios": "~8.4.3",
     "@capacitor/keyboard": "^8.0.3",
     "@capacitor/local-notifications": "^8.2.0",
     "@capacitor/preferences": "^8.0.1",
@@ -98,7 +98,7 @@
     "html-to-image": "^1.11.13",
     "input-otp": "1.4.2",
     "lucide-react": "^0.564.0",
-    "next": "16.3.6",
+    "next": "16.3.8",
     "next-themes": "^0.4.6",
     "react": "^19",
     "react-day-picker": "9.13.2",
@@ -113,7 +113,7 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
-    "@capacitor/cli": "^8.3.4",
+    "@capacitor/cli": "~8.4.3",
     "@tailwindcss/postcss": "^4.2.0",
     "@types/node": "^22",
     "@types/react": "^19",
@@ -129,31 +129,7 @@
   "optionalDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "eslint": "^9.18.0",
-    "eslint-config-next": "16.3.6"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron",
-      "sharp"
-    ],
-    "patchedDependencies": {
-      "@capacitor-community/apple-sign-in": "patches/@capacitor-community__apple-sign-in.patch"
-    },
-    "overrides": {
-      "lodash@<4.18.0": "^4.18.1",
-      "ws@<8.21.0": "^8.22.0",
-      "postcss@<8.5.18": "^8.5.28",
-      "nanoid@<3.3.18": "^3.3.19",
-      "browserslist@<4.28.7": "^4.29.3",
-      "js-yaml@<4.3.2": "^4.3.2",
-      "brace-expansion@<1.1.20": "^1.1.21",
-      "brace-expansion@>=2.0.0 <2.1.6": "^2.1.7",
-      "brace-expansion@>=5.0.0 <5.0.11": "^5.0.12",
-      "replace>minimatch": "3.1.5",
-      "@xmldom/xmldom@<0.8.15": "^0.8.15",
-      "@xmldom/xmldom@>=0.9.0 <0.9.12": "^0.9.12",
-      "@capacitor/cli@8>tar": "^7.5.22"
-    }
+    "eslint-config-next": "16.3.8"
   },
   "build": {
     "appId": "com.lazylazy.huddle.desktop",
