@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, shell, ipcMain, Notification } = require('electron')
+const { app, BrowserWindow, Menu, shell, ipcMain, Notification, Tray, nativeImage, systemPreferences } = require('electron')
 const path = require('node:path')
 
 // Same value as SITE_ORIGIN in lib/site.ts (cannot import TS here). The old waddle.zeabur.app stays live for already-installed apps.
@@ -7,9 +7,11 @@ const appUrl = process.env.HUDDLE_APP_URL || PRODUCTION_URL
 const allowedOrigin = new URL(appUrl).origin
 const { createOAuth } = require('./oauth.cjs')
 const { createNotifications } = require('./notifications.cjs')
+const { createFocusTray } = require('./focus-tray.cjs')
 const { windowOpenPolicy } = require('./navigation.cjs')
 let win
 let oauth
+let focusTray
 let pendingUrl
 const locked = app.requestSingleInstanceLock()
 if (!locked) app.quit()
@@ -59,6 +61,13 @@ function createWindow(targetUrl = appUrl) {
   win.loadURL(targetUrl)
 
   secureNavigation(win)
+  // The focus timer lives in this renderer; a reload, crash or close ends it,
+  // so drop the menu-bar countdown until the page reports again.
+  const owner = win
+  const dropFocusTray = () => { if (win === owner) focusTray?.clear() }
+  win.webContents.on('did-navigate', dropFocusTray)
+  win.webContents.on('render-process-gone', dropFocusTray)
+  win.on('closed', dropFocusTray)
 }
 
 function secureNavigation(window) {
@@ -109,6 +118,11 @@ app.whenReady().then(() => {
   ipcMain.handle('desktop-notification-clear', event => notifications.clear(event))
   ipcMain.handle('desktop-notification-status', event => notifications.status(event))
   ipcMain.handle('desktop-notification-show', (event, payload) => notifications.show(event, payload))
+  focusTray = createFocusTray({ Tray, nativeImage, systemPreferences, platform: process.platform, trusted, focus: () => {
+    if (win && !win.isDestroyed()) { win.restore(); win.show(); win.focus() }
+    else createWindow()
+  } })
+  ipcMain.handle('desktop-focus-status', (event, payload) => focusTray.set(event, payload))
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
   createWindow()
   const initial = pendingUrl || process.argv.find(value => value.startsWith('huddle-desktop://'))

@@ -20,3 +20,9 @@ test('only the same-origin floating host is always on top; arbitrary blank windo
   assert.equal(windowOpenPolicy('https://evil.test/floating-host.html', origin, 'preload').action, 'deny')
   assert.equal(windowOpenPolicy('about:blank', origin, 'preload').action, 'deny')
 })
+test('on macOS only the floating host becomes a panel so it can float above full-screen apps', () => {
+  const origin = 'https://huddle.lazy72.com'
+  assert.equal(windowOpenPolicy(origin + '/floating-host.html', origin, 'preload', 'darwin').overrideBrowserWindowOptions.type, 'panel')
+  assert.equal(windowOpenPolicy(origin + '/float/note', origin, 'preload', 'darwin').overrideBrowserWindowOptions.type, undefined)
+  assert.equal(windowOpenPolicy(origin + '/floating-host.html', origin, 'preload', 'win32').overrideBrowserWindowOptions.type, undefined)
+})

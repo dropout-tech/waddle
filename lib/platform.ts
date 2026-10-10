@@ -23,6 +23,16 @@ declare global {
       clearNotifications?: () => Promise<void>
       notificationStatus?: () => Promise<{ supported: boolean; permission: 'unknown'; lastError: string | null }>
       showNotification?: (payload: { kind: 'meeting' | 'focus' | 'water' | 'test'; id: string; title: string; body: string; silent?: boolean }) => Promise<{ status: string }>
+      /** Mac 選單列專注倒數（desktop/focus-tray.cjs）；null＝收掉。 */
+      setFocusStatus?: (payload: {
+        state: 'running' | 'paused' | 'completed'
+        mode: 'pomodoro' | 'stopwatch'
+        startedAt: number
+        pausedMs: number
+        pausedAt: number | null
+        targetSeconds: number
+        prefix: string
+      } | null) => Promise<{ status: string }>
       cancelOAuth: () => Promise<void>
     }
   }

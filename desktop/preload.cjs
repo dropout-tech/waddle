@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('huddleDesktop', {
   clearNotifications: () => ipcRenderer.invoke('desktop-notification-clear'),
   notificationStatus: () => ipcRenderer.invoke('desktop-notification-status'),
   showNotification: payload => ipcRenderer.invoke('desktop-notification-show', payload),
+  setFocusStatus: payload => ipcRenderer.invoke('desktop-focus-status', payload),
   beginOAuth: () => ipcRenderer.invoke('desktop-oauth-begin'),
   openOAuth: url => ipcRenderer.invoke('desktop-oauth-open', url),
   cancelOAuth: () => ipcRenderer.invoke('desktop-oauth-cancel'),
