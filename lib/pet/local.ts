@@ -17,8 +17,8 @@ export interface PetLocalState {
   dailyLineAsked?: string
   /** Local YYYY-MM-DD of the last overdue nudge (once a day). */
   overdueNudged?: string
-  /** Local YYYY-MM-DD of the last meeting nudge (once a day). */
-  meetingNudged?: string
+  /** Meeting occurrences already announced ("<task id>@YYYY-MM-DDTHH:mm"): one line per meeting, not per day. */
+  meetingNudgedKeys?: string[]
   /** Idle chatter budget: how many idle lines were said on `idleDate`. */
   idleDate?: string
   idleCount?: number

@@ -61,10 +61,10 @@ export const dict: Record<string, string> = {
   '{n} 小時': '{n}h',
 
   // notification-center.tsx
-  '{n} 天前': '{n} days ago',
-  '{n} 週前': '{n} weeks ago',
-  '{n} 個月前': '{n} months ago',
-  '{n} 年前': '{n} years ago',
+  '{n} 天前': '{n} {n|day|days} ago',
+  '{n} 週前': '{n} {n|week|weeks} ago',
+  '{n} 個月前': '{n} {n|month|months} ago',
+  '{n} 年前': '{n} {n|year|years} ago',
   '{n} 個任務已經放了一陣子': '{n} {n|task has|tasks have} been sitting for a while',
   '最久的一件是{time}的。有些也許已經不用做了——放心整理掉，留下真正想做的就好。':
     'The oldest one is from {time}. Some of these might not need doing anymore — feel free to clear them out and keep what you actually want to do.',
@@ -75,16 +75,19 @@ export const dict: Record<string, string> = {
   '今天排了 {n} 件事': "{n} {n|thing|things} on today's schedule",
   '還有時間，可以慢慢做——一件一件來就好。': "There's still time — take it one thing at a time.",
   '{n} 個任務這幾天到期': '{n} {n|task is|tasks are} due in the next few days',
-  '接下來三天會陸續到期，先挑個順手的時段放上日曆，到時候就從容多了。':
-    "These are due over the next three days — put them on the calendar at a time that works, and you'll feel more at ease when they arrive.",
-  '{n} 個任務靜靜躺了兩週': '{n} {n|task has|tasks have} been quietly sitting for two weeks',
+  '接下來 {days} 天會陸續到期，先挑個順手的時段放上日曆，到時候就從容多了。':
+    "These are due over the next {days} {days|day|days} — put them on the calendar at a time that works, and you'll feel more at ease when they arrive.",
+  '{n} 個任務明天到期': '{n} {n|task is|tasks are} due tomorrow',
+  '先看看要不要準備什麼，順手把它們放上日曆吧。': "See if anything needs preparing, and put them on the calendar while you're at it.",
+  '{n} 個任務靜靜躺了 {days} 天以上': '{n} {n|task has|tasks have} been quietly sitting for {days}+ days',
   '還想做的話，挑個日子放上日曆；不想做了也沒關係，歸檔就好。':
     "If you still want to do them, pick a day and put them on the calendar. If not, that's fine too — just archive them.",
   '急件好像有點多': 'Quite a few urgent items',
-  '有 {n} 個任務都標了高優先。全部都急，反而不知道從哪開始——挑出真正的前幾名，其他的緩緩也可以。':
-    "{n} tasks are marked high priority. When everything's urgent, it's hard to know where to start — pick out the real top few and let the rest wait.",
+  '有 {n} 個任務的優先等級在 {level}/10 以上。全部都急，反而不知道從哪開始——挑出真正的前幾名，其他的緩緩也可以。':
+    "{n} tasks are rated {level}/10 or higher. When everything's urgent, it's hard to know where to start — pick out the real top few and let the rest wait.",
   '調整優先順序': 'Adjust priorities',
   '多數任務未排程': 'Most tasks are unscheduled',
+  '不少任務還沒排程': 'Quite a few tasks are unscheduled',
   '有 {n} 個任務還沒排到日曆上。挑個時段放進去，比較容易把事情做完。':
     "{n} tasks haven't made it onto the calendar yet. Pick a time slot for them — it's easier to get things done that way.",
   '排程任務': 'Schedule tasks',
@@ -93,7 +96,21 @@ export const dict: Record<string, string> = {
   '通知中心': 'Notification Center',
   '一切順利！': 'All clear!',
   '目前沒有需要注意的事項': 'Nothing needs your attention right now',
-  '還有 {n} 個任務...': '{n} more tasks...',
+  '還有 {n} 個任務...': '{n} more {n|task|tasks}...',
+  // notification-center.tsx — daily cards, group headers, long lists
+  '今天的摘要': "Today's summary",
+  '{n} 件逾期': '{n} overdue',
+  '今天 {n} 件到期': '{n} due today',
+  '明天 {n} 件到期': '{n} due tomorrow',
+  '每日規劃時間到了': 'Time for your daily planning',
+  '花一分鐘看看待辦，把接下來的時間排一排。': 'Take a minute to look over your to-dos and plan the time ahead.',
+  'Huddle · 每日規劃': 'Huddle · Daily planning',
+  '已逾期': 'Overdue',
+  '快到期': 'Due soon',
+  '閒置中': 'Sitting idle',
+  '小建議': 'Suggestions',
+  '顯示其餘 {n} 則': 'Show the other {n}',
+  '只顯示前 {n} 則': 'Show only the first {n}',
   '全部歸檔': 'Archive all',
 
   // onboarding-tour.tsx — chrome
@@ -164,8 +181,8 @@ export const dict: Record<string, string> = {
     'Set a stretch of time and focus on one thing; the default is a 25-minute Pomodoro. Add music or ambient sound such as rain, waves or a cafe. When it ends, the session is logged on today\'s calendar automatically.',
   '就算 Huddle 沒開著，手機也會跳通知提醒你：會議快開始、專注時間到、該喝水了。到「設定」→「一般設定」打開「會議提醒」和「背景提醒」；手機問要不要允許通知時，按「允許」就好。':
     'Even when Huddle is closed, your phone can remind you that a meeting is about to start, your focus time is up, or it\'s time for water. Go to "Settings" → "General" and turn on "Meeting reminders" and "Background reminders". When your phone asks about notifications, tap "Allow".',
-  '每 60 分鐘，Huddle 會提醒你喝口水。想晚點再喝，按「再過一下」，五分鐘後再提醒。間隔可以在「設定」調整，也可以整個關掉。':
-    'Every 60 minutes, Huddle reminds you to drink some water. Not now? Press "Snooze" and it comes back in five minutes. Change the interval in Settings, or turn it off entirely.',
+  '每隔一段時間，你的企鵝會端一杯水走過來（晚上不會打擾你）。按「乾杯」就算喝了；想晚點再喝，按「等等再喝」，五分鐘後再來。還沒有企鵝的話，角落會冒出一顆小水滴，點一下就好。間隔可以在「設定」調整，也可以整個關掉。':
+    "Every so often, your penguin walks over with a glass of water (never at night). Tap \"Cheers\" once you've had a sip, or \"Later\" and it comes back in five minutes. No penguin yet? A little water drop appears in the corner instead — just tap it. Change the interval in Settings, or turn it off entirely.",
   '角落這隻企鵝是你專屬的。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。牠偶爾會提醒你會議和過期的任務，但多半只是在說些荒謬的話。':
     'The penguin in the corner is yours. Tap it for a joke; to quiet it down, long-press (right-click on a computer) to open its menu. Now and then it reminds you about meetings and overdue tasks, but mostly it just says absurd things.',
   '導覽結束後，你可以領養一隻專屬企鵝，牠會住在畫面角落。點牠會講笑話；想讓牠安靜一下，長按（電腦按右鍵）打開選單。':

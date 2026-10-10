@@ -29,6 +29,7 @@ import {
 import { WORKSPACE_COLORS, UNCATEGORIZED_WORKSPACE_COLOR } from '@/lib/palette'
 import { UNCATEGORIZED_WORKSPACE_ICON } from '@/lib/default-category'
 import { DEFAULT_FOCUS_SETTINGS, normalizeFocusSettings } from '@/lib/focus'
+import { DEFAULT_NOTIFICATION_SETTINGS } from '@/lib/notifications/settings'
 import type { FocusSettings } from '@/lib/focus'
 import { normalizePet, type PetSettings } from '@/lib/pet/types'
 // Aliased: this file uses `t` pervasively as the loop variable for "task"
@@ -167,23 +168,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   bufferTime: { enabled: true, defaultDuration: 30, color: '#FFF8E1' },
   defaultTaskColors: {},
   slotTypes: [],
-  notifications: {
-    enabled: true,
-    overdue: { enabled: true, criticalDays: 7, showInBell: true, dailyDigest: true },
-    dueSoon: { enabled: true, daysBeforeDue: 3, notifyOnDueDay: true, notifyDayBefore: true },
-    staleTasks: { enabled: true, daysUntilStale: 14, includeUnscheduled: true, includeNoDueDate: true },
-    highPriority: { enabled: true, minUrgency: 8, alertWhenTooMany: true, maxBeforeAlert: 5 },
-    scheduling: {
-      enabled: true,
-      remindUnscheduled: true,
-      percentThreshold: 50,
-      dailyPlanningReminder: false,
-      planningReminderTime: '08:00',
-    },
-    workspaceOverrides: {},
-    quietHours: { enabled: false, startTime: '22:00', endTime: '08:00', allowUrgent: true },
-    appearance: { showBadgeCount: true, groupByType: true, autoCollapse: false, maxVisible: 10 },
-  },
+  notifications: DEFAULT_NOTIFICATION_SETTINGS,
 }
 
 type ScratchpadUpdate = Database['public']['Tables']['scratchpad_items']['Update']

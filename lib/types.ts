@@ -393,8 +393,11 @@ export interface NotificationSettings {
   staleTasks: {
     enabled: boolean
     daysUntilStale: number // Days without activity to consider stale (default: 14)
-    includeUnscheduled: boolean // Include tasks without schedule
-    includeNoDueDate: boolean // Include tasks without due date
+    // includeUnscheduled / includeNoDueDate: NO LONGER USED, kept only so stored blobs keep their shape. A stale task is
+    // by definition one with no due date that is not on the calendar, so both sub-switches were just a second master
+    // switch (off = the card can never appear). Removed from the settings page; nothing reads them.
+    includeUnscheduled: boolean
+    includeNoDueDate: boolean
   }
   
   // High priority alerts
@@ -418,7 +421,7 @@ export interface NotificationSettings {
   workspaceOverrides: Record<string, {
     enabled: boolean // Enable/disable notifications for this workspace
     overduePriority: 'high' | 'medium' | 'low' | 'default'
-    muteUntil?: string // ISO date string to temporarily mute
+    muteUntil?: string // ISO date string to temporarily mute (no UI, not applied anywhere yet)
   }>
   
   // Quiet hours
@@ -433,7 +436,7 @@ export interface NotificationSettings {
   appearance: {
     showBadgeCount: boolean
     groupByType: boolean // Group notifications by type
-    autoCollapse: boolean // Auto-collapse read notifications
+    autoCollapse: boolean // Auto-collapse read notifications (no UI, not applied anywhere yet)
     maxVisible: number // Max notifications to show at once (default: 10)
   }
 }

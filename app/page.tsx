@@ -22,9 +22,10 @@ import { useRecurringCompleteConfirm } from '@/components/task-panel/use-recurri
 import { useWaddleData } from '@/hooks/use-waddle-data'
 import { useMeetingReminders } from '@/hooks/use-meeting-reminders'
 import { useFollowupReminders } from '@/hooks/use-followup-reminders'
+import { useDailyPlanningReminder } from '@/hooks/use-daily-planning-reminder'
 import { useWaterReminder } from '@/hooks/use-water-reminder'
 import { useUndoShortcuts } from '@/hooks/use-undo-shortcuts'
-import { WaterReminderModal } from '@/components/modals/water-reminder-modal'
+import { WaterReminder } from '@/components/water/water-reminder'
 import { toDateString } from '@/lib/calendar-utils'
 import { findTaskById } from '@/lib/task-utils'
 import { resolveDefaultCategory, resolveGlobalDefaultCategory } from '@/lib/default-category'
@@ -119,7 +120,7 @@ function HuddlePage() {
   // voice before the reminder hook below re-schedules with it.
   const petVoice = petVoiceName(settings.pet)
   useEffect(() => { setPetVoice(settings.pet) }, [settings.pet])
-  useMeetingReminders(workspaces, petVoice)
+  useMeetingReminders(workspaces, petVoice, settings.notifications?.quietHours)
   // Native: "今天要追" notifications for meeting follow-ups (hooks/use-followup-reminders.ts).
   useFollowupReminders(workspaces)
 
@@ -143,7 +144,10 @@ function HuddlePage() {
     const id = window.setTimeout(() => setTourGraceDone(true), WATER_GRACE_AFTER_TOUR_MS)
     return () => window.clearTimeout(id)
   }, [inTourGrace])
-  const water = useWaterReminder(isLoading || tourOpen || inTourGrace)
+  const water = useWaterReminder({
+    paused: isLoading || tourOpen || inTourGrace,
+    quietHours: settings.notifications?.quietHours,
+  })
 
   // Slot types — generated dynamically from current workspaces, plus static
   // built-in time-block types (break/buffer/focus) and any user customs.
@@ -199,6 +203,10 @@ function HuddlePage() {
   }, [selectedTask, workspaces, assignedTasks, taskMode])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('general')
+  // 每日規劃提醒 (設定 › 提醒設定): iOS repeating notification / web + Mac within 4 hours of the set time while open.
+  // `ready`: until the real settings are loaded they are the defaults (switch off) — acting on those would cancel the
+  // phone's pending reminder on every offline / slow cold start. `isSettingsOpen`: see the hook.
+  useDailyPlanningReminder(settings.notifications, petVoice, !isLoading, isSettingsOpen)
   const [isOverdueReviewOpen, setIsOverdueReviewOpen] = useState(false)
 
   // Email links ("/?settings=subscription") open Settings → 訂閱 directly. The
@@ -585,7 +593,7 @@ function HuddlePage() {
       <UserSettingsProvider value={settings}>
       <NotebookOverlayProvider>
       <LifeGridOverlayProvider>
-      {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} pet={settings.pet} weekStartDay={settings.weekStartDay} />}
+      {isNative() && <WidgetSync workspaces={workspaces} timeBlocks={timeBlocks} boards={scratchpadByDate} pet={settings.pet} weekStartDay={settings.weekStartDay} quietHours={settings.notifications?.quietHours} />}
       <MainLayout
         workspaces={workspaces}
         assignedTasks={assignedTasks}
@@ -726,11 +734,15 @@ function HuddlePage() {
       <KeyboardShortcutsHint />
       <DailyClearCelebration />
       <IglooHost workspaces={workspaces} pet={settings.pet} onSetPet={setPet} />
-      <WaterReminderModal
+      {/* 喝水提醒: the penguin brings a glass (A), or a drop in the corner when there's no penguin (C). */}
+      <WaterReminder
         isOpen={water.isOpen}
+        dueAfterFocus={water.dueAfterFocus}
+        onBreak={water.onBreak}
         onDrink={water.dismiss}
         onSnooze={water.snooze}
         onDisable={water.disable}
+        onIgnore={water.ignore}
       />
     </ErrorBoundary>
   )

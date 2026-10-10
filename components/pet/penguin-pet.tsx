@@ -1,11 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Home, Laugh, Moon, Settings2, VolumeX } from 'lucide-react'
 import { useI18n } from '@/lib/i18n/react'
 import { createClient } from '@/lib/supabase/client'
 import { useFocusTimer } from '@/components/timer/focus-timer-provider'
-import { collectMeetings, meetingStartAsDate } from '@/lib/meeting-reminder'
+import { collectMeetings, meetingOccurrenceKey, pickMeetingNudge, rememberNudgedMeeting } from '@/lib/meeting-reminder'
 import { isTaskOverdue } from '@/lib/task-utils'
 import { toDateString } from '@/lib/calendar-utils'
 import { pickLine, renderLine, type PetLineCategory } from '@/lib/pet/lines'
@@ -17,6 +17,9 @@ import { openLifeGrid } from '@/lib/life-grid/events'
 import { CELEBRATE_CHANCE, IDLE_DAILY_CAP, IDLE_MINUTES, type PetSettings } from '@/lib/pet/types'
 import type { Workspace } from '@/lib/types'
 import { PetSprite, type PetPose } from './pet-sprite'
+import { PetWaterCard, PetWaterCheer, PetWaterInHand, type PetWaterPhase } from './pet-water'
+import { WATER_COVER_SELECTOR, getWaterPetRequest, setPetWaterState, subscribeWaterMoment, type WaterVariant } from '@/lib/water-moment'
+import { hapticTaskComplete } from '@/lib/haptics'
 import { PetAdoptCard } from './pet-adopt-card'
 import styles from './pet.module.css'
 
@@ -28,7 +31,7 @@ const MEETING_LEAD_MS = 10 * 60 * 1000
 const COMBO_MS = 1300
 const LONG_PRESS_MS = 500
 /** Anything that means "a modal / takeover is up" — the penguin steps aside. */
-const HIDE_SELECTOR = '[role="dialog"]:not([data-pet-ui]):not([data-onboarding-tour]), [data-pet-hide]'
+const HIDE_SELECTOR = WATER_COVER_SELECTOR
 
 const CONTROL_SELECTOR =
   'button, a[href], input, select, textarea, summary, [role="button"], [role="tab"], [role="switch"], [role="menuitem"], [role="checkbox"], [contenteditable="true"]'
@@ -178,6 +181,12 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   const [domHidden, setDomHidden] = useState(false)
   const [pageHidden, setPageHidden] = useState(false)
   const [reduced, setReduced] = useState(false)
+  // 喝水提醒 A (lib/water-moment.ts): walking over with a glass → card → 乾杯 / 等等再喝 → home.
+  const [water, setWater] = useState<{ id: number; phase: PetWaterPhase; variant: WaterVariant } | null>(null)
+  const [waterAway, setWaterAway] = useState(false) // standing at the delivery spot (not at home)
+  const [happy, setHappy] = useState(false)
+  const [muted, setMuted] = useState(() => isPetMuted())
+  const waterTimers = useRef<number[]>([])
 
   const homeRef = useRef<HTMLDivElement>(null)
   const bubbleRef = useRef<HTMLDivElement>(null)
@@ -229,6 +238,18 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   const desktopLeft = useDesktopAnchor(!isMobile)
   const yielding = usePetYield(shown && !pageHidden, homeRef, `${isMobile}:${desktopLeft}`)
 
+  // ── 喝水提醒 A: tell the host whether a delivery can be seen; play it when asked ──
+  useEffect(() => {
+    const id = window.setInterval(() => setMuted(isPetMuted()), 5000)
+    return () => window.clearInterval(id)
+  }, [])
+  // off: nothing to send for a while → the drop. wait: just covered (a dialog, a background tab) → A waits.
+  const waterState = muted || hidden || yielding ? 'off' : domHidden || pageHidden ? 'wait' : 'ready'
+  useEffect(() => {
+    setPetWaterState(waterState)
+  }, [waterState])
+  useEffect(() => () => setPetWaterState('off'), [])
+
   // ── speaking ──────────────────────────────────────────────────────────
   const playAct = useCallback((next: Act, ms: number) => {
     window.clearTimeout(actTimer.current)
@@ -264,7 +285,101 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
     window.clearTimeout(bubbleTimer.current)
     window.clearTimeout(actTimer.current)
     window.clearTimeout(longPressTimer.current)
+    waterTimers.current.forEach((id) => window.clearTimeout(id))
   }, [])
+
+  const waterReq = useSyncExternalStore(subscribeWaterMoment, getWaterPetRequest, () => null)
+  const waterRef = useRef(water)
+  useEffect(() => {
+    waterRef.current = water
+  }, [water])
+  const waterAfter = useCallback((ms: number, fn: () => void) => {
+    waterTimers.current.push(window.setTimeout(fn, ms))
+  }, [])
+  const clearWaterTimers = useCallback(() => {
+    waterTimers.current.forEach((id) => window.clearTimeout(id))
+    waterTimers.current = []
+  }, [])
+  /** Walk back to the corner and put the glass away. */
+  const waterGoHome = useCallback((phase: PetWaterPhase, delay: number) => {
+    setWater((w) => (w ? { ...w, phase } : w))
+    waterAfter(delay, () => {
+      setWaterAway(false)
+      if (!reduced) setAct('walk')
+    })
+    waterAfter(delay + (reduced ? 300 : 1400), () => {
+      setAct('')
+      setWater(null)
+    })
+  }, [reduced, waterAfter])
+
+  // A new delivery → hop, the glass appears, waddle over, then the card. The request going away
+  // before anyone answered (switched off elsewhere, the host fell back to the drop) → walk home.
+  useEffect(() => {
+    const cur = waterRef.current
+    if (waterReq && waterReq.id !== cur?.id) {
+      if (!shown || pageHidden) return // covered right now — walk over once it can be seen
+      clearWaterTimers()
+      window.clearTimeout(bubbleTimer.current)
+      setBubble(null)
+      setMenuOpen(false)
+      setPose('stand')
+      setFlip(false)
+      setOffsetX(0)
+      setHappy(false)
+      if (reduced) {
+        setWaterAway(true)
+        setWater({ id: waterReq.id, phase: 'card', variant: waterReq.variant })
+        return
+      }
+      setWater({ id: waterReq.id, phase: 'arrive', variant: waterReq.variant })
+      playAct('hop', 450)
+      waterAfter(550, () => {
+        setWaterAway(true)
+        setAct('walk')
+      })
+      waterAfter(1950, () => {
+        setAct('')
+        setWater((w) => (w ? { ...w, phase: 'card' } : w))
+      })
+      return
+    }
+    if (!waterReq && cur && (cur.phase === 'arrive' || cur.phase === 'card')) {
+      clearWaterTimers()
+      waterGoHome('leave', 0)
+    }
+  }, [waterReq, shown, pageHidden, reduced, playAct, waterAfter, clearWaterTimers, waterGoHome])
+
+  const waterCheers = () => {
+    getWaterPetRequest()?.handlers.drink()
+    hapticTaskComplete() // the clink, on the phone
+    clearWaterTimers()
+    if (reduced) {
+      say(t('咕嚕。好喝！'), { act: '' })
+      waterGoHome('cheers', 0)
+      return
+    }
+    setWater((w) => (w ? { ...w, phase: 'cheers' } : w))
+    waterAfter(600, () => {
+      setHappy(true)
+      setBlush(true)
+    })
+    waterAfter(1850, () => say(t('咕嚕。好喝！'), { act: '' }))
+    waterAfter(2200, () => {
+      setHappy(false)
+      setBlush(false)
+    })
+    waterGoHome('cheers', 2400)
+  }
+  const waterLater = () => {
+    getWaterPetRequest()?.handlers.later()
+    clearWaterTimers()
+    say(t('好，我等一下再端來。'), { act: '' })
+    waterGoHome('later', 500)
+  }
+  const waterDisable = () => {
+    getWaterPetRequest()?.handlers.disable()
+  }
 
   // Hello after adoption.
   useEffect(() => {
@@ -307,7 +422,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   // ── automatic speech ──────────────────────────────────────────────────
   const quiet = focusBusy && pet.quietDuringFocus
   const canAuto = useCallback(() => {
-    if (!shown || pageHidden || quiet || menuOpen || bubble) return false
+    if (!shown || pageHidden || quiet || menuOpen || bubble || waterRef.current) return false
     const local = readPetLocal()
     if (isPetMuted(local)) return false
     if (local.lastSpokeAt && Date.now() - local.lastSpokeAt < MIN_GAP_MS) return false
@@ -397,16 +512,12 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
 
       const today = localDate(now)
 
-      // 1) meeting within 10 minutes — a real reminder, once a day.
-      for (const m of local.meetingNudged === today ? [] : collectMeetings(workspaces)) {
-        const start = meetingStartAsDate(m)
-        if (!start) continue
-        const until = start.getTime() - nowMs
-        if (until > 0 && until <= MEETING_LEAD_MS) {
-          writePetLocal({ meetingNudged: today })
-          say(line(['meeting'], { title: m.title, time: Math.max(1, Math.ceil(until / 60_000)) }), { auto: true, act: 'jump' })
-          return
-        }
+      // 1) meeting within 10 minutes — a real reminder, once per meeting (each occurrence of a repeating one too).
+      const soon = pickMeetingNudge(collectMeetings(workspaces), local.meetingNudgedKeys, nowMs, MEETING_LEAD_MS)
+      if (soon) {
+        writePetLocal({ meetingNudgedKeys: rememberNudgedMeeting(local.meetingNudgedKeys, meetingOccurrenceKey(soon.meeting), today) })
+        say(line(['meeting'], { title: soon.meeting.title, time: Math.max(1, Math.ceil(soon.untilMs / 60_000)) }), { auto: true, act: 'jump' })
+        return
       }
 
       // 2) late night — once per night.
@@ -489,7 +600,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   }, [pageHidden, pet.chattiness, canAuto, workspaces, overdueCount, say, line])
 
   // ── idle body language (blink, look around, a few steps, doze) ────────
-  const animate = shown && !pageHidden && !reduced
+  const animate = shown && !pageHidden && !reduced && !water
   useEffect(() => {
     if (!animate) return
     let t: number | undefined
@@ -538,6 +649,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
       suppressClick.current = false
       return
     }
+    if (water) return // busy holding a glass — the card has the buttons
     if (menuOpen) {
       setMenuOpen(false)
       return
@@ -559,6 +671,7 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   }
 
   const openMenu = () => {
+    if (waterRef.current) return
     window.clearTimeout(bubbleTimer.current)
     setBubble(null)
     setPose('stand')
@@ -577,10 +690,12 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
     if (kind === 'igloo') return openIgloo()
     if (kind === 'hour') {
       writePetLocal({ mutedUntil: Date.now() + 60 * 60 * 1000 })
+      setMuted(true)
       return say(t('好，我安靜一小時。'), { act: '' })
     }
     if (kind === 'today') {
       writePetLocal({ mutedDate: localDate() })
+      setMuted(true)
       return say(t('好，今天我當一個安靜的擺飾。'), { act: '' })
     }
     onOpenSettings?.()
@@ -596,6 +711,10 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
   const homeStyle: React.CSSProperties = isMobile
     ? { left: 16, bottom: 'calc(61px + env(safe-area-inset-bottom))', width: size, height: size }
     : { left: desktopLeft, bottom: 10, width: size, height: size }
+  // 喝水提醒 A: where it stands with the glass — always out of the hour-label gutter (desktop: ~100px
+  // into the day column; phone: past the 55px gutter), lifted off the tab bar and a bit bigger on a phone.
+  const waterX = waterAway ? (isMobile ? 44 : 104) : 0
+  const waterY = waterAway && isMobile ? -8 : 0
 
   return (
     <div
@@ -607,10 +726,11 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
       data-hide-on-keyboard
       data-yield={yielding ? '' : undefined}
       data-paused={pageHidden ? '' : undefined}
+      data-water={water?.phase}
     >
       {/* Desktop: while asking the evening question the penguin steps off the
           hour gutter (its home) so the time labels behind it stay readable. */}
-      <div className={styles.mover} style={{ transform: `translateX(${offsetX + (bubble?.action && !isMobile ? 58 : 0)}px)` }}>
+      <div className={styles.mover} style={{ transform: `translate(${offsetX + waterX + (bubble?.action && !isMobile ? 58 : 0)}px, ${waterY}px)` }}>
         <button
           ref={buttonRef}
           type="button"
@@ -643,10 +763,13 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
           }}
           onPointerUp={clearLongPress}
           onPointerCancel={clearLongPress}
+          style={isMobile ? { transform: waterAway ? 'scale(1.3)' : undefined, transformOrigin: '30% 100%', transition: 'transform 600ms cubic-bezier(0.22, 1, 0.36, 1)' } : undefined}
         >
           <span className={styles.facing} data-flip={flip ? '' : undefined}>
             <span key={actKey} className={styles.act} data-act={act || undefined}>
-              <PetSprite color={pet.color} accessory={pet.accessory} pose={pose} blink={blink} blush={blush} />
+              <PetSprite color={pet.color} accessory={pet.accessory} pose={pose} blink={blink} blush={blush} happy={happy}>
+                {water && <PetWaterInHand phase={water.phase} />}
+              </PetSprite>
             </span>
           </span>
           {pose === 'sleep' && (
@@ -657,6 +780,18 @@ function PetWidget({ pet, workspaces, isMobile, hidden, onOpenSettings }: Pengui
             </span>
           )}
         </button>
+
+        {water?.phase === 'card' && (
+          <PetWaterCard
+            name={pet.name}
+            variant={water.variant}
+            isMobile={isMobile}
+            onCheers={waterCheers}
+            onLater={waterLater}
+            onDisable={waterDisable}
+          />
+        )}
+        {water?.phase === 'cheers' && <PetWaterCheer isMobile={isMobile} />}
 
         {/* Persistent polite live region: the bubble text is announced once. */}
         <div aria-live="polite" aria-atomic="true" aria-label={t('企鵝說的話')}>

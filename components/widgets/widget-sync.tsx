@@ -10,7 +10,8 @@ import { focusNoteExcerpt, loadStickyRows, makeSnapshot } from '@/lib/widgets/mo
 import { HuddleWidgets, publishWidgets, widgetAccount } from '@/lib/widgets/native'
 import { rowToTask } from '@/lib/supabase/mappers'
 import { createClient } from '@/lib/supabase/client'
-import { getWaterNextDueAt, getWaterReminderEnabled, recordWaterFromWidget } from '@/lib/water-reminder'
+import { effectiveWaterDueAt, getWaterNextDueAt, getWaterReminderEnabled, getWaterReminderInterval, recordWaterFromWidget } from '@/lib/water-reminder'
+import { resolveQuietHours, waterQuietWindows } from '@/lib/quiet-hours'
 import { applyWidgetActions, withWatchFocus, WATCH_FOCUS_TTL_MS } from '@/lib/widgets/actions'
 import { widgetPet } from '@/lib/widgets/pet'
 import { getIglooSnapshot } from '@/lib/igloo/store'
@@ -29,13 +30,14 @@ function focusOf(timer:Timer,notes:NotebookNote[],today:string):WidgetSnapshot['
   return {mode:s?.mode,phase:s?.phase,state:timer.state,title:s?.label ?? t('慢慢來，先專心一件事'),seconds:timer.displayTime,endAt:s && timer.state==='running' && s.mode==='pomodoro' ? s.startedAt.getTime()+s.pausedMs+s.targetSeconds*1000:null,note:focusNoteExcerpt(notes,today,s?.label),...(s?.mode==='pomodoro' ? {total:s.targetSeconds} : {})}
 }
 
-export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null,weekStartDay=null}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[];pet?:PetSettings|null;weekStartDay?:number|null}) {
+/** `quietHours` = the saved notifications.quietHours (raw; may be missing) — the water reminders chain skips it. */
+export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null,weekStartDay=null,quietHours=null}:{workspaces:Workspace[];timeBlocks:TimeBlock[];boards:Record<string,ScratchpadItem[]>;notes?:NotebookNote[];pet?:PetSettings|null;weekStartDay?:number|null;quietHours?:unknown}) {
   const {user}=useAuth(), timer=useFocusTimer(), notebook=useNotebook()
-  const latest=useRef({workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet,weekStartDay})
+  const latest=useRef({workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet,weekStartDay,quietHours})
   // Last snapshot that reached the native store — lets a focus start/pause/stop
   // republish instantly instead of waiting on the debounced, network-bound sync.
   const lastSnap=useRef<WidgetSnapshot|null>(null)
-  useEffect(()=>{latest.current={workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet,weekStartDay}},[workspaces,timeBlocks,boards,timer,notebook.notes,notes,user,pet,weekStartDay])
+  useEffect(()=>{latest.current={workspaces,timeBlocks,boards,timer,notes:notes??notebook.notes,user,pet,weekStartDay,quietHours}},[workspaces,timeBlocks,boards,timer,notebook.notes,notes,user,pet,weekStartDay,quietHours])
   useEffect(()=>{
     let alive=true, busy=false, again=false
     let checkIn:{at:number;value?:WidgetSnapshot['checkIn']}|undefined
@@ -85,7 +87,8 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null,weekStar
           snapshot.tasks=makeSnapshot({accountId:source,epoch:auth.epoch,tasks:(rows??[]).map(r=>rowToTask(r,'','',labels.get(r.id)??'')),blocks:[],boards:{}}).tasks
         }
         snapshot.boards = snapshot.boards.map(b => ({...b, thumbnail: boardThumbnail(x.boards[b.id] ?? [])}))
-        snapshot.water={enabled:getWaterReminderEnabled(),nextAt:getWaterNextDueAt(),count:0}
+        // nextAt = when the next reminder can actually appear: a due time inside the quiet window waits for its end.
+        snapshot.water={enabled:getWaterReminderEnabled(),nextAt:effectiveWaterDueAt(getWaterNextDueAt(),waterQuietWindows(resolveQuietHours(latest.current.quietHours))),count:0}
         // 「我的 Huddle」: look + ready-rendered lines; the widget picks the bubble itself.
         const overdue=x.workspaces.filter(w=>!w.isArchived).flatMap(w=>w.categories.filter(c=>!c.isArchived).flatMap(c=>c.tasks)).filter(t=>isTaskOverdue(t,snapshot.today)).length
         snapshot.pet=widgetPet(x.pet,{overdue,lang:getLang(),day:snapshot.today,igloo:getIglooSnapshot()})
@@ -100,7 +103,7 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null,weekStar
         snapshot.focus=focusOf(latest.current.timer,latest.current.notes,snapshot.today)
         await publishWidgets(snapshot)
         lastSnap.current=snapshot
-        await syncWidgetReminders(snapshot)
+        await syncWidgetReminders(snapshot,{waterIntervalMin:getWaterReminderInterval(),quietHours:latest.current.quietHours})
       } catch { /* Keep last snapshot; widget shows its last update time. */ }
       finally {busy=false;if(again && alive) {again=false;void sync()}}
     }
@@ -115,7 +118,7 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null,weekStar
     window.addEventListener('focus',onVisible);document.addEventListener('visibilitychange',onVisible)
     return ()=>{alive=false;lastSnap.current=null;clearTimeout(changeTimer);window.removeEventListener('huddle-widget-refresh',onChange);window.removeEventListener(STICKY_CHANGED_EVENT,onSticky);clearInterval(id);clearTimeout(first);window.removeEventListener('focus',onVisible);document.removeEventListener('visibilitychange',onVisible)}
   },[user?.id])
-  useEffect(()=>{window.dispatchEvent(new Event('huddle-widget-refresh'))},[workspaces,timeBlocks,boards,notebook.notes,notes,timer.state,timer.session,pet,weekStartDay])
+  useEffect(()=>{window.dispatchEvent(new Event('huddle-widget-refresh'))},[workspaces,timeBlocks,boards,notebook.notes,notes,timer.state,timer.session,pet,weekStartDay,quietHours])
   // Focus start / pause / resume / stop → push the Live Activity right away from the
   // last published snapshot (only `focus` changes; the full sync above follows).
   useEffect(()=>{
@@ -124,6 +127,9 @@ export function WidgetSync({workspaces,timeBlocks,boards,notes,pet=null,weekStar
     const next={...last,generatedAt:new Date().toISOString(),focus:focusOf(timer,notes??notebook.notes,last.today)}
     lastSnap.current=next
     void publishWidgets(next).catch(()=>{})
+    // Background reminders follow the timer at once too, without waiting for (or depending on) the network-bound
+    // full sync: a running stopwatch cancels the water chain, pause / stop brings it back.
+    void syncWidgetReminders(next,{waterIntervalMin:getWaterReminderInterval(),quietHours:latest.current.quietHours}).catch(()=>{})
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only focus transitions, not every tick
   },[timer.state,timer.session])
   return null

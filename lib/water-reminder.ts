@@ -7,6 +7,8 @@
 // the tab doesn't reset the clock — otherwise a quick tab-restart would
 // silently push the next nudge a full hour out.
 
+import { deferOutOfQuietWindow, isInQuietWindow, type QuietSpec } from '@/lib/quiet-hours'
+
 export const WATER_REMINDER_ENABLED_KEY = 'waddle.waterReminder.enabled'
 export const WATER_REMINDER_INTERVAL_KEY = 'waddle.waterReminder.intervalMinutes'
 export const WATER_REMINDER_NEXT_DUE_KEY = 'waddle.waterReminder.nextDueAt'
@@ -15,6 +17,17 @@ export const WATER_REMINDER_INTERVALS = [30, 60, 90, 120] as const
 export type WaterReminderInterval = (typeof WATER_REMINDER_INTERVALS)[number]
 export const DEFAULT_WATER_INTERVAL: WaterReminderInterval = 60
 export const SNOOZE_MINUTES = 5
+/** After a focus stretch ends the popup waits this long, so the timer's own farewell/screen change lands first. */
+export const WATER_AFTER_FOCUS_DELAY_MS = 4_000
+
+/** Any change to the schedule (drink / snooze / toggle / interval) asks the native sync to re-plan
+ *  the background reminders now instead of at its next 30 s poll (components/widgets/widget-sync.tsx). */
+function requestReminderResync() {
+  if (typeof window === 'undefined') return
+  try {
+    window.dispatchEvent(new Event('huddle-widget-refresh'))
+  } catch {}
+}
 
 export function getWaterReminderEnabled(): boolean {
   if (typeof window === 'undefined') return false
@@ -34,6 +47,7 @@ export function setWaterReminderEnabled(enabled: boolean) {
   try {
     window.localStorage.setItem(WATER_REMINDER_ENABLED_KEY, enabled ? '1' : '0')
   } catch {}
+  requestReminderResync()
 }
 
 export function getWaterReminderInterval(): WaterReminderInterval {
@@ -54,6 +68,7 @@ export function setWaterReminderInterval(minutes: WaterReminderInterval) {
   try {
     window.localStorage.setItem(WATER_REMINDER_INTERVAL_KEY, String(minutes))
   } catch {}
+  requestReminderResync()
 }
 
 export function getWaterNextDueAt(): number | null {
@@ -73,6 +88,7 @@ export function setWaterNextDueAt(ms: number) {
   try {
     window.localStorage.setItem(WATER_REMINDER_NEXT_DUE_KEY, String(ms))
   } catch {}
+  requestReminderResync()
 }
 
 export function scheduleNextWaterReminder(minutes: number = getWaterReminderInterval()): number {
@@ -88,4 +104,66 @@ export function recordWaterFromWidget(at: number) {
   const next = at + getWaterReminderInterval() * 60 * 1000
   const current = getWaterNextDueAt()
   if (current === null || next > current) setWaterNextDueAt(next)
+}
+
+// ── Pure scheduling rules (no storage, no React): shared by the in-app popup
+//    (hooks/use-water-reminder.ts) and the iOS background chain
+//    (lib/widgets/reminders.ts), and unit-tested in scripts/tests/water-reminder-schedule.test.mjs.
+
+/** A focus stretch is on: the pomodoro work phase or the stopwatch, actually counting (not paused, not a break). */
+export function isFocusRunning(state: string | undefined, phase: string | undefined): boolean {
+  return state === 'running' && phase === 'work'
+}
+
+export type WaterVerdict = 'wait' | 'quiet' | 'focus' | 'show'
+
+/**
+ * What the popup should do right now.
+ *  wait  — not due yet
+ *  quiet — due, but inside the quiet window: keep the stored due time, show when the window ends
+ *  focus — due, but a focus stretch is running (or just ended): hold it, show after
+ *  show  — due and free to appear
+ * Quiet outranks focus so nothing is shown (or marked "after focus") at night.
+ */
+export function waterReminderVerdict(p: { now: number; due: number; quiet: QuietSpec; focusBusy: boolean }): WaterVerdict {
+  if (p.now < p.due) return 'wait'
+  if (isInQuietWindow(p.now, p.quiet)) return 'quiet'
+  if (p.focusBusy) return 'focus'
+  return 'show'
+}
+
+/** The stored due time, pushed to the end of the quiet window when it lands inside one (what widgets display). */
+export function effectiveWaterDueAt(due: number | null, quiet: QuietSpec): number | null {
+  return due === null ? null : deferOutOfQuietWindow(due, quiet)
+}
+
+/**
+ * Times (ms) to pre-schedule as iOS background notifications, soonest first.
+ * One every `intervalMin`, each one pushed out of the quiet window (a step that lands
+ * inside it becomes the window's end, and the next step counts from there — the same
+ * thing that happens in-app when the user taps 喝了 at that moment).
+ *  - already due: it is on screen in the app, so the chain starts one interval from now;
+ *  - a focus stretch ending at `focusEndsAt` (pomodoro, running) holds anything earlier
+ *    until just after it ends.
+ */
+export function planWaterReminders(p: {
+  nextDueAt: number | null
+  now: number
+  intervalMin: number
+  quiet: QuietSpec
+  max: number
+  focusEndsAt?: number | null
+}): number[] {
+  if (p.nextDueAt === null || p.max <= 0) return []
+  const step = Math.max(1, p.intervalMin) * 60_000
+  let t = p.nextDueAt
+  if (p.focusEndsAt != null && p.focusEndsAt > p.now) t = Math.max(t, p.focusEndsAt + WATER_AFTER_FOCUS_DELAY_MS)
+  if (t <= p.now) t = p.now + step
+  t = deferOutOfQuietWindow(t, p.quiet)
+  const out: number[] = []
+  while (out.length < p.max) {
+    out.push(t)
+    t = deferOutOfQuietWindow(t + step, p.quiet)
+  }
+  return out
 }
