@@ -26,6 +26,24 @@ type Rect = { x: number; y: number; w: number; h: number }
 
 const MEDIA = 'img, svg, canvas, video, picture'
 
+/** Floating chrome. Some of it lets taps fall through its visible body (the timer pill only takes clicks on a
+ *  transparent strip), so hit-testing can't see it — take its visible box instead. */
+const FLOATING = '[data-hide-on-keyboard], [data-tour="focus-timer"], [data-sonner-toast]'
+
+function floatingRects(hide: HTMLElement[]): Rect[] {
+  const out: Rect[] = []
+  for (const el of document.querySelectorAll<HTMLElement>(FLOATING)) {
+    if (hide.some((h) => h === el || h.contains(el))) continue
+    const r = el.getBoundingClientRect()
+    if (r.width === 0 || r.height === 0) continue
+    const cs = getComputedStyle(el)
+    if (cs.visibility === 'hidden' || cs.opacity === '0') continue
+    out.push({ x: r.left, y: r.top, w: r.width, h: r.height })
+  }
+  return out
+}
+const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+
 function ownText(el: Element) {
   for (const n of el.childNodes) if (n.nodeType === Node.TEXT_NODE && n.textContent?.trim()) return true
   return false
@@ -54,6 +72,7 @@ function occupancy(hide: HTMLElement[]) {
   const rows = Math.ceil(H / STEP)
   // prefix sums over "busy" cells: sum[(r+1)*(cols+1) + (c+1)]
   const sum = new Uint32Array((rows + 1) * (cols + 1))
+  const cells = new Uint8Array(rows * cols)
   const busy = makeBusy()
   const saved = hide.map((el) => el.style.visibility)
   hide.forEach((el) => {
@@ -61,12 +80,10 @@ function occupancy(hide: HTMLElement[]) {
   })
   try {
     for (let r = 0; r < rows; r++) {
-      let rowSum = 0
       for (let c = 0; c < cols; c++) {
         const x = Math.min(W - 1, c * STEP + STEP / 2)
         const y = Math.min(H - 1, r * STEP + STEP / 2)
-        rowSum += busy(document.elementFromPoint(x, y)) ? 1 : 0
-        sum[(r + 1) * (cols + 1) + (c + 1)] = sum[r * (cols + 1) + (c + 1)] + rowSum
+        if (busy(document.elementFromPoint(x, y))) cells[r * cols + c] = 1
       }
     }
   } finally {
@@ -74,7 +91,22 @@ function occupancy(hide: HTMLElement[]) {
       el.style.visibility = saved[i]
     })
   }
-  const clear = (rect: Rect) => {
+  for (const f of floatingRects(hide)) {
+    const c0 = Math.max(0, Math.floor(f.x / STEP)), c1 = Math.min(cols, Math.ceil((f.x + f.w) / STEP))
+    const r0 = Math.max(0, Math.floor(f.y / STEP)), r1 = Math.min(rows, Math.ceil((f.y + f.h) / STEP))
+    for (let r = r0; r < r1; r++) for (let c = c0; c < c1; c++) cells[r * cols + c] = 1
+  }
+  for (let r = 0; r < rows; r++) {
+    let rowSum = 0
+    for (let c = 0; c < cols; c++) {
+      rowSum += cells[r * cols + c]
+      sum[(r + 1) * (cols + 1) + (c + 1)] = sum[r * (cols + 1) + (c + 1)] + rowSum
+    }
+  }
+  // `pad` keeps a margin around the rect: the grid samples cell centres, so without it an edge could
+  // still slide a few px under a neighbour (the question bubble under the timer pill).
+  const clear = (r: Rect, padX = 0, padY = 0) => {
+    const rect = { x: r.x - padX, y: r.y - padY, w: r.w + padX * 2, h: r.h + padY * 2 }
     if (rect.x < EDGE || rect.y < EDGE || rect.x + rect.w > W - EDGE || rect.y + rect.h > H - EDGE) return false
     const c0 = Math.max(0, Math.floor(rect.x / STEP))
     const r0 = Math.max(0, Math.floor(rect.y / STEP))
@@ -88,6 +120,7 @@ function occupancy(hide: HTMLElement[]) {
 
 /** Is this rect (e.g. where the drop is now) still clear? Cheap enough to poll. */
 export function isRectClear(rect: Rect, hide: HTMLElement[]): boolean {
+  if (floatingRects(hide).some((f) => overlaps(f, rect))) return false
   const saved = hide.map((el) => el.style.visibility)
   hide.forEach((el) => {
     el.style.visibility = 'hidden'
@@ -117,9 +150,9 @@ export function findFreeSpot(p: { hide: HTMLElement[]; drop: { w: number; h: num
   const { w, h } = p.drop
   const chipAt = (x: number, y: number): ChipSide => {
     const cy = y + (h - p.chip.h) / 2
-    if (clear({ x: x + w + 6, y: cy, w: p.chip.w, h: p.chip.h })) return 'right'
-    if (clear({ x, y: y - p.chip.h - 4, w: p.chip.w, h: p.chip.h })) return 'above'
-    if (clear({ x: x - 6 - p.chip.w, y: cy, w: p.chip.w, h: p.chip.h })) return 'left'
+    if (clear({ x: x + w + 6, y: cy, w: p.chip.w, h: p.chip.h }, 10, 4)) return 'right'
+    if (clear({ x, y: y - p.chip.h - 4, w: p.chip.w, h: p.chip.h }, 10, 4)) return 'above'
+    if (clear({ x: x - 6 - p.chip.w, y: cy, w: p.chip.w, h: p.chip.h }, 10, 4)) return 'left'
     return 'none'
   }
   const xs: number[] = []
@@ -127,7 +160,7 @@ export function findFreeSpot(p: { hide: HTMLElement[]; drop: { w: number; h: num
   for (let x = p.start.x - 8; x >= EDGE; x -= 8) xs.push(x)
   for (let y = p.start.y; y >= EDGE; y -= 8) {
     for (const x of xs) {
-      if (clear({ x, y, w, h })) return { x, y, chip: chipAt(x, y) }
+      if (clear({ x, y, w, h }, 6, 0)) return { x, y, chip: chipAt(x, y) }
     }
   }
   return null
