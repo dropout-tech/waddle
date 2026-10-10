@@ -2,7 +2,8 @@
 // into a booted iOS Simulator's App Group container, so the native widgets can
 // be screenshotted without signing in. Used for docs/reports/2026-10-01-lockscreen-widgets.
 //
-//   node scripts/e2e/widget-fixture.mjs <app-group-container-dir> [--en] [--focus=running|paused|idle] [--week-start=0-6]
+//   node scripts/e2e/widget-fixture.mjs <app-group-container-dir> [--en] [--focus=running|paused|idle|break|break-paused|break-ended] [--week-start=0-6]
+//   (break* = the pomodoro break; break-ended = its countdown already ran out, as a widget sees it with the app closed)
 //   (--week-start = the 每週開始日 setting, 0 = Sunday; omitted = 自動)
 //
 // Find the container with:
@@ -17,7 +18,7 @@ registerHooks({resolve(specifier,context,next){if(specifier.startsWith('@/'))ret
 const { makeSnapshot } = await import('../../lib/widgets/model.ts')
 
 const dir = process.argv[2]
-if (!dir) { console.error('usage: widget-fixture.mjs <container-dir> [--en] [--focus=running|paused|idle]'); process.exit(1) }
+if (!dir) { console.error('usage: widget-fixture.mjs <container-dir> [--en] [--focus=running|paused|idle|break|break-paused|break-ended]'); process.exit(1) }
 const en = process.argv.includes('--en')
 const weekArg = process.argv.find(a => a.startsWith('--week-start='))
 const weekStartDay = weekArg ? Number(weekArg.slice(13)) : null
@@ -59,7 +60,14 @@ const stickies = [
 ]
 const snapshot = makeSnapshot({ accountId: 'demo-account', epoch: 'demo-epoch', tasks, blocks, boards: {}, notes: [], stickies, now, locale: en ? 'en' : 'zh-TW', weekStartDay })
 const focusTotal = 50 * 60
-snapshot.focus = focusState === 'running'
+const breakTitle = T('休息 5 分', 'Break 5 min')
+snapshot.focus = focusState === 'break'
+  ? { mode: 'pomodoro', phase: 'break', state: 'running', title: breakTitle, endAt: now.getTime() + 4 * 60000, seconds: 4 * 60, note: '', total: 300 }
+  : focusState === 'break-paused'
+  ? { mode: 'pomodoro', phase: 'break', state: 'paused', title: breakTitle, endAt: null, seconds: 3 * 60 + 12, note: '', total: 300 }
+  : focusState === 'break-ended'
+  ? { mode: 'pomodoro', phase: 'break', state: 'running', title: breakTitle, endAt: now.getTime() - 60000, seconds: 0, note: '', total: 300 }
+  : focusState === 'running'
   ? { mode: 'pomodoro', state: 'running', title: T('寫提案', 'Proposal'), endAt: now.getTime() + 44 * 60000, seconds: 44 * 60, note: '', total: focusTotal }
   : focusState === 'paused'
     ? { mode: 'pomodoro', state: 'paused', title: T('寫提案', 'Proposal'), endAt: null, seconds: 31 * 60 + 20, note: '', total: focusTotal }
