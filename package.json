@@ -150,7 +150,8 @@
       "brace-expansion@>=2.0.0 <2.1.6": "^2.1.7",
       "brace-expansion@>=5.0.0 <5.0.11": "^5.0.12",
       "replace>minimatch": "3.1.5",
-      "@xmldom/xmldom@<0.9.12": "^0.9.12",
+      "@xmldom/xmldom@<0.8.15": "^0.8.15",
+      "@xmldom/xmldom@>=0.9.0 <0.9.12": "^0.9.12",
       "@capacitor/cli@8>tar": "^7.5.22"
     }
   },
